@@ -4,16 +4,16 @@
 
 ## Overview
 
-Sokovan is the orchestration layer that comprehensively coordinates session scheduling, deployment management, and route management in Backend.AI.
+Sokovan is the orchestration layer of Backend.AI. It coordinates session scheduling, deployment management and route management.
 
 **Key Responsibilities:**
-- **Session Scheduling**: Managing the creation, start, and termination of computing sessions based on user requests
-- **Deployment Management**: Deployment and scaling of long-running services including model serving
-- **Route Management**: Network routing and health checks for deployed services
+- **Session Scheduling**: creating, starting and terminating sessions on user request
+- **Deployment Management**: deployment and scaling of long-running services, including model serving
+- **Route Management**: network routing and health checks for deployed services
 
 ## Architecture
 
-Sokovan consists of a 3-tier architecture:
+Sokovan has a three-tier architecture:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────┐
@@ -59,117 +59,117 @@ Sokovan consists of a 3-tier architecture:
 
 #### 1. Orchestrator Layer (SokovanOrchestrator)
 
-SokovanOrchestrator is the top-level entry point of the entire system. It creates and initializes three Coordinator instances, defines and registers periodically executed tasks (TaskSpec). It also manages common dependencies like EventProducer and SchedulingController, and governs the lifecycle of the entire system.
+SokovanOrchestrator is the top-level entry point of the system. It creates and initializes the three Coordinator instances, and defines and registers the periodic tasks (TaskSpec). It also manages shared dependencies such as EventProducer and SchedulingController, and governs the lifecycle of the system.
 
 **Main Components:**
 
 *Coordinator Layer:*
-- **ScheduleCoordinator**: Session scheduling coordination
-- **DeploymentCoordinator**: Deployment management coordination
-- **RouteCoordinator**: Route management coordination
+- **ScheduleCoordinator**: session scheduling coordination
+- **DeploymentCoordinator**: deployment management coordination
+- **RouteCoordinator**: route management coordination
 
 *Controller Layer:*
-- **SchedulingController**: Session validation and preparation before creation
+- **SchedulingController**: session validation and preparation before creation
 
 *Common Infrastructure:*
-- **EventProducer**: System event publication
+- **EventProducer**: system event publication
 
 #### 2. Coordinator Layer
 
-Coordinators orchestrate the internal processing flow for each domain (sessions, deployments, routes).
+A coordinator runs the internal processing flow of one domain: sessions, deployments or routes.
 
 **Periodic Operation Mechanism**
 
-Coordinators operate through two cycle loops:
+A coordinator runs two cycle loops:
 
-- **Short-cycle loop**: Operates based on hints, performing actual work only when hints are set. When specific events (session creation, kernel events, etc.) occur, a hint flag is set to process quickly in the next loop.
-- **Long-cycle loop**: Always performs actual work regardless of hints, ensuring processing even when hints are missed and preventing the system from hanging through periodic retries.
+- **Short-cycle loop**: runs on hints and performs work only when a hint is set. When an event occurs (session creation, kernel event and so on), a hint flag is set and the work runs promptly in the next loop.
+- **Long-cycle loop**: always performs work regardless of hints. It covers a missed hint, and periodic retries keep the system from hanging.
 
-The hint mechanism works by setting a hint flag when a specific event occurs, checking the hint in the short-cycle loop and performing work, then clearing the hint after completion. The important point is that it operates according to the periodic loop, not proportionally to requests immediately.
+A hint flag is set when an event occurs. The short-cycle loop reads the hint and performs the work, then clears the hint. Work runs on the periodic loop, so a request does not start the work immediately.
 
 **Role of State-based Handlers**
 
-Coordinators check the current state of resources (sessions, deployments, routes) and execute the Handler matching that state. Handlers execute the work that needs to be performed in the current state, transitioning to the next state on success, or transitioning to an error state or retry-waiting state on failure.
+A coordinator reads the current state of a resource (session, deployment or route) and runs the Handler for that state. The Handler performs the work the current state requires. On success it transitions to the next state; on failure it transitions to an error state or a retry-waiting state.
 
 **Controller vs Coordinator**
 
-The roles of Controller and Coordinator are clearly distinguished:
+The controller and the coordinator have distinct roles:
 
-- **Controller**: The only entry point that can modify the state of sessions, deployments, etc.
-  - Performs only initial work (enqueue, mark, etc.) and does not perform actual operations
-  - Triggers by changing state so Coordinator can process
-  - Example: Session creation request → Save to DB in PENDING state after validation
-  - Example: Session termination request → Only mark for termination
-- **Coordinator**: Performs actual work according to internal processing flow
-  - Operates when triggered periodically or through hints
-  - Example: PENDING session → Schedule and create kernel → Transition to RUNNING state
-  - Example: Termination-marked session → Actual kernel termination and resource cleanup
+- **Controller**: the only entry point that can change the state of sessions, deployments and the like.
+  - Performs only the initial work (enqueue, mark and so on). It does not perform the actual operation.
+  - It changes state to trigger the coordinator.
+  - Example: session creation request → validate, then save to the DB in PENDING state
+  - Example: session termination request → mark for termination only
+- **Coordinator**: performs the actual work of the internal processing flow.
+  - Runs on a periodic trigger or a hint.
+  - Example: PENDING session → schedule and create the kernel → transition to RUNNING
+  - Example: termination-marked session → terminate the kernel and clean up the resources
 
-Coordinators execute periodic tasks for their domain, select and execute state-specific handlers, and delegate actual work to Schedulers or Engines. They transition states based on work results.
+A coordinator runs the periodic tasks of its domain, selects and runs the handler for the current state, and delegates the actual work to a scheduler or engine. It transitions the state according to the result.
 
 **Coordinator Roles by Domain:**
 
 - **ScheduleCoordinator**
-  - Scheduling coordination for pending sessions
-  - Processing kernel events (pulling, creating, running, terminated, etc.)
-  - Image pulling coordination
-  - Session state transition management
+  - scheduling coordination for pending sessions
+  - processing kernel events (pulling, creating, running, terminated and so on)
+  - image pulling coordination
+  - session state transition management
 
 - **DeploymentCoordinator**
-  - Processing coordination for deployment lifecycle stages
-  - Replica management coordination
-  - Integration with RouteController
+  - processing coordination for deployment lifecycle stages
+  - replica management coordination
+  - integration with RouteController
 
 - **RouteCoordinator**
-  - Processing coordination for route lifecycle stages
-  - Health check execution coordination
+  - processing coordination for route lifecycle stages
+  - health check execution coordination
 
 #### 3. Controller/Engine Layer
 
-Controllers and Engines perform actual business logic:
+Controllers and engines perform the actual business logic:
 
 - **Scheduler**
-  - Querying pending sessions and executing scheduling algorithms
-  - Resource constraint verification through Validators
-  - Priority determination through Sequencers
-  - Agent selection through Selectors
-  - Resource allocation through Allocators
-  - Handling session start, termination, retry
+  - querying pending sessions and running the scheduling algorithms
+  - resource constraint verification through Validators
+  - priority determination through Sequencers
+  - agent selection through Selectors
+  - resource allocation through Allocators
+  - handling session start, termination and retry
 
 - **SchedulingController**
-  - Pre-validation of session creation requests
-  - Preparation of data needed for scheduling
-  - Calculation of resource requirements
-  - Selection of appropriate scaling groups
+  - pre-validation of session creation requests
+  - preparation of the data needed for scheduling
+  - calculation of the resource requirements
+  - selection of the appropriate resource group
 
 - **DeploymentController**
-  - Deployment creation, update, deletion
-  - Session definition generation per deployment type through Definition Generators
-  - Replica count management
+  - deployment creation, update and deletion
+  - session definition generation per deployment type through Definition Generators
+  - replica count management
 
 - **RouteController**
-  - Route creation, update, deletion
-  - Endpoint management
-  - Traffic routing configuration
+  - route creation, update and deletion
+  - endpoint management
+  - traffic routing configuration
 
 ## Main Processing Flows
 
 ### Session Creation and Start
 
-Session creation and start clearly distinguish the roles of Controller and Coordinator:
+Session creation and start separate the roles of the controller and the coordinator:
 
-- **SchedulingController** (External request handling)
-  - Session creation request validation and preparation
-  - Create session and kernel DB objects in PENDING state upon validation success (enqueue)
-  - Does not perform actual scheduling logic or kernel creation on Agent
+- **SchedulingController** (external request handling)
+  - validation and preparation of the session creation request
+  - create the session and kernel DB objects in PENDING state on validation success (enqueue)
+  - does not run the scheduling logic or create kernels on the agent
 
-- **ScheduleCoordinator** (Internal processing flow)
-  - Query PENDING sessions and perform scheduling
-  - Request kernel creation on scheduling success
-  - Manage kernel state transitions (PULLING → RUNNING)
-  - Transition session to RUNNING when all kernels are RUNNING
+- **ScheduleCoordinator** (internal processing flow)
+  - query PENDING sessions and perform scheduling
+  - request kernel creation on scheduling success
+  - manage kernel state transitions (PULLING → RUNNING)
+  - transition the session to RUNNING when all kernels are RUNNING
 
-The complete flow from session creation request to actual execution is shown below. For more details, refer to the [Scheduler documentation](scheduler/README.md).
+The sequence below shows the complete flow from the session creation request to execution. See the [Scheduler documentation](scheduler/README.md) for details.
 
 ```mermaid
 sequenceDiagram
@@ -235,36 +235,36 @@ sequenceDiagram
 
 **Step-by-step Explanation:**
 
-When a user requests session creation through the API, SchedulingController validates and prepares the request. Validators verify cluster size, mount paths, etc., Preparers prepare internal data, cluster configuration, and mount configuration. ResourceCalculator calculates required resources, and ScalingGroupResolver selects an appropriate scaling group. If validation fails, an error is returned immediately.
+When a user requests session creation through the API, SchedulingController validates and prepares the request. Validators verify the cluster size, the mount paths and the like. Preparers prepare the internal data, the cluster configuration and the mount configuration. ResourceCalculator calculates the required resources, and ScalingGroupResolver selects a resource group. If validation fails, the API returns an error immediately.
 
-If validation passes, a session record is created in PENDING state and a session_id is generated and returned.
+If validation passes, a session row is created in PENDING state and the generated session_id is returned.
 
-ScheduleCoordinator executes scheduling periodically. It queries sessions in PENDING state and verifies resource constraints with Validators (user/group quotas, etc.). It determines priority with Sequencers (FIFO, DRF, etc.), selects optimal agents with Selectors, and allocates and reserves resources with Allocators. On success, it transitions the session and kernel states to SCHEDULED.
+ScheduleCoordinator runs scheduling periodically. It queries the sessions in PENDING state and verifies the resource constraints with Validators (user and project quotas and so on). It determines the priority with Sequencers (FIFO, DRF and so on), selects the optimal agents with Selectors, and allocates and reserves resources with Allocators. On success, it transitions the session and kernel states to SCHEDULED.
 
-After scheduling, check_preconditions() transitions sessions to PREPARING state and triggers image check/pull on the selected agents. The agent checks if the required container image exists locally, and pulls it if needed.
+After scheduling, check_preconditions() transitions the sessions to PREPARING and triggers the image check and pull on the selected agents. The agent checks whether the required container image exists locally and pulls it if needed.
 
-check_pulling_progress() periodically checks if all images are ready. Once image pulling is complete for all kernels in a session, it transitions the session to PREPARED state.
+check_pulling_progress() periodically checks whether all images are ready. When image pulling completes for all kernels of a session, it transitions the session to PREPARED.
 
-When preconditions are satisfied, start_sessions() transitions sessions to CREATING state and requests kernel creation from the agents, passing image name, resource slots, environment variables, etc.
+When the preconditions are satisfied, start_sessions() transitions the sessions to CREATING and requests kernel creation from the agents with the image name, the resource slots, the environment variables and the like.
 
-The agent creates and starts the container using the already-pulled image, then publishes a kernel_started event.
+The agent creates and starts the container from the already pulled image, then publishes a kernel_started event.
 
-When ScheduleCoordinator receives kernel_started events from all kernels, it transitions kernel states to RUNNING, and when all kernels are in RUNNING state, it transitions the session state to RUNNING as well.
+When ScheduleCoordinator receives kernel_started events from all kernels, it transitions the kernel states to RUNNING. When all kernels are in RUNNING state, it transitions the session state to RUNNING as well.
 
 ### Session Termination
 
-Session termination also distinguishes the roles of Controller and Coordinator:
+Session termination also separates the roles of the controller and the coordinator:
 
-- **API/Controller** (External request handling)
-  - Receives session termination request and only marks for termination
-  - Does not perform actual kernel termination or resource cleanup
-  - Ensures asynchronous processing by returning response immediately
+- **API/Controller** (external request handling)
+  - receives the session termination request and only marks the session for termination
+  - does not terminate kernels or clean up resources
+  - returns the response immediately for asynchronous processing
 
-- **ScheduleCoordinator** (Internal processing flow)
-  - Queries termination-marked sessions and performs actual termination
-  - Calls kernel termination RPC to agents
-  - Manages kernel state transitions (TERMINATING → TERMINATED)
-  - Transitions session to TERMINATED and releases resources when all kernels are TERMINATED
+- **ScheduleCoordinator** (internal processing flow)
+  - queries termination-marked sessions and performs the termination
+  - calls the kernel termination RPC on the agents
+  - manages kernel state transitions (TERMINATING → TERMINATED)
+  - transitions the session to TERMINATED and releases the resources when all kernels are TERMINATED
 
 ```mermaid
 sequenceDiagram
@@ -310,13 +310,13 @@ sequenceDiagram
 
 **Step-by-step Explanation:**
 
-When termination is requested by user request or system policy, a termination flag is set on the session and a response is immediately returned (asynchronous processing).
+When a user request or a system policy requests termination, the API sets a termination flag on the session and returns a response immediately (asynchronous processing).
 
-Scheduler periodically queries termination-requested sessions and sends termination requests for all kernels of the session. It transitions kernel states to TERMINATING and transitions session state to TERMINATING as well.
+The scheduler periodically queries termination-requested sessions and sends termination requests for all kernels of the session. It transitions the kernel states to TERMINATING and the session state to TERMINATING as well.
 
-The agent terminates the container and cleans up related resources (volumes, network, etc.).
+The agent terminates the container and cleans up the related resources (volumes, network and so on).
 
-ScheduleCoordinator receives kernel_terminated events and transitions kernel states to TERMINATED. When all kernels are in TERMINATED state, it transitions session state to TERMINATED and releases allocated resources (DB update).
+ScheduleCoordinator receives kernel_terminated events and transitions the kernel states to TERMINATED. When all kernels are in TERMINATED state, it transitions the session state to TERMINATED and releases the allocated resources (DB update).
 
 ### Deployment Creation and Scaling
 
@@ -388,33 +388,33 @@ sequenceDiagram
 
 **Step-by-step Explanation:**
 
-Deployment creation request includes deployment type (vllm, tgi, sglang, etc.), model path/name, resource requirements, and initial replica count.
+A deployment creation request includes the deployment type (vllm, tgi, sglang and so on), the model path and name, the resource requirements and the initial replica count.
 
-DeploymentController selects a Definition Generator matching the deployment type. The Generator creates session creation requests, setting image, resources, environment variables, etc.
+DeploymentController selects the Definition Generator for the deployment type. The generator creates session creation requests with the image, the resources, the environment variables and the like.
 
-It saves deployment info in PENDING state and generates and returns a deployment_id.
+DeploymentController saves the deployment row in PENDING state and returns the generated deployment_id.
 
-DeploymentCoordinator requests session creation for the initial replica count through SchedulingController to enqueue to the pending queue. Each session is subsequently scheduled through Scheduler, and deployment state transitions to PROVISIONING.
+DeploymentCoordinator requests session creation for the initial replica count through SchedulingController to enqueue the sessions to the pending queue. The scheduler places each session, and the deployment state transitions to PROVISIONING.
 
-RouteController creates a route for the deployment and registers it with App Proxy Coordinator. It prepares endpoint configuration.
+RouteController creates a route for the deployment and registers it with the app proxy coordinator. It prepares the endpoint configuration.
 
-App Proxy performs periodic health checks on registered routes, and Manager periodically reads these results.
+The app proxy performs periodic health checks on the registered routes, and the manager periodically reads the results.
 
-It periodically checks replica session status. When all replicas' health checks are satisfied, it transitions deployment state to RUNNING and updates the endpoint list in RouteController.
+The coordinator periodically checks the replica session status. When the health checks of all replicas pass, it transitions the deployment state to RUNNING and updates the endpoint list in RouteController.
 
-During scaling, it compares current replica count with target replica count, creating new sessions if insufficient or terminating old sessions if excess.
+During scaling, it compares the current replica count with the target replica count, creates new sessions if the count is insufficient, and terminates old sessions if the count is in excess.
 
 ## Dependencies
 
-Sokovan depends on the following infrastructure components:
+Sokovan depends on these infrastructure components:
 
-**PostgreSQL**: Persistence of sessions, kernels, deployments, routes, agent states
+**PostgreSQL**: persistence of sessions, kernels, deployments, routes and agent states
 
-**Redis (Valkey)**: Agent state cache, event streams
+**Valkey**: agent state cache and event streams
 
-**etcd**: Global configuration sharing
+**etcd**: global configuration sharing
 
-**App Proxy**: Deployment route registration and health check execution
+**app proxy**: deployment route registration and health check execution
 
 ## Directory Structure
 
@@ -450,29 +450,29 @@ CANCELLED     └──────── TERMINATING ────────�
 
 | Current State | Next State | Transition Trigger | Responsible Component | On Failure |
 |----------|----------|------------|--------------|------------|
-| PENDING | SCHEDULED | Scheduling success (agent allocation complete) | Scheduler | CANCELLED (on validation failure) |
-| PENDING | CANCELLED | User cancellation request or pending timeout exceeded | API/Handler | - |
-| SCHEDULED | PREPARED | Image preparation complete | Scheduler | TERMINATING (on preparation failure) |
-| SCHEDULED | TERMINATING | User termination request or system policy | API/Scheduler | - |
-| PREPARED | CREATING | Kernel creation RPC call success | Scheduler | TERMINATING (on RPC failure) |
-| PREPARED | TERMINATING | User termination request or system policy | API/Scheduler | - |
+| PENDING | SCHEDULED | scheduling success (agent allocation complete) | Scheduler | CANCELLED (on validation failure) |
+| PENDING | CANCELLED | user cancellation request or pending timeout exceeded | API/Handler | - |
+| SCHEDULED | PREPARED | image preparation complete | Scheduler | TERMINATING (on preparation failure) |
+| SCHEDULED | TERMINATING | user termination request or system policy | API/Scheduler | - |
+| PREPARED | CREATING | kernel creation RPC call success | Scheduler | TERMINATING (on RPC failure) |
+| PREPARED | TERMINATING | user termination request or system policy | API/Scheduler | - |
 | CREATING | RUNNING | `kernel_started` event received (all kernels) | ScheduleCoordinator | TERMINATING (on kernel creation failure) |
-| CREATING | TERMINATING | User termination request or system policy | API/Scheduler | - |
-| RUNNING | TERMINATING | User termination request or system policy | API/Scheduler | - |
-| TERMINATING | TERMINATED | All kernel `kernel_terminated` events received | ScheduleCoordinator | TERMINATED (after forced termination) |
+| CREATING | TERMINATING | user termination request or system policy | API/Scheduler | - |
+| RUNNING | TERMINATING | user termination request or system policy | API/Scheduler | - |
+| TERMINATING | TERMINATED | all kernel `kernel_terminated` events received | ScheduleCoordinator | TERMINATED (after forced termination) |
 
 **Independent Kernel State Management:**
 
-Kernels manage state independently from sessions. Multiple kernels can belong to a single session (cluster session), and session state is determined by synthesizing all kernel states:
-- Session RUNNING: When all kernels are in RUNNING state
-- Session TERMINATING: When one or more kernels fail or termination is requested
-- Session TERMINATED: When all kernels are in TERMINATED state
+Kernels manage state independently of sessions. Multiple kernels can belong to one session (multi-kernel session), and the session state is derived from all kernel states:
+- Session RUNNING: all kernels are in RUNNING state
+- Session TERMINATING: one or more kernels failed, or termination is requested
+- Session TERMINATED: all kernels are in TERMINATED state
 
 **Failure Handling:**
 
-- **PREPARED failure**: Transition to TERMINATING on image preparation failure
-- **CREATING failure**: Transition to TERMINATING on kernel creation failure
-- **Failure cases**: Image does not exist, insufficient permissions, configuration error, resource shortage
+- **PREPARED failure**: transition to TERMINATING on image preparation failure
+- **CREATING failure**: transition to TERMINATING on kernel creation failure
+- **Failure cases**: image not found, insufficient permission, configuration error, resource shortage
 
 ### Deployment State Transitions
 
@@ -484,15 +484,15 @@ PENDING → PROVISIONING → RUNNING → DESTROYING → TERMINATED
 
 | Current State | Next State | Transition Trigger | Responsible Component | On Failure |
 |----------|----------|------------|--------------|------------|
-| PENDING | PROVISIONING | Replica session creation start | DeploymentCoordinator | Maintain PROVISIONING (retry) |
-| PROVISIONING | RUNNING | All replica sessions' health checks satisfied | ReplicaHandler | Maintain PROVISIONING (retry) |
-| RUNNING | RUNNING | Scale up/down request processing | ScalingHandler | Maintain RUNNING (partial failure allowed) |
-| RUNNING | DESTROYING | User deletion request | API/DeploymentController | - |
-| DESTROYING | TERMINATED | All replica sessions terminated | DestroyingHandler | TERMINATED (after forced termination) |
+| PENDING | PROVISIONING | replica session creation start | DeploymentCoordinator | maintain PROVISIONING (retry) |
+| PROVISIONING | RUNNING | all replica sessions' health checks satisfied | ReplicaHandler | maintain PROVISIONING (retry) |
+| RUNNING | RUNNING | scale up/down request processing | ScalingHandler | maintain RUNNING (partial failure allowed) |
+| RUNNING | DESTROYING | user deletion request | API/DeploymentController | - |
+| DESTROYING | TERMINATED | all replica sessions terminated | DestroyingHandler | TERMINATED (after forced termination) |
 
 **Replica Recovery Policy:**
-- On replica session failure: Automatically create new replica
-- Partial availability: Deployment maintains RUNNING if at least 1 replica satisfies health check (degraded mode)
+- On replica session failure: create a new replica automatically
+- Partial availability: the deployment stays in RUNNING when at least one replica passes the health check (degraded mode)
 
 ### Route State Transitions
 
@@ -506,17 +506,17 @@ PENDING → PROVISIONING → RUNNING → TERMINATING → TERMINATED
 
 | Current State | Next State | Transition Trigger | Responsible Component | On Failure |
 |----------|----------|------------|--------------|------------|
-| PENDING | PROVISIONING | Route configuration creation start | RouteCoordinator | ERROR (configuration validation failure) |
-| PROVISIONING | RUNNING | At least 1 healthy endpoint confirmed | ProvisioningHandler | ERROR (health check failure) |
-| RUNNING | RUNNING | Endpoint addition/removal (on deployment scaling) | RunningHandler | Maintain RUNNING |
-| RUNNING | TERMINATING | Deployment deletion or user request | RouteController | - |
-| TERMINATING | TERMINATED | Route configuration deletion complete | TerminatingHandler | TERMINATED (after forced deletion) |
+| PENDING | PROVISIONING | route configuration creation start | RouteCoordinator | ERROR (configuration validation failure) |
+| PROVISIONING | RUNNING | at least one healthy endpoint confirmed | ProvisioningHandler | ERROR (health check failure) |
+| RUNNING | RUNNING | endpoint addition and removal (on deployment scaling) | RunningHandler | maintain RUNNING |
+| RUNNING | TERMINATING | deployment deletion or user request | RouteController | - |
+| TERMINATING | TERMINATED | route configuration deletion complete | TerminatingHandler | TERMINATED (after forced deletion) |
 
 **Health Check Policy:**
 - Healthy determination: 2 consecutive successful responses
 - Unhealthy determination: 3 consecutive failed responses
-- Unhealthy endpoints: Automatically removed from routing list
-- Recovery: Re-added to routing list on health check success
+- Unhealthy endpoints: removed from the routing list automatically
+- Recovery: added back to the routing list on a successful health check
 
 ## Troubleshooting
 
@@ -524,62 +524,62 @@ PENDING → PROVISIONING → RUNNING → TERMINATING → TERMINATED
 
 #### 1. Session Stays in PENDING State for Long Time
 
-**Symptoms**: Session remains in PENDING state for more than 10 minutes after creation
+**Symptoms**: the session stays in PENDING state for more than 10 minutes after creation
 
 **Causes**:
-- Insufficient available agents in scaling group
-- Agent resource shortage
-- Resource quota exceeded
+- insufficient available agents in the resource group
+- agent resource shortage
+- resource quota exceeded
 
 **Diagnosis**:
-- **Check Session History**: Check Session History on session detail page to identify reasons for persistent PENDING state
-- **Scaling Group Status**: Check agent count and status in the scaling group
-- **Resource Availability**: Check available resources per agent
+- **Check session history**: check the session history on the session detail page to identify the reason for the persistent PENDING state
+- **Resource group status**: check the agent count and status in the resource group
+- **Resource availability**: check the available resources per agent
 
 **Resolution**:
-1. Add agents to scaling group
-2. Check and recover agent status
-3. Adjust resource quotas
+1. Add agents to the resource group.
+2. Check and recover the agent status.
+3. Adjust the resource quotas.
 
 #### 2. Kernel Stuck in PULLING State
 
-**Symptoms**: Kernel remains in PULLING state for extended period
+**Symptoms**: the kernel stays in PULLING state for an extended period
 
 **Causes**:
-- Image registry access failure
-- Agent disk space shortage
-- Network connection issues
+- image registry access failure
+- agent disk space shortage
+- network connection issues
 
 **Diagnosis**:
-- **Check Session History**: Check image pulling related events and error messages
-- **Agent Status**: Check disk usage and network status of the agent
+- **Check session history**: check the image pulling events and the error messages
+- **Agent status**: check the disk usage and network status of the agent
 
 **Resolution**:
-1. Verify image registry connection
-2. Free up agent disk space
-3. Wait for automatic retry on timeout
+1. Verify the image registry connection.
+2. Free up agent disk space.
+3. Wait for the automatic retry on timeout.
 
 ## Sokovan Component Documentation
 
 Detailed documentation for each Sokovan component:
 
 ### Core Components
-- **[Scheduler](./scheduler/README.md)**: Core scheduling engine for session placement and resource allocation
-  - Session scheduling algorithm implementation
-  - Resource matching and agent selection
-  - Session state transitions and lifecycle management
+- **[Scheduler](./scheduler/README.md)**: core scheduling engine for session placement and resource allocation
+  - session scheduling algorithm implementation
+  - resource matching and agent selection
+  - session state transitions and lifecycle management
 
-- **[Scheduling Controller](./scheduling_controller/README.md)**: Validation and preparation logic for scheduling
-  - Session creation validation rules
-  - Resource requirement preparation
-  - Image and environment preparation
+- **[Scheduling Controller](./scheduling_controller/README.md)**: validation and preparation logic for scheduling
+  - session creation validation rules
+  - resource requirement preparation
+  - image and environment preparation
 
-- **[Deployment Controller](./deployment/README.md)**: Deployment lifecycle management
-  - Deployment creation and scaling
-  - Service endpoint management
-  - Deployment health monitoring
+- **[Deployment Controller](./deployment/README.md)**: deployment lifecycle management
+  - deployment creation and scaling
+  - service endpoint management
+  - deployment health monitoring
 
-### Related Documentation
-- [Manager Overview](../README.md): Manager component architecture and responsibilities
-- [Services Layer](../services/README.md): Business logic patterns and implementation
-- [Repositories Layer](../repositories/README.md): Data access patterns and query optimization
+### Related documents
+- [Manager Overview](../README.md): manager component architecture and responsibilities
+- [Services Layer](../services/README.md): business logic patterns and implementation
+- [Repositories Layer](../repositories/README.md): data access patterns and query optimization

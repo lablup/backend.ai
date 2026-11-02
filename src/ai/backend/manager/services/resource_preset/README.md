@@ -2,31 +2,31 @@
 
 ## Service Overview
 
-The Resource Preset Service manages computing resource allocation templates in Backend.AI. It provides pre-defined combinations of CPU, memory, GPU, and other resources that users can easily select when creating computing sessions. This service simplifies resource allocation by offering standardized resource configurations while supporting custom resource types for specialized hardware.
+The Resource Preset Service manages resource allocation templates in Backend.AI. It holds pre-defined combinations of CPU, memory, GPU and other resources that users select when creating sessions. The service simplifies resource allocation by providing standardized resource configurations and supports custom resource types for specialized hardware.
 
 ## Key Features and Capabilities
 
 ### 1. Preset Management
-- **Create Preset**: Define new resource allocation templates with specific CPU, memory, GPU, and custom resource combinations
-- **Modify Preset**: Update existing presets including resource slots, names, and shared memory configurations
-- **Delete Preset**: Remove unused or obsolete presets from the system
-- **List Presets**: Retrieve available presets globally or filtered by scaling group
+- **Create Preset**: Create new resource allocation templates with specific CPU, memory, GPU and custom resource combinations
+- **Update Preset**: Update existing presets including resource slots, names and shared memory configurations
+- **Delete Preset**: Delete unused or obsolete presets from the system
+- **List Presets**: Get the available presets globally or filtered by resource group
 
 ### 2. Resource Validation
 - Enforces intrinsic resource requirements (CPU and memory must always be specified)
-- Supports custom resource types (NPU, TPU, etc.) for specialized hardware
+- Supports custom resource types (NPU, TPU and others) for specialized hardware
 - Validates resource slot specifications during creation and modification
 
-### 3. Scaling Group Support
-- Global presets available across all scaling groups
-- Scaling group-specific presets for cluster-specific configurations
-- Namespace isolation allowing same preset names in different scaling groups
+### 3. Resource Group Support
+- Global presets available across all resource groups
+- Resource group-specific presets for cluster-specific configurations
+- Namespace isolation allowing the same preset names in different resource groups
 
 ### 4. Resource Availability Checking
 - Real-time validation of preset allocatability based on current resource usage
-- Multi-level resource limit checking (keypair, group, domain)
+- Multi-level resource limit checking (keypair, project, domain)
 - Per-agent resource availability verification
-- Scaling group resource visibility control
+- Resource visibility control per resource group
 
 ## Operation Scenarios
 
@@ -132,34 +132,34 @@ custom_preset = CreateResourcePresetAction(
 
 ### 1. Repository Layer
 - `ResourcePresetRepository`: Handles database operations with transaction safety
-- Provides CRUD operations with proper error handling
+- Provides create, get, update and delete operations with error handling
 - Supports both UUID and name-based lookups
 
 ### 2. Agent Registry
-- Queries real-time resource occupancy across keypairs, groups, and domains
+- Queries real-time resource occupancy across keypairs, projects and domains
 - Provides agent resource availability for allocatability checks
 
 ### 3. Configuration Provider
 - Manages resource slot definitions and types
-- Controls group resource visibility settings
+- Controls project resource visibility settings
 - Provides system-wide resource configuration
 
 ### 4. Database Models
 - `ResourcePresetRow`: Core preset data model
 - Supports resource slot normalization and validation
-- Handles scaling group associations
+- Handles resource group associations
 
 ## Testing Guidelines
 
 ### Unit Testing
 
-The service includes comprehensive test coverage for all operations:
+The service includes test coverage for all operations:
 
 1. **Create Preset Tests**
    - Valid preset creation scenarios
    - Intrinsic slot validation
    - Duplicate name handling
-   - Scaling group namespace isolation
+   - Resource group namespace isolation
 
 2. **Modify Preset Tests**
    - Resource slot updates
@@ -169,27 +169,27 @@ The service includes comprehensive test coverage for all operations:
 
 3. **Delete Preset Tests**
    - Normal deletion
-   - In-use preset deletion (presets are templates, deletion doesn't affect running sessions)
+   - In-use preset deletion (presets are templates, deletion does not affect running sessions)
    - UUID and name-based deletion
 
 4. **List Preset Tests**
    - Global preset listing
-   - Scaling group filtering
+   - Resource group filtering
    - Resource slot normalization
 
 5. **Check Preset Tests**
    - Resource availability scenarios
    - Multi-level limit checking
-   - Group visibility settings
+   - Project visibility settings
    - Error cases
 
 ### Integration Testing
 
 When testing integration with other services:
 
-1. Ensure database fixtures include necessary resource policies
+1. Ensure database fixtures include the necessary resource policies
 2. Mock agent registry responses appropriately
-3. Test scaling group associations
+3. Test resource group associations
 4. Verify resource slot calculations across different limit levels
 
 ### Performance Considerations

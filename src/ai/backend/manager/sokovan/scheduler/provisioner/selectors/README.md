@@ -4,12 +4,12 @@
 
 ## Overview
 
-Selectors are plugins that select the optimal agent to run a session. Different selection strategies can be applied per scaling group, providing agent selection tailored to various objectives such as cluster utilization, high availability, and load balancing.
+Selectors are plugins that select the optimal agent to run a session. A resource group can apply a different selection strategy, so agent selection fits objectives such as cluster utilization, high availability and load balancing.
 
 **Key Responsibilities:**
-- Filtering agents that satisfy resource requirements
-- Selecting optimal agent based on selection strategy
-- Multi-agent selection for cluster sessions
+- filtering the agents that satisfy the resource requirements
+- selecting the optimal agent by the selection strategy
+- multi-agent selection for multi-kernel sessions
 
 ## Architecture
 
@@ -39,7 +39,7 @@ Selectors are plugins that select the optimal agent to run a session. Different 
 
 ### AgentInfo
 
-Data class containing agent information.
+Data class with agent information.
 
 ```python
 @dataclass
@@ -53,7 +53,7 @@ class AgentInfo:
 
 ### ResourceRequirements
 
-Defines resource requirements for a session.
+Defines the resource requirements of a session.
 
 ```python
 @dataclass
@@ -65,7 +65,7 @@ class ResourceRequirements:
 
 ### AgentSelector (Abstract Base)
 
-Base class for all Selectors.
+Base class of all Selectors.
 
 ```python
 class AgentSelector(abc.ABC):
@@ -100,18 +100,18 @@ class AgentSelector(abc.ABC):
 Concentrates resources on specific agents to maximize utilization.
 
 **Algorithm:**
-1. Filter agents that satisfy resource requirements
-2. Prioritize agents with higher current occupancy
-3. If occupancy is equal, select agent with smaller total capacity
+1. Filter the agents that satisfy the resource requirements.
+2. Prioritize the agents with the higher current occupancy.
+3. When occupancy is equal, select the agent with the smaller total capacity.
 
 **Advantages:**
-- Maximizes cluster utilization
-- Minimizes idle agents
-- Power/cost efficiency
+- maximizes cluster utilization
+- minimizes idle agents
+- power and cost efficiency
 
 **Disadvantages:**
-- Load concentration on specific agents
-- Increased impact scope on agent failure
+- load concentration on specific agents
+- larger impact when an agent fails
 
 ```
 Agent Status:
@@ -127,18 +127,18 @@ Selection Result: Agent A (highest occupancy)
 Distributes resources across multiple agents for high availability.
 
 **Algorithm:**
-1. Filter agents that satisfy resource requirements
-2. Prioritize agents with lower current occupancy
-3. If occupancy is equal, select agent with larger total capacity
+1. Filter the agents that satisfy the resource requirements.
+2. Prioritize the agents with the lower current occupancy.
+3. When occupancy is equal, select the agent with the larger total capacity.
 
 **Advantages:**
-- Ensures high availability
-- Minimizes impact on agent failure
-- Balanced load distribution
+- ensures high availability
+- minimizes the impact of an agent failure
+- balanced load distribution
 
 **Disadvantages:**
-- Potential resource fragmentation
-- Reduced cluster efficiency
+- possible resource fragmentation
+- lower cluster efficiency
 
 ```
 Agent Status:
@@ -151,21 +151,21 @@ Selection Result: Agent C (lowest occupancy)
 
 ### RoundRobinSelector (Sequential Rotation)
 
-Selects agents sequentially in rotation.
+Selects agents in rotation.
 
 **Algorithm:**
-1. Filter agents that satisfy resource requirements
-2. Select next agent based on internal counter
-3. Increment and cycle counter
+1. Filter the agents that satisfy the resource requirements.
+2. Select the next agent by the internal counter.
+3. Increment the counter and cycle it.
 
 **Advantages:**
-- Predictable distribution
-- Simple implementation
-- Equal request distribution
+- predictable distribution
+- simple implementation
+- equal request distribution
 
 **Disadvantages:**
-- Does not consider agent capacity differences
-- Does not reflect dynamic load changes
+- does not consider the capacity differences of agents
+- does not reflect dynamic load changes
 
 ```
 Selection Order:
@@ -213,9 +213,9 @@ sequenceDiagram
     end
 ```
 
-## Cluster Session Support
+## Multi-Kernel Session Support
 
-Cluster sessions (sessions composed of multiple kernels) require multi-agent selection.
+Multi-kernel sessions (sessions composed of multiple kernels) need multi-agent selection.
 
 ```python
 # Cluster session example
@@ -305,7 +305,7 @@ class WeightedSelector(AgentSelector):
 
 ## Configuration
 
-Configure Selector per scaling group:
+Configure the Selector per resource group:
 
 ```python
 scaling_group = {
@@ -321,17 +321,17 @@ scaling_group = {
 
 | Option | Description | Recommended Use Case |
 |--------|-------------|---------------------|
-| `concentrated` | Bin-packing | GPU clusters, cost optimization |
-| `dispersed` | Spreading | High availability requirements, production |
-| `roundrobin` | Sequential rotation | Development/test environments |
+| `concentrated` | bin-packing | GPU clusters, cost optimization |
+| `dispersed` | spreading | high availability requirements, production |
+| `roundrobin` | sequential rotation | development and test environments |
 
 ## Performance Considerations
 
-- Agent filtering has O(n) complexity
-- Sorting-based selection has O(n log n) complexity
-- Consider caching for large clusters
+- Agent filtering is O(n).
+- Selection with sorting is O(n log n).
+- Consider caching for large clusters.
 
-## Related Documents
+## Related documents
 
 - [Provisioner README](../README.md)
 - [Scheduler README](../../README.md)
