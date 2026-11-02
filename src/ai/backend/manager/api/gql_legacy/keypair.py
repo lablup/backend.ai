@@ -16,13 +16,7 @@ from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
-<<<<<<< HEAD
 from ai.backend.manager.models.keypair import (
-    KeyPairRow,
-=======
-from ai.backend.manager.models.keypair.row import (
-    KEYPAIR_SECRET_KEY_CONTEXT,
->>>>>>> 43286123 (fix(BA-8831): route the legacy keypair modify and delete mutations through processors (#16318))
     keypairs,
 )
 from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
