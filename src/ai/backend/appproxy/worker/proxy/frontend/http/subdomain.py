@@ -13,12 +13,6 @@ from ai.backend.appproxy.worker.config import WildcardDomainConfig
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
 from ai.backend.appproxy.worker.errors.ingress import IngressNotRegisteredError
 from ai.backend.appproxy.worker.types import Circuit, SubdomainFrontendInfo
-from ai.backend.common.dto.appproxy.v2.ingress.types import (
-    IngressFrontend,
-    IngressFrontendKind,
-    IngressProtocol,
-    WildcardFrontend,
-)
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .base import BaseHTTPFrontend
@@ -108,13 +102,7 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
             slot = self.parse_slot(request)
             circuit = self.circuits[slot]
             with with_log_context(circuit_id=circuit.id):
-                ingress = await self._read_registered_ingress(
-                    IngressFrontend(
-                        kind=IngressFrontendKind.WILDCARD,
-                        protocol=IngressProtocol.HTTP,
-                        wildcard=WildcardFrontend(subdomain=slot),
-                    )
-                )
+                ingress = await self._read_registered_ingress(circuit.to_ingress_frontend().key())
                 self.ensure_allowed_ip(request, ingress.access)
                 # TODO: Check the credential against ingress.access once an ingress carries the id
                 # its tokens name.

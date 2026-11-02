@@ -21,13 +21,7 @@ from ai.backend.appproxy.worker.types import (
     PortFrontendInfo,
     RootContext,
 )
-from ai.backend.common.dto.appproxy.v2.ingress.types import (
-    IngressAccess,
-    IngressFrontend,
-    IngressFrontendKind,
-    IngressProtocol,
-)
-from ai.backend.common.dto.appproxy.v2.ingress.types import PortFrontend as IngressPortFrontend
+from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAccess
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .base import BaseFrontend
@@ -150,11 +144,7 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
         with with_log_context(circuit_id=backend.circuit.id):
             try:
                 ingress = await self._read_registered_ingress(
-                    IngressFrontend(
-                        kind=IngressFrontendKind.PORT,
-                        protocol=IngressProtocol.TCP,
-                        port=IngressPortFrontend(number=circuit_key),
-                    )
+                    self.circuits[circuit_key].to_ingress_frontend().key()
                 )
             except IngressNotRegisteredError:
                 log.trace("rejecting a TCP connection to a slot with no ingress")

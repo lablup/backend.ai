@@ -12,12 +12,6 @@ from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
 from ai.backend.appproxy.worker.errors.ingress import IngressNotRegisteredError
 from ai.backend.appproxy.worker.types import Circuit, PortFrontendInfo
-from ai.backend.common.dto.appproxy.v2.ingress.types import (
-    IngressFrontend,
-    IngressFrontendKind,
-    IngressProtocol,
-)
-from ai.backend.common.dto.appproxy.v2.ingress.types import PortFrontend as IngressPortFrontend
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .base import BaseHTTPFrontend
@@ -113,13 +107,7 @@ class PortFrontend(BaseHTTPFrontend[int]):
         if circuit is None:
             raise IngressNotRegisteredError(f"Unregistered slot {port}")
         with with_log_context(circuit_id=circuit.id):
-            ingress = await self._read_registered_ingress(
-                IngressFrontend(
-                    kind=IngressFrontendKind.PORT,
-                    protocol=IngressProtocol.HTTP,
-                    port=IngressPortFrontend(number=port),
-                )
-            )
+            ingress = await self._read_registered_ingress(circuit.to_ingress_frontend().key())
             self.ensure_allowed_ip(request, ingress.access)
             # TODO: Check the credential against ingress.access once an ingress carries the id
             # its tokens name.

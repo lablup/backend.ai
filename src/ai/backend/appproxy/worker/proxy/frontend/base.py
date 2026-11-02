@@ -12,7 +12,11 @@ from ai.backend.appproxy.common.types import (
 from ai.backend.appproxy.worker.errors.ingress import IngressNotRegisteredError
 from ai.backend.appproxy.worker.proxy.backend.base import BaseBackend
 from ai.backend.appproxy.worker.types import Circuit, RootContext
-from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressAccess, IngressFrontend
+from ai.backend.common.dto.appproxy.v2.ingress.types import (
+    Ingress,
+    IngressAccess,
+    IngressFrontendKey,
+)
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -68,8 +72,7 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
             for circuit in list(self.circuits.values()):
                 tg.create_task(self.break_circuit(circuit))
 
-    async def _read_registered_ingress(self, frontend: IngressFrontend) -> Ingress:
-        frontend_key = frontend.key()
+    async def _read_registered_ingress(self, frontend_key: IngressFrontendKey) -> Ingress:
         ingress = await self.root_context.ingress_state.reader.get(frontend_key)
         if ingress is None:
             raise IngressNotRegisteredError(f"frontend {frontend_key} was removed")
