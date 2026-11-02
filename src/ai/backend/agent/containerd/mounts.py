@@ -13,7 +13,6 @@ from ai.backend.common.types import MountPermission, MountTypes
 
 _LXCFS_ROOT = Path("/var/lib/lxcfs")
 _HOST_FILES = (
-    Path("/etc/resolv.conf"),
     Path("/etc/localtime"),
     Path("/etc/timezone"),
 )
@@ -37,11 +36,14 @@ def to_bind_mounts(mounts: Sequence[Mount]) -> list[BindMount]:
     return bind_mounts
 
 
-def host_system_mounts(hosts_file: Path) -> list[Mount]:
-    """The kernel's hosts file, the host's resolver and timezone files and lxcfs views."""
+def host_system_mounts(hosts_file: Path, resolv_conf: Path) -> list[Mount]:
+    """The kernel's hosts and resolv.conf files, the host's timezone files and lxcfs views."""
     if platform.system() != "Linux":
         return []
-    mounts = [Mount(MountTypes.BIND, hosts_file, Path("/etc/hosts"), MountPermission.READ_ONLY)]
+    mounts = [
+        Mount(MountTypes.BIND, hosts_file, Path("/etc/hosts"), MountPermission.READ_ONLY),
+        Mount(MountTypes.BIND, resolv_conf, Path("/etc/resolv.conf"), MountPermission.READ_ONLY),
+    ]
     mounts.extend(
         Mount(MountTypes.BIND, path, path, MountPermission.READ_ONLY)
         for path in _HOST_FILES

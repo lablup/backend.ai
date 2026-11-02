@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
+from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
 from typing import Any, cast, override
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.agent.containerd.agent import ContainerdKernelCreationContext
+from ai.backend.agent.containerd.agent import (
+    HOST_PORTS_LABEL,
+    KERNEL_IP_LABEL,
+    ContainerdKernelCreationContext,
+)
 from ai.backend.agent.containerd.client import MountSpec
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.network import KernelNetwork
@@ -21,12 +27,15 @@ from ai.backend.agent.errors.containerd import (
     KernelNetworkSetupFailed,
     KernelVerbNotSupported,
 )
+from ai.backend.agent.errors.resources import PortPoolExhaustedError
+from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
 from ai.backend.agent.types import KernelOwnershipData, MountInfo
 from ai.backend.common.types import (
     DeviceId,
     DeviceName,
     KernelCreationConfig,
+    KernelId,
     MountTypes,
     ResourceSlot,
     ServicePort,
@@ -36,12 +45,17 @@ from ai.backend.common.types import (
 
 from .fakes import FakeCommandRunner, FakeContainerd
 
+PORT_RANGE = (30000, 30009)
+BRIDGE = "bai-t"
+
 
 def _local_config(scratch_root: Path) -> MagicMock:
     config = MagicMock()
     config.container.scratch_root = scratch_root
     config.container.kernel_uid = 1000
     config.container.kernel_gid = 1000
+    config.container.advertised_host = None
+    config.container.bind_host = "127.0.0.1"
     config.container.sandbox_type = "docker"
     config.debug.coredump.enabled = False
     return config
@@ -53,6 +67,7 @@ def _make_context(
     *,
     scratch_root: Path,
     client: FakeContainerd | None = None,
+    port_pool: PortPool | None = None,
     computers: dict[DeviceName, ComputerContext] | None = None,
     runner: FakeCommandRunner | None = None,
     network: KernelNetwork | None = None,
@@ -66,7 +81,15 @@ def _make_context(
         _local_config(scratch_root),
         computers or {},
         client=client or FakeContainerd(),
-        network=network or KernelNetwork(run=runner or FakeCommandRunner()),
+        port_pool=port_pool or PortPool(PORT_RANGE, cooldown_sec=0),
+        network=network
+        or KernelNetwork(
+            BRIDGE,
+            IPv4Network("172.30.9.0/24"),
+            "10.0.0.5",
+            PORT_RANGE,
+            run=runner or FakeCommandRunner(),
+        ),
         resource_lock=asyncio.Lock(),
     )
 
@@ -139,7 +162,7 @@ class TestPrepareContainer:
         assert base_spec["hostname"] == "main1"
         assert base_spec["linux"]["namespaces"][4] == {
             "type": "network",
-            "path": f"/run/netns/bai-{ownership_data.kernel_id}",
+            "path": f"/run/netns/{BRIDGE}-{ownership_data.kernel_id}",
         }
 
     async def test_config_files_are_written_for_the_kernel_runner(
@@ -164,7 +187,7 @@ class TestPrepareContainer:
         assert (config_dir / "environ.txt").read_text() == "A=1\nB=2\n"
         assert "CPU_SHARES=1:1,3:1" in (config_dir / "resource.txt").read_text()
 
-    async def test_setup_failing_part_way_removes_the_netns(
+    async def test_setup_failing_part_way_removes_the_netns_and_frees_the_address(
         self,
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
@@ -173,15 +196,18 @@ class TestPrepareContainer:
         computers: dict[DeviceName, ComputerContext],
     ) -> None:
         runner = FakeCommandRunner()
-        ns = f"bai-{ownership_data.kernel_id}"
+        ns = f"{BRIDGE}-{ownership_data.kernel_id}"
         runner.script(["ip", "netns", "list"], f"{ns}\n")
-        runner.failing.add(("ip", "-n"))
+        runner.failing.add(("ip", "link", "set"))
+        network = KernelNetwork(
+            BRIDGE, IPv4Network("172.30.9.0/24"), "10.0.0.5", PORT_RANGE, run=runner
+        )
         ctx = _make_context(
             ownership_data,
             launch_kernel_config,
             scratch_root=tmp_path,
             computers=computers,
-            runner=runner,
+            network=network,
         )
         await ctx.prepare_scratch()
 
@@ -189,6 +215,8 @@ class TestPrepareContainer:
             await ctx.prepare_container(resource_spec, {}, [], MagicMock())
 
         assert ("ip", "netns", "del", ns) in runner.calls
+        runner.failing.clear()
+        assert await network.setup(KernelId(uuid.uuid4())) == IPv4Address("172.30.9.2")
 
 
 class TestCreationContextMembers:
@@ -370,6 +398,7 @@ class TestStartContainer:
         resource_spec: KernelResourceSpec,
         computers: dict[DeviceName, ComputerContext],
         client: FakeContainerd,
+        port_pool: PortPool,
         runner: FakeCommandRunner | None = None,
         service_ports: list[ServicePort] | None = None,
     ) -> tuple[ContainerdKernelCreationContext, ContainerdKernel]:
@@ -378,6 +407,7 @@ class TestStartContainer:
             kernel_config,
             scratch_root=tmp_path,
             client=client,
+            port_pool=port_pool,
             computers=computers,
             runner=runner,
         )
@@ -401,6 +431,7 @@ class TestStartContainer:
         computers: dict[DeviceName, ComputerContext],
         fake: FakeContainerd,
     ) -> None:
+        pool = PortPool(PORT_RANGE, cooldown_sec=0)
         ctx, kernel = await self._prepared(
             tmp_path,
             ownership_data,
@@ -408,6 +439,7 @@ class TestStartContainer:
             resource_spec,
             computers,
             fake,
+            pool,
         )
 
         data = await ctx.start_container(kernel, ["python", "-m", "kernel"], None, [], MagicMock())
@@ -434,7 +466,7 @@ class TestStartContainer:
             "cgroup",
         ]
         assert spec["linux"]["namespaces"][4]["path"] == (
-            f"/run/netns/bai-{ownership_data.kernel_id}"
+            f"/run/netns/{BRIDGE}-{ownership_data.kernel_id}"
         )
 
     async def test_the_container_runs_on_runc(
@@ -446,6 +478,7 @@ class TestStartContainer:
         computers: dict[DeviceName, ComputerContext],
         fake: FakeContainerd,
     ) -> None:
+        pool = PortPool(PORT_RANGE, cooldown_sec=0)
         ctx, kernel = await self._prepared(
             tmp_path,
             ownership_data,
@@ -453,6 +486,7 @@ class TestStartContainer:
             resource_spec,
             computers,
             fake,
+            pool,
         )
 
         data = await ctx.start_container(kernel, [], None, [], MagicMock())
@@ -468,6 +502,7 @@ class TestStartContainer:
         computers: dict[DeviceName, ComputerContext],
         fake: FakeContainerd,
     ) -> None:
+        pool = PortPool(PORT_RANGE, cooldown_sec=0)
         ctx, kernel = await self._prepared(
             tmp_path,
             ownership_data,
@@ -475,6 +510,7 @@ class TestStartContainer:
             resource_spec,
             computers,
             fake,
+            pool,
         )
 
         data = await ctx.start_container(kernel, [], None, [], MagicMock())
@@ -483,6 +519,8 @@ class TestStartContainer:
         assert labels["ai.backend.kernel-id"] == str(ownership_data.kernel_id)
         assert labels["ai.backend.session-id"] == str(ownership_data.session_id)
         assert labels["ai.backend.owner"] == str(ownership_data.agent_id)
+        assert labels[HOST_PORTS_LABEL] == ",".join(map(str, data["host_ports"]))
+        assert labels[KERNEL_IP_LABEL] == data["kernel_ip"] == "172.30.9.2"
         assert labels[CONFIG_DIR_LABEL] == str(
             (tmp_path / str(ownership_data.kernel_id)).resolve() / "config"
         )
@@ -496,6 +534,7 @@ class TestStartContainer:
         computers: dict[DeviceName, ComputerContext],
         fake: FakeContainerd,
     ) -> None:
+        pool = PortPool(PORT_RANGE, cooldown_sec=0)
         ctx, kernel = await self._prepared(
             tmp_path,
             ownership_data,
@@ -503,6 +542,7 @@ class TestStartContainer:
             resource_spec,
             computers,
             fake,
+            pool,
         )
 
         data = await ctx.start_container(kernel, [], None, [], MagicMock())
@@ -510,7 +550,7 @@ class TestStartContainer:
         spec = fake.specs[data["container_id"]]
         assert spec["linux"]["cgroupsPath"] == f"/{fake.namespace}/{data['container_id']}"
 
-    async def test_no_port_is_published(
+    async def test_service_ports_are_published_and_the_repl_is_not(
         self,
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
@@ -519,6 +559,7 @@ class TestStartContainer:
         computers: dict[DeviceName, ComputerContext],
         fake: FakeContainerd,
     ) -> None:
+        pool = PortPool(PORT_RANGE, cooldown_sec=0)
         runner = FakeCommandRunner(fake.calls)
         sports: list[ServicePort] = [
             {
@@ -543,17 +584,32 @@ class TestStartContainer:
             resource_spec,
             computers,
             fake,
+            pool,
             runner,
             sports,
         )
 
-        runner.calls.clear()
-
         data = await ctx.start_container(kernel, [], None, [], MagicMock())
 
-        assert data == {"container_id": data["container_id"]}
-        assert [sport["host_ports"] for sport in sports] == [(None,), (None, None)]
-        assert runner.calls == []
+        host_ports = data["host_ports"]
+        assert len(set(host_ports)) == 3
+        assert all(PORT_RANGE[0] <= p <= PORT_RANGE[1] for p in host_ports)
+        assert [p for sport in sports for p in sport["host_ports"]] == host_ports
+        assert (data["repl_in_port"], data["repl_out_port"]) == (0, 0)
+        assert (data["stdin_port"], data["stdout_port"]) == (0, 0)
+        assert data["kernel_host"] == "127.0.0.1"
+        assert data["kernel_ip"] == "172.30.9.2"
+        assert "intrinsic_ports" not in data
+        assert not (
+            tmp_path / str(ownership_data.kernel_id) / "config" / "intrinsic-ports.json"
+        ).exists()
+        dnat = [c for c in runner.calls if "--to-destination" in c]
+        assert [c[c.index("--to-destination") + 1] for c in dnat] == [
+            "172.30.9.2:2200",
+            "172.30.9.2:8080",
+            "172.30.9.2:8081",
+        ]
+        assert len(pool) == 10 - 3
 
     async def test_network_is_set_up_before_the_task_is_created(
         self,
@@ -564,6 +620,7 @@ class TestStartContainer:
         computers: dict[DeviceName, ComputerContext],
         fake: FakeContainerd,
     ) -> None:
+        pool = PortPool(PORT_RANGE, cooldown_sec=0)
         runner = FakeCommandRunner(fake.calls)
         ctx, kernel = await self._prepared(
             tmp_path,
@@ -572,6 +629,7 @@ class TestStartContainer:
             resource_spec,
             computers,
             fake,
+            pool,
             runner,
         )
 
@@ -579,7 +637,41 @@ class TestStartContainer:
 
         ops = [op for op, _ in fake.calls]
         assert ops.index("cmd") < ops.index("create_task")
-        assert "ip -n bai-" in " ".join(key for op, key in fake.calls if op == "cmd")
+        assert "ip -n bai-t-" in " ".join(key for op, key in fake.calls if op == "cmd")
+
+    async def test_pool_exhaustion_releases_the_partial_ports(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        launch_kernel_config: KernelCreationConfig,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+        fake: FakeContainerd,
+    ) -> None:
+        pool = PortPool((30000, 30001), cooldown_sec=0)
+        sport: ServicePort = {
+            "name": "many",
+            "protocol": ServicePortProtocols.TCP,
+            "container_ports": (1, 2, 3),
+            "host_ports": (None, None, None),
+            "is_inference": False,
+        }
+        ctx, kernel = await self._prepared(
+            tmp_path,
+            ownership_data,
+            launch_kernel_config,
+            resource_spec,
+            computers,
+            fake,
+            pool,
+            None,
+            [sport],
+        )
+
+        with pytest.raises(PortPoolExhaustedError):
+            await ctx.start_container(kernel, [], None, [], MagicMock())
+
+        assert len(pool) == 2
 
     async def test_task_stdio_goes_to_the_scratch_log_file(
         self,
@@ -592,6 +684,7 @@ class TestStartContainer:
     ) -> None:
         fake = StdioRecordingContainerd()
         fake.add_image(self.image_ref, diff_ids=["sha256:aa"])
+        pool = PortPool(PORT_RANGE, cooldown_sec=0)
         ctx, kernel = await self._prepared(
             tmp_path,
             ownership_data,
@@ -599,6 +692,7 @@ class TestStartContainer:
             resource_spec,
             computers,
             fake,
+            pool,
         )
 
         await ctx.start_container(kernel, [], None, [], MagicMock())
@@ -615,6 +709,7 @@ class TestStartContainer:
         computers: dict[DeviceName, ComputerContext],
         fake: FakeContainerd,
     ) -> None:
+        pool = PortPool(PORT_RANGE, cooldown_sec=0)
         ctx, kernel = await self._prepared(
             tmp_path,
             ownership_data,
@@ -622,6 +717,7 @@ class TestStartContainer:
             resource_spec,
             computers,
             fake,
+            pool,
         )
 
         first = await ctx.start_container(kernel, [], None, [], MagicMock())
@@ -629,7 +725,7 @@ class TestStartContainer:
 
         assert first["container_id"] != second["container_id"]
 
-    async def test_missing_image_removes_the_netns_and_frees_allocations(
+    async def test_missing_image_releases_ports_and_allocations(
         self,
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
@@ -638,6 +734,7 @@ class TestStartContainer:
         computers: dict[DeviceName, ComputerContext],
     ) -> None:
         empty = FakeContainerd()
+        pool = PortPool(PORT_RANGE, cooldown_sec=0)
         runner = FakeCommandRunner()
         ctx, kernel = await self._prepared(
             tmp_path,
@@ -646,18 +743,20 @@ class TestStartContainer:
             resource_spec,
             computers,
             empty,
+            pool,
             runner,
         )
 
         with pytest.raises(ContainerdImageNotFound):
             await ctx.start_container(kernel, [], None, [], MagicMock())
 
-        assert runner.matching("ip", "netns", "list")  # the netns teardown ran
+        assert len(pool) == 10
+        assert runner.matching("ip", "link", "show")  # the network teardown ran
         assert empty.containers == {}
         cast(MagicMock, computers[DeviceName("cpu")].alloc_map).free.assert_called_once()
         cast(MagicMock, computers[DeviceName("mem")].alloc_map).free.assert_called_once()
 
-    async def test_launch_failure_leaves_no_container_and_no_netns(
+    async def test_launch_failure_releases_ports_and_leaves_no_container(
         self,
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
@@ -667,6 +766,7 @@ class TestStartContainer:
         fake: FakeContainerd,
     ) -> None:
         fake.failing.add("start_task")
+        pool = PortPool(PORT_RANGE, cooldown_sec=0)
         runner = FakeCommandRunner()
         ctx, kernel = await self._prepared(
             tmp_path,
@@ -675,17 +775,19 @@ class TestStartContainer:
             resource_spec,
             computers,
             fake,
+            pool,
             runner,
         )
 
         with pytest.raises(ContainerdOperationFailed, match="start_task"):
             await ctx.start_container(kernel, [], None, [], MagicMock())
 
+        assert len(pool) == 10
         assert fake.containers == {}
         assert fake.snapshots == {}
-        assert runner.matching("ip", "netns", "list")  # the netns teardown ran
+        assert runner.matching("ip", "link", "show")  # the network teardown ran
 
-    async def test_cancellation_leaves_no_container_and_no_netns(
+    async def test_cancellation_releases_ports_and_leaves_no_container(
         self,
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
@@ -696,6 +798,7 @@ class TestStartContainer:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """A cancel of the launch after the task was created rolls back like a failure."""
+        pool = PortPool(PORT_RANGE, cooldown_sec=0)
         runner = FakeCommandRunner()
         ctx, kernel = await self._prepared(
             tmp_path,
@@ -704,6 +807,7 @@ class TestStartContainer:
             resource_spec,
             computers,
             fake,
+            pool,
             runner,
         )
         create_task = fake.create_task
@@ -717,8 +821,9 @@ class TestStartContainer:
         with pytest.raises(asyncio.CancelledError):
             await ctx.start_container(kernel, [], None, [], MagicMock())
 
+        assert len(pool) == 10
         assert fake.containers == {}
         assert fake.tasks == {}
         assert fake.snapshots == {}
-        assert runner.matching("ip", "netns", "list")  # the netns teardown ran
+        assert runner.matching("ip", "link", "show")  # the network teardown ran
         cast(MagicMock, computers[DeviceName("cpu")].alloc_map).free.assert_called_once()

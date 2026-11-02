@@ -54,16 +54,24 @@ class TestHostSystemMounts:
         return paths
 
     def test_existing_host_files_are_bound_read_only(self, host_files: list[Path]) -> None:
-        mounts = host_system_mounts(Path("/scratch/k/hosts"))
+        mounts = host_system_mounts(Path("/scratch/k/hosts"), Path("/scratch/k/resolv.conf"))
 
         assert [(m.source, m.target, m.permission) for m in mounts] == [
             (Path("/scratch/k/hosts"), Path("/etc/hosts"), MountPermission.READ_ONLY),
+            (
+                Path("/scratch/k/resolv.conf"),
+                Path("/etc/resolv.conf"),
+                MountPermission.READ_ONLY,
+            ),
             *[(p, p, MountPermission.READ_ONLY) for p in host_files[:1]],
         ]
+
+    def test_host_resolver_file_is_not_mounted(self) -> None:
+        assert Path("/etc/resolv.conf") not in set(mounts_module._HOST_FILES)
 
     def test_nothing_on_a_non_linux_host(
         self, host_files: list[Path], monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(platform, "system", lambda: "Darwin")
 
-        assert host_system_mounts(Path("/scratch/k/hosts")) == []
+        assert host_system_mounts(Path("/scratch/k/hosts"), Path("/scratch/k/resolv.conf")) == []

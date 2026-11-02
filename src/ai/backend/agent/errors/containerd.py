@@ -106,7 +106,7 @@ class KrunnerEnvironmentError(BackendAIError, web.HTTPInternalServerError):
 
 
 class KernelNetworkSetupFailed(BackendAIError, web.HTTPInternalServerError):
-    """Raised when a host command for a kernel's network namespace (ip) fails."""
+    """Raised when a host network command for a kernel (ip, iptables, sysctl) fails."""
 
     error_type = "https://api.backend.ai/probs/agent/kernel-network-setup-failed"
     error_title = "The kernel network cannot be set up."
@@ -117,4 +117,19 @@ class KernelNetworkSetupFailed(BackendAIError, web.HTTPInternalServerError):
             domain=ErrorDomain.AGENT,
             operation=ErrorOperation.SETUP,
             error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class KernelAddressExhausted(BackendAIError, web.HTTPServiceUnavailable):
+    """Raised when the bridge subnet has no free address left for a kernel."""
+
+    error_type = "https://api.backend.ai/probs/agent/kernel-address-exhausted"
+    error_title = "No kernel address is available on the bridge."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.UNAVAILABLE,
         )
