@@ -1,4 +1,4 @@
-# CLI v2 — Guardrails
+# CLI v2: Guardrails
 
 ## Command hierarchy
 
@@ -6,9 +6,9 @@
 ./bai [admin|my] {entity} [{sub-entity}] {command} [options]
 ```
 
-- `cli/v2/{entity}/commands.py` — user-facing commands (any authenticated user)
-- `cli/v2/admin/{entity}.py` — admin-only commands (superadmin required)
-- `cli/v2/my/{entity}.py` — self-service commands (the current user's own resources)
+- `cli/v2/{entity}/commands.py` - user-facing commands (any authenticated user)
+- `cli/v2/admin/{entity}.py` - admin-only commands (superadmin required)
+- `cli/v2/my/{entity}.py` - self-service commands (the current user's own resources)
 
 ## admin / non-admin / my placement
 
@@ -19,8 +19,8 @@
 - `get` by ID (any authenticated user) → `{entity}/commands.py`
 - scoped search → take the scope as a required argument in `{entity}/commands.py`
 
-**scoped search CLI pattern** (under consideration — may change to follow the SDK `scoped_search` direction):
-- Currently: the command name reflects the scope — `./bai session project-search {project_id}`.
+**scoped search CLI pattern** (under consideration; may change to follow the SDK `scoped_search` direction):
+- Currently, the command name reflects the scope: `./bai session project-search {project_id}`.
 - The scope ID is a required positional argument, not an option flag.
 - Mapped to REST `POST /v2/{entity}/{scope_type}/{scope_id}/search`.
 
@@ -28,14 +28,14 @@
 
 - self-service operations dealing with the current user's own resources → `my/`
 - Mapped to the server `my_`-prefixed API and the `/v2/{entity}/my/` REST endpoint (`my` is the scope qualifier, the entity comes first)
-- e.g. `./bai my keypair search`, `./bai my keypair issue`
+- See `./bai my keypair search`, `./bai my keypair issue`
 
 If an operation has both admin and non-admin variants (differing in behavior, not just permission), place the admin one in `admin/` and the
 non-admin one in `{entity}/commands.py`.
 
 ## SDK v2 integration
 
-- The CLI calls SDK v2 methods (`registry.{entity}.method()`) — direct REST calls are forbidden.
+- The CLI calls SDK v2 methods (`registry.{entity}.method()`); direct REST calls are forbidden.
 - SDK client: `client/v2/domains_v2/{entity}.py`
 - SDK registry: `client/v2/v2_registry.py`
 - Register new SDK domain clients in `V2ClientRegistry` with `@cached_property`.
@@ -43,7 +43,7 @@ non-admin one in `{entity}/commands.py`.
 ## Operation naming
 
 The standard 6 operations use fixed command names: `create`, `get`, `search`, `update`, `delete`, `purge`.
-Only operations outside the 6-op pattern use different names:
+Only operations outside the 6-operation pattern use different names:
 - `enqueue`, `terminate` (session lifecycle)
 - `revision add`, `revision activate`, `revision current` (deployment revision)
 - `login`, `logout` (auth)
@@ -51,17 +51,17 @@ Only operations outside the 6-op pattern use different names:
 ## Command input style
 
 - **Default:** an individual `--option` flag per field.
-- **Auxiliary:** for deeply nested structures (e.g. revision config), take a JSON string or `@file` path in a single option
-  (e.g. `--config '{"cluster_config": ...}'` or `--config @revision.json`).
-- **Never** use raw JSON as a positional argument for create/update.
-- get/delete/purge take the entity identifier (UUID, name) as a positional argument.
+- **Secondary:** for deeply nested structures (for example revision config), take a JSON string or `@file` path in a single option
+  (for example `--config '{"cluster_config": ...}'` or `--config @revision.json`).
+- **Do not** use raw JSON as a positional argument for create and update.
+- get, delete and purge take the entity identifier (UUID, name) as a positional argument.
 - search filters use `--option` flags: `./bai admin domain search --name-contains foo`
 - Use the `print_result()` helper for JSON output.
 - Lazy-import DTO classes inside the command function.
 
 ## Adding a new entity
 
-1. Create `cli/v2/{entity}/commands.py` holding user-facing commands + `__init__.py`
+1. Create `cli/v2/{entity}/commands.py` holding user-facing commands and `__init__.py`
 2. Create admin-only commands `cli/v2/admin/{entity}.py`
 3. Create self-service commands `cli/v2/my/{entity}.py` (if applicable)
 4. Register the user-facing group in `cli/v2/__init__.py`
