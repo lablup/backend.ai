@@ -221,7 +221,7 @@ Create ``webserver.conf`` with the following content:
 
    [apollo-router]
    enabled = true
-   endpoint = "http://host.docker.internal:4000"
+   endpoint = "http://backendai-half-apollo-router:4000"
 
 AppProxy Coordinator Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
