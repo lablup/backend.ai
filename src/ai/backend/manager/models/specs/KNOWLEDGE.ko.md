@@ -4,7 +4,7 @@
 
 ## 이 패키지가 있는 이유
 
-write spec 은 "무엇을 쓰는가"(row, membership, 무결성 검사)를 schema 옆의 선언으로 변경하고, 실행은 ops
+write spec 은 "무엇을 기록하는가"(row, membership, 무결성 검사)를 schema 옆의 선언으로 변경하고, 실행은 ops
 계층이 맡는다. write 의 RBAC 부수 효과, 곧 graph 에 node 를 마련하고 membership 을 등록하는 일을 실행
 경로가 아니라 spec 의 type 이 정하게 하려는 패키지다.
 
@@ -62,7 +62,7 @@ write spec 은 "무엇을 쓰는가"(row, membership, 무결성 검사)를 schem
 ## guard 는 루트에 두어 어떤 경로도 건너뛸 수 없게 한다
 
 - creator, updater, 단일 row purger 는 각각 guard 를 abstract 로 선언한 루트와 `@final` 아래 빈 목록을
-  반환하는 subtype 을 둔다. 하나의 ops 경로가 둘을 처리하므로 guard 가 있는 spec 을 guard 없이 쓰는
+  반환하는 subtype 을 둔다. 하나의 ops 경로가 둘을 처리하므로 guard 가 있는 spec 을 guard 없이 사용하는
   경로에 전달할 수 없다. 공통 ABC 가 없는 것이 다른 곳에서 강제하는 것과 같은 방식이다.
 - 대신 서로 무관한 루트 둘을 두던 때(`DataUpdater` 와 `GuardedDataUpdater`)에는 ops, service, action,
   group 표면이 두 배가 되고 거부가 일반화되지 않았다. write 가 `None` 을 반환하고 호출자가 row 를 다시
@@ -123,7 +123,7 @@ soft delete 는 DB 에서 UPDATE 이므로 ops 가 편집과 구분할 수 없�
 강제할 자리도 없다. 이를 삭제로 기록하는 것은 action 의 `operation_type()` 이며, RBAC 권한과 감사 row 의
 `operation` 을 정한다.
 
-구멍이 하나 남는다. lifecycle column 을 쓰는 일반 편집은 `UPDATE` 로 기록되므로 삭제가 기록에 나타나지
+구멍이 하나 남는다. lifecycle column 을 사용하는 일반 편집은 `UPDATE` 로 기록되므로 삭제가 기록에 나타나지
 않는다. 일반 updater 에서 그 field 를 제거하면 그 구멍이 닫힌다. 편집 경로에는 전이를 만들 수단이 없다.
 delete 와 restore 를 상수 `build_values()` 를 가진 별도 updater 로 나누면 나머지가 닫힌다. 인자로 받은
 전이 값은 잘못 전달될 수 있는 값이다.
@@ -131,7 +131,7 @@ delete 와 restore 를 상수 `build_values()` 를 가진 별도 updater 로 나
 상태를 담는 column 은 아직 다르다(role preset 은 `deleted`, vfolder 나 user 는 `status`). BEP-1069 는
 이를 soft delete mixin 의 `deleted_at` 으로 옮긴다. business 상태와 삭제가 동시에 성립하므로(비활성
 상태에서 삭제된 user) 하나의 enum 으로 합치면 restore 가 앞선 business 상태를 잃는다. user 와 role 의
-restore 는 지금 항상 `active` 를 쓴다.
+restore 는 지금 항상 `active` 를 사용한다.
 
 ## own 과 govern 은 다른 relation 이고 생성이 둘을 조합한다
 
@@ -190,27 +190,27 @@ restore 는 지금 항상 `active` 를 쓴다.
 - relation(`create_relation(scope, target)`): 스코프가 cap READ 로 target 을 govern 하고 target 은 READ
   share 로 스코프를 보유한다. project 는 resource group 과 그 agent 를 읽고, resource group 은 project
   자체만 읽는다. project 가 own 하는 user, session, vfolder 는 보이지 않는다. govern 쪽 cap
-  (`scope_bindings.permission_cap`)은 relation 만 쓴다. 자기 govern 과 `created_in` govern 은 cap 을
+  (`scope_bindings.permission_cap`)은 relation 만 사용한다. 자기 govern 과 `created_in` govern 은 cap 을
   갖지 않는다.
 - relation 테이블은 양쪽에 cascade 외래 키를 가진다(`association_container_registries_groups`,
   `sgroups_for_groups`). 엔티티가 사라지면 그 row 도 함께 사라지고 어느 ops 메서드도 한쪽 전체를 지정하지
   않는다. relation spec 은 pair 의 id type 으로 typed 되므로 spec 이 각 id 를 제 type 으로 읽는다.
 - resource group 이 session 과 deployment 를 보는 것은 relation 이 아니다. scheduling 때 session 을
-  resource group 에 READ 로 공유해 응답한다(후속). 그 resource group 을 govern 하는 다른 project 는
-  share 로 응답을 받지 않으므로 새지 않는다.
+  resource group 에 READ 로 공유해 반환한다(후속). 그 resource group 을 govern 하는 다른 project 는
+  share 로 반환받지 않으므로 새지 않는다.
 - 두 축으로 네 루트다. `created_in` 유무(Entity / Global) × 프리셋 역할 유무(plain / RoleManaged).
   role-managed 는 plain 과 같은 relation 에 프리셋을 더한다.
 - every-field share 와 field-path share 는 의미가 다르고 메서드도 다르다. 저장은 하나의 cap row tree(bit
   마다 row, path row)이지만 선언이 둘을 섞지 않는다. replace 는 앞의 것을 모두 버리고(delete 와 insert,
   읽지 않는다), widen 은 있는 것을 읽어 추가만 하고, narrow 는 제거만 한다. 섞인 share 는 replace 후
-  widen 으로 쓴다.
+  widen 으로 사용한다.
 - relation ops 의 위치. private 기본 연산은 `V2GraphWriteOpsBase` 에만 있고 어떤 provider 도 이를
   제공하지 않는다. 공개 표면은 provider / ops 세 쌍이다.
 
-| relation | write | reverse | 쓰는 쪽 |
+| relation | write | reverse | 기록하는 쪽 |
 |---|---|---|---|
 | node | `_provision(entities)`: node, 자기 own, 자기 govern | `_teardown(entity)`: 나머지는 FK cascade | create / purge |
-| own | `_created_in` 의 일부로만 쓴다 | `_disown(owners, entity)` | project 를 떠나는 user |
+| own | `_created_in` 의 일부로만 기록한다 | `_disown(owners, entity)` | project 를 떠나는 user |
 | govern | `_govern(scopes, entity, cap)` | `_ungovern(scopes, entity)` | relation(cap READ) |
 | own + govern | `_created_in(scopes, entity)`: node 조회 하나 | `_removed_from(scopes, entity)` | create(프리셋 역할 포함), transfer |
 | share(cap 있는 own) | `_reset_share(scope, entity)` / `_widen_share(scope, entity, {bit: paths})` / `_narrow_share` | `_unshare(scope, entities)` | relation, share write |

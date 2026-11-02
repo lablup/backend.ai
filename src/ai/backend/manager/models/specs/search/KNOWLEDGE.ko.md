@@ -157,8 +157,8 @@ filter 를 여는 이유와 order 를 열지 않는 이유는 다르다.
 
 ## 다른 service 도 to-many order 를 집계 이상으로 열지 않는다
 
-엔티티가 소유하는 child row 에 대한 내용이다. 다른 엔티티로 들어가는 filter 는 `다른 service 가 관계
-filter 를 여는 방식` 에 있다.
+엔티티가 소유하는 child row 에 대한 내용이다. 다른 엔티티로 들어가는 filter 는
+`How other services open relational filters` 에 있다.
 
 | service | to-many order 로 여는 것 | 조건 순서 |
 |---|---|---|
@@ -224,7 +224,7 @@ filter 를 여는 방식` 에 있다.
   검사하고 결과를 AND 로 좁힌다. 방향이 정하는 것은 조건이 어느 column 에 걸리는지다.
 - 일반 column filter 로 이를 대신할 수 없다. 지정한 엔티티의 권한을 검사하지 않으므로 결과가 돌아오는지가
   호출자에게 읽을 수 없는 row 의 존재를 알려 준다.
-- "내 resource 를 누가 사용하는가" 는 `uses` 로 답한다. 사용하는 쪽을 search 하고 사용되는 엔티티의 id 로
+- "내 resource 를 누가 사용하는가" 는 `uses` 로 반환한다. 사용하는 쪽을 search 하고 사용되는 엔티티의 id 로
   좁힌다.
 - 방향에 이름을 붙이는 이유는 search 대상 쪽 이름만으로는 어느 쪽이 어느 쪽을 사용하는지 알 수 없기
   때문이다. session 과 agent 를 잇는 조건을 `used_by` 만으로 보내면 agent 를 사용하는 session 을 찾는지
@@ -291,8 +291,8 @@ filter 를 여는 방식` 에 있다.
 
 - public processor 는 권한을 요청하지 않으므로 public 역할에서 READ 를 빼도 읽기가 통과한다. row 조건도
   없다. `image` 의 public 읽기 네 개는 public 에 등록되지 않은 registry 의 image 를 반환한다.
-- 스코프로 두면 검사하는 것과 row 조건이 한 class 에 있다. 이유는 `scope 와 사용은 searcher 로
-  전달된다` 에 있다.
+- 스코프로 두면 검사하는 것과 row 조건이 한 class 에 있다. 이유는
+  `Scopes and uses travel on the searcher` 에 있다.
 
 ### public 의 두 가지 membership
 
@@ -417,7 +417,7 @@ filter 를 여는 방식` 에 있다.
 | `resource_group`(for-domain, for-project, for-keypair row) | 스코프와 resource group 의 relation | 두 엔티티의 Target 으로 읽는다 |
 | `idle_checker`(binding, session idle check) | 스코프와 idle checker, session 과 idle checker 의 relation | `IdleCheckerAssignmentTarget` |
 | `rbac_models/user_role` | role 과 user 의 relation | `UserRoleAssignmentTarget`, `RoleRoleAssignmentTarget` |
-| `association_artifacts_storages` | artifact 와 storage 를 잇는 row. graph relation 으로 쓰지 않는다 | 없음 |
+| `association_artifacts_storages` | artifact 와 storage 를 잇는 row. graph relation 으로 사용하지 않는다 | 없음 |
 | `agent_installed_image`, `event_log` | creator 가 없다 | 없음 |
 | `global_entity`, `virtual_entity`, `rbac_models/entity_field` | singleton row 와 graph row | search 하지 않는다 |
 | `alembic`, `hasher`, `minilang`, `mixins`, `rbac`, `specs` | 엔티티 package 가 아니다 | 없음 |
@@ -460,3 +460,5 @@ filter 를 여는 방식` 에 있다.
 | `etcd_config` | `get_resource_slots`, `get_resource_metadata`, `get_vfolder_types` | etcd 설정, valkey 의 device metadata | 옮기지 않음 | 엔티티가 아니다 |
 | `metric` | `metadata_public_search` | Prometheus 의 container metric 이름 | 옮기지 않음 | 엔티티가 아니다 |
 | `export` | `public_get_report` | 코드에 등록된 report 정의. export 질의는 따로 권한을 검사한다 | 옮기지 않음 | 엔티티가 아니다 |
+| `permission_contoller` | `public_get_scope_types`, `public_get_entity_types`, `public_get_permission_matrix` | 코드 상수와 연결된 action 목록 | 옮기지 않음 | 엔티티가 아니다 |
+| `auth` | `public_resolve_access_key_scope` | access key 를 소유한 user 와 그 domain, role | 옮기지 않음 | 그 user 를 대신해 행동할 수 있는지 service 가 직접 판단한다 |
