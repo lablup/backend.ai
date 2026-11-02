@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import DeclaredEntityType
+from ai.backend.common.data.entity.types import DeclaredEntityType, EntityType, GlobalEntityType
 from ai.backend.common.dto.manager.query import (
     NullableDateTimeFilter,
     StringFilter,
@@ -64,6 +64,13 @@ class CreateRolePresetInput(BaseRequestModel):
         default_factory=list,
         description="Permission entries carried by the preset.",
     )
+
+    @field_validator("scope_type")
+    @classmethod
+    def _validate_scope_type(cls, value: EntityType) -> EntityType:
+        if value == GlobalEntityType():
+            raise ValueError(f"scope_type must not be {GlobalEntityType()}")
+        return value
 
 
 class UpdateRolePresetBody(BaseRequestModel):
