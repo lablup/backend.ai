@@ -10,7 +10,6 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
 from ai.backend.manager.data.project.types import ProjectData, ProjectStatus, ProjectType
 from ai.backend.manager.errors.resource import (
     PersonalProjectDeletionError,
@@ -40,9 +39,6 @@ class ProjectUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
     )
     integration_name: TriState[str] = field(default_factory=TriState[str].nop)
     resource_policy: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    container_registry: TriState[ImageCommitRegistry] = field(
-        default_factory=TriState[ImageCommitRegistry].nop
-    )
     dotfiles: OptionalState[bytes] = field(default_factory=OptionalState[bytes].nop)
 
     @property
@@ -80,9 +76,6 @@ class ProjectUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
         # Field is named integration_name above model layer; DB column remains integration_id.
         self.integration_name.update_dict(to_update, "integration_id")
         self.resource_policy.update_dict(to_update, "resource_policy")
-        if not self.container_registry.is_nop():
-            registry = self.container_registry.optional_value()
-            to_update["container_registry"] = registry.to_json() if registry is not None else None
         self.dotfiles.update_dict(to_update, "dotfiles")
         return to_update
 
