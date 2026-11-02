@@ -27,28 +27,50 @@ class ProbeCheckRunner[TID: Hashable]:
     started again.
     """
 
-    _checks: Sequence[AbstractProbeCheck[TID]]
-    _tasks: list[asyncio.Task[None]]
+    _checks: dict[TID, AbstractProbeCheck[TID]]
+    _tasks: dict[TID, asyncio.Task[None]]
+    _running: bool
 
     def __init__(self, args: ProbeCheckRunnerArgs[TID]) -> None:
-        self._checks = args.checks
-        self._tasks = []
+        self._checks = {check.id(): check for check in args.checks}
+        self._tasks = {}
+        self._running = False
 
     async def start(self) -> None:
-        if self._tasks:
+        if self._running:
             log.warning("probe check runner already running")
             return
-        for check in self._checks:
-            task = asyncio.create_task(self._run_check(check))
-            task.set_name(f"probe-check-{check.id()}")
-            self._tasks.append(task)
+        self._running = True
+        for check in self._checks.values():
+            self._start_check(check)
         log.debug("probe check runner started", check_count=len(self._tasks))
 
     async def stop(self) -> None:
-        for task in self._tasks:
+        self._running = False
+        for task in self._tasks.values():
             await cancel_and_wait(task)
         self._tasks.clear()
         log.debug("probe check runner stopped")
+
+    def add(self, check: AbstractProbeCheck[TID]) -> None:
+        """Adds the check and runs it if the runner runs; a check whose id is held is skipped."""
+        if check.id() in self._checks:
+            return
+        self._checks[check.id()] = check
+        if self._running:
+            self._start_check(check)
+
+    async def remove(self, check_id: TID) -> None:
+        """Stops and drops the check with the id, if there is one."""
+        self._checks.pop(check_id, None)
+        task = self._tasks.pop(check_id, None)
+        if task is not None:
+            await cancel_and_wait(task)
+
+    def _start_check(self, check: AbstractProbeCheck[TID]) -> None:
+        task = asyncio.create_task(self._run_check(check))
+        task.set_name(f"probe-check-{check.id()}")
+        self._tasks[check.id()] = task
 
     async def _run_check(self, check: AbstractProbeCheck[TID]) -> None:
         with with_log_context(check_id=str(check.id())):
