@@ -134,7 +134,7 @@ SessionValidator is a container that manages multiple ValidationRules, executes 
 
 #### ClusterValidationRule
 
-ClusterValidationRule validates the validity of the multi-kernel session configuration.
+ClusterValidationRule verifies the multi-kernel session configuration.
 
 **Validation Items:**
 - Verify cluster size is 1 or greater
@@ -157,7 +157,7 @@ ClusterValidationRule validates the validity of the multi-kernel session configu
 
 #### MountValidationRule
 
-MountValidationRule validates the validity of volume mount paths and configuration.
+MountValidationRule verifies the volume mount paths and configuration.
 
 **Validation Items:**
 - Validate that the mount path is in the correct format
@@ -272,7 +272,7 @@ ClusterPreparer prepares the multi-kernel session configuration.
 - Prepare the dedicated network configuration of the multi-kernel session
 
 **Cluster Modes:**
-- `single-node`: Default mode running as single container
+- `single-node`: Default mode running as a single container
 - `multi-container`: Run multiple containers on one agent
 - `multi-node`: Distribute containers across multiple agents
 
@@ -510,13 +510,13 @@ validation_pipeline.add_rule(ScalingGroupFilteringRule())
 validated_data = validation_pipeline.execute(request_data)
 ```
 
-The advantages of the pipeline pattern are: the processing order is clear, which makes the flow easy to understand; rules can be added or removed dynamically, which provides excellent extensibility; each stage operates independently with low coupling; and individual rules can be tested independently, which makes testing easy.
+The advantages of the pipeline pattern are: the processing order is clear, so the flow is easy to understand; rules can be added or removed dynamically, so extensibility is high; each stage operates independently with low coupling; and individual rules can be tested independently, so testing is easy.
 
 ## Error Handling
 
 ### ValidationError
 
-ValidationError is the exception raised when a request is invalid during the validation stage. This exception includes which validation rule failed, the specific error message, the name and value of the incorrect fields, and suggestions for resolving the problem when possible.
+ValidationError is the exception raised when a request is invalid during the validation stage. This exception includes which validation rule failed, the specific error message, the names and values of the incorrect fields, and suggestions for resolving the problem when possible.
 
 **Examples:**
 ```python
