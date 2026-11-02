@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     NullableDateTimeFilter,
+    NullableUUIDFilter,
     OrderDirection,
     StringFilter,
     UUIDFilter,
@@ -90,6 +91,16 @@ class RolePresetFilterGQL(PydanticInputMixin[RolePresetFilterDTO]):
     )
     name: StringFilter | None = gql_field(description="Filter by name.", default=None)
     scope_type: StringFilter | None = gql_field(description="Filter by scope type.", default=None)
+    scope_id: NullableUUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Filter by the ID of the scope the preset's role is created in. "
+                "`isNull: true` selects presets whose role is created in every scope of their type."
+            ),
+        ),
+        default=None,
+    )
     auto_assign: bool | None = gql_field(description="Filter by auto-assign flag.", default=None)
     auto_assign_to_owner: bool | None = gql_added_field(
         BackendAIGQLMeta(

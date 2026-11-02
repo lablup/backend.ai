@@ -30,9 +30,11 @@ from ai.backend.common.dto.manager.query import DateTimeFilter as DateTimeFilter
 from ai.backend.common.dto.manager.query import DecimalFilter as DecimalFilterDTO
 from ai.backend.common.dto.manager.query import IntFilter as IntFilterDTO
 from ai.backend.common.dto.manager.query import NullableDateTimeFilter as NullableDateTimeFilterDTO
+from ai.backend.common.dto.manager.query import NullableUUIDFilter as NullableUUIDFilterDTO
 from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
 from ai.backend.common.dto.manager.query import UUIDFilter as UUIDFilterDTO
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.adapter_options.cursor.cursor import decode_cursor as decode_cursor
 from ai.backend.manager.api.adapter_options.cursor.cursor import encode_cursor as encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -361,6 +363,21 @@ class UUIDFilter(PydanticInputMixin[UUIDFilterDTO]):
             )
 
         return None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for nullable UUID fields with IS NULL / IS NOT NULL support.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="NullableUUIDFilter",
+)
+class NullableUUIDFilter(PydanticInputMixin[NullableUUIDFilterDTO]):
+    equals: uuid.UUID | None = None
+    in_: list[uuid.UUID] | None = gql_field(description="UUID is in list.", name="in", default=None)
+    not_equals: uuid.UUID | None = None
+    not_in: list[uuid.UUID] | None = None
+    is_null: bool | None = None
 
 
 @gql_pydantic_input(

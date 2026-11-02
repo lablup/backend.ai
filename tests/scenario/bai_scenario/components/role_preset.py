@@ -187,6 +187,7 @@ class PresetLook:
             ),
             Same(f"{at}name", node.name, self.named if self.named is not None else seeded.name),
             Same(f"{at}scope_type", str(node.scope_type), str(seeded.scope_type)),
+            Same(f"{at}scope_id", node.scope_id, seeded.scope_id),
             Same(
                 f"{at}auto_assign",
                 node.auto_assign,

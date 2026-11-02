@@ -10,7 +10,7 @@ from ai.backend.manager.models.specs.conditions.types import FilterColumn
 
 
 class UUIDConditions:
-    """UUID equality and membership on one column."""
+    """UUID equality, membership and null checks on one column."""
 
     _column: FilterColumn
 
@@ -26,6 +26,18 @@ class UUIDConditions:
     def in_(self, spec: UUIDInMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return self._finish(self._column.in_(spec.values), spec.negated)
+
+        return inner
+
+    def is_null(self) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return self._column.is_(None)
+
+        return inner
+
+    def is_not_null(self) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return self._column.isnot(None)
 
         return inner
 

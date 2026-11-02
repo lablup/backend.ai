@@ -498,5 +498,33 @@ class UUIDFilter(BaseRequestModel):
         return None
 
 
+class NullableUUIDFilter(UUIDFilter):
+    """Filter for nullable UUID fields.
+
+    Extends UUIDFilter with is_null support for columns that allow NULL values.
+    Use UUIDFilter for NOT NULL columns.
+    """
+
+    is_null: bool | None = Field(
+        default=None,
+        description="Filter by null status: true = IS NULL, false = IS NOT NULL",
+    )
+
+    @override
+    def build_query_condition(
+        self,
+        equals_factory: Callable[[UUIDEqualMatchSpec], _QC],
+        in_factory: Callable[[UUIDInMatchSpec], _QC],
+        is_null_factory: Callable[[], _QC] | None = None,
+        is_not_null_factory: Callable[[], _QC] | None = None,
+    ) -> _QC | None:
+        if self.is_null is not None:
+            if self.is_null and is_null_factory is not None:
+                return is_null_factory()
+            if not self.is_null and is_not_null_factory is not None:
+                return is_not_null_factory()
+        return super().build_query_condition(equals_factory, in_factory)
+
+
 class ListGroupQuery(BaseRequestModel):
     group_id: uuid.UUID | None = Field(default=None, alias="groupId")

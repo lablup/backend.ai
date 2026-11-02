@@ -292,6 +292,24 @@ class TestEnumBoolUUIDFilters:
         assert ids(equal) == seeded.shelf_ids("S1")
         assert ids(included) == seeded.shelf_ids("S1", "S3")
 
+    async def test_가8_null_uuid_is_dropped_by_a_negation(
+        self, searches: ShelfSearches, seeded: Seeded
+    ) -> None:
+        """Fixed behavior: a null ``category_id`` satisfies no negation; the null checks find it."""
+        unequal = await searches.in_global(
+            conditions=[
+                OWN.category_id.filter.equals(
+                    UUIDEqualMatchSpec(value=seeded.categories["C1"], negated=True)
+                )
+            ]
+        )
+        missing = await searches.in_global(conditions=[OWN.category_id.filter.is_null()])
+        present = await searches.in_global(conditions=[OWN.category_id.filter.is_not_null()])
+
+        assert ids(unequal) == seeded.shelf_ids("S2")
+        assert ids(missing) == seeded.shelf_ids("S3", "S4")
+        assert ids(present) == seeded.shelf_ids("S1", "S2")
+
 
 class TestArrayFilters:
     async def test_가9_containment_and_overlap(

@@ -12035,6 +12035,19 @@ input NullableDateTimeFilter {
 }
 
 """
+Added in 26.10.0. Filter for nullable UUID fields with IS NULL / IS NOT NULL support.
+"""
+input NullableUUIDFilter {
+  equals: UUID = null
+
+  """UUID is in list."""
+  in: [UUID!] = null
+  notEquals: UUID = null
+  notIn: [UUID!] = null
+  isNull: Boolean = null
+}
+
+"""
 Added in 26.3.0. Display number format configuration for a resource slot type.
 """
 type NumberFormat {
@@ -18703,6 +18716,11 @@ type RolePreset implements Node {
   scopeType: String!
 
   """
+  Added in 26.10.0. ID of the one scope of `scopeType` the preset's role is created in: a domain, a project or a global entity. Null when the role is created in every scope of the type.
+  """
+  scopeId: UUID
+
+  """
   Added in 26.10.0. Jinja template rendering the name of each role instantiated from this preset.
   """
   roleNameTemplate: String
@@ -18771,6 +18789,11 @@ input RolePresetFilter {
 
   """Filter by scope type."""
   scopeType: StringFilter = null
+
+  """
+  Added in 26.10.0. Filter by the ID of the scope the preset's role is created in. `isNull: true` selects presets whose role is created in every scope of their type.
+  """
+  scopeId: NullableUUIDFilter = null
 
   """Filter by auto-assign flag."""
   autoAssign: Boolean = null

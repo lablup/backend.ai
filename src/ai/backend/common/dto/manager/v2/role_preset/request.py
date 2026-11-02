@@ -13,6 +13,7 @@ from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import DeclaredEntityType, EntityType, GlobalEntityType
 from ai.backend.common.dto.manager.query import (
     NullableDateTimeFilter,
+    NullableUUIDFilter,
     StringFilter,
     ToManyFilter,
     UUIDFilter,
@@ -205,6 +206,14 @@ class RolePresetFilter(BaseRequestModel):
     )
     name: StringFilter | None = Field(default=None, description="Filter by name.")
     scope_type: StringFilter | None = Field(default=None, description="Filter by scope type.")
+    scope_id: NullableUUIDFilter | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Filter by the ID of the scope the preset's role is "
+            "created in. `is_null: true` selects presets whose role is created in every scope "
+            "of their type."
+        ),
+    )
     auto_assign: bool | None = Field(default=None, description="Filter by auto-assign flag.")
     auto_assign_to_owner: bool | None = Field(
         default=None,

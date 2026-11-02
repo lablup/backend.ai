@@ -25,6 +25,7 @@ from ai.backend.common.dto.manager.query import (
     EnumFilter,
     IntFilter,
     NullableDateTimeFilter,
+    NullableUUIDFilter,
     StringFilter,
     ToManyFilter,
     UUIDFilter,
@@ -321,6 +322,19 @@ class BaseFilterAdapter:
         if uuid_filter.not_in is not None:
             return [conditions.in_(UUIDInMatchSpec(values=uuid_filter.not_in, negated=True))]
         return []
+
+    @final
+    def apply_nullable_uuid_filter(
+        self, uuid_filter: NullableUUIDFilter | None, conditions: UUIDConditions
+    ) -> list[QueryCondition]:
+        """Apply ``is_null`` first, then what ``apply_uuid_filter`` applies."""
+        if uuid_filter is None:
+            return []
+        if uuid_filter.is_null is not None:
+            if uuid_filter.is_null:
+                return [conditions.is_null()]
+            return [conditions.is_not_null()]
+        return self.apply_uuid_filter(uuid_filter, conditions)
 
     @final
     def apply_datetime_filter(
