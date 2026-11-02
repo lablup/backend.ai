@@ -31,7 +31,7 @@ def _make_check(volume_name: str) -> Mock:
         name=StorageBackendType("vfs"), capabilities=StorageBackendCapabilities()
     )
     check.latest.return_value = StorageStatusResultData(
-        check_type=StorageStatusCheckType.VFS,
+        check_type=StorageStatusCheckType.MOUNT,
         check_state=StorageCheckState.NOT_CHECKED,
         check_started_at=None,
         duration=None,

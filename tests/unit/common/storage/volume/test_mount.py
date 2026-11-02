@@ -15,15 +15,15 @@ from ai.backend.common.data.storage.types import (
     StorageCheckState,
     StorageStatusCheckType,
 )
-from ai.backend.common.storage.volume.vfs import (
-    VfsVolumeStatusCheck,
-    VfsVolumeStatusCheckArgs,
+from ai.backend.common.storage.volume.mount import (
+    VolumeMountStatusCheck,
+    VolumeMountStatusCheckArgs,
 )
 
 
-def _make_check(mount_path: Path, executor: Executor) -> VfsVolumeStatusCheck:
-    return VfsVolumeStatusCheck(
-        VfsVolumeStatusCheckArgs(
+def _make_check(mount_path: Path, executor: Executor) -> VolumeMountStatusCheck:
+    return VolumeMountStatusCheck(
+        VolumeMountStatusCheckArgs(
             volume_name=StorageVolumeName("volume-1"),
             storage_backend_metadata=StorageBackendMetadata(
                 name=StorageBackendType("vfs"), capabilities=StorageBackendCapabilities()
@@ -36,7 +36,7 @@ def _make_check(mount_path: Path, executor: Executor) -> VfsVolumeStatusCheck:
     )
 
 
-class TestVfsVolumeStatusCheck:
+class TestVolumeMountStatusCheck:
     @pytest.fixture
     def executor(self) -> Iterator[Executor]:
         with ThreadPoolExecutor(max_workers=1) as executor:
@@ -54,7 +54,7 @@ class TestVfsVolumeStatusCheck:
         check = _make_check(mount, executor)
 
         result = check.latest()
-        assert result.check_type == StorageStatusCheckType.VFS
+        assert result.check_type == StorageStatusCheckType.MOUNT
         assert result.check_state == StorageCheckState.NOT_CHECKED
 
     async def test_records_device_id(self, mount: Path, executor: Executor) -> None:

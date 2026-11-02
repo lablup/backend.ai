@@ -30,7 +30,7 @@ from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.storage.probe.volume import AbstractVolumeStatusCheck
-from ai.backend.common.storage.volume.vfs import VfsVolumeStatusCheck
+from ai.backend.common.storage.volume.mount import VolumeMountStatusCheck
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import (
@@ -414,7 +414,7 @@ class BaseFSOpModel(AbstractFSOpModel):
 
 class BaseVolume(AbstractVolume):
     name: ClassVar[StorageBackendType] = StorageBackendType("vfs")
-    _status_check: VfsVolumeStatusCheck | None
+    _status_check: VolumeMountStatusCheck | None
 
     def __init__(
         self,
@@ -473,7 +473,7 @@ class BaseVolume(AbstractVolume):
                 name=self.name,
                 capabilities=StorageBackendCapabilities(supported=supported),
             )
-            self._status_check = VfsVolumeStatusCheck.create(
+            self._status_check = VolumeMountStatusCheck.create(
                 self._volume_name, metadata, self.mount_path, self._status_check_config
             )
         return self._status_check
