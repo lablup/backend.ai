@@ -2,13 +2,13 @@
 
 ## Service Overview
 
-The Domain Service manages domain resources in Backend.AI. It creates, modifies, deletes and purges domains. A domain contains users, projects and resources.
+The Domain Service manages domain resources in Backend.AI. It creates, modifies, deletes and purges domains. Domains are organizational units that group users, projects and resources together.
 
 ## Key Features and Capabilities
 
 - **Create Domain**: Define new domains with specific resource limits and permissions
 - **Modify Domain**: Update existing domain configurations and resource allocations
-- **Delete Domain**: Delete domains while preserving data relationships
+- **Delete Domain**: Soft-delete domains while preserving data relationships
 - **Purge Domain**: Remove domains and all associated data permanently
 - **RBAC**: Distinguish between superadmin and regular user operations
 - **Resource Management**: Control various domain aspects including:
@@ -38,16 +38,16 @@ The modification process:
 4. Gets and updates the existing domain
 5. Returns updated domain data or error information
 
-### Deleting a Domain (Marked as Deleted)
+### Deleting a Domain (Soft Delete)
 
 The deletion flow:
 1. Accepts deletion request with domain name
 2. Validates user permissions and role
-3. Marks the domain as deleted (inactive)
+3. Performs soft deletion (marks as inactive)
 4. Preserves data relationships and history
 5. Returns success or failure status
 
-### Purging a Domain (Permanent Removal)
+### Purging a Domain (Hard Delete)
 
 The purge process:
 1. Accepts purge request with domain name
@@ -165,7 +165,7 @@ The service follows the action-based pattern with these operations:
    - Returns `ModifyDomainActionResult` with updated domain data
 
 3. **DeleteDomainAction** (src/ai/backend/manager/services/domain/actions/delete_domain.py)
-   - Marks the domain as deleted
+   - Performs soft deletion operations
    - Returns `DeleteDomainActionResult` with success status
 
 4. **PurgeDomainAction** (src/ai/backend/manager/services/domain/actions/purge_domain.py)
@@ -199,7 +199,7 @@ The service implements error handling at each layer:
    - Plan resource allocation across resource groups
 
 3. **Domain Lifecycle**:
-   - Use delete for operational domains
+   - Use soft deletion for operational domains
    - Reserve purge operations for administrative cleanup
    - Maintain audit trails for domain changes
 
@@ -237,6 +237,6 @@ The service implements error handling at each layer:
 
 - Domain creation with various configurations
 - Partial updates using modifiers
-- Delete and purge operations
+- Soft deletion and purge operations
 - Permission validation across user roles
 - Error handling and rollback scenarios

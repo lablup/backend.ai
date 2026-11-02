@@ -366,7 +366,7 @@ In the second phase, check_pulling_progress() periodically queries the sessions 
 
 **Phase 3: Session Start (PREPARED → CREATING)**
 
-In the third phase, start_sessions() queries the sessions in PREPARED state, which passed the precondition check and have all images ready. For a multi-kernel session, it generates SSH key pairs for inter-node communication and configures the dedicated cluster network. It builds all information needed for kernel creation: image references, resource slots, environment variables, volume mounts and network settings.
+In the third phase, start_sessions() queries the sessions in PREPARED state, which passed the precondition check and have all images ready. For a multi-kernel session, it generates SSH key pairs for inter-node communication and configures cluster-dedicated networks. It builds all information needed for kernel creation: image references, resource slots, environment variables, volume mounts and network settings.
 
 It calls the agent's create_kernel RPC for each kernel with the prepared configuration. Because the images were pulled in the PREPARING phase, the agent can create and start the containers immediately without another image pull. It can create multiple kernels concurrently. When the RPC calls succeed, the kernels transition to CREATING, and when all kernels of a session start successfully, the session transitions to RUNNING.
 
@@ -765,7 +765,7 @@ CANCELLED
 
 **Key Rules:**
 - Only PENDING can transition directly to CANCELLED.
-- After SCHEDULED, the session reaches TERMINATED through TERMINATING.
+- After SCHEDULED, the session must reach TERMINATED through TERMINATING.
 - Image pulling happens in the PREPARING phase before kernel creation.
 - A failure in PREPARING or CREATING treats the whole session as TERMINATING.
 

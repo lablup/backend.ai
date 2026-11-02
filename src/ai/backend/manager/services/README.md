@@ -923,7 +923,7 @@ StorageNamespaceOperation.ARCHIVE
 
 ### Testing Services
 
-**Critical rule**: Service tests do not use a real database. Mock the repositories instead.
+**Critical rule**: Service tests must not use a real database. Mock the repositories instead.
 
 ```python
 from unittest.mock import AsyncMock, Mock

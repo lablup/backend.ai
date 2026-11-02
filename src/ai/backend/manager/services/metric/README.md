@@ -11,7 +11,7 @@ The Metric Service collects and manages container utilization metrics for Backen
 - **Flexible Filtering**: Support for label-based filtering (kernel_id, agent_id, user_id, project_id and others)
 - **Metric Type Detection**: Automatic detection and handling of different metric types (GAUGE, RATE, DIFF)
 - **Aggregation Support**: Sum metrics by various dimensions for project-level and user-level analysis
-- **Prometheus Integration**: Direct integration with Prometheus for metric storage and querying
+- **Prometheus Integration**: Direct integration with Prometheus for reliable metric storage and querying
 
 ## Operation Scenarios
 

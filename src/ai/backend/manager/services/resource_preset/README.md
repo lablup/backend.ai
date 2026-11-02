@@ -153,7 +153,7 @@ custom_preset = CreateResourcePresetAction(
 
 ### Unit Testing
 
-The service includes test coverage for all operations:
+The service includes comprehensive test coverage for all operations:
 
 1. **Create Preset Tests**
    - Valid preset creation scenarios
