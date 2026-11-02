@@ -11,6 +11,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
@@ -18,7 +19,11 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     SearchVFoldersInput,
     VFolderFilter,
 )
-from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope
+from ai.backend.common.dto.manager.v2.vfolder.types import (
+    VFolderScope,
+    VFolderUsage,
+    VFolderUsedBy,
+)
 from ai.backend.common.types import QuotaScopeID, VFolderMountPolicy, VFolderUsageMode
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
@@ -107,6 +112,26 @@ class TestVFolderAdapterUserScopedSearch:
         mock_processors.vfolder.scoped_search.run.assert_called_once()
         action = mock_processors.vfolder.scoped_search.run.call_args[0][0]
         assert [item.scope_id() for item in action.searcher.scopes] == [user_id]
+
+    async def test_used_by_session_is_a_use_the_caller_must_read(
+        self,
+        adapter: VFolderAdapter,
+        mock_processors: MagicMock,
+        user_id: uuid.UUID,
+    ) -> None:
+        session_id = uuid4()
+
+        await adapter.scoped_search(
+            ScopedSearchVFoldersInput(
+                scope=VFolderScope(user=[UUIDScope(value=user_id)]),
+                usage=VFolderUsage(used_by=VFolderUsedBy(session=[session_id])),
+                limit=10,
+                offset=0,
+            )
+        )
+
+        action = mock_processors.vfolder.scoped_search.run.call_args[0][0]
+        assert [used.target for used in action.searcher.used_by] == [SessionID(session_id)]
 
     async def test_user_scope_returns_payload(
         self,

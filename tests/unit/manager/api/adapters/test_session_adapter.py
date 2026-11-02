@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
@@ -12,6 +13,7 @@ import pytest
 from ai.backend.common.data.entity.kernel import KernelFieldType, KernelID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.v2.common import (
     ResourceSlotEntryInfo,
     ResourceSlotEntryInput,
@@ -19,6 +21,7 @@ from ai.backend.common.dto.manager.v2.common import (
 )
 from ai.backend.common.dto.manager.v2.kernel.response import ResourceAllocationGQLDTO
 from ai.backend.common.dto.manager.v2.session.request import (
+    AdminSearchSessionsInput,
     BatchConfigInput,
     EnqueueSessionInput,
     TerminateSessionsInput,
@@ -26,6 +29,8 @@ from ai.backend.common.dto.manager.v2.session.request import (
 from ai.backend.common.dto.manager.v2.session.types import (
     ClusterModeEnum,
     CreateSessionTypeEnum,
+    SessionUsage,
+    SessionUses,
 )
 from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 from ai.backend.common.types import (
@@ -328,6 +333,42 @@ def _create_kernel_info(kernel_id: KernelId) -> KernelInfo:
         metadata=Metadata(callback_url=None, internal_data=None),
         kernel_group_id=None,
     )
+
+
+class TestSearchUsage:
+    @pytest.fixture
+    def processors(self) -> MagicMock:
+        processors = MagicMock()
+        processors.global_search.run = AsyncMock(
+            return_value=SimpleNamespace(
+                items=[], total_count=0, has_next_page=False, has_previous_page=False
+            )
+        )
+        processors.batch_get_session_resource_allocation.run = AsyncMock(
+            side_effect=_no_allocations
+        )
+        processors.bulk_get_session_designated_agent_ids.run = AsyncMock(
+            side_effect=_no_designations
+        )
+        return processors
+
+    @pytest.fixture
+    def adapter(self, processors: MagicMock) -> SessionAdapter:
+        return SessionAdapter(processors, MagicMock())
+
+    async def test_uses_vfolder_is_a_use_the_search_carries(
+        self,
+        adapter: SessionAdapter,
+        processors: MagicMock,
+    ) -> None:
+        vfolder_id = uuid4()
+
+        await adapter.admin_search(
+            AdminSearchSessionsInput(usage=SessionUsage(uses=SessionUses(vfolder=[vfolder_id])))
+        )
+
+        action = processors.global_search.run.call_args[0][0]
+        assert [used.target for used in action.searcher.used_by] == [VFolderUUID(vfolder_id)]
 
 
 class TestBatchLoadSessions:
