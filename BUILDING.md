@@ -14,7 +14,7 @@ All development commands use `pants` instead of `pip`, `poetry`, or `uv`.
 - Maintainers own these files and rarely update them
 
 ### Test Code (`tests/` directory)
-- **Add BUILD files for new test directories**
+- **Must add BUILD files for new test directories**
 - Use `python_tests()` for test modules
 - Use `python_testutils()` for shared test utilities
 - Do not list dependencies explicitly; Pants infers them from imports

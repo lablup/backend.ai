@@ -512,7 +512,7 @@ Components and infrastructure that each component depends on.
 
 The Agent receives commands only from the Manager and takes no direct requests from users or other components.
 
-- **Infrastructure**: Container Runtime (Docker), Valkey (event delivery, agent heartbeat, background task management), etcd (global configuration)
+- **Infrastructure**: Container Runtime (Docker), Valkey (event delivery, heartbeat, background task management), etcd (global configuration)
 - **Components**: Manager (receive RPC commands), Storage Proxy (vfolder mounting)
 
 ### Storage Proxy

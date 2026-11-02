@@ -198,7 +198,7 @@ corporate firewalls.
 | manager:5002             | ZeroMQ-based event push from agents to the manager |
 | etcd:2379                | etcd API access |
 | redis:6379               | Valkey/Redis API access |
-| docker-registry:{80,443} | Docker registry API access (HTTP/HTTPS) |
+| docker-registry:{80,443} | HTTP watcher API |
 | (Other hosts)            | Depending on user program requirements |
 
 The agent and the Kubernetes cluster should run in the same local network or VPC and should be

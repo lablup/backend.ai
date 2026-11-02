@@ -67,12 +67,12 @@ We recommend organizing features with **Epics** and **Story** issues:
 
 1. **Create an Epic**
    - Write an Epic issue for the larger feature
-   - The Epic specifies the overall goals and scope
+   - The Epic should specify the overall goals and scope
 
 2. **Break into Stories**
    - Decompose the Epic into concrete Stories
-   - Each Story is independently implementable and testable
-   - Stories should complete within 1-2 sprints
+   - Each Story should be independently implementable and testable
+   - Stories should be completable within 1-2 sprints
 
 ### Bug Report Requirements
 
@@ -94,7 +94,7 @@ problem or idea.
 Bug fix PRs **must** include:
 
 - **Test Code**: Add test cases that reproduce the bug and verify the fix
-  - The tests fail before the fix and pass after it
+  - The tests should fail before the fix and pass after it
   - They are essential for preventing regressions
 
 **For hotfixes**:
@@ -225,7 +225,7 @@ Link the issue in the PR description with the `resolves #1234` format.
 
 Backend.AI consists of many sub-projects in separate GitHub repositories,
 so resolving a single issue often requires multiple PRs in multiple repositories.
-For an integrated view, file an issue in the meta repository and
+For an integrated view, we recommend filing an issue in the meta repository and
 mention it as `refs lablup/backend.ai#xxx` in every related pull request in the
 individual sub-projects.
 
@@ -253,8 +253,8 @@ PRs over 500 lines cause the following issues:
 - **Bottlenecks**: Excessive burden on a single reviewer
 
 **If you have changes over 500 lines**:
-- Split them into multiple smaller PRs
-- Each PR is independently reviewable and mergeable
+- **Must** split them into multiple smaller PRs
+- Each PR should be independently reviewable and mergeable
 - If a large PR is unavoidable, discuss with the team in advance
 
 **Exceptions for large PRs**:
@@ -341,7 +341,7 @@ git log --format='%an' <directory> | sort | uniq -c | sort -rn | head -5
 ```
 
 **Minimum requirements**
-- At least one approval
+- At least one approval is required
 - Tag domain experts for complex changes
 
 ## Commit Guidelines
