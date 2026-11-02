@@ -19,8 +19,10 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.appproxy.worker.proxy.frontend.http.subdomain import SubdomainFrontend
 from ai.backend.appproxy.worker.types import Circuit, InferenceAppInfo, SubdomainFrontendInfo
+from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAuthority
 from ai.backend.common.types import RuntimeVariant
 
+_AUTHORITY = IngressAuthority("worker-1")
 _WILDCARD_DOMAIN = ".apps.example.com"
 _SUBDOMAIN = "echo"
 _GZIP_REQUEST_BODY = gzip.compress(b'{"data": "' + b"a" * 1000 + b'"}')
@@ -92,6 +94,9 @@ async def serving_subdomain_frontend(
         )
     }
     frontend.backends = {_SUBDOMAIN: mocker.MagicMock(proxy_http=record_request_body)}
+    root_context.ingress_state.reader.get = mocker.AsyncMock(
+        return_value=frontend.circuits[_SUBDOMAIN].to_ingress(_AUTHORITY)
+    )
     await frontend.start()
     yield _ServingSubdomainFrontend(
         port=unused_tcp_port,

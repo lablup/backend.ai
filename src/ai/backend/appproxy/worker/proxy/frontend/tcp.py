@@ -12,14 +12,16 @@ from ai.backend.appproxy.common.errors import (
     ServerMisconfiguredError,
     WorkerNotAvailable,
 )
-from ai.backend.appproxy.common.types import RouteInfo, SerializableCircuit
+from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
+from ai.backend.appproxy.worker.errors.ingress import IngressFrontendNotRegisteredError
 from ai.backend.appproxy.worker.proxy.backend import TCPBackend
 from ai.backend.appproxy.worker.types import (
     Circuit,
     PortFrontendInfo,
     RootContext,
 )
+from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAccess
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .base import BaseFrontend
@@ -93,18 +95,12 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
         # TCP does not support authentication
         return
 
-    def _is_peer_allowed(self, writer: asyncio.StreamWriter, circuit: SerializableCircuit) -> bool:
+    def _is_peer_allowed(self, writer: asyncio.StreamWriter, access: IngressAccess) -> bool:
         # TCP carries no forwarded-for header, so the allowlist is matched
         # against the direct connection peer only.
-        validator = circuit.ip_validator
-        if not validator.is_restricted:
-            return True
         peername = writer.get_extra_info("peername")
-        if not peername:
-            log.trace("rejecting a TCP connection with an unknown peer")
-            return False
-        peer_ip = peername[0]
-        if not validator.is_allowed(peer_ip):
+        peer_ip = peername[0] if peername else None
+        if not self._is_client_ip_allowed(peer_ip, access):
             log.trace("rejecting TCP client {} (not in allowed_client_ips)", peer_ip)
             return False
         return True
@@ -146,7 +142,15 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
             return
 
         with with_log_context(circuit_id=backend.circuit.id):
-            if not self._is_peer_allowed(writer, backend.circuit):
+            try:
+                ingress = await self._read_registered_ingress(
+                    self.circuits[circuit_key].to_ingress_frontend().key()
+                )
+            except IngressFrontendNotRegisteredError:
+                log.trace("rejecting a TCP connection to a slot with no ingress")
+                await self._close_writer(writer)
+                return
+            if not self._is_peer_allowed(writer, ingress.access):
                 await self._close_writer(writer)
                 return
 

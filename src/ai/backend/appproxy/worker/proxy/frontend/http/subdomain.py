@@ -8,9 +8,10 @@ import jinja2
 from aiohttp import web
 from aiohttp.typedefs import Handler
 
-from ai.backend.appproxy.common.errors import GenericBadRequest, ServerMisconfiguredError
+from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.worker.config import WildcardDomainConfig
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
+from ai.backend.appproxy.worker.errors.ingress import IngressFrontendNotRegisteredError
 from ai.backend.appproxy.worker.types import Circuit, SubdomainFrontendInfo
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
@@ -90,7 +91,7 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
         # exclude port number when evaluating the subdomain
         subdomain = request.host.partition(":")[0].replace(self.wildcard_config.domain, "").lower()
         if subdomain not in self.circuits:
-            raise GenericBadRequest(f"E20009: Subdomain {subdomain} not registered")
+            raise IngressFrontendNotRegisteredError(f"E20009: Subdomain {subdomain} not registered")
         return subdomain
 
     @web.middleware
@@ -100,10 +101,13 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
         async def _exception_safe_handler(request: web.Request) -> web.StreamResponse:
             slot = self.parse_slot(request)
             circuit = self.circuits[slot]
+            backend = self.backends[slot]
             with with_log_context(circuit_id=circuit.id):
-                self.ensure_allowed_ip(request, circuit)
+                ingress = await self._read_registered_ingress(circuit.to_ingress_frontend().key())
+                self.ensure_allowed_ip(request, ingress.access)
+                # TODO: Check the credential against ingress.access once an ingress carries the id
+                # its tokens name.
                 self.ensure_credential(request, circuit)
-                backend = self.backends[slot]
                 request["circuit"] = circuit
                 request["backend"] = backend
                 return await handler(request)

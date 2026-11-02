@@ -101,3 +101,18 @@ class IngressNotRegisteredError(BackendAIError, web.HTTPNotFound):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class IngressFrontendNotRegisteredError(BackendAIError, web.HTTPBadRequest):
+    """Raised when a request reaches a frontend slot that no Ingress or circuit serves."""
+
+    error_type = "https://api.backend.ai/probs/appproxy-worker/ingress-frontend-not-registered"
+    error_title = "No ingress is registered for the requested frontend."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.APPPROXY,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )

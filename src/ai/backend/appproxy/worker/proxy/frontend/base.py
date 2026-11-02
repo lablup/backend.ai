@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
 from abc import ABCMeta, abstractmethod
 
@@ -8,8 +9,17 @@ from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.types import (
     RouteInfo,
 )
+from ai.backend.appproxy.worker.errors.ingress import (
+    IngressFrontendNotRegisteredError,
+    IngressNotRegisteredError,
+)
 from ai.backend.appproxy.worker.proxy.backend.base import BaseBackend
 from ai.backend.appproxy.worker.types import Circuit, RootContext
+from ai.backend.common.dto.appproxy.v2.ingress.types import (
+    Ingress,
+    IngressAccess,
+    IngressFrontendKey,
+)
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -64,6 +74,29 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
         async with asyncio.TaskGroup() as tg:
             for circuit in list(self.circuits.values()):
                 tg.create_task(self.break_circuit(circuit))
+
+    async def _read_registered_ingress(self, frontend_key: IngressFrontendKey) -> Ingress:
+        try:
+            ingress = await self.root_context.ingress_state.reader.get(frontend_key)
+        except IngressNotRegisteredError as e:
+            raise IngressFrontendNotRegisteredError(
+                f"frontend {frontend_key} is not registered"
+            ) from e
+        if ingress is None:
+            raise IngressFrontendNotRegisteredError(f"frontend {frontend_key} was removed")
+        return ingress
+
+    @staticmethod
+    def _is_client_ip_allowed(client_ip: str | None, access: IngressAccess) -> bool:
+        if not access.allowed_client_ips:
+            return True
+        if not client_ip:
+            return False
+        try:
+            client_address = ipaddress.ip_address(client_ip)
+        except ValueError:
+            return False
+        return any(client_address in network for network in access.allowed_client_ips)
 
     @abstractmethod
     async def start(self) -> None:
