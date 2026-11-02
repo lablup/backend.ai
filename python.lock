@@ -1942,11 +1942,8 @@ dependencies = [
     { name = "pexpect" },
     { name = "prometheus-client" },
     { name = "psutil" },
-<<<<<<< HEAD
-    { name = "pycares" },
-=======
     { name = "pyasn1" },
->>>>>>> fd761e3d6 (deps(BA-8818): bump pyasn1 and the kernel tornado past their CVEs (#16266))
+    { name = "pycares" },
     { name = "pycryptodome" },
     { name = "pydantic", extra = ["email"] },
     { name = "pyhumps" },
@@ -2079,11 +2076,8 @@ requires-dist = [
     { name = "pexpect", specifier = "~=4.8" },
     { name = "prometheus-client", specifier = "~=0.21.1" },
     { name = "psutil", specifier = "~=7.0" },
-<<<<<<< HEAD
-    { name = "pycares", specifier = "~=4.11.0" },
-=======
     { name = "pyasn1", specifier = ">=0.6.5" },
->>>>>>> fd761e3d6 (deps(BA-8818): bump pyasn1 and the kernel tornado past their CVEs (#16266))
+    { name = "pycares", specifier = "~=4.11.0" },
     { name = "pycryptodome", specifier = ">=3.20.0" },
     { name = "pydantic", extras = ["email"], specifier = "~=2.11.3" },
     { name = "pyhumps", specifier = "~=3.8.0" },
