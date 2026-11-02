@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from typing import override
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -42,4 +44,19 @@ class InvalidFrontendTypeError(BackendAIError):
             domain=ErrorDomain.AGENT,
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.MISMATCH,
+        )
+
+
+class CircuitNotRegisteredError(BackendAIError, web.HTTPNotFound):
+    """Raised when the worker holds no circuit for the slot a request reaches."""
+
+    error_type = "https://api.backend.ai/probs/appproxy-worker/circuit-not-registered"
+    error_title = "No circuit is registered for this slot."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.APPPROXY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
         )

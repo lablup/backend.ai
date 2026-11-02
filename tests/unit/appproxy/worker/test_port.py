@@ -15,12 +15,17 @@ import pytest_mock
 from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
 
-from ai.backend.appproxy.common.errors import ClientIPNotAllowed, GenericBadRequest
+from ai.backend.appproxy.common.errors import ClientIPNotAllowed
 from ai.backend.appproxy.common.types import (
     AppMode,
     FrontendMode,
     ProxyProtocol,
     RouteInfo,
+)
+from ai.backend.appproxy.worker.errors.circuit import CircuitNotRegisteredError
+from ai.backend.appproxy.worker.errors.ingress import (
+    IngressNotFoundError,
+    IngressNotRegisteredError,
 )
 from ai.backend.appproxy.worker.ingress.factory import IngressState
 from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
@@ -28,6 +33,7 @@ from ai.backend.appproxy.worker.ingress.layered import LayeredIngressState
 from ai.backend.appproxy.worker.proxy.frontend.http.port import PortFrontend
 from ai.backend.appproxy.worker.types import Circuit, InferenceAppInfo, PortFrontendInfo
 from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAuthority
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import RuntimeVariant
 
 _AUTHORITY = IngressAuthority("worker-1")
@@ -84,10 +90,15 @@ class _IngressPresence(StrEnum):
 @dataclass(frozen=True)
 class _PortSlotCase:
     name: str
-    backend_registered: bool = True
+    circuit_registered: bool = True
     ingress_presence: _IngressPresence = _IngressPresence.HELD
     allowed_client_ips: list[str] = field(default_factory=list)
     client_ip: str = "10.0.0.1"
+
+
+@dataclass(frozen=True, kw_only=True)
+class _RejectedPortSlotCase(_PortSlotCase):
+    expected_error: type[BackendAIError]
 
 
 @dataclass(frozen=True)
@@ -95,6 +106,7 @@ class _PortSlotSituation:
     frontend: PortFrontend
     request: web.Request
     handler: AsyncMock
+    circuit: Circuit
     backend: MagicMock
     ensure_credential: MagicMock
 
@@ -128,8 +140,9 @@ async def port_slot_situation(
         reader=LayeredIngressState([in_memory], in_memory=in_memory), writer=None
     )
     frontend = PortFrontend(root_context=root_context)
-    backend = mocker.MagicMock(circuit=circuit)
-    if case.backend_registered:
+    backend = mocker.MagicMock()
+    if case.circuit_registered:
+        frontend.circuits[_PORT] = circuit
         frontend.backends[_PORT] = backend
     app = web.Application()
     app["port"] = _PORT
@@ -139,6 +152,7 @@ async def port_slot_situation(
             remote=case.client_ip
         ),
         handler=mocker.AsyncMock(return_value=web.Response(text="success")),
+        circuit=circuit,
         backend=backend,
         ensure_credential=mocker.patch.object(frontend, "ensure_credential"),
     )
@@ -175,9 +189,8 @@ async def serving_port_frontend(
         reader=LayeredIngressState([in_memory], in_memory=in_memory), writer=None
     )
     frontend = PortFrontend(root_context=root_context)
-    frontend.backends = {
-        unused_tcp_port: mocker.MagicMock(proxy_http=record_request_body, circuit=circuit)
-    }
+    frontend.circuits = {unused_tcp_port: circuit}
+    frontend.backends = {unused_tcp_port: mocker.MagicMock(proxy_http=record_request_body)}
     await frontend.start()
     yield _ServingPortFrontend(
         port=unused_tcp_port,
@@ -190,21 +203,29 @@ class TestPortFrontend:
     @pytest.mark.parametrize(
         "case",
         [
-            _PortSlotCase(
-                name="no-backend",
-                backend_registered=False,
-                ingress_presence=_IngressPresence.NEVER_HELD,
+            _RejectedPortSlotCase(
+                name="no-circuit",
+                circuit_registered=False,
+                expected_error=CircuitNotRegisteredError,
             ),
-            _PortSlotCase(name="ingress-never-held", ingress_presence=_IngressPresence.NEVER_HELD),
-            _PortSlotCase(name="ingress-removed", ingress_presence=_IngressPresence.REMOVED),
+            _RejectedPortSlotCase(
+                name="ingress-never-held",
+                ingress_presence=_IngressPresence.NEVER_HELD,
+                expected_error=IngressNotRegisteredError,
+            ),
+            _RejectedPortSlotCase(
+                name="ingress-removed",
+                ingress_presence=_IngressPresence.REMOVED,
+                expected_error=IngressNotFoundError,
+            ),
         ],
         ids=lambda case: case.name,
     )
     async def test_unregistered_slot_is_rejected(
-        self, case: _PortSlotCase, port_slot_situation: _PortSlotSituation
+        self, case: _RejectedPortSlotCase, port_slot_situation: _PortSlotSituation
     ) -> None:
         situation = port_slot_situation
-        with pytest.raises(GenericBadRequest):
+        with pytest.raises(case.expected_error):
             await situation.frontend.ensure_slot_middleware(situation.request, situation.handler)
         situation.handler.assert_not_awaited()
 
@@ -218,10 +239,9 @@ class TestPortFrontend:
         )
         assert isinstance(response, web.Response)
         assert response.text == "success"
+        assert situation.request["circuit"] is situation.circuit
         assert situation.request["backend"] is situation.backend
-        situation.ensure_credential.assert_called_once_with(
-            situation.request, situation.backend.circuit
-        )
+        situation.ensure_credential.assert_called_once_with(situation.request, situation.circuit)
 
     @pytest.mark.parametrize(
         "case",

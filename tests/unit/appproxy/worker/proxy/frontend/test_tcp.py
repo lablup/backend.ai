@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from enum import StrEnum
 from ipaddress import ip_network
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
@@ -21,10 +22,16 @@ _AUTHORITY = IngressAuthority("worker-1")
 _PORT = 10200
 
 
+class _IngressPresence(StrEnum):
+    HELD = "held"
+    REMOVED = "removed"
+    NEVER_HELD = "never-held"
+
+
 @dataclass(frozen=True)
 class _TCPConnectionCase:
     name: str
-    ingress_held: bool = True
+    ingress_presence: _IngressPresence = _IngressPresence.HELD
     allowed_client_ips: list[str] = field(default_factory=list)
     peer_ip: str = "10.0.0.1"
 
@@ -87,9 +94,15 @@ async def tcp_connection_situation(
             )
         }
     )
-    in_memory = InMemoryIngressState()
-    if case.ingress_held:
-        await in_memory.apply([ingress])
+    in_memory = InMemoryIngressState(negative_ttl=60.0)
+    match case.ingress_presence:
+        case _IngressPresence.HELD:
+            await in_memory.apply([ingress])
+        case _IngressPresence.REMOVED:
+            await in_memory.apply([ingress])
+            await in_memory.remove([ingress.key()])
+        case _IngressPresence.NEVER_HELD:
+            pass
     root_context = mocker.MagicMock()
     root_context.ingress_state = IngressState(
         reader=LayeredIngressState([in_memory], in_memory=in_memory), writer=None
@@ -108,7 +121,10 @@ class TestTCPFrontendPipe:
     @pytest.mark.parametrize(
         "case",
         [
-            _TCPConnectionCase(name="ingress-never-held", ingress_held=False),
+            _TCPConnectionCase(
+                name="ingress-never-held", ingress_presence=_IngressPresence.NEVER_HELD
+            ),
+            _TCPConnectionCase(name="ingress-removed", ingress_presence=_IngressPresence.REMOVED),
             _TCPConnectionCase(
                 name="peer-outside-the-allowlist",
                 allowed_client_ips=["192.168.0.0/24"],

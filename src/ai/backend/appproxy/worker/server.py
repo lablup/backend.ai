@@ -764,13 +764,12 @@ async def handle_proxy_route_event(
             log.debug("circuit routes updated: {}", event.circuit.id)
             updated_circuit = Circuit.from_serialized_circuit(event.circuit)
             await context.proxy_frontend.update_circuit_route_info(updated_circuit, event.routes)
-            # The frontend stores the new routes on the circuit of the backend it holds and skips a
-            # circuit it holds no backend of.
-            held_backend = context.proxy_frontend.backends.get(
+            # The frontend stores the new routes on the circuit it holds and skips one it does not.
+            held_circuit = context.proxy_frontend.circuits.get(
                 context.proxy_frontend.get_circuit_key(updated_circuit)
             )
-            if ingress_writer is not None and held_backend is not None:
-                await ingress_writer.apply([held_backend.circuit.to_ingress(ingress_authority)])
+            if ingress_writer is not None and held_circuit is not None:
+                await ingress_writer.apply([held_circuit.to_ingress(ingress_authority)])
         case AppProxyCircuitRemovedEvent():
             log.debug("circuits removed: {}", [str(c.id) for c in event.circuits])
             removed_circuits = [Circuit.from_serialized_circuit(c) for c in event.circuits]

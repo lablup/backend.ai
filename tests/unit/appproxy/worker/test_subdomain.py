@@ -99,9 +99,8 @@ async def serving_subdomain_frontend(
         reader=LayeredIngressState([in_memory], in_memory=in_memory), writer=None
     )
     frontend = SubdomainFrontend(root_context=root_context)
-    frontend.backends = {
-        _SUBDOMAIN: mocker.MagicMock(proxy_http=record_request_body, circuit=circuit)
-    }
+    frontend.circuits = {_SUBDOMAIN: circuit}
+    frontend.backends = {_SUBDOMAIN: mocker.MagicMock(proxy_http=record_request_body)}
     await frontend.start()
     yield _ServingSubdomainFrontend(
         port=unused_tcp_port,

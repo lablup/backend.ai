@@ -108,8 +108,8 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
         now = time.time()
         return [
-            backend.circuit
-            for backend in self.backends.values()
+            self.circuits[key]
+            for key, backend in self.backends.items()
             if (backend.last_used - now) >= threshold
         ]
 

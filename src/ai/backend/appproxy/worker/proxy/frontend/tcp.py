@@ -14,6 +14,10 @@ from ai.backend.appproxy.common.errors import (
 )
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
+from ai.backend.appproxy.worker.errors.ingress import (
+    IngressNotFoundError,
+    IngressNotRegisteredError,
+)
 from ai.backend.appproxy.worker.proxy.backend import TCPBackend
 from ai.backend.appproxy.worker.types import (
     Circuit,
@@ -127,8 +131,8 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
         now = time.time()
         return [
-            backend.circuit
-            for backend in self.backends.values()
+            self.circuits[key]
+            for key, backend in self.backends.items()
             if (backend.last_used - now) >= threshold
         ]
 
@@ -147,14 +151,19 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
             return
 
         with with_log_context(circuit_id=backend.circuit.id):
-            ingress = await self._read_ingress(
-                IngressFrontend(
-                    kind=IngressFrontendKind.PORT,
-                    protocol=IngressProtocol.TCP,
-                    port=IngressPortFrontend(number=circuit_key),
+            try:
+                ingress = await self._read_registered_ingress(
+                    IngressFrontend(
+                        kind=IngressFrontendKind.PORT,
+                        protocol=IngressProtocol.TCP,
+                        port=IngressPortFrontend(number=circuit_key),
+                    )
                 )
-            )
-            if ingress is None or not self._is_peer_allowed(writer, ingress.access):
+            except (IngressNotRegisteredError, IngressNotFoundError):
+                log.trace("rejecting a TCP connection to a slot with no ingress")
+                await self._close_writer(writer)
+                return
+            if not self._is_peer_allowed(writer, ingress.access):
                 await self._close_writer(writer)
                 return
 
