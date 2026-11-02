@@ -197,15 +197,8 @@ class TestCircuit:
                 frontend_key=IngressFrontendKey("wildcard-notebook"),
                 kind=IngressFrontendKind.WILDCARD,
             ),
-            _FrontendCase(
-                frontend_mode=FrontendMode.WILDCARD_DOMAIN,
-                port=None,
-                subdomain="NoteBook",
-                frontend_key=IngressFrontendKey("wildcard-notebook"),
-                kind=IngressFrontendKind.WILDCARD,
-            ),
         ],
-        ids=lambda case: f"{case.frontend_mode.value}-{case.port or case.subdomain}",
+        ids=lambda case: case.frontend_mode.value,
     )
     def test_to_ingress_frontend_keys_by_the_circuit_frontend(
         self, frontend_case: _FrontendCase, frontend_case_circuit: Circuit

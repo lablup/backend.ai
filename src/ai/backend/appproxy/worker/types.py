@@ -524,8 +524,7 @@ class Circuit(SerializableCircuit):
                 return IngressFrontend(
                     kind=IngressFrontendKind.WILDCARD,
                     protocol=protocol,
-                    # The subdomain frontends match the lowercased request host.
-                    wildcard=WildcardFrontend(subdomain=subdomain.lower()),
+                    wildcard=WildcardFrontend(subdomain=subdomain),
                 )
             case _:
                 raise UnreachableError("a circuit holds only a port or subdomain frontend")
