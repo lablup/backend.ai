@@ -7,6 +7,7 @@ from typing import Any, Self, override
 from pydantic import field_validator, model_validator
 
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.common.data.permission.types import Permission, role_scope_types
@@ -58,6 +59,13 @@ class RolePresetSeed(SeedItem):
             raise ValueError("a global role names its scope")
         if not is_global and self.scope is not None:
             raise ValueError(f"a {self.scope_type} role is created in every {self.scope_type}")
+        return self
+
+    @model_validator(mode="after")
+    def _owner_assign_on_a_project(self) -> Self:
+        """Only a project has an owner to hand a role to."""
+        if self.auto_assign_to_owner and self.scope_type != ProjectEntityType():
+            raise ValueError(f"a {self.scope_type} role has no owner to assign to")
         return self
 
     @model_validator(mode="before")

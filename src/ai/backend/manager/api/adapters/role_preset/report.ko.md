@@ -23,10 +23,10 @@
   - atomic_bulk_add_permissions: 성공 있음 1 · 실패 있음 1 (single_entity)
   - bulk_add_permissions: 성공 없음 · 실패 없음 (single_entity): SCENARIO-GAP
   - bulk_remove_permissions: 성공 없음 · 실패 없음 (partial_bulk_field): SCENARIO-GAP
-  - create: 성공 없음 · 실패 없음 (scope): SCENARIO-GAP
+  - create: 성공 있음 1 · 실패 없음 (scope): SCENARIO-GAP
   - partial_bulk_remove_permissions: 성공 있음 2 · 실패 없음 (partial_bulk_field): SCENARIO-GAP
-  - partial_bulk_update: 성공 있음 2 · 실패 없음 (partial_bulk): SCENARIO-GAP
-  - update: 성공 있음 1 · 실패 있음 1 (single_entity)
+  - partial_bulk_update: 성공 있음 3 · 실패 없음 (partial_bulk): SCENARIO-GAP
+  - update: 성공 있음 2 · 실패 있음 2 (single_entity)
 
 **delete**
 
@@ -76,6 +76,12 @@
 | [슈퍼관리자가 항목 없는 프리셋에 권한 항목 둘을 넣으면, 넣은 두 항목이 그 프리셋 아래에 온다](#permission_editing-the-superadmin-adds-entries-to-a-preset) | 성공 |
 | [아무 권한도 받지 않은 사용자가 프리셋에 권한 항목을 넣으려 하면, 권한 부족으로 거부된다](#permission_editing-a-user-granted-nothing-may-not-add-entries) | 거부 |
 
+**create**
+
+| 시나리오 | 판정 |
+|---|---|
+| [프로젝트 스코프 프리셋을 소유자 부여를 켜고 만들면, 켜진 프리셋이 온다](#creating-a-project-preset-is-made-with-owner-assign) | 성공 |
+
 **partial_bulk_remove_permissions**
 
 | 시나리오 | 판정 |
@@ -88,13 +94,16 @@
 | 시나리오 | 판정 |
 |---|---|
 | [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | 성공 |
+| [프로젝트 스코프와 도메인 스코프 프리셋의 소유자 부여를 한 번에 켜면, 프로젝트 스코프 프리셋만 고쳐지고 도메인 스코프 프리셋은 실패 목록에 온다](#partial_bulk_editing-only-the-project-preset-takes-owner-assign) | 성공 |
 | [슈퍼관리자가 프리셋 여럿의 자동 부여를 한 번에 켜면, 모두 새 값으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | 성공 |
 
 **update**
 
 | 시나리오 | 판정 |
 |---|---|
+| [프로젝트 스코프 프리셋의 소유자 부여를 켜면, 켜진 프리셋 전체가 온다](#editing-a-project-preset-takes-owner-assign) | 성공 |
 | [슈퍼관리자가 프리셋 이름을 바꾸면, 새 이름을 실은 프리셋 전체가 온다](#editing-the-superadmin-renames-a-preset) | 성공 |
+| [프로젝트 외 스코프 프리셋의 소유자 부여를 켜려 하면, 소유자가 없어 거부된다](#editing-a-domain-preset-refuses-owner-assign) | 거부 |
 | [아무 권한도 받지 않은 사용자가 프리셋 이름을 바꾸려 하면, 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-rename-a-preset) | 거부 |
 
 ### delete
@@ -552,6 +561,34 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
+### create
+
+<a id="creating-a-project-preset-is-made-with-owner-assign"></a>
+
+#### [a-project-preset-is-made-with-owner-assign](/tests/scenario/bai_scenario/manager/role_preset/test_creating.py): pass
+
+프로젝트 스코프 프리셋을 소유자 부여를 켜고 만들면, 켜진 프리셋이 온다
+
+Given
+
+- 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- RolePresetAdapter.create: user-1이 소유자 부여를 켠 프로젝트 스코프 프리셋을 만듦
+
+Then
+
+- 소유자 부여가 켜진 프리셋이 온다
+  - name = 'made-preset'
+  - auto_assign_to_owner = True
+
 ### partial_bulk_remove_permissions
 
 <a id="permission_editing-a-user-granted-nothing-removes-none-of-the-entries"></a>
@@ -664,6 +701,44 @@ Then
   - failed[1].id: 대상의 id와 같다
   - failed[1].message: 'Insufficient permission'를 담은 이유
 
+<a id="partial_bulk_editing-only-the-project-preset-takes-owner-assign"></a>
+
+#### [only-the-project-preset-takes-owner-assign](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_editing.py): pass
+
+프로젝트 스코프와 도메인 스코프 프리셋의 소유자 부여를 한 번에 켜면, 프로젝트 스코프 프리셋만 고쳐지고 도메인 스코프 프리셋은 실패 목록에 온다
+
+Given
+
+- 프로젝트 스코프 프리셋과 도메인 스코프 프리셋 하나씩과, superadmin 한 명
+  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
+  - 역할 프리셋 preset-2: domain 스코프용이고 자동 부여는 꺼져 있다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- RolePresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 소유자 부여를 한 번에 켬
+
+Then
+
+- 프로젝트 스코프 프리셋만 고쳐져 오고, 도메인 스코프 프리셋은 실패 목록에 온다
+  - successes count = 1
+  - failed count = 1
+  - successes[0].auto_assign_to_owner = True
+  - successes[0].id: 미리 만든 프리셋의 id와 같다
+  - successes[0].entity_id: 미리 만든 프리셋의 id와 같다
+  - successes[0].name = 'preset-1'
+  - successes[0].scope_type = 'project'
+  - successes[0].auto_assign = False
+  - successes[0].deleted = False
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].updated_at: 이 실행이 쓴 시각
+  - failed[0].id: 두 번째 프리셋의 id와 같다
+
 <a id="partial_bulk_editing-the-superadmin-edits-several-presets-at-once"></a>
 
 #### [the-superadmin-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_editing.py): pass
@@ -710,6 +785,40 @@ Then
 
 ### update
 
+<a id="editing-a-project-preset-takes-owner-assign"></a>
+
+#### [a-project-preset-takes-owner-assign](/tests/scenario/bai_scenario/manager/role_preset/test_editing.py): pass
+
+프로젝트 스코프 프리셋의 소유자 부여를 켜면, 켜진 프리셋 전체가 온다
+
+Given
+
+- 이미 있는 프리셋 하나와, superadmin 한 명
+  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- RolePresetAdapter.update: user-1이 preset-1의 소유자 부여를 켬
+
+Then
+
+- 소유자 부여가 켜진 프리셋 전체가 온다
+  - auto_assign_to_owner = True
+  - id: 미리 만든 프리셋의 id와 같다
+  - entity_id: 미리 만든 프리셋의 id와 같다
+  - name = 'preset-1'
+  - scope_type = 'project'
+  - auto_assign = False
+  - deleted = False
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
+
 <a id="editing-the-superadmin-renames-a-preset"></a>
 
 #### [the-superadmin-renames-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_editing.py): pass
@@ -742,6 +851,32 @@ Then
   - deleted = False
   - created_at: 이 실행이 쓴 시각
   - updated_at: 이 실행이 쓴 시각
+
+<a id="editing-a-domain-preset-refuses-owner-assign"></a>
+
+#### [a-domain-preset-refuses-owner-assign](/tests/scenario/bai_scenario/manager/role_preset/test_editing.py): pass
+
+프로젝트 외 스코프 프리셋의 소유자 부여를 켜려 하면, 소유자가 없어 거부된다
+
+Given
+
+- 이미 있는 domain 스코프 프리셋 하나와, superadmin 한 명
+  - 역할 프리셋 preset-1: domain 스코프용이고 자동 부여는 꺼져 있다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- RolePresetAdapter.update: user-1이 preset-1의 소유자 부여를 켬
+
+Then
+
+- 거부된다
+  - 거부: RolePresetOwnerAssignNotAllowed
 
 <a id="editing-a-user-granted-nothing-may-not-rename-a-preset"></a>
 

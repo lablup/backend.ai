@@ -3826,6 +3826,11 @@ input CreateRolePresetInput {
   """
   autoAssign: Boolean! = false
 
+  """
+  Added in 26.10.0. Whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.
+  """
+  autoAssignToOwner: Boolean! = false
+
   """Permission entries carried by the preset."""
   permissions: [RolePermissionPresetEntryInput!]!
 }
@@ -18671,6 +18676,11 @@ type RolePreset implements Node {
   autoAssign: Boolean!
 
   """
+  Added in 26.10.0. Whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.
+  """
+  autoAssignToOwner: Boolean!
+
+  """
   Soft-delete flag. Set by the delete mutation and cleared by the restore mutation; archived rows are excluded from default searches.
   """
   deleted: Boolean! @deprecated(reason: "Deprecated since 26.10.0. Use `deletedAt`.")
@@ -18727,6 +18737,9 @@ input RolePresetFilter {
 
   """Filter by auto-assign flag."""
   autoAssign: Boolean = null
+
+  """Added in 26.10.0. Filter by the assign-to-owner flag."""
+  autoAssignToOwner: Boolean = null
 
   """
   Filter by soft-delete flag. Searches exclude soft-deleted rows by default; set this explicitly to `true` to inspect archived presets.
@@ -22775,6 +22788,11 @@ input UpdateRolePresetBodyInput {
   Updated default value for the `auto_assign` flag of instantiated roles.
   """
   autoAssign: Boolean
+
+  """
+  Added in 26.10.0. Updated value for whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.
+  """
+  autoAssignToOwner: Boolean
 }
 
 """
@@ -22791,6 +22809,11 @@ input UpdateRolePresetInput {
   Updated default value for the `auto_assign` flag of instantiated roles.
   """
   autoAssign: Boolean
+
+  """
+  Added in 26.10.0. Updated value for whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.
+  """
+  autoAssignToOwner: Boolean
 }
 
 """Added in 26.4.4. Payload returned after updating a role preset."""

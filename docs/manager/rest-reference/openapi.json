@@ -20546,6 +20546,12 @@
             "title": "Auto Assign",
             "type": "boolean"
           },
+          "auto_assign_to_owner": {
+            "default": false,
+            "description": "Added in 26.10.0. Whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.",
+            "title": "Auto Assign To Owner",
+            "type": "boolean"
+          },
           "permissions": {
             "description": "Permission entries carried by the preset.",
             "items": {
@@ -20804,6 +20810,19 @@
             "default": null,
             "description": "Filter by auto-assign flag.",
             "title": "Auto Assign"
+          },
+          "auto_assign_to_owner": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by the assign-to-owner flag.",
+            "title": "Auto Assign To Owner"
           },
           "deleted": {
             "anyOf": [
@@ -21219,6 +21238,19 @@
             "default": null,
             "description": "Updated default value for the `auto_assign` flag of instantiated roles.",
             "title": "Auto Assign"
+          },
+          "auto_assign_to_owner": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Updated value for whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.",
+            "title": "Auto Assign To Owner"
           }
         },
         "title": "UpdateRolePresetBody",

@@ -10,6 +10,7 @@ import yaml
 from click.testing import CliRunner
 
 from ai.backend.manager.cli.seed import cli
+from ai.backend.manager.errors.seed import InvalidSeedDocument
 from ai.backend.manager.seed.factory import create_seed_kind_registry
 from ai.backend.manager.seed.role_preset.kinds import PermissionKinds
 from ai.backend.manager.seed.role_preset.seed import RolePresetSeed
@@ -102,3 +103,17 @@ class TestRolePresetSeedCheck:
     )
     def test_an_item_breaking_a_rule_fails(self, item: dict[str, Any]) -> None:
         assert len(RolePresetSeed.model_validate(item).check()) == 1
+
+    def test_a_project_role_takes_owner_assign(self) -> None:
+        item = _role("admin", "0198a5a0-0000-7000-8000-000000000001", {})
+        seed = RolePresetSeed.model_validate({**item, "auto_assign_to_owner": True})
+        assert seed.auto_assign_to_owner is True
+
+    def test_a_role_outside_the_project_scope_refuses_owner_assign(self) -> None:
+        item = _role("admin", "0198a5a0-0000-7000-8000-000000000001", {})
+        with pytest.raises(InvalidSeedDocument):
+            RolePresetSeed.model_validate({
+                **item,
+                "scope_type": "domain",
+                "auto_assign_to_owner": True,
+            })
