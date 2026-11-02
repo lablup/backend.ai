@@ -76,7 +76,6 @@ from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import PreemptionMode, PreemptionOrder, SlotQuantity
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.deployment.options import (
-    agent_selection_policy_from_input,
     deployment_handler_options_from_input,
     deployment_options_to_info,
 )
@@ -93,6 +92,7 @@ from ai.backend.manager.data.resource_group.types import (
     ResourceGroupData,
     SchedulerType,
 )
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import (
@@ -1126,7 +1126,11 @@ class ResourceGroupAdapter(BaseAdapter):
                 resource_group_id=await self.lookup_name(name),
                 resource_group=name,
                 handler_options=handler_options,
-                agent_selection_policy=agent_selection_policy_from_input(input.options),
+                agent_selection_policy=(
+                    AgentSelectionPolicy(input.options.agent_selection_policy.value)
+                    if input.options.agent_selection_policy is not None
+                    else None
+                ),
             )
         )
         return ReplaceResourceGroupDefaultDeploymentOptionsPayload(

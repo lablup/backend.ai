@@ -184,7 +184,6 @@ from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.tristate.unset import Unset
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.api.adapter_options.deployment.options import (
-    agent_selection_policy_from_input,
     deployment_handler_options_from_input,
     deployment_options_to_info,
 )
@@ -232,6 +231,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
@@ -901,7 +901,11 @@ class DeploymentAdapter(BaseAdapter):
             ReplaceDeploymentOptionsAction(
                 deployment_id=deployment_id,
                 handler_options=handler_options,
-                agent_selection_policy=agent_selection_policy_from_input(input.options),
+                agent_selection_policy=(
+                    AgentSelectionPolicy(input.options.agent_selection_policy.value)
+                    if input.options.agent_selection_policy is not None
+                    else None
+                ),
             )
         )
         return ReplaceDeploymentOptionsPayload(
