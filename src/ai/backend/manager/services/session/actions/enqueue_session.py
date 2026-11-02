@@ -9,12 +9,19 @@ from typing import override
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.types import AccessKey, ClusterMode, MountInfoEntry, SessionTypes
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionData
+from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
+from ai.backend.manager.models.session_group.searchers import SessionGroupSearcher
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.session.base import (
     SessionScopeAction,
@@ -97,6 +104,7 @@ class EnqueueSessionAction(SessionScopeAction):
 
     tag: str | None = None
     callback_url: str | None = None
+    session_group_id: SessionGroupID | None = None
 
     user_id: uuid.UUID = field(default_factory=lambda: uuid.UUID(int=0))
     user_role: UserRole = UserRole.USER
@@ -122,6 +130,41 @@ class EnqueueSessionAction(SessionScopeAction):
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
+
+    def to_owned_session_group_searcher(self, owner_user_id: UserID) -> SessionGroupSearcher | None:
+        """The live session group named, owned by ``owner_user_id`` in the project;
+        ``None`` when none is named."""
+        conditions = self._owned_session_group_conditions(owner_user_id)
+        if conditions is None:
+            return None
+        return SessionGroupSearcher(pagination=NoPagination(), conditions=conditions)
+
+    def to_held_session_group_searcher(self, owner_user_id: UserID) -> SessionGroupSearcher | None:
+        """The owned session group named, only when a replica group holds it;
+        ``None`` when none is named."""
+        conditions = self._owned_session_group_conditions(owner_user_id)
+        if conditions is None:
+            return None
+        return SessionGroupSearcher(
+            pagination=NoPagination(),
+            conditions=[
+                *conditions,
+                SessionGroupSearchableFields.linked.replica_groups.exists(),
+            ],
+        )
+
+    def _owned_session_group_conditions(self, owner_user_id: UserID) -> list[QueryCondition] | None:
+        if self.session_group_id is None:
+            return None
+        fields = SessionGroupSearchableFields.own
+        return [
+            fields.id.filter.equals(UUIDEqualMatchSpec(value=self.session_group_id, negated=False)),
+            fields.owner_user_id.filter.equals(
+                UUIDEqualMatchSpec(value=owner_user_id, negated=False)
+            ),
+            fields.project_id.filter.equals(UUIDEqualMatchSpec(value=self.group_id, negated=False)),
+            fields.deleted_at.filter.is_null(),
+        ]
 
 
 @dataclass

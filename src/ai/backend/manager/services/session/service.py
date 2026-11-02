@@ -99,6 +99,10 @@ from ai.backend.manager.errors.resource import (
     NoCurrentTaskContext,
     SessionTemplateNotFound,
 )
+from ai.backend.manager.errors.session_group import (
+    SessionGroupInUseForEnqueue,
+    SessionGroupNotFound,
+)
 from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.session.row import (
@@ -1492,9 +1496,9 @@ class SessionService:
         Builds a :class:`SessionSpecDraft` inline from the caller-supplied
         action, resolves delegation (``action.owner_id``), and hands the
         draft straight to the scheduling controller. The controller owns
-        every DB read the preparer / validator chain needs — this
-        service just extracts values from the action and shapes them
-        into the draft.
+        every DB read the preparer / validator chain needs; this service
+        reads only the session group the action names, to check it belongs
+        to the session's owner and project.
         """
         user_id = action.user_id
         access_key = action.access_key
@@ -1519,6 +1523,18 @@ class SessionService:
             user_id = owner.id
             access_key = owner_access_key
             domain_name = owner.domain_name
+
+        owned_session_group_searcher = action.to_owned_session_group_searcher(UserID(user_id))
+        held_session_group_searcher = action.to_held_session_group_searcher(UserID(user_id))
+        if owned_session_group_searcher is not None and held_session_group_searcher is not None:
+            if not await self._scheduler_repository.search_session_groups(
+                owned_session_group_searcher
+            ):
+                raise SessionGroupNotFound(f"Session group {action.session_group_id} not found")
+            if await self._scheduler_repository.search_session_groups(held_session_group_searcher):
+                raise SessionGroupInUseForEnqueue(
+                    f"Session group {action.session_group_id} is used by a replica group"
+                )
 
         # Keep the image resolve so callers passing a stale UUID get a
         # sharp error here instead of deep inside the preparer chain.
@@ -1642,6 +1658,7 @@ class SessionService:
                 project_id=ProjectID(action.group_id),
                 resource_group_id=resource_group_id,
                 resource_group_name=resource_group_name,
+                session_group_id=action.session_group_id,
             ),
         )
 
