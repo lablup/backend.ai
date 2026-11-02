@@ -8,8 +8,8 @@ The Event Dispatcher system provides asynchronous event-based communication betw
 
 **Important Notes:**
 - Message production and delivery are not guaranteed. Messages may be lost, so caution is required.
-- **Broadcast**: Attempts delivery to all subscribers, but message loss is possible. Use only for fast feedback, and it's recommended to use other mechanisms like polling for critical notifications.
-- **Anycast**: Delivered to only one consumer in the consumer group. Use when the task can be performed on any single server among multiple servers (task distribution, load balancing).
+- **Broadcast**: Attempts delivery to all subscribers, but message loss is possible. Use it only for fast feedback, and it is recommended to use another mechanism such as polling for critical notifications.
+- **Anycast**: Delivered to only one consumer in the consumer group. Use it when the task can be performed on any single server among multiple servers, such as for task distribution or load balancing.
 
 ## Architecture
 
@@ -63,7 +63,7 @@ Component that consumes events from the message queue and routes them to registe
 | Type | Anycast (Consumer) | Broadcast (Subscriber) |
 |------|-------------------|----------------------|
 | Processing | One of all subscribers processes | All subscribed servers can process |
-| Use Cases | Task distribution, load balancing | Notifications, state synchronization |
+| Use cases | Task distribution, load balancing | Notifications, state synchronization |
 | Message Queue | Uses Consumer Group | Independent stream per subscriber |
 
 ### 3. EventHandler
@@ -80,7 +80,7 @@ event_types/
 ├── session/         # Session lifecycle events
 ├── bgtask/          # Background task events
 ├── agent/           # Agent events
-├── vfolder/         # Virtual folder events
+├── vfolder/         # Vfolder events
 ├── volume/          # Volume events
 ├── image/           # Image events
 ├── schedule/        # Scheduling events
@@ -117,13 +117,13 @@ event_types/
 
 **Agent**: Publishes kernel state events, subscribes to session execution requests
 
-**Storage Proxy**: Subscribes to folder deletion events and performs cleanup tasks
+**Storage proxy**: Subscribes to folder deletion events and performs cleanup tasks
 
 ## Message Queue Integration
 
-Event Dispatcher is currently implemented based on Redis Streams.
+Event Dispatcher is currently implemented based on Valkey streams.
 
-- **Anycast**: Uses Consumer Group so only one consumer processes
+- **Anycast**: Uses a consumer group so that only one consumer processes
 - **Broadcast**: Each subscriber consumes from independent stream
 
 ## Monitoring
@@ -135,7 +135,7 @@ System status can be monitored by automatically collecting event processing succ
 ### When Handler Raises Exception
 
 - **Broadcast Events**: Continue processing without affecting other handlers
-- **Anycast Events**: Message moves to reprocessing queue (retry possible)
+- **Anycast Events**: Message moves to reprocessing queue (retry is possible)
 
 ### Retry Strategy
 
@@ -150,10 +150,10 @@ Automatic retry is configured at message queue level:
 
 - **Async Processing**: All handlers written as async functions
 - **Avoid Blocking Operations**: CPU-intensive tasks separated into separate threads/processes
-- **Lightweight Handlers**: Keep handlers lightweight and delegate heavy tasks to Background Tasks
+- **Lightweight Handlers**: Keep handlers lightweight and delegate heavy tasks to background tasks
 
-## Related Documentation
+## Related documents
 
-- [Background Task System](../bgtask/README.md) - Long-running task processing
-- [Message Queue](../message_queue/) - Message queue interface and implementation
-- [Manager Events API](../../manager/api/events.py) - SSE-based event streaming
+- [Background task system](../bgtask/README.md) - Long-running task processing
+- [Message queue](../message_queue/) - Message queue interface and implementation
+- [Manager Event Stream API](../../manager/api/events.py) - Event streaming via the Event Stream API

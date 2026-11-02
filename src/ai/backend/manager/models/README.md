@@ -1,59 +1,59 @@
 # DB ORM Model Design Guidelines
 
-This document provides guidelines for designing SQLAlchemy ORM models in Backend.AI Manager.
+This document holds guidelines for designing SQLAlchemy ORM models in the Backend.AI manager.
 
 ## Core Principles
 
 ### Responsibility Scope
 
-- **models**: Table schema definition, column types, relationships, indexes, `to_data()` conversion methods
-- **repositories**: All query logic (CRUD, retrieval, aggregation, etc.)
+- **models**: Table schema definition, column types, relationships, indexes, and `to_data()` conversion methods
+- **repositories**: All query logic (create, get, update, delete, retrieval, aggregation, and the like)
 
-Query-related methods (`get_by_id`, `list_by_condition`, etc.) should be implemented in repositories, not models.
+Query methods such as `get_by_id` and `list_by_condition` belong in repositories, not models.
 
 ### Model Definition
 
-- Define ORM Row classes by inheriting from `Base`
-- Specify table name using `__tablename__` attribute (plural snake_case: `sessions`, `kernels`)
+- Define ORM Row classes by inheriting from `Base`.
+- Set the table name with the `__tablename__` attribute (plural snake_case: `sessions`, `kernels`).
 
 ## Column Types
 
 ### Primary Key
 
-- Use `IDColumn()` recommended
-- Domain-specific ID types ensure type safety: `SessionIDColumn()`, `KernelIDColumn()`, `EndpointIDColumn()`
+- Prefer `IDColumn()`.
+- Domain-specific ID types ensure type safety: `SessionIDColumn()`, `KernelIDColumn()`, `EndpointIDColumn()`.
 
 ### Reference Columns
 
-- Use ID(UUID) columns without DB-level Foreign Key constraints
-- Related rows are fetched by repository queries, not via `relationship()`
+- Use ID (UUID) columns without a DB-level foreign key constraint.
+- Repositories fetch related rows in queries, not through `relationship()`.
 
 ### Enum
 
-- Use `StrEnumType` to store as string
-- Beneficial for debugging and migration
+- Use `StrEnumType` to store the value as a string.
+- This helps debugging and migration.
 
 ### JSONB
 
-- Stored as unstructured data in DB, but define structure with Pydantic models on server side for type safety
-- `StructuredJSONObjectColumn`, `StructuredJSONObjectListColumn` automatically integrate with Pydantic models
-- JSONB internal fields cannot use SQL aggregation → process in Python
+- The value is stored as unstructured data in the DB. Define its structure with Pydantic models on the server side for type safety.
+- `StructuredJSONObjectColumn` and `StructuredJSONObjectListColumn` integrate with Pydantic models automatically.
+- SQL aggregation cannot access fields inside JSONB, so process them in Python.
 
 ### Date/Time
 
-- Always use `sa.DateTime(timezone=True)` (stored in UTC)
-- Recommend creating `created_at` column (supports cursor pagination)
-- Timestamps like `created_at`, `updated_at` should be automatically recorded based on DB time, not manually set
+- Always use `sa.DateTime(timezone=True)`, stored in UTC.
+- Create a `created_at` column (it supports cursor pagination).
+- Record timestamps such as `created_at` and `updated_at` from DB time automatically, not by hand.
   - On creation: `server_default=sa.func.now()`
   - On update: `onupdate=sa.func.now()` or `server_onupdate=sa.func.now()`
 
 ## Default Value Settings
 
-Use only one of `server_default` or `default`. Choose appropriately based on use case.
+Use only one of `server_default` and `default`. Choose by use case.
 
 ### server_default
 
-Sets default at DB level. Applied even when executing SQL directly.
+Sets the default at the DB level. It applies even when SQL runs directly.
 
 - Timestamps: `created_at`, `updated_at`
 - UUID auto-generation
@@ -62,51 +62,51 @@ Sets default at DB level. Applied even when executing SQL directly.
 
 ### default
 
-Sets default at Python level. Applied only when creating via ORM.
+Sets the default at the Python level. It applies only when a row is created through the ORM.
 
-- Mutable objects like empty dict/list: `environ`, `tags`
-- Python constant references: `priority` (SESSION_PRIORITY_DEFAULT, etc.)
-- When specifying Enum default as Python object: `status`
-- When dynamic generation via callable is needed
+- Mutable objects such as an empty dict or list: `environ`, `tags`
+- Python constant references: `priority` (`SESSION_PRIORITY_DEFAULT` and the like)
+- An Enum default given as a Python object: `status`
+- A value that needs dynamic generation through a callable
 
 ### When Not to Use Default Values
 
-- Required input fields: Columns that must be explicitly specified on creation (`name`, `user_uuid`, etc.)
-- Reference columns: Reference target must be explicitly specified
-- When `nullable=True` and NULL itself is a meaningful default state: `terminated_at`, `deleted_at`
+- Required input fields: columns that must be set explicitly on creation (`name`, `user_uuid`, and the like)
+- Reference columns: the reference target must be set explicitly
+- A column with `nullable=True` where NULL is a meaningful default state: `terminated_at`, `deleted_at`
 
 ### Usage with nullable
 
-- `nullable=False` + `server_default`: Default value applied to existing rows during migration
-- `nullable=True` + `default=sa.null()`: Explicitly allow NULL
+- `nullable=False` and `server_default`: the default value applies to existing rows during migration.
+- `nullable=True` and `default=sa.null()`: allow NULL explicitly.
 
 ## Relationship Definition
 
-- Do not define new `relationship()` attributes on Row classes — fetch related rows with repository queries
-- Existing relationships are being removed; when the last reference to one disappears, delete it together with its `back_populates` pair on the other side
+- Define no new `relationship()` attributes on Row classes. Fetch related rows with repository queries.
+- Existing relationships are being removed. When the last reference to one disappears, delete it together with its `back_populates` pair on the other side.
 - Association table naming: `association_{tableA}_{tableB}`
 
 ## Index Design
 
-Consider indexes for the following columns:
+Consider indexes for these columns:
 
-- **WHERE clause**: Frequently filtered columns like `status`, `domain_name`, `scaling_group_name`
-- **ORDER BY clause**: Columns used for sorting like `created_at`, `priority`
-- **Reference columns**: Improves lookup performance for queries on referenced rows
-- **Compound conditions**: Column combinations frequently used together
+- **WHERE clause**: columns that are filtered often, such as `status`, `domain_name`, `scaling_group_name`
+- **ORDER BY clause**: columns used for sorting, such as `created_at`, `priority`
+- **Reference columns**: these improve lookup performance for queries on referenced rows
+- **Compound conditions**: column combinations used together often
 
 Index types:
 - Single column: `index=True`
-- Compound/GIN/Conditional: Use `sa.Index()` in `__table_args__`
+- Compound/GIN/conditional: use `sa.Index()` in `__table_args__`
 
 ## Data Conversion
 
 ### to_data() Method
 
-Implement `to_data()` method to convert ORM Row to dataclass.
+Implement `to_data()` to convert an ORM Row to a dataclass.
 
-- Convert Enum values to appropriate types
-- Convert JSONB data to structured models using Pydantic `model_validate()`
+- Convert Enum values to the appropriate types.
+- Convert JSONB data to structured models with Pydantic `model_validate()`.
 
 ## Naming Conventions
 
@@ -124,13 +124,13 @@ Implement `to_data()` method to convert ORM Row to dataclass.
 
 When adding a new model:
 
-- [ ] Inherit `Base`, define `__tablename__`
-- [ ] Primary Key: `IDColumn()` or domain-specific ID
-- [ ] Reference columns: ID(UUID) based, no DB-level FK constraints
-- [ ] Explicitly specify `nullable`
-- [ ] Set `server_default` or `default` (only one)
-- [ ] Include `created_at` column (cursor pagination)
-- [ ] Add necessary indexes (consider WHERE, ORDER BY)
-- [ ] No `relationship()` attributes — related rows come from repository queries
-- [ ] Implement `to_data()` conversion method
-- [ ] Generate Alembic migration
+- [ ] Inherit `Base` and define `__tablename__`.
+- [ ] Primary key: `IDColumn()` or a domain-specific ID
+- [ ] Reference columns: ID (UUID) based, with no DB-level foreign key constraint
+- [ ] Set `nullable` explicitly
+- [ ] Set `server_default` or `default`, one only
+- [ ] Include a `created_at` column (cursor pagination)
+- [ ] Add the necessary indexes (consider WHERE and ORDER BY)
+- [ ] No `relationship()` attributes: related rows come from repository queries
+- [ ] Implement the `to_data()` conversion method
+- [ ] Generate an Alembic migration

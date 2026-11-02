@@ -4,7 +4,7 @@ Generic single-database configuration.
 
 ## Migration Backport Strategy
 
-This section describes how to safely backport Alembic migrations to release branches
+This section describes how to backport Alembic migrations to release branches safely
 while keeping the main branch consistent.
 
 The same strategy applies to all components:
@@ -12,25 +12,25 @@ The same strategy applies to all components:
 | Component | Alembic directory |
 |---|---|
 | Manager | `src/ai/backend/manager/models/alembic/` |
-| Account Manager | `src/ai/backend/account_manager/models/alembic/` |
-| App Proxy Coordinator | `src/ai/backend/appproxy/coordinator/models/alembic/` |
+| account manager | `src/ai/backend/account_manager/models/alembic/` |
+| app proxy coordinator | `src/ai/backend/appproxy/coordinator/models/alembic/` |
 
 ### Principles
 
-1. **Fixes only** -- Backport migrations must contain schema fixes only (e.g., missing
+1. **Fixes only**: a backport migration contains schema fixes only (for example, missing
    columns, incorrect types, enum coexistence issues). Feature-level schema changes are
    never backported.
-2. **Idempotent** -- Both the backport migration and its duplicate on main must be
-   idempotent so they are safe to re-apply on databases that may already have the change.
-3. **No manual revision editing** -- Never modify the `revision` or `down_revision` of
+2. **Idempotent**: both the backport migration and its duplicate on main are
+   idempotent, so they are safe to re-apply on databases that may already have the change.
+3. **No manual revision editing**: do not modify the `revision` or `down_revision` of
    an existing migration that has already been released. Editing `down_revision` is
    allowed only when inserting a backport migration into the main branch chain before
    the change is merged (see Step 2 below).
-4. **Single head** -- The migration chain must resolve to a single head. Keep it linear
-   by fixing `down_revision` pointers when *your own unmerged* migration diverged; use an
+4. **Single head**: the migration chain must resolve to a single head. Keep it linear
+   by fixing `down_revision` pointers when *your own unmerged* migration diverged. Use an
    empty merge migration only when *main itself* already has two or more released heads.
    When merging released heads, do **not** edit the existing migrations'
-   `revision`/`down_revision` pointers — they may already be released.
+   `revision`/`down_revision` pointers, because they may already be released.
    Generate the empty merge migration with `./py -m alembic merge heads`.
 
 ### Backport Procedure
@@ -43,8 +43,8 @@ a  -->  b  -->  c        (a = backport target head, c = main head)
 
 #### Step 1: Create migration `d` on the release branch
 
-On the release branch, create a new migration whose `down_revision` is `a` (the
-release branch head at the point you are targeting):
+On the release branch, create a new migration whose `down_revision` is `a`, the
+release branch head at the point you are targeting:
 
 ```
 a  -->  d                 (release branch result)
@@ -59,15 +59,15 @@ On **main**, the same migration `d` is inserted between `a` and `b`, and a dupli
 a  -->  d  -->  b  -->  c  -->  d'
 ```
 
-- `d` — Set `down_revision = a` and `revision` to the same value used on the release
+- `d`: set `down_revision = a` and `revision` to the same value used on the release
   branch. Update `b`'s `down_revision` to point to `d`.
-- `d'` — A new migration file with a fresh revision ID, `down_revision = c`, that
-  performs the **same schema change** as `d` but written idempotently so it is a no-op
+- `d'`: a new migration file with a fresh revision ID and `down_revision = c` that
+  performs the **same schema change** as `d`, written idempotently so it is a no-op
   on databases that already applied `d`.
 
 ### Release Version Comment
 
-Every migration file includes a comment marking which release it belongs to,
+Every migration file includes a comment that marks which release it belongs to,
 placed next to the revision identifiers. Use the `NEXT_RELEASE_VERSION`
 placeholder instead of a hardcoded version:
 
@@ -85,7 +85,7 @@ and its main-branch duplicate `d'` freezes to the main release version.
 
 ### Idempotent Writing Rules
 
-Every backport migration (both `d` and `d'`) **must** be idempotent. Use the following
+Every backport migration, both `d` and `d'`, must be idempotent. Use the following
 patterns:
 
 #### DDL guards
@@ -137,8 +137,8 @@ ALTER TABLE my_table DROP COLUMN IF EXISTS old_col;
 
 #### Downgrade
 
-Downgrade functions follow the same idempotent rules. If the downgrade is handled by
-another migration in the chain, use `pass`:
+Downgrade functions follow the same idempotent rules. If another migration in the chain
+handles the downgrade, use `pass`:
 
 ```python
 def downgrade() -> None:
@@ -150,15 +150,15 @@ def downgrade() -> None:
 See the following migrations in the codebase for reference:
 
 - `src/ai/backend/manager/models/alembic/versions/1cc9b47e0a8e_fix_sessionresult_enum_type_coexistence_backport.py`
-  -- Checks multiple possible enum states and fixes whichever scenario it finds.
+  checks multiple possible enum states and fixes whichever scenario it finds.
 - `src/ai/backend/manager/models/alembic/versions/c4ea15b77136_ensure_auditlogs_table_exist.py`
-  -- Uses `inspector.get_table_names()` to skip table creation when it already exists.
+  uses `inspector.get_table_names()` to skip table creation when the table already exists.
 
 ## Large Data Migrations
 
-Always chunk bulk `INSERT`s — never insert every row in one statement. A single
-statement binds at most **32,767** parameters (PostgreSQL Int16 limit), and a multi-row
-`INSERT` binds `rows × columns`, so unbounded backfills overflow on large sites. Use the
+Always split a bulk `INSERT` into chunks. Do not insert every row in one statement. A single
+statement binds at most **32,767** parameters (the PostgreSQL Int16 limit), and a multi-row
+`INSERT` binds `rows × columns`, so an unbounded backfill overflows on large sites. Use the
 shared `insert_skip_on_conflict` helper in
 `src/ai/backend/manager/models/rbac_models/migration/utils.py`, which chunks by column
 count.

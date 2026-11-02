@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Action Processor layer wraps the Services layer to handle cross-cutting concerns such as authorization, monitoring, and logging. This layer sits between the API layer and Services layer, performing necessary validation and monitoring before and after Action execution.
+The Action Processor layer wraps the Services Layer to handle cross-cutting concerns: authorization, monitoring, and logging. It sits between the API Layer and the Services Layer and runs validation and monitoring before and after an Action executes.
 
 ## Architecture
 
@@ -21,24 +21,24 @@ Database Models (models/)
 ## Key Responsibilities
 
 ### 1. Authorization
-- RBAC (Role-Based Access Control) permission checking
-- Resource access authorization
-- Domain-specific permission policies
+- RBAC permission checks
+- Authorization of resource access
+- Permission policies per domain
 
 ### 2. Validation
-- Action input data validation
+- Validation of Action input
 - Pre-validation of business rules
-- Resource state verification
+- Check of resource state
 
 ### 3. Monitoring
-- Audit log recording
-- Prometheus metrics collection
-- Pre and post Action execution monitoring
+- Recording in the audit log
+- Collection of Prometheus metrics
+- Monitoring before and after Action execution
 
 ### 4. Action Execution Orchestration
-- Service method invocation
-- Exception handling and transformation
-- Result return
+- Calling the service method
+- Handling and transforming exceptions
+- Returning the result
 
 ## Directory Structure
 
@@ -70,7 +70,7 @@ actions/
 
 ### 1. BaseAction
 
-Base class for all Actions.
+The base class for all Actions.
 
 ```python
 from abc import ABC, abstractmethod
@@ -105,7 +105,7 @@ class BaseAction(ABC):
 
 ### 2. BaseActionResult
 
-Base class for all ActionResults.
+The base class for all ActionResults.
 
 ```python
 @dataclass
@@ -120,7 +120,7 @@ class BaseActionResult(ABC):
 
 ### 3. ActionProcessor
 
-Core class that processes Actions.
+The core class that processes an Action.
 
 ```python
 class ActionProcessor:
@@ -154,7 +154,7 @@ class ActionProcessor:
 
 ### 4. ActionValidator
 
-Abstract class for performing validation.
+Abstract class for validation.
 
 ```python
 from abc import ABC, abstractmethod
@@ -174,7 +174,7 @@ class ActionValidator(ABC):
 
 ### 5. ActionMonitor
 
-Abstract class for performing monitoring.
+Abstract class for monitoring.
 
 ```python
 from abc import ABC
@@ -365,7 +365,7 @@ result = await processor._run(action, meta)
 
 ## Authorization Patterns
 
-### RBAC (Role-Based Access Control)
+### RBAC
 
 ```python
 from ai.backend.manager.actions.validators.rbac import RBACValidator
@@ -402,7 +402,7 @@ class RBACValidator(ActionValidator):
         ...
 ```
 
-### Resource Ownership Validation
+### Resource ownership validation
 
 ```python
 class ResourceOwnershipValidator(ActionValidator):
@@ -435,7 +435,7 @@ class ResourceOwnershipValidator(ActionValidator):
 
 ## Monitoring Patterns
 
-### Audit Log
+### Audit log
 
 ```python
 class AuditLogMonitor(ActionMonitor):
@@ -471,11 +471,11 @@ class AuditLogMonitor(ActionMonitor):
         )
 ```
 
-### Prometheus Metrics
+### Prometheus metrics
 
-Collects metrics related to Action execution.
+Collects metrics about Action execution.
 
-**Collected Metrics:**
+**Collected metrics:**
 
 1. **backend_action_total** (Counter)
    - Total number of Action executions
@@ -491,7 +491,7 @@ Collects metrics related to Action execution.
 
 ## Error Handling
 
-### Exception Handling in Action Processor
+### Exception handling in Action Processor
 
 ```python
 class ActionProcessor:
@@ -543,9 +543,9 @@ class ActionProcessor:
 
 ## Action Types
 
-### Single Entity Action
+### Single entity action
 
-Operation on a single entity.
+An operation on one entity.
 
 ```python
 @dataclass
@@ -566,9 +566,9 @@ class DestroySessionAction(BaseAction):
         return "destroy"
 ```
 
-### Batch Action
+### Batch action
 
-Batch operation on multiple entities.
+A batch operation on several entities.
 
 ```python
 @dataclass
@@ -589,9 +589,9 @@ class DestroySessionsBatchAction(BaseBatchAction):
         return "destroy_batch"
 ```
 
-### Scope Action
+### Scope action
 
-Operation on a specific scope.
+An operation within a scope.
 
 ```python
 @dataclass
@@ -609,9 +609,9 @@ class ListSessionsAction(BaseScopeAction):
         return "list"
 ```
 
-## Best Practices
+## Best practices
 
-### 1. Separate into Small Validators
+### 1. Separate into small validators
 
 ```python
 # Good example - Single responsibility
@@ -638,7 +638,7 @@ class MegaValidator(ActionValidator):
         ...
 ```
 
-### 2. Clear Exception Messages
+### 2. Clear exception messages
 
 ```python
 # Good example
@@ -650,7 +650,7 @@ raise InsufficientPermission(
 raise InsufficientPermission("Permission denied")
 ```
 
-### 3. Monitors Should Not Fail
+### 3. Monitors do not fail an Action
 
 ```python
 class AuditLogMonitor(ActionMonitor):
@@ -664,6 +664,6 @@ class AuditLogMonitor(ActionMonitor):
 
 ## References
 
-### Related Documentation
+### Related documents
 - [Services Layer](../services/README.md)
 - [API Layer](../api/README.md)

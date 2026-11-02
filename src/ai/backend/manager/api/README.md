@@ -4,7 +4,7 @@
 
 ## Overview
 
-Manager REST API provides Backend.AI's main HTTP-based API endpoints. Built on the Starlette web framework, it offers various features including session creation, virtual folder management, and user management.
+The manager REST API is the main HTTP API of Backend.AI. It is built on the Starlette web framework and covers session creation, vfolder management, user management, and similar work.
 
 ## Architecture
 
@@ -21,30 +21,30 @@ Client → REST v2 Handler → Adapter (api/adapters/) → Processor → Service
 Client → REST v1 Handler → Middleware → Processor → Service → Repository
 ```
 
-**New endpoints MUST use the REST v2 pattern.**
+**Use the REST v2 pattern for new endpoints.**
 
 ## Standard Operations
 
-APIs implement 6 standard operations:
+An API implements six standard operations:
 
-1. **create** - Create new entity
-2. **get** - Retrieve single entity
-3. **search** - Query with filters and pagination
-4. **update** - Update entity
-5. **delete** - Delete entity (soft)
-6. **purge** - Permanently remove entity (hard)
+1. **create** - create a new entity
+2. **get** - get one entity
+3. **search** - query with filters and pagination
+4. **update** - update an entity
+5. **delete** - mark an entity as deleted
+6. **purge** - permanently delete an entity
 
-**Multi-target operations** — two semantics:
-- **Batch** (`batch_*`): many rows in one SQL statement, **atomic** (all-or-nothing); returns only the affected-row count. e.g. `batch_update`, `batch_delete`, `batch_purge`.
-- **Bulk** (`bulk_*`): rows processed individually, **partial failures allowed** (returns successes + errors). e.g. `bulk_create`, `bulk_upsert`.
+**Multi-target operations** have two semantics:
+- **Batch** (`batch_*`): many rows in one SQL statement, **atomic** (all or nothing), and returns the affected row count only. For example, `batch_update`, `batch_delete`, `batch_purge`.
+- **Bulk** (`bulk_*`): rows processed individually, **partial failures allowed** (returns successes and errors). For example, `bulk_create`, `bulk_upsert`.
 
 ## Scope Prefix Rules
 
-**API layer only** (Service/Repository layers don't use prefix)
+**API layer only** (the service and repository layers do not use the prefix)
 
 ### Scoped Operations
 
-Operations within a scope use `{scope}_` prefix:
+Operations within a scope use the `{scope}_` prefix:
 
 **REST endpoints:**
 ```
@@ -65,7 +65,7 @@ query domainSearchUsers(scope: DomainScope, filter: ...)
 
 ### Admin Operations (No Scope)
 
-Operations without scope use `admin_` prefix (superadmin required):
+Operations without a scope use the `admin_` prefix (superadmin required):
 
 **REST endpoints:**
 ```
@@ -84,13 +84,13 @@ query adminDomain(id: ID)
 query adminSearchDomains(filter: ...)
 ```
 
-**See:** `/api-guide` skill for detailed implementation patterns.
+**See** the `/api-guide` skill for detailed implementation patterns.
 
 ## Middleware Stack
 
 ### 1. Authentication Middleware
 
-Handles authentication for API handlers with `@auth_required` decorator.
+Handles authentication for API handlers through the `@auth_required` decorator.
 
 **Supported Authentication Methods:**
 - **HMAC-SHA256 signature** (`Authorization` header)
@@ -98,11 +98,11 @@ Handles authentication for API handlers with `@auth_required` decorator.
 
 ### 2. Error Handling Middleware
 
-Converts exceptions to appropriate HTTP responses.
+The middleware converts exceptions to HTTP responses.
 
 ## REST v2 Handler Pattern
 
-REST v2 handlers use shared Adapters and Pydantic DTOs from `common/dto/manager/v2/`.
+REST v2 handlers use the shared adapter and pydantic DTOs from `common/dto/manager/v2/`.
 
 ```python
 from ai.backend.common.api_handlers import APIResponse, BodyParam
@@ -123,18 +123,18 @@ class DomainV2Handler:
 ```
 
 - `BodyParam[T]` where T is a DTO from `common/dto/manager/v2/`
-- Response is a DTO Payload returned directly via `APIResponse.build(response_model=payload)`
-- Adapters are shared with GraphQL — defined in `api/adapters/{domain}.py`
+- The response is a DTO payload returned directly through `APIResponse.build(response_model=payload)`
+- adapters are shared with GraphQL and defined in `api/adapters/{domain}.py`
 
 ## REST API Pattern Reference
 
 This section documents common patterns used across REST API implementations.
 
-**For comprehensive implementation guides, see the `/api-guide` skill.**
+**For implementation guides, see the `/api-guide` skill.**
 
 ### Scope Pattern
 
-Scope defines access boundaries (domain, project, user level) for queries.
+A scope defines the access boundary of a query (domain, project, or user level).
 
 **Repository Scope:**
 ```python
@@ -188,11 +188,11 @@ async def get_domain_fair_shares(
     return result.to_dto()
 ```
 
-**Flow**: Handler parameters → Scope object → Repository → Query conditions
+**Flow**: handler parameters → scope object → repository → query conditions
 
 ### Filter Pattern
 
-Filters enable dynamic querying with conditions and ordering.
+Filters build query conditions and ordering dynamically.
 
 **Filter Adapter:**
 ```python
@@ -260,7 +260,7 @@ async def list_domain_fair_shares(
     return result.to_dto()
 ```
 
-**Flow**: Query params → Adapter → Conditions/Orders → Repository
+**Flow**: query parameters → adapter → conditions and orders → repository
 
 ### Admin_ Prefix Pattern
 
@@ -298,7 +298,7 @@ async def admin_create_domain(
     return CreateDomainResponse(domain_id=result.domain_id)
 ```
 
-**Pattern**: Function name `admin_{operation}_{entity}`, first line `_check_superadmin()`
+**Pattern**: function name `admin_{operation}_{entity}`, first line `_check_superadmin()`
 
 ### Pagination Pattern
 
@@ -338,22 +338,22 @@ async def list_items(
 ```
 
 **Response fields:**
-- `items`: Current page items
-- `total_count`: Total items across all pages
-- `offset`: Current offset
-- `limit`: Page size
+- `items` - current page items
+- `total_count` - total items across all pages
+- `offset` - current offset
+- `limit` - page size
 
 ## GraphQL Pattern Reference
 
-See [GraphQL API README](./gql/README.md) for full patterns.
-All GQL types must be backed by Pydantic DTOs from `common/dto/manager/v2/` and use
-custom decorators from `gql/decorators.py`. Resolvers call Adapters (`info.context.adapters.*`).
+See [GraphQL API README](./gql/README.md) for the full patterns.
+Every GQL type must be backed by a pydantic DTO from `common/dto/manager/v2/` and uses
+the custom decorators in `gql/decorators.py`. Resolvers call adapters (`info.context.adapters.*`).
 
 ## Error Handling
 
-Exceptions from each layer are converted to appropriate HTTP responses via Error Handling Middleware.
+The Error Handling Middleware converts exceptions from each layer to HTTP responses.
 
-## Related Documentation
+## Related documents
 
 - [GraphQL API](./gql/README.md) - GraphQL endpoints with GQL adapters
 - [Repositories Layer](../repositories/README.md) - Querier pattern and data access
