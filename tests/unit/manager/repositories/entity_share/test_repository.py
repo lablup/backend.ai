@@ -486,6 +486,17 @@ class TestAProjectAnswering:
         assert data.recipient == RuntimeEntityID(ProjectEntityType(), _TEAM_PROJECT_ID)
         assert await _cap(database, _TEAM_PROJECT_ID) == (True, Permission.READ)
 
+    async def test_a_project_turns_down_what_it_was_offered(
+        self,
+        database: ExtendedAsyncSAEngine,
+        ops: OpsRepository[EntityShareData],
+        repository: EntityShareRepository,
+    ) -> None:
+        created = await repository.create(_creator_to(_TEAM_PROJECT_ID))
+        data = await repository.reject(created.id, _TEAM_PROJECT_ID)
+        assert data.status == EntityShareStatus.REJECTED
+        assert await _cap(database, _TEAM_PROJECT_ID) == (False, None)
+
     async def test_a_project_gives_back_what_it_took(
         self,
         database: ExtendedAsyncSAEngine,
