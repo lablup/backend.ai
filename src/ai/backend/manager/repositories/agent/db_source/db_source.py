@@ -199,18 +199,9 @@ class AgentDBSource:
         force: bool,
     ) -> list[KernelInfo]:
         """
-        Change the agent's resource group, gating on the kernels running on it.
-
-        Finds the active kernels on the agent and the designations of the agent by
-        unterminated sessions and deployments of other resource groups. If any exist
-        and ``force`` is not set, raises without changing anything. Otherwise updates
-        the agent's group (name + id columns), drops those designations and returns the
-        kernels so the caller can transition their sessions. The lookups, the check, the
-        update and the designation drop run in one transaction; the agent's own and
-        govern edges move to the new group after it.
-        Raises ScalingGroupNotFound when no resource group matches
-        ``resource_group_id``, and AgentNotFound when no agent row matches
-        ``agent_id``.
+        Change the agent's resource group in one transaction and drop the unterminated designations.
+        Without ``force``, raises AgentHasConflictingSessions when active kernels or unterminated
+        designations by other resource groups exist. Returns the active kernels.
         """
         active_statuses = (
             KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()

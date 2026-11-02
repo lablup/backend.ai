@@ -202,13 +202,9 @@ class AgentRepository:
         *,
         force: bool,
     ) -> list[KernelInfo]:
-        """Change the agent's resource group, returning the kernels still on it.
-
-        Raises AgentHasConflictingSessions if the agent has active kernels, or
-        unterminated sessions or deployments of other resource groups designate it,
-        and ``force`` is not set, ScalingGroupNotFound if the target group does not
-        exist, and AgentNotFound if the agent does not exist; otherwise updates
-        the group and returns those kernels.
+        """Change the agent's resource group, returning the active kernels on it.
+        Without ``force``, raises AgentHasConflictingSessions when active kernels or unterminated
+        designations by other resource groups exist.
         """
         return await self._db_source.update_resource_group(agent_id, resource_group_id, force=force)
 
