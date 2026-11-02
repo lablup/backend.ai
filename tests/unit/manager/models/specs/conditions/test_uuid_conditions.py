@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
 
 import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec, UUIDInMatchSpec
-from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 
 type Render = Callable[[sa.sql.ClauseElement], str]
@@ -51,28 +49,3 @@ class TestUUIDConditionsIn:
         )
 
         assert render(condition()) == expected
-
-
-@dataclass(frozen=True)
-class _UUIDNullCheckCase:
-    check: Callable[[UUIDConditions], QueryCondition]
-    expected_sql: str
-
-
-class TestUUIDConditionsNullChecks:
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _UUIDNullCheckCase(check=UUIDConditions.is_null, expected_sql="items.id IS NULL"),
-            _UUIDNullCheckCase(
-                check=UUIDConditions.is_not_null, expected_sql="items.id IS NOT NULL"
-            ),
-        ],
-        ids=lambda case: case.check.__name__,
-    )
-    def test_null_check(
-        self, items_table: sa.Table, render: Render, case: _UUIDNullCheckCase
-    ) -> None:
-        condition = case.check(UUIDConditions(items_table.c.id))
-
-        assert render(condition()) == case.expected_sql

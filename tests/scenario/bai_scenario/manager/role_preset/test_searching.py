@@ -1,4 +1,4 @@
-"""프리셋 검색 — 스코프 id 필터로 검색한 결과를 검증한다."""
+"""프리셋 검색 — 스코프 타입 필터로 검색한 결과를 검증한다."""
 
 from __future__ import annotations
 
@@ -8,8 +8,9 @@ from typing import override
 
 import pytest
 
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.query import NullableUUIDFilter
+from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.role_preset.request import (
     RolePresetFilter,
     SearchRolePresetsInput,
@@ -19,8 +20,9 @@ from ai.backend.manager.api.adapters.role_preset.adapter import RolePresetAdapte
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
-from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
 from bai_scenario.components.role_preset import (
+    OnlyThePresetForEveryProjectComesBack,
     OnlyThePresetForPublicComesBack,
     PresetsForPublicAndEveryProjectAndACaller,
     PresetsForPublicAndEveryProjectAndSomeone,
@@ -38,10 +40,13 @@ type SearchingStep = Scenario[
 
 
 @dataclass(frozen=True)
-class SearchingByTheScopeOfOnePreset(
+class SearchingByScopeType(
     When[PresetsForPublicAndEveryProjectAndACaller, RolePresetAdapter, SearchRolePresetsPayload]
 ):
-    """스코프 하나에만 역할을 만드는 프리셋이 지정한 스코프의 id로 검색한다."""
+    """스코프 타입 필터에 값 하나를 지정해 검색한다. `excluded`면 그 값이 아닌 프리셋을 찾는다."""
+
+    scope_type: str
+    excluded: bool = False
 
     @override
     def operation(self) -> str:
@@ -49,27 +54,26 @@ class SearchingByTheScopeOfOnePreset(
 
     @override
     def describe(self, laid: PresetsForPublicAndEveryProjectAndACaller) -> str:
-        return (
-            f"{laid.caller.username}이 {laid.for_public.name}이 지정한 스코프의 id를 "
-            "스코프 id 필터에 지정해 검색"
-        )
+        if self.excluded:
+            return f"{laid.caller.username}이 스코프 타입이 {self.scope_type}이 아닌 프리셋을 검색"
+        return f"{laid.caller.username}이 스코프 타입이 {self.scope_type}인 프리셋을 검색"
 
     @override
     async def call(
         self, adapter: RolePresetAdapter, laid: PresetsForPublicAndEveryProjectAndACaller
     ) -> SearchRolePresetsPayload:
+        if self.excluded:
+            scope_type = StringFilter(not_equals=self.scope_type)
+        else:
+            scope_type = StringFilter(equals=self.scope_type)
         with ActingAs(laid.caller):
             return await adapter.search(
-                SearchRolePresetsInput(
-                    filter=RolePresetFilter(
-                        scope_id=NullableUUIDFilter(equals=laid.for_public.scope_id)
-                    )
-                )
+                SearchRolePresetsInput(filter=RolePresetFilter(scope_type=scope_type))
             )
 
 
 @dataclass(frozen=True)
-class AScopeIdFindsThePresetForThatScope(
+class APublicScopeTypeFindsThePresetForPublic(
     Scenario[
         TestSeedingSession,
         PresetsForPublicAndEveryProjectAndACaller,
@@ -81,13 +85,13 @@ class AScopeIdFindsThePresetForThatScope(
 
     @override
     def summary(self) -> str:
-        return "a-scope-id-finds-the-preset-for-that-scope-alone"
+        return "a-public-scope-type-finds-the-preset-for-public-alone"
 
     @override
     def describe(self) -> str:
         return Says(
-            "슈퍼관리자가 한 스코프의 id로 프리셋을 검색하면, 그 스코프 하나에만 역할을 만드는 "
-            "프리셋만 반환된다"
+            f"슈퍼관리자가 스코프 타입 {GlobalEntityName.PUBLIC}으로 프리셋을 검색하면, "
+            f"{GlobalEntityName.PUBLIC} 하나에만 역할을 만드는 프리셋만 반환된다"
         )
 
     @override
@@ -100,11 +104,87 @@ class AScopeIdFindsThePresetForThatScope(
     ) -> When[
         PresetsForPublicAndEveryProjectAndACaller, RolePresetAdapter, SearchRolePresetsPayload
     ]:
-        return SearchingByTheScopeOfOnePreset()
+        return SearchingByScopeType(str(GlobalEntityName.PUBLIC))
 
     @override
     def then(self) -> Then[PresetsForPublicAndEveryProjectAndACaller, SearchRolePresetsPayload]:
         return OnlyThePresetForPublicComesBack(self.started)
+
+
+@dataclass(frozen=True)
+class AGlobalScopeTypeLeavesOutThePresetForPublic(
+    Scenario[
+        TestSeedingSession,
+        PresetsForPublicAndEveryProjectAndACaller,
+        RolePresetAdapter,
+        SearchRolePresetsPayload,
+    ]
+):
+    @override
+    def summary(self) -> str:
+        return "a-global-scope-type-leaves-out-the-preset-for-public"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            f"슈퍼관리자가 스코프 타입 {GlobalEntityName.GLOBAL}로 프리셋을 검색하면, "
+            f"{GlobalEntityName.PUBLIC} 하나에만 역할을 만드는 프리셋은 반환되지 않는다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, PresetsForPublicAndEveryProjectAndACaller]:
+        return PresetsForPublicAndEveryProjectAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(
+        self,
+    ) -> When[
+        PresetsForPublicAndEveryProjectAndACaller, RolePresetAdapter, SearchRolePresetsPayload
+    ]:
+        return SearchingByScopeType(str(GlobalEntityName.GLOBAL))
+
+    @override
+    def then(self) -> Then[PresetsForPublicAndEveryProjectAndACaller, SearchRolePresetsPayload]:
+        return NothingIsFound()
+
+
+@dataclass(frozen=True)
+class AnExcludedPublicScopeTypeLeavesThePresetForEveryProject(
+    Scenario[
+        TestSeedingSession,
+        PresetsForPublicAndEveryProjectAndACaller,
+        RolePresetAdapter,
+        SearchRolePresetsPayload,
+    ]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "an-excluded-public-scope-type-leaves-the-preset-for-every-project"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            f"슈퍼관리자가 스코프 타입이 {GlobalEntityName.PUBLIC}이 아닌 프리셋을 검색하면, "
+            "모든 프로젝트에 역할을 만드는 프리셋만 반환된다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, PresetsForPublicAndEveryProjectAndACaller]:
+        return PresetsForPublicAndEveryProjectAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(
+        self,
+    ) -> When[
+        PresetsForPublicAndEveryProjectAndACaller, RolePresetAdapter, SearchRolePresetsPayload
+    ]:
+        return SearchingByScopeType(str(GlobalEntityName.PUBLIC), excluded=True)
+
+    @override
+    def then(self) -> Then[PresetsForPublicAndEveryProjectAndACaller, SearchRolePresetsPayload]:
+        return OnlyThePresetForEveryProjectComesBack(self.started)
 
 
 @dataclass(frozen=True)
@@ -134,7 +214,7 @@ class AUserGrantedNothingMayNotSearch(
     ) -> When[
         PresetsForPublicAndEveryProjectAndACaller, RolePresetAdapter, SearchRolePresetsPayload
     ]:
-        return SearchingByTheScopeOfOnePreset()
+        return SearchingByScopeType(str(GlobalEntityName.PUBLIC))
 
     @override
     def then(self) -> Then[PresetsForPublicAndEveryProjectAndACaller, SearchRolePresetsPayload]:
@@ -142,7 +222,9 @@ class AUserGrantedNothingMayNotSearch(
 
 
 SCENARIOS: list[SearchingStep] = [
-    AScopeIdFindsThePresetForThatScope(started=datetime.now(UTC)),
+    APublicScopeTypeFindsThePresetForPublic(started=datetime.now(UTC)),
+    AGlobalScopeTypeLeavesOutThePresetForPublic(),
+    AnExcludedPublicScopeTypeLeavesThePresetForEveryProject(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotSearch(),
 ]
 

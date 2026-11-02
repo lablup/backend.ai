@@ -20589,88 +20589,6 @@
         "title": "CreateRolePresetInput",
         "type": "object"
       },
-      "NullableUUIDFilter": {
-        "description": "Filter for nullable UUID fields.\n\nExtends UUIDFilter with is_null support for columns that allow NULL values.\nUse UUIDFilter for NOT NULL columns.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact UUID match",
-            "title": "Equals"
-          },
-          "in": {
-            "anyOf": [
-              {
-                "items": {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "UUID is in list",
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not equals UUID",
-            "title": "Not Equals"
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "UUID is not in list",
-            "title": "Not In"
-          },
-          "is_null": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by null status: true = IS NULL, false = IS NOT NULL",
-            "title": "Is Null"
-          }
-        },
-        "title": "NullableUUIDFilter",
-        "type": "object"
-      },
       "PermissionBitFilter": {
         "description": "Filter for a permission-bit column over ``PermissionBitDTO``.",
         "properties": {
@@ -20900,18 +20818,6 @@
             ],
             "default": null,
             "description": "Filter by scope type."
-          },
-          "scope_id": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/NullableUUIDFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Added in 26.10.0. Filter by the ID of the scope the preset's role is created in. `is_null: true` selects presets whose role is created in every scope of their type."
           },
           "auto_assign": {
             "anyOf": [

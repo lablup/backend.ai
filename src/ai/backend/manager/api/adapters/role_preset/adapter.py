@@ -8,11 +8,17 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from ai.backend.common.data.entity.global_entity import GlobalEntityID
+from ai.backend.common.data.entity.global_entity import GlobalEntityID, GlobalEntityName
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
-from ai.backend.common.data.entity.role_preset import RolePresetID, RolePresetScopeID
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import GlobalEntityType
+from ai.backend.common.data.filter_specs import (
+    StringInMatchSpec,
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+)
+from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.common import (
     OrderDirection,
     PartialBulkFailure,
@@ -535,8 +541,7 @@ class RolePresetAdapter(BaseAdapter):
             *self.apply_uuid_filter(filter_.id, fields.id.filter),
             *self.apply_uuid_filter(filter_.entity_id, fields.id.filter),
             *self.apply_string_filter(filter_.name, fields.name.filter),
-            *self.apply_string_filter(filter_.scope_type, fields.scope_type.filter),
-            *self.apply_nullable_uuid_filter(filter_.scope_id, fields.scope_id.filter),
+            *self._scope_type_conditions(filter_.scope_type),
             *self.apply_bool_filter(filter_.auto_assign, fields.auto_assign.filter),
             *self.apply_bool_filter(
                 filter_.auto_assign_to_owner, fields.auto_assign_to_owner.filter
@@ -577,6 +582,77 @@ class RolePresetAdapter(BaseAdapter):
             return []
         conditions = RolePresetSearchableFields.own.deleted_at.filter
         return [conditions.is_not_null() if deleted else conditions.is_null()]
+
+    def _scope_type_conditions(self, scope_type: StringFilter | None) -> list[QueryCondition]:
+        if scope_type is None:
+            return []
+        single_value_matches: list[tuple[str | None, bool, bool]] = [
+            (scope_type.equals, False, False),
+            (scope_type.i_equals, True, False),
+            (scope_type.not_equals, False, True),
+            (scope_type.i_not_equals, True, True),
+        ]
+        for value, case_insensitive, negated in single_value_matches:
+            if value is not None:
+                return [self._scope_type_is_any_of([value], case_insensitive, negated)]
+        many_value_matches: list[tuple[list[str] | None, bool, bool]] = [
+            (scope_type.in_, False, False),
+            (scope_type.i_in, True, False),
+            (scope_type.not_in, False, True),
+            (scope_type.i_not_in, True, True),
+        ]
+        for values, case_insensitive, negated in many_value_matches:
+            if values is not None:
+                return [self._scope_type_is_any_of(values, case_insensitive, negated)]
+        return self.apply_string_filter(
+            scope_type, RolePresetSearchableFields.own.scope_type.filter
+        )
+
+    def _scope_type_is_any_of(
+        self, values: Sequence[str], case_insensitive: bool, negated: bool
+    ) -> QueryCondition:
+        fields = RolePresetSearchableFields.own
+        named_global_entities = [
+            name
+            for value in values
+            if (name := self._global_entity_named(value, case_insensitive)) is not None
+        ]
+        other_scope_types = [
+            value for value in values if self._global_entity_named(value, case_insensitive) is None
+        ]
+        matches = [
+            fields.scope_type.filter.in_(
+                StringInMatchSpec(
+                    other_scope_types, case_insensitive=case_insensitive, negated=False
+                )
+            ),
+            *(
+                combine_conditions_and([
+                    fields.scope_type.filter.equals(
+                        StringMatchSpec(
+                            str(GlobalEntityType()), case_insensitive=False, negated=False
+                        )
+                    ),
+                    fields.scope_id.filter.equals(
+                        UUIDEqualMatchSpec(GlobalEntityIDCache.id_of(name), negated=False)
+                    ),
+                ])
+                for name in named_global_entities
+            ),
+        ]
+        matched = combine_conditions_or(matches)
+        if negated:
+            return negate_conditions([matched])
+        return matched
+
+    @staticmethod
+    def _global_entity_named(value: str, case_insensitive: bool) -> GlobalEntityName | None:
+        asked = value.lower() if case_insensitive else value
+        for name in GlobalEntityName:
+            shown = name.lower() if case_insensitive else str(name)
+            if shown == asked:
+                return name
+        return None
 
     def _convert_orders(self, orders: list[RolePresetOrder]) -> list[QueryOrder]:
         fields = RolePresetSearchableFields.own
@@ -665,7 +741,6 @@ class RolePresetAdapter(BaseAdapter):
             entity_id=data.entity_id(),
             name=data.name,
             scope_type=RolePresetAdapter._scope_type_or_global_entity_name(data),
-            scope_id=RolePresetScopeID(data.scope_id) if data.scope_id is not None else None,
             role_name_template=data.role_name_template,
             auto_assign=data.auto_assign,
             auto_assign_to_owner=data.auto_assign_to_owner,

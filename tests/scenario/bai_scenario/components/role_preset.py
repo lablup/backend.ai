@@ -245,15 +245,6 @@ class PresetLook:
                 if self.shown_scope_type is not None
                 else str(seeded.scope_type),
             ),
-            (
-                Same(f"{at}scope_id", node.scope_id, None)
-                if seeded.scope_id is None
-                else Held[UUID | None](
-                    f"{at}scope_id",
-                    node.scope_id,
-                    SameAs[UUID | None](seeded.scope_id, "미리 만든 프리셋이 지정한 스코프의 id"),
-                )
-            ),
             Same(
                 f"{at}auto_assign",
                 node.auto_assign,
@@ -314,6 +305,39 @@ class OnlyThePresetForPublicComesBack(
         verdicts: list[Verdict] = [Same("items count", len(page.items), 1)]
         for i, node in enumerate(page.items):
             verdicts += expected.verdicts(f"items[{i}].", node, laid.for_public)
+        return [
+            *verdicts,
+            Same("total_count", page.total_count, 1),
+            Same("has_next_page", page.has_next_page, False),
+            Same("has_previous_page", page.has_previous_page, False),
+        ]
+
+
+@dataclass(frozen=True)
+class OnlyThePresetForEveryProjectComesBack(
+    Then[PresetsForPublicAndEveryProjectAndACaller, SearchRolePresetsPayload]
+):
+    """미리 만든 두 프리셋 중 모든 프로젝트에 역할을 만드는 것만 통째로 반환된다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return "모든 프로젝트에 역할을 만드는 프리셋만 반환된다"
+
+    @override
+    def look(
+        self,
+        laid: PresetsForPublicAndEveryProjectAndACaller,
+        answered: Answered[SearchRolePresetsPayload],
+    ) -> list[Verdict]:
+        page = answered.response
+        if page is None:
+            return [Refused(InsufficientPrivilege, answered.raised)]
+        expected = PresetLook(self.started)
+        verdicts: list[Verdict] = [Same("items count", len(page.items), 1)]
+        for i, node in enumerate(page.items):
+            verdicts += expected.verdicts(f"items[{i}].", node, laid.for_every_project)
         return [
             *verdicts,
             Same("total_count", page.total_count, 1),

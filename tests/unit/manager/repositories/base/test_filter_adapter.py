@@ -22,7 +22,6 @@ from ai.backend.common.dto.manager.query import (
     DateTimeFilter,
     EnumFilter,
     IntFilter,
-    NullableUUIDFilter,
     StringFilter,
     ToManyFilter,
     UUIDFilter,
@@ -86,14 +85,6 @@ class RecordingUUIDConditions(UUIDConditions):
     @override
     def in_(self, spec: UUIDInMatchSpec) -> QueryCondition:
         return Recorded("in_", spec)
-
-    @override
-    def is_null(self) -> QueryCondition:
-        return Recorded("is_null", None)
-
-    @override
-    def is_not_null(self) -> QueryCondition:
-        return Recorded("is_not_null", None)
 
 
 class RecordingDateTimeConditions(DateTimeConditions):
@@ -385,60 +376,6 @@ class TestApplyUUIDFilter:
         self, adapter: BaseFilterAdapter, column: sa.sql.expression.ColumnClause[Any]
     ) -> None:
         assert adapter.apply_uuid_filter(UUIDFilter(), RecordingUUIDConditions(column)) == []
-
-
-@dataclass(frozen=True)
-class _NullableUUIDFilterCase:
-    filter_input: dict[str, Any]
-    expected_applied: list[Recorded]
-
-
-class TestApplyNullableUUIDFilter:
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _NullableUUIDFilterCase(
-                filter_input={"is_null": True},
-                expected_applied=[Recorded("is_null", None)],
-            ),
-            _NullableUUIDFilterCase(
-                filter_input={"is_null": False},
-                expected_applied=[Recorded("is_not_null", None)],
-            ),
-            _NullableUUIDFilterCase(
-                filter_input={"equals": FIRST_ID, "is_null": True},
-                expected_applied=[Recorded("is_null", None)],
-            ),
-            _NullableUUIDFilterCase(
-                filter_input={"equals": FIRST_ID},
-                expected_applied=[Recorded("equals", UUIDEqualMatchSpec(FIRST_ID, False))],
-            ),
-            _NullableUUIDFilterCase(
-                filter_input={"not_in": [FIRST_ID]},
-                expected_applied=[Recorded("in_", UUIDInMatchSpec([FIRST_ID], True))],
-            ),
-            _NullableUUIDFilterCase(filter_input={}, expected_applied=[]),
-        ],
-        ids=lambda case: (
-            ",".join(f"{key}={value}" for key, value in case.filter_input.items()) or "empty"
-        ),
-    )
-    def test_is_null_applies_before_the_uuid_operations(
-        self,
-        adapter: BaseFilterAdapter,
-        column: sa.sql.expression.ColumnClause[Any],
-        case: _NullableUUIDFilterCase,
-    ) -> None:
-        applied = adapter.apply_nullable_uuid_filter(
-            NullableUUIDFilter.model_validate(case.filter_input), RecordingUUIDConditions(column)
-        )
-
-        assert applied == case.expected_applied
-
-    def test_none_applies_nothing(
-        self, adapter: BaseFilterAdapter, column: sa.sql.expression.ColumnClause[Any]
-    ) -> None:
-        assert adapter.apply_nullable_uuid_filter(None, RecordingUUIDConditions(column)) == []
 
 
 class TestApplyDateTimeFilter:
