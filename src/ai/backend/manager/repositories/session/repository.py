@@ -273,7 +273,6 @@ class SessionRepository:
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
     ) -> SessionRow:
-        """Get session with group information eagerly loaded"""
         return await self._db_source.get_session_with_group(
             session_id, kernel_loading_strategy, allow_stale
         )

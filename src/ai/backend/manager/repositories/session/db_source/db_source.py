@@ -588,14 +588,12 @@ class SessionDBSource:
         kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.MAIN_KERNEL_ONLY,
         allow_stale: bool = False,
     ) -> SessionRow:
-        """Get session with group information eagerly loaded"""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await self._session_by_id(
                 db_sess,
                 session_id,
                 kernel_loading_strategy=kernel_loading_strategy,
                 allow_stale=allow_stale,
-                eager_loading_op=[selectinload(SessionRow.group)],
             )
 
     async def get_session_with_routing_minimal(
