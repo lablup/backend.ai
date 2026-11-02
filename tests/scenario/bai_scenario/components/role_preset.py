@@ -314,39 +314,6 @@ class OnlyThePresetForPublicComesBack(
 
 
 @dataclass(frozen=True)
-class OnlyThePresetForEveryProjectComesBack(
-    Then[PresetsForPublicAndEveryProjectAndACaller, SearchRolePresetsPayload]
-):
-    """미리 만든 두 프리셋 중 모든 프로젝트에 역할을 만드는 것만 통째로 반환된다."""
-
-    started: datetime
-
-    @override
-    def says(self) -> str:
-        return "모든 프로젝트에 역할을 만드는 프리셋만 반환된다"
-
-    @override
-    def look(
-        self,
-        laid: PresetsForPublicAndEveryProjectAndACaller,
-        answered: Answered[SearchRolePresetsPayload],
-    ) -> list[Verdict]:
-        page = answered.response
-        if page is None:
-            return [Refused(InsufficientPrivilege, answered.raised)]
-        expected = PresetLook(self.started)
-        verdicts: list[Verdict] = [Same("items count", len(page.items), 1)]
-        for i, node in enumerate(page.items):
-            verdicts += expected.verdicts(f"items[{i}].", node, laid.for_every_project)
-        return [
-            *verdicts,
-            Same("total_count", page.total_count, 1),
-            Same("has_next_page", page.has_next_page, False),
-            Same("has_previous_page", page.has_previous_page, False),
-        ]
-
-
-@dataclass(frozen=True)
 class EveryTargetComesBack(Then[ManyPresetsAndACaller, PartialBulkPayload[RolePresetNode]]):
     """대상이 모두 처리된 목록에 온다. `missing`이 있으면 그 id 만 실패 목록에 온다."""
 
