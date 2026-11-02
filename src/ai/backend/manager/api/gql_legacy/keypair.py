@@ -18,7 +18,6 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
 from ai.backend.manager.models.keypair.row import (
     KEYPAIR_SECRET_KEY_CONTEXT,
-    KeyPairRow,
     keypairs,
 )
 
@@ -48,6 +47,7 @@ from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.utils import agg_to_array
 from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminCreateKeypairAction,
+    PurgeKeypairAction,
     UpdateKeypairAction,
 )
 from ai.backend.manager.services.user.actions.lookup import LookupUserAction
@@ -59,7 +59,6 @@ from .base import (
     PaginatedList,
     batch_multiresult,
     batch_result,
-    simple_db_mutate,
 )
 
 
@@ -601,20 +600,11 @@ class DeleteKeyPair(graphene.Mutation):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         access_key: AccessKey,
     ) -> DeleteKeyPair:
-        ctx: GraphQueryContext = info.context
-        async with ctx.db.begin_readonly_session() as db_session:
-            is_default = await db_session.scalar(
-                sa.select(KeyPairRow.is_default).where(KeyPairRow.access_key == access_key)
-            )
-            if is_default:
-                return DeleteKeyPair(
-                    False, "the keypair is used as the default access key by a user"
-                )
-        # The marker is re-evaluated inside the DELETE, so a keypair that becomes the
-        # default after the read above is not removed.
-        delete_query = (
-            sa.delete(keypairs)
-            .where(keypairs.c.access_key == access_key)
-            .where(sa.not_(keypairs.c.is_default))
+        graph_ctx: GraphQueryContext = info.context
+        keypair = await graph_ctx.processors.user.lookup_keypair.run(
+            LookupKeypairByAccessKeyAction(access_key=access_key)
         )
-        return await simple_db_mutate(cls, ctx, delete_query)
+        await graph_ctx.processors.user.purge_keypair.run(
+            PurgeKeypairAction(keypair_id=KeyPairID(keypair.field_id))
+        )
+        return cls(ok=True, msg="success")
