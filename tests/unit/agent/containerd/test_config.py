@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
 from ai.backend.agent.config.unified import ContainerdConfig
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
 class TestContainerdConfig:
@@ -10,6 +13,7 @@ class TestContainerdConfig:
         assert config.address == "/run/containerd/containerd.sock"
         assert config.namespace == "backend-ai"
         assert config.snapshotter == "overlayfs"
+        assert config.create_task_timeout == 30.0
 
     def test_connection_overrides(self) -> None:
         config = ContainerdConfig.model_validate({
@@ -21,3 +25,18 @@ class TestContainerdConfig:
         assert config.address == "/run/k3s/containerd/containerd.sock"
         assert config.namespace == "k8s.io"
         assert config.snapshotter == "native"
+
+    def test_kebab_keys(self) -> None:
+        config = ContainerdConfig.model_validate({"create-task-timeout": 1200})
+
+        assert config.create_task_timeout == 1200.0
+
+    def test_snake_keys(self) -> None:
+        config = ContainerdConfig.model_validate({"create_task_timeout": 1200})
+
+        assert config.create_task_timeout == 1200.0
+
+    @pytest.mark.parametrize("value", [0, -1])
+    def test_create_task_timeout_must_be_positive(self, value: int) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed):
+            ContainerdConfig.model_validate({"create-task-timeout": value})
