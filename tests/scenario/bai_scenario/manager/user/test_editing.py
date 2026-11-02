@@ -270,9 +270,9 @@ class NullProjectsLeaveTheMembership(
 
 @dataclass(frozen=True)
 class SomeoneEditingAnother(Given[Any, AnEdit]):
-    """한 도메인의 대상 사용자와 부르는 사람, 결과를 읽을 슈퍼관리자.
+    """한 도메인의 대상 사용자와 호출자, 결과를 읽을 슈퍼관리자.
 
-    `on_target`은 대상 사용자 스코프에서, `on_domain`은 도메인 스코프에서 부르는 사람이 받는
+    `on_target`은 대상 사용자 스코프에서, `on_domain`은 도메인 스코프에서 호출자가 받는
     사용자 권한이다. `others`만큼 사용자를 더 두고, `key_on`이 가리키는 사람에게 기본이 아닌
     키를 하나 더 준다. `target_needs_password_change`면 대상 사용자가 비밀번호 변경을 요구받는다.
     """
@@ -287,18 +287,35 @@ class SomeoneEditingAnother(Given[Any, AnEdit]):
     @override
     def describe(self) -> str:
         role = self.role.value
-        parts_ko = [f"도메인 하나와 대상 사용자, 사용자 {self.others}명 더, 부르는 {role} 한 명"]
-        parts_en = [
-            f"one domain, one target user, {self.others} more users, and one calling {role}"
-        ]
-        if self.on_target:
-            names = ", ".join(str(p.name) for p in self.on_target)
-            parts_ko.append(f"호출자는 대상 사용자 스코프에서 {names}를 받았습니다")
-            parts_en.append(f"the caller holds {names} in the target user scope")
-        if self.on_domain:
-            names = ", ".join(str(p.name) for p in self.on_domain)
-            parts_ko.append(f"호출자는 도메인 스코프에서 {names}를 받았습니다")
-            parts_en.append(f"the caller holds {names} in the domain scope")
+        parts_ko = ["도메인 하나와 대상 사용자"]
+        parts_en = ["one domain and one target user"]
+        if self.others:
+            parts_ko.append(f"사용자 {self.others}명 더")
+            parts_en.append(f"{self.others} more users")
+        target_names = ", ".join(str(p.name) for p in self.on_target)
+        domain_names = ", ".join(str(p.name) for p in self.on_domain)
+        if target_names and domain_names:
+            parts_ko.append(
+                f"호출자는 {role} 이고 대상 사용자 스코프에서 {target_names}를, "
+                f"도메인 스코프에서 {domain_names}를 받았습니다"
+            )
+            parts_en.append(
+                f"the caller is a {role} and holds {target_names} in the target user scope "
+                f"and {domain_names} in the domain scope"
+            )
+        elif target_names:
+            parts_ko.append(
+                f"호출자는 {role} 이고 대상 사용자 스코프에서 {target_names}를 받았습니다"
+            )
+            parts_en.append(
+                f"the caller is a {role} and holds {target_names} in the target user scope"
+            )
+        elif domain_names:
+            parts_ko.append(f"호출자는 {role} 이고 도메인 스코프에서 {domain_names}를 받았습니다")
+            parts_en.append(f"the caller is a {role} and holds {domain_names} in the domain scope")
+        else:
+            parts_ko.append(f"호출자는 {role} 입니다")
+            parts_en.append(f"the caller is a {role}")
         if self.key_on is not None:
             parts_ko.append("한 사람에게 기본이 아닌 키가 하나 더 있습니다")
             parts_en.append("one more user holds an extra key that is not the default")

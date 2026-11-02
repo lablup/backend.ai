@@ -62,7 +62,7 @@ from bai_scenario.seeds.user.fields import TestSeedKeypairOf
 
 
 class Granting(enum.Enum):
-    """부르는 사람이 받은 세션 그룹 권한."""
+    """호출자가 받은 세션 그룹 권한."""
 
     READ = Says("읽기", english="read")
     CREATE = Says("생성", english="create")
@@ -94,7 +94,7 @@ class Granting(enum.Enum):
 
 
 class GrantedIn(enum.Enum):
-    """부르는 사람이 세션 그룹 권한을 받은 곳."""
+    """호출자가 세션 그룹 권한을 받은 곳."""
 
     NOWHERE = Says("아무 데서도", english="nowhere")
     THE_PROJECT = Says(
@@ -109,7 +109,7 @@ class GrantedIn(enum.Enum):
     )
 
     def is_the_owner(self) -> bool:
-        """부르는 사람이 세션 그룹들을 만든 사람인지."""
+        """호출자가 세션 그룹들을 만든 사람인지."""
         match self:
             case GrantedIn.THEIR_OWN | GrantedIn.THEIR_OWN_AND_THE_OTHER_PROJECT:
                 return True
@@ -243,7 +243,7 @@ class SomeoneGrantedOnTheirOwnSessionGroups(TestSeedNest[Laid[UserData]]):
 class SessionGroupsInTwoProjects(Given[Any, SessionGroupsAndACaller]):
     """두 프로젝트의 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 그리고 정해진 곳에서 권한을 받은 사용자.
 
-    권한이 자기 스코프에 있으면 부르는 사람이 세션 그룹들을 만든 사람이다.
+    권한이 자기 스코프에 있으면 호출자가 세션 그룹들을 만든 사람이다.
     """
 
     granted_in: GrantedIn = GrantedIn.NOWHERE

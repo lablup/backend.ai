@@ -100,7 +100,7 @@ class AKeyOwnerAndACaller:
 
 @dataclass(frozen=True)
 class SomeoneAndAKeyOwner(Given[Any, AKeyOwnerAndACaller]):
-    """한 도메인의 대상 사용자와 부르는 사람, 그리고 부르는 사람이 대상에 받은 권한."""
+    """한 도메인의 대상 사용자와 호출자, 그리고 호출자가 대상에 받은 권한."""
 
     grant: tuple[Permission, ...] = ()
     extra: bool = False
@@ -108,8 +108,8 @@ class SomeoneAndAKeyOwner(Given[Any, AKeyOwnerAndACaller]):
 
     @override
     def describe(self) -> str:
-        parts_ko = ["도메인 하나와 대상 사용자, 부르는 사용자"]
-        parts_en = ["one domain, one target user, and one caller"]
+        parts_ko = ["도메인 하나와 대상 사용자"]
+        parts_en = ["one domain and one target user"]
         if self.extra:
             parts_ko.append("대상에게 기본 아닌 키 하나")
             parts_en.append("the target holds one extra key that is not the default")

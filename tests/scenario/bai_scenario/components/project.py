@@ -37,7 +37,7 @@ from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
 
 @dataclass(frozen=True)
 class ManyProjectsAndACaller:
-    """건드릴 프로젝트 여럿과, 부르는 사람."""
+    """건드릴 프로젝트 여럿과, 호출자."""
 
     targets: tuple[ProjectData, ...]
     caller: UserData

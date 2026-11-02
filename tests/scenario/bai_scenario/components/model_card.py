@@ -83,7 +83,7 @@ class ModelCardsAndACaller:
 class CardsInAProjectAndSomeone(Given[Any, ModelCardsAndACaller]):
     """모델 카드가 놓인 프로젝트와 사용자 한 명. 그 프로젝트에서 받은 권한은 행이 정한다.
 
-    카드를 만든 사람과 부르는 사람은 다르다. 만든 사람이라서 통하는 길이 행에 섞이지 않는다.
+    카드를 만든 사람과 호출자는 다르다. 만든 사람이라서 통하는 길이 행에 섞이지 않는다.
     """
 
     count: int = 1

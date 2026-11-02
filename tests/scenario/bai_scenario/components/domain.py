@@ -101,7 +101,7 @@ class TargetHolds(enum.Enum):
 class ATargetAndSomeone(Given[Any, ADomainAndACaller]):
     """건드릴 도메인 하나와, 다른 도메인에 사는 사람 한 명.
 
-    건드리는 대상이 부르는 사람의 집이면 안 되는 자리에 쓴다. purge 요청이 그렇다.
+    건드리는 대상이 호출자의 집이면 안 되는 자리에 쓴다. purge 요청이 그렇다.
     """
 
     role: UserRole = UserRole.USER
@@ -152,7 +152,7 @@ class ManyDomainsAndACaller:
     caller: UserData
 
     def elsewhere(self) -> tuple[DomainData, ...]:
-        """부르는 사람이 살지 않는 도메인들. 첫째가 부르는 사람의 집이다."""
+        """호출자가 살지 않는 도메인들. 첫째가 호출자의 집이다."""
         return self.laid[1:]
 
 
@@ -484,7 +484,7 @@ class DomainsOfAGroupAndACaller:
 class DomainsOfAGroupAndSomeone(Given[Any, DomainsOfAGroupAndACaller]):
     """리소스 그룹 하나와 도메인 셋. 그중 둘만 그 그룹을 쓸 수 있다.
 
-    ``reading``이면 부르는 사람이 그 그룹 범위에서 도메인 읽기 역할을 받는다.
+    ``reading``이면 호출자가 그 그룹 범위에서 도메인 읽기 역할을 받는다.
     """
 
     role: UserRole = UserRole.USER

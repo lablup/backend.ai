@@ -40,7 +40,7 @@ from bai_scenario.seeds.rbac.role import TestSeedRole
 
 @dataclass(frozen=True)
 class RolesAndACaller:
-    """역할 여럿과, 그것을 부를 사람. 역할은 부르는 사람이 속하지 않은 도메인에 있다."""
+    """역할 여럿과, 그것을 부를 사람. 역할은 호출자가 속하지 않은 도메인에 있다."""
 
     roles: tuple[RoleData, ...]
     domain: DomainData

@@ -1,6 +1,6 @@
 """배포 훑기 — 세 문이 서로 다른 것으로 막는다.
 
-전역 훑기는 역할이 지킨다. 프로젝트 훑기는 그 프로젝트에, 내 것 훑기는 부르는 사람 자신의
+전역 훑기는 역할이 지킨다. 프로젝트 훑기는 그 프로젝트에, 내 것 훑기는 호출자 자신의
 스코프에 걸린 읽기 권한이 지킨다.
 """
 
@@ -75,7 +75,7 @@ class SearchingEverything(When[ManyDeploymentsAndACaller, DeploymentAdapter, Sea
 
 @dataclass(frozen=True)
 class SearchingTheProject(When[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]):
-    """부르는 사람이 속한 프로젝트 안을 훑는다."""
+    """호출자가 속한 프로젝트 안을 훑는다."""
 
     @override
     def operation(self) -> str:
@@ -98,7 +98,7 @@ class SearchingTheProject(When[ManyDeploymentsAndACaller, DeploymentAdapter, Sea
 
 @dataclass(frozen=True)
 class SearchingMine(When[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]):
-    """부르는 사람이 만든 것을 훑는다."""
+    """호출자가 만든 것을 훑는다."""
 
     @override
     def operation(self) -> str:

@@ -89,7 +89,7 @@ RENAMED = "renamed"
 
 @dataclass(frozen=True)
 class ACallerAndATarget:
-    """부르는 사람, 건드릴 사람, 그리고 지운 뒤를 읽어 볼 슈퍼관리자."""
+    """호출자, 건드릴 사람, 그리고 지운 뒤를 읽어 볼 슈퍼관리자."""
 
     caller: UserData
     target: UserData
@@ -131,7 +131,7 @@ class SomeoneStandingAs(TestSeedNest[Laid[UserData]]):
 
 @dataclass(frozen=True)
 class ATargetAndSomeone(Given[Any, ACallerAndATarget]):
-    """한 도메인의 대상 사용자와 부르는 사람. 부르는 사람은 대상 사용자에 `permissions`를 받는다."""
+    """한 도메인의 대상 사용자와 호출자. 호출자는 대상 사용자에 `permissions`를 받는다."""
 
     permissions: tuple[Permission, ...] = ()
     target_status: UserStatus = UserStatus.ACTIVE
@@ -152,8 +152,8 @@ class ATargetAndSomeone(Given[Any, ACallerAndATarget]):
             granted_ko = ", 호출자는 아무 권한도 받지 않았습니다"
             granted_en = ", with the caller holding no permission"
         return Says(
-            f"도메인 하나와 대상 {state_ko} 하나, 호출자 하나{granted_ko}",
-            english=f"one domain, one target {state_en}, and one caller{granted_en}",
+            f"도메인 하나와 대상 {state_ko} 하나{granted_ko}",
+            english=f"one domain and one target {state_en}{granted_en}",
         )
 
     @override
@@ -306,7 +306,7 @@ class RestoringTheTarget(When[ACallerAndATarget, UserAdapter, Answer]):
 
 @dataclass(frozen=True)
 class PurgingTheTarget(When[ACallerAndATarget, UserAdapter, Answer]):
-    """대상 사용자를 지운다. 넘겨받을 관리자는 부르는 사람이고, `to_nobody`면 없는 id다.
+    """대상 사용자를 지운다. 넘겨받을 관리자는 호출자가고, `to_nobody`면 없는 id다.
 
     지켜보는 슈퍼관리자가 있으면 뒤이어 그 사람이 대상을 일괄로 읽는다.
     """
@@ -353,7 +353,7 @@ class PurgingTheTarget(When[ACallerAndATarget, UserAdapter, Answer]):
 
 @dataclass(frozen=True)
 class PurgingInBulk(When[ASuperadminAndUsers, UserAdapter, Answer]):
-    """사용자들을, 있으면 없는 id까지 함께 일괄로 지운다. 넘겨받는 사람은 부르는 사람이다."""
+    """사용자들을, 있으면 없는 id까지 함께 일괄로 지운다. 넘겨받는 사람은 호출자가다."""
 
     @override
     def operation(self) -> str:

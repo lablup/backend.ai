@@ -75,7 +75,7 @@ type Answer = Searched | RevokedThenSearched | UnblockUserPayload
 
 @dataclass(frozen=True)
 class TwoPeopleAndTheirSessions:
-    """부르는 사람과 다른 사람, 그리고 둘이 가진 세션."""
+    """호출자와 다른 사람, 그리고 둘이 가진 세션."""
 
     caller: UserData
     other: UserData
@@ -109,7 +109,7 @@ class SessionLayer:
 class SomeoneAndAnother(Given[Any, TwoPeopleAndTheirSessions]):
     """한 도메인의 사용자 둘.
 
-    부르는 사람은 ``permissions``만큼 자기 사용자 권한을 받는다. 세션은 ``sessions``가
+    호출자는 ``permissions``만큼 자기 사용자 권한을 받는다. 세션은 ``sessions``가
     말하는 쪽에 심는다.
     """
 
@@ -442,7 +442,7 @@ class EverySessionInOrder(Then[TwoPeopleAndTheirSessions, Answer]):
 
 @dataclass(frozen=True)
 class OnlyMySession(Then[TwoPeopleAndTheirSessions, Answer]):
-    """부르는 사람의 세션 하나만 온다."""
+    """호출자의 세션 하나만 온다."""
 
     started: datetime
 

@@ -225,9 +225,9 @@ def _revisions_and_a_caller(
 class ADeploymentToRevise(Given[Any, RevisionsAndACaller]):
     """배포 하나와 거기 딸린 리비전들, 그리고 그 프로젝트 안의 사용자 한 명.
 
-    모델 폴더는 부르는 사람의 것이다. ``folder_readable``이면 부르는 사람은 그 폴더를 읽을
+    모델 폴더는 호출자의 것이다. ``folder_readable``이면 호출자는 그 폴더를 읽을
     수 있고, 거짓이면 그 폴더에 아무 권한도 없다. ``folder_lent``면 모델 폴더는 남의 것이고,
-    부르는 사람에게 읽기로 공유되어 읽기 전용으로 마운트된다.
+    호출자에게 읽기로 공유되어 읽기 전용으로 마운트된다.
     """
 
     granted: tuple[Permission, ...] = ()

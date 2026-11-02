@@ -63,7 +63,7 @@ class AReaderAndTwoUsers:
 
 @dataclass(frozen=True)
 class SomeoneAndAnother(Given[Any, AReaderAndATarget]):
-    """한 도메인의 사용자 둘. `granted`면 부르는 사람이 상대 사용자에 READ를 받는다."""
+    """한 도메인의 사용자 둘. `granted`면 호출자가 상대 사용자에 READ를 받는다."""
 
     granted: bool
     role: UserRole = UserRole.USER
@@ -95,7 +95,7 @@ class SomeoneAndAnother(Given[Any, AReaderAndATarget]):
 
 @dataclass(frozen=True)
 class SomeoneReadingOneOfTwo(Given[Any, AReaderAndTwoUsers]):
-    """한 도메인의 사용자 셋. 부르는 사람은 둘 중 한 사람에게만 READ를 받았다."""
+    """한 도메인의 사용자 셋. 호출자는 둘 중 한 사람에게만 READ를 받았다."""
 
     @override
     def describe(self) -> str:

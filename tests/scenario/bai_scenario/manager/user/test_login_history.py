@@ -55,7 +55,7 @@ type Answer = AdminSearchLoginHistoryPayload | MySearchLoginHistoryPayload
 
 @dataclass(frozen=True)
 class TwoPeopleAndTheirHistory:
-    """부르는 사람과 다른 사람, 그리고 둘이 남긴 기록."""
+    """호출자와 다른 사람, 그리고 둘이 남긴 기록."""
 
     caller: UserData
     caller_history: LoginHistoryData | None
@@ -79,7 +79,7 @@ class HistoryLayer:
 
 @dataclass(frozen=True)
 class SomeoneAndAnother(Given[Any, TwoPeopleAndTheirHistory]):
-    """한 도메인의 사용자 둘. 부르는 사람은 ``permissions``만큼 자기 사용자 권한을 받는다."""
+    """한 도메인의 사용자 둘. 호출자는 ``permissions``만큼 자기 사용자 권한을 받는다."""
 
     permissions: tuple[Permission, ...] = ()
     other_has_history: bool = True
@@ -269,7 +269,7 @@ class EveryRecordInOrder(Then[TwoPeopleAndTheirHistory, Answer]):
 
 @dataclass(frozen=True)
 class OnlyMyRecord(Then[TwoPeopleAndTheirHistory, Answer]):
-    """부르는 사람의 기록 하나만 온다."""
+    """호출자의 기록 하나만 온다."""
 
     started: datetime
 

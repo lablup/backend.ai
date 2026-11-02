@@ -74,7 +74,7 @@ class SearchingInTheProject(When[Laid, SessionGroupAdapter, Searched]):
 
 @dataclass(frozen=True)
 class SearchingTheirOwn(When[Laid, SessionGroupAdapter, Searched]):
-    """부르는 사람 자신의 사용자 스코프에서 필터 없이 검색한다."""
+    """호출자 자신의 사용자 스코프에서 필터 없이 검색한다."""
 
     @override
     def operation(self) -> str:

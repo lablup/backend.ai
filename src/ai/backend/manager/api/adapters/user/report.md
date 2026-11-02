@@ -768,7 +768,7 @@ even a user granted permission in the domain scope is rejected by the global rol
 
 Given
 
-- one domain and one caller, the caller holds the user READ permission in that domain scope
+- one domain, the caller holds the user READ permission in that domain scope
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -1144,7 +1144,7 @@ when a user granted user READ in the domain scope searches by domain name, the u
 
 Given
 
-- one domain and one caller, one user in the same domain and one user in another domain, the caller holds the user READ permission in that domain scope
+- one domain, one user in the same domain and one user in another domain, the caller holds the user READ permission in that domain scope
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -1183,7 +1183,7 @@ a user holding no role who tries to search by domain name is rejected by the sco
 
 Given
 
-- one domain and one caller
+- one domain, the caller holds no permission
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -1208,7 +1208,7 @@ when a user holding the permission searches by a domain name nothing answers to,
 
 Given
 
-- one domain and one caller, the caller holds the user READ permission in that domain scope
+- one domain, the caller holds the user READ permission in that domain scope
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -1302,7 +1302,7 @@ a user holding the permission is rejected by the global role gate when searching
 
 Given
 
-- one domain and one caller, the caller holds the user READ permission in that domain scope
+- one domain, the caller holds the user READ permission in that domain scope
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -1489,7 +1489,7 @@ a GQL domain search under the same permission brings back only the users of that
 
 Given
 
-- one domain and one caller, one user in the same domain and one user in another domain, the caller holds the user READ permission in that domain scope
+- one domain, one user in the same domain and one user in another domain, the caller holds the user READ permission in that domain scope
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -1528,7 +1528,7 @@ a GQL domain search from a user holding no role is rejected by the scope permiss
 
 Given
 
-- one domain and one caller
+- one domain, the caller holds no permission
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -1843,7 +1843,7 @@ when a user holding the permission runs a scoped search without page arguments, 
 
 Given
 
-- one domain and one caller, the caller holds the user READ permission in that domain scope
+- one domain, the caller holds the user READ permission in that domain scope
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -2191,7 +2191,7 @@ when the superadmin gives a default key switch to another user's key along with 
 
 Given
 
-- one domain, one target user, 1 more users, and one calling superadmin, one more user holds an extra key that is not the default
+- one domain and one target user, 1 more users, the caller is a superadmin, one more user holds an extra key that is not the default
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -2230,7 +2230,7 @@ when the superadmin gives one user to update and one to rename into a taken name
 
 Given
 
-- one domain, one target user, 2 more users, and one calling superadmin
+- one domain and one target user, 2 more users, the caller is a superadmin
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -2292,7 +2292,7 @@ even a user granted UPDATE in the domain scope is rejected by the global role ga
 
 Given
 
-- one domain, one target user, 2 more users, and one calling user, the caller holds UPDATE in the domain scope
+- one domain and one target user, 2 more users, the caller is a user and holds UPDATE in the domain scope
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -2391,7 +2391,7 @@ when a user granted SOFT_DELETE in the target user scope deletes the user, succe
 
 Given
 
-- one domain, one target user, and one caller, with the caller holding the user SOFT_DELETE, READ permission on the target
+- one domain and one target user, with the caller holding the user SOFT_DELETE, READ permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -2446,7 +2446,7 @@ a user holding no role who tries to delete a user is rejected by the entity perm
 
 Given
 
-- one domain, one target user, and one caller, with the caller holding no permission
+- one domain and one target user, with the caller holding no permission
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -2559,7 +2559,7 @@ when a user granted UPDATE and READ in the target user scope gives only a full n
 
 Given
 
-- one domain, one target user, 0 more users, and one calling user, the caller holds UPDATE, READ in the target user scope
+- one domain and one target user, the caller is a user and holds UPDATE, READ in the target user scope
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -2616,7 +2616,7 @@ when a user granted SOFT_DELETE and READ in the target user scope gives ACTIVE i
 
 Given
 
-- one domain, one target deleted user, and one caller, with the caller holding the user SOFT_DELETE, READ permission on the target
+- one domain and one target deleted user, with the caller holding the user SOFT_DELETE, READ permission on the target
   - Domain home-1
   - Prepare one deleted user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -2671,7 +2671,7 @@ when a user granted SOFT_DELETE and READ in the target user scope gives DELETED 
 
 Given
 
-- one domain, one target user, and one caller, with the caller holding the user SOFT_DELETE, READ permission on the target
+- one domain and one target user, with the caller holding the user SOFT_DELETE, READ permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -2725,7 +2725,7 @@ when another user granted UPDATE and READ in the target user scope gives only a 
 
 Given
 
-- one domain, one target user, 0 more users, and one calling user, the caller holds UPDATE, READ in the target user scope, the target user is required to change the password
+- one domain and one target user, the caller is a user and holds UPDATE, READ in the target user scope, the target user is required to change the password
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -2782,7 +2782,7 @@ when a user holding the permission names another key of the target as the defaul
 
 Given
 
-- one domain, one target user, 0 more users, and one calling user, the caller holds UPDATE, READ in the target user scope, one more user holds an extra key that is not the default
+- one domain and one target user, the caller is a user and holds UPDATE, READ in the target user scope, one more user holds an extra key that is not the default
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -2958,7 +2958,7 @@ a user holding no role who tries to edit another user is rejected by the entity 
 
 Given
 
-- one domain, one target user, 0 more users, and one calling user
+- one domain and one target user, the caller is a user
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -2989,7 +2989,7 @@ when a user holding the permission gives a username another user already holds, 
 
 Given
 
-- one domain, one target user, 1 more users, and one calling user, the caller holds UPDATE in the target user scope
+- one domain and one target user, 1 more users, the caller is a user and holds UPDATE in the target user scope
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -3027,7 +3027,7 @@ when a user granted UPDATE and READ in the target user scope changes the full na
 
 Given
 
-- one domain, one target deleted user, and one caller, with the caller holding the user UPDATE, READ permission on the target
+- one domain and one target deleted user, with the caller holding the user UPDATE, READ permission on the target
   - Domain home-1
   - Prepare one deleted user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -3061,7 +3061,7 @@ when a user granted UPDATE and READ in the target user scope gives BEFORE_VERIFI
 
 Given
 
-- one domain, one target user, and one caller, with the caller holding the user UPDATE, READ permission on the target
+- one domain and one target user, with the caller holding the user UPDATE, READ permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -3094,7 +3094,7 @@ when a user granted only UPDATE and READ in the target user scope gives DELETED 
 
 Given
 
-- one domain, one target user, and one caller, with the caller holding the user UPDATE, READ permission on the target
+- one domain and one target user, with the caller holding the user UPDATE, READ permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -3127,7 +3127,7 @@ when only DELETED is given in an edit of a deleted user, nothing changes and tha
 
 Given
 
-- one domain, one target deleted user, and one caller, with the caller holding the user SOFT_DELETE, READ permission on the target
+- one domain and one target deleted user, with the caller holding the user SOFT_DELETE, READ permission on the target
   - Domain home-1
   - Prepare one deleted user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -3509,7 +3509,7 @@ when a user granted UPDATE in the target user scope, not the superadmin, creates
 
 Given
 
-- one domain, one target user, and one caller, the caller holds the user UPDATE permission on the target
+- one domain and one target user, the caller holds the user UPDATE permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -3555,7 +3555,7 @@ when a user holding the permission gives a policy name that does not exist, inpu
 
 Given
 
-- one domain, one target user, and one caller, the caller holds the user UPDATE permission on the target
+- one domain and one target user, the caller holds the user UPDATE permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -3588,7 +3588,7 @@ a user holding no role who tries to create a key is rejected by the entity permi
 
 Given
 
-- one domain, one target user, and one caller, the caller holds no permission
+- one domain and one target user, the caller holds no permission
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -3619,7 +3619,7 @@ when a user granted READ and UPDATE in the target scope deletes a key, the acces
 
 Given
 
-- one domain, one target user, and one caller, the target holds one extra key that is not the default, the caller holds the user READ, UPDATE permission on the target
+- one domain and one target user, the target holds one extra key that is not the default, the caller holds the user READ, UPDATE permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -3654,7 +3654,7 @@ a user holding no role who tries to delete a key is rejected at the owner lookup
 
 Given
 
-- one domain, one target user, and one caller, the target holds one extra key that is not the default, the caller holds no permission
+- one domain and one target user, the target holds one extra key that is not the default, the caller holds no permission
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -3684,7 +3684,7 @@ a user holding only READ who tries to delete a key is rejected by the entity per
 
 Given
 
-- one domain, one target user, and one caller, the target holds one extra key that is not the default, the caller holds the user READ permission on the target
+- one domain and one target user, the target holds one extra key that is not the default, the caller holds the user READ permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -3718,7 +3718,7 @@ when a user holding the permission tries to delete the target's default key, inp
 
 Given
 
-- one domain, one target user, and one caller, the caller holds the user READ, UPDATE permission on the target
+- one domain and one target user, the caller holds the user READ, UPDATE permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -3757,7 +3757,7 @@ when a user granted READ and UPDATE in the target scope deletes the SSH key, the
 
 Given
 
-- one domain, one target user, and one caller, the caller holds the user READ, UPDATE permission on the target
+- one domain and one target user, the caller holds the user READ, UPDATE permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -3795,7 +3795,7 @@ a user holding no role who tries to delete a key is rejected at the owner lookup
 
 Given
 
-- one domain, one target user, and one caller, the caller holds no permission
+- one domain and one target user, the caller holds no permission
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -3827,7 +3827,7 @@ a user holding only READ who tries to delete a key is rejected by the entity per
 
 Given
 
-- one domain, one target user, and one caller, the caller holds the user READ permission on the target
+- one domain and one target user, the caller holds the user READ permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -3865,7 +3865,7 @@ when a user granted READ in the target scope reads a key, that whole key node co
 
 Given
 
-- one domain, one target user, and one caller, the target holds one extra key that is not the default, the caller holds the user READ permission on the target
+- one domain and one target user, the target holds one extra key that is not the default, the caller holds the user READ permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -3911,7 +3911,7 @@ a user holding no role who tries to read a key is rejected at the owner lookup s
 
 Given
 
-- one domain, one target user, and one caller, the target holds one extra key that is not the default, the caller holds no permission
+- one domain and one target user, the target holds one extra key that is not the default, the caller holds no permission
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -3943,7 +3943,7 @@ when a user granted READ in the target scope reads the SSH key, only the access 
 
 Given
 
-- one domain, one target user, and one caller, the caller holds the user READ permission on the target
+- one domain and one target user, the caller holds the user READ permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -3980,7 +3980,7 @@ a user holding no role who tries to read a key is rejected at the owner lookup s
 
 Given
 
-- one domain, one target user, and one caller, the caller holds no permission
+- one domain and one target user, the caller holds no permission
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -4014,7 +4014,7 @@ when a user granted READ and UPDATE in the target scope gives a public key and a
 
 Given
 
-- one domain, one target user, and one caller, the caller holds the user READ, UPDATE permission on the target
+- one domain and one target user, the caller holds the user READ, UPDATE permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -4052,7 +4052,7 @@ a user holding no role who tries to register an SSH key is rejected at the owner
 
 Given
 
-- one domain, one target user, and one caller, the caller holds no permission
+- one domain and one target user, the caller holds no permission
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -4084,7 +4084,7 @@ a user holding only READ who tries to register an SSH key is rejected by the ent
 
 Given
 
-- one domain, one target user, and one caller, the caller holds the user READ permission on the target
+- one domain and one target user, the caller holds the user READ permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -4122,7 +4122,7 @@ when a user granted READ and UPDATE in the target scope gives only a rate limit,
 
 Given
 
-- one domain, one target user, and one caller, the target holds one extra key that is not the default, the caller holds the user READ, UPDATE permission on the target
+- one domain and one target user, the target holds one extra key that is not the default, the caller holds the user READ, UPDATE permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -4169,7 +4169,7 @@ a user holding no role who tries to change a key is rejected at the owner lookup
 
 Given
 
-- one domain, one target user, and one caller, the target holds one extra key that is not the default, the caller holds no permission
+- one domain and one target user, the target holds one extra key that is not the default, the caller holds no permission
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -4199,7 +4199,7 @@ a user holding only READ who tries to change a key is rejected by the entity per
 
 Given
 
-- one domain, one target user, and one caller, the target holds one extra key that is not the default, the caller holds the user READ permission on the target
+- one domain and one target user, the target holds one extra key that is not the default, the caller holds the user READ permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -4233,7 +4233,7 @@ when a user holding the permission gives a policy name that does not exist, inpu
 
 Given
 
-- one domain, one target user, and one caller, the target holds one extra key that is not the default, the caller holds the user READ, UPDATE permission on the target
+- one domain and one target user, the target holds one extra key that is not the default, the caller holds the user READ, UPDATE permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -4497,7 +4497,7 @@ when a user granted HARD_DELETE in the target user scope purges a user that was 
 
 Given
 
-- one domain, one target user, and one caller, with the caller holding the user HARD_DELETE permission on the target
+- one domain and one target user, with the caller holding the user HARD_DELETE permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -4533,7 +4533,7 @@ a user holding no role who tries to purge a user is rejected by the entity permi
 
 Given
 
-- one domain, one target user, and one caller, with the caller holding no permission
+- one domain and one target user, with the caller holding no permission
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -4561,7 +4561,7 @@ when a user holding the permission gives an admin id that does not exist as the 
 
 Given
 
-- one domain, one target user, and one caller, with the caller holding the user HARD_DELETE permission on the target
+- one domain and one target user, with the caller holding the user HARD_DELETE permission on the target
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -4595,7 +4595,7 @@ when a user granted SOFT_DELETE in the target user scope restores a deleted user
 
 Given
 
-- one domain, one target deleted user, and one caller, with the caller holding the user SOFT_DELETE, READ permission on the target
+- one domain and one target deleted user, with the caller holding the user SOFT_DELETE, READ permission on the target
   - Domain home-1
   - Prepare one deleted user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -4651,7 +4651,7 @@ a user holding no role who tries to restore a user is rejected by the entity per
 
 Given
 
-- one domain, one target deleted user, and one caller, with the caller holding no permission
+- one domain and one target deleted user, with the caller holding no permission
   - Domain home-1
   - Prepare one deleted user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -4680,7 +4680,7 @@ when a user holding the permission tries to restore an inactive user that was no
 
 Given
 
-- one domain, one target inactive user, and one caller, with the caller holding the user SOFT_DELETE, READ permission on the target
+- one domain and one target inactive user, with the caller holding the user SOFT_DELETE, READ permission on the target
   - Domain home-1
   - Prepare one inactive user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -5127,7 +5127,7 @@ when a user granted UPDATE in the target user scope sends an edit holding only t
 
 Given
 
-- one domain, one target user, 0 more users, and one calling user, the caller holds UPDATE in the target user scope
+- one domain and one target user, the caller is a user and holds UPDATE in the target user scope
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -5184,7 +5184,7 @@ when an allowed IP edit comes from a user holding no role, the entity permission
 
 Given
 
-- one domain, one target user, 0 more users, and one calling user
+- one domain and one target user, the caller is a user
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name

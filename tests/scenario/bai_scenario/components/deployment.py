@@ -80,7 +80,7 @@ class APlaceAndACaller:
 class ADeploymentAndACaller:
     """이미 있는 배포 하나와, 그것을 부를 사람.
 
-    ``owner``는 그 배포를 만든 사람이다. 대지 않으면 부르는 사람이 만든 것이다.
+    ``owner``는 그 배포를 만든 사람이다. 대지 않으면 호출자가 만든 것이다.
     """
 
     place: APlaceAndACaller
@@ -463,7 +463,7 @@ class DeploymentsInTwoProjects(Given[Any, ManyDeploymentsAndACaller]):
 class MineBesideAnothers(Given[Any, ManyDeploymentsAndACaller]):
     """같은 프로젝트에 두 사람이 각자 만든 배포와, 그중 한 사람.
 
-    답으로 오는 ``laid``는 부르는 사람의 것뿐이다. 다른 사람의 배포는 심기만 하고 답하지
+    답으로 오는 ``laid``는 호출자의 것뿐이다. 다른 사람의 배포는 심기만 하고 답하지
     않으므로, 훑은 결과에 섞여 나오면 그 자리에서 어긋난다.
     """
 

@@ -88,7 +88,7 @@ class AnAskerAndWhomTheyReach:
 
 @dataclass(frozen=True)
 class SomeoneInADomain(Given[Any, AnAskerAndWhomTheyReach]):
-    """도메인 하나와 부르는 사람. `granted`면 그 도메인 스코프의 사용자 READ를 받는다.
+    """도메인 하나와 호출자. `granted`면 그 도메인 스코프의 사용자 READ를 받는다.
 
     `with_neighbours`면 같은 도메인에 사용자 하나, 다른 도메인에 사용자 하나를 더 둔다.
     """
@@ -99,14 +99,17 @@ class SomeoneInADomain(Given[Any, AnAskerAndWhomTheyReach]):
 
     @override
     def describe(self) -> str:
-        parts_ko = ["도메인 하나와 호출자"]
-        parts_en = ["one domain and one caller"]
+        parts_ko = ["도메인 하나"]
+        parts_en = ["one domain"]
         if self.with_neighbours:
             parts_ko.append("같은 도메인 사용자 하나와 다른 도메인 사용자 하나")
             parts_en.append("one user in the same domain and one user in another domain")
         if self.granted:
             parts_ko.append("호출자는 그 도메인 스코프의 사용자 READ 를 받았습니다")
             parts_en.append("the caller holds the user READ permission in that domain scope")
+        else:
+            parts_ko.append("호출자는 아무 권한도 받지 않았습니다")
+            parts_en.append("the caller holds no permission")
         return Says(", ".join(parts_ko), english=", ".join(parts_en))
 
     @override
@@ -211,7 +214,7 @@ class AnActiveAndADeletedUser(Given[Any, AnAskerAndWhomTheyReach]):
 class TwoUsersOneHoldingARole(Given[Any, AnAskerAndWhomTheyReach]):
     """도메인 하나와 사용자 둘, 그중 첫 사람만 역할 하나를 받았다.
 
-    부르는 사람이 슈퍼관리자가 아니고 `granted`면 그 도메인 스코프의 사용자 READ를 받는다.
+    호출자가 슈퍼관리자가 아니고 `granted`면 그 도메인 스코프의 사용자 READ를 받는다.
     """
 
     role: UserRole
@@ -298,7 +301,7 @@ class AProjectAndSomeone(Given[Any, AnAskerAndWhomTheyReach]):
 class AProjectWithAMember(Given[Any, AnAskerAndWhomTheyReach]):
     """도메인 하나와 프로젝트 하나, 명부에 오른 사용자와 오르지 않은 사용자.
 
-    부르는 사람은 그 프로젝트 스코프의 사용자 READ를 받았다.
+    호출자는 그 프로젝트 스코프의 사용자 READ를 받았다.
     """
 
     @override
@@ -338,7 +341,7 @@ class AProjectWithAMember(Given[Any, AnAskerAndWhomTheyReach]):
 class TwoScopes(Given[Any, AnAskerAndWhomTheyReach]):
     """도메인 둘, 둘째 도메인의 프로젝트 하나와 그 명부 사용자 하나.
 
-    부르는 사람은 첫 도메인 스코프의 사용자 READ를 받고, `both`면 그 프로젝트 스코프에도 받는다.
+    호출자는 첫 도메인 스코프의 사용자 READ를 받고, `both`면 그 프로젝트 스코프에도 받는다.
     """
 
     both: bool
