@@ -79,6 +79,7 @@ class KernelCreateSpec(BaseModel):
     # Optional identity overrides; generated when omitted.
     kernel_id: str | None = None
     session_id: str | None = None
+    session_name: str | None = None
     owner_user_id: str | None = None
 
 
@@ -146,6 +147,7 @@ def build_kernel_creation_config(
     image_config: ImageConfig,
     kernel_id: str,
     session_id: str,
+    session_name: str,
     owner_user_id: str,
     agent_addr: str,
 ) -> KernelCreationConfig:
@@ -160,6 +162,7 @@ def build_kernel_creation_config(
         image=image_config,
         kernel_id=kernel_id,
         session_id=session_id,
+        session_name=session_name,
         owner_user_id=owner_user_id,
         owner_project_id=None,
         network_id=session_id,

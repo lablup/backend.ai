@@ -350,6 +350,7 @@ class SessionLauncher:
                         "image": kernel_image_config,
                         "kernel_id": kernel_id_str,
                         "session_id": str(session.session_id),
+                        "session_name": session.name,
                         "owner_user_id": str(session.user_uuid),
                         "owner_project_id": None,  # TODO: Implement project-owned sessions
                         "network_id": str(session.session_id),
