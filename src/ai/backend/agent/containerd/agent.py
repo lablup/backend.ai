@@ -64,7 +64,6 @@ from ai.backend.agent.containerd.scratch import (
     ScratchDirs,
     create_scratch,
     read_resource_spec,
-    remove_scratch,
     write_config_files,
     write_dotfiles,
     write_hosts_file,
@@ -76,6 +75,10 @@ from ai.backend.agent.containerd.spec import (
     build_base_spec,
     build_launch_spec,
     merge_env,
+)
+from ai.backend.agent.containerd.trusted_storage import (
+    attach_trusted_storage,
+    release_scratch,
 )
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.agent import (
@@ -226,6 +229,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _address: IPv4Address | None
     _resource_lock: asyncio.Lock
     _dirs: ScratchDirs
+    _trusted_storage: Path | None
     _generated_mounts: list[GeneratedMount]
     _base_spec: dict[str, Any]
     _spec_signature: str | None
@@ -271,6 +275,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         self._dirs = ScratchDirs.for_kernel(
             local_config.container.scratch_root, str(ownership_data.kernel_id)
         )
+        self._trusted_storage = None
         self._generated_mounts = []
         self._base_spec = {}
         # Before the scratch dir exists: a sealed kernel without a signature fails here.
@@ -334,6 +339,12 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             self._owner(),
             clone_dotfiles=not self.restarting,
         )
+        config = self.local_config.containerd
+        # PROVISIONAL(trusted-storage): enabled per profile name; the profile gets the loop device
+        if self._profile.name in config.trusted_storage_profiles:
+            self._trusted_storage = await attach_trusted_storage(
+                self._dirs.trusted_store, int(config.trusted_storage_size)
+            )
 
     # Not mirrored from the Docker agent: the agent socket, domain-socket proxies, extra
     # Docker volumes and the memory-scratch /tmp.
@@ -404,10 +415,9 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             self._host_config = merge_translations(host_configs)
             self._host_configs = host_configs
         except BaseException:
-            # The kernel is not registered yet, so no clean_kernel removes its scratch dir.
-            await run_in_executor_with_context(
-                None, remove_scratch, self.local_config.container.scratch_root, str(self.kernel_id)
-            )
+            # The kernel is not registered yet, so no clean_kernel removes its scratch dir
+            # or detaches its loop device.
+            await self._release_scratch()
             raise
 
     @override
@@ -482,11 +492,14 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         try:
             return await self._prepare_kernel(resource_spec, environ, service_ports)
         except BaseException:
-            # The kernel is not registered yet, so no clean_kernel removes its scratch dir.
-            await run_in_executor_with_context(
-                None, remove_scratch, self.local_config.container.scratch_root, str(self.kernel_id)
-            )
+            # The kernel is not registered yet, so no clean_kernel removes its scratch dir
+            # or detaches its loop device.
+            await self._release_scratch()
             raise
+
+    async def _release_scratch(self) -> None:
+        await release_scratch(self.local_config.container.scratch_root, str(self.kernel_id))
+        self._trusted_storage = None
 
     async def _prepare_kernel(
         self,
@@ -525,6 +538,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             slots=self._slots,
             devices=self._host_config.translated_devices,
             mounts=tuple(self._generated_mounts),
+            trusted_storage_path=self._trusted_storage,
             base_spec=self._base_spec,
         )
         # The netns exists before plan(); a failure in setup or plan tears it down.
@@ -667,9 +681,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             await self._teardown_network()
             self._port_pool.release_many(host_ports)
             await self._free_allocations(kernel_obj.resource_spec)
-            await run_in_executor_with_context(
-                None, remove_scratch, self.local_config.container.scratch_root, str(self.kernel_id)
-            )
+            await self._release_scratch()
             if not isinstance(e, Exception):
                 raise
             reason = describe_profile_failure(self._profile, None, str(e))
@@ -993,9 +1005,7 @@ class ContainerdAgent(
         except BackendAIError:
             log.exception("kernel network teardown failed")
         if not restarting:
-            await run_in_executor_with_context(
-                None, remove_scratch, self.local_config.container.scratch_root, str(kernel_id)
-            )
+            await release_scratch(self.local_config.container.scratch_root, str(kernel_id))
 
     async def _collect_task_log(
         self, kernel_id: KernelId, container_id: ContainerId, dirs: ScratchDirs

@@ -180,6 +180,21 @@ class KernelNetworkSetupFailed(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class TrustedStorageUnavailable(BackendAIError, web.HTTPInternalServerError):
+    """Raised when the loop device backing a kernel's trusted storage cannot be set up."""
+
+    error_type = "https://api.backend.ai/probs/agent/trusted-storage-unavailable"
+    error_title = "The trusted storage of the kernel cannot be prepared."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class KernelAddressExhausted(BackendAIError, web.HTTPServiceUnavailable):
     """Raised when the bridge subnet has no free address left for a kernel."""
 
