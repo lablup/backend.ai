@@ -116,8 +116,8 @@ BEP-1046 에서 정한다.
 | Storage Proxy, 스토리지 볼륨 | ✅ 이 proxy 에서 volume 을 사용할 수 있는가 | 연결 |
 | 에이전트, 스토리지 볼륨 | ✅ 이 에이전트에서 volume 을 사용할 수 있는가 | 연결 |
 | 자원 그룹, 스토리지 볼륨 | 관리자가 활성화, 비활성화하는 값. 건강 상태가 아니다 | 연결 |
-| 스토리지 백엔드 자체 | ❌ 관리하지 않음 | — |
-| 스토리지 볼륨 자체 | ❌ 관리하지 않음 | — |
+| 스토리지 백엔드 자체 | ❌ 관리하지 않음 | 없음 |
+| 스토리지 볼륨 자체 | ❌ 관리하지 않음 | 없음 |
 
 스토리지 백엔드에는 전체 판정이 없다. 그 volume 을 보유한 서비스만 각자의 네트워크 경로로 appliance
 에 접근할 수 있고, 그 관찰을 하나의 값으로 합치려면 임의의 규칙이 필요하다. proxy 넷 중 하나에
@@ -225,8 +225,8 @@ backend 연결 정보 사본도 마찬가지다. volume 을 생성하거나 변�
 | 시작할 때, 이후 주기적으로 | event bus | 자기 backend 와 보유한 volume 을 선언하는 heartbeat. 각 volume 은 메모리에 있는 최신 volume 상태를 함께 보낸다 |
 | 주기적으로, volume 별로 독립 | 자기 mount | volume 구현이 실행하는 volume 상태 검사. 결과는 메모리에 두고 다음 heartbeat 에 담긴다 |
 | 주기적으로 | backend appliance | `get_hwinfo()`. 이 proxy 에서 appliance 에 접근할 수 있는지 확인한다. 역시 메모리에 둔다 |
-| manager 의 요청 시 | — | volume 검증 endpoint 를 제공한다. **신규**. 기존 volume 목록은 설정을 그대로 반환할 뿐 volume 이 준비됐는지 응답하지 못한다 |
-| client 의 요청 시 | — | 기존 vfolder 파일 API 를 변경 없이 제공한다 |
+| manager 의 요청 시 | 없음 | volume 검증 endpoint 를 제공한다. **신규**. 기존 volume 목록은 설정을 그대로 반환할 뿐 volume 이 준비됐는지 응답하지 못한다 |
+| client 의 요청 시 | 없음 | 기존 vfolder 파일 API 를 변경 없이 제공한다 |
 
 **Agent**
 
@@ -260,7 +260,7 @@ vfolder 는 volume 을 지정하고 더 이상 proxy 를 지정하지 않으므�
 |------|-------|---------|
 | appliance 연결 정보나 자격 증명 등록 | manager | 스토리지 백엔드에 대한 mutation |
 | volume 을 자원 그룹에 제공하거나 비활성화 | manager | 자원 그룹 연결에 대한 mutation |
-| volume 생성 또는 변경 | — | API 없음. volume 은 서비스가 선언하기 때문에 존재하고, 관리자는 삭제만 할 수 있다 |
+| volume 생성 또는 변경 | 없음 | API 없음. volume 은 서비스가 선언하기 때문에 존재하고, 관리자는 삭제만 할 수 있다 |
 | vfolder 내용 읽기나 기록 | Storage Proxy | 변경 없이 기존 vfolder API 를 호출한다 |
 
 ## 이전과 호환
@@ -318,6 +318,6 @@ vfolder 는 volume 을 지정하고 더 이상 proxy 를 지정하지 않으므�
 
 ## 참고
 
-- [BEP-1046: Unified Service Discovery with DB-backed Service Catalog](BEP-1046-unified-service-discovery.md) — 이 제안이 기반으로 삼는 서비스 카탈로그, heartbeat, endpoint 모델
-- [BEP-1047: Resource Slot DB Normalization](BEP-1047-resource-slot-db-normalization.md) — 설정에서 registry 를 정규화한 선례
-- [BEP-1065: Encrypted Secret-Key Storage](BEP-1065-encrypted-secret-key-storage.md) — backend appliance 의 자격 증명 저장
+- [BEP-1046: Unified Service Discovery with DB-backed Service Catalog](BEP-1046-unified-service-discovery.md): 이 제안이 기반으로 삼는 서비스 카탈로그, heartbeat, endpoint 모델
+- [BEP-1047: Resource Slot DB Normalization](BEP-1047-resource-slot-db-normalization.md): 설정에서 registry 를 정규화한 선례
+- [BEP-1065: Encrypted Secret-Key Storage](BEP-1065-encrypted-secret-key-storage.md): backend appliance 의 자격 증명 저장

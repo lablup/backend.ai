@@ -82,7 +82,7 @@ Manager --trigger--> Agent entry (validate, enqueue, return ack)
                     anycast --> Manager (record kernel history + apply from -> to)
 ```
 
-### (b) 실행 계층 — 단계 handler (BA-6077/78/79)
+### (b) 실행 계층: 단계 handler (BA-6077/78/79)
 
 handler 는 커널 수명 주기의 실행 단위다. 각자 BEP-1002 의 `Provisioner`/`Stage` 를 받아 사용하고 BEP-1057 의 `ComputeBackend` 를 호출해 동작을 수행하며, **응답만 반환한다**(event 를 발행하지 않는다). retry 는 맡지 않는다. 실패하면 확보한 자원을 역순으로 정리하고 실패 응답을 반환하며, reschedule 은 sokovan 이 정한다. sokovan 의 "handler 하나 = 파일 하나" 규칙을 따른다.
 
@@ -164,7 +164,7 @@ Agent 재시작은 **커널 수명 주기와 커널 이력에 영향을 주지 �
 ## 6. 참고
 
 - [BEP-1002](BEP-1002-agent-architecture.md), [BEP-1057](BEP-1057-agent-re-architecture.md), [BEP-1030](BEP-1030-sokovan-scheduler-status-transition.md)
-- `src/ai/backend/manager/models/scheduling_history/row.py` — `kernel_scheduling_history` 테이블
-- `src/ai/backend/manager/models/kernel/` — `KernelRow.status_history`
-- `src/ai/backend/common/events/event_types/kernel/` — 기존 커널 anycast/broadcast event
-- `src/ai/backend/agent/AGENTS.md` — event 전용 출구, `stage/` 상태 기계 규칙
+- `src/ai/backend/manager/models/scheduling_history/row.py`: `kernel_scheduling_history` 테이블
+- `src/ai/backend/manager/models/kernel/`: `KernelRow.status_history`
+- `src/ai/backend/common/events/event_types/kernel/`: 기존 커널 anycast/broadcast event
+- `src/ai/backend/agent/AGENTS.md`: event 전용 출구, `stage/` 상태 기계 규칙

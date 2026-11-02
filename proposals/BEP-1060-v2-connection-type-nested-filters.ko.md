@@ -3,7 +3,7 @@
 ## 관련 이슈
 
 - JIRA: BA-6819 (이 BEP)
-- Epic: BA-6818 — v2 연결 유형(to-many) 중첩 필터 표준화
+- Epic BA-6818: v2 연결 유형(to-many) 중첩 필터 표준화
 
 ## 목표
 
@@ -56,10 +56,10 @@ v2 filter DTO 는 GraphQL, REST v2, 클라이언트 SDK, CLI 가 함께 사용�
 
 | | 항목 |
 |---|---|
-| ✅ | `models/clauses.py` — `QueryCondition = Callable[[], ColumnElement[bool]]` |
-| ✅ | `repositories/base/filter_adapter.py` — `convert_string_filter` / `convert_uuid_filter`(잎 필터 DTO → 조건) |
-| ✅ | `repositories/base/utils.py` — `combine_conditions_and` / `combine_conditions_or` / `negate_conditions` |
-| ✅ | `repositories/base/querier.py` — 조건 목록을 `WHERE` 절로 접는다 |
+| ✅ | `models/clauses.py`: `QueryCondition = Callable[[], ColumnElement[bool]]` |
+| ✅ | `repositories/base/filter_adapter.py`: `convert_string_filter` / `convert_uuid_filter`(잎 필터 DTO → 조건) |
+| ✅ | `repositories/base/utils.py`: `combine_conditions_and` / `combine_conditions_or` / `negate_conditions` |
+| ✅ | `repositories/base/querier.py`: 조건 목록을 `WHERE` 절로 접는다 |
 
 ## 제안하는 규칙
 
@@ -77,7 +77,7 @@ to-many relation 필터에는 GraphQL 생태계 전체에 사실상 표준이 �
 - "`every` 는 빈 컬렉션에서 true" 동작도 둘이 같다(Prisma 는 이를 명시적으로 문서화한다).
 - **"자식이 있고 모두 일치한다"**(빈 컬렉션이 아닌 `every`)는 둘 다 전용 축약 없이 **`some: {}` + `every: {…}`** 를 조합해 표현한다. 이 BEP 는 그 관용구를 채택한 뒤, 축약을 추가하는 대신 명시적 `exists` 필드로 대체했다(결정 1, 개정).
 
-### 결정 1 — 모양: 명시적 `some` / `every` / `none`
+### 결정 1: 모양 (명시적 `some` / `every` / `none`)
 
 to-many 중첩 필터는 relation 마다 두는 중첩 필터 모델로 표현한다. 매칭 방식 필드를 최대 셋 두고, 각 필드는 자식 엔티티 자신의 필터를 담는다.
 
@@ -115,7 +115,7 @@ to-many 중첩 필터는 relation 마다 두는 중첩 필터 모델로 표현�
 
 **검토한 트레이드오프.** 지금까지의 관례는 implicit-some(임베드만 두면 `some`)이다. 이를 유지하면 선례 둘과 같아지고 새 개념도 늘지 않지만, `every` 나 `none` 을 전혀 표현할 수 없다. BA-6818 을 이끈 운영 질의("모든 replica 가 healthy", "실행 중인 replica 없음")가 바로 그것이다. 그래서 **기각했다**. 명시적 매칭 방식은 중첩이 한 단계 늘고 implicit-some 선례 둘과 달라지지만(마이그레이션에서 해소), 실제 질의 요구를 포함하는 최소 모양이고 읽을 때 뜻이 분명하다.
 
-### 결정 2 — 재사용 추상화: 공유 `make_correlated_exists` + 엔티티별 바인딩
+### 결정 2: 재사용 추상화 (공유 `make_correlated_exists` + 엔티티별 바인딩)
 
 상관 `EXISTS` 를 생성하는 로직은 **공유 빌더 하나**에 두고, 각 엔티티는 빌더를 자기 relation 에 바인딩해 **도메인 이름의 팩토리**로 노출한다. 엔티티가 사용하는 이름은 rbac 의 `by_assigned_user_id(list[QueryCondition])` 모양을 잇는다.
 
@@ -140,7 +140,7 @@ DeploymentConditions.by_replica_exists = make_correlated_exists(
 - 자식 조건은 엔티티의 기존 잎 필터 변환기에서 온다. deployment 는 `_convert_replica_filter` 이고, 이미 `RoutingRow` 위의 `RouteConditions.*` 를 생성한다.
 - 선례 둘(image 는 잎마다 `EXISTS` 를 넣고, rbac 는 목록을 접는다)도 나중에 옮길 때 이 공유 빌더로 모인다.
 
-### 결정 3 — 의미 문서화 표준
+### 결정 3: 의미 문서화 표준
 
 각 매칭 방식 필드의 설명은 정확한 집합 의미를 밝힌다. `ImageV2Filter.alias`("at least one alias matching")가 세운 선례를 넓힌다.
 
@@ -153,7 +153,7 @@ DeploymentConditions.by_replica_exists = make_correlated_exists(
 
 `every` 설명에는 "also true when there are no {child}" 구절을 넣어 스키마만 보고도 이 동작을 알 수 있게 한다.
 
-## 첫 적용 — `DeploymentFilter.replicas`
+## 첫 적용: `DeploymentFilter.replicas`
 
 위 규칙을 deployment 를 route 로 조회하는 데 적용한다. deployment replica 에는 기존 implicit-some 필드가 없으므로 처음부터 새 모양으로 시작한다.
 
@@ -208,8 +208,8 @@ REST v2 와 클라이언트 SDK 는 DTO 를 공유하므로 필터별 작업 없
 
 ## 참고
 
-- [BEP-1021: GQL StringFilter Enhancement](BEP-1021-gql-string-filter-enhancement.md) — 필터 규칙 선례 BEP(같은 저자, 같은 영역)
-- [BEP-1038: ImageV2 GQL Implementation](BEP-1038-image-v2-gql-implementation.md) — image → alias 중첩 필터 선례
-- [BEP-1008: RBAC](BEP-1008-RBAC.md) — role → user/scope 중첩 필터 선례
-- [Prisma — Relation queries (some/every/none)](https://www.prisma.io/docs/orm/prisma-client/queries/relation-queries) — to-many 필터의 사실상 표준. 빈 컬렉션에서의 `every`
-- [PostGraphile connection-filter — Filtering](https://www.graphile.org/postgraphile/filtering/) — one-to-many `some`/`every`/`none`
+- [BEP-1021: GQL StringFilter Enhancement](BEP-1021-gql-string-filter-enhancement.md): 필터 규칙 선례 BEP(같은 저자, 같은 영역)
+- [BEP-1038: ImageV2 GQL Implementation](BEP-1038-image-v2-gql-implementation.md): image → alias 중첩 필터 선례
+- [BEP-1008: RBAC](BEP-1008-RBAC.md): role → user/scope 중첩 필터 선례
+- [Prisma: Relation queries (some/every/none)](https://www.prisma.io/docs/orm/prisma-client/queries/relation-queries): to-many 필터의 사실상 표준. 빈 컬렉션에서의 `every`
+- [PostGraphile connection-filter: Filtering](https://www.graphile.org/postgraphile/filtering/): one-to-many `some`/`every`/`none`

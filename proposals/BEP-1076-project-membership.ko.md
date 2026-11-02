@@ -2,7 +2,7 @@
 
 ## 관련 이슈
 
-- BEP-1075 (Entity Relation Operations) — 이 문서가 사용하는 relation 기록 프리미티브
+- BEP-1075 (Entity Relation Operations): 이 문서가 사용하는 relation 기록 프리미티브
 - BA-7467 (action 이 엔티티를 지정하는 방법)
 
 ## 동기

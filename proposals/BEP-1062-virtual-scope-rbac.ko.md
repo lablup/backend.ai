@@ -2,15 +2,15 @@
 
 ## 관련 이슈
 
-- Epic **BA-6567** — 가상 스코프 도입: 일반화된 RBAC 소유 계층
+- Epic **BA-6567**: 가상 스코프 도입, 일반화된 RBAC 소유 계층
 - 이 BEP: **BA-6568**
 - 이미 완료된 하위 이슈(이 BEP 의 구현 근거):
-  - **BA-6603** — 가상 스코프 도메인 타입 정의 (#12419)
-  - **BA-6604** — 가상 스코프 DB 테이블(ORM + Alembic) (#12503)
-  - **BA-6605** — 가상 스코프 DB ops (#12528)
-  - **BA-6606** — 가상 스코프 체인 권한 검사 함수 (#12814)
-  - **BA-6863** — 가상 스코프 권한 해석용 커버링 인덱스 (#12817)
-- 상위(여기서 확장한다): **[BEP-1048](BEP-1048-RBAC-entity-relationship-model.md)** — scope-entity relation 모델. 함께 보기: BEP-1008, BEP-1012(RBAC), BEP-1056(virtual_scope 참조)
+  - **BA-6603**: 가상 스코프 도메인 타입 정의 (#12419)
+  - **BA-6604**: 가상 스코프 DB 테이블(ORM + Alembic) (#12503)
+  - **BA-6605**: 가상 스코프 DB ops (#12528)
+  - **BA-6606**: 가상 스코프 체인 권한 검사 함수 (#12814)
+  - **BA-6863**: 가상 스코프 권한 해석용 커버링 인덱스 (#12817)
+- 상위(여기서 확장한다): **[BEP-1048](BEP-1048-RBAC-entity-relationship-model.md)** 는 scope-entity relation 모델이다. 함께 보기: BEP-1008, BEP-1012(RBAC), BEP-1056(virtual_scope 참조)
 
 ## 1. 목표
 
@@ -23,8 +23,8 @@ RBAC 권한 해석의 **재귀 순회를 재귀 없는 2-hop 소유 모델로 �
 
 **가상 스코프는 두 문제를 한 번에 해결하는 중간 계층이다.** 소유자마다 소유를 허브 노드(가상 스코프) 하나에 모으고, 두 개의 범위가 정해진 관계로 나눈다.
 
-- `scope_bindings` — 어느 스코프가 어느 VS 를 통해 권한을 행사하는가(scope → VS)
-- `entity_memberships` — 어느 엔티티가 어느 VS 에 속하는가(VS → entity)
+- `scope_bindings`: 어느 스코프가 어느 VS 를 통해 권한을 행사하는가(scope → VS)
+- `entity_memberships`: 어느 엔티티가 어느 VS 에 속하는가(VS → entity)
 
 그 결과:
 
@@ -44,9 +44,9 @@ BA-6604(테이블)와 BA-6863(커버링 인덱스)로 스키마가 완성된다.
 
 | | 항목 |
 |---|---|
-| ✅ | `virtual_scopes` — 소유 스코프마다 허브 노드 하나. `id` PK, `UNIQUE(scope_type, scope_id)`, `created_at`. **스코프마다 VS 가 정확히 하나** |
-| ✅ | `scope_bindings` — 들어오는 방향 `scope → VS`. PK `(virtual_scope_id, scope_type, scope_id)`, `permission_cap`(nullable = 상한 없음), FK → `virtual_scopes` `ON DELETE CASCADE` |
-| ✅ | `entity_memberships` — 나가는 방향 `VS → entity`. PK `(virtual_scope_id, entity_type, entity_id)`, `permission_cap`(nullable), FK `ON DELETE CASCADE` |
+| ✅ | `virtual_scopes`: 소유 스코프마다 허브 노드 하나. `id` PK, `UNIQUE(scope_type, scope_id)`, `created_at`. **스코프마다 VS 가 정확히 하나** |
+| ✅ | `scope_bindings`: 들어오는 방향 `scope → VS`. PK `(virtual_scope_id, scope_type, scope_id)`, `permission_cap`(nullable = 상한 없음), FK → `virtual_scopes` `ON DELETE CASCADE` |
+| ✅ | `entity_memberships`: 나가는 방향 `VS → entity`. PK `(virtual_scope_id, entity_type, entity_id)`, `permission_cap`(nullable), FK `ON DELETE CASCADE` |
 | ✅ | 커버링 인덱스(BA-6863): `ix_entity_memberships_entity (entity_type, entity_id) INCLUDE (virtual_scope_id, permission_cap)`, `ix_scope_bindings_virtual_scope (virtual_scope_id) INCLUDE (scope_type, scope_id, permission_cap)`, `ix_permissions_scope_entity ... INCLUDE (permission, role_id)`. 정방향과 역방향 join 을 인덱스만으로 처리한다 |
 | ➕ | 마이그레이션 규칙: `association_scopes_entities`(auto/ref)와 엔티티 단위 `permissions` 를 세 테이블로 옮긴다(4절, 마이그레이션과 호환성) |
 
@@ -54,10 +54,10 @@ BA-6604(테이블)와 BA-6863(커버링 인덱스)로 스키마가 완성된다.
 
 | | 항목 |
 |---|---|
-| ✅ | `common/entity/types.py` — `ScopeType`/`EntityType` 은 **열린 `NewType(str)`** 이다. `ScopeRef`/`EntityRef`. 고정 enum 을 늘리지 않고 어떤 소유자 타입도 받는다(핵심 설계) |
-| ✅ | `common/data/permission/virtual_scope.py` — `VirtualScopeData`, `ScopeBindingData`, `EntityMembershipData`(frozen) |
-| ✅ | `common/identifier/virtual_scope.py` — `VirtualScopeID = NewType(UUID)` |
-| ✅ | `manager/data/permission/virtual_scope.py` — `VirtualScopePermissionCheckKey(user_id, entity)` |
+| ✅ | `common/entity/types.py`: `ScopeType`/`EntityType` 은 **열린 `NewType(str)`** 이다. `ScopeRef`/`EntityRef`. 고정 enum 을 늘리지 않고 어떤 소유자 타입도 받는다(핵심 설계) |
+| ✅ | `common/data/permission/virtual_scope.py`: `VirtualScopeData`, `ScopeBindingData`, `EntityMembershipData`(frozen) |
+| ✅ | `common/identifier/virtual_scope.py`: `VirtualScopeID = NewType(UUID)` |
+| ✅ | `manager/data/permission/virtual_scope.py`: `VirtualScopePermissionCheckKey(user_id, entity)` |
 
 ### 2.3 DB write ops (BA-6605)
 
@@ -68,7 +68,7 @@ BA-6604(테이블)와 BA-6863(커버링 인덱스)로 스키마가 완성된다.
 | ✅ | 생성/삭제: `create_scope`/`bulk_create_scopes`/`delete_scope`/`batch_delete_scopes`. 실제 소유자 row 와 그 VS 노드를 함께 생성한다. VS 가 없으면 `_resolve_virtual_scope_id` 가 `VirtualScopeNotFound(500)` 를 발생시킨다 |
 | ✅ | 스코프 바인딩: `bind_scope(scope, owner, permission_cap)` / `unbind_scope` |
 | ✅ | 엔티티 멤버십: `add_entity_members(scope, entities, permission_cap)` / `remove_entity_members`. 초대도 이 경로로 표현한다(3.(e)) |
-| ✅ | (가상 스코프 아님) `add_users_to_scope`(스코프에 사용자를 등재하고 자동 배정 역할을 부여한다), `bulk_create_scoped` — `association_scopes_entities` 에 기록한다. **지금 실제로 연결된 유일한 ops** |
+| ✅ | (가상 스코프 아님) `add_users_to_scope`(스코프에 사용자를 등재하고 자동 배정 역할을 부여한다), `bulk_create_scoped`: `association_scopes_entities` 에 기록한다. **지금 실제로 연결된 유일한 ops** |
 | ➕ | **RBAC ops provider 의 grant 메서드**가 VS write(자기 scope_binding 생성 포함)를 맡고, domain/project/user/resource_group 동작이 그 provider/ops 를 사용하게 한다(연결 전 → 연결) |
 | ➕ | `add_users_to_scope` 이름을 하는 일(등재 + 역할 자동 배정)에 맞게 변경한다(2.7, 후속) |
 
@@ -78,9 +78,9 @@ BA-6604(테이블)와 BA-6863(커버링 인덱스)로 스키마가 완성된다.
 
 | | 항목 |
 |---|---|
-| ✅ | `resolve_effective_permissions_via_virtual_scope(keys)` — `entity → entity_memberships → scope_bindings → scope → permissions → roles → user_roles` 를 **경로 하나, hop 하나**로 join 한다. `granted & scope_cap & entity_cap`(nullable = 상한 없음)으로 자르고 OR 로 합친다. `(user_id, entity_type)` 묶음마다 질의 하나 |
-| ✅ | `check_permission_via_virtual_scope` / `check_bulk_permission_via_virtual_scope` — bitwise 검사 |
-| ✅ | (지금 사용 중) 재귀 스코프 순회 — `_build_scope_walk_cte(..., recursive=True)` 가 스코프 계층을 재귀 순회한다 |
+| ✅ | `resolve_effective_permissions_via_virtual_scope(keys)`: `entity → entity_memberships → scope_bindings → scope → permissions → roles → user_roles` 를 **경로 하나, hop 하나**로 join 한다. `granted & scope_cap & entity_cap`(nullable = 상한 없음)으로 자르고 OR 로 합친다. `(user_id, entity_type)` 묶음마다 질의 하나 |
+| ✅ | `check_permission_via_virtual_scope` / `check_bulk_permission_via_virtual_scope`: bitwise 검사 |
+| ✅ | (지금 사용 중) 재귀 스코프 순회: `_build_scope_walk_cte(..., recursive=True)` 가 스코프 계층을 재귀 순회한다 |
 | ✅ | 해석은 scope_binding 을 거쳐 스코프에 도달한다. 소유(소유자가 자기 엔티티를 보는 것)는 **자기 scope_binding** 을 거친다. 이는 엔티티를 프로비저닝할 때 VS 노드와 함께 기록한다(3.(c)) |
 | ➕ | 역방향 조회: `scope → 읽을 수 있는 엔티티`, `entity → 권한을 주는 스코프`(RBAC 화면, 3.(b)) |
 | ➕ | validator 에 연결하고 재귀 스코프 순회를 제거한다(3.(d), 4절의 마이그레이션) |
@@ -151,7 +151,7 @@ entity → entity_memberships → scope_bindings → scope → permissions → r
 
 **소유/가시성과 권한은 다른 축이다.** VS 그래프(`scope_bindings` + `entity_memberships`)는 "누가 무엇을 own 하고 볼 수 있는가"를 정한다(project 에 속한 user 도 여기다). `roles`/`permissions` 는 "어떤 연산이 허용되는가"를 정한다. 해석은 VS 그래프를 거쳐 스코프에 도달한 뒤 그 스코프의 역할 권한을 적용한다. **둘을 합친다.** 그래서 등재 기록(association)과 권한 부여(`user_roles`)는 겹치지 않고 각자 역할이 있다.
 
-### (c) Scope Creator — 생성 시 VS + 자기 scope_binding
+### (c) Scope Creator: 생성 시 VS + 자기 scope_binding
 
 - **생성:** 소유자 엔티티(domain/project/user/resource_group/…)를 만들면 `create_scope` 가 실제 row + VS 노드 + **자기 scope_binding**(소유 스코프 → 자기 VS)을 함께 생성한다(get-or-create 이므로 반복 호출해도 안전하다).
 - **자기 scope_binding 이 필요한 이유:** 해석은 scope_bindings 를 따라간다(3.(b)). 소유자가 자기 VS 의 엔티티를 보려면 그 VS 에 바인딩이 하나 필요하다. 생성 시 이 row 하나를 추가하면 소유도 계층, 연관, 초대와 **같은 경로 하나**로 해석된다. (질의에 소유자 전용 분기를 추가하는 안보다 낫다.)
@@ -167,7 +167,7 @@ entity → entity_memberships → scope_bindings → scope → permissions → r
 - 그러면 하위 엔티티는 `entity → 하위 VS → 상위 스코프 바인딩`으로 상위 스코프 권한에 **여전히 hop 하나**로 도달한다.
 - 허브가 연결 수를 제한하므로 상속을 미리 구체화해도 바인딩이 대략 `scope × VS` 규모로 유지된다.
 
-### (e) 연관과 초대 — 멤버십으로 통일
+### (e) 연관과 초대: 멤버십으로 통일
 
 | 연결 종류 | 뜻 | 저장 | permission_cap |
 |-----------|---------|---------|----------------|
@@ -182,8 +182,8 @@ entity → entity_memberships → scope_bindings → scope → permissions → r
 
 - "이 스코프에서 이 엔티티에 어떤 연산이 가능한가"를 **action 에서 도출한 전용 dataclass** 로 표현하고 필드로 노출한다.
 - 두 가지를 **읽어 합친다:**
-  1. **스코프 도달 가능성** — 스코프 action 에서 "이 스코프가 이 엔티티에 도달할 수 있는가"
-  2. **엔티티별 연산** — 단일 엔티티 action 에서 "이 엔티티에 어떤 연산이 있는가"
+  1. **스코프 도달 가능성**: 스코프 action 에서 "이 스코프가 이 엔티티에 도달할 수 있는가"
+  2. **엔티티별 연산**: 단일 엔티티 action 에서 "이 엔티티에 어떤 연산이 있는가"
 - **합치는 이유:** 스코프 action 은 READ 만 갖는 경우가 많고 UPDATE/DELETE 는 없다. 그러나 스코프 권한을 가지면 개별 접근도 되므로, 스코프 action 에 없고 엔티티의 단일 엔티티 action 에 있는 UPDATE/DELETE 도 가능한 연산으로 **포함해야 한다.**
 - 접근을 이 dataclass 로 라우팅하고 `VALID_SCOPE_ENTITY_COMBINATIONS`(직접 작성)와 별도 DB 테이블을 **둘 다** 제거한다.
 - 선행 조건: 도출이 완전하려면 action 이 RBAC action 3종으로 정규화되어야 한다(2.7).

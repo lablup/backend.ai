@@ -148,7 +148,7 @@ selector 는 주어진 agent 가 이 그룹의 구성원을 지금 몇 개 보�
 |-------------|----------------|----------|
 | `preferred` | **order**(`SessionGroupOrder`) | 선호 등급으로만 좁힌다. 선호 agent 에 용량이 없으면 남은 후보가 그대로 남고 배치는 성공한다 |
 | `strict` | **제외 filter**(`SessionGroupStrictFilter`) | 조건에 맞지 않는 agent 를 제거한다. 후보 집합이 비면 배치 오류다(3.d 만족할 수 없는 strict 제약) |
-| `none` | — | 그룹은 유지하되 배치에 참여하지 않는다 |
+| `none` | 없음 | 그룹은 유지하되 배치에 참여하지 않는다 |
 
 **rank 함수(order, 낮을수록 선호):**
 

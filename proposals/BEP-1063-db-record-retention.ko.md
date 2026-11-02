@@ -63,7 +63,7 @@ Backend.AI 는 이력 row 를 계속 쌓는다. event/감사/로그인 로그, r
 
 **핵심 흐름:** leader 에서만 실행되는 주기 task 가 활성 정책을 읽는다 → repository 로 정책의 **카테고리** 삭제를 해석한다 → `now − retention_period` 보다 오래된 row 를 **배치로, 배치마다 커밋하며** 삭제한다 → `last_swept_at` 을 기록한다. 비워진 공간은 autovacuum 이 회수한다.
 
-### (a) 정책 저장 — `retention_policies`
+### (a) 정책 저장: `retention_policies`
 
 보존 정책은 superadmin 이 실행 중에 카테고리마다 CRUD 하는 **데이터**다. 감사와 조회가 필요하다. 검토한 대안은 다음과 같다.
 
@@ -98,7 +98,7 @@ Backend.AI 는 이력 row 를 계속 쌓는다. event/감사/로그인 로그, r
 - **`batch_size` 를 정책 필드로 두지 않는 이유:** 성능과 안전 값이지 보존 결정이 아니다. 사용자가 예를 들어 `1` 로 두면 삭제가 영영 따라잡지 못하는 위험이 있다. → 서버 설정.
 - **`sweep_interval` 을 정책별로 두지 않는 이유:** 스윕 주기는 운영 조정이지 카테고리별 보존 결정이 아니다(의미 있는 정책 값은 `retention_period` 뿐이다). task 는 tick 하나로 실행되고 tick 마다 활성 정책을 모두 처리하므로 정책별 게이트가 필요 없다. → 서버 설정 하나.
 
-### (b) 대상 카탈로그 — 도메인 카테고리와 안전 삭제
+### (b) 대상 카탈로그: 도메인 카테고리와 안전 삭제
 
 보존 대상은 **도메인 카테고리**로 묶는다. 카테고리마다 정리 방식(경계 column + 참조 안전 삭제 절차)은 **코드에 고정**되고 테이블 성질이 이끌며, 정책 row 는 `retention_period` / `enabled` 만 담는다. 카테고리 하나가 테이블 여럿에 걸칠 수 있다. 경계 column 을 공유하는 테이블은 **Mixin** 으로 함께 처리하고, 경계가 다른 테이블은 카테고리를 공유하되 각자 spec 을 둔다(`retention_period` 는 공유한다).
 
@@ -137,7 +137,7 @@ Backend.AI 는 이력 row 를 계속 쌓는다. event/감사/로그인 로그, r
 | `usage_records` | **90일** | 원본 기록을 버킷으로 집계하므로 짧게 둔다 |
 | `usage_buckets` | **2년** | 청구 대사, 규정 준수 |
 
-### (c) 스윕 — LeaderCron 주기 task
+### (c) 스윕: LeaderCron 주기 task
 
 스윕은 manager 의 **`LeaderCron`** 에서 `PeriodicTask` 하나로 실행되고, `GlobalTimer` + 분산 잠금 경로도 sokovan reconciler 도 아니다.
 
@@ -150,13 +150,13 @@ tick 마다 **활성 정책을 모두** 처리한다. 카테고리마다 `thresh
 
 **장시간 실행 안전.** 기존 LeaderCron task 와 달리 이 스윕은 오래 실행될 수 있지만 배치 설계가 그것을 가둔다. 별도 asyncio task(event loop 나 다른 task 를 차단하지 않는다), 배치별 커밋(긴 트랜잭션 없음), 같은 leader 에서 재진입 없음, 멱등 삭제(실행 중 leader 가 교체되면 최대 무해한 겹침만 생긴다). `per_tick_budget` 이 밀린 양을 tick 들로 나누어 한 번의 실행이 길어지지 않게 한다.
 
-### (d) Admin API — superadmin v2 CRUD
+### (d) Admin API: superadmin v2 CRUD
 
 `retention_policies` 는 전체 계층(REST v2 + Strawberry GraphQL + 공유 adapter + SDK v2 + CLI v2)으로 노출하는 v2 엔티티이고 **superadmin 전용**이며 표준 6개 연산을 갖는다. `category` 는 카탈로그로 검증한다. 카테고리 집합이 고정이므로 흔한 연산은 seed row 에 대한 `update`(기간 조정, 활성 여부 변경)이다. 조회는 `last_swept_at` 을 노출한다.
 
 **인가는 RBAC 스코프 해석이 아니라 superadmin 역할 게이트다.** `retention_policies` 는 어느 스코프에도 속하지 않는 전역 단일 설정이고, RBAC 스코프 계층은 `ScopeType.GLOBAL` / `GLOBAL_SCOPE_ID` 를 deprecated 로 두었다. 그래서 이 엔티티는 **RBAC `EntityType`/`ScopeType` 으로 등록하지 않고 가상 스코프에도 연결하지 않는다.** 다른 전역 superadmin 전용 연산(resource policy/preset 변경, agent 검색)과 같이 `UserRole.SUPERADMIN` 역할 게이트로 인가한다. 스코프가 없으므로 service 계층에 스코프 해석 부담이 없고 `scope_entity_combinations` 항목도 없다.
 
-### (e) `clear-history` CLI — 반복 작업을 흡수하고 탈출구는 남긴다
+### (e) `clear-history` CLI: 반복 작업을 흡수하고 탈출구는 남긴다
 
 | 책임 | 새 위치 |
 |---|---|

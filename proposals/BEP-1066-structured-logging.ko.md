@@ -144,7 +144,7 @@ process 수명 동안 변하지 않는 값(컴포넌트 이름, node)은 scope �
 | 개수 | `<thing>_count` | `allocation_count` |
 | 기간 | `_sec`, `_ms` 접미사 | `delay_sec`, `elapsed_ms` |
 | 크기 | `_bytes` 접미사 | `transferred_bytes` |
-| 금지 | `id`, `name`, `entity_id` 같은 일반 이름 | — |
+| 금지 | `id`, `name`, `entity_id` 같은 일반 이름 | 없음 |
 
 ### 5. field 배치
 

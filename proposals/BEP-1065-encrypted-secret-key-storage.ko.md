@@ -43,7 +43,7 @@
 | ✅ | `ManagerUnifiedConfig` 의 pydantic section 패턴(`AuthConfig` 등). 비밀번호 hash 알고리즘 설정이 선례다 |
 | ✅ | 통합 설정은 컴포넌트 시작 시 읽어 들이고 runtime 에 `ManagerConfigProvider` 로 접근한다 |
 | ✅ | one-shot CLI 명령을 위한 `ManagerConfigProvider` 조립 경로가 있다. CLI 도 통합 설정 전체를 읽으므로 key 주입 경로를 따로 둘 필요가 없다(3.5 key 재료의 위치) |
-| ➕ | 새 section `secret-encryption`: **어느 provider type 이 쓰는지**, 그리고 provider type 별 선택 subsection |
+| ➕ | 새 section `secret-encryption`: **어느 provider type 이 사용하는지**, 그리고 provider type 별 선택 subsection |
 
 - **별도 on/off 값이 없다.** 쓰기를 담당하는 provider type 을 지정하는 것이 암호화를 활성화하는 일이고, 다시 `plain` 을 지정하는 것이 비활성화하는 일이다. 기본값이 `plain` 이므로 opt-in 이다.
 - **읽기는 저장 값이 정한다.** 값이 자기를 읽을 provider type 을 담으므로, 쓰기를 평문으로 되돌려도 이미 암호화된 row 는 읽을 수 있다.
