@@ -1,7 +1,15 @@
+import asyncio
+import uuid
+from collections.abc import Sequence
+from decimal import Decimal
+from typing import Any, cast, override
+
 import pytest
 
 from ai.backend.agent.errors.agent import UnsupportedBaseDistroError
-from ai.backend.agent.kernel import match_distro_data
+from ai.backend.agent.errors.kernel import KernelRunnerInvalidReplyError
+from ai.backend.agent.kernel import AbstractCodeRunner, match_distro_data
+from ai.backend.common import msgpack
 
 
 def test_match_distro_data() -> None:
@@ -160,3 +168,53 @@ def test_match_distro_data_with_musllinux_krunner() -> None:
 
     assert match_distro_data(krunner_volumes, "alpine3.24") == ("musllinux_1_2", "m1")
     assert match_distro_data(krunner_volumes, "ubuntu22.04") == ("static-gnu", "x1")
+
+
+class _BareRunner(AbstractCodeRunner):
+    """The real runner with its abstract addresses filled in; built with `__new__` so that no
+    sockets or tasks are created."""
+
+    @override
+    async def get_repl_in_addr(self) -> str:
+        return "tcp://127.0.0.1:1"
+
+    @override
+    async def get_repl_out_addr(self) -> str:
+        return "tcp://127.0.0.1:2"
+
+
+def _runner_that_is_never_answered() -> AbstractCodeRunner:
+    """A runner whose kernel never replies: the queues stay empty and the send goes nowhere."""
+    runner = _BareRunner.__new__(_BareRunner)
+    runner.status_queue = asyncio.Queue()
+    runner.service_apps_info_queue = asyncio.Queue()
+
+    class _Silent:
+        async def send_multipart(self, parts: Sequence[bytes]) -> None:
+            pass
+
+    runner._sockets = cast(Any, _Silent())
+    return runner
+
+
+class TestStatusReplyExtensionTypes:
+    @pytest.mark.parametrize(
+        "reply",
+        [
+            {"started_at": Decimal("1.5")},
+            {"started_at": uuid.UUID(int=1)},
+            {"nested": [{"started_at": Decimal("1.5")}]},
+        ],
+        ids=["decimal", "uuid", "nested"],
+    )
+    async def test_a_status_with_an_extension_type_is_rejected(self, reply: object) -> None:
+        runner = _runner_that_is_never_answered()
+        await runner.status_queue.put(msgpack.packb(reply))
+        with pytest.raises(KernelRunnerInvalidReplyError):
+            await runner.feed_and_get_status()
+
+    async def test_ping_reports_a_rejected_status_as_no_reply(self) -> None:
+        runner = _runner_that_is_never_answered()
+        runner.kernel_id = cast(Any, "k")
+        await runner.status_queue.put(msgpack.packb({"started_at": Decimal("1.5")}))
+        assert await runner.ping() is None
