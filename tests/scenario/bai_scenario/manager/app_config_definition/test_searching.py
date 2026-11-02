@@ -19,7 +19,7 @@ from ai.backend.manager.api.adapters.app_config_definition.adapter import (
 )
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config_definition import (
     EveryLaidDefinitionIsFound,
@@ -46,7 +46,10 @@ class SearchingEverything(When[ManyDefinitionsAndACaller, AppConfigDefinitionAda
 
     @override
     def describe(self, laid: ManyDefinitionsAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체 조회"
+        return Says(
+            f"{laid.caller.username} 이 필터 없이 전체를 조회합니다",
+            english=f"{laid.caller.username} reads everything without a filter",
+        )
 
     @override
     async def call(
@@ -66,7 +69,13 @@ class TheSuperadminCountsEveryOne(
 
     @override
     def describe(self) -> str:
-        return "설정 정의 셋이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 셋 다 집계된다"
+        return Says(
+            "설정 정의 셋이 있고 superadmin 이 필터 없이 전체를 검색하면, 셋 다 집계됩니다",
+            english=(
+                "when three config definitions exist and the superadmin searches everything "
+                "without a filter, all three are counted"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyDefinitionsAndACaller]:
@@ -91,7 +100,13 @@ class APlainUserMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "일반 사용자가 전체를 검색하면, 슈퍼관리자 권한이 없어 거부된다"
+        return Says(
+            "일반 사용자가 전체를 검색하면, superadmin 권한이 없어 거부됩니다",
+            english=(
+                "when a regular user searches everything, it is rejected because the user "
+                "has no superadmin privilege"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyDefinitionsAndACaller]:

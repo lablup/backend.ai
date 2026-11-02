@@ -31,11 +31,14 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.app_config import (
     UNREGISTERED,
@@ -58,12 +61,25 @@ WRITING = (Permission.CREATE, Permission.UPDATE)
 """쓰기는 생성일 수도 수정일 수도 있으므로 둘 다 요구한다."""
 
 
-def _who(granted: Sequence[Permission], role: UserRole, seat: str = "자기 스코프에서") -> str:
+def _who(
+    granted: Sequence[Permission],
+    role: UserRole,
+    seat: str = Says("자기 스코프에서", english="in their own scope"),
+) -> Says:
     if role == UserRole.SUPERADMIN:
-        return "슈퍼관리자 한 명"
+        return Says("superadmin 한 명", english="one superadmin")
     if not granted:
-        return "설정 조각 권한이 하나도 없는 사용자 한 명"
-    return f"{seat} 설정 조각에 대한 {names_of(granted)} 권한을 받은 사용자 한 명"
+        return Says(
+            "설정 조각 권한이 하나도 없는 사용자 한 명",
+            english="one user with no config fragment permission",
+        )
+    return Says(
+        f"{seat} 설정 조각에 대한 {names_of(granted)} 권한을 받은 사용자 한 명",
+        english=(
+            f"one user granted the {names_of(granted)} permission on config fragments "
+            f"{in_language(seat, Language.ENGLISH)}"
+        ),
+    )
 
 
 class Target(enum.StrEnum):
@@ -86,13 +102,13 @@ class Target(enum.StrEnum):
     def says(self) -> str:
         match self:
             case Target.HOME_DOMAIN:
-                return "자기 도메인"
+                return Says("자기 도메인", english="their own domain")
             case Target.PUBLIC:
-                return "공개 스코프"
+                return Says("공개 스코프", english="the public scope")
             case Target.ANOTHER_USER:
-                return "다른 사용자"
+                return Says("다른 사용자", english="another user")
             case Target.NOBODY:
-                return "어느 사용자도 아닌 id"
+                return Says("어느 사용자도 아닌 id", english="an id that belongs to no user")
 
 
 # --- writing ---------------------------------------------------------------------
@@ -135,17 +151,26 @@ class MyWritingPlace(Given[Any, AWritingPlace]):
     @override
     def describe(self) -> str:
         who = _who(self.granted, self.role)
+        who_en = in_language(who, Language.ENGLISH)
         if not self.defined:
-            return f"등록되지 않은 설정 이름과, {who}"
-        opened = "·".join(SCOPE_NAMES[one] for one in self.kinds)
-        what = f"{opened} 스코프에 허용된 설정 이름 하나"
+            return Says(
+                f"등록되지 않은 설정 이름과, {who}",
+                english=f"an unregistered config name, and {who_en}",
+            )
+        opened_ko = ", ".join(str(SCOPE_NAMES[one]) for one in self.kinds)
+        opened_en = ", ".join(in_language(SCOPE_NAMES[one], Language.ENGLISH) for one in self.kinds)
+        what_ko = f"{opened_ko} 스코프에 허용된 설정 이름 하나"
+        what_en = f"one config name opened in the {opened_en} scope"
         if self.existing is not None:
-            what = f"{what}에 이미 있는 자기 조각"
+            what_ko = f"{what_ko}에 이미 있는 자기 조각"
+            what_en = f"{what_en} with an existing fragment of their own"
         if self.more_opened:
-            what = f"{what}, 사용자 스코프에 허용된 설정 이름 {self.more_opened}개"
+            what_ko = f"{what_ko}, 사용자 스코프에 허용된 설정 이름 {self.more_opened}개"
+            what_en = f"{what_en}, and {self.more_opened} config names opened in the user scope"
         if self.more_unopened:
-            what = f"{what}, 어느 스코프에도 허용되지 않은 설정 이름 {self.more_unopened}개"
-        return f"{what}와, {who}"
+            what_ko = f"{what_ko}, 어느 스코프에도 허용되지 않은 설정 이름 {self.more_unopened}개"
+            what_en = f"{what_en}, and {self.more_unopened} config names opened in no scope"
+        return Says(f"{what_ko}와, {who}", english=f"{what_en}, and {who_en}")
 
     @override
     async def lay(self, seeding: Any) -> AWritingPlace:
@@ -218,11 +243,22 @@ class SomewhereToTarget(Given[Any, ATargetAndACaller]):
 
     @override
     def describe(self) -> str:
-        seat = "자기 스코프에서" if self.target == Target.ANOTHER_USER else "자기 도메인에서"
-        what = f"{self.target.says()}에 허용된 설정 이름 하나"
+        seat = (
+            Says("자기 스코프에서", english="in their own scope")
+            if self.target == Target.ANOTHER_USER
+            else Says("자기 도메인에서", english="in their own domain")
+        )
+        target = self.target.says()
+        what_ko = f"{target}에 허용된 설정 이름 하나"
+        what_en = f"one config name opened in {in_language(target, Language.ENGLISH)}"
         if self.laid is not None:
-            what = f"{what}와 거기 있는 설정 조각 하나"
-        return f"{what}, 그리고 {_who(self.granted, self.role, seat)}"
+            what_ko = f"{what_ko}와 거기 있는 설정 조각 하나"
+            what_en = f"{what_en} and one config fragment there"
+        who = _who(self.granted, self.role, seat)
+        return Says(
+            f"{what_ko}, 그리고 {who}",
+            english=f"{what_en}, and {in_language(who, Language.ENGLISH)}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ATargetAndACaller:
@@ -289,7 +325,10 @@ class TheWrittenFragments(
 
     @override
     def says(self) -> str:
-        return "쓴 설정 조각 전체가 요청 순서대로 반환된다"
+        return Says(
+            "쓴 설정 조각 전체가 요청 순서대로 반환됩니다",
+            english="every config fragment written comes back in request order",
+        )
 
     @override
     def look(
@@ -307,15 +346,36 @@ class TheWrittenFragments(
         for i, (node, config) in enumerate(zip(payload.items, self.configs, strict=False)):
             if self.replacing and i == 0 and laid.existing is not None:
                 seen.append(
-                    Held(f"items[{i}].id", node.id, SameAs(laid.existing.id, "이미 있던 조각"))
+                    Held(
+                        f"items[{i}].id",
+                        node.id,
+                        SameAs(
+                            laid.existing.id,
+                            Says(
+                                "이미 있던 조각",
+                                english="the fragment that already existed",
+                            ),
+                        ),
+                    )
                 )
             else:
-                seen.append(Skipped(f"items[{i}].id", "데이터베이스가 만든다"))
+                seen.append(
+                    Skipped(
+                        f"items[{i}].id",
+                        Says(
+                            "데이터베이스가 생성합니다",
+                            english="the database generates it",
+                        ),
+                    )
+                )
             seen.extend([
                 Held(
                     f"items[{i}].config_name",
                     node.config_name,
-                    SameAs(laid.names[i], "요청한 이름"),
+                    SameAs(
+                        laid.names[i],
+                        Says("요청한 이름", english="the requested name"),
+                    ),
                 ),
                 Same(f"items[{i}].scope_type", node.scope_type, laid.scope_type),
                 Held(
@@ -323,7 +383,12 @@ class TheWrittenFragments(
                     node.scope_id,
                     SameAs[UUID | None](
                         laid.scope_id,
-                        "지정한 소유자" if laid.scope_id is not None else "소유자 없음",
+                        Says(
+                            "지정한 소유자",
+                            english="the named owner",
+                        )
+                        if laid.scope_id is not None
+                        else Says("소유자 없음", english="no owner"),
                     ),
                 ),
                 Same(f"items[{i}].config", node.config, dict(config)),
@@ -363,12 +428,25 @@ class MyFragmentsLaid(Given[Any, AReadingPlace]):
 
     @override
     def describe(self) -> str:
-        what = f"사용자 스코프에 허용된 설정 이름 {self.names}개 중 {len(self.mine_on)}개에 있는 자기 조각"
+        what_ko = (
+            f"사용자 스코프에 허용된 설정 이름 {self.names}개 중 "
+            f"{len(self.mine_on)}개에 있는 자기 조각"
+        )
+        what_en = (
+            f"their own fragments on {len(self.mine_on)} of {self.names} config names "
+            "opened in the user scope"
+        )
         if self.anothers is not None:
-            what = f"{what}, 같은 이름의 다른 사용자 조각"
+            what_ko = f"{what_ko}, 같은 이름의 다른 사용자 조각"
+            what_en = f"{what_en}, another user's fragment of the same name"
         if self.domains is not None:
-            what = f"{what}, 같은 이름의 자기 도메인 조각"
-        return f"{what}과, {_who(self.granted, self.role)}"
+            what_ko = f"{what_ko}, 같은 이름의 자기 도메인 조각"
+            what_en = f"{what_en}, their domain's fragment of the same name"
+        who = _who(self.granted, self.role)
+        return Says(
+            f"{what_ko}과, {who}",
+            english=f"{what_en}, and {in_language(who, Language.ENGLISH)}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AReadingPlace:
@@ -421,7 +499,13 @@ class EachNameAnsweredWithMine(Then[AReadingPlace, list[AppConfigFragmentNode | 
 
     @override
     def says(self) -> str:
-        return "이름마다 자기 조각이 있으면 그 조각, 없으면 빈 항목이 요청 순서대로 반환된다"
+        return Says(
+            "이름마다 자기 조각이 있으면 그 조각, 없으면 빈 항목이 요청 순서대로 반환됩니다",
+            english=(
+                "for each name, their own fragment if one exists and an empty item "
+                "otherwise, in request order"
+            ),
+        )
 
     @override
     def look(
@@ -439,7 +523,13 @@ class EachNameAnsweredWithMine(Then[AReadingPlace, list[AppConfigFragmentNode | 
                     Held[object](
                         f"items[{i}].id",
                         getattr(got, "id", got),
-                        SameAs[object](mine.id, "미리 만들어 둔 자기 조각"),
+                        SameAs[object](
+                            mine.id,
+                            Says(
+                                "미리 저장한 자기 조각",
+                                english="the fragment of their own made in advance",
+                            ),
+                        ),
                     )
                 )
                 seen.append(Same(f"items[{i}].config", getattr(got, "config", got), mine.config))
@@ -452,7 +542,10 @@ class TheTargetsFragmentByName(Then[ATargetAndACaller, list[AppConfigFragmentNod
 
     @override
     def says(self) -> str:
-        return "지정한 스코프의 설정 조각 하나가 반환된다"
+        return Says(
+            "지정한 스코프의 설정 조각 하나가 반환됩니다",
+            english="the config fragment of the named scope comes back",
+        )
 
     @override
     def look(
@@ -470,14 +563,20 @@ class TheTargetsFragmentByName(Then[ATargetAndACaller, list[AppConfigFragmentNod
             Held[object](
                 "items[0].id",
                 getattr(got, "id", got),
-                SameAs[object](laid.fragment.id, "미리 만들어 둔 조각"),
+                SameAs[object](
+                    laid.fragment.id,
+                    Says("미리 저장한 조각", english="the fragment made in advance"),
+                ),
             ),
             Same("items[0].scope_type", getattr(got, "scope_type", got), laid.scope_type),
             Held[object](
                 "items[0].scope_id",
                 getattr(got, "scope_id", got),
                 SameAs[object](
-                    laid.scope_id, "지정한 소유자" if laid.scope_id is not None else "소유자 없음"
+                    laid.scope_id,
+                    Says("지정한 소유자", english="the named owner")
+                    if laid.scope_id is not None
+                    else Says("소유자 없음", english="no owner"),
                 ),
             ),
             Same("items[0].config", getattr(got, "config", got), laid.fragment.config),
@@ -519,17 +618,32 @@ class FragmentsLaidAcross(Given[Any, ManyFragmentsAndACaller]):
 
     @override
     def describe(self) -> str:
-        parts = []
+        parts_ko: list[str] = []
+        parts_en: list[str] = []
         if self.mine:
-            parts.append(f"자기 조각 {self.mine}개")
+            parts_ko.append(f"자기 조각 {self.mine}개")
+            parts_en.append(f"{self.mine} fragments of their own")
         if self.anothers:
-            parts.append(f"다른 사용자의 조각 {self.anothers}개")
+            parts_ko.append(f"다른 사용자의 조각 {self.anothers}개")
+            parts_en.append(f"{self.anothers} fragments of another user")
         if self.domains:
-            parts.append(f"자기 도메인의 조각 {self.domains}개")
+            parts_ko.append(f"자기 도메인의 조각 {self.domains}개")
+            parts_en.append(f"{self.domains} fragments of their own domain")
         if self.publics:
-            parts.append(f"공개 조각 {self.publics}개")
-        seat = "자기 도메인에서" if self.answers == AppConfigScopeType.DOMAIN else "자기 스코프에서"
-        return f"{', '.join(parts) or '설정 조각 없음'}과, {_who(self.granted, self.role, seat)}"
+            parts_ko.append(f"공개 조각 {self.publics}개")
+            parts_en.append(f"{self.publics} public fragments")
+        seat = (
+            Says("자기 도메인에서", english="in their own domain")
+            if self.answers == AppConfigScopeType.DOMAIN
+            else Says("자기 스코프에서", english="in their own scope")
+        )
+        who = _who(self.granted, self.role, seat)
+        joined_ko = ", ".join(parts_ko) or "설정 조각 없음"
+        joined_en = ", ".join(parts_en) or "no config fragment"
+        return Says(
+            f"{joined_ko}과, {who}",
+            english=f"{joined_en}, and {in_language(who, Language.ENGLISH)}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyFragmentsAndACaller:
@@ -617,7 +731,10 @@ class EveryAnsweringFragmentIsFound(Then[ManyFragmentsAndACaller, SearchAppConfi
 
     @override
     def says(self) -> str:
-        return "그 스코프의 설정 조각이 모두, 그리고 그것만 집계된다"
+        return Says(
+            "그 스코프의 설정 조각이 모두, 그리고 그것만 집계됩니다",
+            english="every config fragment of that scope is counted, and only those",
+        )
 
     @override
     def look(
@@ -651,11 +768,11 @@ class Whose(enum.StrEnum):
     def says(self) -> str:
         match self:
             case Whose.MINE:
-                return "자기 조각"
+                return Says("자기 조각", english="their own fragment")
             case Whose.ANOTHERS:
-                return "다른 사용자의 조각"
+                return Says("다른 사용자의 조각", english="another user's fragment")
             case Whose.PUBLIC:
-                return "공개 조각"
+                return Says("공개 조각", english="a public fragment")
 
 
 @dataclass(frozen=True)
@@ -677,7 +794,14 @@ class AFragmentAndSomeone(Given[Any, AFragmentAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"{self.whose.says()} 하나와, {_who(self.granted, self.role)}"
+        whose = self.whose.says()
+        who = _who(self.granted, self.role)
+        return Says(
+            f"{whose} 하나와, {who}",
+            english=(
+                f"{in_language(whose, Language.ENGLISH)} and {in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> AFragmentAndACaller:
@@ -728,7 +852,10 @@ class TheFragmentNode(Then[AFragmentAndACaller, AppConfigFragmentNode]):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 설정 조각 전체가 반환된다"
+        return Says(
+            "미리 저장한 설정 조각 전체가 반환됩니다",
+            english="the whole config fragment made in advance comes back",
+        )
 
     @override
     def look(
@@ -739,7 +866,14 @@ class TheFragmentNode(Then[AFragmentAndACaller, AppConfigFragmentNode]):
             return [NotRefused(answered.raised)]
         written = WrittenByThisRun(self.started)
         return [
-            Held("id", node.id, SameAs(laid.fragment.id, "미리 만들어 둔 조각")),
+            Held(
+                "id",
+                node.id,
+                SameAs(
+                    laid.fragment.id,
+                    Says("미리 저장한 조각", english="the fragment made in advance"),
+                ),
+            ),
             Same("config_name", node.config_name, laid.fragment.config_name),
             Same("scope_type", node.scope_type, AppConfigScopeType.of_owner(laid.owner)),
             Held[object](
@@ -747,7 +881,12 @@ class TheFragmentNode(Then[AFragmentAndACaller, AppConfigFragmentNode]):
                 node.scope_id,
                 SameAs[object](
                     laid.owner,
-                    "미리 만들어 둔 조각의 소유자" if laid.owner is not None else "소유자 없음",
+                    Says(
+                        "미리 저장한 조각의 소유자",
+                        english="the owner of the fragment made in advance",
+                    )
+                    if laid.owner is not None
+                    else Says("소유자 없음", english="no owner"),
                 ),
             ),
             Same("config", node.config, laid.fragment.config),
@@ -775,7 +914,14 @@ class SomeFragmentsAndSomeone(Given[Any, SomeFragmentsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"자기 조각 {self.mine}개와 다른 사용자의 조각 하나, 그리고 {_who(self.granted, self.role)}"
+        who = _who(self.granted, self.role)
+        return Says(
+            f"자기 조각 {self.mine}개와 다른 사용자의 조각 하나, 그리고 {who}",
+            english=(
+                f"{self.mine} fragments of their own, one fragment of another user, and "
+                f"{in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> SomeFragmentsAndACaller:

@@ -24,6 +24,7 @@ from ai.backend.testutils.scenario_steps import (
     Held,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -59,8 +60,19 @@ class PurgingTheLaidLabels(When[LabeledDomainsAndACaller, EntityLabelAdapter, Pu
 
     @override
     def describe(self, laid: LabeledDomainsAndACaller) -> str:
-        besides = f" 와 없는 id {self.missing}개" if self.missing else ""
-        return f"{laid.caller.username}이 라벨 {len(laid.labels)}개{besides}를 한 번에 뗌"
+        if self.missing:
+            return Says(
+                f"{laid.caller.username}이 라벨 {len(laid.labels)}개와 없는 id "
+                f"{self.missing}개를 한 번에 영구 삭제합니다",
+                english=(
+                    f"{laid.caller.username} purges {len(laid.labels)} labels "
+                    f"and {self.missing} unknown ids at once"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username}이 라벨 {len(laid.labels)}개를 한 번에 영구 삭제합니다",
+            english=f"{laid.caller.username} purges {len(laid.labels)} labels at once",
+        )
 
     @override
     async def call(self, adapter: EntityLabelAdapter, laid: LabeledDomainsAndACaller) -> Purged:
@@ -80,11 +92,21 @@ class PurgedAndRefused(Then[LabeledDomainsAndACaller, Purged]):
     @override
     def says(self) -> str:
         if self.missing:
-            return (
-                f"라벨 {self.purged}개가 떼어진 채 오고, 없는 id 는 대상이 없다는 이유로 "
-                "실패 목록에 온다"
+            unknown = "the unknown id" if self.missing == 1 else "the unknown ids"
+            return Says(
+                f"라벨 {self.purged}개가 영구 삭제된 채 오고, 없는 id 는 대상이 없다는 이유로 "
+                "실패 목록에 옵니다",
+                english=(
+                    f"{self.purged} labels come back purged, and {unknown} come back "
+                    "in the failed list as not found"
+                ),
             )
-        return f"라벨 {self.purged}개가 떼어진 채 오고, 나머지는 실패 목록에 온다"
+        return Says(
+            f"라벨 {self.purged}개가 영구 삭제된 채 오고, 나머지는 실패 목록에 옵니다",
+            english=(
+                f"{self.purged} labels come back purged and the rest come back in the failed list"
+            ),
+        )
 
     @override
     def look(self, laid: LabeledDomainsAndACaller, answered: Answered[Purged]) -> list[Verdict]:
@@ -96,14 +118,31 @@ class PurgedAndRefused(Then[LabeledDomainsAndACaller, Purged]):
         verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(purged))]
         for i, (got, label) in enumerate(zip(payload.successes, purged, strict=False)):
             verdicts.append(
-                Held[UUID](f"successes[{i}]", got, SameAs(label.id, "미리 붙인 라벨의 id"))
+                Held[UUID](
+                    f"successes[{i}]",
+                    got,
+                    SameAs(
+                        label.id,
+                        Says(
+                            "미리 붙인 라벨의 id",
+                            english="the id of the label attached in advance",
+                        ),
+                    ),
+                )
             )
         failed = [*refused, *MISSING[: self.missing]]
         verdicts.append(Same("failed count", len(payload.failed), len(failed)))
         for i, (failure, label_id) in enumerate(zip(payload.failed, failed, strict=False)):
             reason = self.reason if label_id in refused else "not found"
             verdicts += [
-                Held[UUID](f"failed[{i}].id", failure.id, SameAs(label_id, "요청에 넣은 id")),
+                Held[UUID](
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(
+                        label_id,
+                        Says("요청에 넣은 id", english="the id put in the request"),
+                    ),
+                ),
                 Held(f"failed[{i}].message", failure.message, Mentions(reason)),
             ]
         return verdicts
@@ -153,28 +192,48 @@ class EnforcementOffRow(PurgingRow, Configured):
 SCENARIOS: list[LabelStep] = [
     PurgingRow(
         named="a-writer-purges-two-labels-of-one-entity",
-        guarantees="수정 권한을 받은 사용자가 한 엔티티의 라벨 둘을 떼면, 둘 다 떼어지고 실패한 것은 없다",
+        guarantees=Says(
+            "수정 권한을 받은 사용자가 한 엔티티의 라벨 둘을 영구 삭제하면 둘 다 영구 "
+            "삭제되고 실패한 것은 없습니다",
+            english=(
+                "when a user granted update permission purges two labels of one entity, "
+                "both are purged and nothing failed"
+            ),
+        ),
         situation=LabeledDomainsAndSomeone(targets=1, writable=1, keys=("team", "tier")),
         purged=2,
     ),
     PurgingRow(
         named="a-writer-purges-labels-of-two-entities",
-        guarantees="엔티티 둘에 붙은 라벨을 하나씩 떼면, 둘 다 떼어진다",
+        guarantees=Says(
+            "엔티티 둘에 붙은 라벨을 하나씩 영구 삭제하면 둘 다 영구 삭제됩니다",
+            english="purging one label on each of two entities purges both",
+        ),
         situation=LabeledDomainsAndSomeone(writable=2, keys=("team",)),
         purged=2,
     ),
     PurgingRow(
         named="only-the-label-of-the-writable-entity-is-purged",
-        guarantees=(
-            "한 엔티티에만 수정 권한이 있으면, 그 엔티티의 라벨만 떼어지고 다른 쪽은 실패 목록에 온다"
+        guarantees=Says(
+            "한 엔티티에만 수정 권한이 있으면 그 엔티티의 라벨만 영구 삭제되고 다른 쪽은 "
+            "실패 목록에 옵니다",
+            english=(
+                "with update permission on one entity only, only that entity's label is "
+                "purged and the other comes back in the failed list"
+            ),
         ),
         situation=LabeledDomainsAndSomeone(writable=1, keys=("team",)),
         purged=1,
     ),
     PurgingRow(
         named="a-missing-id-beside-a-label-is-one-failed-item",
-        guarantees=(
-            "있는 id 뒤에 없는 id 를 붙여 떼면, 있는 것은 떼어지고 없는 id 는 실패 목록에 온다"
+        guarantees=Says(
+            "있는 id 뒤에 없는 id 를 붙여 영구 삭제하면 있는 것은 영구 삭제되고 없는 id 는 "
+            "실패 목록에 옵니다",
+            english=(
+                "purging an existing id followed by an unknown id purges the one that exists "
+                "and puts the unknown id in the failed list"
+            ),
         ),
         situation=LabeledDomainsAndSomeone(targets=1, writable=1, keys=("team",)),
         purged=1,
@@ -182,22 +241,35 @@ SCENARIOS: list[LabelStep] = [
     ),
     PurgingRow(
         named="every-id-missing-is-answered-per-id",
-        guarantees="없는 id 만 둘 떼면, 떼어진 것 없이 둘 다 실패 목록에 온다",
+        guarantees=Says(
+            "없는 id 만 둘 영구 삭제하면 영구 삭제된 것 없이 둘 다 실패 목록에 옵니다",
+            english="purging only two unknown ids purges nothing and puts both in the failed list",
+        ),
         situation=LabeledDomainsAndSomeone(targets=1, writable=1),
         purged=0,
         missing=2,
     ),
     PurgingRow(
         named="a-user-granted-nothing-purges-nothing",
-        guarantees=(
-            "아무 권한도 없는 사용자가 라벨 둘을 떼면, 떼어진 것 없이 둘 다 실패 목록에 온다"
+        guarantees=Says(
+            "아무 권한도 없는 사용자가 라벨 둘을 영구 삭제하면 영구 삭제된 것 없이 둘 다 "
+            "실패 목록에 옵니다",
+            english=(
+                "when a user with no permission purges two labels, nothing is purged and "
+                "both come back in the failed list"
+            ),
         ),
         situation=LabeledDomainsAndSomeone(targets=1, keys=("team", "tier")),
         purged=0,
     ),
     EnforcementOffRow(
         named="turning-enforcement-off-lets-anyone-purge",
-        guarantees="RBAC 강제를 끄면 아무 권한도 없는 사용자도 라벨 둘을 뗀다",
+        guarantees=Says(
+            "RBAC 강제를 끄면 아무 권한도 없는 사용자도 라벨 둘을 영구 삭제합니다",
+            english=(
+                "turning RBAC enforcement off lets a user with no permission purge two labels"
+            ),
+        ),
         situation=LabeledDomainsAndSomeone(targets=1, keys=("team", "tier")),
         purged=2,
     ),

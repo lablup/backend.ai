@@ -28,6 +28,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Then,
     Verdict,
 )
@@ -54,12 +55,17 @@ class TokensOfADeployment(Given[Any, TokensOfADeploymentAndACaller]):
 
     @override
     def describe(self) -> str:
-        who = (
-            "아무 배포 권한도 받지 않은 사용자"
-            if not self.granted
-            else f"배포에 {', '.join(p.name or '' for p in self.granted)} 권한을 받은 사용자"
+        if not self.granted:
+            who_ko = "아무 배포 권한도 받지 않은 사용자"
+            who_en = "a user with no deployment permission"
+        else:
+            names = ", ".join(p.name or "" for p in self.granted)
+            who_ko = f"배포에 {names} 권한을 받은 사용자"
+            who_en = f"a user granted the {names} permission on deployments"
+        return Says(
+            f"접근 토큰 {self.count}개가 걸린 배포 하나와, {who_ko} 한 명",
+            english=f"one deployment holding {self.count} access tokens, and {who_en}",
         )
-        return f"접근 토큰 {self.count}개가 걸린 배포 하나와, {who} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> TokensOfADeploymentAndACaller:
@@ -95,8 +101,17 @@ class EveryTokenComesBack(Then[TokensOfADeploymentAndACaller, PartialBulkPayload
     @override
     def says(self) -> str:
         if self.missing is None:
-            return "토큰이 모두 처리된 목록에 오고, 실패한 것은 없다"
-        return "토큰이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+            return Says(
+                "토큰이 모두 처리된 목록에 오고, 실패한 것은 없습니다",
+                english="every token comes back in the processed list, and none failed",
+            )
+        return Says(
+            "토큰이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "every token comes back in the processed list, and the missing id comes back "
+                "in the failed list with a reason that it does not exist"
+            ),
+        )
 
     @override
     def look(
@@ -112,14 +127,34 @@ class EveryTokenComesBack(Then[TokensOfADeploymentAndACaller, PartialBulkPayload
         ]
         for i, (node, token) in enumerate(zip(payload.successes, laid.tokens, strict=False)):
             verdicts.append(
-                Held[UUID](f"successes[{i}].id", node.id, SameAs(token.id, "심은 토큰의 id"))
+                Held[UUID](
+                    f"successes[{i}].id",
+                    node.id,
+                    SameAs(
+                        token.id,
+                        Says(
+                            "미리 저장한 토큰의 id",
+                            english="the id of the token seeded in advance",
+                        ),
+                    ),
+                )
             )
         if self.missing is None:
             return [*verdicts, Same("failed", payload.failed, [])]
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says(
+                            "요청에 넣은 없는 id",
+                            english="the nonexistent id sent in the request",
+                        ),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -133,7 +168,10 @@ class NoTokenIsProcessed(Then[TokensOfADeploymentAndACaller, PartialBulkPayload[
 
     @override
     def says(self) -> str:
-        return "처리된 토큰 없이 토큰이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 토큰 없이 토큰이 모두 실패 목록에 옵니다",
+            english="no token is processed and every token comes back in the failed list",
+        )
 
     @override
     def look(
@@ -150,7 +188,17 @@ class NoTokenIsProcessed(Then[TokensOfADeploymentAndACaller, PartialBulkPayload[
         ]
         for i, (failure, token) in enumerate(zip(payload.failed, laid.tokens, strict=False)):
             verdicts += [
-                Held[UUID](f"failed[{i}].id", failure.id, SameAs(token.id, "심은 토큰의 id")),
+                Held[UUID](
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(
+                        token.id,
+                        Says(
+                            "미리 저장한 토큰의 id",
+                            english="the id of the token seeded in advance",
+                        ),
+                    ),
+                ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]
         return verdicts

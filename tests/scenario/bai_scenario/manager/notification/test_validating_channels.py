@@ -19,7 +19,7 @@ from ai.backend.manager.api.adapters.notification.adapter import NotificationAda
 from ai.backend.manager.errors.notification import NotificationChannelNotFound
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.notification import (
     AChannelAndACaller,
@@ -48,8 +48,16 @@ class Validating(When[AChannelAndACaller, NotificationAdapter, Validated]):
 
     @override
     def describe(self, laid: AChannelAndACaller) -> str:
-        target = "존재하지 않는 id" if self.unknown else f"채널 {laid.channel.name}"
-        return f"{laid.caller.username}이 {target}을 시험 메시지로 검증"
+        if self.unknown:
+            target_ko = "존재하지 않는 id"
+            target_en = "an unknown id"
+        else:
+            target_ko = f"채널 {laid.channel.name}"
+            target_en = f"the channel {laid.channel.name}"
+        return Says(
+            f"{laid.caller.username}이 {target_ko} 를 시험 메시지로 검증합니다",
+            english=(f"{laid.caller.username} validates {target_en} with a test message"),
+        )
 
     @override
     async def call(self, adapter: NotificationAdapter, laid: AChannelAndACaller) -> Validated:
@@ -71,7 +79,14 @@ class TheSuperadminValidatesAWebhookChannel(
 
     @override
     def describe(self) -> str:
-        return "webhook 채널 하나가 있고 슈퍼관리자가 시험 메시지로 검증하면 검증한 채널의 id가 반환된다"
+        return Says(
+            "webhook 채널 하나가 있고 superadmin 이 시험 메시지로 검증하면 "
+            "검증한 채널의 id 가 반환됩니다",
+            english=(
+                "with one webhook channel, when the superadmin validates it with a "
+                "test message, the id of the validated channel comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
@@ -96,7 +111,13 @@ class TheSuperadminValidatingAnUnknownIdIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 id를 검증하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 id 를 검증하면 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when the superadmin validates an id nothing answers to, "
+                "it is rejected because no target is found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
@@ -121,7 +142,13 @@ class AUserGrantedNothingMayNotValidate(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 검증하려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 검증하려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing validates a channel, "
+                "it is rejected for not enough permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:

@@ -21,6 +21,7 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -37,7 +38,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-EDITED = "고쳐 쓴 제목"
+EDITED = Says("수정한 제목", english="the edited title")
 
 type Edited = PartialBulkPayload[ModelCardNode]
 type CardStep = Scenario[TestSeedingSession, ModelCardsAndACaller, ModelCardAdapter, Edited]
@@ -53,7 +54,10 @@ class EditingEveryTitle(When[ModelCardsAndACaller, ModelCardAdapter, Edited]):
 
     @override
     def describe(self, laid: ModelCardsAndACaller) -> str:
-        return f"{laid.caller.username}이 카드 {len(laid.cards)}개의 제목을 한 번에 고침"
+        return Says(
+            f"{laid.caller.username}이 카드 {len(laid.cards)}개의 제목을 한 번에 수정합니다",
+            english=f"{laid.caller.username} edits the titles of {len(laid.cards)} cards at once",
+        )
 
     @override
     async def call(self, adapter: ModelCardAdapter, laid: ModelCardsAndACaller) -> Edited:
@@ -73,7 +77,10 @@ class EveryCardIsEdited(Then[ModelCardsAndACaller, Edited]):
 
     @override
     def says(self) -> str:
-        return "대상 카드가 모두 새 제목으로 오고, 실패한 것은 없다"
+        return Says(
+            "대상 카드가 모두 새 제목으로 오고 실패한 것은 없습니다",
+            english="every target card comes back with the new title and nothing failed",
+        )
 
     @override
     def look(self, laid: ModelCardsAndACaller, answered: Answered[Edited]) -> list[Verdict]:
@@ -99,9 +106,14 @@ class AUserGrantedUpdateEditsSeveral(
 
     @override
     def describe(self) -> str:
-        return (
-            "프로젝트에서 모델 카드 읽기와 수정 권한을 받은 사용자가 카드 여럿의 제목을 한 번에 바꾸면, "
-            "모두 새 제목으로 오고 실패한 것은 없다"
+        return Says(
+            "프로젝트에서 모델 카드 읽기와 수정 권한을 받은 사용자가 카드 여럿의 제목을 한 "
+            "번에 변경하면 모두 새 제목으로 오고 실패한 것은 없습니다",
+            english=(
+                "when a user granted read and update permission on model cards in the project "
+                "changes the titles of several cards at once, they all come back with the new "
+                "title and nothing failed"
+            ),
         )
 
     @override
@@ -127,9 +139,13 @@ class AUserGrantedNothingEditsNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 카드 여럿을 한 번에 수정하려 하면, "
-            "수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 카드 여럿을 한 번에 수정하려 하면 수정된 것 없이 "
+            "모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to update several cards at once, nothing "
+                "is updated and all come back in the failed list for lack of permission"
+            ),
         )
 
     @override

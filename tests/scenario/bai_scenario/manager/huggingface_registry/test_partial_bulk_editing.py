@@ -17,7 +17,7 @@ from ai.backend.manager.api.adapters.huggingface_registry.adapter import (
 )
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.huggingface_registry import (
     EDITED_URL,
     Edited,
@@ -45,7 +45,14 @@ class EditingEveryTarget(When[ManyRegistriesAndACaller, HuggingFaceRegistryAdapt
 
     @override
     def describe(self, laid: ManyRegistriesAndACaller) -> str:
-        return f"{laid.caller.username}이 레지스트리 {len(laid.laid)}개의 주소를 한 번에 바꿈"
+        return Says(
+            f"{laid.caller.username}이 허깅 페이스 레지스트리 {len(laid.laid)}개의 주소를 한 "
+            "번에 변경합니다",
+            english=(
+                f"{laid.caller.username} changes the addresses of {len(laid.laid)} HuggingFace "
+                "registries at once"
+            ),
+        )
 
     @override
     async def call(
@@ -74,9 +81,13 @@ class AUserGrantedUpdateEditsSeveral(
 
     @override
     def describe(self) -> str:
-        return (
-            "레지스트리 수정 권한을 받은 사용자가 여럿의 주소를 한 번에 바꾸면, 모두 새 주소로 오고 "
-            "실패한 것은 없다"
+        return Says(
+            "허깅 페이스 레지스트리 수정 권한을 받은 사용자가 여럿의 주소를 한 번에 변경하면, "
+            "모두 새 주소로 오고 실패한 것은 없습니다",
+            english=(
+                "when a user granted permission to edit HuggingFace registries changes the "
+                "addresses of several at once, all come back with the new address and none failed"
+            ),
         )
 
     @override
@@ -102,9 +113,14 @@ class AUserGrantedNothingEditsNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 레지스트리 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 허깅 페이스 레지스트리 여럿을 한 번에 수정하려 하면, "
+            "수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to edit several HuggingFace registries at "
+                "once, nothing is edited and all come back in the failed list because there is "
+                "no permission"
+            ),
         )
 
     @override

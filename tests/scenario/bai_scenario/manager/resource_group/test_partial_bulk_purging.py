@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
 )
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.resource_group import (
     EveryGroupIsProcessed,
     GroupLook,
@@ -45,8 +45,20 @@ class PurgingEveryGroup(When[ManyGroupsAndACaller, ResourceGroupAdapter, Process
 
     @override
     def describe(self, laid: ManyGroupsAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 그룹 {len(laid.laid)}개{besides}를 한 번에 완전 삭제함"
+        if self.missing is not None:
+            besides_ko = " 와 없는 id 하나"
+            besides_en = " and one unknown id"
+        else:
+            besides_ko = ""
+            besides_en = ""
+        return Says(
+            f"{laid.caller.username}이 자원 그룹 {len(laid.laid)}개{besides_ko}를 한 번에 "
+            "완전 삭제합니다",
+            english=(
+                f"{laid.caller.username} purges {len(laid.laid)} resource groups{besides_en} "
+                "at once"
+            ),
+        )
 
     @override
     async def call(self, adapter: ResourceGroupAdapter, laid: ManyGroupsAndACaller) -> Processed:
@@ -70,9 +82,14 @@ class PurgingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 그룹 둘과 없는 id 하나를 한 번에 완전 삭제하면, 둘은 지운 그대로 오고 "
-            "없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "superadmin 이 자원 그룹 둘과 없는 id 하나를 한 번에 완전 삭제하면, 둘은 삭제한 그대로 "
+            "오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when the superadmin purges two resource groups and one unknown id at once, the "
+                "two come back as deleted and the unknown id comes back in the failed list "
+                "because no target answers to it"
+            ),
         )
 
     @override
@@ -98,9 +115,13 @@ class AUserGrantedNothingPurgesNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 그룹 여럿을 한 번에 완전 삭제하려 하면, 지워진 것 "
-            "없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 자원 그룹 여럿을 한 번에 완전 삭제하려 하면, 지워진 "
+            "것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "a user granted nothing trying to purge several resource groups at once gets "
+                "none purged and every one in the failed list for not enough permission"
+            ),
         )
 
     @override

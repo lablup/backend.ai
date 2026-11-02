@@ -7,6 +7,7 @@ from typing import override
 
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.vfs_storage.creators import VFSStorageCreator
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 SEEDED_BASE_PATH = "/seeded/vfs-storage"
@@ -20,11 +21,14 @@ class TestSeedVFSStorage(TestSeedRow[VFSStorageData]):
 
     @override
     def kind(self) -> str:
-        return "VFS storage"
+        return Says("VFS storage", english="VFS storage")
 
     @override
     def detail(self) -> str:
-        return f"기본 경로가 {SEEDED_BASE_PATH} 이다"
+        return Says(
+            f"기본 경로가 {SEEDED_BASE_PATH}입니다",
+            english=f"its base path is {SEEDED_BASE_PATH}",
+        )
 
     @override
     def name(self, naming: Naming) -> str:

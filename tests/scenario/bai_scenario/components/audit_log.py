@@ -33,12 +33,15 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.runner.planting import TestSeedingSession
@@ -87,19 +90,31 @@ def look_node(node: AuditLogNode, expected: ExpectedRecord, *, at: str = "") -> 
     """The whole node, checked. The ids the database and the run make are skipped; the
     owner and actor are read as coming from the rows earlier steps laid."""
     verdicts: list[Verdict] = [
-        Skipped(f"{at}id", "데이터베이스가 만든다"),
-        Skipped(f"{at}action_id", "실행마다 새로 생성된다"),
+        Skipped(
+            f"{at}id",
+            Says("데이터베이스가 생성합니다", english="the database generates it"),
+        ),
+        Skipped(
+            f"{at}action_id",
+            Says("실행마다 새로 생성됩니다", english="a new one is generated each run"),
+        ),
         Same(f"{at}operation", node.operation, expected.operation),
         Same(f"{at}entity_type", node.entity_type, expected.entity_type),
         Held(
             f"{at}entity_id",
             node.entity_id,
-            SameAs[str | None](str(expected.entity_id), "기록의 대상 엔티티"),
+            SameAs[str | None](
+                str(expected.entity_id),
+                Says("기록의 대상 엔티티", english="the entity the record is about"),
+            ),
         ),
         Held(
             f"{at}target_entity_id",
             node.target_entity_id,
-            SameAs[UUID | None](expected.entity_id, "기록의 대상 엔티티"),
+            SameAs[UUID | None](
+                expected.entity_id,
+                Says("기록의 대상 엔티티", english="the entity the record is about"),
+            ),
         ),
         Same(f"{at}status", node.status, expected.status),
         Same(f"{at}description", node.description, f"{expected.operation} was recorded"),
@@ -116,7 +131,10 @@ def look_node(node: AuditLogNode, expected: ExpectedRecord, *, at: str = "") -> 
             Held(
                 f"{at}triggered_by",
                 node.triggered_by,
-                SameAs[str | None](str(expected.triggered_by), "실행한 사용자"),
+                SameAs[str | None](
+                    str(expected.triggered_by),
+                    Says("실행한 사용자", english="the user who ran it"),
+                ),
             )
         )
     return verdicts
@@ -293,7 +311,10 @@ class TwoRecordsGlobally(Given[Any, RecordsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"서로 다른 시각의 기록 둘과, {self.role.value} 한 명"
+        return Says(
+            f"서로 다른 시각의 기록 둘과, {self.role.value} 한 명",
+            english=f"two records from different times and one {self.role.value}",
+        )
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> RecordsAndACaller:
@@ -327,7 +348,10 @@ class MixedStatusGlobally(Given[Any, RecordsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return "성공한 기록과 거부된 기록, 그리고 슈퍼관리자 한 명"
+        return Says(
+            "성공한 기록과 거부된 기록, 그리고 superadmin 한 명",
+            english="a successful record and a rejected record, and one superadmin",
+        )
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> RecordsAndACaller:
@@ -357,7 +381,10 @@ class TwoActorsGlobally(Given[Any, RecordsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return "두 사용자가 각각 남긴 기록과, 슈퍼관리자 한 명"
+        return Says(
+            "두 사용자가 각각 남긴 기록과, superadmin 한 명",
+            english="records two users each left, and one superadmin",
+        )
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> RecordsAndACaller:
@@ -398,8 +425,12 @@ class OneRunGlobally(Given[Any, RecordsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return (
-            "한 실행이 두 사용자에 하나씩 남긴 기록, 다른 실행이 남긴 기록 하나와, 슈퍼관리자 한 명"
+        return Says(
+            "한 실행이 두 사용자에 하나씩 남긴 기록, 다른 실행이 남긴 기록 하나와, superadmin 한 명",
+            english=(
+                "records one run left on each of two users, one record another run left, "
+                "and one superadmin"
+            ),
         )
 
     @override
@@ -448,7 +479,10 @@ class ManyRecordsGlobally(Given[Any, RecordsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"기록 {self.total}개와, 슈퍼관리자 한 명"
+        return Says(
+            f"기록 {self.total}개와, superadmin 한 명",
+            english=f"{self.total} records and one superadmin",
+        )
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> RecordsAndACaller:
@@ -472,7 +506,10 @@ class TwoRecordsToRead(Given[Any, RecordsToLoad]):
 
     @override
     def describe(self) -> str:
-        return f"id로 조회할 자기에 대한 기록 둘과, {self.role.value} 한 명"
+        return Says(
+            f"id 로 조회할 자기에 대한 기록 둘과, {self.role.value} 한 명",
+            english=f"two records about the caller to read by id, and one {self.role.value}",
+        )
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> RecordsToLoad:
@@ -511,11 +548,30 @@ class ProjectRecords(Given[Any, ScopedEntities]):
 
     @override
     def describe(self) -> str:
-        granted = [n for n, g in (("첫째", self.grant_first), ("둘째", self.grant_second)) if g]
-        holding = (
-            f"{'·'.join(granted)} 프로젝트에 읽기 권한을 받은" if granted else "아무 권한도 없는"
+        granted_ko = [
+            name
+            for name, given in (("첫째", self.grant_first), ("둘째", self.grant_second))
+            if given
+        ]
+        granted_en = [
+            name
+            for name, given in (("the first", self.grant_first), ("the second", self.grant_second))
+            if given
+        ]
+        holding_ko = (
+            f"{', '.join(granted_ko)} 프로젝트에 읽기 권한을 받은"
+            if granted_ko
+            else "아무 권한도 없는"
         )
-        return f"서로 다른 프로젝트의 기록 둘과, {holding} {self.role.value} 한 명"
+        holding_en = (
+            f"granted read permission on the {' and '.join(granted_en)} projects"
+            if granted_en
+            else "with no permission"
+        )
+        return Says(
+            f"서로 다른 프로젝트의 기록 둘과, {holding_ko} {self.role.value} 한 명",
+            english=(f"two records of different projects, and one {self.role.value} {holding_en}"),
+        )
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> ScopedEntities:
@@ -551,7 +607,13 @@ class ProjectRecordsToLoad(Given[Any, RecordsToLoad]):
 
     @override
     def describe(self) -> str:
-        return "서로 다른 프로젝트의 기록 둘과, 첫째 프로젝트에만 읽기 권한을 받은 사용자 한 명"
+        return Says(
+            "서로 다른 프로젝트의 기록 둘과, 첫째 프로젝트에만 읽기 권한을 받은 사용자 한 명",
+            english=(
+                "two records of different projects, and one user granted read permission "
+                "on the first project only"
+            ),
+        )
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> RecordsToLoad:
@@ -570,7 +632,13 @@ class OneProjectMixedStatus(Given[Any, ScopedEntities]):
 
     @override
     def describe(self) -> str:
-        return "성공한 기록과 거부된 기록을 가진 프로젝트 하나와, 읽기 권한을 받은 사용자 한 명"
+        return Says(
+            "성공한 기록과 거부된 기록을 가진 프로젝트 하나와, 읽기 권한을 받은 사용자 한 명",
+            english=(
+                "one project holding a successful record and a rejected record, and one "
+                "user granted read permission"
+            ),
+        )
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> ScopedEntities:
@@ -613,9 +681,13 @@ class OneProjectOneRun(Given[Any, ScopedEntities]):
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "한 실행이 남긴 기록 둘과 다른 실행이 남긴 기록 하나를 가진 프로젝트 하나와, 읽기 "
-            "권한을 받은 사용자 한 명"
+            "권한을 받은 사용자 한 명",
+            english=(
+                "one project holding two records one run left and one record another run "
+                "left, and one user granted read permission"
+            ),
         )
 
     @override
@@ -676,7 +748,12 @@ class OneProjectManyRecords(Given[Any, ScopedEntities]):
 
     @override
     def describe(self) -> str:
-        return f"기록 {self.total}개를 가진 프로젝트 하나와, 읽기 권한을 받은 사용자 한 명"
+        return Says(
+            f"기록 {self.total}개를 가진 프로젝트 하나와, 읽기 권한을 받은 사용자 한 명",
+            english=(
+                f"one project holding {self.total} records, and one user granted read permission"
+            ),
+        )
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> ScopedEntities:
@@ -709,9 +786,13 @@ class ARecordScopedToAProject(Given[Any, ScopedEntities]):
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "다른 엔티티에 대한 기록이 한 프로젝트를 스코프로 달고 있고, 그 프로젝트에 읽기 "
-            "권한을 받은 사용자 한 명"
+            "권한을 받은 사용자 한 명",
+            english=(
+                "a record about another entity carrying a project as its scope, and one "
+                "user granted read permission on that project"
+            ),
         )
 
     @override
@@ -755,12 +836,16 @@ class ActorRecords(Given[Any, ScopedActors]):
 
     @override
     def describe(self) -> str:
-        who = (
-            "그중 첫 사용자"
-            if self.caller_is_first
-            else "그 사용자에 대한 읽기 권한을 받은 다른 사용자 한 명"
+        if self.caller_is_first:
+            who_ko = "그중 첫 사용자"
+            who_en = "the first of those users"
+        else:
+            who_ko = "그 사용자에 대한 읽기 권한을 받은 다른 사용자 한 명"
+            who_en = "another user granted read permission on that user"
+        return Says(
+            f"두 사용자가 각각 실행한 기록과, {who_ko}",
+            english=f"records two users each triggered, and {who_en}",
         )
-        return f"두 사용자가 각각 실행한 기록과, {who}"
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> ScopedActors:
@@ -784,7 +869,10 @@ class TheRecordsAnswered(Then[Any, SearchAuditLogsPayload]):
 
     @override
     def says(self) -> str:
-        return "지정한 기록이 순서대로, 그리고 그것만 반환된다"
+        return Says(
+            "지정한 기록이 순서대로, 그리고 그것만 반환됩니다",
+            english="the named records come back in order, and only those",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[SearchAuditLogsPayload]) -> list[Verdict]:
@@ -811,7 +899,10 @@ class ThePageIsCapped(Then[Any, SearchAuditLogsPayload]):
 
     @override
     def says(self) -> str:
-        return "기본 페이지 크기만큼 반환되고 다음 페이지가 있다고 응답한다"
+        return Says(
+            "기본 페이지 크기만큼 반환되고 다음 페이지가 있다고 응답합니다",
+            english="the default page size comes back and the answer says another page follows",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[SearchAuditLogsPayload]) -> list[Verdict]:
@@ -838,7 +929,12 @@ class TheSlotsInOrder(Then[RecordsToLoad, Loaded]):
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로 항목마다 노드, 거부, 또는 빈 항목이 반환된다"
+        return Says(
+            "요청한 순서대로 항목마다 노드, 거부, 또는 빈 항목이 반환됩니다",
+            english=(
+                "for each item in request order, a node, a rejection, or an empty item comes back"
+            ),
+        )
 
     @override
     def look(self, laid: RecordsToLoad, answered: Answered[Loaded]) -> list[Verdict]:
@@ -872,9 +968,14 @@ class ARecordReachedThroughItsScope(Given[Any, RecordsToLoad]):
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "한 사용자에 대한 기록이 한 프로젝트를 범위로 남겼고, 다른 프로젝트에 기록 하나가 "
-            "있으며, 범위 프로젝트에만 읽기 권한을 받은 사용자 한 명"
+            "있으며, 범위 프로젝트에만 읽기 권한을 받은 사용자 한 명",
+            english=(
+                "a record about one user that left a project as its scope, one record on "
+                "another project, and one user granted read permission on the scope "
+                "project only"
+            ),
         )
 
     @override
@@ -928,9 +1029,14 @@ class ARecordReachedThroughItsTrigger(Given[Any, RecordsToLoad]):
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "한 프로젝트에 대한 기록을 다른 사용자가 실행했고, 다른 프로젝트에 기록 하나가 "
-            "있으며, 실행한 사용자에만 읽기 권한을 받은 사용자 한 명"
+            "있으며, 실행한 사용자에만 읽기 권한을 받은 사용자 한 명",
+            english=(
+                "a record about one project triggered by another user, one record on "
+                "another project, and one user granted read permission on the triggering "
+                "user only"
+            ),
         )
 
     @override
@@ -1015,16 +1121,36 @@ class AScopedRecord(Given[Any, ScopesToSearch]):
     @override
     def describe(self) -> str:
         who = {
-            "superadmin": "슈퍼관리자 한 명",
-            "scope": "범위 프로젝트에만 읽기 권한을 받은 사용자 한 명",
-            "about": "대상 프로젝트에만 읽기 권한을 받은 사용자 한 명",
-            "trigger": "실행한 사용자에만 읽기 권한을 받은 사용자 한 명",
-            "nobody": "아무 권한도 없는 사용자 한 명",
-            "monitor": "아무 권한도 없는 모니터 역할 사용자 한 명",
+            "superadmin": Says("superadmin 한 명", english="one superadmin"),
+            "scope": Says(
+                "범위 프로젝트에만 읽기 권한을 받은 사용자 한 명",
+                english="one user granted read permission on the scope project only",
+            ),
+            "about": Says(
+                "대상 프로젝트에만 읽기 권한을 받은 사용자 한 명",
+                english="one user granted read permission on the target project only",
+            ),
+            "trigger": Says(
+                "실행한 사용자에만 읽기 권한을 받은 사용자 한 명",
+                english="one user granted read permission on the triggering user only",
+            ),
+            "nobody": Says(
+                "아무 권한도 없는 사용자 한 명",
+                english="one user with no permission",
+            ),
+            "monitor": Says(
+                "아무 권한도 없는 모니터 역할 사용자 한 명",
+                english="one monitor-role user with no permission",
+            ),
         }[self.reader]
-        return (
+        return Says(
             "한 프로젝트에 대한 기록을 다른 사용자가 실행했고 그 기록이 다른 프로젝트와 "
-            f"한 사용자를 범위로 남겼으며, {who}"
+            f"한 사용자를 범위로 남겼으며, {who}",
+            english=(
+                "a record about one project was triggered by another user and left another "
+                "project and one user as its scopes, and "
+                f"{in_language(who, Language.ENGLISH)}"
+            ),
         )
 
     @override
@@ -1095,8 +1221,12 @@ class ARecordWithoutScopes(Given[Any, ScopesToSearch]):
 
     @override
     def describe(self) -> str:
-        return (
-            "범위를 남기지 않은 한 프로젝트의 기록과, 그 프로젝트에 읽기 권한을 받은 사용자 한 명"
+        return Says(
+            "범위를 남기지 않은 한 프로젝트의 기록과, 그 프로젝트에 읽기 권한을 받은 사용자 한 명",
+            english=(
+                "a record of one project that left no scope, and one user granted read "
+                "permission on that project"
+            ),
         )
 
     @override
@@ -1127,7 +1257,7 @@ class NoRecordToSearch(Given[Any, ScopesToSearch]):
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자 한 명"
+        return Says("superadmin 한 명", english="one superadmin")
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> ScopesToSearch:
@@ -1142,7 +1272,10 @@ class TheScopesAnswered(Then[ScopesToSearch, SearchAuditLogScopesPayload]):
 
     @override
     def says(self) -> str:
-        return "기록의 범위가 순서대로, 그리고 그것만 반환된다"
+        return Says(
+            "기록의 범위가 순서대로, 그리고 그것만 반환됩니다",
+            english="the scopes of the record come back in order, and only those",
+        )
 
     @override
     def look(
@@ -1160,16 +1293,30 @@ class TheScopesAnswered(Then[ScopesToSearch, SearchAuditLogScopesPayload]):
         for index, (node, expected) in enumerate(zip(payload.items, laid.visible, strict=False)):
             at = f"[{index}]."
             verdicts.extend([
-                Skipped(f"{at}id", "데이터베이스가 만든다"),
-                Skipped(f"{at}field_id", "데이터베이스가 만든다"),
+                Skipped(
+                    f"{at}id",
+                    Says("데이터베이스가 생성합니다", english="the database generates it"),
+                ),
+                Skipped(
+                    f"{at}field_id",
+                    Says("데이터베이스가 생성합니다", english="the database generates it"),
+                ),
                 Held(
-                    f"{at}audit_log_id", node.audit_log_id, SameAs[UUID](laid.record, "검색한 기록")
+                    f"{at}audit_log_id",
+                    node.audit_log_id,
+                    SameAs[UUID](
+                        laid.record,
+                        Says("검색한 기록", english="the record searched"),
+                    ),
                 ),
                 Same(f"{at}scope_type", node.scope_type, expected.scope_type),
                 Held(
                     f"{at}scope_id",
                     node.scope_id,
-                    SameAs[UUID](expected.scope_id, "기록이 남긴 범위"),
+                    SameAs[UUID](
+                        expected.scope_id,
+                        Says("기록이 남긴 범위", english="the scope the record left"),
+                    ),
                 ),
             ])
         return verdicts

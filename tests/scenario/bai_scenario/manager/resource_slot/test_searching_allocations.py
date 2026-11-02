@@ -21,7 +21,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_allocation import (
     EveryLaidAllocationIsCounted,
@@ -52,7 +52,10 @@ class SearchingEveryAllocation(When[KernelsAndACaller, ResourceSlotAdapter, Sear
 
     @override
     def describe(self, laid: KernelsAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체 조회"
+        return Says(
+            f"{laid.caller.username} 이 필터 없이 전체를 조회합니다",
+            english=f"{laid.caller.username} reads everything without a filter",
+        )
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: KernelsAndACaller) -> Searched:
@@ -70,7 +73,11 @@ class SearchingBySlotName(When[KernelsAndACaller, ResourceSlotAdapter, Searched]
 
     @override
     def describe(self, laid: KernelsAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.named.slots[0][0]} 슬롯 이름 필터로 조회"
+        slot = laid.named.slots[0][0]
+        return Says(
+            f"{laid.caller.username} 이 {slot} 슬롯 이름 필터로 조회합니다",
+            english=f"{laid.caller.username} reads with the slot name filter {slot}",
+        )
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: KernelsAndACaller) -> Searched:
@@ -94,7 +101,13 @@ class SearchingByKernelId(When[KernelsAndACaller, ResourceSlotAdapter, Searched]
 
     @override
     def describe(self, laid: KernelsAndACaller) -> str:
-        return f"{laid.caller.username}이 미리 만들어 둔 커널 중 하나의 id 필터로 조회"
+        return Says(
+            f"{laid.caller.username} 이 미리 저장한 커널 중 하나의 id 필터로 조회합니다",
+            english=(
+                f"{laid.caller.username} reads with the id of one kernel stored in advance as a "
+                "filter"
+            ),
+        )
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: KernelsAndACaller) -> Searched:
@@ -120,7 +133,10 @@ class SearchingTheFirst(When[KernelsAndACaller, ResourceSlotAdapter, Searched]):
 
     @override
     def describe(self, laid: KernelsAndACaller) -> str:
-        return f"{laid.caller.username}이 앞에서 {self.first}건만 청해 조회"
+        return Says(
+            f"{laid.caller.username} 이 앞에서 {self.first}건만 요청해 조회합니다",
+            english=f"{laid.caller.username} reads asking for only the first {self.first}",
+        )
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: KernelsAndACaller) -> Searched:
@@ -140,7 +156,14 @@ class TheSuperadminCountsEveryAllocation(
 
     @override
     def describe(self) -> str:
-        return "슬롯 둘을 요구하는 커널 하나가 있을 때 슈퍼관리자가 필터 없이 조회하면 할당 둘이 다 집계된다"
+        return Says(
+            "슬롯 둘을 요구하는 커널 하나가 있을 때 superadmin 이 필터 없이 조회하면 할당 둘이 "
+            "다 집계됩니다",
+            english=(
+                "when one kernel asks for two slots and the superadmin reads without a filter, "
+                "both allocations are counted"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, KernelsAndACaller]:
@@ -165,7 +188,14 @@ class ASlotNameFilterNarrows(
 
     @override
     def describe(self) -> str:
-        return "슬롯 둘을 요구하는 커널 하나가 있을 때 한 슬롯의 이름을 필터로 조회하면, 응답에는 그 슬롯의 할당만 남는다"
+        return Says(
+            "슬롯 둘을 요구하는 커널 하나가 있을 때 한 슬롯의 이름을 필터로 조회하면, 응답에는 그 "
+            "슬롯의 할당만 남습니다",
+            english=(
+                "when one kernel asks for two slots and the call reads with the name of one slot "
+                "as a filter, only the allocation of that slot stays in the answer"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, KernelsAndACaller]:
@@ -190,7 +220,14 @@ class AKernelIdFilterNarrows(
 
     @override
     def describe(self) -> str:
-        return "슬롯 하나씩 요구하는 커널 둘이 있을 때 한 커널의 id를 필터로 조회하면, 응답에는 그 커널의 할당만 남는다"
+        return Says(
+            "슬롯 하나씩 요구하는 커널 둘이 있을 때 한 커널의 id 를 필터로 조회하면, 응답에는 그 "
+            "커널의 할당만 남습니다",
+            english=(
+                "when two kernels ask for one slot each and the call reads with the id of one "
+                "kernel as a filter, only the allocations of that kernel stay in the answer"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, KernelsAndACaller]:
@@ -215,8 +252,13 @@ class OmittingThePageSizeGivesTen(
 
     @override
     def describe(self) -> str:
-        return (
-            "할당 11건이 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다"
+        return Says(
+            "할당 11건이 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 "
+            "응답합니다",
+            english=(
+                "when 11 allocations exist and the call reads without a size, 10 come back and "
+                "the answer says a next page exists"
+            ),
         )
 
     @override
@@ -242,7 +284,14 @@ class AskingForTheFirstOneGivesOne(
 
     @override
     def describe(self) -> str:
-        return "할당 둘이 있을 때 앞에서 한 건만 청해 조회하면 한 건이 반환되고 다음 페이지가 있다고 응답한다"
+        return Says(
+            "할당 둘이 있을 때 앞에서 한 건만 요청해 조회하면 한 건이 반환되고 다음 페이지가 "
+            "있다고 응답합니다",
+            english=(
+                "when two allocations exist and the call asks for only the first one, one comes "
+                "back and the answer says a next page exists"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, KernelsAndACaller]:
@@ -267,7 +316,14 @@ class AMonitorCountsEveryAllocation(
 
     @override
     def describe(self) -> str:
-        return "모니터가 필터 없이 조회하면 할당이 다 집계된다. 슈퍼관리자인지 검사하는 조회는 모니터도 통과한다"
+        return Says(
+            "모니터가 필터 없이 조회하면 할당이 다 집계됩니다. superadmin 인지 검사하는 조회는 "
+            "모니터도 통과합니다",
+            english=(
+                "when a monitor reads without a filter, every allocation is counted. A read that "
+                "checks whether the caller is the superadmin also passes for a monitor"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, KernelsAndACaller]:
@@ -292,7 +348,10 @@ class AUserGrantedNothingMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 조회하면 역할 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 조회하면 역할 부족으로 거부됩니다",
+            english=("when a user granted nothing reads, the call is rejected for lack of role"),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, KernelsAndACaller]:
@@ -317,7 +376,14 @@ class EnforcementOffStillNeedsTheRole(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 꺼도 슈퍼관리자나 모니터가 아니면 조회할 수 없다. 슈퍼관리자 검사는 그 설정을 읽지 않는다"
+        return Says(
+            "권한 검사를 꺼도 superadmin 이나 모니터가 아니면 조회할 수 없습니다. superadmin "
+            "검사는 그 설정을 읽지 않습니다",
+            english=(
+                "turning permission checks off still does not let a user who is neither the "
+                "superadmin nor a monitor read. The superadmin check does not read that setting"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:

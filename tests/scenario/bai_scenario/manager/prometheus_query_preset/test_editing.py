@@ -30,6 +30,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Configured,
     Given,
+    Says,
     Scenario,
     Then,
     When,
@@ -74,6 +75,7 @@ class Editing(When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAn
     @override
     def describe(self, laid: APresetAndACaller) -> str:
         target = "존재하지 않는 id" if self.other is not None else laid.preset.name
+        target_en = "an absent id" if self.other is not None else laid.preset.name
         changed = [
             what
             for what, asked in (
@@ -81,14 +83,32 @@ class Editing(When[APresetAndACaller, PrometheusQueryPresetAdapter, PresetNodeAn
                 ("템플릿 변경", self.query_template is not None),
                 ("설명 비우기", self.clear_description),
                 ("다른 카테고리로 이동", self.move_elsewhere),
-                ("존재하지 않는 카테고리 id로 이동", self.under_an_unknown_category),
+                ("존재하지 않는 카테고리 id 로 이동", self.under_an_unknown_category),
                 ("필터 라벨 변경", self.filter_labels is not None),
             )
             if asked
         ]
+        changed_en = [
+            what
+            for what, asked in (
+                ("rename", self.named is not None),
+                ("template change", self.query_template is not None),
+                ("clear the description", self.clear_description),
+                ("move to another category", self.move_elsewhere),
+                ("move to an unknown category id", self.under_an_unknown_category),
+                ("filter label change", self.filter_labels is not None),
+            )
+            if asked
+        ]
         if not changed:
-            return f"{laid.caller.username}이 {target} 수정 (빈 요청)"
-        return f"{laid.caller.username}이 {target} 수정 ({', '.join(changed)})"
+            return Says(
+                f"{laid.caller.username}이 {target} 을 수정합니다 (빈 요청)",
+                english=f"{laid.caller.username} edits {target_en} (empty request)",
+            )
+        return Says(
+            f"{laid.caller.username}이 {target} 을 수정합니다 ({', '.join(changed)})",
+            english=f"{laid.caller.username} edits {target_en} ({', '.join(changed_en)})",
+        )
 
     def _category(self, laid: APresetAndACaller) -> UUID | Unset | None:
         if self.move_elsewhere and laid.elsewhere is not None:
@@ -132,7 +152,14 @@ class TheSuperadminRetunesTheTemplate(
 
     @override
     def describe(self) -> str:
-        return "프리셋 하나가 있고 슈퍼관리자가 템플릿만 수정하면, 템플릿은 새 값이고 나머지는 그대로다"
+        return Says(
+            "프리셋 하나가 있고 superadmin 이 템플릿만 수정하면, 템플릿은 새 값이고 나머지는 "
+            "그대로입니다",
+            english=(
+                "when a preset exists and the superadmin edits only the template, the "
+                "template is the new value and the rest stays as it is"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
@@ -159,7 +186,13 @@ class ClearingTheDescription(
 
     @override
     def describe(self) -> str:
-        return "설명이 있는 프리셋을 슈퍼관리자가 설명을 비우도록 수정하면, 설명이 없어진다"
+        return Says(
+            "설명이 있는 프리셋을 superadmin 이 설명을 비우도록 수정하면, 설명이 없어집니다",
+            english=(
+                "when the superadmin edits a preset that has a description to clear it, the "
+                "description is gone"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
@@ -186,7 +219,14 @@ class MovingToAnotherCategory(
 
     @override
     def describe(self) -> str:
-        return "카테고리 둘 중 한쪽에 속한 프리셋을 슈퍼관리자가 다른 카테고리로 옮기면, 응답의 카테고리가 그것을 가리킨다"
+        return Says(
+            "카테고리 둘 중 한쪽에 속한 프리셋을 superadmin 이 다른 카테고리로 옮기면, 응답의 "
+            "카테고리가 그것을 참조합니다",
+            english=(
+                "when the superadmin moves a preset filed under one of two categories to the "
+                "other, the category in the response references it"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
@@ -213,9 +253,14 @@ class ChangingOnlyTheFilterLabels(
 
     @override
     def describe(self) -> str:
-        return (
-            "필터 라벨과 그룹 라벨이 모두 있는 프리셋을 슈퍼관리자가 필터 라벨만 수정하면, "
-            "필터 라벨은 새 값이고 그룹 라벨은 그대로다"
+        return Says(
+            "필터 라벨과 그룹 라벨이 모두 있는 프리셋을 superadmin 이 필터 라벨만 수정하면, 필터 "
+            "라벨은 새 값이고 그룹 라벨은 그대로입니다",
+            english=(
+                "when the superadmin edits only the filter labels of a preset that has both "
+                "filter and group labels, the filter labels are the new value and the group "
+                "labels stay as they are"
+            ),
         )
 
     @override
@@ -245,8 +290,13 @@ class GivingNothingChangesNothing(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 값을 하나도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환된다"
+        return Says(
+            "superadmin 이 값을 하나도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 "
+            "반환됩니다",
+            english=(
+                "when the superadmin edits without giving any value, the node comes back with "
+                "nothing changed"
+            ),
         )
 
     @override
@@ -272,9 +322,14 @@ class AnUnknownCategoryIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 존재하지 않는 카테고리 id로 수정하면, 카테고리가 없다는 이유로 거부된다. "
-            "저장소의 참조 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다"
+        return Says(
+            "superadmin 이 존재하지 않는 카테고리 id 로 수정하면, 카테고리가 없다는 이유로 "
+            "거부됩니다. 저장소의 참조 제약이 차단하며 도메인 오류로 옮기지 않았습니다",
+            english=(
+                "when the superadmin edits a preset naming a category id that does not exist, "
+                "it is rejected because the category does not exist. The repository's "
+                "reference constraint blocks it, and it has not been moved to a domain error"
+            ),
         )
 
     @override
@@ -300,9 +355,14 @@ class AUserGrantedNothingMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "같은 프리셋이 있고 아무 권한도 없는 사용자가 이름을 수정하면, 권한 부족으로 "
-            "거부된다. 이 엔티티는 어느 스코프에도 속하지 않아 권한을 받을 방법이 없다"
+            "거부됩니다. 이 엔티티는 어느 스코프에도 속하지 않아 권한을 받을 방법이 없습니다",
+            english=(
+                "when the same preset exists and a user granted nothing edits its name, it is "
+                "rejected for lack of permission. This entity belongs to no scope, so there "
+                "is no way to grant permission on it"
+            ),
         )
 
     @override
@@ -331,7 +391,12 @@ class EnforcementOffLetsAnyoneEdit(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있다"
+        return Says(
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있습니다",
+            english=(
+                "turning the permission check off lets even a user granted nothing edit a preset"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:
@@ -360,8 +425,13 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 존재하지 않는 id의 이름을 수정하면, 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 id 의 이름을 수정하면, 대상을 찾을 수 없다는 이유로 "
+            "거부됩니다",
+            english=(
+                "when the superadmin edits the name of an id that does not exist, it is "
+                "rejected because the target is not found"
+            ),
         )
 
     @override

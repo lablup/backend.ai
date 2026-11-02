@@ -24,11 +24,14 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.domain import Mentions
 from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
@@ -59,7 +62,11 @@ class AStorageAndSomeone(Given[Any, AStorageAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"object storage 하나와, {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"object storage 하나와, {who} 한 명",
+            english=f"one object storage and one {in_language(who, Language.ENGLISH)}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AStorageAndACaller:
@@ -77,7 +84,11 @@ class ManyStoragesAndSomeone(Given[Any, ManyStoragesAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"object storage {self.count}개와, {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"object storage {self.count}개와, {who} 한 명",
+            english=(f"{self.count} object storages and one {in_language(who, Language.ENGLISH)}"),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyStoragesAndACaller:
@@ -93,13 +104,13 @@ def storage_verdicts(
     at: str, node: ObjectStorageNode, storage: ObjectStorageData, host: str | Kept
 ) -> list[Verdict]:
     """Every place of one object storage node, prefixed for a node inside a list."""
+    seeded = Says(
+        "미리 저장한 object storage",
+        english="the object storage created in advance",
+    )
     return [
-        Held[UUID](f"{at}id", node.id, SameAs[UUID](storage.id, "미리 만들어 둔 object storage")),
-        Held[UUID](
-            f"{at}entity_id",
-            node.entity_id,
-            SameAs[UUID](storage.id, "미리 만들어 둔 object storage"),
-        ),
+        Held[UUID](f"{at}id", node.id, SameAs[UUID](storage.id, seeded)),
+        Held[UUID](f"{at}entity_id", node.entity_id, SameAs[UUID](storage.id, seeded)),
         Same(f"{at}name", node.name, storage.name),
         Same(f"{at}host", node.host, storage.host if isinstance(host, Kept) else host),
         Same(f"{at}access_key", node.access_key, storage.access_key),
@@ -117,7 +128,10 @@ class TheStorageNode(Then[AStorageAndACaller, ObjectStorageNode]):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 object storage 전체가 반환된다"
+        return Says(
+            "미리 저장한 object storage 전체가 반환됩니다",
+            english="the whole object storage created in advance comes back",
+        )
 
     @override
     def look(
@@ -135,7 +149,10 @@ class ThePurgedStorageId(Then[AStorageAndACaller, PurgeObjectStoragePayload]):
 
     @override
     def says(self) -> str:
-        return "purge 한 object storage 의 id 가 반환된다"
+        return Says(
+            "purge 한 object storage 의 id 가 반환됩니다",
+            english="the id of the purged object storage comes back",
+        )
 
     @override
     def look(
@@ -146,7 +163,15 @@ class ThePurgedStorageId(Then[AStorageAndACaller, PurgeObjectStoragePayload]):
             return [Refused(EntityNotFoundError, answered.raised)]
         return [
             Held[UUID](
-                "id", payload.id, SameAs[UUID](laid.storage.id, "미리 만들어 둔 object storage")
+                "id",
+                payload.id,
+                SameAs[UUID](
+                    laid.storage.id,
+                    Says(
+                        "미리 저장한 object storage",
+                        english="the object storage created in advance",
+                    ),
+                ),
             )
         ]
 
@@ -161,10 +186,20 @@ class EveryStorageIsProcessed(Then[ManyStoragesAndACaller, PartialBulkPayload[Ob
     @override
     def says(self) -> str:
         if self.missing is None:
-            return "대상 object storage 가 모두 처리된 목록에 오고, 실패한 것은 없다"
-        return (
+            return Says(
+                "대상 object storage 가 모두 처리된 목록에 오고, 실패한 것은 없습니다",
+                english=(
+                    "every target object storage comes back in the processed list "
+                    "and nothing failed"
+                ),
+            )
+        return Says(
             "대상 object storage 가 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 "
-            "실패 목록에 온다"
+            "실패 목록에 옵니다",
+            english=(
+                "every target object storage comes back in the processed list and an unknown id "
+                "comes back in the failed list because no target answers to it"
+            ),
         )
 
     @override
@@ -184,7 +219,14 @@ class EveryStorageIsProcessed(Then[ManyStoragesAndACaller, PartialBulkPayload[Ob
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the unknown id put in the request"),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -198,7 +240,10 @@ class NothingIsProcessed(Then[ManyStoragesAndACaller, PartialBulkPayload[ObjectS
 
     @override
     def says(self) -> str:
-        return "처리된 object storage 없이 대상이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 object storage 없이 대상이 모두 실패 목록에 옵니다",
+            english="no object storage is processed and every target comes back in the failed list",
+        )
 
     @override
     def look(
@@ -216,7 +261,15 @@ class NothingIsProcessed(Then[ManyStoragesAndACaller, PartialBulkPayload[ObjectS
         for i, (failure, storage) in enumerate(zip(payload.failed, laid.laid, strict=False)):
             verdicts += [
                 Held[UUID](
-                    f"failed[{i}].id", failure.id, SameAs(storage.id, "대상 object storage 의 id")
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(
+                        storage.id,
+                        Says(
+                            "대상 object storage 의 id",
+                            english="the id of the target object storage",
+                        ),
+                    ),
                 ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]

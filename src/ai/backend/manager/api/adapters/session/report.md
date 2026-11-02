@@ -42,25 +42,25 @@ Scenario: incomplete 28 / 30
 
 | scenario | verdict |
 |---|---|
-| [세션을 하나도 심지 않은 상태에서 슈퍼관리자가 조회하면, 답은 비어 있다](#session-a-scenario-that-laid-no-session-finds-none) | answered |
-| [슈퍼관리자가 지정된 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다](#searching_details-session-scheduling-conditions-are-preserved-when-configured) | answered |
-| [슈퍼관리자가 미설정인 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다](#searching_details-session-scheduling-conditions-are-preserved-when-unset) | answered |
-| [필터 없는 전체 조회는 슈퍼관리자 역할로만 열리므로, 아무 권한도 받지 않은 사용자는 역할 부족으로 거부된다](#session-a-user-granted-nothing-may-not-search-sessions) | rejected |
+| [when the superadmin searches with no session seeded, the answer is empty](#session-a-scenario-that-laid-no-session-finds-none) | answered |
+| [when the superadmin reads the set session scheduling conditions, they are kept with the existing session information](#searching_details-session-scheduling-conditions-are-preserved-when-configured) | answered |
+| [when the superadmin reads the unset session scheduling conditions, they are kept with the existing session information](#searching_details-session-scheduling-conditions-are-preserved-when-unset) | answered |
+| [an unfiltered search is open only to the superadmin role, so a user granted nothing is rejected for lacking the role](#session-a-user-granted-nothing-may-not-search-sessions) | rejected |
 
 **partial_bulk_terminate**
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 대기 세션을 종료하려 하면, 종료된 것 없이 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_terminating-a-user-granted-nothing-terminates-none) | answered |
-| [프로젝트 범위에서 세션 soft delete 권한을 받은 사용자가 그 프로젝트의 대기 세션을 종료하면, 취소됨으로 처리된 목록에 온다](#partial_bulk_terminating-a-user-granted-session-soft-delete-in-the-project-terminates-its-session) | answered |
-| [슈퍼관리자가 대기 세션과 없는 id 하나를 한 번에 종료하면, 대기 세션은 취소됨, 없는 id 는 건너뜀으로 처리된 목록에 온다](#partial_bulk_terminating-terminating-several-skips-the-missing-one) | answered |
+| [when a user granted nothing tries to terminate a pending session, none is terminated and it comes back in the failed list for lack of permission](#partial_bulk_terminating-a-user-granted-nothing-terminates-none) | answered |
+| [when a user granted session soft delete in the project scope terminates the pending session of that project, it comes back as cancelled in the processed list](#partial_bulk_terminating-a-user-granted-session-soft-delete-in-the-project-terminates-its-session) | answered |
+| [when the superadmin terminates a pending session and a missing id in one call, the pending session comes back as cancelled and the missing id as skipped in the processed list](#partial_bulk_terminating-terminating-several-skips-the-missing-one) | answered |
 
 **terminate**
 
 | scenario | verdict |
 |---|---|
-| [슈퍼관리자가 대기 세션을 종료하면, 취소된 목록에 온다](#terminating-a-superadmin-terminates-a-pending-session) | answered |
-| [아무 권한도 받지 않은 사용자가 대기 세션을 종료하려 하면, 호출 전체가 거부된다](#terminating-a-user-granted-nothing-may-not-terminate) | rejected |
+| [when the superadmin terminates a pending session, it comes back in the cancelled list](#terminating-a-superadmin-terminates-a-pending-session) | answered |
+| [when a user granted nothing tries to terminate a pending session, the whole call is rejected](#terminating-a-user-granted-nothing-may-not-terminate) | rejected |
 
 ### admin_search
 
@@ -68,25 +68,25 @@ Scenario: incomplete 28 / 30
 
 #### [a-scenario-that-laid-no-session-finds-none](/tests/scenario/bai_scenario/manager/session/test_session.py): pass
 
-세션을 하나도 심지 않은 상태에서 슈퍼관리자가 조회하면, 답은 비어 있다
+when the superadmin searches with no session seeded, the answer is empty
 
 Given
 
-- 도메인 하나와, 그 도메인에 속한 superadmin 한 명
-  - 도메인 host-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain and one superadmin in it
+  - Domain host-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- SessionAdapter.admin_search: user-1이 필터 없이 전체 조회
+- SessionAdapter.admin_search: user-1 searches everything without a filter
 
 Then
 
-- 답이 비어 있다
+- the answer is empty
   - items = []
   - total_count = 0
   - has_next_page = False
@@ -96,41 +96,41 @@ Then
 
 #### [session-scheduling-conditions-are-preserved-when-configured](/tests/scenario/bai_scenario/manager/session/test_searching_details.py): pass
 
-슈퍼관리자가 지정된 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다
+when the superadmin reads the set session scheduling conditions, they are kept with the existing session information
 
 Given
 
-- 세션 그룹, designated_agent_ids, requested_starts_at의 세 값이 지정된 세션과 슈퍼관리자
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 세션 그룹 session-group-1: 가능하면 세션들을 서로 다른 에이전트에 배치한다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
-  - 에이전트 agent-2: 살아 있고, 아직 보고한 슬롯이 없다
-  - 세션 session-1: 세션 그룹, requested_starts_at을 지정한 대기 세션
-  - 세션 session-1: 지정 agent 하나를 갖는다
-  - 세션 session-1: 지정 agent 하나를 갖는다
+- a session with all three values set and the superadmin
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - superadmin user-2: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - Container registry registry-1: image source
+  - Image image-1: x86_64 image
+  - Session group session-group-1: places the sessions on different agents when possible
+  - Agent agent-1: alive, and has not reported any slot yet
+  - Agent agent-2: alive, and has not reported any slot yet
+  - Session session-1: a pending session with a session group and requested_starts_at set
+  - Session session-1: has one designated agent
+  - Session session-1: has one designated agent
 
 When
 
-- SessionAdapter.admin_search: user-2이 필터 없이 전체 조회
+- SessionAdapter.admin_search: user-2 searches everything without a filter
 
 Then
 
-- 스케줄링 조건을 포함한 세션 정보 전체가 저장된 그대로 반환된다
-  - items: 저장된 세션의 전체 정보와 같다
+- the whole session information including the scheduling conditions comes back exactly as it was stored
+  - items: same as the whole information of the stored session
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
@@ -139,36 +139,36 @@ Then
 
 #### [session-scheduling-conditions-are-preserved-when-unset](/tests/scenario/bai_scenario/manager/session/test_searching_details.py): pass
 
-슈퍼관리자가 미설정인 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다
+when the superadmin reads the unset session scheduling conditions, they are kept with the existing session information
 
 Given
 
-- 세션 그룹, designated_agent_ids, requested_starts_at의 세 값이 미설정인 세션과 슈퍼관리자
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 세션 session-1: 스케줄링을 기다리고 있다
+- a session with none of the three values set and the superadmin
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - superadmin user-2: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - Container registry registry-1: image source
+  - Image image-1: x86_64 image
+  - Session session-1: waiting to be scheduled
 
 When
 
-- SessionAdapter.admin_search: user-2이 필터 없이 전체 조회
+- SessionAdapter.admin_search: user-2 searches everything without a filter
 
 Then
 
-- 스케줄링 조건을 포함한 세션 정보 전체가 저장된 그대로 반환된다
-  - items: 저장된 세션의 전체 정보와 같다
+- the whole session information including the scheduling conditions comes back exactly as it was stored
+  - items: same as the whole information of the stored session
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
@@ -177,26 +177,26 @@ Then
 
 #### [a-user-granted-nothing-may-not-search-sessions](/tests/scenario/bai_scenario/manager/session/test_session.py): pass
 
-필터 없는 전체 조회는 슈퍼관리자 역할로만 열리므로, 아무 권한도 받지 않은 사용자는 역할 부족으로 거부된다
+an unfiltered search is open only to the superadmin role, so a user granted nothing is rejected for lacking the role
 
 Given
 
-- 도메인 하나와, 그 도메인에 속한 user 한 명
-  - 도메인 host-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain and one user in it
+  - Domain host-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- SessionAdapter.admin_search: user-1이 필터 없이 전체 조회
+- SessionAdapter.admin_search: user-1 searches everything without a filter
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### partial_bulk_terminate
 
@@ -204,121 +204,121 @@ Then
 
 #### [a-user-granted-nothing-terminates-none](/tests/scenario/bai_scenario/manager/session/test_partial_bulk_terminating.py): pass
 
-아무 권한도 받지 않은 사용자가 대기 세션을 종료하려 하면, 종료된 것 없이 권한이 없다는 이유로 실패 목록에 온다
+when a user granted nothing tries to terminate a pending session, none is terminated and it comes back in the failed list for lack of permission
 
 Given
 
-- 대기 세션 하나와 아무 권한도 받지 않은 일반 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 세션 session-1: 스케줄링을 기다리고 있다
+- one pending session and one regular user holding no permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - Container registry registry-1: image source
+  - Image image-1: x86_64 image
+  - Session session-1: waiting to be scheduled
 
 When
 
-- SessionAdapter.partial_bulk_terminate: user-2이 대기 세션를 한 번에 종료함
+- SessionAdapter.partial_bulk_terminate: user-2 terminates a pending session in one call
 
 Then
 
-- 종료된 세션 없이 대상이 권한이 없다는 이유로 실패 목록에 온다
+- no session is terminated and the target comes back in the failed list for lack of permission
   - successes = []
   - failed count = 1
-  - failed[0].id: 대기 세션의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the pending session
+  - failed[0].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_terminating-a-user-granted-session-soft-delete-in-the-project-terminates-its-session"></a>
 
 #### [a-user-granted-session-soft-delete-in-the-project-terminates-its-session](/tests/scenario/bai_scenario/manager/session/test_partial_bulk_terminating.py): pass
 
-프로젝트 범위에서 세션 soft delete 권한을 받은 사용자가 그 프로젝트의 대기 세션을 종료하면, 취소됨으로 처리된 목록에 온다
+when a user granted session soft delete in the project scope terminates the pending session of that project, it comes back as cancelled in the processed list
 
 Given
 
-- 대기 세션 하나와 그 프로젝트 범위에서 세션 soft delete 권한을 받은 일반 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 프로젝트 범위의 세션 soft delete 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-      - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-terminator-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-terminator-1: session 전체에 SOFT_DELETE 허용
-    - 일반 사용자 user-2: 역할 session-terminator-1 보유
+- one pending session and one regular user granted the session soft delete permission in the project scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - Container registry registry-1: image source
+  - Image image-1: x86_64 image
+  - Session session-1: waiting to be scheduled
+  - Prepare a user granted the session soft delete permission in the project scope
+    - Prepare one user in the domain
+      - User resource policy user-policy-2: up to 10 folders per user
+      - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+      - regular user user-2: has their own keypair and personal project
+    - Role session-terminator-1: applies only within the scope it is granted in
+    - Role session-terminator-1: SOFT_DELETE allowed on every session
+    - regular user user-2: holds Role session-terminator-1
 
 When
 
-- SessionAdapter.partial_bulk_terminate: user-2이 대기 세션를 한 번에 종료함
+- SessionAdapter.partial_bulk_terminate: user-2 terminates a pending session in one call
 
 Then
 
-- 대기 세션이 취소됨으로 처리된 목록에 오고, 실패한 것은 없다
+- the pending session comes back in the processed list as cancelled and nothing failed
   - successes count = 1
   - failed = []
-  - successes[0].id: 대기 세션의 id와 같다
+  - successes[0].id: same as the id of the pending session
   - successes[0].status = <SessionTerminationStatusEnum.CANCELLED: 'cancelled'>
 
 <a id="partial_bulk_terminating-terminating-several-skips-the-missing-one"></a>
 
 #### [terminating-several-skips-the-missing-one](/tests/scenario/bai_scenario/manager/session/test_partial_bulk_terminating.py): pass
 
-슈퍼관리자가 대기 세션과 없는 id 하나를 한 번에 종료하면, 대기 세션은 취소됨, 없는 id 는 건너뜀으로 처리된 목록에 온다
+when the superadmin terminates a pending session and a missing id in one call, the pending session comes back as cancelled and the missing id as skipped in the processed list
 
 Given
 
-- 대기 세션 하나와 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 세션 session-1: 스케줄링을 기다리고 있다
+- one pending session and one superadmin
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - superadmin user-2: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - Container registry registry-1: image source
+  - Image image-1: x86_64 image
+  - Session session-1: waiting to be scheduled
 
 When
 
-- SessionAdapter.partial_bulk_terminate: user-2이 대기 세션와 없는 id 하나를 한 번에 종료함
+- SessionAdapter.partial_bulk_terminate: user-2 terminates a pending session and a missing id in one call
 
 Then
 
-- 대기 세션은 취소됨, 없는 id 는 건너뜀으로 처리된 목록에 오고, 실패한 것은 없다
+- the pending session comes back as cancelled and the missing id as skipped in the processed list, and nothing failed
   - successes count = 2
   - failed = []
-  - successes[0].id: 대기 세션의 id와 같다
+  - successes[0].id: same as the id of the pending session
   - successes[0].status = <SessionTerminationStatusEnum.CANCELLED: 'cancelled'>
-  - successes[1].id: 요청에 넣은 없는 id와 같다
+  - successes[1].id: same as the missing id given in the request
   - successes[1].status = <SessionTerminationStatusEnum.SKIPPED: 'skipped'>
 
 ### terminate
@@ -327,73 +327,73 @@ Then
 
 #### [a-superadmin-terminates-a-pending-session](/tests/scenario/bai_scenario/manager/session/test_terminating.py): pass
 
-슈퍼관리자가 대기 세션을 종료하면, 취소된 목록에 온다
+when the superadmin terminates a pending session, it comes back in the cancelled list
 
 Given
 
-- 대기 세션 하나와 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 세션 session-1: 스케줄링을 기다리고 있다
+- one pending session and one superadmin
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - superadmin user-2: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - Container registry registry-1: image source
+  - Image image-1: x86_64 image
+  - Session session-1: waiting to be scheduled
 
 When
 
-- SessionAdapter.terminate: user-2이 대기 세션을 종료함
+- SessionAdapter.terminate: user-2 terminates a pending session
 
 Then
 
-- 대기 세션이 취소된 목록에 오고, 나머지 목록은 비어 있다
+- the pending session comes back in the cancelled list and the other lists are empty
   - cancelled count = 1
   - terminating = []
   - force_terminated = []
   - skipped = []
-  - cancelled[0]: 대기 세션의 id와 같다
+  - cancelled[0]: same as the id of the pending session
 
 <a id="terminating-a-user-granted-nothing-may-not-terminate"></a>
 
 #### [a-user-granted-nothing-may-not-terminate](/tests/scenario/bai_scenario/manager/session/test_terminating.py): pass
 
-아무 권한도 받지 않은 사용자가 대기 세션을 종료하려 하면, 호출 전체가 거부된다
+when a user granted nothing tries to terminate a pending session, the whole call is rejected
 
 Given
 
-- 대기 세션 하나와 아무 권한도 받지 않은 일반 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 세션 session-1: 스케줄링을 기다리고 있다
+- one pending session and one regular user holding no permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - Container registry registry-1: image source
+  - Image image-1: x86_64 image
+  - Session session-1: waiting to be scheduled
 
 When
 
-- SessionAdapter.terminate: user-2이 대기 세션을 종료함
+- SessionAdapter.terminate: user-2 terminates a pending session
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 

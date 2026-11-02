@@ -9,6 +9,7 @@ from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.models.project.creators import ProjectCreator
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import Naming, TestSeedRowFromTwo
 
 
@@ -20,11 +21,11 @@ class TestSeedProject(TestSeedRowFromTwo[DomainData, ProjectResourcePolicyData, 
 
     @override
     def kind(self) -> str:
-        return "프로젝트"
+        return Says("프로젝트", english="Project")
 
     @override
     def detail(self) -> str:
-        return ""
+        return Says("")
 
     @override
     def name(self, naming: Naming) -> str:

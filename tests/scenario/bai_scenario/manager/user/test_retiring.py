@@ -46,14 +46,17 @@ from ai.backend.testutils.scenario_steps import (
     Condition,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Skipped,
     Then,
     Verdict,
     When,
+    in_language,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
@@ -111,7 +114,10 @@ class SomeoneStandingAs(TestSeedNest[Laid[UserData]]):
 
     @override
     def kind(self) -> str:
-        return f"도메인에 속한 {self.status.value} 상태 사용자 한 명 준비"
+        return Says(
+            f"도메인에 속한 {self.status.value} 상태 사용자 한 명 준비",
+            english=f"Prepare one {self.status.value} user in the domain",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[UserData]:
@@ -133,17 +139,22 @@ class ATargetAndSomeone(Given[Any, ACallerAndATarget]):
 
     @override
     def describe(self) -> str:
-        state = (
-            "사용자"
-            if self.target_status == UserStatus.ACTIVE
-            else f"{self.target_status.value} 상태 사용자"
+        if self.target_status == UserStatus.ACTIVE:
+            state_ko, state_en = "사용자", "user"
+        else:
+            state_ko = f"{self.target_status.value} 상태 사용자"
+            state_en = f"{self.target_status.value} user"
+        if self.permissions:
+            names = ", ".join(str(p.name) for p in self.permissions)
+            granted_ko = f", 부르는 사람은 대상에 대한 사용자 {names} 권한을 받았습니다"
+            granted_en = f", with the caller holding the user {names} permission on the target"
+        else:
+            granted_ko = ", 부르는 사람은 아무 권한도 받지 않았습니다"
+            granted_en = ", with the caller holding no permission"
+        return Says(
+            f"도메인 하나와 대상 {state_ko} 하나, 부르는 사람 하나{granted_ko}",
+            english=f"one domain, one target {state_en}, and one caller{granted_en}",
         )
-        granted = (
-            f", 부르는 사람은 대상에 대한 사용자 {', '.join(str(p.name) for p in self.permissions)} 권한을 받았다"
-            if self.permissions
-            else ", 부르는 사람은 아무 권한도 받지 않았다"
-        )
-        return f"도메인 하나와 대상 {state} 하나, 부르는 사람 하나{granted}"
 
     @override
     async def lay(self, seeding: Any) -> ACallerAndATarget:
@@ -177,8 +188,17 @@ class ASuperadminAndSomeUsers(Given[Any, ASuperadminAndUsers]):
 
     @override
     def describe(self) -> str:
-        missing = ", 그리고 어떤 사용자도 아닌 id 하나" if self.with_missing else ""
-        return f"도메인 하나와 슈퍼관리자 하나, 사용자 {self.count}명{missing}"
+        if self.with_missing:
+            return Says(
+                f"도메인 하나와 superadmin 하나, 사용자 {self.count}명, 그리고 어떤 사용자도 아닌 id 하나",
+                english=(
+                    f"one domain, one superadmin, {self.count} users, and an id that is no user"
+                ),
+            )
+        return Says(
+            f"도메인 하나와 superadmin 하나, 사용자 {self.count}명",
+            english=f"one domain, one superadmin, and {self.count} users",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ASuperadminAndUsers:
@@ -198,7 +218,14 @@ class SomeoneGrantedOnTheDomain(Given[Any, ASuperadminAndUsers]):
 
     @override
     def describe(self) -> str:
-        return "도메인 하나와 사용자 하나, 부르는 사람은 도메인 스코프의 사용자 HARD_DELETE 권한을 받았다"
+        return Says(
+            "도메인 하나와 사용자 하나, 부르는 사람은 도메인 스코프의 사용자 HARD_DELETE 권한을 "
+            "받았습니다",
+            english=(
+                "one domain and one user, and the caller holds the user HARD_DELETE permission "
+                "in the domain scope"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ASuperadminAndUsers:
@@ -221,8 +248,17 @@ class DeletingTheTarget(When[ACallerAndATarget, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: ACallerAndATarget) -> str:
-        after = " 뒤 다시 읽음" if self.then_reading else ""
-        return f"{laid.caller.username}이 {laid.target.username}을 물림{after}"
+        if self.then_reading:
+            return Says(
+                f"{laid.caller.username}이 {laid.target.username}을 삭제하고 다시 읽습니다",
+                english=(
+                    f"{laid.caller.username} deletes {laid.target.username} and reads it again"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username}이 {laid.target.username}을 삭제합니다",
+            english=f"{laid.caller.username} deletes {laid.target.username}",
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: ACallerAndATarget) -> Answer:
@@ -246,8 +282,17 @@ class RestoringTheTarget(When[ACallerAndATarget, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: ACallerAndATarget) -> str:
-        after = " 뒤 다시 읽음" if self.then_reading else ""
-        return f"{laid.caller.username}이 {laid.target.username}을 되살림{after}"
+        if self.then_reading:
+            return Says(
+                f"{laid.caller.username}이 {laid.target.username}을 복원하고 다시 읽습니다",
+                english=(
+                    f"{laid.caller.username} restores {laid.target.username} and reads it again"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username}이 {laid.target.username}을 복원합니다",
+            english=f"{laid.caller.username} restores {laid.target.username}",
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: ACallerAndATarget) -> Answer:
@@ -274,9 +319,23 @@ class PurgingTheTarget(When[ACallerAndATarget, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: ACallerAndATarget) -> str:
-        heir = "없는 관리자 id" if self.to_nobody else "자기"
-        after = f", 뒤이어 {laid.overseer.username}이 일괄 읽음" if laid.overseer else ""
-        return f"{laid.caller.username}이 {heir}에게 넘기며 {laid.target.username}을 지움{after}"
+        heir_ko = "없는 관리자 id" if self.to_nobody else "자기"
+        heir_en = "an admin id that does not exist" if self.to_nobody else "themselves"
+        if laid.overseer is not None:
+            return Says(
+                f"{laid.caller.username}이 {heir_ko}에게 넘기며 {laid.target.username}을 "
+                f"영구 삭제하고, 뒤이어 {laid.overseer.username}이 일괄 읽습니다",
+                english=(
+                    f"{laid.caller.username} purges {laid.target.username} handing it over to "
+                    f"{heir_en}, and {laid.overseer.username} batch reads it afterwards"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username}이 {heir_ko}에게 넘기며 {laid.target.username}을 영구 삭제합니다",
+            english=(
+                f"{laid.caller.username} purges {laid.target.username} handing it over to {heir_en}"
+            ),
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: ACallerAndATarget) -> Answer:
@@ -303,8 +362,17 @@ class PurgingInBulk(When[ASuperadminAndUsers, UserAdapter, Answer]):
     @override
     def describe(self, laid: ASuperadminAndUsers) -> str:
         names = ", ".join(one.username for one in laid.users)
-        missing = "와 없는 id" if laid.missing is not None else ""
-        return f"{laid.caller.username}이 {names}{missing}를 일괄로 지움"
+        if laid.missing is not None:
+            return Says(
+                f"{laid.caller.username}이 {names}와 없는 id 를 일괄로 영구 삭제합니다",
+                english=(
+                    f"{laid.caller.username} bulk purges {names} and an id that does not exist"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username}이 {names}를 일괄로 영구 삭제합니다",
+            english=f"{laid.caller.username} bulk purges {names}",
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: ASuperadminAndUsers) -> Answer:
@@ -323,7 +391,10 @@ class NoKey(Condition[str | None]):
 
     @override
     def says(self) -> str:
-        return "활성 기본 키가 없어 비어 있다"
+        return Says(
+            "활성 기본 키가 없어 비어 있습니다",
+            english="it is empty because there is no active default key",
+        )
 
     @override
     def holds(self, got: str | None) -> bool:
@@ -340,7 +411,10 @@ class TheTargetNowStands(Then[ACallerAndATarget, Answer]):
 
     @override
     def says(self) -> str:
-        return f"성공이 오고, 다시 읽은 사용자는 {self.status} 상태다"
+        return Says(
+            f"성공이 오고, 다시 읽은 사용자는 {self.status} 상태입니다",
+            english=f"the call succeeds and the user read back is in the {self.status} state",
+        )
 
     @override
     def look(self, laid: ACallerAndATarget, answered: Answered[Answer]) -> list[Verdict]:
@@ -357,7 +431,7 @@ class TheTargetNowStands(Then[ACallerAndATarget, Answer]):
                 node,
                 expected,
                 main_access_key=None if self.key_is_active else NoKey(),
-                at="뒤이은 읽기.",
+                at="the read that follows.",
             ),
         ]
 
@@ -368,7 +442,10 @@ class TheTargetIsGone(Then[ACallerAndATarget, Answer]):
 
     @override
     def says(self) -> str:
-        return "성공이 오고, 그 사용자를 더 찾을 수 없다"
+        return Says(
+            "성공이 오고, 그 사용자를 더 찾을 수 없습니다",
+            english="the call succeeds and that user is no longer found",
+        )
 
     @override
     def look(self, laid: ACallerAndATarget, answered: Answered[Answer]) -> list[Verdict]:
@@ -378,7 +455,13 @@ class TheTargetIsGone(Then[ACallerAndATarget, Answer]):
         payload, loaded = answer
         return [
             Same("success", payload.success, True),
-            Skipped("뒤이은 일괄 읽기", "없는 id에 superadmin이 받는 답은 아직 정해지지 않았다"),
+            Skipped(
+                "the batch read that follows",
+                Says(
+                    "없는 id 에 superadmin 이 받는 응답은 아직 정해지지 않았습니다",
+                    english=("the response a superadmin gets for a missing id is not decided yet"),
+                ),
+            ),
         ]
 
 
@@ -388,7 +471,10 @@ class EveryoneIsPurged(Then[ASuperadminAndUsers, Answer]):
 
     @override
     def says(self) -> str:
-        return "지운 사용자 id와 개수, 그리고 실패가 온다"
+        return Says(
+            "삭제한 사용자 id 와 개수, 그리고 실패가 응답으로 옵니다",
+            english="the purged user ids, the count, and the failures come back",
+        )
 
     @override
     def look(self, laid: ASuperadminAndUsers, answered: Answered[Answer]) -> list[Verdict]:
@@ -399,7 +485,10 @@ class EveryoneIsPurged(Then[ASuperadminAndUsers, Answer]):
             Held(
                 "successes",
                 list(payload.successes),
-                SameAs([one.id for one in laid.users], "심은 사용자 전부"),
+                SameAs(
+                    [one.id for one in laid.users],
+                    Says("미리 저장한 사용자 전부", english="every user seeded in advance"),
+                ),
             ),
             Same("purged_count", payload.purged_count, len(laid.users)),
         ]
@@ -410,10 +499,21 @@ class EveryoneIsPurged(Then[ASuperadminAndUsers, Answer]):
                 Held(
                     "failed.user_id",
                     [one.user_id for one in payload.failed],
-                    SameAs([laid.missing], "없는 id"),
+                    SameAs(
+                        [laid.missing],
+                        Says("없는 id", english="an id that does not exist"),
+                    ),
                 )
             )
-            seen.append(Skipped("failed.message", "예외 문장은 바뀌어도 되는 값이다"))
+            seen.append(
+                Skipped(
+                    "failed.message",
+                    Says(
+                        "예외 메시지는 변경되어도 되는 값입니다",
+                        english="the exception message may change",
+                    ),
+                )
+            )
         return seen
 
 
@@ -429,7 +529,14 @@ class AGrantedUserDeletesAUser(
 
     @override
     def describe(self) -> str:
-        return "대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 물리면, 성공이 오고 그 사용자 상태가 삭제로 바뀐다"
+        return Says(
+            "대상 사용자 스코프에서 SOFT_DELETE 를 받은 사용자가 삭제하면, "
+            "성공이 오고 그 사용자 상태가 삭제로 변경됩니다",
+            english=(
+                "when a user granted SOFT_DELETE in the target user scope deletes the user, "
+                "success comes back and the state of that user changes to deleted"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
@@ -454,7 +561,13 @@ class AUserGrantedNothingMayNotDelete(
 
     @override
     def describe(self) -> str:
-        return "역할 없이 물리려 하면, 엔티티 권한 문이 막는다"
+        return Says(
+            "역할 없이 삭제하려 하면, 엔티티 권한 문이 막습니다",
+            english=(
+                "a user holding no role who tries to delete a user is rejected by the entity "
+                "permission gate"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
@@ -481,7 +594,14 @@ class AGrantedUserRestoresADeletedUser(
 
     @override
     def describe(self) -> str:
-        return "대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 삭제 상태 사용자를 되살리면, 성공이 오고 상태가 활성으로 바뀐다"
+        return Says(
+            "대상 사용자 스코프에서 SOFT_DELETE 를 받은 사용자가 삭제 상태 사용자를 복원하면, "
+            "성공이 오고 상태가 활성으로 변경됩니다",
+            english=(
+                "when a user granted SOFT_DELETE in the target user scope restores a deleted "
+                "user, success comes back and the state changes to active"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
@@ -509,7 +629,14 @@ class RestoringAUserWhoWasNotDeletedIsRefused(
 
     @override
     def describe(self) -> str:
-        return "권한 받은 사용자가 물리지 않은 비활성 사용자를 되살리려 하면, 삭제 상태가 아니라 막힌다"
+        return Says(
+            "권한 받은 사용자가 삭제되지 않은 비활성 사용자를 복원하려 하면, "
+            "삭제 상태가 아니라 거부됩니다",
+            english=(
+                "when a user holding the permission tries to restore an inactive user that was "
+                "not deleted, it is rejected because the user is not deleted"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
@@ -537,7 +664,13 @@ class AUserGrantedNothingMayNotRestore(
 
     @override
     def describe(self) -> str:
-        return "역할 없이 되살리려 하면, 엔티티 권한 문이 막는다"
+        return Says(
+            "역할 없이 복원하려 하면, 엔티티 권한 문이 막습니다",
+            english=(
+                "a user holding no role who tries to restore a user is rejected by the entity "
+                "permission gate"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
@@ -560,7 +693,14 @@ class AGrantedUserPurgesAUser(Scenario[TestSeedingSession, ACallerAndATarget, Us
 
     @override
     def describe(self) -> str:
-        return "대상 사용자 스코프에서 HARD_DELETE를 받은 사용자가 물리지 않은 사용자를 지워도, 성공이 오고 그 사용자를 더 찾을 수 없다"
+        return Says(
+            "대상 사용자 스코프에서 HARD_DELETE 를 받은 사용자가 삭제되지 않은 사용자를 "
+            "영구 삭제해도, 성공이 오고 그 사용자를 더 찾을 수 없습니다",
+            english=(
+                "when a user granted HARD_DELETE in the target user scope purges a user that "
+                "was not deleted, success comes back and that user is no longer found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
@@ -585,7 +725,13 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return "역할 없이 지우려 하면, 엔티티 권한 문이 막는다"
+        return Says(
+            "역할 없이 영구 삭제하려 하면, 엔티티 권한 문이 막습니다",
+            english=(
+                "a user holding no role who tries to purge a user is rejected by the entity "
+                "permission gate"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
@@ -610,7 +756,13 @@ class PurgingToNobodyIsRefused(
 
     @override
     def describe(self) -> str:
-        return "권한 받은 사용자가 넘겨받을 관리자로 없는 id를 주면, 입력 검증이 막는다"
+        return Says(
+            "권한 받은 사용자가 넘겨받을 관리자로 없는 id 를 주면, 입력 검증이 막습니다",
+            english=(
+                "when a user holding the permission gives an admin id that does not exist as "
+                "the heir, input validation rejects it"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
@@ -635,8 +787,13 @@ class TheSuperadminPurgesTwoInBulk(
 
     @override
     def describe(self) -> str:
-        return (
-            "전역 역할이 문인 일괄 지우기에서 슈퍼관리자가 사용자 둘을 주면, 두 id와 개수 둘이 온다"
+        return Says(
+            "전역 역할이 문인 일괄 영구 삭제에서 superadmin 이 사용자 둘을 주면, "
+            "두 id 와 개수 둘이 응답으로 옵니다",
+            english=(
+                "when the superadmin gives two users in a bulk purge gated by the global role, "
+                "the two ids and a count of two come back"
+            ),
         )
 
     @override
@@ -662,7 +819,14 @@ class ABulkPurgeRecordsAMissingIdAsAFailure(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 있는 사용자와 없는 id를 함께 주면, 하나는 지워지고 없는 id는 실패로 담긴다"
+        return Says(
+            "superadmin 이 있는 사용자와 없는 id 를 함께 주면, "
+            "하나는 영구 삭제되고 없는 id 는 실패로 담깁니다",
+            english=(
+                "when the superadmin gives an existing user and a missing id together, one is "
+                "purged and the missing id comes back as failed"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ASuperadminAndUsers]:
@@ -687,7 +851,14 @@ class AUserWhoIsNotTheSuperadminMayNotPurgeInBulk(
 
     @override
     def describe(self) -> str:
-        return "도메인 스코프에서 HARD_DELETE를 받은 사용자라도 일괄 지우기를 하려 하면, 전역 역할 문이 막는다"
+        return Says(
+            "도메인 스코프에서 HARD_DELETE 를 받은 사용자라도 일괄 영구 삭제를 하려 하면, "
+            "전역 역할 문이 막습니다",
+            english=(
+                "even a user granted HARD_DELETE in the domain scope is rejected by the global "
+                "role gate when purging in bulk"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ASuperadminAndUsers]:
@@ -718,7 +889,10 @@ class ASuperadminWithActiveAndDeleted(Given[Any, ASuperadminAndThreeTargets]):
 
     @override
     def describe(self) -> str:
-        return "도메인 하나와 슈퍼관리자 하나, 활성 사용자 하나, 삭제 상태 사용자 둘"
+        return Says(
+            "도메인 하나와 superadmin 하나, 활성 사용자 하나, 삭제 상태 사용자 둘",
+            english=("one domain, one superadmin, one active user, and two deleted users"),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ASuperadminAndThreeTargets:
@@ -748,7 +922,13 @@ class EditingTheTarget(When[ACallerAndATarget, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: ACallerAndATarget) -> str:
-        return f"{laid.caller.username}이 {laid.target.username}의 {self.says_what}"
+        return Says(
+            f"{laid.caller.username}이 {laid.target.username}의 {self.says_what}",
+            english=(
+                f"{laid.caller.username} edits {laid.target.username}: "
+                f"{in_language(self.says_what, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: ACallerAndATarget) -> Answer:
@@ -767,10 +947,15 @@ class BulkEditingTheStatuses(When[ASuperadminAndThreeTargets, UserAdapter, Answe
 
     @override
     def describe(self, laid: ASuperadminAndThreeTargets) -> str:
-        return (
+        return Says(
             f"{laid.caller.username}이 {laid.active.username}에 DELETED, "
             f"{laid.deleted.username}에 ACTIVE, {laid.other_deleted.username}에 전체 이름을 "
-            "일괄 수정으로 줌"
+            "일괄 수정으로 줍니다",
+            english=(
+                f"{laid.caller.username} bulk edits: DELETED for {laid.active.username}, "
+                f"ACTIVE for {laid.deleted.username}, and a full name for "
+                f"{laid.other_deleted.username}"
+            ),
         )
 
     @override
@@ -802,7 +987,10 @@ class TheEditedNodeStands(Then[ACallerAndATarget, Answer]):
 
     @override
     def says(self) -> str:
-        return f"{self.status} 상태의 사용자 전체가 온다"
+        return Says(
+            f"{self.status} 상태의 사용자 전체가 응답으로 옵니다",
+            english=f"the whole user in the {self.status} state comes back",
+        )
 
     @override
     def look(self, laid: ACallerAndATarget, answered: Answered[Answer]) -> list[Verdict]:
@@ -825,7 +1013,10 @@ class TheDeletedTargetIsUntouched(Then[ACallerAndATarget, Answer]):
 
     @override
     def says(self) -> str:
-        return "삭제 상태 그대로인 사용자 전체가 온다"
+        return Says(
+            "삭제 상태 그대로인 사용자 전체가 응답으로 옵니다",
+            english="the whole user still in the deleted state comes back",
+        )
 
     @override
     def look(self, laid: ACallerAndATarget, answered: Answered[Answer]) -> list[Verdict]:
@@ -843,7 +1034,13 @@ class DeletedAndRestoredOneRefused(Then[ASuperadminAndThreeTargets, Answer]):
 
     @override
     def says(self) -> str:
-        return "물린 사용자와 되살린 사용자가 수정 목록에, 나머지 하나가 실패 목록에 온다"
+        return Says(
+            "삭제한 사용자와 복원한 사용자가 수정 목록에, 나머지 하나가 실패 목록에 옵니다",
+            english=(
+                "the deleted user and the restored user come back in the updated list and the "
+                "remaining one in the failed list"
+            ),
+        )
 
     @override
     def look(self, laid: ASuperadminAndThreeTargets, answered: Answered[Answer]) -> list[Verdict]:
@@ -857,15 +1054,30 @@ class DeletedAndRestoredOneRefused(Then[ASuperadminAndThreeTargets, Answer]):
                 sorted(str(node.id) for node in payload.updated_users),
                 SameAs(
                     sorted([str(laid.active.id), str(laid.deleted.id)]),
-                    "DELETED와 ACTIVE를 준 사용자",
+                    Says(
+                        "DELETED 와 ACTIVE 를 준 사용자",
+                        english="the users given DELETED and ACTIVE",
+                    ),
                 ),
             ),
             Held(
                 "failed.user_id",
                 [one.user_id for one in payload.failed],
-                SameAs([laid.other_deleted.id], "삭제 상태에서 전체 이름만 고친 사용자"),
+                SameAs(
+                    [laid.other_deleted.id],
+                    Says(
+                        "삭제 상태에서 전체 이름만 변경한 사용자",
+                        english="the deleted user whose full name alone was changed",
+                    ),
+                ),
             ),
-            Skipped("failed.message", "예외 문장은 바뀌어도 되는 값이다"),
+            Skipped(
+                "failed.message",
+                Says(
+                    "예외 메시지는 변경되어도 되는 값입니다",
+                    english="the exception message may change",
+                ),
+            ),
         ]
         if laid.active.id in by_id:
             seen.extend(
@@ -874,7 +1086,7 @@ class DeletedAndRestoredOneRefused(Then[ASuperadminAndThreeTargets, Answer]):
                     dataclasses.replace(
                         laid.active, status="deleted", status_info="admin-requested"
                     ),
-                    at="updated_users[물린 사용자].",
+                    at="updated_users[deleted user].",
                 )
             )
         if laid.deleted.id in by_id:
@@ -885,7 +1097,7 @@ class DeletedAndRestoredOneRefused(Then[ASuperadminAndThreeTargets, Answer]):
                         laid.deleted, status="active", status_info="admin-requested"
                     ),
                     main_access_key=NoKey(),
-                    at="updated_users[되살린 사용자].",
+                    at="updated_users[restored user].",
                 )
             )
         return seen
@@ -901,9 +1113,13 @@ class EditingToDeletedDeletes(Scenario[TestSeedingSession, ACallerAndATarget, Us
 
     @override
     def describe(self) -> str:
-        return (
-            "대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 수정으로 DELETED를 주면, "
-            "물리기와 같이 삭제 상태가 된다"
+        return Says(
+            "대상 사용자 스코프에서 SOFT_DELETE 와 READ 를 받은 사용자가 수정으로 DELETED 를 주면, "
+            "삭제와 같이 삭제 상태가 됩니다",
+            english=(
+                "when a user granted SOFT_DELETE and READ in the target user scope gives "
+                "DELETED in an edit, the user enters the deleted state as with a delete"
+            ),
         )
 
     @override
@@ -913,7 +1129,8 @@ class EditingToDeletedDeletes(Scenario[TestSeedingSession, ACallerAndATarget, Us
     @override
     def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
         return EditingTheTarget(
-            UpdateUserInput(status=UserStatusDTO.DELETED), "상태에 DELETED를 줌"
+            UpdateUserInput(status=UserStatusDTO.DELETED),
+            Says("상태에 DELETED 를 줍니다", english="sets the status to DELETED"),
         )
 
     @override
@@ -931,9 +1148,13 @@ class EditingToDeletedNeedsSoftDelete(
 
     @override
     def describe(self) -> str:
-        return (
-            "대상 사용자 스코프에서 UPDATE와 READ만 받은 사용자가 수정으로 DELETED를 주면, "
-            "물리기의 엔티티 권한 문이 막는다"
+        return Says(
+            "대상 사용자 스코프에서 UPDATE 와 READ 만 받은 사용자가 수정으로 DELETED 를 주면, "
+            "삭제의 엔티티 권한 문이 막습니다",
+            english=(
+                "when a user granted only UPDATE and READ in the target user scope gives "
+                "DELETED in an edit, the entity permission gate of the delete rejects it"
+            ),
         )
 
     @override
@@ -943,7 +1164,8 @@ class EditingToDeletedNeedsSoftDelete(
     @override
     def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
         return EditingTheTarget(
-            UpdateUserInput(status=UserStatusDTO.DELETED), "상태에 DELETED를 줌"
+            UpdateUserInput(status=UserStatusDTO.DELETED),
+            Says("상태에 DELETED 를 줍니다", english="sets the status to DELETED"),
         )
 
     @override
@@ -963,7 +1185,14 @@ class EditingADeletedUserToDeletedChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "삭제 상태 사용자에 수정으로 DELETED만 주면, 아무것도 바뀌지 않고 그 사용자가 온다"
+        return Says(
+            "삭제 상태 사용자에 수정으로 DELETED 만 주면, "
+            "아무것도 변경되지 않고 그 사용자가 응답으로 옵니다",
+            english=(
+                "when only DELETED is given in an edit of a deleted user, nothing changes and "
+                "that user comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
@@ -975,7 +1204,8 @@ class EditingADeletedUserToDeletedChangesNothing(
     @override
     def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
         return EditingTheTarget(
-            UpdateUserInput(status=UserStatusDTO.DELETED), "상태에 DELETED를 줌"
+            UpdateUserInput(status=UserStatusDTO.DELETED),
+            Says("상태에 DELETED 를 줍니다", english="sets the status to DELETED"),
         )
 
     @override
@@ -995,9 +1225,13 @@ class EditingADeletedUserToActiveRestores(
 
     @override
     def describe(self) -> str:
-        return (
-            "대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 삭제 상태 사용자에 "
-            "수정으로 ACTIVE를 주면, 되살리기와 같이 활성이 된다"
+        return Says(
+            "대상 사용자 스코프에서 SOFT_DELETE 와 READ 를 받은 사용자가 삭제 상태 사용자에 "
+            "수정으로 ACTIVE 를 주면, 복원과 같이 활성이 됩니다",
+            english=(
+                "when a user granted SOFT_DELETE and READ in the target user scope gives ACTIVE "
+                "in an edit of a deleted user, the user becomes active as with a restore"
+            ),
         )
 
     @override
@@ -1009,7 +1243,10 @@ class EditingADeletedUserToActiveRestores(
 
     @override
     def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
-        return EditingTheTarget(UpdateUserInput(status=UserStatusDTO.ACTIVE), "상태에 ACTIVE를 줌")
+        return EditingTheTarget(
+            UpdateUserInput(status=UserStatusDTO.ACTIVE),
+            Says("상태에 ACTIVE 를 줍니다", english="sets the status to ACTIVE"),
+        )
 
     @override
     def then(self) -> Then[ACallerAndATarget, Answer]:
@@ -1026,9 +1263,13 @@ class EditingADeletedUserIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 삭제 상태 사용자의 "
-            "전체 이름을 고치면, 삭제된 사용자라 막힌다"
+        return Says(
+            "대상 사용자 스코프에서 UPDATE 와 READ 를 받은 사용자가 삭제 상태 사용자의 "
+            "전체 이름을 변경하면, 삭제된 사용자라 거부됩니다",
+            english=(
+                "when a user granted UPDATE and READ in the target user scope changes the full "
+                "name of a deleted user, it is rejected because the user is deleted"
+            ),
         )
 
     @override
@@ -1040,7 +1281,10 @@ class EditingADeletedUserIsRefused(
 
     @override
     def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
-        return EditingTheTarget(UpdateUserInput(full_name=RENAMED), "전체 이름을 바꿈")
+        return EditingTheTarget(
+            UpdateUserInput(full_name=RENAMED),
+            Says("전체 이름을 변경합니다", english="changes the full name"),
+        )
 
     @override
     def then(self) -> Then[ACallerAndATarget, Answer]:
@@ -1057,9 +1301,13 @@ class EditingToAnotherStatusIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 수정으로 BEFORE_VERIFICATION을 주면, "
-            "입력 검증이 막는다"
+        return Says(
+            "대상 사용자 스코프에서 UPDATE 와 READ 를 받은 사용자가 수정으로 "
+            "BEFORE_VERIFICATION 을 주면, 입력 검증이 막습니다",
+            english=(
+                "when a user granted UPDATE and READ in the target user scope gives "
+                "BEFORE_VERIFICATION in an edit, input validation rejects it"
+            ),
         )
 
     @override
@@ -1070,7 +1318,10 @@ class EditingToAnotherStatusIsRefused(
     def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
         return EditingTheTarget(
             UpdateUserInput(status=UserStatusDTO.BEFORE_VERIFICATION),
-            "상태에 BEFORE_VERIFICATION을 줌",
+            Says(
+                "상태에 BEFORE_VERIFICATION 을 줍니다",
+                english="sets the status to BEFORE_VERIFICATION",
+            ),
         )
 
     @override
@@ -1090,10 +1341,16 @@ class ABulkEditDeletesAndRestoresPerItem(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 일괄 수정으로 활성 사용자에 DELETED, 삭제 상태 사용자에 ACTIVE, "
-            "다른 삭제 상태 사용자에 전체 이름을 주면, 둘은 물리고 되살린 뒤 수정 목록에, "
-            "하나는 실패로 담긴다"
+        return Says(
+            "superadmin 이 일괄 수정으로 활성 사용자에 DELETED, 삭제 상태 사용자에 ACTIVE, "
+            "다른 삭제 상태 사용자에 전체 이름을 주면, 둘은 삭제와 복원을 거쳐 수정 목록에, "
+            "하나는 실패로 담깁니다",
+            english=(
+                "when the superadmin bulk edits with DELETED for an active user, ACTIVE for a "
+                "deleted user, and a full name for another deleted user, the first two are "
+                "deleted and restored and come back in the updated list, and the third comes "
+                "back as failed"
+            ),
         )
 
     @override

@@ -19,7 +19,7 @@ from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
     RuntimeVariantPresetAdapter,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.runtime_variant_preset import (
     VALID_AT,
     ManyPresetsAndACaller,
@@ -51,7 +51,10 @@ class SearchingEveryPreset(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapt
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체를 조회"
+        return Says(
+            f"{laid.caller.username}이 필터 없이 전체를 조회합니다",
+            english=f"{laid.caller.username} reads everything with no filter",
+        )
 
     @override
     async def call(
@@ -71,7 +74,13 @@ class SearchingByVariant(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 변형 필터로 조회: 대상: {laid.variant.name}"
+        return Says(
+            f"{laid.caller.username}이 인퍼런스 런타임 종류 필터로 조회: 대상: {laid.variant.name}",
+            english=(
+                f"{laid.caller.username} reads with the runtime variant filter: target: "
+                f"{laid.variant.name}"
+            ),
+        )
 
     @override
     async def call(
@@ -97,7 +106,10 @@ class SearchingValidAtAVersion(When[ManyPresetsAndACaller, RuntimeVariantPresetA
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 버전 {VALID_AT}에 유효한 프리셋만 조회"
+        return Says(
+            f"{laid.caller.username}이 버전 {VALID_AT}에 유효한 런타임 파라미터만 조회합니다",
+            english=(f"{laid.caller.username} reads only the presets valid at version {VALID_AT}"),
+        )
 
     @override
     async def call(
@@ -121,7 +133,14 @@ class AUserGrantedNothingCountsEveryPreset(
 
     @override
     def describe(self) -> str:
-        return "프리셋이 둘 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 두 프리셋이 모두 반환된다"
+        return Says(
+            "런타임 파라미터가 둘 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 두 런타임 "
+            "파라미터가 모두 반환됩니다",
+            english=(
+                "when two presets exist and a user granted nothing reads with no filter, both "
+                "presets come back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
@@ -146,7 +165,14 @@ class AVariantFilterNarrows(
 
     @override
     def describe(self) -> str:
-        return "프리셋이 두 변형에 나뉘어 있을 때 한 변형을 필터로 조회하면 해당 변형의 프리셋만 반환된다"
+        return Says(
+            "런타임 파라미터가 두 인퍼런스 런타임 종류에 나뉘어 있을 때 한 인퍼런스 런타임 종류를 "
+            "필터로 조회하면 해당 인퍼런스 런타임 종류의 런타임 파라미터만 반환됩니다",
+            english=(
+                "when presets are split across two runtime variants and one runtime variant is "
+                "named in the filter, only the presets of that runtime variant come back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
@@ -171,9 +197,15 @@ class AVersionFilterKeepsWhatIsValidThen(
 
     @override
     def describe(self) -> str:
-        return (
-            "추가 버전과 폐기 버전이 서로 다른 프리셋을 버전 필터로 조회하면 추가 버전 이상이고 "
-            "폐기 버전 미만인 프리셋만 반환된다. 값이 비어 있는 쪽에는 제한이 없다"
+        return Says(
+            "추가 버전과 폐기 버전이 서로 다른 런타임 파라미터를 버전 필터로 조회하면 추가 버전 "
+            "이상이고 폐기 버전 미만인 런타임 파라미터만 반환됩니다. 값이 비어 있는 쪽에는 제한이 "
+            "없습니다",
+            english=(
+                "when presets with different added and deprecated versions are read with a "
+                "version filter, only the presets at or above the added version and below the "
+                "deprecated version come back. An empty side places no limit"
+            ),
         )
 
     @override
@@ -199,7 +231,14 @@ class OmittingThePageSizeGivesTen(
 
     @override
     def describe(self) -> str:
-        return "프리셋이 11개 있을 때 페이지 크기를 생략하면 10건을 반환하고 다음 페이지가 있음을 표시한다"
+        return Says(
+            "런타임 파라미터가 11개 있을 때 페이지 크기를 생략하면 10건을 반환하고 다음 페이지가 "
+            "있음을 표시합니다",
+            english=(
+                "when eleven presets exist and the page size is omitted, ten come back and the "
+                "response marks that there is a next page"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:

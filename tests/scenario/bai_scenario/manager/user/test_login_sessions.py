@@ -37,13 +37,16 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
     When,
+    in_language,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
@@ -116,12 +119,21 @@ class SomeoneAndAnother(Given[Any, TwoPeopleAndTheirSessions]):
 
     @override
     def describe(self) -> str:
-        grant = (
-            f"부르는 사람은 자기 사용자에 {', '.join(str(p.name) for p in self.permissions)} 권한을 받았다"
-            if self.permissions
-            else "부르는 사람은 아무 권한도 받지 않았다"
+        if self.permissions:
+            names = ", ".join(str(p.name) for p in self.permissions)
+            grant = Says(
+                f"부르는 사람은 자기 사용자에 {names} 권한을 받았습니다",
+                english=f"the caller holds the {names} permission on their own user",
+            )
+        else:
+            grant = Says(
+                "부르는 사람은 아무 권한도 받지 않았습니다",
+                english="the caller holds no permission",
+            )
+        return Says(
+            f"도메인 하나와 사용자 둘, {grant}",
+            english=f"one domain and two users, {in_language(grant, Language.ENGLISH)}",
         )
-        return f"도메인 하나와 사용자 둘, {grant}"
 
     @override
     async def lay(self, seeding: Any) -> TwoPeopleAndTheirSessions:
@@ -147,8 +159,14 @@ class TheSuperadminAndOthers(Given[Any, TwoPeopleAndTheirSessions]):
     @override
     def describe(self) -> str:
         if self.both_have_sessions:
-            return "도메인 하나와 슈퍼관리자, 세션을 하나씩 가진 사용자 둘"
-        return "도메인 하나와 슈퍼관리자, 세션 하나를 가진 사용자 하나"
+            return Says(
+                "도메인 하나와 superadmin, 세션을 하나씩 가진 사용자 둘",
+                english="one domain, one superadmin, and two users who each hold one session",
+            )
+        return Says(
+            "도메인 하나와 superadmin, 세션 하나를 가진 사용자 하나",
+            english="one domain, one superadmin, and one user holding one session",
+        )
 
     @override
     async def lay(self, seeding: Any) -> TwoPeopleAndTheirSessions:
@@ -177,9 +195,13 @@ class SomeoneGrantedOnDomain(Given[Any, TwoPeopleAndTheirSessions]):
 
     @override
     def describe(self) -> str:
-        return (
-            f"도메인 하나와 세션을 가진 사용자 하나, 부르는 사람은 도메인 스코프에서 "
-            f"사용자 {self.permission.name} 권한을 받았다"
+        return Says(
+            "도메인 하나와 세션을 가진 사용자 하나, 부르는 사람은 도메인 스코프에서 "
+            f"사용자 {self.permission.name} 권한을 받았습니다",
+            english=(
+                "one domain and one user holding a session, and the caller holds the user "
+                f"{self.permission.name} permission in the domain scope"
+            ),
         )
 
     @override
@@ -207,7 +229,10 @@ class SearchingEverySession(When[TwoPeopleAndTheirSessions, LoginSessionAdapter,
 
     @override
     def describe(self, laid: TwoPeopleAndTheirSessions) -> str:
-        return f"{laid.caller.username}이 세션 전체를 훑음"
+        return Says(
+            f"{laid.caller.username}이 세션 전체를 조회합니다",
+            english=f"{laid.caller.username} searches every login session",
+        )
 
     @override
     async def call(self, adapter: LoginSessionAdapter, laid: TwoPeopleAndTheirSessions) -> Answer:
@@ -225,7 +250,10 @@ class SearchingMySessions(When[TwoPeopleAndTheirSessions, LoginSessionAdapter, A
 
     @override
     def describe(self, laid: TwoPeopleAndTheirSessions) -> str:
-        return f"{laid.caller.username}이 자기 세션을 훑음"
+        return Says(
+            f"{laid.caller.username}이 자기 세션을 조회합니다",
+            english=f"{laid.caller.username} searches their own login sessions",
+        )
 
     @override
     async def call(self, adapter: LoginSessionAdapter, laid: TwoPeopleAndTheirSessions) -> Answer:
@@ -245,8 +273,17 @@ class RevokingASession(When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answ
 
     @override
     def describe(self, laid: TwoPeopleAndTheirSessions) -> str:
-        whose = laid.other.username if self.others else "자기"
-        return f"{laid.caller.username}이 {whose} 세션을 회수"
+        if self.others:
+            return Says(
+                f"{laid.caller.username}이 {laid.other.username}의 세션을 회수합니다",
+                english=(
+                    f"{laid.caller.username} revokes the login session of {laid.other.username}"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username}이 자기 세션을 회수합니다",
+            english=f"{laid.caller.username} revokes their own login session",
+        )
 
     @override
     async def call(self, adapter: LoginSessionAdapter, laid: TwoPeopleAndTheirSessions) -> Answer:
@@ -270,8 +307,21 @@ class RevokingAsAdmin(When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answe
 
     @override
     def describe(self, laid: TwoPeopleAndTheirSessions) -> str:
-        what = "없는 세션" if self.missing else f"{laid.other.username}의 세션"
-        return f"{laid.caller.username}이 관리자 경로로 {what}을 회수"
+        if self.missing:
+            return Says(
+                f"{laid.caller.username}이 관리자 경로로 없는 세션을 회수합니다",
+                english=(
+                    f"{laid.caller.username} revokes a login session that does not exist "
+                    "through the admin path"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username}이 관리자 경로로 {laid.other.username}의 세션을 회수합니다",
+            english=(
+                f"{laid.caller.username} revokes the login session of "
+                f"{laid.other.username} through the admin path"
+            ),
+        )
 
     @override
     async def call(self, adapter: LoginSessionAdapter, laid: TwoPeopleAndTheirSessions) -> Answer:
@@ -300,8 +350,15 @@ class Unblocking(When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]):
 
     @override
     def describe(self, laid: TwoPeopleAndTheirSessions) -> str:
-        named = "없는 이름" if self.nobody else laid.other.username
-        return f"{laid.caller.username}이 {named}의 차단을 풂"
+        if self.nobody:
+            return Says(
+                f"{laid.caller.username}이 어떤 사용자도 아닌 이름의 차단을 해제합니다",
+                english=(f"{laid.caller.username} unblocks a username nobody holds"),
+            )
+        return Says(
+            f"{laid.caller.username}이 {laid.other.username}의 차단을 해제합니다",
+            english=f"{laid.caller.username} unblocks {laid.other.username}",
+        )
 
     @override
     async def call(self, adapter: LoginSessionAdapter, laid: TwoPeopleAndTheirSessions) -> Answer:
@@ -322,9 +379,27 @@ class SessionNodeLook:
         self, node: LoginSessionNode, expected: LoginSessionData, at: str
     ) -> list[Verdict]:
         return [
-            Held(f"{at}id", node.id, SameAs(expected.id, "심은 세션")),
-            Held(f"{at}user_id", node.user_id, SameAs(expected.user_id, "세션의 주인")),
-            Held(f"{at}access_key", node.access_key, SameAs(expected.access_key, "세션을 연 키")),
+            Held(
+                f"{at}id",
+                node.id,
+                SameAs(
+                    expected.id,
+                    Says("미리 저장한 세션", english="the session seeded in advance"),
+                ),
+            ),
+            Held(
+                f"{at}user_id",
+                node.user_id,
+                SameAs(expected.user_id, Says("세션 소유자", english="the session owner")),
+            ),
+            Held(
+                f"{at}access_key",
+                node.access_key,
+                SameAs(
+                    expected.access_key,
+                    Says("세션을 연 키", english="the key that opened the session"),
+                ),
+            ),
             Same(f"{at}status", node.status, "active"),
             Held(f"{at}created_at", node.created_at, WrittenByThisRun(self._started)),
             Same(f"{at}last_accessed_at", node.last_accessed_at, None),
@@ -340,7 +415,10 @@ class EverySessionInOrder(Then[TwoPeopleAndTheirSessions, Answer]):
 
     @override
     def says(self) -> str:
-        return "심은 세션이 모두 순서대로 온다"
+        return Says(
+            "미리 저장한 세션이 모두 순서대로 옵니다",
+            english="every session seeded in advance comes back in order",
+        )
 
     @override
     def look(self, laid: TwoPeopleAndTheirSessions, answered: Answered[Answer]) -> list[Verdict]:
@@ -370,7 +448,10 @@ class OnlyMySession(Then[TwoPeopleAndTheirSessions, Answer]):
 
     @override
     def says(self) -> str:
-        return "자기 세션 하나만 온다"
+        return Says(
+            "자기 세션 하나만 옵니다",
+            english="only their own session comes back",
+        )
 
     @override
     def look(self, laid: TwoPeopleAndTheirSessions, answered: Answered[Answer]) -> list[Verdict]:
@@ -399,7 +480,10 @@ class RevokedAndGone(Then[TwoPeopleAndTheirSessions, Answer]):
 
     @override
     def says(self) -> str:
-        return "회수가 성공하고 뒤이은 조회에 세션이 없다"
+        return Says(
+            "회수가 성공하고 뒤이은 조회에 세션이 없습니다",
+            english="the revoke succeeds and the session is gone from the search that follows",
+        )
 
     @override
     def look(self, laid: TwoPeopleAndTheirSessions, answered: Answered[Answer]) -> list[Verdict]:
@@ -421,7 +505,10 @@ class Unblocked(Then[TwoPeopleAndTheirSessions, Answer]):
 
     @override
     def says(self) -> str:
-        return "차단 해제가 성공한다"
+        return Says(
+            "차단 해제가 성공합니다",
+            english="the unblock succeeds",
+        )
 
     @override
     def look(self, laid: TwoPeopleAndTheirSessions, answered: Answered[Answer]) -> list[Verdict]:
@@ -448,9 +535,14 @@ class TheSuperadminSearchesEverySession(
 
     @override
     def describe(self) -> str:
-        return (
-            "전역 역할이 문인 세션 검색에서 슈퍼관리자가 페이지 인자 없이 훑으면, "
-            "사용자와 무관하게 심은 세션이 생성 시각 내림차순으로 온다"
+        return Says(
+            "전역 역할이 문인 세션 검색에서 superadmin 이 페이지 인자 없이 조회하면, "
+            "사용자와 무관하게 미리 저장한 세션이 생성 시각 내림차순으로 옵니다",
+            english=(
+                "when the superadmin searches without page arguments in a session search "
+                "gated by the global role, every session seeded in advance comes back in "
+                "descending creation time regardless of the user"
+            ),
         )
 
     @override
@@ -476,7 +568,13 @@ class OnlyTheSuperadminSearchesEverySession(
 
     @override
     def describe(self) -> str:
-        return "권한 받은 사용자가 세션 전체 검색을 하려 하면, 전역 역할 문이 막는다"
+        return Says(
+            "권한 받은 사용자가 세션 전체 검색을 하려 하면, 전역 역할 문이 막습니다",
+            english=(
+                "a user holding the permission is rejected by the global role gate when "
+                "searching every login session"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirSessions]:
@@ -503,7 +601,13 @@ class AGrantedUserSearchesOnlyTheirOwnSessions(
 
     @override
     def describe(self) -> str:
-        return "자기 스코프에서 READ를 받은 사용자가 훑으면, 다른 사용자의 세션은 빠진다"
+        return Says(
+            "자기 스코프에서 READ 를 받은 사용자가 조회하면, 다른 사용자의 세션은 빠집니다",
+            english=(
+                "when a user granted READ in their own scope searches, the sessions of other "
+                "users are left out"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirSessions]:
@@ -528,7 +632,13 @@ class AUserGrantedNothingMayNotSearchTheirSessions(
 
     @override
     def describe(self) -> str:
-        return "역할 없이 자기 세션을 훑으려 하면, 본인이어도 스코프 권한 문이 막는다"
+        return Says(
+            "역할 없이 자기 세션을 조회하려 하면, 본인이어도 스코프 권한 문이 막습니다",
+            english=(
+                "a user holding no role who tries to search their own sessions is rejected "
+                "by the scope permission gate even for themselves"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirSessions]:
@@ -553,9 +663,14 @@ class AGrantedUserRevokesTheirOwnSession(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 스코프에서 READ와 UPDATE를 받은 사용자가 자기 세션을 회수하면, "
-            "성공이 오고 그 세션은 더 조회되지 않으며 사용자가 회수했다는 이력이 생긴다"
+        return Says(
+            "자기 스코프에서 READ 와 UPDATE 를 받은 사용자가 자기 세션을 회수하면, "
+            "성공이 오고 그 세션은 더 조회되지 않으며 사용자가 회수했다는 이력이 생깁니다",
+            english=(
+                "when a user granted READ and UPDATE in their own scope revokes their own "
+                "session, success comes back, the session is no longer searched, and a "
+                "history record says the user revoked it"
+            ),
         )
 
     @override
@@ -583,7 +698,13 @@ class AUserGrantedNothingMayNotRevokeTheirSession(
 
     @override
     def describe(self) -> str:
-        return "역할 없이 회수하려 하면, 소유자 조회 단계가 막는다"
+        return Says(
+            "역할 없이 회수하려 하면, 소유자 조회 단계가 막습니다",
+            english=(
+                "a user holding no role who tries to revoke a session is rejected at the "
+                "owner lookup step"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirSessions]:
@@ -608,7 +729,13 @@ class AReaderMayNotRevokeTheirSession(
 
     @override
     def describe(self) -> str:
-        return "READ만 받고 회수하려 하면, 엔티티 권한 문이 막는다"
+        return Says(
+            "READ 만 받고 회수하려 하면, 엔티티 권한 문이 막습니다",
+            english=(
+                "a user holding only READ who tries to revoke a session is rejected by the "
+                "entity permission gate"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirSessions]:
@@ -633,9 +760,13 @@ class OwnGrantsMayNotRevokeSomeoneElsesSession(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 스코프에서만 READ와 UPDATE를 받은 사용자가 다른 사용자의 세션을 주면, "
-            "그 소유자에 대한 조회 단계가 막는다"
+        return Says(
+            "자기 스코프에서만 READ 와 UPDATE 를 받은 사용자가 다른 사용자의 세션을 주면, "
+            "그 소유자에 대한 조회 단계가 막습니다",
+            english=(
+                "when a user granted READ and UPDATE only in their own scope gives another "
+                "user's session, the lookup step on its owner rejects it"
+            ),
         )
 
     @override
@@ -663,9 +794,14 @@ class TheSuperadminRevokesSomeoneElsesSession(
 
     @override
     def describe(self) -> str:
-        return (
-            "전역 역할이 문인 관리자 회수에서 슈퍼관리자가 다른 사용자의 세션을 회수하면, "
-            "성공이 오고 세션 전체 검색에서 빠지며 관리자가 회수했다는 이력이 생긴다"
+        return Says(
+            "전역 역할이 문인 관리자 회수에서 superadmin 이 다른 사용자의 세션을 회수하면, "
+            "성공이 오고 세션 전체 검색에서 빠지며 관리자가 회수했다는 이력이 생깁니다",
+            english=(
+                "when the superadmin revokes another user's session in an admin revoke gated "
+                "by the global role, success comes back, the session leaves the whole "
+                "session search, and a history record says an admin revoked it"
+            ),
         )
 
     @override
@@ -691,7 +827,13 @@ class TheSuperadminMayNotRevokeAMissingSession(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 없는 세션 id를 주면, 입력 검증이 막는다"
+        return Says(
+            "superadmin 이 없는 세션 id 를 주면, 입력 검증이 막습니다",
+            english=(
+                "when the superadmin gives a session id that does not exist, input "
+                "validation rejects it"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirSessions]:
@@ -716,7 +858,13 @@ class OnlyTheSuperadminRevokesAsAdmin(
 
     @override
     def describe(self) -> str:
-        return "권한 받은 사용자가 관리자 회수를 하려 하면, 전역 역할 문이 막는다"
+        return Says(
+            "권한 받은 사용자가 관리자 회수를 하려 하면, 전역 역할 문이 막습니다",
+            english=(
+                "a user holding the permission is rejected by the global role gate when "
+                "revoking a session as admin"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirSessions]:
@@ -741,9 +889,13 @@ class TheSuperadminUnblocksAUser(
 
     @override
     def describe(self) -> str:
-        return (
-            "전역 역할이 문인 차단 해제에서 슈퍼관리자가 사용자 이름을 주면, "
-            "성공이 오고 그 이름의 차단 기록이 사라진다"
+        return Says(
+            "전역 역할이 문인 차단 해제에서 superadmin 이 사용자 이름을 주면, "
+            "성공이 오고 그 이름의 차단 기록이 사라집니다",
+            english=(
+                "when the superadmin gives a username in an unblock gated by the global "
+                "role, success comes back and the block record of that name is gone"
+            ),
         )
 
     @override
@@ -769,7 +921,13 @@ class UnblockingANameNobodyHoldsSucceeds(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 어떤 사용자도 아닌 이름을 주면, 존재를 확인하지 않고 성공이 온다"
+        return Says(
+            "superadmin 이 어떤 사용자도 아닌 이름을 주면, 존재를 확인하지 않고 성공이 옵니다",
+            english=(
+                "when the superadmin gives a username nobody holds, success comes back "
+                "without checking that it exists"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirSessions]:
@@ -794,7 +952,13 @@ class OnlyTheSuperadminUnblocks(
 
     @override
     def describe(self) -> str:
-        return "권한 받은 사용자가 차단을 풀려 하면, 전역 역할 문이 막는다"
+        return Says(
+            "권한 받은 사용자가 차단을 해제하려 하면, 전역 역할 문이 막습니다",
+            english=(
+                "a user holding the permission is rejected by the global role gate when "
+                "unblocking a user"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirSessions]:

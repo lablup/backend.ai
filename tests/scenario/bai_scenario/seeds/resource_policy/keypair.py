@@ -14,7 +14,8 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy.creators import KeyPairResourcePolicyCreator
-from bai_scenario.seeds.seeder import Naming, TestSeedRow
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import Naming, TestSeedRow, joined
 
 
 @dataclass(frozen=True)
@@ -33,16 +34,32 @@ class TestSeedKeypairPolicy(TestSeedRow[KeyPairResourcePolicyData]):
 
     @override
     def kind(self) -> str:
-        return "키페어 정책"
+        return Says("키페어 정책", english="Keypair policy")
 
     @override
     def detail(self) -> str:
-        allows = [f"동시 세션 {self.max_concurrent_sessions}개까지"]
+        allows = [
+            Says(
+                f"동시 세션 {self.max_concurrent_sessions}개까지",
+                english=f"up to {self.max_concurrent_sessions} concurrent sessions",
+            )
+        ]
         if self.max_pending_session_count is not None:
-            allows.append(f"그중 대기 {self.max_pending_session_count}개까지")
+            allows.append(
+                Says(
+                    f"그중 대기 {self.max_pending_session_count}개까지",
+                    english=f"up to {self.max_pending_session_count} of them pending",
+                )
+            )
         if self.vfolder_hosts:
-            allows.append(f"폴더는 {', '.join(self.vfolder_hosts)}에 놓을 수 있다")
-        return ", ".join(allows)
+            hosts = ", ".join(self.vfolder_hosts)
+            allows.append(
+                Says(
+                    f"vfolder 는 {hosts}에 놓을 수 있습니다",
+                    english=f"folders can be placed on {hosts}",
+                )
+            )
+        return joined(allows)
 
     @override
     def name(self, naming: Naming) -> str:

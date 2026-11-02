@@ -24,6 +24,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
@@ -51,7 +52,13 @@ class ManyProjectsAndSomeone(Given[Any, ManyProjectsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"한 도메인 아래의 프로젝트 {self.count}개와, 다른 도메인에 사는 {self.role.value} 한 명"
+        return Says(
+            f"한 도메인 아래의 프로젝트 {self.count}개와, 다른 도메인에 사는 {self.role.value} 한 명",
+            english=(
+                f"{self.count} projects under one domain and one {self.role.value} "
+                "in another domain"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyProjectsAndACaller:
@@ -90,10 +97,24 @@ class ProjectLook:
             ),
             Same(f"{prefix}allowed_vfolder_hosts", node.storage.allowed_vfolder_hosts, []),
             Same(f"{prefix}is_active", node.lifecycle.is_active, self.active),
-            Skipped(f"{prefix}id", "데이터베이스가 만든다"),
-            Skipped(f"{prefix}type", "타입이 이미 값을 못박는다"),
+            Skipped(
+                f"{prefix}id",
+                Says("데이터베이스가 생성합니다", english="the database generates it"),
+            ),
+            Skipped(
+                f"{prefix}type",
+                Says("타입이 이미 값을 고정합니다", english="the type already fixes the value"),
+            ),
             Held[UUID](
-                f"{prefix}entity_id", node.entity_id, SameAs(laid.id, "미리 만든 프로젝트의 id")
+                f"{prefix}entity_id",
+                node.entity_id,
+                SameAs(
+                    laid.id,
+                    Says(
+                        "미리 저장한 프로젝트의 id",
+                        english="the id of the project seeded in advance",
+                    ),
+                ),
             ),
             Held(f"{prefix}created_at", node.lifecycle.created_at, written),
             Held(f"{prefix}modified_at", node.lifecycle.modified_at, written),
@@ -108,7 +129,10 @@ class NoProjectIsProcessed(Then[ManyProjectsAndACaller, PartialBulkPayload[Proje
 
     @override
     def says(self) -> str:
-        return "처리된 프로젝트 없이 대상이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 프로젝트 없이 대상이 모두 실패 목록에 옵니다",
+            english="no project is processed and every target comes back in the failed list",
+        )
 
     @override
     def look(
@@ -125,7 +149,14 @@ class NoProjectIsProcessed(Then[ManyProjectsAndACaller, PartialBulkPayload[Proje
         ]
         for i, (failure, project) in enumerate(zip(payload.failed, laid.targets, strict=False)):
             verdicts += [
-                Held[UUID](f"failed[{i}].id", failure.id, SameAs(project.id, "대상 프로젝트의 id")),
+                Held[UUID](
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(
+                        project.id,
+                        Says("대상 프로젝트의 id", english="the id of the target project"),
+                    ),
+                ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]
         return verdicts

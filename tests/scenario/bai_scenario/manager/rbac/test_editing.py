@@ -20,6 +20,7 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Refused,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -31,7 +32,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-EDITED = "고친 설명"
+EDITED = Says("수정한 설명", english="the edited description")
 
 type RoleStep = Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, RoleNode]
 
@@ -46,7 +47,10 @@ class Editing(When[RolesAndACaller, RBACAdapter, RoleNode]):
 
     @override
     def describe(self, laid: RolesAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.role.name}의 설명을 고침"
+        return Says(
+            f"{laid.caller.username}이 {laid.role.name} 의 설명을 수정합니다",
+            english=f"{laid.caller.username} edits the description of {laid.role.name}",
+        )
 
     @override
     async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> RoleNode:
@@ -65,7 +69,10 @@ class EditingStatusToDeleted(When[RolesAndACaller, RBACAdapter, RoleNode]):
 
     @override
     def describe(self, laid: RolesAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.role.name}의 status 를 DELETED 로 고침"
+        return Says(
+            f"{laid.caller.username}이 {laid.role.name} 의 status 를 DELETED 로 변경합니다",
+            english=f"{laid.caller.username} changes the status of {laid.role.name} to DELETED",
+        )
 
     @override
     async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> RoleNode:
@@ -82,7 +89,10 @@ class TheSoftDeletedRole(Then[RolesAndACaller, RoleNode]):
 
     @override
     def says(self) -> str:
-        return "삭제 상태의 역할 전체가 온다"
+        return Says(
+            "삭제 상태의 역할 전체가 응답으로 옵니다",
+            english="the whole role in the deleted state comes back",
+        )
 
     @override
     def look(self, laid: RolesAndACaller, answered: Answered[RoleNode]) -> list[Verdict]:
@@ -102,7 +112,10 @@ class TheEditedRole(Then[RolesAndACaller, RoleNode]):
 
     @override
     def says(self) -> str:
-        return "새 설명을 실은 역할 전체가 온다"
+        return Says(
+            "새 설명을 담은 역할 전체가 응답으로 옵니다",
+            english="the whole role carrying the new description comes back",
+        )
 
     @override
     def look(self, laid: RolesAndACaller, answered: Answered[RoleNode]) -> list[Verdict]:
@@ -122,7 +135,13 @@ class TheSuperadminEditsARole(Scenario[TestSeedingSession, RolesAndACaller, RBAC
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 역할의 설명을 바꾸면, 새 설명을 실은 역할 전체가 온다"
+        return Says(
+            "superadmin 이 역할의 설명을 변경하면, 새 설명을 담은 역할 전체가 응답으로 옵니다",
+            english=(
+                "when the superadmin changes the description of a role, the whole role carrying "
+                "the new description comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
@@ -147,7 +166,10 @@ class AUserGrantedNothingMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자는 역할을 수정할 수 없다"
+        return Says(
+            "아무 권한도 받지 않은 사용자는 역할을 수정할 수 없습니다",
+            english="a user granted nothing cannot edit a role",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
@@ -174,7 +196,14 @@ class EditingStatusToDeletedSoftDeletes(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 역할의 status 를 DELETED 로 고치면, soft delete 되어 삭제 상태로 온다"
+        return Says(
+            "superadmin 이 역할의 status 를 DELETED 로 변경하면, soft delete 되어 삭제 상태로 "
+            "옵니다",
+            english=(
+                "when the superadmin changes the status of a role to DELETED, it is soft "
+                "deleted and comes back in the deleted state"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:

@@ -40,11 +40,14 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.domain import WAS_HERE, Mentions, WrittenByThisRun
 from bai_scenario.components.system import lay_a_caller, role_named
@@ -70,7 +73,11 @@ class SomeCheckersAndSomeone(Given[Any, CheckersAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"유휴 검사기 {self.count}개와, {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"유휴 검사기 {self.count}개와, {who} 한 명",
+            english=f"{self.count} idle checkers and one {in_language(who, Language.ENGLISH)}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> CheckersAndACaller:
@@ -100,7 +107,14 @@ class OneCheckerOnSomeDomains(Given[Any, AssignmentsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"도메인 {self.count}개에 켜 둔 유휴 검사기 하나와, {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"도메인 {self.count}개에 활성화해 둔 유휴 검사기 하나와, {who} 한 명",
+            english=(
+                f"one idle checker enabled on {self.count} domains and one "
+                f"{in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> AssignmentsAndACaller:
@@ -179,7 +193,14 @@ class EveryCheckerIsPurged(Then[CheckersAndACaller, PartialBulkPayload[IdleCheck
 
     @override
     def says(self) -> str:
-        return "심은 검사기가 모두 지운 모습으로 오고, 없는 id 는 대상 없음 이유로 실패 목록에 온다"
+        return Says(
+            "미리 저장한 검사기가 모두 삭제된 모습으로 오고, 없는 id 는 대상이 없다는 이유로 "
+            "실패 목록에 옵니다",
+            english=(
+                "every checker seeded in advance comes back deleted and an unknown id comes back "
+                "in the failed list because no target answers to it"
+            ),
+        )
 
     @override
     def look(
@@ -199,12 +220,25 @@ class EveryCheckerIsPurged(Then[CheckersAndACaller, PartialBulkPayload[IdleCheck
                 Held[IdleCheckerNode](
                     f"successes[{i}]",
                     node,
-                    SameAs(checker_node_of(checker), f"{i + 1}번째로 심은 검사기 전체"),
+                    SameAs(
+                        checker_node_of(checker),
+                        Says(
+                            f"{i + 1}번째로 미리 저장한 검사기 전체",
+                            english=f"the whole checker seeded in advance number {i + 1}",
+                        ),
+                    ),
                 )
             )
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the unknown id put in the request"),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -218,7 +252,10 @@ class NoCheckerIsPurged(Then[CheckersAndACaller, PartialBulkPayload[IdleCheckerN
 
     @override
     def says(self) -> str:
-        return "지운 검사기 없이 대상이 모두 실패 목록에 온다"
+        return Says(
+            "삭제한 검사기 없이 대상이 모두 실패 목록에 옵니다",
+            english="no checker is deleted and every target comes back in the failed list",
+        )
 
     @override
     def look(
@@ -236,7 +273,15 @@ class NoCheckerIsPurged(Then[CheckersAndACaller, PartialBulkPayload[IdleCheckerN
         for i, (failure, checker) in enumerate(zip(payload.failed, laid.laid, strict=False)):
             verdicts += [
                 Held[UUID](
-                    f"failed[{i}].id", failure.id, SameAs(checker.id, f"{i + 1}번째로 심은 검사기")
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(
+                        checker.id,
+                        Says(
+                            f"{i + 1}번째로 미리 저장한 검사기",
+                            english=f"the checker seeded in advance number {i + 1}",
+                        ),
+                    ),
                 ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]
@@ -253,11 +298,20 @@ class EveryAssignmentComesBack(Then[AssignmentsAndACaller, AssignmentsAnswered])
 
     @override
     def says(self) -> str:
-        state = "켜진" if self.enabled else "꺼진"
+        state = "활성" if self.enabled else "비활성"
+        state_en = "enabled" if self.enabled else "disabled"
         if self.missing is None:
-            return f"요청한 할당이 모두 {state} 상태로 오고, 실패한 것은 없다"
-        return (
-            f"요청한 할당이 모두 {state} 상태로 오고, 없는 id 는 대상 없음 이유로 실패 목록에 온다"
+            return Says(
+                f"요청한 할당이 모두 {state} 상태로 오고, 실패한 것은 없습니다",
+                english=f"every requested assignment comes back {state_en} and nothing failed",
+            )
+        return Says(
+            f"요청한 할당이 모두 {state} 상태로 오고, 없는 id 는 대상이 없다는 이유로 "
+            "실패 목록에 옵니다",
+            english=(
+                f"every requested assignment comes back {state_en} and an unknown id comes back "
+                "in the failed list because no target answers to it"
+            ),
         )
 
     @override
@@ -277,18 +331,33 @@ class EveryAssignmentComesBack(Then[AssignmentsAndACaller, AssignmentsAnswered])
                 Held[UUID](
                     f"successes[{i}].id",
                     node.id,
-                    SameAs(answer.ids[i], f"요청에 넣은 {i + 1}번째 id"),
+                    SameAs(
+                        answer.ids[i],
+                        Says(
+                            f"요청에 넣은 {i + 1}번째 id",
+                            english=f"the id put in the request number {i + 1}",
+                        ),
+                    ),
                 ),
                 Same(f"successes[{i}].scope_type", node.scope_type, IdleCheckerScopeTypeDTO.DOMAIN),
                 Held[UUID](
                     f"successes[{i}].scope_id",
                     node.scope_id,
-                    SameAs(domain.id, f"{i + 1}번째로 심은 도메인"),
+                    SameAs(
+                        domain.id,
+                        Says(
+                            f"{i + 1}번째로 미리 저장한 도메인",
+                            english=f"the domain seeded in advance number {i + 1}",
+                        ),
+                    ),
                 ),
                 Held[IdleCheckerID](
                     f"successes[{i}].idle_checker_id",
                     node.idle_checker_id,
-                    SameAs(laid.checker.id, "심은 검사기"),
+                    SameAs(
+                        laid.checker.id,
+                        Says("미리 저장한 검사기", english="the checker seeded in advance"),
+                    ),
                 ),
                 Same(f"successes[{i}].enabled", node.enabled, self.enabled),
                 Held(f"successes[{i}].created_at", node.created_at, written),
@@ -299,7 +368,14 @@ class EveryAssignmentComesBack(Then[AssignmentsAndACaller, AssignmentsAnswered])
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the unknown id put in the request"),
+                    ),
+                ),
                 Held(
                     "failed[0].message",
                     failure.message,
@@ -317,7 +393,13 @@ class NoAssignmentIsProcessed(Then[AssignmentsAndACaller, AssignmentsAnswered]):
 
     @override
     def says(self) -> str:
-        return "처리된 할당 없이 요청한 할당이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 할당 없이 요청한 할당이 모두 실패 목록에 옵니다",
+            english=(
+                "no assignment is processed and every requested assignment comes back in the "
+                "failed list"
+            ),
+        )
 
     @override
     def look(
@@ -336,7 +418,13 @@ class NoAssignmentIsProcessed(Then[AssignmentsAndACaller, AssignmentsAnswered]):
                 Held[UUID](
                     f"failed[{i}].id",
                     failure.id,
-                    SameAs(answer.ids[i], f"요청에 넣은 {i + 1}번째 id"),
+                    SameAs(
+                        answer.ids[i],
+                        Says(
+                            f"요청에 넣은 {i + 1}번째 id",
+                            english=f"the id put in the request number {i + 1}",
+                        ),
+                    ),
                 ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]

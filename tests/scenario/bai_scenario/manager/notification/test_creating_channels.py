@@ -26,7 +26,7 @@ from ai.backend.manager.api.adapters.notification.adapter import NotificationAda
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.notification import InvalidNotificationSpec
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.notification import TheNewChannelNode
 from bai_scenario.components.system import ACaller, SomeoneAlone
@@ -83,7 +83,12 @@ class Creating(When[ACaller, NotificationAdapter, NotificationChannelNode]):
 
     @override
     def describe(self, laid: ACaller) -> str:
-        return f"{laid.caller.username}이 {self.channel_type.value} 채널 {self.named}을 생성"
+        return Says(
+            f"{laid.caller.username}이 {self.channel_type.value} 채널 {self.named} 을 생성합니다",
+            english=(
+                f"{laid.caller.username} creates the {self.channel_type.value} channel {self.named}"
+            ),
+        )
 
     @override
     async def call(self, adapter: NotificationAdapter, laid: ACaller) -> NotificationChannelNode:
@@ -112,9 +117,13 @@ class TheSuperadminMakesAWebhookChannel(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 이름과 주소만 주고 webhook 채널을 만들면, "
-            "활성 상태이고 설명이 비어 있는 채널 전체가 반환된다"
+        return Says(
+            "superadmin 이 이름과 주소만 주고 webhook 채널을 생성하면, "
+            "활성 상태이고 설명이 비어 있는 채널 전체가 응답으로 옵니다",
+            english=(
+                "when the superadmin creates a webhook channel with only a name and a URL, "
+                "the whole channel comes back active with an empty description"
+            ),
         )
 
     @override
@@ -142,9 +151,15 @@ class TheSuperadminMakesAnEmailChannel(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 SMTP 접속과 보내는 사람, 받는 사람, 인증 계정을 주고 email 채널을 만들면, "
-            "인증 계정의 이름은 있고 비밀번호는 없는 채널 전체가 반환된다"
+        return Says(
+            "superadmin 이 SMTP 접속과 보내는 사람, 받는 사람, 인증 계정을 주고 "
+            "email 채널을 생성하면, 인증 계정의 이름은 있고 비밀번호는 없는 채널 전체가 "
+            "응답으로 옵니다",
+            english=(
+                "when the superadmin creates an email channel with the SMTP connection, "
+                "the sender, the recipients and the auth credentials, the whole channel "
+                "comes back with the auth username and without the password"
+            ),
         )
 
     @override
@@ -178,7 +193,13 @@ class ADisabledChannelIsMade(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 비활성으로 지정해 채널을 만들면 비활성인 채널이 반환된다"
+        return Says(
+            "superadmin 이 비활성으로 지정해 채널을 생성하면 비활성인 채널이 응답으로 옵니다",
+            english=(
+                "when the superadmin creates a channel marked disabled, "
+                "a disabled channel comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
@@ -203,7 +224,13 @@ class ASpecNamingNeitherIsRefused(
 
     @override
     def describe(self) -> str:
-        return "webhook도 email도 주지 않은 명세로 만들려 하면 잘못된 입력으로 거부된다"
+        return Says(
+            "webhook 도 email 도 주지 않은 명세로 생성하려 하면 잘못된 입력으로 거부됩니다",
+            english=(
+                "creating a channel with a spec naming neither webhook nor email "
+                "is rejected as invalid input"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
@@ -228,9 +255,15 @@ class ATypeAndSpecThatDisagreeAreRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "email 종류라고 하면서 webhook 명세를 주고 만들려 하면, "
-            "쓴 행을 읽어 돌려주는 자리에서 명세가 종류에 맞지 않아 거부되고 쓴 것은 되돌려진다"
+        return Says(
+            "email 종류라고 하면서 webhook 명세를 주고 생성하려 하면, "
+            "쓴 행을 읽어 반환하는 자리에서 명세가 종류에 맞지 않아 거부되고 "
+            "쓴 것은 되돌려집니다",
+            english=(
+                "when a channel is created as the email type with a webhook spec, "
+                "reading the written row back rejects it because the spec does not match "
+                "the type, and the write is rolled back"
+            ),
         )
 
     @override
@@ -256,7 +289,13 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 채널을 만들려 하면 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 채널을 생성하려 하면 역할 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin creates a channel, "
+                "it is rejected for an insufficient role"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
@@ -281,7 +320,13 @@ class TheMonitorMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "모니터가 채널을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다"
+        return Says(
+            "모니터가 채널을 생성하려 하면 역할 부족으로 거부됩니다. 모니터는 읽기만 통과합니다",
+            english=(
+                "when the monitor creates a channel, it is rejected for an insufficient "
+                "role. The monitor passes reads only"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:

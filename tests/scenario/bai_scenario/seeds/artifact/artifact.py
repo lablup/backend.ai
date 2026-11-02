@@ -9,6 +9,7 @@ from typing import override
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactType
 from ai.backend.manager.models.artifact.creators import ArtifactCreator
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
@@ -22,11 +23,14 @@ class TestSeedArtifact(TestSeedRow[ArtifactData]):
 
     @override
     def kind(self) -> str:
-        return "아티팩트"
+        return Says("아티팩트", english="Artifact")
 
     @override
     def detail(self) -> str:
-        return "HuggingFace 레지스트리에서 스캔된 모델"
+        return Says(
+            "허깅 페이스 레지스트리에서 스캔한 모델",
+            english="a model scanned from a HuggingFace registry",
+        )
 
     @override
     def name(self, naming: Naming) -> str:

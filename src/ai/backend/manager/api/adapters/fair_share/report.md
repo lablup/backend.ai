@@ -25,17 +25,17 @@ Scenario: incomplete 13 / 15
 
 | scenario | verdict |
 |---|---|
-| [슈퍼관리자가 도메인 둘의 가중치를 한 번에 정하면, 둘을 정했다는 개수가 온다](#atomic_bulk_upserting-the-superadmin-sets-several-domain-weights-at-once) | answered |
-| [아무 권한도 받지 않은 사용자가 도메인 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부된다](#atomic_bulk_upserting-a-user-granted-nothing-may-not-set-several-domain-weights) | rejected |
-| [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 도메인 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부된다. 가중치 쓰기는 그룹이 아니라 전역 대상으로 권한을 본다](#atomic_bulk_upserting-a-user-granted-update-on-the-group-may-not-set-several-domain-weights) | rejected |
+| [when the superadmin sets the weights of two domains at once, a count comes back saying that two were set](#atomic_bulk_upserting-the-superadmin-sets-several-domain-weights-at-once) | answered |
+| [when a user granted nothing tries to set the weights of two domains at once, it is rejected for a lack of permission](#atomic_bulk_upserting-a-user-granted-nothing-may-not-set-several-domain-weights) | rejected |
+| [when a user granted the update permission through a role assigned on the group tries to set the weights of two domains at once, it is rejected for a lack of permission. A weight write checks permission against the global target, not the group](#atomic_bulk_upserting-a-user-granted-update-on-the-group-may-not-set-several-domain-weights) | rejected |
 
 **upsert_domain**
 
 | scenario | verdict |
 |---|---|
-| [슈퍼관리자가 그룹 안 도메인의 가중치를 정하면, 그 가중치를 실은 기록이 오고 나머지 설정은 그룹 기본값이다](#upserting-the-superadmin-sets-a-domain-weight) | answered |
-| [아무 권한도 받지 않은 사용자가 도메인의 가중치를 정하려 하면 권한 부족으로 거부된다](#upserting-a-user-granted-nothing-may-not-set-a-domain-weight) | rejected |
-| [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 도메인의 가중치를 정하려 하면 권한 부족으로 거부된다. 가중치 쓰기는 그룹이 아니라 전역 대상으로 권한을 본다](#upserting-a-user-granted-update-on-the-group-may-not-set-a-domain-weight) | rejected |
+| [when the superadmin sets the weight of a domain in the group, the record comes back carrying that weight and the rest of the settings are the group defaults](#upserting-the-superadmin-sets-a-domain-weight) | answered |
+| [when a user granted nothing tries to set the weight of a domain, it is rejected for a lack of permission](#upserting-a-user-granted-nothing-may-not-set-a-domain-weight) | rejected |
+| [when a user granted the update permission through a role assigned on the group tries to set the weight of a domain, it is rejected for a lack of permission. A weight write checks permission against the global target, not the group](#upserting-a-user-granted-update-on-the-group-may-not-set-a-domain-weight) | rejected |
 
 ### atomic_bulk_upsert_domain
 
@@ -43,86 +43,86 @@ Scenario: incomplete 13 / 15
 
 #### [the-superadmin-sets-several-domain-weights-at-once](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting.py): pass
 
-슈퍼관리자가 도메인 둘의 가중치를 한 번에 정하면, 둘을 정했다는 개수가 온다
+when the superadmin sets the weights of two domains at once, a count comes back saying that two were set
 
 Given
 
-- 리소스 그룹 하나와 도메인 2개, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and 2 domains, and one superadmin
+  - Domain home-1
+  - Domain other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- FairShareAdapter.atomic_bulk_upsert_domain: user-1이 resource-group-1 안 도메인 2개의 가중치를 한 번에 정함
+- FairShareAdapter.atomic_bulk_upsert_domain: user-1 sets the weights of 2 domains in resource-group-1 at once
 
 Then
 
-- 도메인 수만큼 정했다는 개수가 온다
+- a count comes back saying how many domains were set
   - upserted_count = 2
 
 <a id="atomic_bulk_upserting-a-user-granted-nothing-may-not-set-several-domain-weights"></a>
 
 #### [a-user-granted-nothing-may-not-set-several-domain-weights](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting.py): pass
 
-아무 권한도 받지 않은 사용자가 도메인 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부된다
+when a user granted nothing tries to set the weights of two domains at once, it is rejected for a lack of permission
 
 Given
 
-- 리소스 그룹 하나와 도메인 2개, 그리고 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and 2 domains, and one regular user
+  - Domain home-1
+  - Domain other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- FairShareAdapter.atomic_bulk_upsert_domain: user-1이 resource-group-1 안 도메인 2개의 가중치를 한 번에 정함
+- FairShareAdapter.atomic_bulk_upsert_domain: user-1 sets the weights of 2 domains in resource-group-1 at once
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="atomic_bulk_upserting-a-user-granted-update-on-the-group-may-not-set-several-domain-weights"></a>
 
 #### [a-user-granted-update-on-the-group-may-not-set-several-domain-weights](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting.py): pass
 
-그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 도메인 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부된다. 가중치 쓰기는 그룹이 아니라 전역 대상으로 권한을 본다
+when a user granted the update permission through a role assigned on the group tries to set the weights of two domains at once, it is rejected for a lack of permission. A weight write checks permission against the global target, not the group
 
 Given
 
-- 리소스 그룹 하나와 도메인 2개, 그리고 그 그룹 범위의 UPDATE 역할을 받은 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 리소스 그룹 범위의 UPDATE 역할을 받은 사용자 준비
-    - 역할 group-role-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 group-role-1: resource_group 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 group-role-1 보유
+- one resource group and 2 domains, and the regular user granted the UPDATE role in the resource group scope
+  - Domain home-1
+  - Domain other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the UPDATE role in the resource group scope
+    - Role group-role-1: applies only within the scope it is granted in
+    - Role group-role-1: UPDATE allowed on every resource_group
+    - regular user user-1: holds Role group-role-1
 
 When
 
-- FairShareAdapter.atomic_bulk_upsert_domain: user-1이 resource-group-1 안 도메인 2개의 가중치를 한 번에 정함
+- FairShareAdapter.atomic_bulk_upsert_domain: user-1 sets the weights of 2 domains in resource-group-1 at once
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### upsert_domain
 
@@ -130,27 +130,27 @@ Then
 
 #### [the-superadmin-sets-a-domain-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting.py): pass
 
-슈퍼관리자가 그룹 안 도메인의 가중치를 정하면, 그 가중치를 실은 기록이 오고 나머지 설정은 그룹 기본값이다
+when the superadmin sets the weight of a domain in the group, the record comes back carrying that weight and the rest of the settings are the group defaults
 
 Given
 
-- 리소스 그룹 하나와 도메인 1개, 그리고 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and 1 domains, and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- FairShareAdapter.upsert_domain: user-1이 resource-group-1 안 home-1의 가중치를 정함
+- FairShareAdapter.upsert_domain: user-1 sets the weight of home-1 in resource-group-1
 
 Then
 
-- 정한 가중치를 실은 기록이 오고, 나머지 설정은 그룹 기본값이다
-  - id: 무시함: 데이터베이스가 만든다
+- the record comes back carrying the weight just set and the rest of the settings are the group defaults
+  - id: skipped: the database generates it
   - resource_group_name = 'resource-group-1'
   - domain_name = 'home-1'
   - spec.weight = Decimal('2.5')
@@ -162,65 +162,65 @@ Then
   - calculation_snapshot.fair_share_factor = Decimal('1')
   - calculation_snapshot.total_decayed_usage = []
   - calculation_snapshot.normalized_usage = Decimal('0')
-  - calculation_snapshot.lookback_start: 무시함: 쓴 날짜에 따라 달라진다
-  - calculation_snapshot.lookback_end: 무시함: 쓴 날짜에 따라 달라진다
-  - calculation_snapshot.last_calculated_at: 이 실행이 쓴 시각
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - calculation_snapshot.lookback_start: skipped: it depends on the date written
+  - calculation_snapshot.lookback_end: skipped: it depends on the date written
+  - calculation_snapshot.last_calculated_at: the time this run wrote
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="upserting-a-user-granted-nothing-may-not-set-a-domain-weight"></a>
 
 #### [a-user-granted-nothing-may-not-set-a-domain-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting.py): pass
 
-아무 권한도 받지 않은 사용자가 도메인의 가중치를 정하려 하면 권한 부족으로 거부된다
+when a user granted nothing tries to set the weight of a domain, it is rejected for a lack of permission
 
 Given
 
-- 리소스 그룹 하나와 도메인 1개, 그리고 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group and 1 domains, and one regular user
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- FairShareAdapter.upsert_domain: user-1이 resource-group-1 안 home-1의 가중치를 정함
+- FairShareAdapter.upsert_domain: user-1 sets the weight of home-1 in resource-group-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="upserting-a-user-granted-update-on-the-group-may-not-set-a-domain-weight"></a>
 
 #### [a-user-granted-update-on-the-group-may-not-set-a-domain-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting.py): pass
 
-그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 도메인의 가중치를 정하려 하면 권한 부족으로 거부된다. 가중치 쓰기는 그룹이 아니라 전역 대상으로 권한을 본다
+when a user granted the update permission through a role assigned on the group tries to set the weight of a domain, it is rejected for a lack of permission. A weight write checks permission against the global target, not the group
 
 Given
 
-- 리소스 그룹 하나와 도메인 1개, 그리고 그 그룹 범위의 UPDATE 역할을 받은 일반 사용자 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 리소스 그룹 범위의 UPDATE 역할을 받은 사용자 준비
-    - 역할 group-role-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 group-role-1: resource_group 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 group-role-1 보유
+- one resource group and 1 domains, and the regular user granted the UPDATE role in the resource group scope
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the UPDATE role in the resource group scope
+    - Role group-role-1: applies only within the scope it is granted in
+    - Role group-role-1: UPDATE allowed on every resource_group
+    - regular user user-1: holds Role group-role-1
 
 When
 
-- FairShareAdapter.upsert_domain: user-1이 resource-group-1 안 home-1의 가중치를 정함
+- FairShareAdapter.upsert_domain: user-1 sets the weight of home-1 in resource-group-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 

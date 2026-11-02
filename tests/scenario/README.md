@@ -84,8 +84,7 @@ There are three formats.
 | `summary` | Counts only. One line of build log |
 
 A row looks like this. Only the first sentence is written by a person, and the three parts below it come from the
-run. Rows seeded within another seed are indented under it. Report sentences are still Korean; this example
-shows them in English.
+run. Rows seeded within another seed are indented under it. Every sentence is written in both languages.
 
 ```markdown
 #### a-user-granted-folder-create-makes-one-of-their-own — pass
@@ -117,5 +116,4 @@ Then
 
 The report also lists the calls an adapter provides that no scenario calls.
 
-The `describe` sentences are Korean drafts. They move to English once they pass review; the English report
-keeps the Korean sentences until then.
+The `describe` sentences carry both languages. The English report refuses a sentence whose English is missing.

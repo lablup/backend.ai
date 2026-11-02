@@ -13,7 +13,15 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    Given,
+    Language,
+    Says,
+    Scenario,
+    Then,
+    When,
+    in_language,
+)
 from bai_scenario.components.resource_policy import (
     FAMILIES,
     EveryUnusedTargetIsProcessed,
@@ -46,10 +54,21 @@ class PurgingEveryTarget(When[SeveralPoliciesAndACaller[Any], ResourcePolicyAdap
 
     @override
     def describe(self, laid: SeveralPoliciesAndACaller[Any]) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return (
-            f"{laid.caller.username}이 {self.family.kind} {len(laid.targets)}개{besides}를 "
-            "한 번에 삭제"
+        kind = self.family.kind
+        kind_en = in_language(kind, Language.ENGLISH)
+        if self.missing is not None:
+            besides_ko = " 와 없는 id 하나"
+            besides_en = " and one unknown id"
+        else:
+            besides_ko = ""
+            besides_en = ""
+        return Says(
+            f"{laid.caller.username}이 {kind} {len(laid.targets)}개{besides_ko}를 한 번에 "
+            "삭제합니다",
+            english=(
+                f"{laid.caller.username} deletes {len(laid.targets)} policies of the {kind_en} "
+                f"kind{besides_en} at once"
+            ),
         )
 
     @override
@@ -77,9 +96,16 @@ class PurgingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
-            f"슈퍼관리자가 아무도 사용하지 않는 {self.family.kind} 둘과 없는 id 하나를 한 번에 "
-            "삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        kind = self.family.kind
+        kind_en = in_language(kind, Language.ENGLISH)
+        return Says(
+            f"superadmin 이 아무도 사용하지 않는 {kind} 둘과 없는 id 하나를 한 번에 삭제하면, "
+            "둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                f"when the superadmin deletes two unused policies of the {kind_en} kind and one "
+                "unknown id at once, the two come back in the processed list and the unknown id "
+                "comes back in the failed list because no target answers to it"
+            ),
         )
 
     @override
@@ -108,10 +134,17 @@ class AHeldPolicyIsAnsweredFor(
 
     @override
     def describe(self) -> str:
-        return (
-            f"슈퍼관리자가 아직 할당된 {self.family.kind}과 아무도 사용하지 않는 것을 한 번에 "
-            "삭제하면, 사용하지 않는 것은 처리된 목록에 오고 할당된 것은 아직 참조 중이라는 "
-            "이유로 실패 목록에 온다"
+        kind = self.family.kind
+        kind_en = in_language(kind, Language.ENGLISH)
+        return Says(
+            f"superadmin 이 아직 할당된 {kind}과 아무도 사용하지 않는 것을 한 번에 삭제하면, "
+            "사용하지 않는 것은 처리된 목록에 오고 할당된 것은 아직 참조 중이라는 이유로 실패 "
+            "목록에 옵니다",
+            english=(
+                f"when the superadmin deletes a still assigned {kind_en} and an unused one at "
+                "once, the unused one comes back in the processed list and the assigned one "
+                "comes back in the failed list because it is still referenced"
+            ),
         )
 
     @override
@@ -141,9 +174,16 @@ class AUserGrantedNothingPurgesNone(
 
     @override
     def describe(self) -> str:
-        return (
-            f"아무 권한도 받지 않은 사용자가 {self.family.kind} 여럿을 한 번에 삭제하려 하면, "
-            "삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+        kind = self.family.kind
+        kind_en = in_language(kind, Language.ENGLISH)
+        return Says(
+            f"아무 권한도 받지 않은 사용자가 {kind} 여럿을 한 번에 삭제하려 하면, 삭제된 것 "
+            "없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                f"a user granted nothing trying to delete several policies of the {kind_en} kind "
+                "at once gets none deleted and every one in the failed list for not enough "
+                "permission"
+            ),
         )
 
     @override

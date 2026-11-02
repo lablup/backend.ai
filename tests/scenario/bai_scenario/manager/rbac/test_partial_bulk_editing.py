@@ -27,6 +27,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Refused,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -42,7 +43,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-EDITED = "한 번에 고친 설명"
+EDITED = Says("한 번에 수정한 설명", english="the description edited in one call")
 
 type Edited = PartialBulkPayload[RoleNode]
 type RoleStep = Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, Edited]
@@ -58,7 +59,13 @@ class EditingEveryRole(When[RolesAndACaller, RBACAdapter, Edited]):
 
     @override
     def describe(self, laid: RolesAndACaller) -> str:
-        return f"{laid.caller.username}이 역할 {len(laid.roles)}개의 설명을 한 번에 고침"
+        return Says(
+            f"{laid.caller.username}이 역할 {len(laid.roles)}개의 설명을 한 번에 수정합니다",
+            english=(
+                f"{laid.caller.username} edits the description of {len(laid.roles)} roles in "
+                "one call"
+            ),
+        )
 
     @override
     async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> Edited:
@@ -85,9 +92,13 @@ class SoftDeletingThenEditingStatusToActive(When[RolesAndACaller, RBACAdapter, E
 
     @override
     def describe(self, laid: RolesAndACaller) -> str:
-        return (
+        return Says(
             f"{laid.caller.username}이 역할 {len(laid.roles)}개를 한 번에 soft delete 했다가 "
-            "status 를 ACTIVE 로 한 번에 고침"
+            "status 를 ACTIVE 로 한 번에 변경합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {len(laid.roles)} roles in one call and "
+                "then changes their status to ACTIVE in one call"
+            ),
         )
 
     @override
@@ -116,7 +127,10 @@ class EveryRoleIsRestored(Then[RolesAndACaller, Edited]):
 
     @override
     def says(self) -> str:
-        return "역할이 모두 활성으로 오고, 실패한 것은 없다"
+        return Says(
+            "역할이 모두 활성으로 오고, 실패한 것은 없습니다",
+            english="every role comes back active and nothing failed",
+        )
 
     @override
     def look(self, laid: RolesAndACaller, answered: Answered[Edited]) -> list[Verdict]:
@@ -141,7 +155,10 @@ class EveryRoleIsEdited(Then[RolesAndACaller, Edited]):
 
     @override
     def says(self) -> str:
-        return "역할이 모두 새 설명으로 오고, 실패한 것은 없다"
+        return Says(
+            "역할이 모두 새 설명으로 오고, 실패한 것은 없습니다",
+            english="every role comes back with the new description and nothing failed",
+        )
 
     @override
     def look(self, laid: RolesAndACaller, answered: Answered[Edited]) -> list[Verdict]:
@@ -170,8 +187,13 @@ class TheSuperadminEditsSeveralRoles(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 역할 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다"
+        return Says(
+            "superadmin 이 역할 여럿의 설명을 한 번에 변경하면, 모두 새 설명으로 오고 실패한 "
+            "것은 없습니다",
+            english=(
+                "when the superadmin changes the description of several roles in one call, all "
+                "come back with the new description and nothing failed"
+            ),
         )
 
     @override
@@ -197,9 +219,13 @@ class AUserGrantedNothingEditsNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 역할 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 역할 여럿을 한 번에 수정하려 하면, 수정된 것 없이 "
+            "모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to edit several roles in one call, none is "
+                "edited and all come back in the failed list for lack of permission"
+            ),
         )
 
     @override
@@ -227,9 +253,13 @@ class EditingStatusToActiveRestoresSeveral(
 
     @override
     def describe(self) -> str:
-        return (
-            "soft delete 된 역할 여럿의 status 를 한 번에 ACTIVE 로 고치면, restore 되어 "
-            "모두 활성으로 온다"
+        return Says(
+            "soft delete 된 역할 여럿의 status 를 한 번에 ACTIVE 로 변경하면, restore 되어 "
+            "모두 활성으로 옵니다",
+            english=(
+                "when the status of several soft-deleted roles is changed to ACTIVE in one "
+                "call, they are restored and all come back active"
+            ),
         )
 
     @override

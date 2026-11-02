@@ -33,6 +33,7 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Same,
+    Says,
     Skipped,
     Then,
     Verdict,
@@ -90,7 +91,10 @@ class NoRegistryYet(Given[TestSeedingSession, AProjectAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"레지스트리 없음, 프로젝트 하나, 도메인 하나에 속한 {self.role.value} 한 명"
+        return Says(
+            f"레지스트리 없음, 프로젝트 하나, 도메인 하나에 속한 {self.role.value} 한 명",
+            english=f"no registry, one project, and one {self.role.value} in one domain",
+        )
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> AProjectAndACaller:
@@ -110,9 +114,14 @@ class ARegistryAndSomeone(Given[TestSeedingSession, ARegistryAndACaller]):
 
     @override
     def describe(self) -> str:
-        project = ", 프로젝트 하나" if self.with_project or self.allowed else ""
-        allowed = "가 이미 허용돼 있음" if self.allowed else ""
-        return f"레지스트리 하나{project}{allowed}, {self.role.value} 한 명"
+        project_ko = ", 프로젝트 하나" if self.with_project or self.allowed else ""
+        project_en = ", one project" if self.with_project or self.allowed else ""
+        allowed_ko = "가 이미 허용돼 있음" if self.allowed else ""
+        allowed_en = " already allowed to it" if self.allowed else ""
+        return Says(
+            f"레지스트리 하나{project_ko}{allowed_ko}, {self.role.value} 한 명",
+            english=f"one registry{project_en}{allowed_en}, and one {self.role.value}",
+        )
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> ARegistryAndACaller:
@@ -139,7 +148,10 @@ class ManyRegistriesAndSomeone(Given[TestSeedingSession, ManyRegistriesAndACalle
 
     @override
     def describe(self) -> str:
-        return f"레지스트리 2개, {self.role.value} 한 명"
+        return Says(
+            f"레지스트리 2개, {self.role.value} 한 명",
+            english=f"two registries and one {self.role.value}",
+        )
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> ManyRegistriesAndACaller:
@@ -177,20 +189,38 @@ class ARegistryAndAProjectToAllow(Given[TestSeedingSession, ARegistryToAllowAndA
 
     @override
     def describe(self) -> str:
-        held = [
+        held_ko = [
             place
             for place, given in (("레지스트리", self.on_registry), ("프로젝트", self.on_project))
             if given
         ]
-        holds = ", ".join(held) + "에 권한 있음" if held else "아무 권한도 없음"
-        already = ""
+        held_en = [
+            place
+            for place, given in (
+                ("the registry", self.on_registry),
+                ("the project", self.on_project),
+            )
+            if given
+        ]
+        holds_ko = ", ".join(held_ko) + "에 권한 있음" if held_ko else "아무 권한도 없음"
+        holds_en = (
+            "holding permission on " + " and ".join(held_en) if held_en else "holding no permission"
+        )
+        already_ko = ""
+        already_en = ""
         if self.allowed:
-            already = ", 프로젝트는 이미 허용돼 있음"
+            already_ko = ", 프로젝트는 이미 허용돼 있음"
+            already_en = ", and the project is already allowed"
         if self.allowed_as_default:
-            already = ", 프로젝트는 이미 이 레지스트리를 default로 허용돼 있음"
+            already_ko = ", 프로젝트는 이미 이 레지스트리를 default 로 허용돼 있음"
+            already_en = ", and the project already has this registry as its default"
         if self.other_default:
-            already += ", 프로젝트에는 다른 default 레지스트리가 있음"
-        return f"레지스트리 하나, 프로젝트 하나, {holds}인 사용자 한 명{already}"
+            already_ko += ", 프로젝트에는 다른 default 레지스트리가 있음"
+            already_en += ", and the project has another default registry"
+        return Says(
+            f"레지스트리 하나, 프로젝트 하나, {holds_ko}인 사용자 한 명{already_ko}",
+            english=f"one registry, one project, and one user {holds_en}{already_en}",
+        )
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> ARegistryToAllowAndACaller:
@@ -248,7 +278,10 @@ class SomeoneAllowingIn[ScopeData](TestSeedNest[Laid[None]]):
 
     @override
     def kind(self) -> str:
-        return f"{self.name_hint} 권한을 받은 사용자 준비"
+        return Says(
+            f"{self.name_hint} 권한을 받은 사용자 준비",
+            english=f"Prepare a user granted the {self.name_hint} permission",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[None]:
@@ -289,7 +322,10 @@ class TheNewRegistryNode(Then[AProjectAndACaller, ContainerRegistryNode]):
 
     @override
     def says(self) -> str:
-        return "생성한 레지스트리 전체가 반환된다"
+        return Says(
+            "생성한 레지스트리 전체가 반환됩니다",
+            english="the whole created registry comes back",
+        )
 
     @override
     def look(
@@ -307,7 +343,10 @@ class TheNewRegistryNode(Then[AProjectAndACaller, ContainerRegistryNode]):
             Same("ssl_verify", node.ssl_verify, self.ssl_verify),
             Same("is_global", node.is_global, self.is_global),
             Same("extra", node.extra, self.extra),
-            Skipped("id", "데이터베이스가 만든다"),
+            Skipped(
+                "id",
+                Says("데이터베이스가 생성합니다", english="the database generates it"),
+            ),
         ]
 
 
@@ -317,7 +356,10 @@ class TheUpdatedRegistryNode(Then[ARegistryAndACaller, ContainerRegistryNode]):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 레지스트리 전체가 반환된다"
+        return Says(
+            "미리 저장한 레지스트리 전체가 반환됩니다",
+            english="the whole registry made in advance comes back",
+        )
 
     @override
     def look(
@@ -337,7 +379,10 @@ class TheUpdatedRegistryNode(Then[ARegistryAndACaller, ContainerRegistryNode]):
             Same("ssl_verify", node.ssl_verify, laid.registry.ssl_verify),
             Same("is_global", node.is_global, laid.registry.is_global),
             Same("extra", node.extra, laid.registry.extra),
-            Skipped("id", "데이터베이스가 만든다"),
+            Skipped(
+                "id",
+                Says("데이터베이스가 생성합니다", english="the database generates it"),
+            ),
         ]
 
 
@@ -359,7 +404,10 @@ class TestSeededRegistry(RegistryTarget):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 레지스트리"
+        return Says(
+            "미리 저장한 레지스트리",
+            english="the registry made in advance",
+        )
 
     @override
     def id_of(self, laid: ARegistryAndACaller) -> uuid.UUID:
@@ -370,7 +418,7 @@ class TestSeededRegistry(RegistryTarget):
 class MissingRegistry(RegistryTarget):
     @override
     def says(self) -> str:
-        return "존재하지 않는 id"
+        return Says("존재하지 않는 id", english="an id that does not exist")
 
     @override
     def id_of(self, laid: ARegistryAndACaller) -> uuid.UUID:
@@ -393,7 +441,7 @@ class AllowedProjects(ABC):
 class NoProjects(AllowedProjects):
     @override
     def says(self) -> str:
-        return "허용 목록 없이"
+        return Says("허용 목록 없이", english="with no allow list")
 
     @override
     def of(self, laid: AProjectAndACaller) -> AllowedGroupsInput | None:
@@ -406,7 +454,10 @@ class TestSeededProject(AllowedProjects):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 프로젝트를 허용 목록에 넣고"
+        return Says(
+            "미리 저장한 프로젝트를 허용 목록에 넣고",
+            english="adding the project made in advance to the allow list",
+        )
 
     @override
     def of(self, laid: AProjectAndACaller) -> AllowedGroupsInput:
@@ -417,7 +468,10 @@ class TestSeededProject(AllowedProjects):
 class MissingProject(AllowedProjects):
     @override
     def says(self) -> str:
-        return "존재하지 않는 프로젝트를 허용 목록에 넣고"
+        return Says(
+            "존재하지 않는 프로젝트를 허용 목록에 넣고",
+            english="adding a project that does not exist to the allow list",
+        )
 
     @override
     def of(self, laid: AProjectAndACaller) -> AllowedGroupsInput:
@@ -440,7 +494,7 @@ class AllowedProjectChange(ABC):
 class AddProject(AllowedProjectChange):
     @override
     def says(self) -> str:
-        return "허용 목록에 넣음"
+        return Says("허용 목록에 넣음", english="added to the allow list")
 
     @override
     def of(self, laid: ARegistryToAllowAndACaller) -> AllowedGroupsModel:
@@ -451,7 +505,7 @@ class AddProject(AllowedProjectChange):
 class RemoveProject(AllowedProjectChange):
     @override
     def says(self) -> str:
-        return "허용 목록에서 뺌"
+        return Says("허용 목록에서 뺌", english="removed from the allow list")
 
     @override
     def of(self, laid: ARegistryToAllowAndACaller) -> AllowedGroupsModel:
@@ -462,7 +516,10 @@ class RemoveProject(AllowedProjectChange):
 class AddMissingProject(AllowedProjectChange):
     @override
     def says(self) -> str:
-        return "존재하지 않는 프로젝트를 허용 목록에 넣음"
+        return Says(
+            "존재하지 않는 프로젝트를 허용 목록에 넣음",
+            english="a project that does not exist added to the allow list",
+        )
 
     @override
     def of(self, laid: ARegistryToAllowAndACaller) -> AllowedGroupsModel:

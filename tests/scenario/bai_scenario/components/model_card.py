@@ -27,6 +27,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Then,
     Verdict,
 )
@@ -40,7 +41,7 @@ from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
 from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 from bai_scenario.seeds.vfolder.vfolder import TestSeedProjectVFolder
 
-CARD_TITLE = "이미 있던 카드"
+CARD_TITLE = Says("이미 있던 카드", english="a card that already existed")
 
 
 @dataclass(frozen=True)
@@ -53,7 +54,7 @@ class SomeoneHandlingCardsIn(TestSeedNest[Laid[None]]):
 
     @override
     def kind(self) -> str:
-        return "모델 카드 권한 부여"
+        return Says("모델 카드 권한 부여", english="Grant model card permissions")
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[None]:
@@ -91,12 +92,23 @@ class CardsInAProjectAndSomeone(Given[Any, ModelCardsAndACaller]):
 
     @override
     def describe(self) -> str:
-        grant = (
-            f"그 프로젝트에서 모델 카드에 {', '.join(str(p.name) for p in self.granted)} 권한을 받은"
+        names = ", ".join(str(permission.name) for permission in self.granted)
+        grant_ko = (
+            f"그 프로젝트에서 모델 카드에 {names} 권한을 받은"
             if self.granted
             else "아무 권한도 받지 않은"
         )
-        return f"모델 카드 {self.count}개가 놓인 프로젝트와, {grant} {self.role.value} 한 명"
+        grant_en = (
+            f"granted {names} on model cards in that project"
+            if self.granted
+            else "granted no permission"
+        )
+        return Says(
+            f"모델 카드 {self.count}개가 놓인 프로젝트와, {grant_ko} {self.role.value} 한 명",
+            english=(
+                f"a project holding {self.count} model cards and one {self.role.value} {grant_en}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ModelCardsAndACaller:
@@ -134,21 +146,35 @@ class ModelCardLook:
     title: str = CARD_TITLE
 
     def verdicts(self, prefix: str, node: ModelCardNode, laid: ModelCardData) -> list[Verdict]:
+        card = Says("미리 저장한 카드", english="the card created in advance")
         return [
-            Held[UUID](f"{prefix}id", node.id, SameAs(laid.id, "미리 만든 카드")),
-            Held[UUID](f"{prefix}entity_id", node.entity_id, SameAs(laid.id, "미리 만든 카드")),
+            Held[UUID](f"{prefix}id", node.id, SameAs(laid.id, card)),
+            Held[UUID](f"{prefix}entity_id", node.entity_id, SameAs(laid.id, card)),
             Same(f"{prefix}name", node.name, laid.name),
             Held[UUID](
-                f"{prefix}vfolder_id", node.vfolder_id, SameAs(laid.vfolder_id, "카드가 얹힌 폴더")
+                f"{prefix}vfolder_id",
+                node.vfolder_id,
+                SameAs(
+                    laid.vfolder_id,
+                    Says("카드가 놓인 vfolder", english="the vfolder the card is placed on"),
+                ),
             ),
             Same(f"{prefix}domain_name", node.domain_name, laid.domain),
             Held[UUID](
                 f"{prefix}project_id",
                 node.project_id,
-                SameAs(laid.project_id, "카드가 놓인 프로젝트"),
+                SameAs(
+                    laid.project_id,
+                    Says("카드가 놓인 프로젝트", english="the project the card is placed in"),
+                ),
             ),
             Held[UUID](
-                f"{prefix}creator_id", node.creator_id, SameAs(laid.creator_id, "카드를 만든 사람")
+                f"{prefix}creator_id",
+                node.creator_id,
+                SameAs(
+                    laid.creator_id,
+                    Says("카드를 만든 사람", english="the user who created the card"),
+                ),
             ),
             Same(f"{prefix}metadata.author", node.metadata.author, None),
             Same(f"{prefix}metadata.title", node.metadata.title, self.title),
@@ -176,7 +202,10 @@ class Mentions(Condition[str]):
 
     @override
     def says(self) -> str:
-        return f"'{self.phrase}'를 담은 이유"
+        return Says(
+            f"'{self.phrase}'를 담은 이유",
+            english=f"a reason containing '{self.phrase}'",
+        )
 
     @override
     def holds(self, got: str) -> bool:
@@ -191,7 +220,10 @@ class NoCardIsProcessed(Then[ModelCardsAndACaller, PartialBulkPayload[ModelCardN
 
     @override
     def says(self) -> str:
-        return "처리된 카드 없이 대상이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 카드 없이 대상이 모두 실패 목록에 옵니다",
+            english="no card is processed and every target comes back in the failed list",
+        )
 
     @override
     def look(
@@ -208,7 +240,14 @@ class NoCardIsProcessed(Then[ModelCardsAndACaller, PartialBulkPayload[ModelCardN
         ]
         for i, (failure, card) in enumerate(zip(payload.failed, laid.cards, strict=False)):
             verdicts += [
-                Held[UUID](f"failed[{i}].id", failure.id, SameAs(card.id, "대상 카드의 id")),
+                Held[UUID](
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(
+                        card.id,
+                        Says("대상 카드의 id", english="the id of the target card"),
+                    ),
+                ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]
         return verdicts

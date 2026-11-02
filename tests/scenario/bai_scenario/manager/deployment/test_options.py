@@ -36,6 +36,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -72,12 +73,22 @@ class Replacing(When[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeployment
     @override
     def describe(self, laid: ADeploymentAndACaller) -> str:
         if not self.entries:
-            given = "기본값만 담아"
+            given_ko = "기본값만 담아"
+            given_en = "only the defaults"
         else:
-            given = f"처리기별 설정 {', '.join(name for name, _, _ in self.entries)}을 담아"
+            names = ", ".join(name for name, _, _ in self.entries)
+            given_ko = f"처리기별 설정 {names}을 담아"
+            given_en = f"the per-handler settings {names}"
         if self.policy is not None:
-            given = f"선택 정책 {self.policy.value}와 {given}"
-        return f"{laid.caller.username}이 {laid.deployment.metadata.name}의 옵션을 {given} 갈아끼움"
+            given_ko = f"선택 정책 {self.policy.value}와 {given_ko}"
+            given_en = f"the selection policy {self.policy.value} and {given_en}"
+        return Says(
+            f"{laid.caller.username} 이 {laid.deployment.metadata.name}의 옵션을 {given_ko} 교체합니다",
+            english=(
+                f"{laid.caller.username} replaces the options of "
+                f"{laid.deployment.metadata.name} with {given_en}"
+            ),
+        )
 
     @override
     async def call(
@@ -110,7 +121,10 @@ class TheOptionsAreReplaced(Then[ADeploymentAndACaller, ReplaceDeploymentOptions
 
     @override
     def says(self) -> str:
-        return "갈아끼운 옵션만 온다"
+        return Says(
+            "교체한 옵션만 옵니다",
+            english="only the replaced options come back",
+        )
 
     @override
     def look(
@@ -123,7 +137,14 @@ class TheOptionsAreReplaced(Then[ADeploymentAndACaller, ReplaceDeploymentOptions
             return [Refused(EntityNotFoundError, answered.raised)]
         handler = payload.options.handler_options
         return [
-            Held("deployment_id", payload.deployment_id, SameAs(laid.deployment.id, "심은 배포")),
+            Held(
+                "deployment_id",
+                payload.deployment_id,
+                SameAs(
+                    laid.deployment.id,
+                    Says("미리 저장한 배포", english="the deployment seeded in advance"),
+                ),
+            ),
             Same("options.handler_options.default.timeout_sec", handler.default.timeout_sec, WAITS),
             Same(
                 "options.handler_options.default.max_retry_count",
@@ -158,9 +179,14 @@ class WhatIsGivenBecomesTheOptions(
 
     @override
     def describe(self) -> str:
-        return (
-            "수정 권한을 받은 사용자가 기본값과 처리기별 설정을 담아 옵션을 갈아끼우면, "
-            "준 것이 통째로 새 옵션이 되고 답은 그 옵션만 싣는다"
+        return Says(
+            "수정 권한을 받은 사용자가 기본값과 처리기별 설정을 담아 옵션을 교체하면, "
+            "준 것이 전부 새 옵션이 되고 응답은 그 옵션만 싣습니다",
+            english=(
+                "when a user granted update replaces the options with the defaults and per-handler "
+                "settings, what was given becomes the new options as a whole and the response "
+                "carries only those options"
+            ),
         )
 
     @override
@@ -193,9 +219,13 @@ class WhatIsNotGivenDoesNotStay(
 
     @override
     def describe(self) -> str:
-        return (
-            "물려받은 처리기별 설정이 있는 배포에 기본값만 담아 옵션을 갈아끼우면, "
-            "물려받은 설정이 하나도 남지 않는다"
+        return Says(
+            "상속한 처리기별 설정이 있는 배포에 기본값만 담아 옵션을 교체하면, "
+            "상속한 설정이 하나도 남지 않습니다",
+            english=(
+                "replacing the options of a deployment that holds inherited per-handler settings "
+                "with only the defaults leaves none of the inherited settings"
+            ),
         )
 
     @override
@@ -297,7 +327,13 @@ class AnUnregisteredHandlerIsRefused(
 
     @override
     def describe(self) -> str:
-        return "등록되지 않은 처리기 이름을 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다"
+        return Says(
+            "등록되지 않은 처리기 이름을 담아 옵션을 교체하면, 입력이 틀렸다는 이유로 거부됩니다",
+            english=(
+                "replacing the options with an unregistered handler name is rejected because the "
+                "input is wrong"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
@@ -329,7 +365,13 @@ class AHandlerNamedTwiceIsRefused(
 
     @override
     def describe(self) -> str:
-        return "같은 처리기 이름을 두 번 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다"
+        return Says(
+            "같은 처리기 이름을 두 번 담아 옵션을 교체하면, 입력이 틀렸다는 이유로 거부됩니다",
+            english=(
+                "replacing the options with the same handler name twice is rejected because the "
+                "input is wrong"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
@@ -361,7 +403,13 @@ class ReadingIsNotEnoughToReplace(
 
     @override
     def describe(self) -> str:
-        return "읽기 권한만 받은 사용자가 옵션을 갈아끼우면, 권한 부족으로 거부된다"
+        return Says(
+            "읽기 권한만 받은 사용자가 옵션을 교체하면, 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted only read replaces the options, the call is rejected for "
+                "lack of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:

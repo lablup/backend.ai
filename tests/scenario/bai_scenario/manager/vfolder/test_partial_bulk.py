@@ -30,6 +30,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -61,8 +62,13 @@ class UpdatingAll(When[TwoOwnFoldersAndAnothers, VFolderAdapter, Processed]):
 
     @override
     def describe(self, laid: TwoOwnFoldersAndAnothers) -> str:
-        return (
-            f"{laid.caller.username}이 자기 폴더 둘과 남의 폴더 하나를 한 번에 복제 가능으로 바꿈"
+        return Says(
+            f"{laid.caller.username}이 자기 vfolder 둘과 다른 사용자의 vfolder 하나를 한 번에 "
+            "복제 가능으로 변경합니다",
+            english=(
+                f"{laid.caller.username} makes their two vfolders and someone else's vfolder "
+                "cloneable in one call"
+            ),
         )
 
     @override
@@ -87,7 +93,14 @@ class SoftDeletingAll(When[TwoOwnFoldersAndAnothers, VFolderAdapter, Processed])
 
     @override
     def describe(self, laid: TwoOwnFoldersAndAnothers) -> str:
-        return f"{laid.caller.username}이 자기 폴더 둘과 남의 폴더 하나를 한 번에 soft delete 함"
+        return Says(
+            f"{laid.caller.username}이 자기 vfolder 둘과 다른 사용자의 vfolder 하나를 한 번에 "
+            "soft delete 합니다",
+            english=(
+                f"{laid.caller.username} soft deletes their two vfolders and someone else's "
+                "vfolder in one call"
+            ),
+        )
 
     @override
     async def call(self, adapter: VFolderAdapter, laid: TwoOwnFoldersAndAnothers) -> Processed:
@@ -106,8 +119,13 @@ class SoftDeletingThenRestoringOwn(When[TwoOwnFoldersAndAnothers, VFolderAdapter
 
     @override
     def describe(self, laid: TwoOwnFoldersAndAnothers) -> str:
-        return (
-            f"{laid.caller.username}이 자기 폴더 둘을 한 번에 soft delete 했다가 한 번에 restore 함"
+        return Says(
+            f"{laid.caller.username}이 자기 vfolder 둘을 한 번에 soft delete 했다가 한 번에 "
+            "restore 합니다. restore 의 응답을 반환합니다",
+            english=(
+                f"{laid.caller.username} soft deletes their two vfolders in one call and then "
+                "restores them in one call. It answers the restore"
+            ),
         )
 
     @override
@@ -128,7 +146,14 @@ class DeniedLook:
         verdicts: list[Verdict] = [Same("failed count", len(payload.failed), len(self.folders))]
         for i, (failure, folder) in enumerate(zip(payload.failed, self.folders, strict=False)):
             verdicts += [
-                Held[UUID](f"failed[{i}].id", failure.id, SameAs(folder.id, "대상 폴더의 id")),
+                Held[UUID](
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(
+                        folder.id,
+                        Says("대상 vfolder 의 id", english="the id of the target vfolder"),
+                    ),
+                ),
                 Held(f"failed[{i}].message", failure.message, Mentions(DENIED)),
             ]
         return verdicts
@@ -146,9 +171,20 @@ class OwnAreProcessed(Then[TwoOwnFoldersAndAnothers, Processed]):
     @override
     def says(self) -> str:
         state = "복제 가능으로" if self.cloneable else f"{self.status} 상태로"
+        state_en = "cloneable" if self.cloneable else f"in the {self.status} state"
         if not self.others_denied:
-            return f"자기 폴더 둘이 {state} 오고, 실패한 것은 없다"
-        return f"자기 폴더 둘이 {state} 오고, 남의 폴더는 권한이 없다는 이유로 실패 목록에 온다"
+            return Says(
+                f"자기 vfolder 둘이 {state} 오고, 실패한 것은 없습니다",
+                english=f"both of their vfolders come back {state_en} and nothing failed",
+            )
+        return Says(
+            f"자기 vfolder 둘이 {state} 오고, 다른 사용자의 vfolder 는 권한이 없다는 이유로 "
+            "실패 목록에 옵니다",
+            english=(
+                f"both of their vfolders come back {state_en} and the other user's vfolder "
+                "comes back in the failed list for lack of permission"
+            ),
+        )
 
     @override
     def look(self, laid: TwoOwnFoldersAndAnothers, answered: Answered[Processed]) -> list[Verdict]:
@@ -170,7 +206,13 @@ class NothingIsProcessed(Then[TwoOwnFoldersAndAnothers, Processed]):
 
     @override
     def says(self) -> str:
-        return "처리된 폴더 없이 셋 모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "처리된 vfolder 없이, 셋 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "no vfolder is processed and all three come back in the failed list for lack "
+                "of permission"
+            ),
+        )
 
     @override
     def look(self, laid: TwoOwnFoldersAndAnothers, answered: Answered[Processed]) -> list[Verdict]:
@@ -195,9 +237,16 @@ class AGrantedOwnerUpdatesTheirsOnly(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 개인 프로젝트에서 폴더 수정 권한을 받은 사용자가 자기 폴더 둘과 남의 폴더 하나를 "
-            "한 번에 수정하면, 자기 폴더 둘은 수정되어 오고 남의 폴더는 권한 부족으로 실패 목록에 온다"
+        return Says(
+            "자기 개인 프로젝트에서 vfolder 수정 권한을 받은 사용자가 자기 vfolder 둘과 다른 "
+            "사용자의 vfolder 하나를 한 번에 수정하면, 자기 vfolder 둘은 수정되어 응답으로 오고 "
+            "다른 사용자의 vfolder 는 권한 부족으로 실패 목록에 옵니다",
+            english=(
+                "when a user granted vfolder update in their personal project updates their two "
+                "vfolders and someone else's vfolder in one call, their two vfolders come back "
+                "updated and the other user's vfolder comes back in the failed list for lack of "
+                "permission"
+            ),
         )
 
     @override
@@ -225,9 +274,13 @@ class AUserGrantedNothingUpdatesNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 폴더 여럿을 한 번에 수정하려 하면, 수정된 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 vfolder 여럿을 한 번에 수정하려 하면, 수정된 것 없이 "
+            "모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to update several vfolders in one call, none "
+                "is updated and all come back in the failed list for lack of permission"
+            ),
         )
 
     @override
@@ -255,10 +308,16 @@ class AGrantedOwnerSoftDeletesTheirsOnly(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 개인 프로젝트에서 폴더 soft delete 권한을 받은 사용자가 자기 폴더 둘과 남의 폴더 "
-            "하나를 한 번에 soft delete 하면, 자기 폴더 둘은 삭제 대기로 오고 남의 폴더는 권한 "
-            "부족으로 실패 목록에 온다"
+        return Says(
+            "자기 개인 프로젝트에서 vfolder soft delete 권한을 받은 사용자가 자기 vfolder 둘과 "
+            "다른 사용자의 vfolder 하나를 한 번에 soft delete 하면, 자기 vfolder 둘은 삭제 "
+            "대기로 오고 다른 사용자의 vfolder 는 권한 부족으로 실패 목록에 옵니다",
+            english=(
+                "when a user granted vfolder soft delete in their personal project soft deletes "
+                "their two vfolders and someone else's vfolder in one call, their two vfolders "
+                "come back delete-pending and the other user's vfolder comes back in the failed "
+                "list for lack of permission"
+            ),
         )
 
     @override
@@ -286,9 +345,13 @@ class AUserGrantedNothingSoftDeletesNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 폴더 여럿을 한 번에 soft delete 하려 하면, soft delete "
-            "된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 vfolder 여럿을 한 번에 soft delete 하려 하면, soft "
+            "delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to soft delete several vfolders in one call, "
+                "none is soft deleted and all come back in the failed list for lack of permission"
+            ),
         )
 
     @override
@@ -316,9 +379,13 @@ class RestoringBringsSeveralBack(
 
     @override
     def describe(self) -> str:
-        return (
-            "폴더 soft delete 권한을 받은 사용자가 soft delete 한 자기 폴더 둘을 한 번에 restore "
-            "하면, 둘 다 쓸 수 있는 상태로 온다"
+        return Says(
+            "vfolder soft delete 권한을 받은 사용자가 soft delete 한 자기 vfolder 둘을 한 번에 "
+            "restore 하면, 둘 다 사용할 수 있는 상태로 옵니다",
+            english=(
+                "when a user granted vfolder soft delete restores their two soft-deleted "
+                "vfolders in one call, both come back ready for use"
+            ),
         )
 
     @override

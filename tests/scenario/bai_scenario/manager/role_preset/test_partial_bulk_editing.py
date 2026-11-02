@@ -18,7 +18,7 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
 from ai.backend.common.dto.manager.v2.role_preset.response import RolePresetNode
 from ai.backend.manager.api.adapters.role_preset.adapter import RolePresetAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.role_preset import (
     AProjectAndADomainPresetAndSomeone,
     EveryTargetComesBack,
@@ -46,7 +46,12 @@ class TurningAutoAssignOnForEvery(When[ManyPresetsAndACaller, RolePresetAdapter,
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 프리셋 {len(laid.laid)}개의 자동 부여를 한 번에 켬"
+        return Says(
+            f"{laid.caller.username}이 프리셋 {len(laid.laid)}개의 자동 부여를 한 번에 켭니다",
+            english=(
+                f"{laid.caller.username} turns auto assign on for {len(laid.laid)} presets at once"
+            ),
+        )
 
     @override
     async def call(self, adapter: RolePresetAdapter, laid: ManyPresetsAndACaller) -> Edited:
@@ -96,7 +101,14 @@ class TheSuperadminEditsSeveral(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 프리셋 여럿의 자동 부여를 한 번에 켜면, 모두 새 값으로 오고 실패한 것은 없다"
+        return Says(
+            "superadmin 이 프리셋 여럿의 자동 부여를 한 번에 켜면, 모두 새 값으로 오고 "
+            "실패한 것은 없습니다",
+            english=(
+                "when the superadmin turns auto assign on for several presets at once, "
+                "all of them come back with the new value and nothing failed"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
@@ -121,9 +133,14 @@ class AUserGrantedNothingEditsNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 고치려 하면, "
-            "고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 수정하려 하면, "
+            "수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to edit several presets at once, "
+                "none is edited and every one comes back in the failed list for "
+                "lack of permission"
+            ),
         )
 
     @override

@@ -17,51 +17,51 @@ Scenario: incomplete 1 / 6
 
 | scenario | verdict |
 |---|---|
-| [슈퍼관리자가 이름만 지정해 설정 정의를 등록하면, 이름은 지정한 그대로이고 ID와 시각은 서버가 채운 노드가 반환된다](#registering-the-superadmin-registers-a-name) | answered |
-| [이미 등록된 이름으로 슈퍼관리자가 다시 등록하면 거부되지만, 응답이 이름 중복이라고 알려 주지 않고 데이터베이스의 제약 위반이 그대로 전파된다](#registering-a-name-already-registered-is-refused-as-a-constraint-violation) | rejected |
-| [일반 사용자가 설정 정의를 등록하려 하면, 슈퍼관리자 권한이 없어 거부된다](#registering-a-user-who-is-not-the-superadmin-may-not-register-a-name) | rejected |
-| [RBAC 강제를 꺼도 일반 사용자의 설정 정의 등록은 거부된다](#registering-turning-enforcement-off-still-does-not-let-a-user-register-a-name) | rejected |
+| [when the superadmin registers a config definition with only a name, the node comes back with the name as given and the id and times filled by the server](#registering-the-superadmin-registers-a-name) | answered |
+| [when the superadmin registers again with a name already registered, it is rejected, but the answer does not say the name is taken and the database constraint violation propagates as it is](#registering-a-name-already-registered-is-refused-as-a-constraint-violation) | rejected |
+| [when a regular user tries to register a config definition, it is rejected because the user has no superadmin privilege](#registering-a-user-who-is-not-the-superadmin-may-not-register-a-name) | rejected |
+| [turning RBAC enforcement off still rejects registering a config definition by a regular user](#registering-turning-enforcement-off-still-does-not-let-a-user-register-a-name) | rejected |
 
 **admin_get**
 
 | scenario | verdict |
 |---|---|
-| [설정 정의 하나가 있고 슈퍼관리자가 ID로 조회하면, 그 정의의 모든 필드가 반환된다](#reading-the-superadmin-reads-a-definition-by-id) | answered |
-| [RBAC 강제를 끄면 권한이 없는 일반 사용자도 설정 정의를 조회할 수 있다](#reading-turning-enforcement-off-lets-a-plain-user-read) | answered |
-| [같은 설정 정의가 있고 권한이 없는 일반 사용자가 조회하면, 엔티티 읽기 권한이 없어 거부된다](#reading-a-user-who-is-not-the-superadmin-may-not-read-a-definition) | rejected |
-| [슈퍼관리자가 존재하지 않는 ID로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다](#reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
+| [when one config definition exists and the superadmin reads it by id, every field of the definition comes back](#reading-the-superadmin-reads-a-definition-by-id) | answered |
+| [turning RBAC enforcement off lets a regular user with no permission read a config definition](#reading-turning-enforcement-off-lets-a-plain-user-read) | answered |
+| [when a regular user with no permission reads the same config definition, it is rejected because the user has no entity read permission](#reading-a-user-who-is-not-the-superadmin-may-not-read-a-definition) | rejected |
+| [when the superadmin reads by a missing id, it is rejected because no such target exists. Only a user who passes the permission check sees this answer](#reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
 
 **admin_search**
 
 | scenario | verdict |
 |---|---|
-| [설정 정의 셋이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 셋 다 집계된다](#searching-the-superadmin-counts-every-definition) | answered |
-| [일반 사용자가 전체를 검색하면, 슈퍼관리자 권한이 없어 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-definitions) | rejected |
+| [when three config definitions exist and the superadmin searches everything without a filter, all three are counted](#searching-the-superadmin-counts-every-definition) | answered |
+| [when a regular user searches everything, it is rejected because the user has no superadmin privilege](#searching-a-user-who-is-not-the-superadmin-may-not-search-definitions) | rejected |
 
 **batch_load_by_ids**
 
 | scenario | verdict |
 |---|---|
-| [빈 ID 목록을 주면 빈 응답이 반환된다](#reading_many-an-empty-id-list-answers-empty) | answered |
-| [슈퍼관리자가 같은 설정 정의 ID를 두 번 조회하면, 입력 순서를 보존해 같은 노드가 두 번 반환된다](#reading_many-duplicate-ids-keep-their-input-positions) | answered |
-| [슈퍼관리자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 ID에 해당하는 항목은 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다](#reading_many-the-superadmin-reads-both-and-a-missing-id-comes-back-empty) | answered |
-| [슈퍼관리자가 아닌 사용자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 요청 전체가 막히는 것이 아니라 세 항목 모두 그 항목만 권한 부족으로 거부된다](#reading_many-a-user-who-is-not-the-superadmin-is-refused-per-id) | rejected |
+| [an empty id list answers empty](#reading_many-an-empty-id-list-answers-empty) | answered |
+| [when the superadmin reads the same config definition id twice, the same node comes back twice, keeping the input order](#reading_many-duplicate-ids-keep-their-input-positions) | answered |
+| [when the superadmin reads two config definitions and one missing id at once, the two come back as nodes and the item for the missing id is empty. Only a user who passes the permission check sees an empty item](#reading_many-the-superadmin-reads-both-and-a-missing-id-comes-back-empty) | answered |
+| [when a user who is not the superadmin reads two config definitions and one missing id at once, the whole request is not blocked; all three items are rejected for that item alone for lack of permission](#reading_many-a-user-who-is-not-the-superadmin-is-refused-per-id) | rejected |
 
 **partial_bulk_purge**
 
 | scenario | verdict |
 |---|---|
-| [권한이 없는 일반 사용자가 설정 정의 둘을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-definitions) | answered |
-| [슈퍼관리자가 설정 정의 둘과 존재하지 않는 ID를 한 번에 영구 삭제하면, 둘은 처리된 목록에 오고 없는 ID는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | answered |
+| [when a regular user with no permission tries to purge two config definitions at once, nothing is purged and both come back in the failed list for lack of permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-definitions) | answered |
+| [when the superadmin purges two config definitions and a missing id at once, both come back in the succeeded list and the missing id comes back in the failed list because no such target exists](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | answered |
 
 **purge**
 
 | scenario | verdict |
 |---|---|
-| [허용 목록 항목과 설정 조각이 딸린 설정 정의를 슈퍼관리자가 영구 삭제하면, 종속 행이 삭제를 막지 않고 정의의 ID가 반환된다](#purging-a-definition-holding-an-entry-and-a-fragment-is-still-purged) | answered |
-| [종속 행이 없는 설정 정의를 슈퍼관리자가 영구 삭제하면, 삭제한 ID가 반환된다](#purging-the-superadmin-purges-a-definition) | answered |
-| [같은 설정 정의가 있고 권한이 없는 일반 사용자가 영구 삭제하면, 엔티티 영구 삭제 권한이 없어 거부된다](#purging-a-user-who-is-not-the-superadmin-may-not-purge-a-definition) | rejected |
-| [슈퍼관리자가 존재하지 않는 ID를 영구 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다](#purging-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
+| [when the superadmin purges a config definition holding an allow-list entry and a config fragment, the dependent rows do not block the purge and the id of the definition comes back](#purging-a-definition-holding-an-entry-and-a-fragment-is-still-purged) | answered |
+| [when the superadmin purges a config definition with no dependent rows, the purged id comes back](#purging-the-superadmin-purges-a-definition) | answered |
+| [when a regular user with no permission purges the same config definition, it is rejected because the user has no entity purge permission](#purging-a-user-who-is-not-the-superadmin-may-not-purge-a-definition) | rejected |
+| [when the superadmin purges a missing id, it is rejected because no such target exists](#purging-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
 
 ### admin_create
 
@@ -69,108 +69,108 @@ Scenario: incomplete 1 / 6
 
 #### [the-superadmin-registers-a-name](/tests/scenario/bai_scenario/manager/app_config_definition/test_registering.py): pass
 
-슈퍼관리자가 이름만 지정해 설정 정의를 등록하면, 이름은 지정한 그대로이고 ID와 시각은 서버가 채운 노드가 반환된다
+when the superadmin registers a config definition with only a name, the node comes back with the name as given and the id and times filled by the server
 
 Given
 
-- 설정 정의 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one config definition, and one superadmin
+  - Domain home-1
+  - Config definition config-1: the config of this name is registered
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.admin_create: user-1이 설정 이름 fresh-config 등록
+- AppConfigDefinitionAdapter.admin_create: user-1 registers the config name fresh-config
 
 Then
 
-- 등록한 설정 정의의 모든 필드가 반환된다
-  - ID: 무시함: 데이터베이스가 만든다
+- every field of the registered config definition comes back
+  - ID: skipped: the database generates it
   - config_name = 'fresh-config'
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="registering-a-name-already-registered-is-refused-as-a-constraint-violation"></a>
 
 #### [a-name-already-registered-is-refused-as-a-constraint-violation](/tests/scenario/bai_scenario/manager/app_config_definition/test_registering.py): pass
 
-이미 등록된 이름으로 슈퍼관리자가 다시 등록하면 거부되지만, 응답이 이름 중복이라고 알려 주지 않고 데이터베이스의 제약 위반이 그대로 전파된다
+when the superadmin registers again with a name already registered, it is rejected, but the answer does not say the name is taken and the database constraint violation propagates as it is
 
 Given
 
-- 설정 정의 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one config definition, and one superadmin
+  - Domain home-1
+  - Config definition config-1: the config of this name is registered
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.admin_create: user-1이 설정 이름 config-1 등록
+- AppConfigDefinitionAdapter.admin_create: user-1 registers the config name config-1
 
 Then
 
-- 거부된다
-  - 거부: UniqueConstraintViolationError
+- the call is rejected
+  - rejected: UniqueConstraintViolationError
 
 <a id="registering-a-user-who-is-not-the-superadmin-may-not-register-a-name"></a>
 
 #### [a-user-who-is-not-the-superadmin-may-not-register-a-name](/tests/scenario/bai_scenario/manager/app_config_definition/test_registering.py): pass
 
-일반 사용자가 설정 정의를 등록하려 하면, 슈퍼관리자 권한이 없어 거부된다
+when a regular user tries to register a config definition, it is rejected because the user has no superadmin privilege
 
 Given
 
-- 설정 정의 하나와, 권한이 없는 일반 사용자 한 명
-  - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one config definition, and one Regular user with no permission
+  - Domain home-1
+  - Config definition config-1: the config of this name is registered
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.admin_create: user-1이 설정 이름 fresh-config 등록
+- AppConfigDefinitionAdapter.admin_create: user-1 registers the config name fresh-config
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 <a id="registering-turning-enforcement-off-still-does-not-let-a-user-register-a-name"></a>
 
 #### [turning-enforcement-off-still-does-not-let-a-user-register-a-name](/tests/scenario/bai_scenario/manager/app_config_definition/test_registering.py): pass
 
-RBAC 강제를 꺼도 일반 사용자의 설정 정의 등록은 거부된다
+turning RBAC enforcement off still rejects registering a config definition by a regular user
 
 Given
 
-- 설정 정의 하나와, 권한이 없는 일반 사용자 한 명
-  - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one config definition, and one Regular user with no permission
+  - Domain home-1
+  - Config definition config-1: the config of this name is registered
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.admin_create: user-1이 설정 이름 fresh-config 등록
+- AppConfigDefinitionAdapter.admin_create: user-1 registers the config name fresh-config
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### admin_get
 
@@ -178,111 +178,111 @@ Then
 
 #### [the-superadmin-reads-a-definition-by-id](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading.py): pass
 
-설정 정의 하나가 있고 슈퍼관리자가 ID로 조회하면, 그 정의의 모든 필드가 반환된다
+when one config definition exists and the superadmin reads it by id, every field of the definition comes back
 
 Given
 
-- 설정 정의 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one config definition, and one superadmin
+  - Domain home-1
+  - Config definition config-1: the config of this name is registered
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.admin_get: user-1이 config-1(으)로 조회
+- AppConfigDefinitionAdapter.admin_get: user-1 reads config-1 by id
 
 Then
 
-- 미리 만들어 둔 설정 정의의 모든 필드가 반환된다
-  - ID: 미리 만들어 둔 설정 정의와 같다
+- every field of the config definition made in advance comes back
+  - ID: same as the config definition made in advance
   - config_name = 'config-1'
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="reading-turning-enforcement-off-lets-a-plain-user-read"></a>
 
 #### [turning-enforcement-off-lets-a-plain-user-read](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading.py): pass
 
-RBAC 강제를 끄면 권한이 없는 일반 사용자도 설정 정의를 조회할 수 있다
+turning RBAC enforcement off lets a regular user with no permission read a config definition
 
 Given
 
-- 설정 정의 하나와, 권한이 없는 일반 사용자 한 명
-  - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one config definition, and one Regular user with no permission
+  - Domain home-1
+  - Config definition config-1: the config of this name is registered
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.admin_get: user-1이 config-1(으)로 조회
+- AppConfigDefinitionAdapter.admin_get: user-1 reads config-1 by id
 
 Then
 
-- 미리 만들어 둔 설정 정의의 모든 필드가 반환된다
-  - ID: 미리 만들어 둔 설정 정의와 같다
+- every field of the config definition made in advance comes back
+  - ID: same as the config definition made in advance
   - config_name = 'config-1'
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="reading-a-user-who-is-not-the-superadmin-may-not-read-a-definition"></a>
 
 #### [a-user-who-is-not-the-superadmin-may-not-read-a-definition](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading.py): pass
 
-같은 설정 정의가 있고 권한이 없는 일반 사용자가 조회하면, 엔티티 읽기 권한이 없어 거부된다
+when a regular user with no permission reads the same config definition, it is rejected because the user has no entity read permission
 
 Given
 
-- 설정 정의 하나와, 권한이 없는 일반 사용자 한 명
-  - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one config definition, and one Regular user with no permission
+  - Domain home-1
+  - Config definition config-1: the config of this name is registered
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.admin_get: user-1이 config-1(으)로 조회
+- AppConfigDefinitionAdapter.admin_get: user-1 reads config-1 by id
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
 #### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading.py): pass
 
-슈퍼관리자가 존재하지 않는 ID로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다
+when the superadmin reads by a missing id, it is rejected because no such target exists. Only a user who passes the permission check sees this answer
 
 Given
 
-- 설정 정의 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one config definition, and one superadmin
+  - Domain home-1
+  - Config definition config-1: the config of this name is registered
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.admin_get: user-1이 존재하지 않는 ID(으)로 조회
+- AppConfigDefinitionAdapter.admin_get: user-1 reads by a missing id
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 ### admin_search
 
@@ -290,28 +290,28 @@ Then
 
 #### [the-superadmin-counts-every-definition](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py): pass
 
-설정 정의 셋이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 셋 다 집계된다
+when three config definitions exist and the superadmin searches everything without a filter, all three are counted
 
 Given
 
-- 설정 정의 3개와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 definition-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 definition-2: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 definition-3: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 3 config definitions, and one superadmin
+  - Domain home-1
+  - Config definition definition-1: the config of this name is registered
+  - Config definition definition-2: the config of this name is registered
+  - Config definition definition-3: the config of this name is registered
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.admin_search: user-1이 필터 없이 전체 조회
+- AppConfigDefinitionAdapter.admin_search: user-1 reads everything without a filter
 
 Then
 
-- 미리 만들어 둔 설정 정의가 모두, 그리고 그것만 집계된다
+- every config definition made in advance is counted, and only those
   - items = ['definition-1', 'definition-2', 'definition-3']
   - total_count = 3
   - has_next_page = False
@@ -321,29 +321,29 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-search-definitions](/tests/scenario/bai_scenario/manager/app_config_definition/test_searching.py): pass
 
-일반 사용자가 전체를 검색하면, 슈퍼관리자 권한이 없어 거부된다
+when a regular user searches everything, it is rejected because the user has no superadmin privilege
 
 Given
 
-- 설정 정의 3개와, 권한이 없는 일반 사용자 한 명
-  - 도메인 home-1
-  - 설정 정의 definition-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 definition-2: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 definition-3: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 3 config definitions, and one Regular user with no permission
+  - Domain home-1
+  - Config definition definition-1: the config of this name is registered
+  - Config definition definition-2: the config of this name is registered
+  - Config definition definition-3: the config of this name is registered
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.admin_search: user-1이 필터 없이 전체 조회
+- AppConfigDefinitionAdapter.admin_search: user-1 reads everything without a filter
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### batch_load_by_ids
 
@@ -351,117 +351,117 @@ Then
 
 #### [an-empty-id-list-answers-empty](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading_many.py): pass
 
-빈 ID 목록을 주면 빈 응답이 반환된다
+an empty id list answers empty
 
 Given
 
-- 설정 정의 둘과, 권한이 없는 일반 사용자 한 명
-  - 도메인 home-1
-  - 설정 정의 first-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 second-1: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two config definitions, and one Regular user with no permission
+  - Domain home-1
+  - Config definition first-1: the config of this name is registered
+  - Config definition second-1: the config of this name is registered
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.batch_load_by_ids: user-1이 빈 ID 목록으로 조회
+- AppConfigDefinitionAdapter.batch_load_by_ids: user-1 reads with an empty id list
 
 Then
 
-- 빈 응답이 반환된다
+- an empty answer comes back
   - items = []
 
 <a id="reading_many-duplicate-ids-keep-their-input-positions"></a>
 
 #### [duplicate-ids-keep-their-input-positions](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading_many.py): pass
 
-슈퍼관리자가 같은 설정 정의 ID를 두 번 조회하면, 입력 순서를 보존해 같은 노드가 두 번 반환된다
+when the superadmin reads the same config definition id twice, the same node comes back twice, keeping the input order
 
 Given
 
-- 설정 정의 둘과, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 first-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 second-1: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two config definitions, and one superadmin
+  - Domain home-1
+  - Config definition first-1: the config of this name is registered
+  - Config definition second-1: the config of this name is registered
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.batch_load_by_ids: user-1이 첫 번째 설정 정의의 ID를 두 번 조회
+- AppConfigDefinitionAdapter.batch_load_by_ids: user-1 reads the id of the first config definition twice
 
 Then
 
-- 중복 ID의 두 항목에 같은 설정 정의가 반환된다
+- the same config definition comes back for both items of the duplicate id
   - items = 2
-  - items[0].ID: 미리 만들어 둔 첫 번째 설정 정의와 같다
-  - items[1].ID: 미리 만들어 둔 첫 번째 설정 정의와 같다
+  - items[0].ID: same as the first config definition made in advance
+  - items[1].ID: same as the first config definition made in advance
 
 <a id="reading_many-the-superadmin-reads-both-and-a-missing-id-comes-back-empty"></a>
 
 #### [the-superadmin-reads-both-and-a-missing-id-comes-back-empty](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading_many.py): pass
 
-슈퍼관리자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 ID에 해당하는 항목은 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다
+when the superadmin reads two config definitions and one missing id at once, the two come back as nodes and the item for the missing id is empty. Only a user who passes the permission check sees an empty item
 
 Given
 
-- 설정 정의 둘과, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 first-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 second-1: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two config definitions, and one superadmin
+  - Domain home-1
+  - Config definition first-1: the config of this name is registered
+  - Config definition second-1: the config of this name is registered
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.batch_load_by_ids: user-1이 first-1, second-1, 존재하지 않는 ID를 한 번에 조회
+- AppConfigDefinitionAdapter.batch_load_by_ids: user-1 reads first-1, second-1 and a missing id at once
 
 Then
 
-- 있는 둘은 노드로 반환되고, 없는 ID에 해당하는 항목은 비어 있다
+- the two existing items come back as nodes and the item for the missing id is empty
   - items = 3
-  - items[0].ID: 미리 만들어 둔 첫째 설정 정의와 같다
-  - items[1].ID: 미리 만들어 둔 둘째 설정 정의와 같다
+  - items[0].ID: same as the first config definition made in advance
+  - items[1].ID: same as the second config definition made in advance
   - items[2] = None
 
 <a id="reading_many-a-user-who-is-not-the-superadmin-is-refused-per-id"></a>
 
 #### [a-user-who-is-not-the-superadmin-is-refused-per-id](/tests/scenario/bai_scenario/manager/app_config_definition/test_reading_many.py): pass
 
-슈퍼관리자가 아닌 사용자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 요청 전체가 막히는 것이 아니라 세 항목 모두 그 항목만 권한 부족으로 거부된다
+when a user who is not the superadmin reads two config definitions and one missing id at once, the whole request is not blocked; all three items are rejected for that item alone for lack of permission
 
 Given
 
-- 설정 정의 둘과, 권한이 없는 일반 사용자 한 명
-  - 도메인 home-1
-  - 설정 정의 first-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 second-1: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two config definitions, and one Regular user with no permission
+  - Domain home-1
+  - Config definition first-1: the config of this name is registered
+  - Config definition second-1: the config of this name is registered
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.batch_load_by_ids: user-1이 first-1, second-1, 존재하지 않는 ID를 한 번에 조회
+- AppConfigDefinitionAdapter.batch_load_by_ids: user-1 reads first-1, second-1 and a missing id at once
 
 Then
 
-- 있는 둘도 없는 ID도 그 항목만 거부된다
+- both existing items and the missing id are rejected for that item alone
   - items = 3
-  - 거부: NotEnoughPermission
-  - 거부: NotEnoughPermission
-  - 거부: NotEnoughPermission
+  - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
 
 ### partial_bulk_purge
 
@@ -469,63 +469,63 @@ Then
 
 #### [a-user-granted-nothing-purges-none-of-several-definitions](/tests/scenario/bai_scenario/manager/app_config_definition/test_partial_bulk_purging.py): pass
 
-권한이 없는 일반 사용자가 설정 정의 둘을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다
+when a regular user with no permission tries to purge two config definitions at once, nothing is purged and both come back in the failed list for lack of permission
 
 Given
 
-- 설정 정의 둘과, 권한이 없는 일반 사용자 한 명
-  - 도메인 home-1
-  - 설정 정의 first-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 second-1: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two config definitions, and one Regular user with no permission
+  - Domain home-1
+  - Config definition first-1: the config of this name is registered
+  - Config definition second-1: the config of this name is registered
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.partial_bulk_purge: user-1이 설정 정의 둘를 한 번에 영구 삭제
+- AppConfigDefinitionAdapter.partial_bulk_purge: user-1 purges two config definitions at once
 
 Then
 
-- 처리된 설정 정의 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다
+- no config definition is processed and both come back in the failed list for lack of permission
   - successes = []
   - failed count = 2
-  - failed[0].id: 준비한 ID와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 준비한 ID와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id prepared
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id prepared
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_purging-purging-several-answers-for-the-missing-one"></a>
 
 #### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/app_config_definition/test_partial_bulk_purging.py): pass
 
-슈퍼관리자가 설정 정의 둘과 존재하지 않는 ID를 한 번에 영구 삭제하면, 둘은 처리된 목록에 오고 없는 ID는 대상이 없다는 이유로 실패 목록에 온다
+when the superadmin purges two config definitions and a missing id at once, both come back in the succeeded list and the missing id comes back in the failed list because no such target exists
 
 Given
 
-- 설정 정의 둘과, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 first-1: 이 이름의 설정이 등록돼 있다
-  - 설정 정의 second-1: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two config definitions, and one superadmin
+  - Domain home-1
+  - Config definition first-1: the config of this name is registered
+  - Config definition second-1: the config of this name is registered
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.partial_bulk_purge: user-1이 설정 정의 둘와 존재하지 않는 ID를 한 번에 영구 삭제
+- AppConfigDefinitionAdapter.partial_bulk_purge: user-1 purges two config definitions and a missing id at once
 
 Then
 
-- 설정 정의 둘은 처리된 목록에, 없는 ID는 대상이 없다는 이유로 실패 목록에 온다
-  - successes: 준비한 ID 둘와 같다
+- both config definitions come back in the succeeded list, and the missing id comes back in the failed list because no such target exists
+  - successes: same as the two ids prepared
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 ID와 같다
-  - failed[0].message: 'not found'를 담은 이유
+  - failed[0].id: same as the missing id put in the request
+  - failed[0].message: a reason containing 'not found'
 
 ### purge
 
@@ -533,105 +533,105 @@ Then
 
 #### [a-definition-holding-an-entry-and-a-fragment-is-still-purged](/tests/scenario/bai_scenario/manager/app_config_definition/test_purging.py): pass
 
-허용 목록 항목과 설정 조각이 딸린 설정 정의를 슈퍼관리자가 영구 삭제하면, 종속 행이 삭제를 막지 않고 정의의 ID가 반환된다
+when the superadmin purges a config definition holding an allow-list entry and a config fragment, the dependent rows do not block the purge and the id of the definition comes back
 
 Given
 
-- 허용 목록 항목과 설정 조각이 딸린 설정 정의 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 공개 설정 조각 public-fragment-1: 값 {'theme': 'light'}
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one config definition holding an allow-list entry and a config fragment, and one superadmin
+  - Domain home-1
+  - Config definition config-1: the config of this name is registered
+  - Allow-list entry entry-1: the config of this name can be set in the public scope, rank is the default of the scope kind
+  - public app config fragment public-fragment-1: value {'theme': 'light'}
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.purge: user-1이 config-1 영구 삭제
+- AppConfigDefinitionAdapter.purge: user-1 purges config-1
 
 Then
 
-- 영구 삭제한 설정 정의의 ID를 응답한다
-  - ID: 미리 만들어 둔 설정 정의와 같다
+- it answers with the id of the purged config definition
+  - ID: same as the config definition made in advance
 
 <a id="purging-the-superadmin-purges-a-definition"></a>
 
 #### [the-superadmin-purges-a-definition](/tests/scenario/bai_scenario/manager/app_config_definition/test_purging.py): pass
 
-종속 행이 없는 설정 정의를 슈퍼관리자가 영구 삭제하면, 삭제한 ID가 반환된다
+when the superadmin purges a config definition with no dependent rows, the purged id comes back
 
 Given
 
-- 설정 정의 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one config definition, and one superadmin
+  - Domain home-1
+  - Config definition config-1: the config of this name is registered
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.purge: user-1이 config-1 영구 삭제
+- AppConfigDefinitionAdapter.purge: user-1 purges config-1
 
 Then
 
-- 영구 삭제한 설정 정의의 ID를 응답한다
-  - ID: 미리 만들어 둔 설정 정의와 같다
+- it answers with the id of the purged config definition
+  - ID: same as the config definition made in advance
 
 <a id="purging-a-user-who-is-not-the-superadmin-may-not-purge-a-definition"></a>
 
 #### [a-user-who-is-not-the-superadmin-may-not-purge-a-definition](/tests/scenario/bai_scenario/manager/app_config_definition/test_purging.py): pass
 
-같은 설정 정의가 있고 권한이 없는 일반 사용자가 영구 삭제하면, 엔티티 영구 삭제 권한이 없어 거부된다
+when a regular user with no permission purges the same config definition, it is rejected because the user has no entity purge permission
 
 Given
 
-- 설정 정의 하나와, 권한이 없는 일반 사용자 한 명
-  - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one config definition, and one Regular user with no permission
+  - Domain home-1
+  - Config definition config-1: the config of this name is registered
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.purge: user-1이 config-1 영구 삭제
+- AppConfigDefinitionAdapter.purge: user-1 purges config-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="purging-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
 #### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_definition/test_purging.py): pass
 
-슈퍼관리자가 존재하지 않는 ID를 영구 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다
+when the superadmin purges a missing id, it is rejected because no such target exists
 
 Given
 
-- 설정 정의 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one config definition, and one superadmin
+  - Domain home-1
+  - Config definition config-1: the config of this name is registered
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- AppConfigDefinitionAdapter.purge: user-1이 존재하지 않는 ID 영구 삭제
+- AppConfigDefinitionAdapter.purge: user-1 purges a missing id
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 

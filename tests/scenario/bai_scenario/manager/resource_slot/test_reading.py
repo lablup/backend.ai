@@ -11,7 +11,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import ResourceSlot
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_slot import (
     ASlotTypeAndACaller,
@@ -41,7 +41,11 @@ class ReadingByName(When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotT
 
     @override
     def describe(self, laid: ASlotTypeAndACaller) -> str:
-        return f"{laid.caller.username}이 {self.named or laid.slot_type.slot_name} 이름으로 조회"
+        name = self.named or laid.slot_type.slot_name
+        return Says(
+            f"{laid.caller.username} 이 {name} 이름으로 조회합니다",
+            english=f"{laid.caller.username} reads under the name {name}",
+        )
 
     @override
     async def call(
@@ -61,9 +65,14 @@ class AUserGrantedNothingReadsByName(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 이름으로 조회하면 그 슬롯 종류 전체가 반환된다. "
-            "이름을 풀어내는 단계도 그 뒤의 조회도 인증만 확인한다"
+        return Says(
+            "아무 권한도 없는 사용자가 이름으로 조회하면 그 자원 슬롯 유형 전체가 반환됩니다. "
+            "이름을 풀어내는 단계도 그 뒤의 조회도 인증만 확인합니다",
+            english=(
+                "when a user granted nothing reads by name, the whole slot type comes back. "
+                "Neither the name resolution step nor the read after it checks anything but "
+                "authentication"
+            ),
         )
 
     @override
@@ -89,9 +98,14 @@ class ANameNothingAnswersToIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "존재하지 않는 이름으로 조회하면 거부된다. 변환한 대상에 권한 검사가 뒤따르므로 "
-            "존재하지 않는 이름과 닿지 못하는 이름이 같은 이름으로 거부된다"
+        return Says(
+            "존재하지 않는 이름으로 조회하면 거부됩니다. 변환한 대상에 권한 검사가 뒤따르므로 "
+            "존재하지 않는 이름과 접근하지 못하는 이름이 같은 이유로 거부됩니다",
+            english=(
+                "reading under a name nothing answers to is rejected. The permission check "
+                "follows on the resolved target, so a name that does not exist and a name the "
+                "caller cannot reach are rejected for the same reason"
+            ),
         )
 
     @override

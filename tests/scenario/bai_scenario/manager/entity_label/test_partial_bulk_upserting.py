@@ -30,6 +30,7 @@ from ai.backend.testutils.scenario_steps import (
     Held,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -71,10 +72,22 @@ class UpsertingOnEveryTarget(When[LabeledDomainsAndACaller, EntityLabelAdapter, 
 
     @override
     def describe(self, laid: LabeledDomainsAndACaller) -> str:
-        besides = " 와 없는 타입 하나" if self.unwired else ""
-        return (
-            f"{laid.caller.username}이 도메인 {len(laid.targets)}개{besides}에 키 "
-            f"{len(self.keys)}개씩을 한 번에 붙임"
+        if self.unwired:
+            return Says(
+                f"{laid.caller.username}이 도메인 {len(laid.targets)}개와 없는 타입 하나에 키 "
+                f"{len(self.keys)}개씩을 한 번에 추가합니다",
+                english=(
+                    f"{laid.caller.username} adds {len(self.keys)} keys each to "
+                    f"{len(laid.targets)} domains and one unknown type at once"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username}이 도메인 {len(laid.targets)}개에 키 "
+            f"{len(self.keys)}개씩을 한 번에 추가합니다",
+            english=(
+                f"{laid.caller.username} adds {len(self.keys)} keys each to "
+                f"{len(laid.targets)} domains at once"
+            ),
         )
 
     @override
@@ -108,9 +121,13 @@ class WrittenAndRefused(Then[LabeledDomainsAndACaller, Upserted]):
 
     @override
     def says(self) -> str:
-        return (
-            f"도메인 {self.written}개에 키 {len(self.keys)}개씩 붙은 라벨이 오고, "
-            "나머지 도메인은 키마다 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            f"도메인 {self.written}개에 키 {len(self.keys)}개씩 추가된 라벨이 오고, "
+            "나머지 도메인은 키마다 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                f"labels with {len(self.keys)} keys each come back for {self.written} domains, "
+                "and the rest come back in the failed list per key for lack of permission"
+            ),
         )
 
     @override
@@ -140,7 +157,10 @@ class WrittenAndRefused(Then[LabeledDomainsAndACaller, Upserted]):
                 Held[UUID](
                     f"failed[{i}].entity_id",
                     failure.entity_id,
-                    SameAs(target.id, "대상 도메인의 id"),
+                    SameAs(
+                        target.id,
+                        Says("대상 도메인의 id", english="the id of the target domain"),
+                    ),
                 ),
                 Same(f"failed[{i}].key", failure.key, key),
                 Held(f"failed[{i}].message", failure.message, Mentions("Insufficient permission")),
@@ -199,9 +219,13 @@ class AnUnwiredTypeRefusesTheWholeCall(
 
     @override
     def describe(self) -> str:
-        return (
-            "배선되지 않은 타입이 하나라도 섞여 있으면 잘못된 요청으로 통째로 거부되고 "
-            "아무것도 쓰이지 않는다"
+        return Says(
+            "연결 및 호출 경로로 처리되지 않는 타입이 하나라도 섞여 있으면 잘못된 요청으로 "
+            "전체가 거부되고 아무것도 기록되지 않습니다",
+            english=(
+                "when even one type that has no connection and call path is mixed in, "
+                "the whole request is rejected as invalid and nothing is written"
+            ),
         )
 
     @override
@@ -223,8 +247,13 @@ def _scenarios() -> list[LabelStep]:
     return [
         UpsertingRow(
             named="a-writer-labels-two-entities-with-two-keys",
-            guarantees=(
-                "수정 권한을 받은 사용자가 엔티티 둘에 키 둘을 붙이면, 라벨 넷이 오고 실패한 것은 없다"
+            guarantees=Says(
+                "수정 권한을 받은 사용자가 엔티티 둘에 키 둘을 추가하면 라벨 넷이 오고 "
+                "실패한 것은 없습니다",
+                english=(
+                    "when a user granted update permission adds two keys to two entities, "
+                    "four labels come back and nothing failed"
+                ),
             ),
             situation=LabeledDomainsAndSomeone(writable=2),
             keys=two_keys,
@@ -233,9 +262,13 @@ def _scenarios() -> list[LabelStep]:
         ),
         UpsertingRow(
             named="only-the-writable-entity-is-labeled",
-            guarantees=(
-                "한 엔티티에만 수정 권한이 있으면, 그 엔티티의 라벨 둘이 오고 다른 엔티티는 "
-                "키마다 하나씩 실패 목록에 온다"
+            guarantees=Says(
+                "한 엔티티에만 수정 권한이 있으면 그 엔티티의 라벨 둘이 오고, 다른 엔티티는 "
+                "키마다 하나씩 실패 목록에 옵니다",
+                english=(
+                    "with update permission on one entity only, its two labels come back and "
+                    "the other entity comes back in the failed list once per key"
+                ),
             ),
             situation=LabeledDomainsAndSomeone(writable=1),
             keys=two_keys,
@@ -244,8 +277,13 @@ def _scenarios() -> list[LabelStep]:
         ),
         UpsertingRow(
             named="a-user-granted-nothing-labels-nothing",
-            guarantees=(
-                "아무 권한도 없는 사용자가 붙이면, 붙은 라벨 없이 엔티티 둘 다 실패 목록에 온다"
+            guarantees=Says(
+                "아무 권한도 없는 사용자가 추가하면 라벨이 추가되지 않고 엔티티 둘 다 실패 "
+                "목록에 옵니다",
+                english=(
+                    "when a user with no permission adds labels, none is added and both "
+                    "entities come back in the failed list"
+                ),
             ),
             situation=LabeledDomainsAndSomeone(),
             keys=("team",),
@@ -254,8 +292,13 @@ def _scenarios() -> list[LabelStep]:
         ),
         UpsertingRow(
             named="one-entity-in-several-items-gets-every-key",
-            guarantees=(
-                "같은 엔티티가 여러 항목에 나오면, 그 엔티티의 라벨이 키마다 오고 실패한 것은 없다"
+            guarantees=Says(
+                "같은 엔티티가 여러 항목에 나오면 그 엔티티의 라벨이 키마다 오고 실패한 것은 "
+                "없습니다",
+                english=(
+                    "when the same entity appears in several items, its label comes back for "
+                    "each key and nothing failed"
+                ),
             ),
             situation=LabeledDomainsAndSomeone(targets=1, writable=1),
             keys=two_keys,
@@ -264,7 +307,12 @@ def _scenarios() -> list[LabelStep]:
         ),
         UpsertingRow(
             named="a-key-already-on-the-entity-takes-the-new-value",
-            guarantees="이미 붙은 키를 다시 붙이면, 같은 라벨이 값만 바뀌어 온다",
+            guarantees=Says(
+                "이미 붙은 키를 다시 추가하면 같은 라벨이 값만 바뀌어 옵니다",
+                english=(
+                    "adding a key that is already attached changes only the value of the same label"
+                ),
+            ),
             situation=LabeledDomainsAndSomeone(targets=1, writable=1, keys=("team",)),
             keys=("team",),
             written=1,
@@ -273,8 +321,13 @@ def _scenarios() -> list[LabelStep]:
         AnUnwiredTypeRefusesTheWholeCall(),
         EnforcementOffRow(
             named="turning-enforcement-off-lets-anyone-label",
-            guarantees=(
-                "RBAC 강제를 끄면 아무 권한도 없는 사용자도 엔티티 둘에 라벨을 붙이고 실패한 것은 없다"
+            guarantees=Says(
+                "RBAC 강제를 끄면 아무 권한도 없는 사용자도 엔티티 둘에 라벨을 추가하고 "
+                "실패한 것은 없습니다",
+                english=(
+                    "turning RBAC enforcement off lets a user with no permission add labels "
+                    "to two entities with nothing failed"
+                ),
             ),
             situation=LabeledDomainsAndSomeone(role=UserRole.USER),
             keys=("team",),

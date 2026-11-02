@@ -23,88 +23,79 @@ Scenario: incomplete 16 / 21
   - atomic_bulk_add_permissions: success present 1 · rejection present 1 (single_entity)
   - bulk_add_permissions: success absent · rejection absent (single_entity): SCENARIO-GAP
   - bulk_remove_permissions: success absent · rejection absent (partial_bulk_field): SCENARIO-GAP
-  - create: success present 1 · rejection absent (scope): SCENARIO-GAP
+  - create: success absent · rejection absent (scope): SCENARIO-GAP
   - partial_bulk_remove_permissions: success present 2 · rejection absent (partial_bulk_field): SCENARIO-GAP
-  - partial_bulk_update: success present 3 · rejection absent (partial_bulk): SCENARIO-GAP
-  - update: success present 2 · rejection present 2 (single_entity)
+  - partial_bulk_update: success present 2 · rejection absent (partial_bulk): SCENARIO-GAP
+  - update: success present 1 · rejection present 1 (single_entity)
 
 **delete**
 
 | scenario | verdict |
 |---|---|
-| [슈퍼관리자가 프리셋을 soft delete 하면, 삭제 표시가 켜진 프리셋 전체가 온다](#deleting-the-superadmin-soft-deletes-a-preset) | answered |
-| [아무 권한도 받지 않은 사용자가 프리셋을 soft delete 하려 하면, 권한 부족으로 거부된다](#deleting-a-user-granted-nothing-may-not-soft-delete-a-preset) | rejected |
+| [when the superadmin soft deletes a preset, the whole preset marked deleted comes back](#deleting-the-superadmin-soft-deletes-a-preset) | answered |
+| [when a user granted nothing tries to soft delete a preset, it is rejected for lack of permission](#deleting-a-user-granted-nothing-may-not-soft-delete-a-preset) | rejected |
 
 **partial_bulk_delete**
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-presets) | answered |
-| [프리셋 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 삭제 표시가 켜진 채 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | answered |
+| [when a user granted nothing tries to soft delete several presets at once, none is soft-deleted and every one comes back in the failed list for lack of permission](#partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-presets) | answered |
+| [when two presets and one missing id are soft-deleted at once, the two come back marked deleted and the missing id comes back in the failed list because there is no such target](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | answered |
 
 **partial_bulk_purge**
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-a-user-granted-nothing-purges-none-of-several-presets) | answered |
-| [프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 하기 전의 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-purging-several-answers-for-the-missing-one) | answered |
+| [when a user granted nothing tries to purge several presets at once, none is purged and every one comes back in the failed list for lack of permission](#partial_bulk_deleting-a-user-granted-nothing-purges-none-of-several-presets) | answered |
+| [when two presets and one missing id are purged at once, the two come back as they were before the purge and the missing id comes back in the failed list because there is no such target](#partial_bulk_deleting-purging-several-answers-for-the-missing-one) | answered |
 
 **partial_bulk_restore**
 
 | scenario | verdict |
 |---|---|
-| [soft delete 된 프리셋 여럿을 한 번에 restore 하면, 모두 삭제 표시가 꺼진 채 온다](#partial_bulk_deleting-restoring-several-brings-them-back) | answered |
+| [when several soft-deleted presets are restored at once, all of them come back not marked deleted](#partial_bulk_deleting-restoring-several-brings-them-back) | answered |
 
 **purge**
 
 | scenario | verdict |
 |---|---|
-| [슈퍼관리자가 프리셋을 purge 하면, purge 하기 전의 프리셋 전체가 온다](#deleting-the-superadmin-purges-a-preset) | answered |
-| [아무 권한도 받지 않은 사용자가 프리셋을 purge 하려 하면, 권한 부족으로 거부된다](#deleting-a-user-granted-nothing-may-not-purge-a-preset) | rejected |
+| [when the superadmin purges a preset, the whole preset as it was before the purge comes back](#deleting-the-superadmin-purges-a-preset) | answered |
+| [when a user granted nothing tries to purge a preset, it is rejected for lack of permission](#deleting-a-user-granted-nothing-may-not-purge-a-preset) | rejected |
 
 **restore**
 
 | scenario | verdict |
 |---|---|
-| [soft delete 된 프리셋을 restore 하면, 삭제 표시가 꺼진 프리셋 전체가 온다](#deleting-restoring-a-soft-deleted-preset-brings-it-back) | answered |
-| [아무 권한도 받지 않은 사용자가 프리셋을 restore 하려 하면, 권한 부족으로 거부된다](#deleting-a-user-granted-nothing-may-not-restore-a-preset) | rejected |
+| [when a soft-deleted preset is restored, the whole preset not marked deleted comes back](#deleting-restoring-a-soft-deleted-preset-brings-it-back) | answered |
+| [when a user granted nothing tries to restore a preset, it is rejected for lack of permission](#deleting-a-user-granted-nothing-may-not-restore-a-preset) | rejected |
 
 **atomic_bulk_add_permissions**
 
 | scenario | verdict |
 |---|---|
-| [슈퍼관리자가 항목 없는 프리셋에 권한 항목 둘을 넣으면, 넣은 두 항목이 그 프리셋 아래에 온다](#permission_editing-the-superadmin-adds-entries-to-a-preset) | answered |
-| [아무 권한도 받지 않은 사용자가 프리셋에 권한 항목을 넣으려 하면, 권한 부족으로 거부된다](#permission_editing-a-user-granted-nothing-may-not-add-entries) | rejected |
-
-**create**
-
-| scenario | verdict |
-|---|---|
-| [프로젝트 스코프 프리셋을 소유자 부여를 켜고 만들면, 켜진 프리셋이 온다](#creating-a-project-preset-is-made-with-owner-assign) | answered |
+| [when the superadmin adds two permission entries to a preset that has none, the two entries added come back under the preset](#permission_editing-the-superadmin-adds-entries-to-a-preset) | answered |
+| [when a user granted nothing tries to add permission entries to a preset, it is rejected for lack of permission](#permission_editing-a-user-granted-nothing-may-not-add-entries) | rejected |
 
 **partial_bulk_remove_permissions**
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 권한 항목 여럿을 한 번에 빼려 하면, 뺀 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#permission_editing-a-user-granted-nothing-removes-none-of-the-entries) | answered |
-| [슈퍼관리자가 권한 항목 둘과 없는 id 하나를 한 번에 빼면, 둘은 처리된 목록에 오고 없는 id 는 실패 목록에 온다](#permission_editing-removing-entries-answers-for-the-missing-one) | answered |
+| [when a user granted nothing tries to remove several permission entries at once, none is removed and every one comes back in the failed list for lack of permission](#permission_editing-a-user-granted-nothing-removes-none-of-the-entries) | answered |
+| [when the superadmin removes two permission entries and one missing id at once, the two come back in the processed list and the missing id comes back in the failed list](#permission_editing-removing-entries-answers-for-the-missing-one) | answered |
 
 **partial_bulk_update**
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | answered |
-| [프로젝트 스코프와 도메인 스코프 프리셋의 소유자 부여를 한 번에 켜면, 프로젝트 스코프 프리셋만 고쳐지고 도메인 스코프 프리셋은 실패 목록에 온다](#partial_bulk_editing-only-the-project-preset-takes-owner-assign) | answered |
-| [슈퍼관리자가 프리셋 여럿의 자동 부여를 한 번에 켜면, 모두 새 값으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | answered |
+| [when a user granted nothing tries to edit several presets at once, none is edited and every one comes back in the failed list for lack of permission](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | answered |
+| [when the superadmin turns auto assign on for several presets at once, all of them come back with the new value and nothing failed](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | answered |
 
 **update**
 
 | scenario | verdict |
 |---|---|
-| [프로젝트 스코프 프리셋의 소유자 부여를 켜면, 켜진 프리셋 전체가 온다](#editing-a-project-preset-takes-owner-assign) | answered |
-| [슈퍼관리자가 프리셋 이름을 바꾸면, 새 이름을 실은 프리셋 전체가 온다](#editing-the-superadmin-renames-a-preset) | answered |
-| [프로젝트 외 스코프 프리셋의 소유자 부여를 켜려 하면, 소유자가 없어 거부된다](#editing-a-domain-preset-refuses-owner-assign) | rejected |
-| [아무 권한도 받지 않은 사용자가 프리셋 이름을 바꾸려 하면, 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-rename-a-preset) | rejected |
+| [when the superadmin renames a preset, the whole preset carrying the new name comes back](#editing-the-superadmin-renames-a-preset) | answered |
+| [when a user granted nothing tries to rename a preset, it is rejected for lack of permission](#editing-a-user-granted-nothing-may-not-rename-a-preset) | rejected |
 
 ### delete
 
@@ -112,60 +103,60 @@ Scenario: incomplete 16 / 21
 
 #### [the-superadmin-soft-deletes-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_deleting.py): pass
 
-슈퍼관리자가 프리셋을 soft delete 하면, 삭제 표시가 켜진 프리셋 전체가 온다
+when the superadmin soft deletes a preset, the whole preset marked deleted comes back
 
 Given
 
-- 이미 있는 프리셋 하나와, superadmin 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one preset that already exists and one superadmin
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RolePresetAdapter.delete: user-1이 preset-1을 soft delete 함
+- RolePresetAdapter.delete: user-1 soft deletes preset-1
 
 Then
 
-- 삭제 표시가 켜진 프리셋 전체가 온다
-  - id: 미리 만든 프리셋의 id와 같다
-  - entity_id: 미리 만든 프리셋의 id와 같다
+- the whole preset marked deleted comes back
+  - id: same as the id of the preset seeded in advance
+  - entity_id: same as the id of the preset seeded in advance
   - name = 'preset-1'
   - scope_type = 'project'
   - auto_assign = False
   - deleted = True
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="deleting-a-user-granted-nothing-may-not-soft-delete-a-preset"></a>
 
 #### [a-user-granted-nothing-may-not-soft-delete-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_deleting.py): pass
 
-아무 권한도 받지 않은 사용자가 프리셋을 soft delete 하려 하면, 권한 부족으로 거부된다
+when a user granted nothing tries to soft delete a preset, it is rejected for lack of permission
 
 Given
 
-- 이미 있는 프리셋 하나와, user 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one preset that already exists and one user
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RolePresetAdapter.delete: user-1이 preset-1을 soft delete 함
+- RolePresetAdapter.delete: user-1 soft deletes preset-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### partial_bulk_delete
 
@@ -173,79 +164,79 @@ Then
 
 #### [a-user-granted-nothing-soft-deletes-none-of-several-presets](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_deleting.py): pass
 
-아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user granted nothing tries to soft delete several presets at once, none is soft-deleted and every one comes back in the failed list for lack of permission
 
 Given
 
-- 프리셋 2개와, user 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 역할 프리셋 preset-2: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 presets and one user
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RolePresetAdapter.partial_bulk_delete: user-1이 프리셋 2개를 한 번에 soft delete 함
+- RolePresetAdapter.partial_bulk_delete: user-1 soft deletes 2 presets at once
 
 Then
 
-- 처리된 것 없이 대상이 모두 실패 목록에 온다
+- nothing is processed and every target comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the target
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one"></a>
 
 #### [soft-deleting-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_deleting.py): pass
 
-프리셋 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 삭제 표시가 켜진 채 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+when two presets and one missing id are soft-deleted at once, the two come back marked deleted and the missing id comes back in the failed list because there is no such target
 
 Given
 
-- 프리셋 2개와, superadmin 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 역할 프리셋 preset-2: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 presets and one superadmin
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RolePresetAdapter.partial_bulk_delete: user-1이 프리셋 2개 와 없는 id 하나를 한 번에 soft delete 함
+- RolePresetAdapter.partial_bulk_delete: user-1 soft deletes 2 presets and one missing id at once
 
 Then
 
-- 대상 프리셋이 모두 삭제 표시가 켜진 채 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+- every target preset comes back marked deleted, and an unknown id comes back in the failed list because no target answers to it
   - successes count = 2
-  - successes[0].id: 미리 만든 프리셋의 id와 같다
-  - successes[0].entity_id: 미리 만든 프리셋의 id와 같다
+  - successes[0].id: same as the id of the preset seeded in advance
+  - successes[0].entity_id: same as the id of the preset seeded in advance
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
   - successes[0].auto_assign = False
   - successes[0].deleted = True
-  - successes[0].created_at: 이 실행이 쓴 시각
-  - successes[0].updated_at: 이 실행이 쓴 시각
-  - successes[1].id: 미리 만든 프리셋의 id와 같다
-  - successes[1].entity_id: 미리 만든 프리셋의 id와 같다
+  - successes[0].created_at: the time this run wrote
+  - successes[0].updated_at: the time this run wrote
+  - successes[1].id: same as the id of the preset seeded in advance
+  - successes[1].entity_id: same as the id of the preset seeded in advance
   - successes[1].name = 'preset-2'
   - successes[1].scope_type = 'project'
   - successes[1].auto_assign = False
   - successes[1].deleted = True
-  - successes[1].created_at: 이 실행이 쓴 시각
-  - successes[1].updated_at: 이 실행이 쓴 시각
+  - successes[1].created_at: the time this run wrote
+  - successes[1].updated_at: the time this run wrote
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 'not found'를 담은 이유
+  - failed[0].id: same as the unknown id put in the request
+  - failed[0].message: a reason containing 'not found'
 
 ### partial_bulk_purge
 
@@ -253,79 +244,79 @@ Then
 
 #### [a-user-granted-nothing-purges-none-of-several-presets](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_deleting.py): pass
 
-아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user granted nothing tries to purge several presets at once, none is purged and every one comes back in the failed list for lack of permission
 
 Given
 
-- 프리셋 2개와, user 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 역할 프리셋 preset-2: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 presets and one user
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RolePresetAdapter.partial_bulk_purge: user-1이 프리셋 2개를 한 번에 purge 함
+- RolePresetAdapter.partial_bulk_purge: user-1 purges 2 presets at once
 
 Then
 
-- 처리된 것 없이 대상이 모두 실패 목록에 온다
+- nothing is processed and every target comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the target
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_deleting-purging-several-answers-for-the-missing-one"></a>
 
 #### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_deleting.py): pass
 
-프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 하기 전의 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+when two presets and one missing id are purged at once, the two come back as they were before the purge and the missing id comes back in the failed list because there is no such target
 
 Given
 
-- 프리셋 2개와, superadmin 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 역할 프리셋 preset-2: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 presets and one superadmin
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RolePresetAdapter.partial_bulk_purge: user-1이 프리셋 2개 와 없는 id 하나를 한 번에 purge 함
+- RolePresetAdapter.partial_bulk_purge: user-1 purges 2 presets and one missing id at once
 
 Then
 
-- 대상 프리셋이 모두 삭제 표시가 꺼진 채 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+- every target preset comes back not marked deleted, and an unknown id comes back in the failed list because no target answers to it
   - successes count = 2
-  - successes[0].id: 미리 만든 프리셋의 id와 같다
-  - successes[0].entity_id: 미리 만든 프리셋의 id와 같다
+  - successes[0].id: same as the id of the preset seeded in advance
+  - successes[0].entity_id: same as the id of the preset seeded in advance
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
   - successes[0].auto_assign = False
   - successes[0].deleted = False
-  - successes[0].created_at: 이 실행이 쓴 시각
-  - successes[0].updated_at: 이 실행이 쓴 시각
-  - successes[1].id: 미리 만든 프리셋의 id와 같다
-  - successes[1].entity_id: 미리 만든 프리셋의 id와 같다
+  - successes[0].created_at: the time this run wrote
+  - successes[0].updated_at: the time this run wrote
+  - successes[1].id: same as the id of the preset seeded in advance
+  - successes[1].entity_id: same as the id of the preset seeded in advance
   - successes[1].name = 'preset-2'
   - successes[1].scope_type = 'project'
   - successes[1].auto_assign = False
   - successes[1].deleted = False
-  - successes[1].created_at: 이 실행이 쓴 시각
-  - successes[1].updated_at: 이 실행이 쓴 시각
+  - successes[1].created_at: the time this run wrote
+  - successes[1].updated_at: the time this run wrote
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 'not found'를 담은 이유
+  - failed[0].id: same as the unknown id put in the request
+  - failed[0].message: a reason containing 'not found'
 
 ### partial_bulk_restore
 
@@ -333,44 +324,44 @@ Then
 
 #### [restoring-several-brings-them-back](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_deleting.py): pass
 
-soft delete 된 프리셋 여럿을 한 번에 restore 하면, 모두 삭제 표시가 꺼진 채 온다
+when several soft-deleted presets are restored at once, all of them come back not marked deleted
 
 Given
 
-- 프리셋 2개와, superadmin 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 역할 프리셋 preset-2: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 presets and one superadmin
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RolePresetAdapter.partial_bulk_restore: user-1이 프리셋 2개를 한 번에 soft delete 했다가 한 번에 restore 함
+- RolePresetAdapter.partial_bulk_restore: user-1 soft deletes 2 presets at once and then restores them at once
 
 Then
 
-- 대상 프리셋이 모두 삭제 표시가 꺼진 채 오고, 실패한 것은 없다
+- every target preset comes back not marked deleted, and nothing failed
   - successes count = 2
-  - successes[0].id: 미리 만든 프리셋의 id와 같다
-  - successes[0].entity_id: 미리 만든 프리셋의 id와 같다
+  - successes[0].id: same as the id of the preset seeded in advance
+  - successes[0].entity_id: same as the id of the preset seeded in advance
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
   - successes[0].auto_assign = False
   - successes[0].deleted = False
-  - successes[0].created_at: 이 실행이 쓴 시각
-  - successes[0].updated_at: 이 실행이 쓴 시각
-  - successes[1].id: 미리 만든 프리셋의 id와 같다
-  - successes[1].entity_id: 미리 만든 프리셋의 id와 같다
+  - successes[0].created_at: the time this run wrote
+  - successes[0].updated_at: the time this run wrote
+  - successes[1].id: same as the id of the preset seeded in advance
+  - successes[1].entity_id: same as the id of the preset seeded in advance
   - successes[1].name = 'preset-2'
   - successes[1].scope_type = 'project'
   - successes[1].auto_assign = False
   - successes[1].deleted = False
-  - successes[1].created_at: 이 실행이 쓴 시각
-  - successes[1].updated_at: 이 실행이 쓴 시각
+  - successes[1].created_at: the time this run wrote
+  - successes[1].updated_at: the time this run wrote
   - failed = []
 
 ### purge
@@ -379,60 +370,60 @@ Then
 
 #### [the-superadmin-purges-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_deleting.py): pass
 
-슈퍼관리자가 프리셋을 purge 하면, purge 하기 전의 프리셋 전체가 온다
+when the superadmin purges a preset, the whole preset as it was before the purge comes back
 
 Given
 
-- 이미 있는 프리셋 하나와, superadmin 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one preset that already exists and one superadmin
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RolePresetAdapter.purge: user-1이 preset-1을 purge 함
+- RolePresetAdapter.purge: user-1 purges preset-1
 
 Then
 
-- 삭제 표시가 꺼진 프리셋 전체가 온다
-  - id: 미리 만든 프리셋의 id와 같다
-  - entity_id: 미리 만든 프리셋의 id와 같다
+- the whole preset not marked deleted comes back
+  - id: same as the id of the preset seeded in advance
+  - entity_id: same as the id of the preset seeded in advance
   - name = 'preset-1'
   - scope_type = 'project'
   - auto_assign = False
   - deleted = False
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="deleting-a-user-granted-nothing-may-not-purge-a-preset"></a>
 
 #### [a-user-granted-nothing-may-not-purge-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_deleting.py): pass
 
-아무 권한도 받지 않은 사용자가 프리셋을 purge 하려 하면, 권한 부족으로 거부된다
+when a user granted nothing tries to purge a preset, it is rejected for lack of permission
 
 Given
 
-- 이미 있는 프리셋 하나와, user 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one preset that already exists and one user
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RolePresetAdapter.purge: user-1이 preset-1을 purge 함
+- RolePresetAdapter.purge: user-1 purges preset-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### restore
 
@@ -440,60 +431,60 @@ Then
 
 #### [restoring-a-soft-deleted-preset-brings-it-back](/tests/scenario/bai_scenario/manager/role_preset/test_deleting.py): pass
 
-soft delete 된 프리셋을 restore 하면, 삭제 표시가 꺼진 프리셋 전체가 온다
+when a soft-deleted preset is restored, the whole preset not marked deleted comes back
 
 Given
 
-- 이미 있는 프리셋 하나와, superadmin 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one preset that already exists and one superadmin
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RolePresetAdapter.restore: user-1이 preset-1을 soft delete 했다가 restore 함
+- RolePresetAdapter.restore: user-1 soft deletes preset-1 and then restores it
 
 Then
 
-- 삭제 표시가 꺼진 프리셋 전체가 온다
-  - id: 미리 만든 프리셋의 id와 같다
-  - entity_id: 미리 만든 프리셋의 id와 같다
+- the whole preset not marked deleted comes back
+  - id: same as the id of the preset seeded in advance
+  - entity_id: same as the id of the preset seeded in advance
   - name = 'preset-1'
   - scope_type = 'project'
   - auto_assign = False
   - deleted = False
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="deleting-a-user-granted-nothing-may-not-restore-a-preset"></a>
 
 #### [a-user-granted-nothing-may-not-restore-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_deleting.py): pass
 
-아무 권한도 받지 않은 사용자가 프리셋을 restore 하려 하면, 권한 부족으로 거부된다
+when a user granted nothing tries to restore a preset, it is rejected for lack of permission
 
 Given
 
-- 이미 있는 프리셋 하나와, user 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one preset that already exists and one user
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RolePresetAdapter.restore: user-1이 preset-1을 restore 함
+- RolePresetAdapter.restore: user-1 restores preset-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### atomic_bulk_add_permissions
 
@@ -501,93 +492,65 @@ Then
 
 #### [the-superadmin-adds-entries-to-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_permission_editing.py): pass
 
-슈퍼관리자가 항목 없는 프리셋에 권한 항목 둘을 넣으면, 넣은 두 항목이 그 프리셋 아래에 온다
+when the superadmin adds two permission entries to a preset that has none, the two entries added come back under the preset
 
 Given
 
-- 이미 있는 프리셋 하나와, superadmin 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one preset that already exists and one superadmin
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RolePresetAdapter.atomic_bulk_add_permissions: user-1이 preset-1에 권한 항목 2개를 넣음
+- RolePresetAdapter.atomic_bulk_add_permissions: user-1 adds 2 permission entries to preset-1
 
 Then
 
-- 넣은 두 항목이 프리셋 아래에 온다
+- the two entries added come back under the preset
   - items count = 2
-  - items[0].id: 무시함: 데이터베이스가 만든다
-  - items[0].field_id: 무시함: 데이터베이스가 만든다
-  - items[0].role_preset_id: 미리 만든 프리셋의 id와 같다
+  - items[0].id: skipped: the database generates it
+  - items[0].field_id: skipped: the database generates it
+  - items[0].role_preset_id: same as the id of the preset seeded in advance
   - items[0].entity_type = 'domain'
   - items[0].permission = <PermissionBitDTO.READ: 'read'>
-  - items[0].created_at: 이 실행이 쓴 시각
-  - items[1].id: 무시함: 데이터베이스가 만든다
-  - items[1].field_id: 무시함: 데이터베이스가 만든다
-  - items[1].role_preset_id: 미리 만든 프리셋의 id와 같다
+  - items[0].created_at: the time this run wrote
+  - items[1].id: skipped: the database generates it
+  - items[1].field_id: skipped: the database generates it
+  - items[1].role_preset_id: same as the id of the preset seeded in advance
   - items[1].entity_type = 'project'
   - items[1].permission = <PermissionBitDTO.UPDATE: 'update'>
-  - items[1].created_at: 이 실행이 쓴 시각
+  - items[1].created_at: the time this run wrote
 
 <a id="permission_editing-a-user-granted-nothing-may-not-add-entries"></a>
 
 #### [a-user-granted-nothing-may-not-add-entries](/tests/scenario/bai_scenario/manager/role_preset/test_permission_editing.py): pass
 
-아무 권한도 받지 않은 사용자가 프리셋에 권한 항목을 넣으려 하면, 권한 부족으로 거부된다
+when a user granted nothing tries to add permission entries to a preset, it is rejected for lack of permission
 
 Given
 
-- 이미 있는 프리셋 하나와, user 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one preset that already exists and one user
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RolePresetAdapter.atomic_bulk_add_permissions: user-1이 preset-1에 권한 항목 2개를 넣음
+- RolePresetAdapter.atomic_bulk_add_permissions: user-1 adds 2 permission entries to preset-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
-
-### create
-
-<a id="creating-a-project-preset-is-made-with-owner-assign"></a>
-
-#### [a-project-preset-is-made-with-owner-assign](/tests/scenario/bai_scenario/manager/role_preset/test_creating.py): pass
-
-프로젝트 스코프 프리셋을 소유자 부여를 켜고 만들면, 켜진 프리셋이 온다
-
-Given
-
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- RolePresetAdapter.create: user-1이 소유자 부여를 켠 프로젝트 스코프 프리셋을 만듦
-
-Then
-
-- 소유자 부여가 켜진 프리셋이 온다
-  - name = 'made-preset'
-  - auto_assign_to_owner = True
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### partial_bulk_remove_permissions
 
@@ -595,77 +558,77 @@ Then
 
 #### [a-user-granted-nothing-removes-none-of-the-entries](/tests/scenario/bai_scenario/manager/role_preset/test_permission_editing.py): pass
 
-아무 권한도 받지 않은 사용자가 권한 항목 여럿을 한 번에 빼려 하면, 뺀 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user granted nothing tries to remove several permission entries at once, none is removed and every one comes back in the failed list for lack of permission
 
 Given
 
-- 권한 항목 둘을 가진 프리셋 하나와, user 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 역할 프리셋 preset-1: domain 전체에 READ 허용 항목
-  - 역할 프리셋 preset-1: project 전체에 UPDATE 허용 항목
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one preset with two permission entries and one user
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-1: READ allowed on every domain
+  - Role preset preset-1: UPDATE allowed on every project
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RolePresetAdapter.partial_bulk_remove_permissions: user-1이 preset-1의 권한 항목 2개를 한 번에 뺌
+- RolePresetAdapter.partial_bulk_remove_permissions: user-1 removes 2 permission entries from preset-1 at once
 
 Then
 
-- 처리된 것 없이 대상이 모두 실패 목록에 온다
+- nothing is processed and every target comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the target
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="permission_editing-removing-entries-answers-for-the-missing-one"></a>
 
 #### [removing-entries-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/role_preset/test_permission_editing.py): pass
 
-슈퍼관리자가 권한 항목 둘과 없는 id 하나를 한 번에 빼면, 둘은 처리된 목록에 오고 없는 id 는 실패 목록에 온다
+when the superadmin removes two permission entries and one missing id at once, the two come back in the processed list and the missing id comes back in the failed list
 
 Given
 
-- 권한 항목 둘을 가진 프리셋 하나와, superadmin 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 역할 프리셋 preset-1: domain 전체에 READ 허용 항목
-  - 역할 프리셋 preset-1: project 전체에 UPDATE 허용 항목
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one preset with two permission entries and one superadmin
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-1: READ allowed on every domain
+  - Role preset preset-1: UPDATE allowed on every project
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RolePresetAdapter.partial_bulk_remove_permissions: user-1이 preset-1의 권한 항목 2개 와 없는 id 하나를 한 번에 뺌
+- RolePresetAdapter.partial_bulk_remove_permissions: user-1 removes 2 permission entries and one missing id from preset-1 at once
 
 Then
 
-- 뺀 두 항목이 처리된 목록에 오고, 없는 id 는 실패 목록에 온다
+- the two entries removed come back in the processed list, and the unknown id comes back in the failed list
   - successes count = 2
-  - successes[0].id: 미리 만든 항목의 id와 같다
-  - successes[0].field_id: 미리 만든 항목의 id와 같다
-  - successes[0].role_preset_id: 미리 만든 프리셋의 id와 같다
+  - successes[0].id: same as the id of the entry seeded in advance
+  - successes[0].field_id: same as the id of the entry seeded in advance
+  - successes[0].role_preset_id: same as the id of the preset seeded in advance
   - successes[0].entity_type = 'domain'
   - successes[0].permission = <PermissionBitDTO.READ: 'read'>
-  - successes[0].created_at: 미리 만든 항목의 시각와 같다
-  - successes[1].id: 미리 만든 항목의 id와 같다
-  - successes[1].field_id: 미리 만든 항목의 id와 같다
-  - successes[1].role_preset_id: 미리 만든 프리셋의 id와 같다
+  - successes[0].created_at: same as the time of the entry seeded in advance
+  - successes[1].id: same as the id of the entry seeded in advance
+  - successes[1].field_id: same as the id of the entry seeded in advance
+  - successes[1].role_preset_id: same as the id of the preset seeded in advance
   - successes[1].entity_type = 'project'
   - successes[1].permission = <PermissionBitDTO.UPDATE: 'update'>
-  - successes[1].created_at: 미리 만든 항목의 시각와 같다
+  - successes[1].created_at: same as the time of the entry seeded in advance
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 'not found'를 담은 이유
+  - failed[0].id: same as the unknown id put in the request
+  - failed[0].message: a reason containing 'not found'
 
 ### partial_bulk_update
 
@@ -673,234 +636,136 @@ Then
 
 #### [a-user-granted-nothing-edits-none-of-several-presets](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_editing.py): pass
 
-아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user granted nothing tries to edit several presets at once, none is edited and every one comes back in the failed list for lack of permission
 
 Given
 
-- 프리셋 2개와, user 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 역할 프리셋 preset-2: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 presets and one user
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RolePresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 자동 부여를 한 번에 켬
+- RolePresetAdapter.partial_bulk_update: user-1 turns auto assign on for 2 presets at once
 
 Then
 
-- 처리된 것 없이 대상이 모두 실패 목록에 온다
+- nothing is processed and every target comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
-
-<a id="partial_bulk_editing-only-the-project-preset-takes-owner-assign"></a>
-
-#### [only-the-project-preset-takes-owner-assign](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_editing.py): pass
-
-프로젝트 스코프와 도메인 스코프 프리셋의 소유자 부여를 한 번에 켜면, 프로젝트 스코프 프리셋만 고쳐지고 도메인 스코프 프리셋은 실패 목록에 온다
-
-Given
-
-- 프로젝트 스코프 프리셋과 도메인 스코프 프리셋 하나씩과, superadmin 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 역할 프리셋 preset-2: domain 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- RolePresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 소유자 부여를 한 번에 켬
-
-Then
-
-- 프로젝트 스코프 프리셋만 고쳐져 오고, 도메인 스코프 프리셋은 실패 목록에 온다
-  - successes count = 1
-  - failed count = 1
-  - successes[0].auto_assign_to_owner = True
-  - successes[0].id: 미리 만든 프리셋의 id와 같다
-  - successes[0].entity_id: 미리 만든 프리셋의 id와 같다
-  - successes[0].name = 'preset-1'
-  - successes[0].scope_type = 'project'
-  - successes[0].auto_assign = False
-  - successes[0].deleted = False
-  - successes[0].created_at: 이 실행이 쓴 시각
-  - successes[0].updated_at: 이 실행이 쓴 시각
-  - failed[0].id: 두 번째 프리셋의 id와 같다
+  - failed[0].id: same as the id of the target
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-presets-at-once"></a>
 
 #### [the-superadmin-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_editing.py): pass
 
-슈퍼관리자가 프리셋 여럿의 자동 부여를 한 번에 켜면, 모두 새 값으로 오고 실패한 것은 없다
+when the superadmin turns auto assign on for several presets at once, all of them come back with the new value and nothing failed
 
 Given
 
-- 프리셋 2개와, superadmin 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 역할 프리셋 preset-2: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 presets and one superadmin
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RolePresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 자동 부여를 한 번에 켬
+- RolePresetAdapter.partial_bulk_update: user-1 turns auto assign on for 2 presets at once
 
 Then
 
-- 대상 프리셋이 모두 새 값으로 오고, 실패한 것은 없다
+- every target preset comes back with the new value, and nothing failed
   - successes count = 2
-  - successes[0].id: 미리 만든 프리셋의 id와 같다
-  - successes[0].entity_id: 미리 만든 프리셋의 id와 같다
+  - successes[0].id: same as the id of the preset seeded in advance
+  - successes[0].entity_id: same as the id of the preset seeded in advance
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
   - successes[0].auto_assign = True
   - successes[0].deleted = False
-  - successes[0].created_at: 이 실행이 쓴 시각
-  - successes[0].updated_at: 이 실행이 쓴 시각
-  - successes[1].id: 미리 만든 프리셋의 id와 같다
-  - successes[1].entity_id: 미리 만든 프리셋의 id와 같다
+  - successes[0].created_at: the time this run wrote
+  - successes[0].updated_at: the time this run wrote
+  - successes[1].id: same as the id of the preset seeded in advance
+  - successes[1].entity_id: same as the id of the preset seeded in advance
   - successes[1].name = 'preset-2'
   - successes[1].scope_type = 'project'
   - successes[1].auto_assign = True
   - successes[1].deleted = False
-  - successes[1].created_at: 이 실행이 쓴 시각
-  - successes[1].updated_at: 이 실행이 쓴 시각
+  - successes[1].created_at: the time this run wrote
+  - successes[1].updated_at: the time this run wrote
   - failed = []
 
 ### update
-
-<a id="editing-a-project-preset-takes-owner-assign"></a>
-
-#### [a-project-preset-takes-owner-assign](/tests/scenario/bai_scenario/manager/role_preset/test_editing.py): pass
-
-프로젝트 스코프 프리셋의 소유자 부여를 켜면, 켜진 프리셋 전체가 온다
-
-Given
-
-- 이미 있는 프리셋 하나와, superadmin 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- RolePresetAdapter.update: user-1이 preset-1의 소유자 부여를 켬
-
-Then
-
-- 소유자 부여가 켜진 프리셋 전체가 온다
-  - auto_assign_to_owner = True
-  - id: 미리 만든 프리셋의 id와 같다
-  - entity_id: 미리 만든 프리셋의 id와 같다
-  - name = 'preset-1'
-  - scope_type = 'project'
-  - auto_assign = False
-  - deleted = False
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
 
 <a id="editing-the-superadmin-renames-a-preset"></a>
 
 #### [the-superadmin-renames-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_editing.py): pass
 
-슈퍼관리자가 프리셋 이름을 바꾸면, 새 이름을 실은 프리셋 전체가 온다
+when the superadmin renames a preset, the whole preset carrying the new name comes back
 
 Given
 
-- 이미 있는 프리셋 하나와, superadmin 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one preset that already exists and one superadmin
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RolePresetAdapter.update: user-1이 preset-1의 이름을 renamed-preset(으)로 바꿈
+- RolePresetAdapter.update: user-1 renames preset-1 to renamed-preset
 
 Then
 
-- 새 이름을 실은 프리셋 전체가 온다
-  - id: 미리 만든 프리셋의 id와 같다
-  - entity_id: 미리 만든 프리셋의 id와 같다
+- the whole preset carrying the new name comes back
+  - id: same as the id of the preset seeded in advance
+  - entity_id: same as the id of the preset seeded in advance
   - name = 'renamed-preset'
   - scope_type = 'project'
   - auto_assign = False
   - deleted = False
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
-
-<a id="editing-a-domain-preset-refuses-owner-assign"></a>
-
-#### [a-domain-preset-refuses-owner-assign](/tests/scenario/bai_scenario/manager/role_preset/test_editing.py): pass
-
-프로젝트 외 스코프 프리셋의 소유자 부여를 켜려 하면, 소유자가 없어 거부된다
-
-Given
-
-- 이미 있는 domain 스코프 프리셋 하나와, superadmin 한 명
-  - 역할 프리셋 preset-1: domain 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- RolePresetAdapter.update: user-1이 preset-1의 소유자 부여를 켬
-
-Then
-
-- 거부된다
-  - 거부: RolePresetOwnerAssignNotAllowed
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="editing-a-user-granted-nothing-may-not-rename-a-preset"></a>
 
 #### [a-user-granted-nothing-may-not-rename-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_editing.py): pass
 
-아무 권한도 받지 않은 사용자가 프리셋 이름을 바꾸려 하면, 권한 부족으로 거부된다
+when a user granted nothing tries to rename a preset, it is rejected for lack of permission
 
 Given
 
-- 이미 있는 프리셋 하나와, user 한 명
-  - 역할 프리셋 preset-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one preset that already exists and one user
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RolePresetAdapter.update: user-1이 preset-1의 이름을 renamed-preset(으)로 바꿈
+- RolePresetAdapter.update: user-1 renames preset-1 to renamed-preset
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 

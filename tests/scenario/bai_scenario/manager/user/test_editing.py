@@ -44,6 +44,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Skipped,
     Then,
@@ -121,9 +122,13 @@ class AProjectMemberAndAnEditor(Given[Any, AMemberEdit]):
 
     @override
     def describe(self) -> str:
-        return (
-            "도메인 하나와 프로젝트 하나, 그 명부에 오른 대상 사용자, "
-            "대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자 한 명"
+        return Says(
+            "도메인 하나와 프로젝트 하나, 그 멤버 목록에 오른 대상 사용자, "
+            "대상 사용자 스코프에서 UPDATE 와 READ 를 받은 사용자 한 명",
+            english=(
+                "one domain and one project, the target user on its roster, and one user "
+                "granted UPDATE and READ in the target user scope"
+            ),
         )
 
     @override
@@ -159,9 +164,14 @@ class ClearingTheProjectsWithNull(When[AMemberEdit, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: AMemberEdit) -> str:
-        return (
+        return Says(
             f"{laid.caller.username}이 {laid.target.username}의 소속 프로젝트에 빈 값을 주고, "
-            f"{laid.observer.username}이 {laid.project.name}으로 훑음"
+            f"{laid.observer.username}이 {laid.project.name}으로 조회합니다",
+            english=(
+                f"{laid.caller.username} gives an empty value for the projects of "
+                f"{laid.target.username}, and {laid.observer.username} searches by "
+                f"{laid.project.name}"
+            ),
         )
 
     @override
@@ -183,7 +193,10 @@ class TheMembershipStays(Then[AMemberEdit, Answer]):
 
     @override
     def says(self) -> str:
-        return "사용자는 그대로이고 프로젝트 명부에 남아 있다"
+        return Says(
+            "사용자는 그대로이고 프로젝트 멤버 목록에 남아 있습니다",
+            english="the user is unchanged and stays on the project roster",
+        )
 
     @override
     def look(self, laid: AMemberEdit, answered: Answered[Answer]) -> list[Verdict]:
@@ -193,13 +206,31 @@ class TheMembershipStays(Then[AMemberEdit, Answer]):
         return [
             *UserNodeLook(self.started).verdicts(edited.node, laid.target),
             Held(
-                "뒤이은 프로젝트 검색.items",
+                "the project search that follows.items",
                 [one.id for one in edited.members.items],
-                SameAs([laid.target.id], "명부에 올린 대상 사용자 하나"),
+                SameAs(
+                    [laid.target.id],
+                    Says(
+                        "멤버 목록에 올린 대상 사용자 하나",
+                        english="the one target user on the roster",
+                    ),
+                ),
             ),
-            Same("뒤이은 프로젝트 검색.pagination.total", edited.members.pagination.total, 1),
-            Same("뒤이은 프로젝트 검색.pagination.offset", edited.members.pagination.offset, 0),
-            Same("뒤이은 프로젝트 검색.pagination.limit", edited.members.pagination.limit, 50),
+            Same(
+                "the project search that follows.pagination.total",
+                edited.members.pagination.total,
+                1,
+            ),
+            Same(
+                "the project search that follows.pagination.offset",
+                edited.members.pagination.offset,
+                0,
+            ),
+            Same(
+                "the project search that follows.pagination.limit",
+                edited.members.pagination.limit,
+                50,
+            ),
         ]
 
 
@@ -215,9 +246,13 @@ class NullProjectsLeaveTheMembership(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "권한 받은 사용자가 소속 프로젝트 자리에 빈 값을 주면, "
-            "소속을 건드리지 않고 나머지 수정만 반영된다"
+            "소속을 건드리지 않고 나머지 수정만 반영됩니다",
+            english=(
+                "when a user holding the permission gives an empty value for the projects, "
+                "the membership is left untouched and only the other edits are applied"
+            ),
         )
 
     @override
@@ -251,22 +286,26 @@ class SomeoneEditingAnother(Given[Any, AnEdit]):
 
     @override
     def describe(self) -> str:
-        parts = [
-            f"도메인 하나와 대상 사용자, 사용자 {self.others}명 더, 부르는 {self.role.value} 한 명"
+        role = self.role.value
+        parts_ko = [f"도메인 하나와 대상 사용자, 사용자 {self.others}명 더, 부르는 {role} 한 명"]
+        parts_en = [
+            f"one domain, one target user, {self.others} more users, and one calling {role}"
         ]
         if self.on_target:
-            parts.append(
-                f"부르는 사람은 대상 사용자 스코프에서 {', '.join(str(p.name) for p in self.on_target)}를 받았다"
-            )
+            names = ", ".join(str(p.name) for p in self.on_target)
+            parts_ko.append(f"부르는 사람은 대상 사용자 스코프에서 {names}를 받았습니다")
+            parts_en.append(f"the caller holds {names} in the target user scope")
         if self.on_domain:
-            parts.append(
-                f"부르는 사람은 도메인 스코프에서 {', '.join(str(p.name) for p in self.on_domain)}를 받았다"
-            )
+            names = ", ".join(str(p.name) for p in self.on_domain)
+            parts_ko.append(f"부르는 사람은 도메인 스코프에서 {names}를 받았습니다")
+            parts_en.append(f"the caller holds {names} in the domain scope")
         if self.key_on is not None:
-            parts.append("한 사람에게 기본이 아닌 키가 하나 더 있다")
+            parts_ko.append("한 사람에게 기본이 아닌 키가 하나 더 있습니다")
+            parts_en.append("one more user holds an extra key that is not the default")
         if self.target_needs_password_change:
-            parts.append("대상 사용자는 비밀번호 변경을 요구받는다")
-        return ", ".join(parts)
+            parts_ko.append("대상 사용자는 비밀번호 변경을 요구받습니다")
+            parts_en.append("the target user is required to change the password")
+        return Says(", ".join(parts_ko), english=", ".join(parts_en))
 
     @override
     async def lay(self, seeding: Any) -> AnEdit:
@@ -303,9 +342,13 @@ class SomeoneEditingThemselves(Given[Any, AnEdit]):
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "도메인 하나와 비밀번호 변경을 요구받는 사용자 한 명, "
-            "그 사용자는 자기 사용자 스코프에서 UPDATE, READ를 받았다"
+            "그 사용자는 자기 사용자 스코프에서 UPDATE, READ 를 받았습니다",
+            english=(
+                "one domain and one user required to change the password, "
+                "who holds UPDATE and READ in their own user scope"
+            ),
         )
 
     @override
@@ -333,7 +376,13 @@ class ChangingTheFullName(When[AnEdit, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: AnEdit) -> str:
-        return f"{laid.caller.username}이 {laid.target.username}의 전체 이름을 {RENAMED}로 바꿈"
+        return Says(
+            f"{laid.caller.username}이 {laid.target.username}의 전체 이름을 {RENAMED}로 변경합니다",
+            english=(
+                f"{laid.caller.username} changes the full name of {laid.target.username} "
+                f"to {RENAMED}"
+            ),
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: AnEdit) -> Answer:
@@ -354,7 +403,10 @@ class ChangingAnotherUsersPasswordOnly(When[AnEdit, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: AnEdit) -> str:
-        return f"{laid.caller.username}이 {laid.target.username}의 비밀번호만 바꿈"
+        return Says(
+            f"{laid.caller.username}이 {laid.target.username}의 비밀번호만 변경합니다",
+            english=f"{laid.caller.username} changes only the password of {laid.target.username}",
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: AnEdit) -> Answer:
@@ -375,7 +427,13 @@ class SettingOwnPasswordLiftingTheRequirement(When[AnEdit, UserAdapter, Answer])
 
     @override
     def describe(self, laid: AnEdit) -> str:
-        return f"{laid.caller.username}이 자기 비밀번호를 바꾸며 비밀번호 변경 요구를 풂"
+        return Says(
+            f"{laid.caller.username}이 자기 비밀번호를 변경하며 비밀번호 변경 요구를 해제합니다",
+            english=(
+                f"{laid.caller.username} changes their own password and lifts the "
+                "password change requirement"
+            ),
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: AnEdit) -> Answer:
@@ -397,9 +455,13 @@ class TakingAnotherUsersName(When[AnEdit, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: AnEdit) -> str:
-        return (
+        return Says(
             f"{laid.caller.username}이 {laid.target.username}의 이름을 "
-            f"{laid.others[0].username}로 바꿈"
+            f"{laid.others[0].username}로 변경합니다",
+            english=(
+                f"{laid.caller.username} changes the name of {laid.target.username} "
+                f"to {laid.others[0].username}"
+            ),
         )
 
     @override
@@ -421,7 +483,13 @@ class NamingTheOtherKeyAsDefault(When[AnEdit, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: AnEdit) -> str:
-        return f"{laid.caller.username}이 {laid.target.username}의 추가한 키를 기본 키로 줌"
+        return Says(
+            f"{laid.caller.username}이 {laid.target.username}의 추가한 키를 기본 키로 지정합니다",
+            english=(
+                f"{laid.caller.username} names the extra key of {laid.target.username} "
+                "as the default key"
+            ),
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: AnEdit) -> Answer:
@@ -443,9 +511,13 @@ class ChangingTheAllowedIp(When[AnEdit, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: AnEdit) -> str:
-        return (
-            f"{laid.caller.username}이 {laid.target.username}의 허용 IP를 바꾸고, "
-            f"{laid.observer.username}이 다시 읽음"
+        return Says(
+            f"{laid.caller.username}이 {laid.target.username}의 허용 IP 를 변경하고, "
+            f"{laid.observer.username}이 다시 읽습니다",
+            english=(
+                f"{laid.caller.username} changes the allowed IP of {laid.target.username}, "
+                f"and {laid.observer.username} reads it back"
+            ),
         )
 
     @override
@@ -474,9 +546,14 @@ class BulkRenamingOneAndCollidingAnother(When[AnEdit, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: AnEdit) -> str:
-        return (
-            f"{laid.caller.username}이 {laid.target.username}의 전체 이름을 바꾸고 "
-            f"{laid.others[1].username}의 이름을 {laid.others[0].username}로 일괄 수정"
+        return Says(
+            f"{laid.caller.username}이 {laid.target.username}의 전체 이름을 변경하고 "
+            f"{laid.others[1].username}의 이름을 {laid.others[0].username}로 일괄 수정합니다",
+            english=(
+                f"{laid.caller.username} bulk edits: renames the full name of "
+                f"{laid.target.username}, and renames {laid.others[1].username} "
+                f"to {laid.others[0].username}"
+            ),
         )
 
     @override
@@ -506,9 +583,13 @@ class BulkRenamingWithSomeoneElsesKey(When[AnEdit, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: AnEdit) -> str:
-        return (
+        return Says(
             f"{laid.caller.username}이 {laid.target.username}을 일괄 수정하며 "
-            f"{laid.others[0].username}의 키로 기본 키를 옮김"
+            f"{laid.others[0].username}의 키로 기본 키를 옮깁니다",
+            english=(
+                f"{laid.caller.username} bulk edits {laid.target.username} and moves the "
+                f"default key to the key of {laid.others[0].username}"
+            ),
         )
 
     @override
@@ -536,7 +617,10 @@ class TheRenamedNode(Then[AnEdit, Answer]):
 
     @override
     def says(self) -> str:
-        return "전체 이름만 바뀐 사용자 전체가 온다"
+        return Says(
+            "전체 이름만 변경된 사용자 전체가 응답으로 옵니다",
+            english="the whole user with only the full name changed comes back",
+        )
 
     @override
     def look(self, laid: AnEdit, answered: Answered[Answer]) -> list[Verdict]:
@@ -556,8 +640,16 @@ class ThePasswordChangeRequirement(Then[AnEdit, Answer]):
     @override
     def says(self) -> str:
         if self.required:
-            return "비밀번호 변경 요구가 남은 사용자 전체가 온다"
-        return "비밀번호 변경 요구가 풀린 사용자 전체가 온다"
+            return Says(
+                "비밀번호 변경 요구가 남은 사용자 전체가 응답으로 옵니다",
+                english=(
+                    "the whole user with the password change requirement still standing comes back"
+                ),
+            )
+        return Says(
+            "비밀번호 변경 요구가 해제된 사용자 전체가 응답으로 옵니다",
+            english=("the whole user with the password change requirement lifted comes back"),
+        )
 
     @override
     def look(self, laid: AnEdit, answered: Answered[Answer]) -> list[Verdict]:
@@ -577,7 +669,10 @@ class TheDefaultKeyMoved(Then[AnEdit, Answer]):
 
     @override
     def says(self) -> str:
-        return "기본 키가 추가한 키로 옮겨간 사용자 전체가 온다"
+        return Says(
+            "기본 키가 추가한 키로 옮겨간 사용자 전체가 응답으로 옵니다",
+            english="the whole user whose default key moved to the extra key comes back",
+        )
 
     @override
     def look(self, laid: AnEdit, answered: Answered[Answer]) -> list[Verdict]:
@@ -587,7 +682,9 @@ class TheDefaultKeyMoved(Then[AnEdit, Answer]):
         return UserNodeLook(self.started).verdicts(
             node,
             laid.target,
-            main_access_key=SameAs(str(laid.extra_key.access_key), "추가한 키"),
+            main_access_key=SameAs(
+                str(laid.extra_key.access_key), Says("추가한 키", english="the extra key")
+            ),
         )
 
 
@@ -599,7 +696,10 @@ class TheAllowedIpChanged(Then[AnEdit, Answer]):
 
     @override
     def says(self) -> str:
-        return "성공이 오고, 다시 읽은 사용자는 허용 IP만 바뀌어 있다"
+        return Says(
+            "성공이 오고, 다시 읽은 사용자는 허용 IP 만 변경되어 있습니다",
+            english="the call succeeds and the user read back has only the allowed IP changed",
+        )
 
     @override
     def look(self, laid: AnEdit, answered: Answered[Answer]) -> list[Verdict]:
@@ -611,7 +711,7 @@ class TheAllowedIpChanged(Then[AnEdit, Answer]):
             *UserNodeLook(self.started).verdicts(
                 changed.after,
                 replace(laid.target, allowed_client_ip=STORED_IP),
-                at="뒤이은 읽기.",
+                at="the read that follows.",
             ),
         ]
 
@@ -624,7 +724,10 @@ class OneUpdatedOneFailed(Then[AnEdit, Answer]):
 
     @override
     def says(self) -> str:
-        return "하나는 수정 목록에, 하나는 실패 목록에 온다"
+        return Says(
+            "하나는 수정 목록에, 하나는 실패 목록에 옵니다",
+            english="one comes back in the updated list and one in the failed list",
+        )
 
     @override
     def look(self, laid: AnEdit, answered: Answered[Answer]) -> list[Verdict]:
@@ -648,10 +751,24 @@ class OneUpdatedOneFailed(Then[AnEdit, Answer]):
                 Held(
                     "failed[0].user_id",
                     payload.failed[0].user_id,
-                    SameAs(laid.others[1].id, "이름이 겹치게 바꾼 사용자"),
+                    SameAs(
+                        laid.others[1].id,
+                        Says(
+                            "이름이 겹치게 변경한 사용자",
+                            english="the user renamed into a taken name",
+                        ),
+                    ),
                 )
             )
-            seen.append(Skipped("failed[0].message", "예외 메시지는 바뀌어도 되는 값이다"))
+            seen.append(
+                Skipped(
+                    "failed[0].message",
+                    Says(
+                        "예외 메시지는 변경되어도 되는 값입니다",
+                        english="the exception message may change",
+                    ),
+                )
+            )
         return seen
 
 
@@ -661,7 +778,10 @@ class TheSwitchFailureIsAFailure(Then[AnEdit, Answer]):
 
     @override
     def says(self) -> str:
-        return "수정 목록은 비고, 그 사용자가 실패 목록에 온다"
+        return Says(
+            "수정 목록은 비고, 그 사용자가 실패 목록에 옵니다",
+            english="the updated list is empty and that user comes back in the failed list",
+        )
 
     @override
     def look(self, laid: AnEdit, answered: Answered[Answer]) -> list[Verdict]:
@@ -677,10 +797,24 @@ class TheSwitchFailureIsAFailure(Then[AnEdit, Answer]):
                 Held(
                     "failed[0].user_id",
                     payload.failed[0].user_id,
-                    SameAs(laid.target.id, "기본 키를 옮기려던 사용자"),
+                    SameAs(
+                        laid.target.id,
+                        Says(
+                            "기본 키를 옮기려던 사용자",
+                            english="the user who tried to move the default key",
+                        ),
+                    ),
                 )
             )
-            seen.append(Skipped("failed[0].message", "예외 메시지는 바뀌어도 되는 값이다"))
+            seen.append(
+                Skipped(
+                    "failed[0].message",
+                    Says(
+                        "예외 메시지는 변경되어도 되는 값입니다",
+                        english="the exception message may change",
+                    ),
+                )
+            )
         return seen
 
 
@@ -694,9 +828,13 @@ class AGrantedUserChangesOnlyTheFullName(Scenario[TestSeedingSession, AnEdit, Us
 
     @override
     def describe(self) -> str:
-        return (
-            "대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 전체 이름만 주면, "
-            "전체 이름만 바뀐 노드가 온다"
+        return Says(
+            "대상 사용자 스코프에서 UPDATE 와 READ 를 받은 사용자가 전체 이름만 주면, "
+            "전체 이름만 변경된 노드가 응답으로 옵니다",
+            english=(
+                "when a user granted UPDATE and READ in the target user scope gives only "
+                "a full name, the node comes back with only the full name changed"
+            ),
         )
 
     @override
@@ -724,9 +862,14 @@ class AnotherUsersNewPasswordLeavesTheRequirement(
 
     @override
     def describe(self) -> str:
-        return (
-            "대상 사용자 스코프에서 UPDATE와 READ를 받은 다른 사용자가 비밀번호 변경을 요구받는 "
-            "사용자에게 새 비밀번호만 주면, 요구가 남은 노드가 온다"
+        return Says(
+            "대상 사용자 스코프에서 UPDATE 와 READ 를 받은 다른 사용자가 비밀번호 변경을 "
+            "요구받는 사용자에게 새 비밀번호만 주면, 요구가 남은 노드가 응답으로 옵니다",
+            english=(
+                "when another user granted UPDATE and READ in the target user scope gives "
+                "only a new password to a user required to change the password, the node "
+                "comes back with the requirement still standing"
+            ),
         )
 
     @override
@@ -754,9 +897,14 @@ class OwnNewPasswordLiftsTheRequirement(Scenario[TestSeedingSession, AnEdit, Use
 
     @override
     def describe(self) -> str:
-        return (
-            "비밀번호 변경을 요구받는 사용자가 자기 사용자 스코프에서 UPDATE와 READ를 받고, "
-            "새 비밀번호와 요구 해제를 함께 주면, 요구가 풀린 노드가 온다"
+        return Says(
+            "비밀번호 변경을 요구받는 사용자가 자기 사용자 스코프에서 UPDATE 와 READ 를 받고, "
+            "새 비밀번호와 요구 해제를 함께 주면, 요구가 해제된 노드가 응답으로 옵니다",
+            english=(
+                "when a user required to change the password, granted UPDATE and READ in "
+                "their own user scope, gives a new password and the requirement lifted "
+                "together, the node comes back with the requirement lifted"
+            ),
         )
 
     @override
@@ -782,7 +930,13 @@ class AUserGrantedNothingMayNotEditAnother(
 
     @override
     def describe(self) -> str:
-        return "역할을 받지 않은 사용자가 수정하려 하면, 엔티티 권한 문이 막는다"
+        return Says(
+            "역할을 받지 않은 사용자가 수정하려 하면, 엔티티 권한 문이 막습니다",
+            english=(
+                "a user holding no role who tries to edit another user is rejected by the "
+                "entity permission gate"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnEdit]:
@@ -805,7 +959,13 @@ class ANameAnotherUserHoldsMayNotBeTaken(Scenario[TestSeedingSession, AnEdit, Us
 
     @override
     def describe(self) -> str:
-        return "권한 받은 사용자가 이미 쓰이는 사용자 이름을 주면, 입력 검증이 막는다"
+        return Says(
+            "권한 받은 사용자가 이미 쓰이는 사용자 이름을 주면, 입력 검증이 막습니다",
+            english=(
+                "when a user holding the permission gives a username another user already "
+                "holds, input validation rejects it"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnEdit]:
@@ -832,9 +992,14 @@ class NamingADefaultKeyMovesItAfterTheEdit(
 
     @override
     def describe(self) -> str:
-        return (
-            "권한 받은 사용자가 대상 사용자의 다른 키를 기본 키로 주면, "
-            "수정이 반영된 뒤 기본 키가 옮겨간 노드가 온다"
+        return Says(
+            "권한 받은 사용자가 대상 사용자의 다른 키를 기본 키로 지정하면, "
+            "수정이 반영된 뒤 기본 키가 옮겨간 노드가 응답으로 옵니다",
+            english=(
+                "when a user holding the permission names another key of the target as the "
+                "default key, the node comes back with the default key moved after the edit "
+                "is applied"
+            ),
         )
 
     @override
@@ -862,9 +1027,14 @@ class AGrantedUserChangesTheAllowedIp(Scenario[TestSeedingSession, AnEdit, UserA
 
     @override
     def describe(self) -> str:
-        return (
-            "대상 사용자 스코프에서 UPDATE를 받은 사용자가 허용 IP만 담은 수정을 보내면, "
-            "성공 표시가 오고 그 사용자의 허용 IP가 바뀐다"
+        return Says(
+            "대상 사용자 스코프에서 UPDATE 를 받은 사용자가 허용 IP 만 담은 수정을 보내면, "
+            "성공 표시가 오고 그 사용자의 허용 IP 가 변경됩니다",
+            english=(
+                "when a user granted UPDATE in the target user scope sends an edit holding "
+                "only the allowed IP, a success flag comes back and the allowed IP of that "
+                "user changes"
+            ),
         )
 
     @override
@@ -890,7 +1060,13 @@ class AUserGrantedNothingMayNotChangeTheAllowedIp(
 
     @override
     def describe(self) -> str:
-        return "역할 없이 허용 IP 수정을 보내면, 엔티티 권한 문이 막는다"
+        return Says(
+            "역할 없이 허용 IP 수정을 보내면, 엔티티 권한 문이 막습니다",
+            english=(
+                "when an allowed IP edit comes from a user holding no role, the entity "
+                "permission gate rejects it"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnEdit]:
@@ -917,9 +1093,14 @@ class TheSuperadminBulkEditSplitsUpdatedAndFailed(
 
     @override
     def describe(self) -> str:
-        return (
-            "전역 역할이 문인 일괄 수정에서 슈퍼관리자가 있는 사용자와 이름이 겹치게 바꾸는 사용자를 "
-            "함께 주면, 하나는 수정되고 하나는 사용자 id와 함께 실패로 담긴다"
+        return Says(
+            "전역 역할이 문인 일괄 수정에서 superadmin 이 있는 사용자와 이름이 겹치게 변경하는 "
+            "사용자를 함께 주면, 하나는 수정되고 하나는 사용자 id 와 함께 실패로 담깁니다",
+            english=(
+                "when the superadmin gives one user to update and one to rename into a taken "
+                "name in a bulk edit gated by the global role, one is updated and one comes "
+                "back as failed with its user id"
+            ),
         )
 
     @override
@@ -945,9 +1126,13 @@ class AFailedKeySwitchTurnsTheUserIntoAFailure(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 일괄 수정과 함께 남의 키로 기본 키 전환을 주면, "
-            "그 사용자는 수정 목록에서 빠지고 실패로 담긴다"
+        return Says(
+            "superadmin 이 일괄 수정과 함께 다른 사용자의 키로 기본 키 전환을 주면, "
+            "그 사용자는 수정 목록에서 빠지고 실패로 담깁니다",
+            english=(
+                "when the superadmin gives a default key switch to another user's key along "
+                "with a bulk edit, that user leaves the updated list and comes back as failed"
+            ),
         )
 
     @override
@@ -971,9 +1156,13 @@ class OnlyTheSuperadminMayBulkEdit(Scenario[TestSeedingSession, AnEdit, UserAdap
 
     @override
     def describe(self) -> str:
-        return (
-            "도메인 스코프에서 UPDATE를 받은 사용자라도 일괄 수정을 하려 하면, "
-            "전역 역할 문이 막는다"
+        return Says(
+            "도메인 스코프에서 UPDATE 를 받은 사용자라도 일괄 수정하려 하면, "
+            "전역 역할 문이 막습니다",
+            english=(
+                "even a user granted UPDATE in the domain scope is rejected by the global "
+                "role gate when bulk editing users"
+            ),
         )
 
     @override

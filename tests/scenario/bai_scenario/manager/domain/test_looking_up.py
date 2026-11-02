@@ -19,6 +19,7 @@ from ai.backend.testutils.scenario_steps import (
     Held,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -49,7 +50,11 @@ class LookingUpTheName(When[ADomainAndACaller, DomainAdapter, DomainID]):
 
     @override
     def describe(self, laid: ADomainAndACaller) -> str:
-        return f"{laid.caller.username}이 {self.named or laid.domain.name}의 id를 찾음"
+        name = self.named or laid.domain.name
+        return Says(
+            f"{laid.caller.username}이 {name}의 id 를 조회합니다",
+            english=f"{laid.caller.username} looks up the id of {name}",
+        )
 
     @override
     async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> DomainID:
@@ -63,14 +68,29 @@ class TheDomainsIdComesBack(Then[ADomainAndACaller, DomainID]):
 
     @override
     def says(self) -> str:
-        return "그 도메인의 id가 온다"
+        return Says(
+            "그 도메인의 id 가 응답으로 옵니다",
+            english="the id of that domain comes back",
+        )
 
     @override
     def look(self, laid: ADomainAndACaller, answered: Answered[DomainID]) -> list[Verdict]:
         found = answered.response
         if found is None:
             return [MissingResponse(answered.raised)]
-        return [Held("id", found, SameAs(laid.domain.id, "미리 만든 도메인의 id"))]
+        return [
+            Held(
+                "id",
+                found,
+                SameAs(
+                    laid.domain.id,
+                    Says(
+                        "미리 저장한 도메인의 id",
+                        english="the id of the domain seeded in advance",
+                    ),
+                ),
+            )
+        ]
 
 
 @dataclass(frozen=True)
@@ -83,7 +103,12 @@ class TheSuperadminLooksUpAName(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 도메인 이름으로 id를 찾으면, 그 도메인의 id가 온다"
+        return Says(
+            "superadmin 이 도메인 이름으로 id 를 조회하면, 그 도메인의 id 가 응답으로 옵니다",
+            english=(
+                "when the superadmin looks up a domain by name, the id of that domain comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
@@ -108,9 +133,14 @@ class AUserGrantedNothingStillLooksUpAName(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자도 도메인 이름으로 id를 찾을 수 있다. "
-            "이 호출은 인증만 보고, 권한은 그 id를 받는 호출이 본다"
+        return Says(
+            "아무 권한도 받지 않은 사용자도 도메인 이름으로 id 를 조회할 수 있습니다. "
+            "이 호출은 인증만 확인하고, 권한은 그 id 를 받는 호출이 확인합니다",
+            english=(
+                "a user granted nothing can still look up a domain by name. "
+                "This call checks authentication only, and the call receiving that id "
+                "checks the permission"
+            ),
         )
 
     @override
@@ -136,7 +166,12 @@ class LookingUpNames(When[ADomainAndACaller, DomainAdapter, Found]):
 
     @override
     def describe(self, laid: ADomainAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.domain.name}과 {UNKNOWN}의 id를 여럿 찾음"
+        return Says(
+            f"{laid.caller.username}이 {laid.domain.name}과 {UNKNOWN}의 id 를 여럿을 조회합니다",
+            english=(
+                f"{laid.caller.username} looks up several ids for {laid.domain.name} and {UNKNOWN}"
+            ),
+        )
 
     @override
     async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> Found:
@@ -150,7 +185,13 @@ class OnlyTheKnownNameHasAnId(Then[ADomainAndACaller, Found]):
 
     @override
     def says(self) -> str:
-        return "있는 이름에는 그 도메인의 id, 없는 이름에는 빈 값이 온다"
+        return Says(
+            "있는 이름의 항목에 그 도메인의 id 가, 없는 이름의 항목에 빈 값이 응답으로 옵니다",
+            english=(
+                "the id of that domain comes back for the name that exists, "
+                "and an empty value for the name that does not"
+            ),
+        )
 
     @override
     def look(self, laid: ADomainAndACaller, answered: Answered[Found]) -> list[Verdict]:
@@ -161,7 +202,15 @@ class OnlyTheKnownNameHasAnId(Then[ADomainAndACaller, Found]):
             case [known, unknown]:
                 return [
                     Held[DomainID | None](
-                        "[0]", known, SameAs(laid.domain.id, "미리 만든 도메인의 id")
+                        "[0]",
+                        known,
+                        SameAs(
+                            laid.domain.id,
+                            Says(
+                                "미리 저장한 도메인의 id",
+                                english="the id of the domain seeded in advance",
+                            ),
+                        ),
                     ),
                     Same("[1]", unknown, None),
                 ]
@@ -179,9 +228,14 @@ class TheSuperadminLooksUpNames(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 있는 이름과 없는 이름으로 id를 여럿 찾으면, "
-            "있는 이름에는 그 도메인의 id, 없는 이름에는 빈 값이 온다"
+        return Says(
+            "superadmin 이 있는 이름과 없는 이름으로 id 를 여럿 조회하면, "
+            "있는 이름에는 그 도메인의 id, 없는 이름에는 빈 값이 응답으로 옵니다",
+            english=(
+                "when the superadmin looks up several ids for a name that exists and "
+                "one that does not, the id of that domain comes back for the name that "
+                "exists and an empty value for the name that does not"
+            ),
         )
 
     @override
@@ -207,9 +261,14 @@ class AUserGrantedNothingGetsTheSameIds(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 찾아도 슈퍼관리자와 같은 답이 온다. "
-            "이 호출은 인증만 보므로 이름이 있는지는 누구에게나 드러난다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 조회해도 superadmin 과 같은 응답이 옵니다. "
+            "이 호출은 인증만 확인하므로 이름이 있는지는 누구에게나 드러납니다",
+            english=(
+                "a user granted nothing gets the same answer as the superadmin. "
+                "This call checks authentication only, so whether a name exists is "
+                "visible to anyone"
+            ),
         )
 
     @override
@@ -235,7 +294,10 @@ class LookingUpNamesWithoutLogin(When[ADomainAndACaller, DomainAdapter, Found]):
 
     @override
     def describe(self, laid: ADomainAndACaller) -> str:
-        return f"로그인 문맥 없이 {laid.domain.name}의 id를 여럿 찾음"
+        return Says(
+            f"로그인 문맥 없이 {laid.domain.name}의 id 를 여럿을 조회합니다",
+            english=f"without a login context, looks up several ids for {laid.domain.name}",
+        )
 
     @override
     async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> Found:
@@ -252,7 +314,13 @@ class ACallWithoutLoginIsRefused(
 
     @override
     def describe(self) -> str:
-        return "로그인 문맥 없이 이름으로 id를 여럿 찾으면, 사용자를 찾을 수 없다는 것으로 거부된다"
+        return Says(
+            "로그인 문맥 없이 이름으로 id 를 여럿 조회하면, 사용자를 찾을 수 없다는 것으로 거부됩니다",
+            english=(
+                "looking up several ids by name without a login context is rejected "
+                "as user not found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
@@ -284,7 +352,10 @@ class ANameNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "아무 도메인도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다"
+        return Says(
+            "아무 도메인도 갖지 않은 이름으로 id 를 조회하면 대상이 없다는 것으로 거부됩니다",
+            english="looking up an id by a name no domain answers to is rejected as not found",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:

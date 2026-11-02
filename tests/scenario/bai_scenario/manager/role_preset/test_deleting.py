@@ -13,7 +13,7 @@ from ai.backend.common.dto.manager.v2.role_preset.response import RolePresetNode
 from ai.backend.manager.api.adapters.role_preset.adapter import RolePresetAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.role_preset import (
     APresetAndACaller,
@@ -40,7 +40,10 @@ class SoftDeleting(When[APresetAndACaller, RolePresetAdapter, RolePresetNode]):
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.preset.name}을 soft delete 함"
+        return Says(
+            f"{laid.caller.username}이 {laid.preset.name}을 soft delete 합니다",
+            english=f"{laid.caller.username} soft deletes {laid.preset.name}",
+        )
 
     @override
     async def call(self, adapter: RolePresetAdapter, laid: APresetAndACaller) -> RolePresetNode:
@@ -58,7 +61,12 @@ class SoftDeletingThenRestoring(When[APresetAndACaller, RolePresetAdapter, RoleP
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.preset.name}을 soft delete 했다가 restore 함"
+        return Says(
+            f"{laid.caller.username}이 {laid.preset.name}을 soft delete 한 뒤 restore 합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {laid.preset.name} and then restores it"
+            ),
+        )
 
     @override
     async def call(self, adapter: RolePresetAdapter, laid: APresetAndACaller) -> RolePresetNode:
@@ -77,7 +85,10 @@ class Restoring(When[APresetAndACaller, RolePresetAdapter, RolePresetNode]):
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.preset.name}을 restore 함"
+        return Says(
+            f"{laid.caller.username}이 {laid.preset.name}을 restore 합니다",
+            english=f"{laid.caller.username} restores {laid.preset.name}",
+        )
 
     @override
     async def call(self, adapter: RolePresetAdapter, laid: APresetAndACaller) -> RolePresetNode:
@@ -95,7 +106,10 @@ class Purging(When[APresetAndACaller, RolePresetAdapter, RolePresetNode]):
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.preset.name}을 purge 함"
+        return Says(
+            f"{laid.caller.username}이 {laid.preset.name}을 purge 합니다",
+            english=f"{laid.caller.username} purges {laid.preset.name}",
+        )
 
     @override
     async def call(self, adapter: RolePresetAdapter, laid: APresetAndACaller) -> RolePresetNode:
@@ -115,7 +129,13 @@ class TheSuperadminSoftDeletesIt(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 프리셋을 soft delete 하면, 삭제 표시가 켜진 프리셋 전체가 온다"
+        return Says(
+            "superadmin 이 프리셋을 soft delete 하면, 삭제로 표시된 프리셋 전체가 응답으로 옵니다",
+            english=(
+                "when the superadmin soft deletes a preset, "
+                "the whole preset marked deleted comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
@@ -140,8 +160,12 @@ class AUserGrantedNothingMayNotSoftDelete(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 프리셋을 soft delete 하려 하면, 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 프리셋을 soft delete 하려 하면, 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing tries to soft delete a preset, "
+                "it is rejected for lack of permission"
+            ),
         )
 
     @override
@@ -169,7 +193,14 @@ class RestoringBringsItBack(
 
     @override
     def describe(self) -> str:
-        return "soft delete 된 프리셋을 restore 하면, 삭제 표시가 꺼진 프리셋 전체가 온다"
+        return Says(
+            "soft delete 된 프리셋을 restore 하면, 삭제로 표시되지 않은 프리셋 전체가 "
+            "응답으로 옵니다",
+            english=(
+                "when a soft-deleted preset is restored, "
+                "the whole preset not marked deleted comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
@@ -194,7 +225,13 @@ class AUserGrantedNothingMayNotRestore(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 프리셋을 restore 하려 하면, 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 프리셋을 restore 하려 하면, 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing tries to restore a preset, "
+                "it is rejected for lack of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
@@ -221,7 +258,13 @@ class TheSuperadminPurgesIt(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 프리셋을 purge 하면, purge 하기 전의 프리셋 전체가 온다"
+        return Says(
+            "superadmin 이 프리셋을 purge 하면, purge 하기 전의 프리셋 전체가 응답으로 옵니다",
+            english=(
+                "when the superadmin purges a preset, "
+                "the whole preset as it was before the purge comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
@@ -246,7 +289,13 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 프리셋을 purge 하려 하면, 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 프리셋을 purge 하려 하면, 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing tries to purge a preset, "
+                "it is rejected for lack of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:

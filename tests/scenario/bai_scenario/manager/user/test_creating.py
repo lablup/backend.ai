@@ -23,7 +23,7 @@ from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.user.creators import UserCreateSpec
 from ai.backend.manager.services.user.actions.create_user import BulkCreateUserAction
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.user import AGrant
@@ -53,8 +53,16 @@ class SomeoneInADomain(Given[Any, ADomainAndACaller]):
     @override
     def describe(self) -> str:
         if self.granted:
-            return "도메인 하나와, 그 도메인 스코프에서 사용자 생성 권한을 받은 사용자 한 명"
-        return "도메인 하나와, 아무 권한도 받지 않은 사용자 한 명"
+            return Says(
+                "도메인 하나와, 그 도메인 스코프에서 사용자 생성 권한을 받은 사용자 한 명",
+                english=(
+                    "one domain and one user granted the user create permission in the domain scope"
+                ),
+            )
+        return Says(
+            "도메인 하나와, 아무 권한도 받지 않은 사용자 한 명",
+            english="one domain and one user granted no permission",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ADomainAndACaller:
@@ -77,7 +85,11 @@ class CreatingAUser(When[ADomainAndACaller, UserAdapter, Any]):
 
     @override
     def describe(self, laid: ADomainAndACaller) -> str:
-        return f"{laid.caller.username}이 {self.domain_name or laid.domain.name}에 {MADE}을 만듦"
+        domain_name = self.domain_name or laid.domain.name
+        return Says(
+            f"{laid.caller.username}이 {domain_name}에 {MADE}을 생성합니다",
+            english=f"{laid.caller.username} creates {MADE} in {domain_name}",
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: ADomainAndACaller) -> Any:
@@ -106,7 +118,10 @@ class BulkCreatingAUser(When[ADomainAndACaller, UserAdapter, Any]):
 
     @override
     def describe(self, laid: ADomainAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.domain.name}에 {MADE}을 일괄 생성"
+        return Says(
+            f"{laid.caller.username}이 {laid.domain.name}에 {MADE}을 일괄 생성합니다",
+            english=f"{laid.caller.username} bulk creates {MADE} in {laid.domain.name}",
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: ADomainAndACaller) -> Any:
@@ -146,7 +161,13 @@ class AUserGrantedNothingMayNotCreateAUser(
 
     @override
     def describe(self) -> str:
-        return "역할을 받지 않은 사용자가 만들려 하면, 도메인 스코프 권한 문이 막는다"
+        return Says(
+            "역할을 받지 않은 사용자가 생성하려 하면, 도메인 스코프 권한 문이 막습니다",
+            english=(
+                "a user holding no role who tries to create a user is rejected by the "
+                "domain scope permission gate"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
@@ -171,9 +192,13 @@ class ANameNoDomainHoldsMayNotHoldAUser(
 
     @override
     def describe(self) -> str:
-        return (
-            "권한 받은 사용자가 없는 도메인 이름을 주면, "
-            "도메인 이름 조회 단계가 대상 없음으로 막는다"
+        return Says(
+            "권한 받은 사용자가 어떤 도메인도 아닌 이름을 주면, "
+            "도메인 이름 조회 단계가 대상 없음으로 막습니다",
+            english=(
+                "when a user holding the permission gives a domain name nothing answers to, "
+                "the domain name lookup step rejects it as not found"
+            ),
         )
 
     @override
@@ -199,9 +224,13 @@ class OnlyTheSuperadminMayBulkCreate(
 
     @override
     def describe(self) -> str:
-        return (
-            "도메인 스코프에서 CREATE를 받은 사용자라도 일괄 생성을 하려 하면, "
-            "전역 역할 문이 막는다"
+        return Says(
+            "도메인 스코프에서 CREATE 를 받은 사용자라도 일괄 생성하려 하면, "
+            "전역 역할 문이 막습니다",
+            english=(
+                "even a user granted CREATE in the domain scope is rejected by the global "
+                "role gate when bulk creating users"
+            ),
         )
 
     @override
@@ -227,7 +256,13 @@ class OnlyTheSuperadminMayBulkCreateWithKeypairs(
 
     @override
     def describe(self) -> str:
-        return "권한 받은 사용자가 이 일괄 생성을 하려 하면, 전역 역할 문이 막는다"
+        return Says(
+            "권한 받은 사용자가 이 일괄 생성을 하려 하면, 전역 역할 문이 막습니다",
+            english=(
+                "a user holding the permission is rejected by the global role gate when "
+                "calling this bulk create"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:

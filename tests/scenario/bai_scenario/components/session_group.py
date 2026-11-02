@@ -35,10 +35,13 @@ from ai.backend.testutils.scenario_steps import (
     Condition,
     Given,
     Held,
+    Language,
     Same,
     SameAs,
+    Says,
     Skipped,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.deployment.deployment import TestSeedDeployment
@@ -61,10 +64,10 @@ from bai_scenario.seeds.user.fields import TestSeedKeypairOf
 class Granting(enum.Enum):
     """부르는 사람이 받은 세션 그룹 권한."""
 
-    READ = "읽기"
-    CREATE = "생성"
-    UPDATE = "수정"
-    HARD_DELETE = "영구 삭제"
+    READ = Says("읽기", english="read")
+    CREATE = Says("생성", english="create")
+    UPDATE = Says("수정", english="update")
+    HARD_DELETE = Says("영구 삭제", english="purge")
 
     def permission(self) -> Permission:
         match self:
@@ -93,11 +96,17 @@ class Granting(enum.Enum):
 class GrantedIn(enum.Enum):
     """부르는 사람이 세션 그룹 권한을 받은 곳."""
 
-    NOWHERE = "아무 데서도"
-    THE_PROJECT = "세션 그룹들이 있는 프로젝트에서"
-    THE_OTHER_PROJECT = "다른 프로젝트에서만"
-    THEIR_OWN = "자기 스코프에서"
-    THEIR_OWN_AND_THE_OTHER_PROJECT = "자기 스코프와 다른 프로젝트에서"
+    NOWHERE = Says("아무 데서도", english="nowhere")
+    THE_PROJECT = Says(
+        "세션 그룹들이 있는 프로젝트에서",
+        english="in the project the session groups are in",
+    )
+    THE_OTHER_PROJECT = Says("다른 프로젝트에서만", english="only in the other project")
+    THEIR_OWN = Says("자기 스코프에서", english="in their own scope")
+    THEIR_OWN_AND_THE_OTHER_PROJECT = Says(
+        "자기 스코프와 다른 프로젝트에서",
+        english="in their own scope and the other project",
+    )
 
     def is_the_owner(self) -> bool:
         """부르는 사람이 세션 그룹들을 만든 사람인지."""
@@ -140,7 +149,14 @@ class SomeoneGrantedOnSessionGroups(TestSeedNest[Laid[UserData]]):
 
     @override
     def kind(self) -> str:
-        return f"프로젝트에서 세션 그룹 {self.granting.value} 권한을 받은 사용자 준비"
+        granting = self.granting.value
+        return Says(
+            f"프로젝트에서 세션 그룹 {granting} 권한을 받은 사용자 준비",
+            english=(
+                "Prepare a user granted the session group "
+                f"{in_language(granting, Language.ENGLISH)} permission in the project"
+            ),
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[UserData]:
@@ -173,10 +189,22 @@ class SomeoneGrantedOnTheirOwnSessionGroups(TestSeedNest[Laid[UserData]]):
 
     @override
     def kind(self) -> str:
+        granting = self.granting.value
         if self.also_in is None:
-            return f"자기 스코프에서 세션 그룹 {self.granting.value} 권한을 받은 사용자 준비"
-        return (
-            f"자기 스코프와 한 프로젝트에서 세션 그룹 {self.granting.value} 권한을 받은 사용자 준비"
+            return Says(
+                f"자기 스코프에서 세션 그룹 {granting} 권한을 받은 사용자 준비",
+                english=(
+                    "Prepare a user granted the session group "
+                    f"{in_language(granting, Language.ENGLISH)} permission in their own scope"
+                ),
+            )
+        return Says(
+            f"자기 스코프와 한 프로젝트에서 세션 그룹 {granting} 권한을 받은 사용자 준비",
+            english=(
+                "Prepare a user granted the session group "
+                f"{in_language(granting, Language.ENGLISH)} permission in their own scope "
+                "and in one project"
+            ),
         )
 
     @override
@@ -224,21 +252,41 @@ class SessionGroupsInTwoProjects(Given[Any, SessionGroupsAndACaller]):
 
     @override
     def describe(self) -> str:
-        laid = (
-            "한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 "
-            "세션 그룹과 다른 사용자가 만든 세션 그룹"
+        laid_ko = (
+            "한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group 이 가진 세션 그룹, 다른 "
+            "프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹"
         )
+        laid_en = (
+            "the session group a user made in one project and the session group the "
+            "deployment's replica group holds, the session group the same user made in "
+            "another project, and the session group another user made"
+        )
+        granted_in = self.granted_in.value
+        granting = self.granting.value
         if self.granted_in.is_the_owner():
-            return (
-                f"{laid}, 그리고 {self.granted_in.value} 세션 그룹 {self.granting.value} "
-                "권한을 받은 세션 그룹들을 만든 사용자"
+            return Says(
+                f"{laid_ko}, 그리고 {granted_in} 세션 그룹 {granting} 권한을 받은 "
+                "세션 그룹들을 만든 사용자",
+                english=(
+                    f"{laid_en}, and the user who made those session groups, granted the "
+                    f"session group {in_language(granting, Language.ENGLISH)} permission "
+                    f"{in_language(granted_in, Language.ENGLISH)}"
+                ),
             )
-        who = "슈퍼관리자" if self.role is UserRole.SUPERADMIN else "사용자"
+        who_ko = "superadmin" if self.role is UserRole.SUPERADMIN else "사용자"
+        who_en = "superadmin" if self.role is UserRole.SUPERADMIN else "user"
         if self.granted_in is GrantedIn.NOWHERE:
-            reach = "아무 권한도 받지 않은"
+            reach_ko, reach_en = "아무 권한도 받지 않은", "holding no permission"
         else:
-            reach = f"{self.granted_in.value} 세션 그룹 {self.granting.value} 권한을 받은"
-        return f"{laid}, 그리고 {reach} {who} 한 명"
+            reach_ko = f"{granted_in} 세션 그룹 {granting} 권한을 받은"
+            reach_en = (
+                f"granted the session group {in_language(granting, Language.ENGLISH)} "
+                f"permission {in_language(granted_in, Language.ENGLISH)}"
+            )
+        return Says(
+            f"{laid_ko}, 그리고 {reach_ko} {who_ko} 한 명",
+            english=f"{laid_en}, and one {who_en} {reach_en}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> SessionGroupsAndACaller:
@@ -305,9 +353,9 @@ class SessionGroupsInTwoProjects(Given[Any, SessionGroupsAndACaller]):
 class OwnerGrant(enum.Enum):
     """세션 그룹들을 만든 사람이 자기 스코프에서 받은 세션 그룹 권한."""
 
-    NOTHING = "없음"
-    READ = "읽기"
-    HARD_DELETE = "영구 삭제"
+    NOTHING = Says("없음", english="none")
+    READ = Says("읽기", english="read")
+    HARD_DELETE = Says("영구 삭제", english="purge")
 
     def granting(self) -> Granting | None:
         match self:
@@ -340,12 +388,30 @@ class AUsersGroupWithMembers(Given[Any, AGroupWithMembersAndItsOwner]):
 
     @override
     def describe(self) -> str:
-        laid = "한 프로젝트에 멤버 세션 둘을 가진 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹"
+        laid_ko = (
+            "한 프로젝트에 멤버 세션 둘을 가진 사용자가 만든 세션 그룹과 배포의 replica "
+            "group 이 가진 세션 그룹"
+        )
+        laid_en = (
+            "the session group a user made with two member sessions in one project and "
+            "the session group the deployment's replica group holds"
+        )
         if self.granted is OwnerGrant.NOTHING:
-            return f"{laid}, 그리고 아무 권한도 받지 않은 세션 그룹들을 만든 사용자"
-        return (
-            f"{laid}, 그리고 자기 스코프에서 세션 그룹 {self.granted.value} 권한을 받은 "
-            "세션 그룹들을 만든 사용자"
+            return Says(
+                f"{laid_ko}, 그리고 아무 권한도 받지 않은 세션 그룹들을 만든 사용자",
+                english=(
+                    f"{laid_en}, and the user who made those session groups, holding no permission"
+                ),
+            )
+        granting = self.granted.value
+        return Says(
+            f"{laid_ko}, 그리고 자기 스코프에서 세션 그룹 {granting} 권한을 받은 "
+            "세션 그룹들을 만든 사용자",
+            english=(
+                f"{laid_en}, and the user who made those session groups, granted the "
+                f"session group {in_language(granting, Language.ENGLISH)} permission "
+                "in their own scope"
+            ),
         )
 
     @override
@@ -406,7 +472,7 @@ class TheseGroups(Condition[Collection[UUID]]):
 
     @override
     def says(self) -> str:
-        return self.named
+        return self.named if isinstance(self.named, Says) else Says(self.named)
 
     @override
     def holds(self, got: Collection[UUID]) -> bool:
@@ -428,22 +494,41 @@ class UsersGroupLook:
         self, prefix: str, node: SessionGroupNode, laid: SessionGroupsAndACaller
     ) -> list[Verdict]:
         return [
-            Skipped(f"{prefix}id", "데이터베이스가 만든다"),
+            Skipped(
+                f"{prefix}id",
+                Says("데이터베이스가 생성합니다", english="the database generates it"),
+            ),
             Held[UUID](
                 f"{prefix}entity_id",
                 node.entity_id,
-                SameAs(laid.users_group.id, "사용자가 만든 세션 그룹의 id"),
+                SameAs(
+                    laid.users_group.id,
+                    Says(
+                        "사용자가 만든 세션 그룹의 id",
+                        english="the id of the session group the user made",
+                    ),
+                ),
             ),
             Held[UUID](
-                f"{prefix}domain_id", node.domain_id, SameAs(laid.domain.id, "그 도메인의 id")
+                f"{prefix}domain_id",
+                node.domain_id,
+                SameAs(laid.domain.id, Says("그 도메인의 id", english="the id of that domain")),
             ),
             Held[UUID](
-                f"{prefix}project_id", node.project_id, SameAs(laid.project.id, "그 프로젝트의 id")
+                f"{prefix}project_id",
+                node.project_id,
+                SameAs(laid.project.id, Says("그 프로젝트의 id", english="the id of that project")),
             ),
             Held[UUID](
                 f"{prefix}owner_user_id",
                 node.owner_user_id,
-                SameAs(laid.owner.id, "만든 사람의 id"),
+                SameAs(
+                    laid.owner.id,
+                    Says(
+                        "생성한 사용자의 id",
+                        english="the id of the user who created it",
+                    ),
+                ),
             ),
             Same(
                 f"{prefix}placement_direction",
@@ -463,9 +548,18 @@ class UsersGroupLook:
 class CallerGrant(enum.Enum):
     """세션 그룹을 만드는 사람이 받은 세션 그룹 권한과 그 자리."""
 
-    CREATE_IN_THE_PROJECT = "세션 그룹을 만들 프로젝트에서 세션 그룹 생성"
-    READ_IN_THE_PROJECT = "세션 그룹을 만들 프로젝트에서 세션 그룹 읽기"
-    CREATE_IN_THE_OTHER_PROJECT = "다른 프로젝트에서만 세션 그룹 생성"
+    CREATE_IN_THE_PROJECT = Says(
+        "세션 그룹을 생성할 프로젝트에서 세션 그룹 생성",
+        english="create a session group in the project it goes in",
+    )
+    READ_IN_THE_PROJECT = Says(
+        "세션 그룹을 생성할 프로젝트에서 세션 그룹 읽기",
+        english="read a session group in the project it goes in",
+    )
+    CREATE_IN_THE_OTHER_PROJECT = Says(
+        "다른 프로젝트에서만 세션 그룹 생성",
+        english="create a session group only in the other project",
+    )
 
     def granting(self) -> Granting:
         match self:
@@ -500,7 +594,14 @@ class AProjectAndACallerGranted(Given[Any, AProjectAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"한 도메인의 두 프로젝트, 그리고 {self.granted.value} 권한을 받은 사용자"
+        granted = self.granted.value
+        return Says(
+            f"한 도메인의 두 프로젝트, 그리고 {granted} 권한을 받은 사용자",
+            english=(
+                "two projects in one domain, and one user granted "
+                f"{in_language(granted, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> AProjectAndACaller:
@@ -532,12 +633,25 @@ class CreatedGroupLook:
 
     def verdicts(self, node: SessionGroupNode, laid: AProjectAndACaller) -> list[Verdict]:
         return [
-            Skipped("id", "데이터베이스가 만든다"),
+            Skipped("id", Says("데이터베이스가 생성합니다", english="the database generates it")),
             Held[UUID]("entity_id", node.entity_id, SameAs(node.id, "id")),
-            Held[UUID]("domain_id", node.domain_id, SameAs(laid.domain.id, "그 도메인의 id")),
-            Held[UUID]("project_id", node.project_id, SameAs(laid.project.id, "그 프로젝트의 id")),
             Held[UUID](
-                "owner_user_id", node.owner_user_id, SameAs(laid.caller.id, "만든 사람의 id")
+                "domain_id",
+                node.domain_id,
+                SameAs(laid.domain.id, Says("그 도메인의 id", english="the id of that domain")),
+            ),
+            Held[UUID](
+                "project_id",
+                node.project_id,
+                SameAs(laid.project.id, Says("그 프로젝트의 id", english="the id of that project")),
+            ),
+            Held[UUID](
+                "owner_user_id",
+                node.owner_user_id,
+                SameAs(
+                    laid.caller.id,
+                    Says("생성한 사용자의 id", english="the id of the user who created it"),
+                ),
             ),
             Same("placement_direction", node.placement_direction, self.direction),
             Same("placement_enforcement", node.placement_enforcement, self.enforcement),

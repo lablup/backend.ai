@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
 from ai.backend.common.dto.manager.v2.image.response import ImageNode
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.image import (
     EveryImageComesBack,
     ManyImagesAndACaller,
@@ -44,7 +44,10 @@ class EditingEveryTarget(When[ManyImagesAndACaller, ImageAdapter, Edited]):
 
     @override
     def describe(self, laid: ManyImagesAndACaller) -> str:
-        return f"{laid.caller.username}이 이미지 {len(laid.laid)}개의 태그를 한 번에 고침"
+        return Says(
+            f"{laid.caller.username}이 이미지 {len(laid.laid)}개의 태그를 한 번에 수정합니다",
+            english=f"{laid.caller.username} changes the tags of {len(laid.laid)} images at once",
+        )
 
     @override
     async def call(self, adapter: ImageAdapter, laid: ManyImagesAndACaller) -> Edited:
@@ -71,8 +74,13 @@ class TheSuperadminEditsSeveralImages(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 이미지 여럿의 태그를 한 번에 바꾸면, 모두 새 태그로 오고 실패한 것은 없다"
+        return Says(
+            "superadmin 이 이미지 여럿의 태그를 한 번에 변경하면 모두 새 태그로 오고 "
+            "실패한 것은 없습니다",
+            english=(
+                "when the superadmin changes the tags of several images at once, "
+                "they all come back with the new tag and nothing failed"
+            ),
         )
 
     @override
@@ -98,9 +106,14 @@ class AUserGrantedNothingEditsNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 이미지 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 이미지 여럿을 한 번에 수정하려 하면 수정된 것 없이 "
+            "모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to update several images at once, "
+                "nothing is updated and every one comes back in the failed list for "
+                "lack of permission"
+            ),
         )
 
     @override

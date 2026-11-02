@@ -25,6 +25,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -59,8 +60,19 @@ class PurgingEveryPolicy(When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdap
 
     @override
     def describe(self, laid: ManyMaskingPoliciesAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 정책 {len(laid.laid)}개{besides}를 한 번에 purge 함"
+        has_missing = self.missing is not None
+        besides_ko = " 와 없는 id 하나" if has_missing else ""
+        besides_en = " and one unknown id" if has_missing else ""
+        return Says(
+            (
+                f"{laid.caller.username} 이 클라이언트 IP 마스킹 정책 {len(laid.laid)}개"
+                f"{besides_ko}를 한 번에 purge 합니다"
+            ),
+            english=(
+                f"{laid.caller.username} purges {len(laid.laid)} client IP masking policies"
+                f"{besides_en} at once"
+            ),
+        )
 
     @override
     async def call(
@@ -84,7 +96,13 @@ class EveryPolicyIsPurged(Then[ManyMaskingPoliciesAndACaller, Purged]):
 
     @override
     def says(self) -> str:
-        return "정책이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            ("정책이 모두 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다"),
+            english=(
+                "every policy comes back in the processed list and the unknown id comes back in "
+                "the failed list because no target answers to it"
+            ),
+        )
 
     @override
     def look(
@@ -99,7 +117,14 @@ class EveryPolicyIsPurged(Then[ManyMaskingPoliciesAndACaller, Purged]):
         for node, policy in zip(payload.successes, laid.laid, strict=False):
             verdicts += masking_verdicts(
                 node,
-                identity=Held[UUID]("id", node.id, SameAs[UUID](policy.id, "미리 만들어 둔 정책")),
+                identity=Held[UUID](
+                    "id",
+                    node.id,
+                    SameAs[UUID](
+                        policy.id,
+                        Says("미리 저장한 정책", english="the policy made in advance"),
+                    ),
+                ),
                 target=policy.target_type,
                 mode=policy.mode,
                 ipv4=policy.ipv4_prefix,
@@ -109,7 +134,17 @@ class EveryPolicyIsPurged(Then[ManyMaskingPoliciesAndACaller, Purged]):
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says(
+                            "요청에 넣은 없는 id",
+                            english="the unknown id put in the request",
+                        ),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -128,9 +163,16 @@ class PurgingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 정책 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 "
-            "없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            (
+                "superadmin 이 정책 둘과 없는 id 하나를 한 번에 purge 하면 둘은 처리된 목록에 오고 "
+                "없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다"
+            ),
+            english=(
+                "when the superadmin purges two policies and an unknown id at once, the two come "
+                "back in the processed list and the unknown id comes back in the failed list "
+                "because no target answers to it"
+            ),
         )
 
     @override
@@ -156,9 +198,15 @@ class AUserGrantedNothingPurgesNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 정책 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            (
+                "아무 권한도 없는 사용자가 정책 여럿을 한 번에 purge 하려 하면 purge 된 것 없이 모두 "
+                "권한이 없다는 이유로 실패 목록에 옵니다"
+            ),
+            english=(
+                "when a user granted nothing tries to purge several policies at once, nothing is "
+                "purged and every one comes back in the failed list because there is no permission"
+            ),
         )
 
     @override

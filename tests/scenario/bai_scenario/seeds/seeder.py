@@ -61,6 +61,7 @@ from ai.backend.manager.repositories.ops.v2.user.write import (
     FullUserCreator,
     FullUserCreatorResult,
 )
+from ai.backend.testutils.scenario_steps import Language, Says, in_language
 from bai_scenario.seeds.ops import TestSeedOps
 
 
@@ -340,12 +341,31 @@ def _since(start: datetime) -> Callable[[datetime], bool]:
     return condition
 
 
-def _there_is(seed: TestSeed, name: str) -> str:
-    return f"{seed.kind()} {name}"
+def _english(text: str) -> str:
+    return in_language(text, Language.ENGLISH)
 
 
-def _states(sentence: str, detail: str) -> str:
-    return f"{sentence}: {detail}" if detail else sentence
+def _pair(korean: str, english: str) -> Says:
+    return Says(korean, english=english)
+
+
+def joined(parts: Sequence[str], separator: str = ", ") -> Says:
+    """``parts`` in order, each in the language the report asks for."""
+    return _pair(
+        separator.join(str(one) for one in parts),
+        separator.join(_english(one) for one in parts),
+    )
+
+
+def _there_is(seed: TestSeed, name: str) -> Says:
+    kind = seed.kind()
+    return _pair(f"{kind} {name}", f"{_english(kind)} {name}")
+
+
+def _states(sentence: str, detail: str) -> Says:
+    if not detail:
+        return _pair(str(sentence), _english(sentence))
+    return _pair(f"{sentence}: {detail}", f"{_english(sentence)}: {_english(detail)}")
 
 
 async def _write(ops: TestSeedOps, spec: WriteSpec[Any]) -> Any:
@@ -498,7 +518,10 @@ class TestSeeder:
             name=user.name,
             kind=user.kind,
             nest=tuple(self._nesting),
-            describe=f"{user.describe}의 개인 프로젝트",
+            describe=_pair(
+                f"{user.describe}의 개인 프로젝트",
+                f"personal project of {_english(user.describe)}",
+            ),
             states="",
             sources=(provisioned,),
             write=project,
@@ -515,8 +538,14 @@ class TestSeeder:
                 name=owner.name,
                 kind=owner.kind,
                 nest=tuple(self._nesting),
-                describe=f"{owner.describe}({seed.kind()})",
-                states=f"{owner.describe}: {seed.kind()}",
+                describe=_pair(
+                    f"{owner.describe}({seed.kind()})",
+                    f"{_english(owner.describe)}({_english(seed.kind())})",
+                ),
+                states=_pair(
+                    f"{owner.describe}: {seed.kind()}",
+                    f"{_english(owner.describe)}: {_english(seed.kind())}",
+                ),
                 sources=(owner,),
                 write=write,
             )
@@ -539,8 +568,14 @@ class TestSeeder:
                 name=owner.name,
                 kind=owner.kind,
                 nest=tuple(self._nesting),
-                describe=f"{owner.describe}({seed.kind()})",
-                states=f"{owner.describe}: {seed.kind()}",
+                describe=_pair(
+                    f"{owner.describe}({seed.kind()})",
+                    f"{_english(owner.describe)}({_english(seed.kind())})",
+                ),
+                states=_pair(
+                    f"{owner.describe}: {seed.kind()}",
+                    f"{_english(owner.describe)}: {_english(seed.kind())}",
+                ),
                 sources=(owner,),
                 write=write,
             )
@@ -562,7 +597,10 @@ class TestSeeder:
                 kind=target.kind,
                 nest=tuple(self._nesting),
                 describe=target.describe,
-                states=f"{scope.describe} {seed.kind()} {target.describe}",
+                states=_pair(
+                    f"{scope.describe} {seed.kind()} {target.describe}",
+                    f"{_english(scope.describe)} {_english(seed.kind())} {_english(target.describe)}",
+                ),
                 sources=(scope, target),
                 write=write,
             )
@@ -585,7 +623,10 @@ class TestSeeder:
                 kind=offer.kind,
                 nest=tuple(self._nesting),
                 describe=offer.describe,
-                states=f"{offer.describe}: {seed.kind()}",
+                states=_pair(
+                    f"{offer.describe}: {seed.kind()}",
+                    f"{_english(offer.describe)}: {_english(seed.kind())}",
+                ),
                 sources=(offer,),
                 write=write,
             )
@@ -610,7 +651,10 @@ class TestSeeder:
                 kind=to.kind,
                 nest=tuple(self._nesting),
                 describe=to.describe,
-                states=f"{to.describe}: {role.describe} 보유",
+                states=_pair(
+                    f"{to.describe}: {role.describe} 보유",
+                    f"{_english(to.describe)}: holds {_english(role.describe)}",
+                ),
                 sources=(role, to),
                 write=write,
             )
@@ -635,7 +679,11 @@ class TestSeeder:
                 kind=member.kind,
                 nest=tuple(self._nesting),
                 describe=member.describe,
-                states=f"{member.describe}: {project.describe} 명부에 오름",
+                states=_pair(
+                    f"{member.describe}: {project.describe} 멤버 목록에 추가됨",
+                    f"{_english(member.describe)}: added to the member list of "
+                    f"{_english(project.describe)}",
+                ),
                 sources=(project, member),
                 write=write,
             )
@@ -653,7 +701,7 @@ class TestSeeder:
             name=name,
             kind=seed.kind(),
             nest=tuple(self._nesting),
-            describe=f"{seed.kind()} {name}",
+            describe=_there_is(seed, name),
             states=_states(sentence, seed.detail()),
             sources=tuple(sources),
             write=write,

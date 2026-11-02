@@ -16,7 +16,7 @@ from ai.backend.manager.api.adapters.object_storage.adapter import ObjectStorage
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.object_storage import (
     AStorageAndACaller,
@@ -44,8 +44,16 @@ class EditingTheHost(When[AStorageAndACaller, ObjectStorageAdapter, ObjectStorag
 
     @override
     def describe(self, laid: AStorageAndACaller) -> str:
-        target = "존재하지 않는 id" if self.unknown else laid.storage.name
-        return f"{laid.caller.username}이 {target}의 호스트 수정"
+        if self.unknown:
+            target_ko = "존재하지 않는 id"
+            target_en = "an id nothing answers to"
+        else:
+            target_ko = laid.storage.name
+            target_en = laid.storage.name
+        return Says(
+            f"{laid.caller.username} 이 {target_ko}의 호스트를 수정합니다",
+            english=f"{laid.caller.username} updates the host of {target_en}",
+        )
 
     @override
     async def call(
@@ -69,7 +77,13 @@ class TheSuperadminMovesTheHost(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 호스트만 바꾸면, 호스트는 새 값이 되고 나머지는 그대로 남는다"
+        return Says(
+            "superadmin 이 호스트만 변경하면 호스트는 새 값이 되고 나머지는 그대로 남습니다",
+            english=(
+                "when the superadmin changes only the host, the host becomes the new value and the "
+                "rest stays as it was"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AStorageAndACaller]:
@@ -94,7 +108,13 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            ("superadmin 이 존재하지 않는 id 를 수정하면 대상을 찾을 수 없다는 이유로 거부됩니다"),
+            english=(
+                "when the superadmin updates an id nothing answers to, it is rejected because the "
+                "target cannot be found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AStorageAndACaller]:
@@ -119,9 +139,16 @@ class AUserGrantedNothingMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 object storage 를 수정하면 권한 부족으로 거부된다. "
-            "object storage 는 global 에만 속해 그 권한을 받을 방법이 없다"
+        return Says(
+            (
+                "아무 권한도 받지 않은 사용자가 object storage 를 수정하면 권한 부족으로 "
+                "거부됩니다. object storage 는 global 에만 속해 그 권한을 받을 방법이 없습니다"
+            ),
+            english=(
+                "when a user granted nothing updates an object storage, it is rejected for a lack "
+                "of permission. An object storage belongs to global alone, so there is no way to "
+                "receive that permission"
+            ),
         )
 
     @override

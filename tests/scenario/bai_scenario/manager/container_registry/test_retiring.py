@@ -21,11 +21,14 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
     When,
+    in_language,
 )
 from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.container_registry import (
@@ -58,7 +61,11 @@ class Deleting(When[ARegistryAndACaller, ContainerRegistryAdapter, PurgeContaine
 
     @override
     def describe(self, laid: ARegistryAndACaller) -> str:
-        return f"{laid.caller.username}이 {self.target.says()}를 삭제"
+        target = self.target.says()
+        return Says(
+            f"{laid.caller.username}이 {target}를 삭제합니다",
+            english=f"{laid.caller.username} deletes {in_language(target, Language.ENGLISH)}",
+        )
 
     @override
     async def call(
@@ -73,7 +80,7 @@ class Deleting(When[ARegistryAndACaller, ContainerRegistryAdapter, PurgeContaine
 class TheDeletedIdComesBack(Then[ARegistryAndACaller, PurgeContainerRegistryPayload]):
     @override
     def says(self) -> str:
-        return "삭제한 id가 반환된다"
+        return Says("삭제한 id 가 반환됩니다", english="the id that was deleted comes back")
 
     @override
     def look(
@@ -83,7 +90,19 @@ class TheDeletedIdComesBack(Then[ARegistryAndACaller, PurgeContainerRegistryPayl
         if payload is None:
             return [MissingResponse(answered.raised)]
         wanted: UUID = laid.registry.id
-        return [Held("id", payload.id, SameAs(wanted, "미리 만들어 둔 레지스트리의 id"))]
+        return [
+            Held(
+                "id",
+                payload.id,
+                SameAs(
+                    wanted,
+                    Says(
+                        "미리 저장한 컨테이너 레지스트리의 id",
+                        english="the id of the container registry seeded in advance",
+                    ),
+                ),
+            )
+        ]
 
 
 @dataclass(frozen=True)
@@ -101,7 +120,13 @@ class DeletingAnswersWithTheRemovedId(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 레지스트리를 삭제하면 삭제한 id를 담은 응답이 반환된다"
+        return Says(
+            "superadmin 이 컨테이너 레지스트리를 삭제하면 삭제한 id 를 담은 응답이 반환됩니다",
+            english=(
+                "when the superadmin deletes a container registry, the answer comes back "
+                "holding the id it deleted"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
@@ -133,7 +158,14 @@ class DeletingTakesTheAllowedProjectWithIt(
 
     @override
     def describe(self) -> str:
-        return "허용 프로젝트가 있는 레지스트리를 삭제하면, 외래 키를 통해 그 허용 목록까지 함께 삭제된다"
+        return Says(
+            "허용 프로젝트가 있는 컨테이너 레지스트리를 삭제하면, 외래 키를 통해 그 허용 목록까지 "
+            "함께 삭제됩니다",
+            english=(
+                "when a container registry that has an allowed project is deleted, the allow "
+                "list is deleted with it through the foreign key"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
@@ -165,7 +197,10 @@ class MissingRegistryIsRefused(
 
     @override
     def describe(self) -> str:
-        return "존재하지 않는 id를 삭제하려 하면 대상을 찾을 수 없어 거부된다"
+        return Says(
+            "존재하지 않는 id 를 삭제하려 하면 대상을 찾을 수 없어 거부됩니다",
+            english="when an id that does not exist is deleted, it is rejected because the target cannot be found",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
@@ -197,9 +232,14 @@ class APlainUserMayNotDelete(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 아닌 사용자가 레지스트리를 삭제하려 하면 권한 부족으로 거부된다. "
-            "이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다"
+        return Says(
+            "superadmin 이 아닌 사용자가 컨테이너 레지스트리를 삭제하려 하면 권한 부족으로 "
+            "거부됩니다. 이 호출은 호출자가 superadmin 인지만 검사하고 부여된 권한은 보지 않습니다",
+            english=(
+                "when a user who is not the superadmin tries to delete a container registry, "
+                "it is rejected for lack of permission. This call checks only whether the "
+                "caller is the superadmin and does not look at the permissions granted"
+            ),
         )
 
     @override

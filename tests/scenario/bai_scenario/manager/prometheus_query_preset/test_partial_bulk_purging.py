@@ -28,6 +28,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -62,7 +63,11 @@ class PurgingEveryPreset(When[ManyPresetsAndACaller, Adapter, Purged]):
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
         besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 프리셋 {len(laid.laid)}개{besides}를 한 번에 purge 함"
+        besides_en = " and one absent id" if self.missing is not None else ""
+        return Says(
+            f"{laid.caller.username}이 프리셋 {len(laid.laid)}개{besides}를 한 번에 purge 합니다",
+            english=(f"{laid.caller.username} purges {len(laid.laid)} presets at once{besides_en}"),
+        )
 
     @override
     async def call(self, adapter: Adapter, laid: ManyPresetsAndACaller) -> Purged:
@@ -81,9 +86,13 @@ class EveryPresetIsPurged(Then[ManyPresetsAndACaller, Purged]):
 
     @override
     def says(self) -> str:
-        return (
-            "대상 프리셋이 모두 지워지기 전 모습으로 오고, 없는 id 는 대상이 없다는 이유로 "
-            "실패 목록에 온다"
+        return Says(
+            "대상 프리셋이 모두 삭제되기 전 모습으로 오고, 없는 id 는 대상이 없다는 이유로 "
+            "실패 목록에 옵니다",
+            english=(
+                "every target preset comes back as it was before deletion, and the absent id "
+                "comes back in the failed list because the target is not found"
+            ),
         )
 
     @override
@@ -98,12 +107,27 @@ class EveryPresetIsPurged(Then[ManyPresetsAndACaller, Purged]):
         for i, (node, preset) in enumerate(zip(payload.successes, laid.laid, strict=False)):
             verdicts.append(
                 Held[QueryDefinitionNode](
-                    f"successes[{i}]", node, SameAs(node_of(preset), "대상 프리셋 전체")
+                    f"successes[{i}]",
+                    node,
+                    SameAs(
+                        node_of(preset),
+                        Says("대상 프리셋 전체", english="the whole target preset"),
+                    ),
                 )
             )
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says(
+                            "요청에 넣은 없는 id",
+                            english="the absent id put in the request",
+                        ),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -121,9 +145,14 @@ class PurgingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워지기 전 모습으로 "
-            "오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "superadmin 이 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 삭제되기 전 "
+            "모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when the superadmin purges two presets and one absent id at once, the two "
+                "come back as they were before deletion and the absent id comes back in the "
+                "failed list because the target is not found"
+            ),
         )
 
     @override
@@ -149,9 +178,13 @@ class AUserGrantedNothingPurgesNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 삭제된 것 "
+            "없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to purge several presets at once, nothing "
+                "is deleted and all come back in the failed list for lack of permission"
+            ),
         )
 
     @override

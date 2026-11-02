@@ -29,13 +29,16 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
     When,
+    in_language,
 )
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
@@ -83,12 +86,21 @@ class SomeoneAndAnother(Given[Any, TwoPeopleAndTheirHistory]):
 
     @override
     def describe(self) -> str:
-        grant = (
-            f"부르는 사람은 자기 사용자에 {', '.join(str(p.name) for p in self.permissions)} 권한을 받았다"
-            if self.permissions
-            else "부르는 사람은 아무 권한도 받지 않았다"
+        if self.permissions:
+            names = ", ".join(str(p.name) for p in self.permissions)
+            grant = Says(
+                f"부르는 사람은 자기 사용자에 {names} 권한을 받았습니다",
+                english=f"the caller holds the {names} permission on their own user",
+            )
+        else:
+            grant = Says(
+                "부르는 사람은 아무 권한도 받지 않았습니다",
+                english="the caller holds no permission",
+            )
+        return Says(
+            f"도메인 하나와 사용자 둘, {grant}",
+            english=f"one domain and two users, {in_language(grant, Language.ENGLISH)}",
         )
-        return f"도메인 하나와 사용자 둘, {grant}"
 
     @override
     async def lay(self, seeding: Any) -> TwoPeopleAndTheirHistory:
@@ -109,7 +121,10 @@ class TheSuperadminAndTwoRecords(Given[Any, TwoPeopleAndTheirHistory]):
 
     @override
     def describe(self) -> str:
-        return "도메인 하나와 슈퍼관리자, 성공 기록을 하나씩 가진 사용자 둘"
+        return Says(
+            "도메인 하나와 superadmin, 성공 기록을 하나씩 가진 사용자 둘",
+            english="one domain, one superadmin, and two users who each hold one success record",
+        )
 
     @override
     async def lay(self, seeding: Any) -> TwoPeopleAndTheirHistory:
@@ -129,7 +144,12 @@ class SomeoneReadingTheDomain(Given[Any, TwoPeopleAndTheirHistory]):
 
     @override
     def describe(self) -> str:
-        return "도메인 하나, 부르는 사람은 도메인 스코프에서 사용자 READ 권한을 받았다"
+        return Says(
+            "도메인 하나, 부르는 사람은 도메인 스코프에서 사용자 READ 권한을 받았습니다",
+            english=(
+                "one domain, and the caller holds the user READ permission in the domain scope"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> TwoPeopleAndTheirHistory:
@@ -149,7 +169,10 @@ class SearchingEveryRecord(When[TwoPeopleAndTheirHistory, LoginHistoryAdapter, A
 
     @override
     def describe(self, laid: TwoPeopleAndTheirHistory) -> str:
-        return f"{laid.caller.username}이 로그인 기록 전체를 훑음"
+        return Says(
+            f"{laid.caller.username}이 로그인 이력 전체를 조회합니다",
+            english=f"{laid.caller.username} searches every login history record",
+        )
 
     @override
     async def call(self, adapter: LoginHistoryAdapter, laid: TwoPeopleAndTheirHistory) -> Answer:
@@ -167,7 +190,10 @@ class SearchingMyRecords(When[TwoPeopleAndTheirHistory, LoginHistoryAdapter, Ans
 
     @override
     def describe(self, laid: TwoPeopleAndTheirHistory) -> str:
-        return f"{laid.caller.username}이 자기 로그인 기록을 훑음"
+        return Says(
+            f"{laid.caller.username}이 자기 로그인 이력을 조회합니다",
+            english=f"{laid.caller.username} searches their own login history",
+        )
 
     @override
     async def call(self, adapter: LoginHistoryAdapter, laid: TwoPeopleAndTheirHistory) -> Answer:
@@ -187,8 +213,19 @@ class HistoryNodeLook:
         self, node: LoginHistoryNode, expected: LoginHistoryData, at: str
     ) -> list[Verdict]:
         return [
-            Held(f"{at}id", node.id, SameAs(expected.id, "심은 기록")),
-            Held(f"{at}user_id", node.user_id, SameAs(expected.user_id, "기록의 주인")),
+            Held(
+                f"{at}id",
+                node.id,
+                SameAs(
+                    expected.id,
+                    Says("미리 저장한 기록", english="the record seeded in advance"),
+                ),
+            ),
+            Held(
+                f"{at}user_id",
+                node.user_id,
+                SameAs(expected.user_id, Says("기록 소유자", english="the record owner")),
+            ),
             Same(f"{at}domain_name", node.domain_name, expected.domain_name),
             Same(f"{at}result", node.result, "success"),
             Same(f"{at}fail_reason", node.fail_reason, None),
@@ -205,7 +242,10 @@ class EveryRecordInOrder(Then[TwoPeopleAndTheirHistory, Answer]):
 
     @override
     def says(self) -> str:
-        return "심은 기록이 모두 순서대로 온다"
+        return Says(
+            "미리 저장한 기록이 모두 순서대로 옵니다",
+            english="every record seeded in advance comes back in order",
+        )
 
     @override
     def look(self, laid: TwoPeopleAndTheirHistory, answered: Answered[Answer]) -> list[Verdict]:
@@ -235,7 +275,10 @@ class OnlyMyRecord(Then[TwoPeopleAndTheirHistory, Answer]):
 
     @override
     def says(self) -> str:
-        return "자기 기록 하나만 온다"
+        return Says(
+            "자기 기록 하나만 옵니다",
+            english="only their own record comes back",
+        )
 
     @override
     def look(self, laid: TwoPeopleAndTheirHistory, answered: Answered[Answer]) -> list[Verdict]:
@@ -275,9 +318,14 @@ class TheSuperadminSearchesEveryRecord(
 
     @override
     def describe(self) -> str:
-        return (
-            "전역 역할이 문인 이력 검색에서 슈퍼관리자가 훑으면, "
-            "사용자와 무관하게 심은 이력이 생성 시각 내림차순으로 온다"
+        return Says(
+            "전역 역할이 문인 이력 검색에서 superadmin 이 조회하면, "
+            "사용자와 무관하게 미리 저장한 이력이 생성 시각 내림차순으로 옵니다",
+            english=(
+                "when the superadmin searches in a history search gated by the global role, "
+                "every record seeded in advance comes back in descending creation time "
+                "regardless of the user"
+            ),
         )
 
     @override
@@ -303,7 +351,13 @@ class OnlyTheSuperadminSearchesEveryRecord(
 
     @override
     def describe(self) -> str:
-        return "권한 받은 사용자가 이력 전체 검색을 하려 하면, 전역 역할 문이 막는다"
+        return Says(
+            "권한 받은 사용자가 이력 전체 검색을 하려 하면, 전역 역할 문이 막습니다",
+            english=(
+                "a user holding the permission is rejected by the global role gate when "
+                "searching every history record"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirHistory]:
@@ -330,7 +384,13 @@ class AGrantedUserSearchesOnlyTheirOwnHistory(
 
     @override
     def describe(self) -> str:
-        return "자기 스코프에서 READ를 받은 사용자가 훑으면, 다른 사용자의 이력은 빠진다"
+        return Says(
+            "자기 스코프에서 READ 를 받은 사용자가 조회하면, 다른 사용자의 이력은 빠집니다",
+            english=(
+                "when a user granted READ in their own scope searches, the history of other "
+                "users is left out"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirHistory]:
@@ -355,7 +415,13 @@ class AUserGrantedNothingMayNotSearchTheirHistory(
 
     @override
     def describe(self) -> str:
-        return "역할 없이 자기 이력을 훑으려 하면, 본인이어도 스코프 권한 문이 막는다"
+        return Says(
+            "역할 없이 자기 이력을 조회하려 하면, 본인이어도 스코프 권한 문이 막습니다",
+            english=(
+                "a user holding no role who tries to search their own history is rejected "
+                "by the scope permission gate even for themselves"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirHistory]:
