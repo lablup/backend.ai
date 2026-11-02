@@ -46,7 +46,7 @@ jobs:
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v11
+      uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
       # See: github.com/pantsbuild/actions/tree/main/init-pants/
       # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
@@ -99,7 +99,7 @@ jobs:
       checks: write
     steps:
       - uses: actions/checkout@v6
-      - uses: graphql-hive/graphql-inspector@v4.0.0
+      - uses: graphql-hive/graphql-inspector@c0ecb19ad21de709b80ed897041a4976c079c718  # v4.0.0
         with:
           schema: '${{ github.base_ref }}:docs/manager/graphql-reference/supergraph.graphql'
           rules: |
