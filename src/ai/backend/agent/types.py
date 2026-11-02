@@ -177,6 +177,8 @@ class ContainerLifecycleEvent:
     done_future: asyncio.Future[Any] | None = None
     exit_code: int | None = None
     suppress_events: bool = False
+    # Exit status of a containerd task; the terminated events report -1 when None.
+    task_exit_status: int | None = None
 
     @override
     def __str__(self) -> str:
