@@ -123,7 +123,7 @@ class StorageAnomaly(enum.StrEnum):
 class StorageStatusCheckType(enum.StrEnum):
     """Which status check a result comes from, deciding how the result is read."""
 
-    VFS = "vfs"
+    MOUNT = "mount"
 
 
 @dataclass(frozen=True)

@@ -27,7 +27,7 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
-class VfsVolumeStatusCheckArgs:
+class VolumeMountStatusCheckArgs:
     volume_name: StorageVolumeName
     storage_backend_metadata: StorageBackendMetadata
     mount_path: Path
@@ -36,8 +36,8 @@ class VfsVolumeStatusCheckArgs:
     executor: Executor
 
 
-class VfsVolumeAnomalyDetector(AbstractStatusAnomalyDetector):
-    """Detects an anomaly in a vfs volume's result."""
+class VolumeMountAnomalyDetector(AbstractStatusAnomalyDetector):
+    """Detects an anomaly in a volume mount's result."""
 
     @override
     def detect(
@@ -58,8 +58,8 @@ class VfsVolumeAnomalyDetector(AbstractStatusAnomalyDetector):
         return StorageAnomaly.NONE
 
 
-class VfsVolumeStatusCheck(AbstractVolumeStatusCheck):
-    """Reads the device id of the mount a vfs volume is served from.
+class VolumeMountStatusCheck(AbstractVolumeStatusCheck):
+    """Reads the device id of the mount a volume is served from.
 
     The mount is read in the executor it is given, so a mount hung in the kernel blocks
     a thread there and not the event loop.
@@ -73,7 +73,7 @@ class VfsVolumeStatusCheck(AbstractVolumeStatusCheck):
     _executor: Executor
     _latest: StorageStatusResultData
 
-    def __init__(self, args: VfsVolumeStatusCheckArgs) -> None:
+    def __init__(self, args: VolumeMountStatusCheckArgs) -> None:
         self._volume_name = args.volume_name
         self._storage_backend_metadata = args.storage_backend_metadata
         self._mount_path = args.mount_path
@@ -81,7 +81,7 @@ class VfsVolumeStatusCheck(AbstractVolumeStatusCheck):
         self._initial_delay = args.initial_delay
         self._executor = args.executor
         self._latest = StorageStatusResultData(
-            check_type=StorageStatusCheckType.VFS,
+            check_type=StorageStatusCheckType.MOUNT,
             check_state=StorageCheckState.NOT_CHECKED,
             check_started_at=None,
             duration=None,
@@ -99,14 +99,14 @@ class VfsVolumeStatusCheck(AbstractVolumeStatusCheck):
         config: VolumeStatusCheckConfig,
     ) -> Self:
         return cls(
-            VfsVolumeStatusCheckArgs(
+            VolumeMountStatusCheckArgs(
                 volume_name=volume_name,
                 storage_backend_metadata=storage_backend_metadata,
                 mount_path=mount_path,
                 interval=config.check_interval,
                 initial_delay=config.initial_delay,
                 executor=ThreadPoolExecutor(
-                    max_workers=1, thread_name_prefix=f"vfs-volume-status-{volume_name}"
+                    max_workers=1, thread_name_prefix=f"volume-mount-status-{volume_name}"
                 ),
             )
         )
@@ -155,7 +155,7 @@ class VfsVolumeStatusCheck(AbstractVolumeStatusCheck):
             )
             error_msg = str(e)
         self._latest = StorageStatusResultData(
-            check_type=StorageStatusCheckType.VFS,
+            check_type=StorageStatusCheckType.MOUNT,
             check_state=StorageCheckState.CHECKED,
             check_started_at=started_at,
             duration=timedelta(seconds=time.perf_counter() - start_counter),
