@@ -101,13 +101,13 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
         async def _exception_safe_handler(request: web.Request) -> web.StreamResponse:
             slot = self.parse_slot(request)
             circuit = self.circuits[slot]
+            backend = self.backends[slot]
             with with_log_context(circuit_id=circuit.id):
                 ingress = await self._read_registered_ingress(circuit.to_ingress_frontend().key())
                 self.ensure_allowed_ip(request, ingress.access)
                 # TODO: Check the credential against ingress.access once an ingress carries the id
                 # its tokens name.
                 self.ensure_credential(request, circuit)
-                backend = self.backends[slot]
                 request["circuit"] = circuit
                 request["backend"] = backend
                 return await handler(request)

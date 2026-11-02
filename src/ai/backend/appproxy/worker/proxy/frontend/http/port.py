@@ -106,13 +106,13 @@ class PortFrontend(BaseHTTPFrontend[int]):
         circuit = self.circuits.get(port, None)
         if circuit is None:
             raise IngressFrontendNotRegisteredError(f"Unregistered slot {port}")
+        backend = self.backends[port]
         with with_log_context(circuit_id=circuit.id):
             ingress = await self._read_registered_ingress(circuit.to_ingress_frontend().key())
             self.ensure_allowed_ip(request, ingress.access)
             # TODO: Check the credential against ingress.access once an ingress carries the id
             # its tokens name.
             self.ensure_credential(request, circuit)
-            backend = self.backends[port]
             request["circuit"] = circuit
             request["backend"] = backend
             return await handler(request)
