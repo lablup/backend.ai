@@ -25,9 +25,6 @@ __all__ = (
     "generate_halfstack_toml",
 )
 
-# Marks a template argument while lines are built, so escaping leaves it alone.
-_ARG_START, _ARG_END = "\ue000", "\ue001"
-_ARG_PATTERN = re.compile(f"{_ARG_START}(\\w+){_ARG_END}")
 _JINJA_MARKER = re.compile(r"\{[{%#]")
 
 
@@ -43,10 +40,9 @@ class ConfigTemplateArgMissing(InvalidConfigError):
         )
 
 
-def _to_template(text: str) -> str:
-    """Escape text that Jinja would read as syntax, then turn argument marks into variables."""
-    escaped = _JINJA_MARKER.sub(lambda m: "{{ '" + m.group(0) + "' }}", text)
-    return _ARG_PATTERN.sub(lambda m: "{{ " + m.group(1) + " }}", escaped)
+def _escape_jinja(text: str) -> str:
+    """Escape text that Jinja would read as syntax, so rendering gives it back unchanged."""
+    return _JINJA_MARKER.sub(lambda m: "{{ '" + m.group(0) + "' }}", text)
 
 
 class TOMLGenerator:
@@ -98,7 +94,7 @@ class TOMLGenerator:
         """
         schema = self._inspector.extract(model)
         lines = self._generate_schema(schema, path=[])
-        return _to_template("\n".join(lines))
+        return "\n".join(lines)
 
     def generate_to_file(
         self,
@@ -118,7 +114,7 @@ class TOMLGenerator:
 
         with output.open("w", encoding="utf-8") as f:
             if header:
-                f.write(_to_template(self._wrap_comment(header, "")))
+                f.write(self._wrap_comment(header, ""))
                 f.write("\n\n")
             f.write(content)
             f.write("\n")
@@ -196,7 +192,7 @@ class TOMLGenerator:
         if self._config.include_version_comments:
             lines.append(f"{indent}# Added in {field.doc.added_version}")
             if field.doc.deprecated_version:
-                hint = field.doc.deprecation_hint or ""
+                hint = _escape_jinja(field.doc.deprecation_hint or "")
                 lines.append(f"{indent}# DEPRECATED in {field.doc.deprecated_version}: {hint}")
 
         # Get example value
@@ -209,6 +205,7 @@ class TOMLGenerator:
         value_str = formatted.value
         if formatted.comment:
             value_str = f"{value_str}  {formatted.comment}"
+        value_str = _escape_jinja(value_str)
 
         match visibility:
             case FieldVisibility.REQUIRED:
@@ -254,7 +251,7 @@ class TOMLGenerator:
         if self._config.include_version_comments:
             lines.append(f"{indent}# Added in {field.doc.added_version}")
             if field.doc.deprecated_version:
-                hint = field.doc.deprecation_hint or ""
+                hint = _escape_jinja(field.doc.deprecation_hint or "")
                 lines.append(f"{indent}# DEPRECATED in {field.doc.deprecated_version}: {hint}")
 
         # A DICT of tables keys each entry by a template argument, filled at render time;
@@ -265,7 +262,7 @@ class TOMLGenerator:
             template_arg = field.type_info.template_arg
             if template_arg is None:
                 raise ConfigTemplateArgMissing(".".join(section_path))
-            section_path.append(f"{_ARG_START}{template_arg}{_ARG_END}")
+            section_path.append(f"{{{{ {template_arg} }}}}")
             lines.append(f"{indent}# Set `{template_arg}` when rendering this template")
 
         # Section header - sections are NOT prefixed with ## even if optional
@@ -319,7 +316,7 @@ class TOMLGenerator:
         if self._config.include_version_comments:
             lines.append(f"{indent}# Added in {field.doc.added_version}")
             if field.doc.deprecated_version:
-                hint = field.doc.deprecation_hint or ""
+                hint = _escape_jinja(field.doc.deprecation_hint or "")
                 lines.append(f"{indent}# DEPRECATED in {field.doc.deprecated_version}: {hint}")
 
         # Array of tables header
@@ -563,7 +560,7 @@ class TOMLGenerator:
                 for wrapped_line in wrapped:
                     result_lines.append(f"{indent}# {wrapped_line}")
 
-        return "\n".join(result_lines)
+        return _escape_jinja("\n".join(result_lines))
 
     def _categorize_fields(
         self,
