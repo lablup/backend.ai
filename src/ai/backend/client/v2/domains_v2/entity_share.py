@@ -38,19 +38,21 @@ class V2EntityShareClient(BaseDomainClient):
             response_model=EntitySharePayload,
         )
 
-    async def accept(self, share_id: UUID) -> EntitySharePayload:
-        """Take what was offered."""
+    async def accept(self, share_id: UUID, project_id: UUID | None = None) -> EntitySharePayload:
+        """Take what was offered; ``project_id`` answers for that project instead of the caller."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/{share_id}/accept",
+            params={"project_id": str(project_id)} if project_id is not None else None,
             response_model=EntitySharePayload,
         )
 
-    async def reject(self, share_id: UUID) -> EntitySharePayload:
-        """Turn down what was offered."""
+    async def reject(self, share_id: UUID, project_id: UUID | None = None) -> EntitySharePayload:
+        """Turn down what was offered; ``project_id`` answers for that project instead of the caller."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/{share_id}/reject",
+            params={"project_id": str(project_id)} if project_id is not None else None,
             response_model=EntitySharePayload,
         )
 
