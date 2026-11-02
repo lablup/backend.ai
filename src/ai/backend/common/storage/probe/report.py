@@ -47,4 +47,7 @@ class StorageStatusReportTask(PeriodicTask):
 
     @override
     async def run(self) -> None:
-        await self._event_producer.anycast_event(self._reporter.report())
+        event = self._reporter.report()
+        if not event.observations:
+            return
+        await self._event_producer.anycast_event(event)
