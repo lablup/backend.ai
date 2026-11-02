@@ -404,9 +404,10 @@ async def download_directory_as_archive(
         zip_filename = file_path.name + ".zip"
     zf = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED, allowZip64=True)
     async for root, dirs, files in _iter2aiter(os.walk(file_path)):
-        for file in files:
+        regular_files = [f for f in files if not (Path(root) / f).is_symlink()]
+        for file in regular_files:
             zf.write(Path(root) / file, Path(root).relative_to(file_path) / file)
-        if len(dirs) == 0 and len(files) == 0:
+        if len(dirs) == 0 and len(regular_files) == 0:
             # Include an empty directory in the archive as well.
             zf.write(root, Path(root).relative_to(file_path))
     ascii_filename = (
