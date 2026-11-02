@@ -248,10 +248,8 @@ class AgentDBSource:
             deployment_designations = (
                 DeploymentDesignatedAgentRow.agent_uuid == agent.uuid,
                 DeploymentDesignatedAgentRow.endpoint_id.in_(
-                    sa.select(EndpointRow.id)
-                    .join(ResourceGroupRow, ResourceGroupRow.name == EndpointRow.resource_group)
-                    .where(
-                        ResourceGroupRow.id != resource_group_id,
+                    sa.select(EndpointRow.id).where(
+                        EndpointRow.resource_group != resource_group_name,
                         EndpointRow.lifecycle_stage != EndpointLifecycle.DESTROYED,
                     )
                 ),
