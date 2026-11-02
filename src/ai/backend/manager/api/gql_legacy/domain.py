@@ -18,6 +18,8 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ai.backend.common import msgpack
+from ai.backend.common.dotfile import DotfilePath
 from ai.backend.common.exception import (
     DomainNotFound,
 )
@@ -390,6 +392,9 @@ class CreateDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
         def value_or_none(value: Any) -> Any:
             return value if value is not graphql.Undefined else None
 
+        if dotfiles := value_or_none(self.dotfiles):
+            for entry in msgpack.unpackb(dotfiles) or []:
+                DotfilePath(entry["path"])
         return CreateDomainNodeAction(
             creator=Creator(
                 spec=DomainCreatorSpec(
@@ -476,6 +481,9 @@ class ModifyDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
         return field_value
 
     def to_action(self, name: str, user_info: UserInfo) -> ModifyDomainNodeAction:
+        if self.dotfiles is not graphql.Undefined and self.dotfiles:
+            for entry in msgpack.unpackb(self.dotfiles) or []:
+                DotfilePath(entry["path"])
         spec = DomainNodeUpdaterSpec(
             description=TriState[str].from_graphql(
                 self.description,

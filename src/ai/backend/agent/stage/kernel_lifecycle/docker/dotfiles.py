@@ -5,13 +5,19 @@ This stage handles processing and installation of dotfiles in containers.
 """
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
+from ai.backend.agent.dotfile import DotfileTargetResolver
+from ai.backend.common.dotfile import InvalidDotfilePath
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
+from ai.backend.logging import BraceStyleAdapter
 
 from .utils import ChownUtil, PathOwnerDeterminer
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -96,8 +102,13 @@ class DotfilesProvisioner(Provisioner[DotfilesSpec, DotfilesResult]):
         determined_uid: int | None = None
         determined_gid: int | None = None
         processed_dotfiles: list[DotfileProcResult] = []
+        targets = DotfileTargetResolver(spec.work_dir)
         for dotfile in spec.dotfiles:
-            file_path = self._resolve_dotfile_path(spec, dotfile.path)
+            try:
+                file_path = targets.resolve(dotfile.path)
+            except InvalidDotfilePath:
+                log.warning("dotfile skipped by the path rule", path=dotfile.path)
+                continue
 
             # Create parent directories
             file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -106,7 +117,9 @@ class DotfilesProvisioner(Provisioner[DotfilesSpec, DotfilesResult]):
             self._write_dotfile(dotfile.data, file_path)
 
             # Set permissions and ownership
-            target_paths = self._get_parent_dirs(spec.work_dir, file_path, dotfile.perm)
+            target_paths = targets.paths_below_work_dir(file_path)
+            for target_path in target_paths:
+                target_path.chmod(int(dotfile.perm, 8))
 
             uid, gid = owner_determiner.determine(
                 file_path, uid_override=spec.uid_override, gid_override=spec.gid_override
@@ -135,42 +148,10 @@ class DotfilesProvisioner(Provisioner[DotfilesSpec, DotfilesResult]):
 
         return processed_dotfiles
 
-    def _resolve_dotfile_path(self, spec: DotfilesSpec, dotfile_path: str) -> Path:
-        """
-        Determine the file path for a dotfile based on its path and the scratch directory.
-        """
-        if dotfile_path.startswith("/"):
-            if dotfile_path.startswith("/home/"):
-                # Handle paths under /home/ by redirecting to scratch dir
-                path_arr = dotfile_path.split("/")
-                file_path = spec.scratch_dir / "/".join(path_arr[2:])
-            else:
-                # Absolute paths outside /home/
-                file_path = Path(dotfile_path)
-        else:
-            # Relative paths go under work_dir
-            file_path = spec.work_dir / dotfile_path
-        return file_path
-
     def _write_dotfile(self, dotfile_content: str, dotfile_path: Path) -> None:
         if not dotfile_content.endswith("\n"):
             dotfile_content += "\n"
         dotfile_path.write_text(dotfile_content)
-
-    def _get_parent_dirs(self, work_dir: Path, base_path: Path, perm: str) -> list[Path]:
-        """
-        Get all parent directories of a given path.
-        """
-        # Set permissions and ownership
-        tmp = Path(base_path)
-        tmp_paths: list[Path] = []
-
-        # Set permissions on file and all parent directories up to work_dir
-        while tmp != work_dir:
-            tmp.chmod(int(perm, 8))
-            tmp_paths.append(tmp)
-            tmp = tmp.parent
-        return tmp_paths
 
     @override
     async def teardown(self, resource: DotfilesResult) -> None:

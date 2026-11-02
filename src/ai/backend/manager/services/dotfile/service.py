@@ -5,6 +5,7 @@ import uuid
 from typing import Final
 
 from ai.backend.common import msgpack
+from ai.backend.common.dotfile import DotfilePath
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.dotfile.types import (
@@ -19,7 +20,6 @@ from ai.backend.manager.errors.storage import (
     DotfileCreationFailed,
     DotfileNotFound,
 )
-from ai.backend.manager.models.domain import verify_dotfile_name
 from ai.backend.manager.repositories.dotfile.repository import DotfileRepository
 
 from .actions.check_group_membership import (
@@ -55,8 +55,7 @@ class DotfileService:
             raise DotfileCreationFailed("No leftover space for dotfile storage")
         if len(query_result.entries) == 100:
             raise DotfileCreationFailed("Dotfile creation limit reached")
-        if not verify_dotfile_name(action.path):
-            raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
+        DotfilePath(action.path)
 
         # Check for vFolder conflict (user scope only)
         if action.scope == DotfileScope.USER and action.user_uuid is not None:
@@ -98,6 +97,7 @@ class DotfileService:
 
     async def update_dotfile(self, action: UpdateDotfileAction) -> UpdateDotfileActionResult:
         """Update an existing dotfile."""
+        DotfilePath(action.path)
         query_result = await self._get_dotfiles(action.scope, action.entity_key)
 
         new_entries_raw = [

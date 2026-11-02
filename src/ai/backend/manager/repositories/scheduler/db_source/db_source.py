@@ -29,6 +29,7 @@ from ai.backend.common.data.permission.types import (
     RBACElementType,
 )
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.dotfile import DotfilePath, InvalidDotfilePath
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
@@ -1843,6 +1844,7 @@ class ScheduleDBSource:
                     keypairs.c.ssh_public_key,
                     keypairs.c.ssh_private_key,
                     keypairs.c.dotfiles,
+                    keypairs.c.user,
                 ).where(keypairs.c.access_key == access_key)
             )
         ).first()
@@ -1878,11 +1880,22 @@ class ScheduleDBSource:
                 )
                 seen_paths.add(entry["path"])
 
+        writable_entries: list[DotfileEntry] = []
+        for ordered_entry in ordered_entries:
+            try:
+                DotfilePath(ordered_entry.path)
+            except InvalidDotfilePath:
+                log.warning(
+                    "dotfile skipped by the path rule", path=ordered_entry.path, user_id=row.user
+                )
+                continue
+            writable_entries.append(ordered_entry)
+
         # Reverse so higher-priority entries win when agents apply
         # dotfiles in list order — matches the legacy behavior.
-        ordered_entries.reverse()
+        writable_entries.reverse()
         return DotfileBundle(
-            dotfiles=tuple(ordered_entries),
+            dotfiles=tuple(writable_entries),
             ssh_keypair=ssh_keypair,
         )
 

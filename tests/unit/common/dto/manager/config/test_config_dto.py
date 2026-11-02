@@ -9,6 +9,7 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
+from ai.backend.common.dotfile import InvalidDotfilePath
 from ai.backend.common.dto.manager.config.request import (
     CreateDomainDotfileRequest,
     CreateGroupDotfileRequest,
@@ -89,6 +90,13 @@ class TestMaxLength:
                 data="x" * (MAXIMUM_DOTFILE_SIZE + 1),
                 permission="644",
             )
+
+    @pytest.mark.parametrize(
+        "path", [".ssh/authorized_keys", "/etc/passwd", "../x", "/home/config/kconfig.dat"]
+    )
+    def test_rejects_path_by_path_rule(self, path: str) -> None:
+        with pytest.raises(InvalidDotfilePath):
+            CreateUserDotfileRequest(path=path, data="x", permission="644")
 
     def test_bootstrap_script_exceeds_limit(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
