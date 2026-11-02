@@ -611,3 +611,39 @@ class TestStartContainer:
         assert fake.containers == {}
         assert fake.snapshots == {}
         assert runner.matching("ip", "netns", "list")  # the netns teardown ran
+
+    async def test_cancellation_leaves_no_container_and_no_netns(
+        self,
+        ownership_data: KernelOwnershipData,
+        launch_kernel_config: KernelCreationConfig,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+        fake: FakeContainerd,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A cancel of the launch after the task was created rolls back like a failure."""
+        runner = FakeCommandRunner()
+        ctx, kernel = await self._prepared(
+            ownership_data,
+            launch_kernel_config,
+            resource_spec,
+            computers,
+            fake,
+            runner,
+        )
+        create_task = fake.create_task
+
+        async def create_task_then_cancelled(*args: Any, **kwargs: Any) -> Any:
+            await create_task(*args, **kwargs)
+            raise asyncio.CancelledError
+
+        monkeypatch.setattr(fake, "create_task", create_task_then_cancelled)
+
+        with pytest.raises(asyncio.CancelledError):
+            await ctx.start_container(kernel, [], None, [], MagicMock())
+
+        assert fake.containers == {}
+        assert fake.tasks == {}
+        assert fake.snapshots == {}
+        assert runner.matching("ip", "netns", "list")  # the netns teardown ran
+        cast(MagicMock, computers[DeviceName("cpu")].alloc_map).free.assert_called_once()
