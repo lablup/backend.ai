@@ -4,10 +4,12 @@ import enum
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Final, NewType
 
 from pydantic import ConfigDict, Field
 
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.type_adapters import VFolderIDField
 from ai.backend.common.types import BackendAISchema
 
@@ -79,6 +81,14 @@ class StorageBackendMetadata(BackendAISchema):
 
     name: StorageBackendType
     capabilities: StorageBackendCapabilities
+
+
+class StorageVolumeDeclaration(BackendAISchema):
+    """A volume an agent holds, as the agent reads it to check the volume's status."""
+
+    volume_name: StorageVolumeName
+    storage_backend_metadata: StorageBackendMetadata
+    mount_path: Path
 
 
 class StorageVolumeUsageField(enum.StrEnum):

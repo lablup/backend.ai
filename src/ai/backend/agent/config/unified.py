@@ -138,6 +138,32 @@ class SyncContainerLifecyclesConfig(BaseConfigSchema):
     ]
 
 
+class VolumeDeclarationRefreshConfig(BaseConfigSchema):
+    interval: Annotated[
+        float,
+        Field(default=30.0, gt=0),
+        BackendAIConfigMeta(
+            description="Seconds between two reads of the agent's volume declarations from Redis.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="30", prod="30"),
+        ),
+    ]
+    initial_delay: Annotated[
+        float,
+        Field(
+            default=0.0,
+            ge=0,
+            validation_alias=AliasChoices("initial-delay", "initial_delay"),
+            serialization_alias="initial-delay",
+        ),
+        BackendAIConfigMeta(
+            description="Seconds to wait before the first read of the agent's volume declarations.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="0", prod="0"),
+        ),
+    ]
+
+
 class SocketRelayHealthCheckConfig(BaseConfigSchema):
     enable: Annotated[
         bool,
@@ -2531,6 +2557,24 @@ class AgentGlobalConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description="Configuration for the periodic status checks of the volumes.",
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    volume_declaration_refresh: Annotated[
+        VolumeDeclarationRefreshConfig,
+        Field(
+            default_factory=VolumeDeclarationRefreshConfig,
+            validation_alias=AliasChoices(
+                "volume-declaration-refresh", "volume_declaration_refresh"
+            ),
+            serialization_alias="volume-declaration-refresh",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Configuration for the periodic read of the agent's volume declarations, "
+                "which decides the volumes the agent checks."
+            ),
             added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),

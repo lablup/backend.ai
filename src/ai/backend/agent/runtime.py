@@ -14,12 +14,21 @@ from ai.backend.agent.kernel import KernelRegistry
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from ai.backend.agent.resources import ComputerContext, ResourceAllocator
 from ai.backend.agent.tasks import CollectNodeStatTask, UpdateSlotsTask
+from ai.backend.agent.tasks.refresh_volume_status_checks import (
+    RefreshVolumeStatusChecksTask,
+    RefreshVolumeStatusChecksTaskArgs,
+)
 from ai.backend.agent.types import AgentBackend, get_agent_discovery
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
+from ai.backend.common.clients.valkey_client.valkey_storage_volume.client import (
+    ValkeyStorageVolumeClient,
+)
 from ai.backend.common.cron import LocalCron, PeriodicTask
 from ai.backend.common.data.entity.storage_volume import StorageVolumeName
+from ai.backend.common.defs import REDIS_STORAGE_VOLUME_DB, RedisRole
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.storage.probe.registry import VolumeStatusCheckRegistry
 from ai.backend.common.storage.probe.report import (
     StorageStatusReportTask,
@@ -46,6 +55,8 @@ class AgentRuntime:
     _stop_signal: signal.Signals
     _volume_status_check_registry: VolumeStatusCheckRegistry
     _probe_check_runner: ProbeCheckRunner[StorageVolumeName]
+    _valkey_storage_volume_client: ValkeyStorageVolumeClient | None
+    _refresh_volume_status_checks_task: RefreshVolumeStatusChecksTask | None
     _local_cron: LocalCron
 
     @classmethod
@@ -99,6 +110,9 @@ class AgentRuntime:
         agents_list = [task.result() for task in create_agent_tasks]
         primary_agent = agents_list[0]
         agents = {agent.id: agent for agent in agents_list}
+        valkey_storage_volume_client = await cls._create_valkey_storage_volume_client(
+            local_config, sentinel_monitors
+        )
 
         runtime = AgentRuntime(
             local_config=local_config,
@@ -108,10 +122,33 @@ class AgentRuntime:
             kernel_registry=kernel_registry,
             resource_allocator=resource_allocator,
             metadata_server=metadata_server,
+            valkey_storage_volume_client=valkey_storage_volume_client,
         )
         await runtime._local_cron.start()
         await runtime._probe_check_runner.start()
         return runtime
+
+    @classmethod
+    async def _create_valkey_storage_volume_client(
+        cls,
+        local_config: AgentUnifiedConfig,
+        sentinel_monitors: SentinelMonitorSet,
+    ) -> ValkeyStorageVolumeClient:
+        if local_config.redis is None:
+            raise ConfigurationError({
+                "AgentRuntime.create_runtime": "Redis runtime configuration is not set."
+            })
+        valkey_target = (
+            local_config.redis.to_redis_profile_target()
+            .profile_target(RedisRole.STORAGE_VOLUME)
+            .to_valkey_target()
+        )
+        return await ValkeyStorageVolumeClient.create(
+            valkey_target,
+            human_readable_name="agent.storage_volume",
+            db_id=REDIS_STORAGE_VOLUME_DB,
+            sentinel_monitor=sentinel_monitors.monitor_for(valkey_target),
+        )
 
     @classmethod
     async def _create_metadata_server(
@@ -169,6 +206,7 @@ class AgentRuntime:
         kernel_registry: KernelRegistry,
         resource_allocator: ResourceAllocator,
         metadata_server: MetadataServer | None = None,
+        valkey_storage_volume_client: ValkeyStorageVolumeClient | None = None,
     ) -> None:
         self._local_config = local_config
         self._etcd_views = etcd_views
@@ -177,6 +215,7 @@ class AgentRuntime:
         self._kernel_registry = kernel_registry
         self._resource_allocator = resource_allocator
         self._metadata_server = metadata_server
+        self._valkey_storage_volume_client = valkey_storage_volume_client
 
         self._stop_signal = signal.SIGTERM
         volume_status_checks: list[AbstractVolumeStatusCheck] = []
@@ -188,6 +227,18 @@ class AgentRuntime:
             UpdateSlotsTask(self),
             CollectNodeStatTask(self, local_config),
         ]
+        self._refresh_volume_status_checks_task = None
+        if valkey_storage_volume_client is not None:
+            self._refresh_volume_status_checks_task = RefreshVolumeStatusChecksTask(
+                RefreshVolumeStatusChecksTaskArgs(
+                    valkey_storage_volume_client=valkey_storage_volume_client,
+                    agent_ids=list(agents.keys()),
+                    registry=self._volume_status_check_registry,
+                    runner=self._probe_check_runner,
+                    local_config=local_config,
+                )
+            )
+            periodic_tasks.append(self._refresh_volume_status_checks_task)
         sd_config = local_config.service_discovery
         # The manager tells reports apart by these ids, so without both there is nothing to report.
         if sd_config.instance_id and sd_config.service_group:
@@ -211,8 +262,12 @@ class AgentRuntime:
         self._local_cron = LocalCron(periodic_tasks)
 
     async def __aexit__(self, *exc_info: Any) -> None:
-        await self._probe_check_runner.stop()
         await self._local_cron.stop()
+        await self._probe_check_runner.stop()
+        if self._refresh_volume_status_checks_task is not None:
+            await self._refresh_volume_status_checks_task.close()
+        if self._valkey_storage_volume_client is not None:
+            await self._valkey_storage_volume_client.close()
         for agent in self._agents.values():
             await agent.shutdown(self._stop_signal)
         if self._metadata_server is not None:

@@ -930,6 +930,17 @@
   # Added in 26.10.0
   initial-delay = 5.0
 
+# Configuration for the periodic read of the agent's volume declarations, which
+# decides the volumes the agent checks.
+# Added in 26.10.0
+[volume-declaration-refresh]
+  # Seconds between two reads of the agent's volume declarations from Redis.
+  # Added in 26.10.0
+  interval = 30.0
+  # Seconds to wait before the first read of the agent's volume declarations.
+  # Added in 26.10.0
+  initial-delay = 0.0
+
 # Configuration for the periodic storage status report to the manager.
 # Added in 26.10.0
 [storage-status-report]
