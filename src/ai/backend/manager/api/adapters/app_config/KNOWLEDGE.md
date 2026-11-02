@@ -1,7 +1,7 @@
 ---
 name: app-config-adapter-scenarios
 type: reference
-description: what the merged app config read guarantees, as scenarios; a value with no row of its own, built by merging fragments in allow-list rank order, read either at the caller's own scope or anonymously from the public fragments alone; the tests in tests/scenario/bai_scenario/manager/app_config match these one for one
+description: merged app config read contract, a value with no row of its own built by merging fragments in allow-list rank order, read at the caller's own scope or anonymously from the public fragments alone
 scope: src/ai/backend/manager/api/adapters/app_config
 keywords: [app config, scenario, adapter, merge, rank, anonymous, rbac]
 generated:
@@ -34,21 +34,6 @@ status: draft
 
 ## 자기 설정 조회
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| `fragment`가 하나도 없는 이름을 조회한다 | `definition` 하나, `allow_list` 항목도 `fragment`도 없음, 자기 스코프에 읽기 권한 있음 | 그 이름 하나로 조회 | 그 이름 하나, `config`는 빈 값. 응답에서 빠지지 않는다 |
-| `definition`조차 없는 이름을 조회한다 | `definition` 없음, 읽기 권한 있음 | 이름 하나로 조회 | 빈 `config`. `definition`이 없다고 거부되지 않는다 |
-| 공개 `fragment`만 있는 이름을 조회한다 | `definition` 하나, 공개 `allow_list` 항목 하나, 공개 `fragment` 하나, 읽기 권한 있음 | 조회 | `config`가 공개 `fragment`의 값과 같다 |
-| 자기 `fragment`가 도메인 `fragment`를 덮어쓴다 | 도메인·사용자 `allow_list` 항목의 `rank` 값이 기본값, 겹치는 키를 가진 도메인 `fragment`와 자기 `fragment`, 읽기 권한 있음 | 조회 | 겹치는 키는 자기 값, 겹치지 않는 키는 양쪽 모두 남는다 |
-| 도메인 `fragment`가 공개 `fragment`를 덮어쓴다 | 공개·도메인 `allow_list` 항목의 `rank` 값이 기본값, 겹치는 키를 가진 공개 `fragment`와 도메인 `fragment`, 읽기 권한 있음 | 조회 | 겹치는 키는 도메인 값 |
-| 관리자가 `rank` 값을 뒤집으면 도메인 `fragment`가 자기 `fragment`를 덮어쓴다 | 도메인 `allow_list` 항목의 `rank` 값이 사용자 항목보다 큼, 겹치는 키를 가진 도메인 `fragment`와 자기 `fragment`, 읽기 권한 있음 | 조회 | 겹치는 키는 도메인 값 |
-| 다른 사용자의 `fragment`는 섞이지 않는다 | 도메인 하나, 사용자 둘, 사용자 `allow_list` 항목 하나, 두 사용자 각자의 `fragment`, 읽기 권한 있음 | 조회 | 자기 `fragment`의 값만 |
-| 다른 도메인의 `fragment`는 섞이지 않는다 | 도메인 둘, 각 도메인의 `fragment`, 도메인 `allow_list` 항목 하나, 읽기 권한 있음 | 조회 | 자기 도메인 `fragment`의 값만 |
-| 여러 이름을 한 번에 조회하면 요청한 순서대로 반환된다 | `definition` 셋, 각각의 `allow_list` 항목과 `fragment`, 읽기 권한 있음 | 이름 셋으로 조회 | 셋, 요청 순서대로, 각각 자기 병합 결과 |
-| 같은 이름을 두 번 지정하면 두 번 반환된다 | `definition` 하나, `fragment` 하나, 읽기 권한 있음 | 같은 이름 둘로 조회 | 둘, 같은 값 |
-| 읽기 권한이 없는 사용자가 조회한다 | `definition` 하나, 공개 `fragment` 하나, 자기 스코프에 권한 없음 | 조회 | 권한 부족으로 거부 |
-| 권한 검사를 끄면 권한 없이도 조회된다 | 권한 검사 비활성화, 권한 없음 | 조회 | 병합 결과가 반환된다 |
-
 `rank` 값을 뒤집는 시나리오가 있는 이유는, 병합 순서를 `allow_list` 항목이 결정하고 값의 소유자는
 바꿀 수 없다는 것을 고정하기 위해서다. `rank` 값은 `allow_list` 항목에 있고 `fragment`에는 없다.
 
@@ -72,14 +57,6 @@ status: draft
 
 ## 공개 설정 조회
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 로그인하지 않은 호출자가 공개 값을 조회한다 | `definition` 하나, 공개·도메인·사용자 `allow_list` 항목 셋, `fragment` 셋 | 이름 하나로 조회 | `config`가 공개 `fragment`의 값과 같다. 도메인과 사용자 `fragment`는 섞이지 않는다 |
-| 공개 `fragment`가 없는 이름을 조회한다 | `definition` 하나, 사용자 `fragment`만 있음 | 조회 | 빈 `config` |
-| `definition`조차 없는 이름을 조회한다 | `definition` 없음 | 조회 | 빈 `config` |
-| 로그인한 사용자가 조회해도 같은 응답을 받는다 | 로그인하지 않은 호출자의 시나리오와 같은 공개·도메인·사용자 `fragment` 셋, 아무 권한도 없는 사용자 | 조회 | 공개 `fragment`의 값만 |
-| 여러 이름을 한 번에 조회하면 요청한 순서대로 반환된다 | `definition` 셋, 각각의 공개 `fragment` | 이름 셋으로 조회 | 셋, 요청 순서대로 |
-
 어떤 검사도 없다. 인증도 권한도 확인하지 않는다. 쓰기는 이 경로에 연결할 수 없게 막혀 있으므로, 검사 없이
 호출되는 것은 조회뿐이다.
 
@@ -90,9 +67,3 @@ status: draft
 
 로그인한 사용자의 시나리오는 이 조회가 호출자 정보를 전혀 사용하지 않는다는 것을 고정한다. 권한이
 있어도 자기 `fragment`가 섞이지 않고, 없어도 거부되지 않는다.
-
-## 아직 적지 않은 것
-
-어댑터가 제공하는 `my_app_configs`와 `public_app_configs`가 모두 위에 있다. 실행 결과에 남는
-`batch_load_fields`는 어댑터 공통 기반 클래스가 물려주는 필드 읽기이고, 이 엔티티는 필드를 갖지
-않아 호출할 일이 없다.

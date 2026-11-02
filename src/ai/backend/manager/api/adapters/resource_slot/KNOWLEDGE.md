@@ -1,7 +1,7 @@
 ---
 name: resource-slot-adapter-scenarios
 type: reference
-description: what the resource slot adapter guarantees, as scenarios; the name-keyed slot type catalog with the superadmin role on create and update against the entity gate on purge and the rows that refuse a purge while referenced, the agent resource reads gated by a role in the agent's resource group, the kernel allocation reads gated by a role over the kernel's session with a lookup that answers a missing kernel and a missing permission alike, and the domain and project overviews gated by session read in that scope
+description: what the resource slot adapter guarantees: the name-keyed slot type catalog with the superadmin role on create and update against the entity gate on purge and the rows that refuse a purge while referenced, the agent resource reads gated by a role in the agent's resource group, the kernel allocation reads gated by a role over the kernel's session with a lookup that answers a missing kernel and a missing permission alike, and the domain and project overviews gated by session read in that scope
 scope: src/ai/backend/manager/api/adapters/resource_slot
 keywords: [resource slot type, agent resource, kernel allocation, resource overview, scenario, adapter, superadmin, lookup, purge, in use, public read]
 generated:
@@ -44,15 +44,6 @@ REST `DELETE /slot-types/{slot_name}`)은 이름으로 id 찾기를 먼저 부�
 
 ## 생성
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 이름과 `slot_type`만 지정해 생성한다 | `resource_slot_type` 없음, 슈퍼관리자 | 이름과 `slot_type` 값으로 생성 | `display_name`·`description`·`display_unit`·`display_icon` 값은 모두 비어 있고, `required` 값은 false, `enabled` 값은 true, `rank` 값은 0, `number_format` 값은 십진에 반올림 없음인 노드 |
-| `display_name`·`description`·`display_unit`·`display_icon`·`number_format`·`rank` 값을 모두 지정해 생성한다 | `resource_slot_type` 없음, 슈퍼관리자 | `display_name`·`description`·`display_unit`·`display_icon`·`number_format`·`rank` 값까지 지정해 생성 | 지정한 값이 그대로 담긴 노드 |
-| `slot_type` 값을 `count`·`bytes`·`unique`·`unified` 각각으로 지정해 생성한다 | `resource_slot_type` 없음, 슈퍼관리자 | 그 `slot_type` 값으로 생성 | 그 `slot_type` 값이 담긴 노드 |
-| 이미 사용 중인 이름으로 생성한다 | 그 이름의 `resource_slot_type` 행이 있음, 슈퍼관리자 | 생성 | 이름 중복으로 거부 |
-| 슈퍼관리자가 아닌 사용자가 생성한다 | 슈퍼관리자 아님 | 생성 | 역할 부족으로 거부 |
-| 권한 검사를 꺼도 슈퍼관리자가 아니면 생성할 수 없다 | 권한 검사 비활성화, 슈퍼관리자 아님 | 생성 | 역할 부족으로 거부 |
-
 이미 사용 중인 이름을 덮어쓰지 않고 거부하는 것은 이 행을
 `agent_resources`·`resource_allocations`·`model_card_resource_requirements`·`preset_resource_slots`·`deployment_revision_resource_slots`
 테이블이 참조하기 때문이다. 덮어쓰면 그 이름으로 기록된 할당량의 의미가 모두 바뀐다.
@@ -62,11 +53,6 @@ REST `DELETE /slot-types/{slot_name}`)은 이름으로 id 찾기를 먼저 부�
 
 ## 조회
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| public 에서 읽는 사용자가 이름으로 조회한다 | `resource_slot_type` 하나, public 조회 권한만 있음 | 이름으로 조회 | 그 `resource_slot_type` 전체 |
-| 존재하지 않는 이름으로 조회한다 | 다른 `resource_slot_type` 행만 있음 | 이름으로 조회 | 잘못된 요청으로 거부 |
-
 조회는 public 에서 READ 를 검사한다. 이름으로 id를 찾는 단계도 찾아낸 대상에 권한 검사가 뒤따르므로,
 존재하지 않는 이름과 닿을 수 없는 이름이 같은 이유로 거부된다. public 조회 권한만 받은 사용자가
 성공하는 시나리오가 그것을 증명하고, 생성 절의 역할 부족으로 거부되는 시나리오와 대비된다.
@@ -75,29 +61,10 @@ REST `DELETE /slot-types/{slot_name}`)은 이름으로 id 찾기를 먼저 부�
 
 ## 검색
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 아무 권한도 없는 사용자가 검색한다 | `resource_slot_type` 둘, 아무 권한도 없음 | 전체 조회 | 둘 다 반환된다 |
-| 이름 필터로 검색한다 | 이름이 다른 `resource_slot_type` 여럿 | 이름 필터 조회 | 그 이름의 `resource_slot_type` 행만 남는다 |
-| 페이지 크기를 생략한다 | `resource_slot_type` 11개 | 크기 없이 조회 | 10건까지 반환되고 다음 페이지가 있다고 응답한다 |
-| `slot_type` 필터로 검색한다 | `slot_type` 값이 다른 `resource_slot_type` 하나와 `slot_type` 값이 같은 `resource_slot_type` 여럿 | `slot_type` 필터 조회 | 그 `slot_type` 값의 `resource_slot_type` 행만 남는다 |
-| `display_name` 필터로 검색한다 | `display_name` 값이 다른 `resource_slot_type` 하나와 `display_name` 값이 같은 `resource_slot_type` 여럿 | `display_name` 필터 조회 | 그 `display_name` 값의 `resource_slot_type` 행만 남는다 |
-| `first`만 지정해 검색한다 | `resource_slot_type` 셋 | `first` 값을 1로 지정해 조회 | 한 건이 반환되고 다음 페이지가 있다고 응답한다 |
-
 요청 타입이 받는 필드는 모두 읽힌다. 이름·`slot_type`·`display_name` 필터와 `limit`·`offset`, 그리고
 `first`·`after`·`last`·`before` 필드다. 받아 놓고 무시하는 필드는 없다.
 
 ## 수정
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 `display_name`만 바꾼다 | `resource_slot_type` 하나, 슈퍼관리자 | 이름으로 지정해 `display_name` 수정 | `display_name` 값은 새 값, 나머지는 그대로 |
-| `enabled` 값을 false로 바꾼다 | `enabled` 값이 true인 `resource_slot_type`, 슈퍼관리자 | `enabled` 수정 | `enabled` 값이 false인 노드 |
-| 값을 하나도 지정하지 않는다 | `resource_slot_type` 하나, 슈퍼관리자 | 이름만 지정하는 빈 수정 | 아무것도 바뀌지 않은 노드 |
-| 존재하지 않는 이름을 수정한다 | 다른 `resource_slot_type` 행만 있음, 슈퍼관리자 | `display_name` 수정 | 대상을 찾을 수 없어 거부 |
-| 슈퍼관리자가 아닌 사용자가 수정한다 | 같은 `resource_slot_type`, 슈퍼관리자 아님 | `display_name` 수정 | 역할 부족으로 거부 |
-| 슈퍼관리자가 아닌 사용자가 없는 이름을 수정한다 | 다른 `resource_slot_type` 행만 있음, 슈퍼관리자 아님 | `display_name` 수정 | 역할 부족으로 거부 |
-| 권한 검사를 꺼도 슈퍼관리자가 아니면 수정할 수 없다 | 권한 검사 비활성화, 슈퍼관리자 아님 | `display_name` 수정 | 역할 부족으로 거부 |
 
 이름과 `slot_type` 값은 수정할 수 없다. 요청 타입이 그 둘을 받지 않으므로 시나리오로 두지 않는다.
 
@@ -108,28 +75,10 @@ REST `DELETE /slot-types/{slot_name}`)은 이름으로 id 찾기를 먼저 부�
 
 ## 이름으로 id 찾기
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 아무 권한도 없는 사용자가 이름으로 id를 찾는다 | `resource_slot_type` 하나, 아무 권한도 없음 | 이름으로 찾기 | 그 `resource_slot_type` 의 id |
-| 존재하지 않는 이름으로 id를 찾는다 | 다른 `resource_slot_type` 행만 있음 | 이름으로 찾기 | 잘못된 요청으로 거부 |
-
 찾은 대상에 public 에서 READ 를 검사한다. 모든 계정이 그 권한을 받으므로 아무 권한도 받지 않은
 사용자도 찾는다.
 
 ## 삭제
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 삭제한다 | 어디서도 참조되지 않는 `resource_slot_type`, 슈퍼관리자 | id로 삭제 | 삭제한 이름을 담은 응답 |
-| 에이전트가 아직 보고하는 슬롯을 삭제한다 | 그 슬롯을 보고하는 `agent_resource` 행이 있음, 슈퍼관리자 | 삭제 | 아직 참조 중이라는 이유로 거부 |
-| 커널에 아직 할당된 슬롯을 삭제한다 | 그 슬롯의 `resource_allocation` 행이 있음, 슈퍼관리자 | 삭제 | 아직 참조 중이라는 이유로 거부 |
-| 모델 카드가 아직 요구하는 슬롯을 삭제한다 | 그 슬롯을 요구하는 모델 카드가 있음, 슈퍼관리자 | 삭제 | 아직 참조 중이라는 이유로 거부 |
-| 배포 preset이 아직 사용하는 슬롯을 삭제한다 | 그 슬롯을 사용하는 배포 preset이 있음, 슈퍼관리자 | 삭제 | 아직 참조 중이라는 이유로 거부 |
-| 배포 리비전이 아직 사용하는 슬롯을 삭제한다 | 그 슬롯을 사용하는 배포 리비전이 있음, 슈퍼관리자 | 삭제 | 아직 참조 중이라는 이유로 거부 |
-| 존재하지 않는 id를 삭제한다 | 다른 `resource_slot_type` 행만 있음, 슈퍼관리자 | 삭제 | 대상을 찾을 수 없어 거부 |
-| 아무 권한도 없는 사용자가 삭제한다 | 같은 `resource_slot_type`, 아무 권한도 없음 | 삭제 | 권한 부족으로 거부 |
-| 아무 권한도 없는 사용자가 없는 id를 삭제한다 | 다른 `resource_slot_type` 행만 있음, 아무 권한도 없음 | 삭제 | 권한 부족으로 거부 |
-| 권한 검사를 끄면 권한 없이도 삭제된다 | 권한 검사 비활성화, 아무 권한도 없음 | 삭제 | 삭제한 이름을 담은 응답 |
 
 참조하는 테이블마다 시나리오를 하나씩 둔다.
 `agent_resources`·`resource_allocations`·`model_card_resource_requirements`·`preset_resource_slots`·`deployment_revision_resource_slots`
@@ -143,27 +92,11 @@ REST `DELETE /slot-types/{slot_name}`)은 이름으로 id 찾기를 먼저 부�
 
 ## 여럿 삭제
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 둘과 없는 id 하나를 한 번에 삭제한다 | 어디서도 참조되지 않는 `resource_slot_type` 둘, 슈퍼관리자 | 셋 삭제 | 둘은 지워지기 전 모습으로 오고, 없는 id 는 대상 없음 이유로 실패 목록에 옴 |
-| 아무 권한도 없는 사용자가 여럿을 삭제한다 | 같은 `resource_slot_type` 둘, 아무 권한도 없음 | 둘 삭제 | 삭제된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
-
 여럿 삭제는 호출 전체를 거부하지 않는다. 처리한 `resource_slot_type` 은 처리된 목록에, 처리하지
 못한 것은 id 와 이유를 실패 목록에 싣는다. 아직 참조 중인 `resource_slot_type` 도 그것만 실패
 목록에 온다.
 
 ## `agent_resource` 조회
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 `agent_id` 값과 슬롯 이름으로 조회한다 | 그 슬롯을 보고하는 에이전트 하나, 슈퍼관리자 | 조회 | 그 에이전트가 그 슬롯에 대해 보고한 `capacity`·`used` 값 |
-| 리소스 그룹의 에이전트를 읽을 수 있는 사용자가 조회한다 | 그 슬롯을 보고하는 에이전트 하나, 그 리소스 그룹 범위의 에이전트 조회 역할 있음 | 조회 | 그 에이전트가 그 슬롯에 대해 보고한 `capacity`·`used` 값 |
-| 에이전트가 보고하지 않는 슬롯을 조회한다 | 그 슬롯을 보고하지 않는 에이전트 하나, 슈퍼관리자 | 조회 | 대상을 찾을 수 없어 거부 |
-| 리소스 그룹의 에이전트를 읽을 수 있는 사용자가 보고하지 않는 슬롯을 조회한다 | 그 슬롯을 보고하지 않는 에이전트 하나, 그 리소스 그룹 범위의 에이전트 조회 역할 있음 | 조회 | 권한 검사를 통과한 뒤 대상을 찾을 수 없어 거부 |
-| 아무 권한도 없는 사용자가 조회한다 | 에이전트 하나, 아무 권한도 없음 | 조회 | 권한 부족으로 거부 |
-| 존재하지 않는 `agent_id` 값으로 조회한다 | 다른 에이전트만 있음, 슈퍼관리자 | 조회 | 대상을 찾을 수 없어 거부 |
-| 아무 권한도 없는 사용자가 없는 `agent_id` 값으로 조회한다 | 다른 에이전트만 있음, 아무 권한도 없음 | 조회 | 대상을 찾을 수 없어 거부 |
-| 권한 검사를 끄면 권한 없이도 권한 검사를 통과한다 | 권한 검사 비활성화, 그 슬롯을 보고하지 않는 에이전트 하나, 아무 권한도 없음 | 조회 | 권한 검사를 통과한 뒤 대상을 찾을 수 없어 거부 |
 
 `agent_id` 값으로 에이전트를 찾는 단계는 인증만 확인한다. 아무 권한도 없는 사용자가 없는 `agent_id`
 값으로 조회하면 대상을 찾을 수 없어 거부되는 것이 그 증거다. 권한은 찾은 에이전트에 대해, 슬롯을
@@ -171,45 +104,14 @@ REST `DELETE /slot-types/{slot_name}`)은 이름으로 id 찾기를 먼저 부�
 
 ## `agent_resource` 검색
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 검색한다 | 슬롯을 보고한 에이전트 둘, 슈퍼관리자 | 전체 조회 | 보고된 슬롯이 모두 반환된다 |
-| 슬롯 이름 필터로 검색한다 | 이름이 다른 슬롯을 보고한 에이전트 하나 | 슬롯 이름 필터 조회 | 그 슬롯의 행만 남는다 |
-| `agent_id` 필터로 검색한다 | 슬롯을 보고한 에이전트 둘 | `agent_id` 필터 조회 | 그 에이전트의 행만 남는다 |
-| 페이지 크기를 생략한다 | 보고된 슬롯 11개 | 크기 없이 조회 | 슬롯 이름 순서로 앞선 10건까지 반환되고 다음 페이지가 있다고 응답한다 |
-| `first`만 지정해 검색한다 | 보고된 슬롯 둘 | `first` 값을 1로 지정해 조회 | 슬롯 이름 순서로 앞선 한 건이 반환되고 다음 페이지가 있다고 응답한다 |
-| 보고된 슬롯이 하나도 없다 | 슬롯을 보고하지 않은 에이전트 하나, 슈퍼관리자 | 전체 조회 | 비어 있다 |
-| 모니터가 검색한다 | 모니터 역할 | 전체 조회 | 응답이 반환된다 |
-| 아무 권한도 없는 사용자가 검색한다 | 아무 권한도 없음 | 전체 조회 | 역할 부족으로 거부 |
-| 권한 검사를 꺼도 슈퍼관리자나 모니터가 아니면 검색할 수 없다 | 권한 검사 비활성화, 아무 권한도 없음 | 전체 조회 | 역할 부족으로 거부 |
-
 정렬을 지정하지 않으면 슬롯 이름 순서로 반환된다. 이 검색은 슬롯 순위를 보지 않는다.
 
 ## 지정한 에이전트의 `agent_resource` 검색
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 리소스 그룹의 에이전트를 읽을 수 있는 사용자가 그 에이전트를 지정해 검색한다 | 슬롯을 보고한 에이전트 하나, 그 리소스 그룹 범위의 에이전트 조회 역할 있음 | 그 에이전트 지정 조회 | 그 에이전트가 보고한 슬롯이 모두 반환된다 |
-| 슬롯을 보고하지 않은 에이전트를 지정해 검색한다 | 슬롯을 보고하지 않은 에이전트 하나, 그 리소스 그룹 범위의 에이전트 조회 역할 있음 | 그 에이전트 지정 조회 | 비어 있다 |
-| 슈퍼관리자가 지정해 검색한다 | 슬롯을 보고하지 않은 에이전트 하나, 슈퍼관리자 | 그 에이전트 지정 조회 | 비어 있다 |
-| 아무 권한도 없는 사용자가 지정해 검색한다 | 에이전트 하나, 아무 권한도 없음 | 그 에이전트 지정 조회 | 권한 부족으로 거부 |
-| 둘 중 하나만 읽을 수 있는 사용자가 둘을 함께 지정한다 | 리소스 그룹이 다른 에이전트 둘, 한쪽 그룹 범위의 에이전트 조회 역할만 있음 | 둘 지정 조회 | 전체가 권한 부족으로 거부 |
-| 권한 검사를 끄면 권한 없이도 지정해 검색된다 | 권한 검사 비활성화, 아무 권한도 없음 | 그 에이전트 지정 조회 | 응답이 반환된다 |
 
 지정한 에이전트마다 권한을 검사하고, 하나라도 읽을 수 없으면 읽을 수 있는 쪽만 반환하지 않고
 전체를 거부한다.
 
 ## `resource_allocation` 조회
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 커널 id와 슬롯 이름으로 조회한다 | 그 슬롯을 요구하며 대기 중인 커널 하나, 슈퍼관리자 | 조회 | `requested` 값이 담기고 `used` 값은 비어 있는 `resource_allocation` 행 |
-| 프로젝트 범위에서 세션을 읽을 수 있는 사용자가 조회한다 | 같은 커널, 그 프로젝트 범위의 세션 조회 역할 있음 | 조회 | 같은 `resource_allocation` 행 |
-| 아무 권한도 없는 사용자가 조회한다 | 같은 커널, 아무 권한도 없음 | 조회 | 커널 id로 세션을 찾을 수 없다는 이유로 거부 |
-| 존재하지 않는 커널 id로 조회한다 | 다른 커널만 있음, 슈퍼관리자 | 조회 | 대상을 찾을 수 없어 거부 |
-| 커널이 요구하지 않은 슬롯을 조회한다 | 다른 슬롯만 요구하는 커널 하나, 슈퍼관리자 | 조회 | 대상을 찾을 수 없어 거부 |
-| 아무 권한도 없는 사용자가 없는 커널 id를 조회한다 | 다른 커널만 있음, 아무 권한도 없음 | 조회 | 커널 id로 세션을 찾을 수 없다는 같은 이유로 거부 |
-| 권한 검사를 끄면 권한 없이도 조회된다 | 권한 검사 비활성화, 아무 권한도 없음 | 조회 | 같은 `resource_allocation` 행 |
 
 커널 id로 세션을 찾는 단계가 그 세션에 대한 권한을 검사한다. 권한이 없을 때와 커널이 없을 때 같은
 이유로 거부되므로, 거부 이유만으로는 그 커널이 있는지 알 수 없다. 모든 검사를 통과하는
@@ -217,41 +119,12 @@ REST `DELETE /slot-types/{slot_name}`)은 이름으로 id 찾기를 먼저 부�
 
 ## `resource_allocation` 검색
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 검색한다 | 슬롯 둘을 요구하는 커널 하나, 슈퍼관리자 | 전체 조회 | `resource_allocation` 행 둘이 다 반환된다 |
-| 슬롯 이름 필터로 검색한다 | 슬롯 둘을 요구하는 커널 하나 | 슬롯 이름 필터 조회 | 그 슬롯의 `resource_allocation` 행만 남는다 |
-| 커널 id 필터로 검색한다 | 슬롯 하나씩 요구하는 커널 둘 | 커널 id 필터 조회 | 그 커널의 `resource_allocation` 행만 남는다 |
-| 페이지 크기를 생략한다 | `resource_allocation` 행 11건 | 크기 없이 조회 | 10건까지 반환되고 다음 페이지가 있다고 응답한다 |
-| `first`만 지정해 검색한다 | `resource_allocation` 행 둘 | `first` 값을 1로 지정해 조회 | 한 건이 반환되고 다음 페이지가 있다고 응답한다 |
-| 모니터가 검색한다 | 슬롯 둘을 요구하는 커널 하나, 모니터 역할 | 전체 조회 | `resource_allocation` 행 둘이 다 반환된다 |
-| 아무 권한도 없는 사용자가 검색한다 | 아무 권한도 없음 | 전체 조회 | 역할 부족으로 거부 |
-| 권한 검사를 꺼도 슈퍼관리자나 모니터가 아니면 검색할 수 없다 | 권한 검사 비활성화, 아무 권한도 없음 | 전체 조회 | 역할 부족으로 거부 |
-
 ## 도메인 리소스 개요
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 도메인 이름으로 조회한다 | 대기 중인 커널만 있는 도메인, 슈퍼관리자 | 조회 | 점유된 슬롯이 없고 세션 수가 0 |
-| 도메인 범위에서 세션을 읽을 수 있는 사용자가 조회한다 | 같은 도메인, 그 도메인 범위의 세션 조회 역할 있음 | 조회 | 같은 개요 |
-| 프로젝트 범위에서만 세션을 읽을 수 있는 사용자가 조회한다 | 같은 도메인, 그 안의 프로젝트 범위의 세션 조회 역할만 있음 | 조회 | 권한 부족으로 거부 |
-| 아무 권한도 없는 사용자가 조회한다 | 같은 도메인, 아무 권한도 없음 | 조회 | 권한 부족으로 거부 |
-| 존재하지 않는 도메인 이름으로 조회한다 | 다른 도메인만 있음, 슈퍼관리자 | 조회 | 대상을 찾을 수 없어 거부 |
-| 권한 검사를 끄면 권한 없이도 조회된다 | 권한 검사 비활성화, 아무 권한도 없음 | 조회 | 같은 개요 |
 
 개요는 리소스를 점유했거나 배정받은 커널만 세고, 요구만 하고 대기 중인 커널은 세지 않는다.
 대기 중인 커널만 있는 도메인의 개요가 비어 있는 것이 그 증거다.
 
 ## 프로젝트 리소스 개요
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 프로젝트 id로 조회한다 | 대기 중인 커널만 있는 프로젝트, 슈퍼관리자 | 조회 | 점유된 슬롯이 없고 세션 수가 0 |
-| 프로젝트 범위에서 세션을 읽을 수 있는 사용자가 조회한다 | 같은 프로젝트, 그 프로젝트 범위의 세션 조회 역할 있음 | 조회 | 같은 개요 |
-| 도메인 범위에서 세션을 읽을 수 있는 사용자가 조회한다 | 같은 프로젝트, 그 프로젝트가 속한 도메인 범위의 세션 조회 역할 있음 | 조회 | 같은 개요 |
-| 아무 권한도 없는 사용자가 조회한다 | 같은 프로젝트, 아무 권한도 없음 | 조회 | 권한 부족으로 거부 |
-| 존재하지 않는 프로젝트 id로 조회한다 | 다른 프로젝트만 있음, 슈퍼관리자 | 조회 | 점유된 슬롯이 없고 세션 수가 0 |
-| 권한 검사를 끄면 권한 없이도 조회된다 | 권한 검사 비활성화, 아무 권한도 없음 | 조회 | 같은 개요 |
 
 도메인 범위의 세션 조회 권한은 그 안의 프로젝트에도 미치고, 프로젝트 범위의 권한은 도메인에
 미치지 않는다. 이 절의 도메인 범위 시나리오와 도메인 개요 절의 프로젝트 범위 시나리오가 그것을
@@ -259,12 +132,3 @@ REST `DELETE /slot-types/{slot_name}`)은 이름으로 id 찾기를 먼저 부�
 
 프로젝트는 이름이 아니라 id로 지정하므로 id를 찾는 단계가 없고, 프로젝트가 있는지 확인하지
 않는다. 존재하지 않는 id로 조회하면 거부가 아니라 빈 개요가 반환된다.
-
-## 아직 적지 않은 것
-
-어느 시나리오도 호출하지 않는 어댑터 호출이다. 실행 결과가 이 목록을 함께 출력한다.
-
-없다. 어댑터 호출 14개 전부에 시나리오가 있다.
-
-`batch_load_fields`는 모든 어댑터가 물려받는 공용 메서드이지 이 엔티티의 호출이 아니다. 실행 결과가
-함께 세지만 적을 것이 없다.

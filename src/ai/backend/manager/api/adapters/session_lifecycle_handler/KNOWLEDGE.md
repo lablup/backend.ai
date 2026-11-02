@@ -1,7 +1,7 @@
 ---
 name: session-lifecycle-handler-adapter-scenarios
 type: reference
-description: what the session lifecycle handler adapter guarantees, as scenarios; lists every lifecycle handler registered on the schedule coordinator with the name and description the handler defines, no permission check of its own
+description: what the session lifecycle handler adapter guarantees: the single list call, the handlers registered on the schedule coordinator with the name and description each handler defines, and no permission check of its own
 scope: src/ai/backend/manager/api/adapters/session_lifecycle_handler
 keywords: [session lifecycle handler, scenario, adapter, handler options, schedule coordinator]
 generated:
@@ -29,8 +29,3 @@ status: draft
 그래서 권한이 있는 경우와 없는 경우의 짝을 이 문서에 두지 않는다.
 
 ## 목록 조회
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 등록된 처리기를 반환한다 | 코디네이터에 세션 종료 처리기가 등록되어 있다 | 목록 조회 | 세션 종료 처리기 하나가 반환된다. 이름과 설명은 그 처리기가 정한 값이다 |
-| 등록된 처리기가 없으면 빈 목록을 반환한다 | 코디네이터에 등록된 처리기가 없다 | 목록 조회 | 빈 목록이 반환된다 |

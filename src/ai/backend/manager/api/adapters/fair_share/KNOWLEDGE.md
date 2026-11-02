@@ -1,7 +1,7 @@
 ---
 name: fair-share-adapter-scenarios
 type: reference
-description: what the fair share adapter guarantees, as scenarios; the tests in tests/scenario/bai_scenario/manager/fair_share match these one for one
+description: "what the fair share adapter guarantees: the global authorization check on weight writes and the single transaction of bulk upsert"
 scope: src/ai/backend/manager/api/adapters/fair_share
 keywords: [fair share, weight, upsert, atomic bulk, scenario, adapter, rbac]
 generated:
@@ -21,23 +21,6 @@ fair share 기록은 리소스 그룹과 도메인, 프로젝트, 사용자 중 
 
 ## 가중치 하나 정하기
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 그룹 안 도메인의 가중치를 정한다 | 리소스 그룹 하나와 도메인 하나 | 가중치 정하기 | 그 가중치를 실은 기록. 나머지 설정은 그룹 기본값 |
-| 그 그룹의 수정 권한을 받은 사용자가 정하려 한다 | 같은 그룹과 도메인, 그룹에 앉힌 역할로 수정 권한 | 가중치 정하기 | 권한 부족으로 거부 |
-| 아무 권한도 받지 않은 사용자가 정하려 한다 | 같은 그룹과 도메인 | 가중치 정하기 | 권한 부족으로 거부 |
-
 ## 가중치 여럿 한 번에 정하기
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 도메인 둘의 가중치를 한 번에 정한다 | 리소스 그룹 하나와 도메인 둘 | 둘의 가중치 정하기 | 정한 개수 둘 |
-| 그 그룹의 수정 권한을 받은 사용자가 한 번에 정하려 한다 | 같은 그룹과 도메인 둘, 그룹에 앉힌 역할로 수정 권한 | 둘의 가중치 정하기 | 권한 부족으로 거부 |
-| 아무 권한도 받지 않은 사용자가 한 번에 정하려 한다 | 같은 그룹과 도메인 둘 | 둘의 가중치 정하기 | 권한 부족으로 거부 |
-
 여럿 정하기는 한 트랜잭션이다. 항목마다 따로 답하지 않고, 실패하면 호출 전체가 거부된다.
-
-## 아직 적지 않은 것
-
-- 프로젝트와 사용자의 가중치 정하기, 여럿 정하기. 도메인과 같은 그룹 권한 검사를 지난다.
-- 기록 하나 읽기, 전체 검색, 리소스 그룹 범위 검색 (도메인, 프로젝트, 사용자 모두).

@@ -1,7 +1,7 @@
 ---
 name: runtime-variant-adapter-scenarios
 type: reference
-description: what the runtime variant adapter guarantees, as scenarios; the superadmin role on create, the entity gate nobody but a superadmin passes on update and purge, the reads answered in the public scope, the partial bulk update and purge that answer per id
+description: what the runtime variant adapter guarantees; the superadmin role on create, the entity gate nobody but a superadmin passes on update and purge, the reads answered in the public scope, the partial bulk update and purge that answer per id
 scope: src/ai/backend/manager/api/adapters/runtime_variant
 keywords: [runtime variant, scenario, adapter, superadmin, public read, lookup, bulk delete, partial bulk update, partial bulk purge]
 generated:
@@ -28,14 +28,6 @@ status: draft
 
 ## 생성
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 이름만 지정해 생성한다 | `runtime_variant` 없음, 슈퍼관리자 | 이름만 지정해 생성 | 설명은 비어 있고, `reads_vfolder_config_files` 값은 false이며, `default_model_definition` 필드는 코드가 정해 둔 기본값인 노드 |
-| 이름과 설명을 함께 지정해 생성한다 | `runtime_variant` 없음, 슈퍼관리자 | 이름과 설명으로 생성 | 지정한 값이 그대로 담긴 노드 |
-| 이미 사용 중인 이름으로 생성한다 | 그 이름의 `runtime_variant` 행 있음, 슈퍼관리자 | 생성 | 이름 중복으로 거부 |
-| 슈퍼관리자가 아닌 사용자가 생성한다 | 슈퍼관리자 아님 | 생성 | 역할 부족으로 거부 |
-| 권한 검사를 꺼도 슈퍼관리자가 아니면 생성할 수 없다 | 권한 검사 비활성화, 슈퍼관리자 아님 | 생성 | 역할 부족으로 거부 |
-
 `default_model_definition` 필드와 `reads_vfolder_config_files` 값은 요청으로 정할 수 없다. 생성이
 값을 고정하고, 어느 호출도 그 둘을 바꾸지 않는다. 생성 시점의 값이 그대로 유지되므로
 "슈퍼관리자가 이름만 지정해 생성한다" 시나리오가 둘을 함께 검사한다.
@@ -44,15 +36,6 @@ status: draft
 어댑터가 보장하는 것이 아니다.
 
 ## 조회
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| public 에서 읽는 사용자가 id로 조회한다 | `runtime_variant` 하나, public 조회 권한만 있음 | id로 조회 | 그 `runtime_variant` 노드 전체 |
-| 존재하지 않는 id로 조회한다 | 다른 `runtime_variant` 행만 있음 | id로 조회 | 권한 부족으로 거부 |
-| 이름으로 id를 얻는다 | `runtime_variant` 하나, public 조회 권한만 있음 | 이름을 id로 변환 | 그 `runtime_variant` 행의 id |
-| 존재하지 않는 이름을 변환한다 | 다른 `runtime_variant` 행만 있음 | 이름을 id로 변환 | 잘못된 요청으로 거부 |
-| 있는 것과 없는 것을 섞어 조회한다 | `runtime_variant` 둘, public 조회 권한만 있음 | 세 id를 한 번에 | 요청한 순서대로 반환되고, 없는 id에 해당하는 항목에는 거부가 담긴다 |
-| 빈 목록을 준다 | `runtime_variant` 하나 | 빈 id 목록 | 빈 응답. 하위 계층을 호출하지 않는다 |
 
 조회는 public 에서 READ 를 검사한다. public 조회 권한만 받은 사용자가 성공하는 시나리오가 그것을
 증명한다. 같은 사용자가 조회는 할 수 있고 생성은 할 수 없다. 그에 대응하는 거부 시나리오는 생성
@@ -66,31 +49,9 @@ status: draft
 
 ## 검색
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 아무 권한도 없는 사용자가 검색한다 | `runtime_variant` 둘, 아무 권한도 없음 | 전체 조회 | 둘 다 반환된다 |
-| 이름 필터로 검색한다 | 이름이 다른 `runtime_variant` 여럿 | 이름 필터 조회 | 그 이름의 `runtime_variant` 노드만 반환된다 |
-| 페이지 크기를 생략한다 | `runtime_variant` 11개 | 크기 없이 조회 | 10건까지 반환되고 다음 페이지가 있다고 응답한다 |
-
 ## 수정
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 이름만 바꾼다 | 설명이 있는 `runtime_variant` 하나, 슈퍼관리자 | 이름 수정 | 이름은 새 값, 설명은 그대로 |
-| 설명을 지운다 | 설명이 있는 `runtime_variant`, 슈퍼관리자 | 설명을 비우는 수정 | 설명이 없어진다 |
-| 값을 하나도 지정하지 않는다 | `runtime_variant` 하나, 슈퍼관리자 | 빈 수정 | 아무것도 바뀌지 않은 노드 |
-| 이미 사용 중인 이름으로 바꾼다 | `runtime_variant` 둘, 슈퍼관리자 | 한쪽 이름을 다른 쪽 이름으로 수정 | 이름 중복으로 거부 |
-| 존재하지 않는 id를 수정한다 | 다른 `runtime_variant` 행만 있음, 슈퍼관리자 | 이름 수정 | 대상을 찾을 수 없어 거부 |
-| 아무 권한도 없는 사용자가 수정한다 | 같은 `runtime_variant`, 아무 권한도 없음 | 이름 수정 | 권한 부족으로 거부 |
-| 아무 권한도 없는 사용자가 없는 id를 수정한다 | 다른 `runtime_variant` 행만 있음, 아무 권한도 없음 | 이름 수정 | 권한 부족으로 거부 |
-| 권한 검사를 끄면 권한 없이도 수정된다 | 권한 검사 비활성화, 아무 권한도 없음 | 이름 수정 | 이름이 새 값인 노드 |
-
 ## 여럿 수정하기
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 여럿의 설명을 한 번에 바꾼다 | `runtime_variant` 둘, 슈퍼관리자 | 둘의 설명 수정 | 둘 다 새 설명으로 오고 실패한 것은 없음 |
-| 아무 권한도 없는 사용자가 여럿을 수정한다 | 같은 `runtime_variant` 둘, 아무 권한도 없음 | 둘의 설명 수정 | 수정된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
 
 설명은 세 가지(생략·비우기·값 지정)를 받고 이름은 생략과 값 지정 둘뿐이다. 그래서 비우는
 시나리오는 설명에만 둔다.
@@ -103,18 +64,6 @@ status: draft
 수정은 저장소의 제약 위반을 그대로 전파한다. 시나리오를 적기 전에 하나로 맞출 것인지 정한다.
 
 ## purge
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 삭제한다 | `runtime_variant` 하나, 슈퍼관리자 | 삭제 | 삭제한 id를 담은 응답 |
-| 존재하지 않는 id를 삭제한다 | 다른 `runtime_variant` 행만 있음, 슈퍼관리자 | 삭제 | 대상을 찾을 수 없어 거부 |
-| 아무 권한도 없는 사용자가 삭제한다 | 같은 `runtime_variant`, 아무 권한도 없음 | 삭제 | 권한 부족으로 거부 |
-| 권한 검사를 끄면 권한 없이도 삭제된다 | 권한 검사 비활성화, 아무 권한도 없음 | 삭제 | 삭제한 id를 담은 응답 |
-| 여럿을 한 번에 삭제한다 | `runtime_variant` 둘, 슈퍼관리자 | 두 id를 한 번에 | 둘 다 삭제된 목록에 담기고 실패 목록은 비어 있다 |
-| 없는 id가 섞인 목록을 삭제한다 | `runtime_variant` 하나, 슈퍼관리자 | 있는 id 뒤에 없는 id를 붙여 한 번에 | 있는 것은 삭제된 목록에, 없는 id는 실패 목록에 담긴다 |
-| 아무 권한도 없는 사용자가 여럿을 삭제한다 | `runtime_variant` 둘, 아무 권한도 없음 | 두 id를 한 번에 | 둘 다 실패 목록에 담기고 아무것도 삭제되지 않는다 |
-| 여럿과 없는 id 하나를 한 번에 purge 한다 | `runtime_variant` 둘, 슈퍼관리자 | 세 id를 한 번에 | 둘은 purge 되기 전 노드로 처리된 목록에 오고, 없는 id 는 실패 목록에 옴 |
-| 아무 권한도 없는 사용자가 여럿을 purge 한다 | `runtime_variant` 둘, 아무 권한도 없음 | 두 id를 한 번에 | purge 된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
 
 단건 purge 와 여럿 purge 는 `purge`, `partial_bulk_purge` 다. 옛 일괄 삭제(`bulk_delete`)는 같은
 processor 를 부르고 id 목록과 삭제 수로 답한다. 표의 여럿을 삭제하는 행 셋이 그 길이다.
@@ -130,11 +79,3 @@ preset과 함께 지워지므로, 하나가 실패해도 나머지는 삭제된 
 마이그레이션과 같은 외래 키를 갖게 되면(BA-7931) 주석을 해제한다.
 
 이 어댑터에는 soft delete가 없다. 삭제하면 행이 사라지고 되살리는 호출도 없다.
-
-## 아직 적지 않은 것
-
-없다. 어댑터가 제공하는 `create`, `get`, `resolve_by_name`, `batch_load_by_ids`, `search`,
-`update`, `partial_bulk_update`, `purge`, `partial_bulk_purge`, `bulk_delete`가 모두 위에 있다.
-
-`batch_load_fields`는 모든 어댑터가 물려받는 공용 헬퍼이지 이 엔티티의 호출이 아니다. 리포트에서는
-함께 세지만 시나리오로 적을 것은 없다.
