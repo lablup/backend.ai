@@ -9,59 +9,47 @@ generated:
   at: 2026-09-14
 status: draft
 ---
-# app_config_definition 어댑터의 현재 계약
+# app_config_definition adapter: current contract
 
-`app_config_definition` 엔티티에는 사용할 수 있는 `config_name` 값을 등록한다. 실제 설정 값은
-`app_config_fragment` 행에, 스코프별 허용 범위는 `app_config_allow_list` 항목에 저장된다.
+An `app_config_definition` entity registers a usable `config_name` value. The actual config values are stored in `app_config_fragment` rows, and the per-scope allowance in `app_config_allow_list` entries.
 
-- `definition` 엔티티는 도메인·프로젝트·사용자 스코프 중 어디에도 자동으로 속하지 않는다.
-- 생성과 전체 검색은 호출자가 슈퍼관리자인지 검사한다.
-- 개별 조회, 배치 조회, 완전 삭제는 대상 `definition` 엔티티에 대한 권한을 검사한다.
-- 현재 기본 역할이 부여되는 스코프와 `definition` 사이에 소유 관계가 없으므로,
-  일반 사용자는 개별 엔티티 권한 검사도 통과하지 못한다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-`definition` 하나를 만들 때 RBAC 노드 자체는 생성된다. 따라서 “`definition` 엔티티는 RBAC 엔티티가
-아니다”가 아니라 “현재 도메인·프로젝트·사용자 소유 관계에 연결되지 않는다”가 정확한 설명이다.
+- A `definition` entity belongs to no domain, project or user scope automatically.
+- Create and the unscoped search check whether the caller is superadmin.
+- Get, batch get and purge check the permission on the target `definition` entity.
+- The scopes that receive a default role own no `definition` today, so a regular user fails the single-entity permission check too.
 
-## 등록은 슈퍼관리자에게만 열려 있다
+Creating one `definition` creates the RBAC node itself. The accurate statement is therefore not that a `definition` entity is not an RBAC entity, but that it is not attached to a domain, project or user ownership relation today.
 
-이름이 중복되면 데이터베이스 제약 위반으로 거부된다. 이를 전용 오류로 변환하는 계약은 아직 없다.
-빈 이름과 128자를 넘는 이름은 요청 DTO가 거부하므로 어댑터 시나리오에서 다루지 않는다.
+## Registration is open to superadmin only
 
-## 개별 조회는 엔티티 읽기 권한을 검사한다
+A duplicate name is rejected by a database constraint violation. No contract converts it to a dedicated error yet. The request DTO rejects an empty name and a name longer than 128 characters, so the adapter scenarios do not cover them.
 
-권한 검사가 데이터 조회보다 먼저 실행된다. 따라서 권한이 없는 사용자가 존재하지 않는 ID를
-요청하면, 대상을 찾을 수 없어 거부되는 것이 아니라 권한 부족으로 거부된다.
+## Get checks the entity read permission
 
-## 배치 조회는 입력 위치마다 결과를 반환한다
+The permission check runs before the data read. A user without permission who requests a non-existent ID is therefore rejected for insufficient permission, not for a missing target.
 
-한 ID가 권한 검사에 실패해도 배치 전체가 중단되지는 않는다. 존재하지 않는 ID 위치에 `None`이
-반환되는지 권한 부족으로 거부되는지는 그 ID의 권한 검사를 먼저 통과했는지에 따라 달라진다.
+## Batch get returns a result per input position
 
-## 전체 검색은 슈퍼관리자에게만 열려 있다
+A failed permission check on one ID does not stop the whole batch. Whether `None` is returned for a non-existent ID or the request is rejected for insufficient permission depends on whether the permission check for that ID passed first.
 
-필터·정렬·페이지네이션은 검색 공통 계약이므로 이 어댑터의 시나리오로는 검증하지 않는다.
+## The unscoped search is open to superadmin only
 
-## 완전 삭제는 `definition` 행과 RBAC 노드를 제거한다
+Filter, sort and pagination are the common search contract, so a scenario of this adapter does not verify them.
 
-`definition` 행을 삭제하면 외래 키 연쇄 삭제로 같은 이름의 `allow_list` 항목과 `fragment` 행도
-삭제된다. `definition` 자체의 RBAC 노드는 완전 삭제 과정에서 함께 삭제된다. soft delete와 복원
-호출은 없다.
+## Purge deletes the `definition` row and the RBAC node
 
-현재 완전 삭제 과정은 데이터베이스가 연쇄 삭제한 `allow_list` 항목과 `fragment` 행의 RBAC 노드까지는
-삭제하지 않는다. 남은 RBAC 노드는 보장할 동작이 아니라 별도 수정이 필요한 한계다. 시나리오는
-어댑터 응답을 검증하며, 연쇄 삭제된 행과 남은 RBAC 노드는 직접 조회하지 않는다.
+Deleting a `definition` row also deletes the `allow_list` entry and the `fragment` rows of the same name by foreign key cascade. The RBAC node of the `definition` itself is deleted during purge. There is no delete or restore call.
 
-## 여럿 완전 삭제하기
+The current purge does not delete the RBAC nodes of the `allow_list` entry and `fragment` rows deleted by the database cascade. A remaining RBAC node is a limitation that needs a separate fix, not guaranteed behavior. Scenarios verify the adapter response and do not read the cascaded rows or the remaining RBAC node directly.
 
-여럿 연산은 호출 전체를 거부하지 않는다. 처리한 `definition`은 처리된 목록에, 처리하지 못한 것은 ID와
-이유를 실패 목록에 싣는다. 여럿 완전 삭제는 `definition`마다 `allow_list` 항목과 `fragment` 행을 먼저
-지우고 각자의 savepoint 안에서 처리한다.
+## Purging several
 
-## 이름
+A bulk operation does not reject the whole call. Processed `definition` rows go into the processed list, and the failure list contains the ID and the reason of each failed item. Bulk purge deletes the `allow_list` entry and the `fragment` rows of each `definition` first and processes each `definition` inside its own savepoint.
 
-단건 완전 삭제는 `purge`이고 엔티티 권한 검사만 한다. 옛 `admin_purge` GQL mutation은 deprecated이고,
-같은 호출로 이어지되 슈퍼관리자 검사를 그대로 둔다. REST `DELETE /v2/app-config-definitions/{id}`는
-경로가 같아 새 이름의 동작으로 바뀌었다.
+## Names
 
-병합된 설정 조회 계약은 [app_config 어댑터](../app_config/KNOWLEDGE.md)가 다룬다.
+Purge of one `definition` is `purge` and applies only the entity permission check. The old `admin_purge` GQL mutation is deprecated; it leads to the same call and keeps the superadmin check. The REST `DELETE /v2/app-config-definitions/{id}` keeps its path and was changed to the behavior of the new name.
+
+The merged config read contract is in the [app_config adapter](../app_config/KNOWLEDGE.md).
