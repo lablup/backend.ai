@@ -68,13 +68,9 @@ def deployment_handler_options_from_input(
     *,
     valid_handler_names: frozenset[str],
 ) -> DeploymentHandlerOptions:
-    """Validate and project the handler options of an incoming API payload
-    into the domain model.
+    """Project the handler options of the payload into the domain model.
 
-    ``valid_handler_names`` is the runtime set of handlers registered on
-    the deployment coordinator; any ``by_handler`` key outside this set
-    is rejected as :class:`InvalidAPIParameters`. Duplicate keys are
-    likewise rejected.
+    Rejects a duplicate or unregistered ``handler_name`` with :class:`InvalidAPIParameters`.
     """
     by_handler: dict[str, HandlerOptions] = {}
     for entry in options.handler_options.by_handler:
