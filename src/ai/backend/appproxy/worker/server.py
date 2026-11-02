@@ -610,7 +610,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     }
     served_wildcard_domain = proxy_worker_config.served_wildcard_domain()
     if served_wildcard_domain is not None:
-        service_discovery_labels[WORKER_WILDCARD_DOMAIN_LABEL] = served_wildcard_domain.domain
+        service_discovery_labels[WORKER_WILDCARD_DOMAIN_LABEL] = served_wildcard_domain
     sd_loop = ServiceDiscoveryLoop(
         sd_type,
         service_discovery,

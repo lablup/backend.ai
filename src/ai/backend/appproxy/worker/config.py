@@ -5,7 +5,6 @@ import os
 import socket
 import sys
 import textwrap
-from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from pprint import pformat
@@ -25,7 +24,7 @@ from ai.backend.appproxy.common.config import (
     SecretConfig,
     UserIDValidator,
 )
-from ai.backend.appproxy.common.errors import ConfigValidationError, ServerMisconfiguredError
+from ai.backend.appproxy.common.errors import ConfigValidationError
 from ai.backend.appproxy.common.types import (
     AppMode,
     EventLoopType,
@@ -68,12 +67,6 @@ def _get_default_gid() -> int:
     if not server_file.exists():
         raise ConfigValidationError(f"server.py not found at {server_file}")
     return server_file.stat().st_gid
-
-
-@dataclass(frozen=True)
-class ServedWildcardDomain:
-    domain: str
-    traffic_port: int
 
 
 class AppFilterConfig(BaseSchema):
@@ -1004,34 +997,24 @@ class ProxyWorkerConfig(BaseSchema):
                     raise ValueError("http2 config must be set when protocol = 'h2'")
         return self
 
-    def served_wildcard_domain(self) -> ServedWildcardDomain | None:
+    def served_wildcard_domain(self) -> str | None:
         match self.frontend_mode:
             case FrontendServerMode.PORT:
                 return None
             case FrontendServerMode.WILDCARD_DOMAIN:
                 if self.wildcard_domain is None:
-                    raise ServerMisconfiguredError("worker:proxy-worker.wildcard-domain")
-                return ServedWildcardDomain(
-                    domain=self.wildcard_domain.domain,
-                    traffic_port=(
-                        self.wildcard_domain.advertised_port or self.wildcard_domain.bind_addr.port
-                    ),
-                )
+                    return None
+                return self.wildcard_domain.domain
             case FrontendServerMode.TRAEFIK:
                 if self.traefik is None:
-                    raise ServerMisconfiguredError("worker:proxy-worker.traefik")
+                    return None
                 match self.traefik.frontend_mode:
                     case FrontendMode.PORT:
                         return None
                     case FrontendMode.WILDCARD_DOMAIN:
                         if self.traefik.wildcard_domain is None:
-                            raise ServerMisconfiguredError(
-                                "worker:proxy-worker.traefik.wildcard-domain"
-                            )
-                        return ServedWildcardDomain(
-                            domain=self.traefik.wildcard_domain.domain,
-                            traffic_port=self.traefik.wildcard_domain.advertised_port,
-                        )
+                            return None
+                        return self.traefik.wildcard_domain.domain
 
 
 class ServerConfig(BaseSchema):
