@@ -4,12 +4,16 @@ import asyncio
 import logging
 import signal
 import uuid
-from collections.abc import Mapping, MutableMapping, Sequence
+from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from decimal import Decimal
+from functools import partial
+from importlib.resources import files
+from io import StringIO
 from pathlib import Path
 from typing import Any, Final, cast, override
 
 import aiodocker
+import aiofiles
 
 from ai.backend.agent.agent import (
     ACTIVE_STATUS_SET,
@@ -32,8 +36,20 @@ from ai.backend.agent.containerd.lifecycle import (
     destroy_container,
     launch_container,
 )
+from ai.backend.agent.containerd.mounts import host_system_mounts, to_bind_mounts
 from ai.backend.agent.containerd.network import KernelNetwork
+from ai.backend.agent.containerd.scratch import (
+    CONFIG_DIR_LABEL,
+    Owner,
+    ScratchDirs,
+    create_scratch,
+    remove_scratch,
+    write_config_files,
+    write_dotfiles,
+    write_hosts_file,
+)
 from ai.backend.agent.containerd.spec import (
+    BindMount,
     SpecInput,
     build_base_spec,
     build_launch_spec,
@@ -53,8 +69,9 @@ from ai.backend.agent.resources import (
 )
 from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo
 from ai.backend.agent.utils import get_arch_name
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cgroup import CgroupController
-from ai.backend.common.docker import ImageRef, LabelName
+from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
@@ -84,6 +101,25 @@ from ai.backend.logging.structured import StructuredLogger
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
+async def _run_scratch_work[**P, T](func: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
+    """Run blocking scratch work in the executor; a cancel waits until the thread has finished.
+
+    Otherwise the thread could recreate the scratch dir after its removal.
+    """
+    work = asyncio.ensure_future(run_in_executor_with_context(None, partial(func, *args, **kwargs)))
+    try:
+        return await asyncio.shield(work)
+    except asyncio.CancelledError:
+        while not work.done():
+            try:
+                await asyncio.wait({work})
+            except asyncio.CancelledError:
+                pass
+        raise
+
+
+_LOG_COLLECT_TIMEOUT_SEC: Final = 60.0
+_LOG_CHUNK_BYTES: Final = 64 * 1024
 _CONTAINER_STATUS: Final[Mapping[TaskState, ContainerStatus]] = {
     TaskState.CREATED: ContainerStatus.CREATED,
     TaskState.RUNNING: ContainerStatus.RUNNING,
@@ -121,6 +157,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _client: ContainerdAPI
     _network: KernelNetwork
     _resource_lock: asyncio.Lock
+    _dirs: ScratchDirs
+    _bind_mounts: list[BindMount]
     _base_spec: dict[str, Any]
 
     def __init__(
@@ -151,7 +189,23 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         self._client = client
         self._network = network
         self._resource_lock = resource_lock
+        self._dirs = ScratchDirs.for_kernel(
+            local_config.container.scratch_root, str(ownership_data.kernel_id)
+        )
+        self._bind_mounts = []
         self._base_spec = {}
+
+    def _owner(self) -> Owner | None:
+        """Who owns the files in the work dir, as the Docker agent decides it."""
+        container = self.local_config.container
+        uid_match = KernelFeatures.UID_MATCH in self.kernel_features
+        ouid, ogid = self.get_overriding_uid(), self.get_overriding_gid()
+        if ouid is None and ogid is None:
+            return Owner(container.kernel_uid, container.kernel_gid) if uid_match else None
+        return Owner(
+            ouid if ouid is not None or not uid_match else container.kernel_uid,
+            ogid if ogid is not None or not uid_match else container.kernel_gid,
+        )
 
     @override
     async def get_extra_envs(self) -> Mapping[str, str]:
@@ -186,14 +240,36 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         resource_opts = self.kernel_config.get("resource_opts", {})
         return resource_spec, resource_opts
 
-    # No scratch directory: the kernel sees only its image rootfs.
+    # FIXME(containerd-mvp): scratch is always a host directory, whatever container.scratch-type
+    # says (memory and hostfile are not implemented)
     @override
     async def prepare_scratch(self) -> None:
-        return None
+        await _run_scratch_work(
+            create_scratch,
+            self._dirs,
+            self._owner(),
+            clone_dotfiles=not self.restarting,
+        )
 
+    # Not mirrored from the Docker agent: the agent socket, domain-socket proxies, extra
+    # Docker volumes and the memory-scratch /tmp.
     @override
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
-        return []
+        mounts = [
+            Mount(
+                MountTypes.BIND, self._dirs.config, Path("/home/config"), MountPermission.READ_ONLY
+            ),
+            Mount(MountTypes.BIND, self._dirs.work, Path("/home/work"), MountPermission.READ_WRITE),
+            *host_system_mounts(self._dirs.hosts),
+        ]
+        coredump = self.local_config.debug.coredump
+        if coredump.enabled:
+            mounts.append(
+                Mount(
+                    MountTypes.BIND, coredump.path, coredump.core_path, MountPermission.READ_WRITE
+                )
+            )
+        return mounts
 
     @property
     @override
@@ -216,11 +292,9 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
         return None
 
-    # Nothing is mounted into the kernel; requested mounts (vfolders) are refused, not dropped.
     @override
     async def process_mounts(self, mounts: Sequence[Mount]) -> None:
-        if mounts:
-            raise KernelVerbNotSupported(f"mounts ({', '.join(str(m.target) for m in mounts)})")
+        self._bind_mounts = to_bind_mounts(mounts)
 
     # cpu and mem return no Docker container fragment and are applied through the spec
     # resources; a plugin that needs one (devices, env) is refused.
@@ -230,17 +304,15 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> None:
-        if await computer.generate_docker_args(_NO_DOCKER, device_alloc):
-            raise KernelVerbNotSupported(f"container arguments of {computer.key}")
-
-    # No kernel runner: the image's own command runs, so no runner or plugin files are mounted.
-    @override
-    async def mount_krunner(
-        self,
-        resource_spec: KernelResourceSpec,
-        environ: MutableMapping[str, str],
-    ) -> None:
-        return None
+        try:
+            if await computer.generate_docker_args(_NO_DOCKER, device_alloc):
+                raise KernelVerbNotSupported(f"container arguments of {computer.key}")
+        except BaseException:
+            # The kernel is not registered yet, so no clean_kernel removes its scratch dir.
+            await run_in_executor_with_context(
+                None, remove_scratch, self.local_config.container.scratch_root, str(self.kernel_id)
+            )
+            raise
 
     @override
     async def generate_accelerator_mounts(
@@ -248,11 +320,15 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> list[MountInfo]:
-        raise KernelVerbNotSupported("generate_accelerator_mounts")
+        src_path = self._dirs.config / str(computer.key)
+        await run_in_executor_with_context(
+            None, partial(src_path.mkdir, parents=True, exist_ok=True)
+        )
+        return await computer.generate_mounts(src_path, device_alloc)
 
     @override
     def resolve_krunner_filepath(self, filename: str) -> Path:
-        raise KernelVerbNotSupported("resolve_krunner_filepath")
+        return Path(str(files("ai.backend.runner").joinpath("../" + filename))).resolve()
 
     @override
     def get_runner_mount(
@@ -263,7 +339,13 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         perm: MountPermission = MountPermission.READ_ONLY,
         opts: Mapping[str, Any] | None = None,
     ) -> Mount:
-        raise KernelVerbNotSupported("get_runner_mount")
+        return Mount(
+            type,
+            Path(src),
+            Path(target),
+            MountPermission(perm),
+            opts=opts,
+        )
 
     @override
     async def prepare_container(
@@ -273,6 +355,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         service_ports: list[ServicePort],
         cluster_info: ClusterInfo,
     ) -> ContainerdKernel:
+        await self._write_config_files(resource_spec, environ)
         extra_caps = (
             ("CAP_SYS_PTRACE",)
             if self.local_config.container.sandbox_type == ContainerSandboxType.JAIL
@@ -283,6 +366,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         mems = resource_spec.allocations.get(DeviceName("mem"), {}).get(SlotName("mem"), {})
         self._base_spec = build_base_spec(
             SpecInput(
+                cwd="/home/work",
                 hostname=self.kernel_config["cluster_hostname"],
                 cpu_cores=sorted(int(core) for core in cpus),
                 memory_bytes=int(sum(mems.values())),
@@ -309,6 +393,30 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             data={},
         )
 
+    async def _write_config_files(
+        self, resource_spec: KernelResourceSpec, environ: Mapping[str, str]
+    ) -> None:
+        resource_lines = StringIO()
+        resource_spec.write_to_file(resource_lines)
+        for dev_type, device_alloc in resource_spec.allocations.items():
+            plugin = self.computers[dev_type].instance
+            for k, v in (await plugin.generate_resource_data(device_alloc)).items():
+                resource_lines.write(f"{k}={v}\n")
+        owner = self._owner()
+
+        def _write() -> None:
+            write_config_files(
+                self._dirs,
+                environ="".join(f"{k}={v}\n" for k, v in environ.items()),
+                resource=resource_lines.getvalue(),
+                bootstrap_script=self.kernel_config.get("bootstrap_script"),
+                owner=owner,
+            )
+            write_dotfiles(self._dirs, self.internal_data.get("dotfiles", []), owner)
+            write_hosts_file(self._dirs, self.kernel_config["cluster_hostname"])
+
+        await _run_scratch_work(_write)
+
     async def _teardown_network(self) -> None:
         try:
             await self._network.teardown(self.kernel_id)
@@ -320,8 +428,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             for dev_name, device_alloc in resource_spec.allocations.items():
                 self.computers[dev_name].alloc_map.free(device_alloc)
 
-    # No port is published. No runner either: the task runs the image's own command, so
-    # cmdargs (the runner's arguments) are not used.
+    # No port is published: the REPL and service ports stay inside the kernel netns.
     @override
     async def start_container(
         self,
@@ -337,9 +444,9 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             image = await resolve_image(self._client, image_name, get_arch_name())
             spec = build_launch_spec(
                 self._base_spec,
-                args=[*image.entrypoint, *image.cmd],
+                args=["/opt/kernel/entrypoint.sh", *cmdargs],
                 env=merge_env(image.env, kernel_obj.environ),
-                cwd=image.working_dir or "/",
+                mounts=self._bind_mounts,
                 # cgroupfs form: the native API passes no runc options, so runc uses cgroupfs.
                 cgroups_path=f"/{self._client.namespace}/{container_id}",
             )
@@ -356,10 +463,14 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 runtime=_RUNC_RUNTIME,
                 chain_id=image.chain_id,
                 spec=spec,
+                stdio=f"file://{self._dirs.task_log}",
             )
         except BaseException:
             await self._teardown_network()
             await self._free_allocations(kernel_obj.resource_spec)
+            await run_in_executor_with_context(
+                None, remove_scratch, self.local_config.container.scratch_root, str(self.kernel_id)
+            )
             raise
         return {"container_id": container_id}
 
@@ -374,6 +485,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             LabelName.BLOCK_SERVICE_PORTS: (
                 "1" if self.internal_data.get("block_service_ports", False) else "0"
             ),
+            CONFIG_DIR_LABEL: str(self._dirs.config),
         }
 
 
@@ -563,15 +675,41 @@ class ContainerdAgent(
         container_id: ContainerId | None,
         restarting: bool,
     ) -> None:
-        if container_id is not None and not self.local_config.debug.skip_container_deletion:
-            try:
-                await clean_container(self._client, str(container_id))
-            except BackendAIError:
-                log.exception("container delete failed", container_id=container_id)
+        dirs = ScratchDirs.for_kernel(self.local_config.container.scratch_root, str(kernel_id))
+        if container_id is not None:
+            await self._collect_task_log(kernel_id, container_id, dirs)
+            if not self.local_config.debug.skip_container_deletion:
+                try:
+                    await clean_container(self._client, str(container_id))
+                except BackendAIError:
+                    log.exception("container delete failed", container_id=container_id)
         try:
             await self._network.teardown(kernel_id)
         except BackendAIError:
             log.exception("kernel network teardown failed")
+        if not restarting:
+            await run_in_executor_with_context(
+                None, remove_scratch, self.local_config.container.scratch_root, str(kernel_id)
+            )
+
+    async def _collect_task_log(
+        self, kernel_id: KernelId, container_id: ContainerId, dirs: ScratchDirs
+    ) -> None:
+        async def log_iter() -> AsyncGenerator[bytes]:
+            try:
+                async with aiofiles.open(dirs.task_log, "rb") as fp:
+                    while chunk := await fp.read(_LOG_CHUNK_BYTES):
+                        yield chunk
+            except FileNotFoundError:
+                return
+
+        try:
+            async with asyncio.timeout(_LOG_COLLECT_TIMEOUT_SEC):
+                await self.collect_logs(kernel_id, str(container_id), log_iter())
+        except TimeoutError:
+            log.warning("container log collection timed out", container_id=container_id)
+        except Exception as e:
+            log.warning("container log collection failed", container_id=container_id, exc_info=e)
 
     @override
     async def create_local_network(self, network_name: str) -> None:

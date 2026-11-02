@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Final
 
 from ai.backend.agent.utils import get_safe_ulimit
@@ -97,6 +98,7 @@ _READONLY_PATHS: Final = (
 
 @dataclass(frozen=True)
 class SpecInput:
+    cwd: str
     hostname: str
     cpu_cores: Sequence[int]  # the cpuset; its length is the CPU quota
     memory_bytes: int
@@ -130,7 +132,7 @@ def _resources(inp: SpecInput) -> dict[str, Any]:
 
 
 def build_base_spec(inp: SpecInput) -> dict[str, Any]:
-    """The kernel-independent spec: no process args."""
+    """The kernel-independent spec: no process args, no kernel mounts."""
     caps = [*DEFAULT_CAPABILITIES, *inp.extra_caps]
     mounts: list[dict[str, Any]] = copy.deepcopy(list(_DEFAULT_MOUNTS))
     mounts.insert(
@@ -149,7 +151,7 @@ def build_base_spec(inp: SpecInput) -> dict[str, Any]:
             "user": {"uid": 0, "gid": 0},
             "args": [],
             "env": [],
-            "cwd": "/",
+            "cwd": inp.cwd,
             "capabilities": {
                 "bounding": caps,
                 "effective": caps,
@@ -177,20 +179,38 @@ def build_base_spec(inp: SpecInput) -> dict[str, Any]:
     }
 
 
+@dataclass(frozen=True)
+class BindMount:
+    source: Path
+    target: str
+    read_only: bool
+
+
+def _bind_mount(mount: BindMount) -> dict[str, Any]:
+    return {
+        "destination": mount.target,
+        "type": "bind",
+        "source": str(mount.source),
+        "options": ["rbind", "rprivate", "ro" if mount.read_only else "rw"],
+    }
+
+
 def build_launch_spec(
     base_spec: Mapping[str, Any],
     *,
     args: Sequence[str],
     env: Sequence[str],
-    cwd: str,
+    mounts: Sequence[BindMount],
     cgroups_path: str,
 ) -> dict[str, Any]:
-    """Add the process args, env, working directory and cgroup path."""
+    """Add the process args, env, cgroup path and the kernel mounts."""
     spec = copy.deepcopy(dict(base_spec))
     spec["linux"]["cgroupsPath"] = cgroups_path
     spec["process"]["args"] = list(args)
     spec["process"]["env"] = list(env)
-    spec["process"]["cwd"] = cwd
+    # Shallower destinations first, so a mount is never hidden by one made before its parent.
+    ordered = sorted(mounts, key=lambda m: m.target.rstrip("/").count("/"))
+    spec["mounts"] = [*spec["mounts"], *(_bind_mount(m) for m in ordered)]
     return spec
 
 

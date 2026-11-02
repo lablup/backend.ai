@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 import uuid
+from pathlib import Path
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
@@ -9,7 +11,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from ai.backend.agent.config.unified import ContainerdConfig
-from ai.backend.agent.containerd.agent import ContainerdAgent
+from ai.backend.agent.containerd.agent import ContainerdAgent, _run_scratch_work
 from ai.backend.agent.containerd.client import ContainerRecord, TaskInfo, TaskState
 from ai.backend.agent.containerd.network import KernelNetwork
 from ai.backend.agent.errors.agent import UnsupportedBaseDistroError
@@ -275,41 +277,84 @@ class TestDestroyKernel:
 
 
 class TestCleanKernel:
-    @pytest.fixture(autouse=True)
-    def _delete_containers(self, agent: ContainerdAgent) -> None:
-        cast(MagicMock, agent.local_config).debug.skip_container_deletion = False
+    @pytest.fixture
+    def scratch_root(self, agent: ContainerdAgent, tmp_path: Path) -> Path:
+        config = cast(MagicMock, agent.local_config)
+        config.container.scratch_root = tmp_path
+        config.debug.skip_container_deletion = False
+        return tmp_path
 
-    async def test_works_with_an_empty_kernel_registry(self, agent: ContainerdAgent) -> None:
+    @pytest.fixture
+    def collected(self, agent: ContainerdAgent, monkeypatch: pytest.MonkeyPatch) -> list[bytes]:
+        chunks: list[bytes] = []
+
+        async def collect_logs(kernel_id: KernelId, container_id: str, iterator: Any) -> None:
+            async for chunk in iterator:
+                chunks.append(chunk)
+
+        monkeypatch.setattr(agent, "collect_logs", collect_logs)
+        return chunks
+
+    async def test_works_with_an_empty_kernel_registry(
+        self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
+    ) -> None:
         fake = cast(FakeContainerd, agent._client)
         kid = _add_container(fake, "c1", state=TaskState.RUNNING)
         fake.snapshots["c1"] = []
+        scratch = scratch_root / str(kid)
+        scratch.mkdir()
+        (scratch / "task.log").write_bytes(b"hello\n")
 
         await agent.clean_kernel(kid, ContainerId("c1"), False)
 
         assert fake.containers == {} and fake.tasks == {} and fake.snapshots == {}
+        assert not scratch.exists()
+        assert b"".join(collected) == b"hello\n"
 
-    async def test_unknown_container_is_tolerated(self, agent: ContainerdAgent) -> None:
+    async def test_unknown_container_is_tolerated(
+        self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
+    ) -> None:
         await agent.clean_kernel(KernelId(uuid.uuid4()), ContainerId("absent"), False)
 
-    async def test_without_a_container_id_the_network_is_removed(
-        self, agent: ContainerdAgent, runner: FakeCommandRunner
+    async def test_without_a_container_id_the_network_and_scratch_are_removed(
+        self, agent: ContainerdAgent, scratch_root: Path, runner: FakeCommandRunner
     ) -> None:
         kid = KernelId(uuid.uuid4())
+        (scratch_root / str(kid)).mkdir()
         runner.script(["ip", "netns", "list"], f"bai-{kid}\n")
 
         await agent.clean_kernel(kid, None, False)
 
+        assert not (scratch_root / str(kid)).exists()
         assert cast(FakeContainerd, agent._client).calls == []
         assert ("ip", "netns", "del", f"bai-{kid}") in runner.calls
 
-    async def test_network_teardown_failure_is_logged_not_raised(
-        self, agent: ContainerdAgent, runner: FakeCommandRunner
+    async def test_network_teardown_failure_does_not_stop_the_scratch_removal(
+        self, agent: ContainerdAgent, scratch_root: Path, runner: FakeCommandRunner
     ) -> None:
+        kid = KernelId(uuid.uuid4())
+        (scratch_root / str(kid)).mkdir()
         runner.failing.add(("ip", "netns", "list"))
 
-        await agent.clean_kernel(KernelId(uuid.uuid4()), None, False)
+        await agent.clean_kernel(kid, None, False)
 
-    async def test_debug_flag_keeps_the_container(self, agent: ContainerdAgent) -> None:
+        assert not (scratch_root / str(kid)).exists()
+
+    async def test_restart_keeps_the_scratch(
+        self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        kid = _add_container(fake, "c1", state=TaskState.STOPPED)
+        (scratch_root / str(kid)).mkdir()
+
+        await agent.clean_kernel(kid, ContainerId("c1"), True)
+
+        assert (scratch_root / str(kid)).exists()
+        assert fake.containers == {}
+
+    async def test_debug_flag_keeps_the_container(
+        self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
+    ) -> None:
         cast(MagicMock, agent.local_config).debug.skip_container_deletion = True
         fake = cast(FakeContainerd, agent._client)
         kid = _add_container(fake, "c1", state=TaskState.STOPPED)
@@ -318,12 +363,17 @@ class TestCleanKernel:
 
         assert "c1" in fake.containers
 
-    async def test_containerd_error_is_logged_not_raised(self, agent: ContainerdAgent) -> None:
+    async def test_containerd_error_does_not_stop_the_scratch_removal(
+        self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
+    ) -> None:
         fake = cast(FakeContainerd, agent._client)
         kid = _add_container(fake, "c1", state=TaskState.STOPPED)
         fake.failing.add("delete_container")
+        (scratch_root / str(kid)).mkdir()
 
         await agent.clean_kernel(kid, ContainerId("c1"), False)
+
+        assert not (scratch_root / str(kid)).exists()
 
 
 class TestShutdown:
@@ -377,3 +427,28 @@ class TestAinit:
 
         assert await agent.enumerate_containers() == []
         assert fake.calls == []
+
+
+class TestRunScratchWork:
+    async def test_cancellation_waits_for_the_thread_to_finish(self) -> None:
+        """The scratch work is done before the cancel propagates, so a removal after it holds."""
+        started = threading.Event()
+        release = threading.Event()
+        finished: list[bool] = []
+
+        def work() -> None:
+            started.set()
+            release.wait(5)
+            finished.append(True)
+
+        task = asyncio.create_task(_run_scratch_work(work))
+        await asyncio.get_running_loop().run_in_executor(None, started.wait, 5)
+
+        task.cancel()
+        await asyncio.sleep(0.05)
+        assert not task.done()
+        release.set()
+
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert finished == [True]

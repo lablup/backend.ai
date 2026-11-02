@@ -13,6 +13,7 @@ from ai.backend.agent.containerd.agent import ContainerdKernelCreationContext
 from ai.backend.agent.containerd.client import MountSpec
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.network import KernelNetwork
+from ai.backend.agent.containerd.scratch import CONFIG_DIR_LABEL
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.containerd import (
     ContainerdImageNotFound,
@@ -20,8 +21,8 @@ from ai.backend.agent.errors.containerd import (
     KernelNetworkSetupFailed,
     KernelVerbNotSupported,
 )
-from ai.backend.agent.resources import ComputerContext, KernelResourceSpec, Mount
-from ai.backend.agent.types import KernelOwnershipData
+from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
+from ai.backend.agent.types import KernelOwnershipData, MountInfo
 from ai.backend.common.types import (
     DeviceId,
     DeviceName,
@@ -36,9 +37,13 @@ from ai.backend.common.types import (
 from .fakes import FakeCommandRunner, FakeContainerd
 
 
-def _local_config() -> MagicMock:
+def _local_config(scratch_root: Path) -> MagicMock:
     config = MagicMock()
+    config.container.scratch_root = scratch_root
+    config.container.kernel_uid = 1000
+    config.container.kernel_gid = 1000
     config.container.sandbox_type = "docker"
+    config.debug.coredump.enabled = False
     return config
 
 
@@ -46,6 +51,7 @@ def _make_context(
     ownership_data: KernelOwnershipData,
     kernel_config: KernelCreationConfig,
     *,
+    scratch_root: Path,
     client: FakeContainerd | None = None,
     computers: dict[DeviceName, ComputerContext] | None = None,
     runner: FakeCommandRunner | None = None,
@@ -57,7 +63,7 @@ def _make_context(
         MagicMock(),
         kernel_config,
         "ubuntu22.04",
-        _local_config(),
+        _local_config(scratch_root),
         computers or {},
         client=client or FakeContainerd(),
         network=network or KernelNetwork(run=runner or FakeCommandRunner()),
@@ -65,9 +71,12 @@ def _make_context(
     )
 
 
-def _accelerator_plugin(key: str, fragment: Mapping[str, Any]) -> MagicMock:
+def _accelerator_plugin(
+    key: str, fragment: Mapping[str, Any], mounts: Sequence[MountInfo] = ()
+) -> MagicMock:
     plugin = MagicMock(key=DeviceName(key))
     plugin.generate_docker_args = AsyncMock(return_value=fragment)
+    plugin.generate_mounts = AsyncMock(return_value=list(mounts))
     return plugin
 
 
@@ -107,6 +116,7 @@ def launch_kernel_config(kernel_config: KernelCreationConfig) -> KernelCreationC
 class TestPrepareContainer:
     async def test_base_spec_carries_the_kernel_resources(
         self,
+        tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
         resource_spec: KernelResourceSpec,
@@ -115,8 +125,10 @@ class TestPrepareContainer:
         ctx = _make_context(
             ownership_data,
             launch_kernel_config,
+            scratch_root=tmp_path,
             computers=computers,
         )
+        await ctx.prepare_scratch()
 
         kernel = await ctx.prepare_container(resource_spec, {"A": "1"}, [], MagicMock())
 
@@ -130,8 +142,31 @@ class TestPrepareContainer:
             "path": f"/run/netns/bai-{ownership_data.kernel_id}",
         }
 
+    async def test_config_files_are_written_for_the_kernel_runner(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        launch_kernel_config: KernelCreationConfig,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+    ) -> None:
+        ctx = _make_context(
+            ownership_data,
+            launch_kernel_config,
+            scratch_root=tmp_path,
+            computers=computers,
+        )
+        await ctx.prepare_scratch()
+
+        await ctx.prepare_container(resource_spec, {"A": "1", "B": "2"}, [], MagicMock())
+
+        config_dir = tmp_path / str(ownership_data.kernel_id) / "config"
+        assert (config_dir / "environ.txt").read_text() == "A=1\nB=2\n"
+        assert "CPU_SHARES=1:1,3:1" in (config_dir / "resource.txt").read_text()
+
     async def test_setup_failing_part_way_removes_the_netns(
         self,
+        tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
         resource_spec: KernelResourceSpec,
@@ -144,9 +179,11 @@ class TestPrepareContainer:
         ctx = _make_context(
             ownership_data,
             launch_kernel_config,
+            scratch_root=tmp_path,
             computers=computers,
             runner=runner,
         )
+        await ctx.prepare_scratch()
 
         with pytest.raises(KernelNetworkSetupFailed):
             await ctx.prepare_container(resource_spec, {}, [], MagicMock())
@@ -157,10 +194,11 @@ class TestPrepareContainer:
 class TestCreationContextMembers:
     def test_repl_ports_and_protected_services_stay_unsupported(
         self,
+        tmp_path: Path,
         ownership_data: KernelOwnershipData,
         kernel_config: KernelCreationConfig,
     ) -> None:
-        ctx = _make_context(ownership_data, kernel_config)
+        ctx = _make_context(ownership_data, kernel_config, scratch_root=tmp_path)
 
         with pytest.raises(KernelVerbNotSupported, match="repl_ports"):
             _ = ctx.repl_ports
@@ -169,68 +207,53 @@ class TestCreationContextMembers:
 
     async def test_extra_envs_are_empty(
         self,
+        tmp_path: Path,
         ownership_data: KernelOwnershipData,
         kernel_config: KernelCreationConfig,
     ) -> None:
-        ctx = _make_context(ownership_data, kernel_config)
+        ctx = _make_context(ownership_data, kernel_config, scratch_root=tmp_path)
 
         assert await ctx.get_extra_envs() == {}
 
     async def test_resource_spec_requires_cpu(
         self,
+        tmp_path: Path,
         ownership_data: KernelOwnershipData,
         kernel_config: KernelCreationConfig,
     ) -> None:
         config = cast(KernelCreationConfig, {**kernel_config, "resource_slots": {"mem": "1"}})
-        ctx = _make_context(ownership_data, config)
+        ctx = _make_context(ownership_data, config, scratch_root=tmp_path)
 
         with pytest.raises(UnsupportedResource):
             await ctx.prepare_resource_spec()
 
     async def test_apply_network_is_a_noop(
         self,
+        tmp_path: Path,
         ownership_data: KernelOwnershipData,
         kernel_config: KernelCreationConfig,
     ) -> None:
-        ctx = _make_context(ownership_data, kernel_config)
+        ctx = _make_context(ownership_data, kernel_config, scratch_root=tmp_path)
 
         await ctx.apply_network(MagicMock())
 
 
-class TestNoRunner:
-    @pytest.fixture
-    def ctx(
-        self, ownership_data: KernelOwnershipData, kernel_config: KernelCreationConfig
-    ) -> ContainerdKernelCreationContext:
-        return _make_context(ownership_data, kernel_config)
-
-    async def test_no_scratch_and_no_intrinsic_mounts(
-        self, ctx: ContainerdKernelCreationContext, resource_spec: KernelResourceSpec
+class TestIntrinsicMounts:
+    async def test_config_is_read_only_and_work_is_writable(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        kernel_config: KernelCreationConfig,
     ) -> None:
-        environ: dict[str, str] = {}
+        ctx = _make_context(ownership_data, kernel_config, scratch_root=tmp_path)
 
-        await ctx.prepare_scratch()
-        await ctx.mount_krunner(resource_spec, environ)
+        mounts = {str(m.target): m for m in await ctx.get_intrinsic_mounts()}
 
-        assert await ctx.get_intrinsic_mounts() == []
-        assert resource_spec.mounts == [] and environ == {}
-        await ctx.process_mounts([])
-
-    async def test_requested_mounts_are_refused(self, ctx: ContainerdKernelCreationContext) -> None:
-        vfolder = Mount(MountTypes.BIND, Path("/vfroot/v1"), Path("/home/work/v1"))
-
-        with pytest.raises(KernelVerbNotSupported, match="/home/work/v1"):
-            await ctx.process_mounts([vfolder])
-
-    async def test_runner_files_and_accelerator_mounts_are_unsupported(
-        self, ctx: ContainerdKernelCreationContext
-    ) -> None:
-        with pytest.raises(KernelVerbNotSupported):
-            ctx.resolve_krunner_filepath("runner/entrypoint.sh")
-        with pytest.raises(KernelVerbNotSupported):
-            ctx.get_runner_mount(MountTypes.BIND, "/a", "/b")
-        with pytest.raises(KernelVerbNotSupported):
-            await ctx.generate_accelerator_mounts(_accelerator_plugin("cuda", {}), {})
+        scratch = (tmp_path / str(ownership_data.kernel_id)).resolve()
+        assert mounts["/home/config"].source == scratch / "config"
+        assert mounts["/home/config"].permission.value == "ro"
+        assert mounts["/home/work"].source == scratch / "work"
+        assert mounts["/home/work"].permission.value == "rw"
 
 
 class TestAccelerators:
@@ -241,6 +264,7 @@ class TestAccelerators:
     @pytest.fixture
     def ctx(
         self,
+        tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
         computers: dict[DeviceName, ComputerContext],
@@ -249,6 +273,7 @@ class TestAccelerators:
         return _make_context(
             ownership_data,
             launch_kernel_config,
+            scratch_root=tmp_path,
             client=fake,
             computers=computers,
         )
@@ -262,6 +287,7 @@ class TestAccelerators:
         slot: str,
     ) -> None:
         alloc = {SlotName(slot): {DeviceId("root"): Decimal(1)}}
+        await ctx.prepare_scratch()
 
         await ctx.apply_accelerator_allocation(_accelerator_plugin(slot, {}), alloc)
         await ctx.prepare_container(resource_spec, {}, [], MagicMock())
@@ -275,9 +301,32 @@ class TestAccelerators:
 
         await ctx.apply_accelerator_allocation(_accelerator_plugin("cuda", {}), alloc)
 
-    async def test_plugin_with_container_arguments_is_refused(
-        self, ctx: ContainerdKernelCreationContext, fake: FakeContainerd
+    async def test_accelerator_mounts_come_from_the_plugin(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        ctx: ContainerdKernelCreationContext,
     ) -> None:
+        await ctx.prepare_scratch()
+        info = MountInfo(MountTypes.BIND, tmp_path / "acc-src", Path("/opt/accel"))
+        plugin = _accelerator_plugin("cuda", {}, mounts=[info])
+        alloc = {SlotName("cuda.shares"): {DeviceId("0"): Decimal(1)}}
+
+        mounts = await ctx.generate_accelerator_mounts(plugin, alloc)
+
+        source_dir = tmp_path / str(ownership_data.kernel_id) / "config" / "cuda"
+        assert mounts == [info]
+        plugin.generate_mounts.assert_awaited_once_with(source_dir, alloc)
+        assert source_dir.is_dir()
+
+    async def test_plugin_with_container_arguments_is_refused_and_removes_the_scratch(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        ctx: ContainerdKernelCreationContext,
+        fake: FakeContainerd,
+    ) -> None:
+        await ctx.prepare_scratch()
         fragment = {"HostConfig": {"Devices": [{"PathOnHost": "/dev/nvidia0"}]}}
         plugin = _accelerator_plugin("cuda", fragment)
         alloc = {SlotName("cuda.shares"): {DeviceId("0"): Decimal(1)}}
@@ -285,6 +334,7 @@ class TestAccelerators:
         with pytest.raises(KernelVerbNotSupported, match="cuda"):
             await ctx.apply_accelerator_allocation(plugin, alloc)
 
+        assert not (tmp_path / str(ownership_data.kernel_id)).exists()
         assert fake.calls == []
 
 
@@ -309,16 +359,12 @@ class TestStartContainer:
     @pytest.fixture
     def fake(self) -> FakeContainerd:
         fake = FakeContainerd()
-        fake.add_image(
-            self.image_ref,
-            diff_ids=["sha256:aa"],
-            env=["PATH=/usr/bin", "LANG=C"],
-            runtime={"Entrypoint": ["/bin/sh", "-c"], "Cmd": ["sleep 1"], "WorkingDir": "/srv"},
-        )
+        fake.add_image(self.image_ref, diff_ids=["sha256:aa"], env=["PATH=/usr/bin", "LANG=C"])
         return fake
 
     async def _prepared(
         self,
+        tmp_path: Path,
         ownership_data: KernelOwnershipData,
         kernel_config: KernelCreationConfig,
         resource_spec: KernelResourceSpec,
@@ -330,10 +376,14 @@ class TestStartContainer:
         ctx = _make_context(
             ownership_data,
             kernel_config,
+            scratch_root=tmp_path,
             client=client,
             computers=computers,
             runner=runner,
         )
+        await ctx.prepare_scratch()
+        resource_spec.mounts.extend(await ctx.get_intrinsic_mounts())
+        await ctx.process_mounts(resource_spec.mounts)
         kernel = await ctx.prepare_container(
             resource_spec,
             {"LANG": "en_US.UTF-8", "LOCAL_USER_ID": "1000"},
@@ -344,6 +394,7 @@ class TestStartContainer:
 
     async def test_container_is_created_and_started(
         self,
+        tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
         resource_spec: KernelResourceSpec,
@@ -351,6 +402,7 @@ class TestStartContainer:
         fake: FakeContainerd,
     ) -> None:
         ctx, kernel = await self._prepared(
+            tmp_path,
             ownership_data,
             launch_kernel_config,
             resource_spec,
@@ -358,7 +410,6 @@ class TestStartContainer:
             fake,
         )
 
-        # The runner's cmdargs are ignored: the image's own command runs.
         data = await ctx.start_container(kernel, ["python", "-m", "kernel"], None, [], MagicMock())
 
         container_id = data["container_id"]
@@ -366,14 +417,14 @@ class TestStartContainer:
         assert fake.tasks[container_id].state.value == "running"
         assert fake.snapshots[container_id][0].options == ("lowerdir=sha256:aa",)
         spec: dict[str, Any] = dict(fake.specs[container_id])
-        assert spec["process"]["args"] == ["/bin/sh", "-c", "sleep 1"]
-        assert spec["process"]["cwd"] == "/srv"
+        assert spec["process"]["args"] == ["/opt/kernel/entrypoint.sh", "python", "-m", "kernel"]
         assert spec["process"]["env"] == [
             "PATH=/usr/bin",
             "LANG=en_US.UTF-8",
             "LOCAL_USER_ID=1000",
         ]
-        assert all(m["type"] != "bind" for m in spec["mounts"])
+        destinations = [m["destination"] for m in spec["mounts"] if m["type"] == "bind"]
+        assert {"/home/config", "/home/work"} <= set(destinations)
         assert [ns["type"] for ns in spec["linux"]["namespaces"]] == [
             "pid",
             "ipc",
@@ -388,6 +439,7 @@ class TestStartContainer:
 
     async def test_the_container_runs_on_runc(
         self,
+        tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
         resource_spec: KernelResourceSpec,
@@ -395,6 +447,7 @@ class TestStartContainer:
         fake: FakeContainerd,
     ) -> None:
         ctx, kernel = await self._prepared(
+            tmp_path,
             ownership_data,
             launch_kernel_config,
             resource_spec,
@@ -408,6 +461,7 @@ class TestStartContainer:
 
     async def test_labels_identify_the_kernel_and_its_owner(
         self,
+        tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
         resource_spec: KernelResourceSpec,
@@ -415,6 +469,7 @@ class TestStartContainer:
         fake: FakeContainerd,
     ) -> None:
         ctx, kernel = await self._prepared(
+            tmp_path,
             ownership_data,
             launch_kernel_config,
             resource_spec,
@@ -428,9 +483,13 @@ class TestStartContainer:
         assert labels["ai.backend.kernel-id"] == str(ownership_data.kernel_id)
         assert labels["ai.backend.session-id"] == str(ownership_data.session_id)
         assert labels["ai.backend.owner"] == str(ownership_data.agent_id)
+        assert labels[CONFIG_DIR_LABEL] == str(
+            (tmp_path / str(ownership_data.kernel_id)).resolve() / "config"
+        )
 
     async def test_cgroup_path_is_namespaced_by_container_id(
         self,
+        tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
         resource_spec: KernelResourceSpec,
@@ -438,6 +497,7 @@ class TestStartContainer:
         fake: FakeContainerd,
     ) -> None:
         ctx, kernel = await self._prepared(
+            tmp_path,
             ownership_data,
             launch_kernel_config,
             resource_spec,
@@ -452,6 +512,7 @@ class TestStartContainer:
 
     async def test_no_port_is_published(
         self,
+        tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
         resource_spec: KernelResourceSpec,
@@ -476,6 +537,7 @@ class TestStartContainer:
             },
         ]
         ctx, kernel = await self._prepared(
+            tmp_path,
             ownership_data,
             launch_kernel_config,
             resource_spec,
@@ -495,6 +557,7 @@ class TestStartContainer:
 
     async def test_network_is_set_up_before_the_task_is_created(
         self,
+        tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
         resource_spec: KernelResourceSpec,
@@ -503,6 +566,7 @@ class TestStartContainer:
     ) -> None:
         runner = FakeCommandRunner(fake.calls)
         ctx, kernel = await self._prepared(
+            tmp_path,
             ownership_data,
             launch_kernel_config,
             resource_spec,
@@ -517,8 +581,9 @@ class TestStartContainer:
         assert ops.index("cmd") < ops.index("create_task")
         assert "ip -n bai-" in " ".join(key for op, key in fake.calls if op == "cmd")
 
-    async def test_task_has_no_stdio(
+    async def test_task_stdio_goes_to_the_scratch_log_file(
         self,
+        tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
         resource_spec: KernelResourceSpec,
@@ -528,6 +593,7 @@ class TestStartContainer:
         fake = StdioRecordingContainerd()
         fake.add_image(self.image_ref, diff_ids=["sha256:aa"])
         ctx, kernel = await self._prepared(
+            tmp_path,
             ownership_data,
             launch_kernel_config,
             resource_spec,
@@ -537,10 +603,12 @@ class TestStartContainer:
 
         await ctx.start_container(kernel, [], None, [], MagicMock())
 
-        assert fake.stdio == ["", ""]
+        expected = f"file://{(tmp_path / str(ownership_data.kernel_id)).resolve()}/task.log"
+        assert fake.stdio == [expected, expected]
 
     async def test_each_launch_attempt_gets_a_fresh_container_id(
         self,
+        tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
         resource_spec: KernelResourceSpec,
@@ -548,6 +616,7 @@ class TestStartContainer:
         fake: FakeContainerd,
     ) -> None:
         ctx, kernel = await self._prepared(
+            tmp_path,
             ownership_data,
             launch_kernel_config,
             resource_spec,
@@ -562,6 +631,7 @@ class TestStartContainer:
 
     async def test_missing_image_removes_the_netns_and_frees_allocations(
         self,
+        tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
         resource_spec: KernelResourceSpec,
@@ -570,6 +640,7 @@ class TestStartContainer:
         empty = FakeContainerd()
         runner = FakeCommandRunner()
         ctx, kernel = await self._prepared(
+            tmp_path,
             ownership_data,
             launch_kernel_config,
             resource_spec,
@@ -588,6 +659,7 @@ class TestStartContainer:
 
     async def test_launch_failure_leaves_no_container_and_no_netns(
         self,
+        tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
         resource_spec: KernelResourceSpec,
@@ -597,6 +669,7 @@ class TestStartContainer:
         fake.failing.add("start_task")
         runner = FakeCommandRunner()
         ctx, kernel = await self._prepared(
+            tmp_path,
             ownership_data,
             launch_kernel_config,
             resource_spec,
@@ -614,6 +687,7 @@ class TestStartContainer:
 
     async def test_cancellation_leaves_no_container_and_no_netns(
         self,
+        tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
         resource_spec: KernelResourceSpec,
@@ -624,6 +698,7 @@ class TestStartContainer:
         """A cancel of the launch after the task was created rolls back like a failure."""
         runner = FakeCommandRunner()
         ctx, kernel = await self._prepared(
+            tmp_path,
             ownership_data,
             launch_kernel_config,
             resource_spec,
