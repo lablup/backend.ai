@@ -373,7 +373,10 @@ class TestUpdateResourceGroup:
     ) -> None:
         # Given the repository rejects the change because active sessions remain
         mock_agent_repository.update_resource_group.side_effect = AgentHasConflictingSessions(
-            agent_id, 1
+            agent_id,
+            allocated_session_count=1,
+            designating_session_count=0,
+            designating_deployment_count=0,
         )
 
         # When / Then the error propagates and nothing is terminated
