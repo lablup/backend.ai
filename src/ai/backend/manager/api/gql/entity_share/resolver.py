@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+from typing import Annotated
 from uuid import UUID
 
+import strawberry
 from strawberry import Info
 from strawberry.relay import PageInfo
 
 from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.entity_share.request import (
+    AnswerEntityShareOptions,
     EntityShareOrderBy,
     MySearchEntitySharesInput,
     ScopedSearchEntitySharesInput,
@@ -17,6 +20,7 @@ from ai.backend.common.dto.manager.v2.entity_share.types import (
     EntityShareOrderField,
     EntityShareSideDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -174,8 +178,19 @@ async def create_entity_share(
 async def accept_entity_share(
     info: Info[StrawberryGQLContext],
     id: UUID,
+    project_id: Annotated[
+        UUID | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. The project answering an offer addressed "
+                "to it. The caller answers for themselves when omitted."
+            )
+        ),
+    ] = None,
 ) -> EntitySharePayloadGQL | None:
-    payload = await info.context.adapters.entity_share.accept(EntityShareID(id))
+    payload = await info.context.adapters.entity_share.accept(
+        EntityShareID(id), AnswerEntityShareOptions(project_id=project_id)
+    )
     return EntitySharePayloadGQL.from_pydantic(payload)
 
 
@@ -183,8 +198,19 @@ async def accept_entity_share(
 async def reject_entity_share(
     info: Info[StrawberryGQLContext],
     id: UUID,
+    project_id: Annotated[
+        UUID | None,
+        strawberry.argument(
+            description=(
+                f"Added in {NEXT_RELEASE_VERSION}. The project answering an offer addressed "
+                "to it. The caller answers for themselves when omitted."
+            )
+        ),
+    ] = None,
 ) -> EntitySharePayloadGQL | None:
-    payload = await info.context.adapters.entity_share.reject(EntityShareID(id))
+    payload = await info.context.adapters.entity_share.reject(
+        EntityShareID(id), AnswerEntityShareOptions(project_id=project_id)
+    )
     return EntitySharePayloadGQL.from_pydantic(payload)
 
 
