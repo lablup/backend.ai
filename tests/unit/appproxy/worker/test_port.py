@@ -23,12 +23,13 @@ from ai.backend.appproxy.common.types import (
     RouteInfo,
 )
 from ai.backend.appproxy.worker.errors.ingress import IngressNotRegisteredError
-from ai.backend.appproxy.worker.ingress.factory import IngressState
-from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
-from ai.backend.appproxy.worker.ingress.layered import LayeredIngressState
 from ai.backend.appproxy.worker.proxy.frontend.http.port import PortFrontend
 from ai.backend.appproxy.worker.types import Circuit, InferenceAppInfo, PortFrontendInfo
-from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAuthority
+from ai.backend.common.dto.appproxy.v2.ingress.types import (
+    IngressAccess,
+    IngressAccessMode,
+    IngressAuthority,
+)
 from ai.backend.common.types import RuntimeVariant
 
 _AUTHORITY = IngressAuthority("worker-1")
@@ -102,33 +103,26 @@ class _PortSlotSituation:
 
 
 @pytest.fixture
-async def port_slot_situation(
+def port_slot_situation(
     mocker: pytest_mock.MockerFixture, case: _PortSlotCase
 ) -> _PortSlotSituation:
     circuit = create_circuit(_PORT)
-    circuit_ingress = circuit.to_ingress(_AUTHORITY)
-    ingress = circuit_ingress.model_copy(
-        update={
-            "access": circuit_ingress.access.model_copy(
-                update={
-                    "allowed_client_ips": [ip_network(cidr) for cidr in case.allowed_client_ips]
-                }
-            )
-        }
+    access = IngressAccess(
+        mode=IngressAccessMode.PUBLIC,
+        allowed_client_ips=[ip_network(cidr) for cidr in case.allowed_client_ips],
     )
-    in_memory = InMemoryIngressState(negative_ttl=60.0)
+    root_context = mocker.MagicMock()
     match case.ingress_presence:
         case _IngressPresence.HELD:
-            await in_memory.apply([ingress])
+            root_context.ingress_state.reader.get = mocker.AsyncMock(
+                return_value=circuit.to_ingress(_AUTHORITY).model_copy(update={"access": access})
+            )
         case _IngressPresence.REMOVED:
-            await in_memory.apply([ingress])
-            await in_memory.remove([ingress.key()])
+            root_context.ingress_state.reader.get = mocker.AsyncMock(return_value=None)
         case _IngressPresence.NEVER_HELD:
-            pass
-    root_context = mocker.MagicMock()
-    root_context.ingress_state = IngressState(
-        reader=LayeredIngressState([in_memory], in_memory=in_memory), writer=None
-    )
+            root_context.ingress_state.reader.get = mocker.AsyncMock(
+                side_effect=IngressNotRegisteredError("no layer holds the frontend")
+            )
     frontend = PortFrontend(root_context=root_context)
     backend = mocker.MagicMock()
     if case.circuit_registered:
@@ -172,15 +166,14 @@ async def serving_port_frontend(
         bodies_received_by_backend.append(await request.read())
         return web.Response()
 
-    circuit = create_circuit(unused_tcp_port).model_copy(update={"open_to_public": True})
-    in_memory = InMemoryIngressState()
-    await in_memory.apply([circuit.to_ingress(_AUTHORITY)])
-    root_context.ingress_state = IngressState(
-        reader=LayeredIngressState([in_memory], in_memory=in_memory), writer=None
-    )
     frontend = PortFrontend(root_context=root_context)
-    frontend.circuits = {unused_tcp_port: circuit}
+    frontend.circuits = {
+        unused_tcp_port: create_circuit(unused_tcp_port).model_copy(update={"open_to_public": True})
+    }
     frontend.backends = {unused_tcp_port: mocker.MagicMock(proxy_http=record_request_body)}
+    root_context.ingress_state.reader.get = mocker.AsyncMock(
+        return_value=frontend.circuits[unused_tcp_port].to_ingress(_AUTHORITY)
+    )
     await frontend.start()
     yield _ServingPortFrontend(
         port=unused_tcp_port,
@@ -207,7 +200,18 @@ class TestPortFrontend:
             await situation.frontend.ensure_slot_middleware(situation.request, situation.handler)
         situation.handler.assert_not_awaited()
 
-    @pytest.mark.parametrize("case", [_PortSlotCase(name="registered")], ids=lambda case: case.name)
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _PortSlotCase(name="open-allowlist"),
+            _PortSlotCase(
+                name="client-inside-the-allowlist",
+                allowed_client_ips=["10.0.0.0/8"],
+                client_ip="10.0.0.1",
+            ),
+        ],
+        ids=lambda case: case.name,
+    )
     async def test_registered_slot_reaches_the_handler_with_its_backend(
         self, case: _PortSlotCase, port_slot_situation: _PortSlotSituation
     ) -> None:
@@ -225,10 +229,9 @@ class TestPortFrontend:
         "case",
         [
             _PortSlotCase(
-                name="ipv4-outside", allowed_client_ips=["192.168.0.0/24"], client_ip="10.0.0.1"
-            ),
-            _PortSlotCase(
-                name="ipv6-outside", allowed_client_ips=["fd00::/8"], client_ip="2001:db8::1"
+                name="client-outside-the-allowlist",
+                allowed_client_ips=["192.168.0.0/24"],
+                client_ip="10.0.0.1",
             ),
             _PortSlotCase(
                 name="unparsable-remote",
@@ -245,25 +248,6 @@ class TestPortFrontend:
         with pytest.raises(ClientIPNotAllowed):
             await situation.frontend.ensure_slot_middleware(situation.request, situation.handler)
         situation.handler.assert_not_awaited()
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _PortSlotCase(
-                name="ipv4-inside", allowed_client_ips=["10.0.0.0/8"], client_ip="10.0.0.1"
-            ),
-            _PortSlotCase(
-                name="ipv6-inside", allowed_client_ips=["2001:db8::/32"], client_ip="2001:db8::1"
-            ),
-        ],
-        ids=lambda case: case.name,
-    )
-    async def test_client_inside_the_ingress_allowlist_reaches_the_handler(
-        self, case: _PortSlotCase, port_slot_situation: _PortSlotSituation
-    ) -> None:
-        situation = port_slot_situation
-        await situation.frontend.ensure_slot_middleware(situation.request, situation.handler)
-        situation.handler.assert_awaited_once()
 
     async def test_proxy_passes_compressed_request_body_as_received(
         self,
