@@ -12,11 +12,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Make a link to the doc preview build (en)
-        uses: readthedocs/actions/preview@v1
+        uses: readthedocs/actions/preview@b8bba1484329bda1a3abe986df7ebc80a8950333  # v1
         with:
           project-slug: "sorna"
       - name: Make a link to the doc preview build (ko)
-        uses: readthedocs/actions/preview@v1
+        uses: readthedocs/actions/preview@b8bba1484329bda1a3abe986df7ebc80a8950333  # v1
         with:
           project-slug: "sorna-ko"
           project-language: "ko"
