@@ -6,7 +6,8 @@ Usage:
 
 Every `<name>.ko.md` needs a `<name>.md` beside it with the same number of
 headings at each level. With --base, the change since REF must not add Korean
-to a `.md` file and must update both files of a pair. Prints one
+to a `.md` file and must update both files of a pair. A newly added `.ko.md` is
+exempt, since it translates an English file that does not change. Prints one
 "path: problem" line per violation and exits 1 when any exist. CI runs this via
 knowledge-check.yml.
 """
@@ -99,11 +100,24 @@ def check_added_korean(root: Path, base: str) -> list[str]:
 
 def check_pair_updates(root: Path, base: str) -> list[str]:
     changed = set(_git(root, "diff", "--name-only", f"{base}...HEAD", "--", "*.md").splitlines())
+    added = set(
+        _git(
+            root,
+            "diff",
+            "--name-only",
+            "--diff-filter=A",
+            f"{base}...HEAD",
+            "--",
+            "*.md",
+        ).splitlines()
+    )
     problems = []
     for path in sorted(changed):
         if path.startswith(ONE_SIDE_CHANGE_ALLOWED):
             continue
         if path.endswith(KO_SUFFIX):
+            if path in added:
+                continue
             partner = _english_path(path)
         else:
             partner = path.removesuffix(".md") + KO_SUFFIX

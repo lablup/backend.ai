@@ -154,6 +154,15 @@ BEP numbers start from 1000.
 
 ## File Structure
 
+### English and Korean pairs
+
+Every BEP is a pair in `proposals/`: English `BEP-NNNN-title.md` and Korean `BEP-NNNN-title.ko.md`.
+Each sub-document of a segmented BEP is a pair too, such as `BEP-1033/00-overview.md` and `BEP-1033/00-overview.ko.md`.
+
+- Frontmatter goes only in the English file.
+- Both files keep the same headings in the same order.
+- Update both files in the same change.
+
 ### Single-File BEP (< 500 lines)
 
 For short proposals, use a single markdown file:
