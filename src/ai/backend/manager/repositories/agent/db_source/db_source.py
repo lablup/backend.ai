@@ -201,11 +201,13 @@ class AgentDBSource:
         """
         Change the agent's resource group, gating on the kernels running on it.
 
-        Finds the active kernels on the agent. If any exist and ``force`` is not
-        set, raises without changing anything. Otherwise updates the agent's group
-        (name + id columns) and returns those kernels so the caller can transition
-        their sessions. The lookup, the check, the update and the designation drop run in one
-        transaction; the agent's own and govern edges move to the new group after it.
+        Finds the active kernels on the agent and the designations of the agent by
+        unterminated sessions and deployments of other resource groups. If any exist
+        and ``force`` is not set, raises without changing anything. Otherwise updates
+        the agent's group (name + id columns), drops those designations and returns the
+        kernels so the caller can transition their sessions. The lookups, the check, the
+        update and the designation drop run in one transaction; the agent's own and
+        govern edges move to the new group after it.
         Raises ScalingGroupNotFound when no resource group matches
         ``resource_group_id``, and AgentNotFound when no agent row matches
         ``agent_id``.
@@ -242,9 +244,50 @@ class AgentDBSource:
                 .all()
             )
             kernels = [row.to_kernel_info() for row in rows]
-            if kernels and not force:
-                distinct_sessions = len({kernel.session.session_id for kernel in kernels})
-                raise AgentHasConflictingSessions(agent_id, distinct_sessions)
+
+            session_designations = (
+                SessionDesignatedAgentRow.agent_uuid == agent.uuid,
+                SessionDesignatedAgentRow.session_id.in_(
+                    sa.select(SessionRow.id).where(
+                        SessionRow.resource_group_id != resource_group_id,
+                        SessionRow.status.not_in(SessionStatus.terminal_statuses()),
+                    )
+                ),
+            )
+            deployment_designations = (
+                DeploymentDesignatedAgentRow.agent_uuid == agent.uuid,
+                DeploymentDesignatedAgentRow.endpoint_id.in_(
+                    sa.select(EndpointRow.id)
+                    .join(ResourceGroupRow, ResourceGroupRow.name == EndpointRow.resource_group)
+                    .where(
+                        ResourceGroupRow.id != resource_group_id,
+                        EndpointRow.lifecycle_stage != EndpointLifecycle.DESTROYED,
+                    )
+                ),
+            )
+            if not force:
+                allocated_session_count = len({kernel.session.session_id for kernel in kernels})
+                designating_session_count = await session.scalar(
+                    sa.select(sa.func.count())
+                    .select_from(SessionDesignatedAgentRow)
+                    .where(*session_designations)
+                )
+                designating_deployment_count = await session.scalar(
+                    sa.select(sa.func.count())
+                    .select_from(DeploymentDesignatedAgentRow)
+                    .where(*deployment_designations)
+                )
+                if (
+                    allocated_session_count
+                    or designating_session_count
+                    or designating_deployment_count
+                ):
+                    raise AgentHasConflictingSessions(
+                        agent_id,
+                        allocated_session_count=allocated_session_count,
+                        designating_session_count=designating_session_count or 0,
+                        designating_deployment_count=designating_deployment_count or 0,
+                    )
 
             await session.execute(
                 sa.update(agents)
@@ -254,29 +297,9 @@ class AgentDBSource:
                     scaling_group=resource_group_name,
                 )
             )
+            await session.execute(sa.delete(SessionDesignatedAgentRow).where(*session_designations))
             await session.execute(
-                sa.delete(DeploymentDesignatedAgentRow).where(
-                    DeploymentDesignatedAgentRow.agent_uuid == agent.uuid,
-                    DeploymentDesignatedAgentRow.endpoint_id.in_(
-                        sa.select(EndpointRow.id)
-                        .join(ResourceGroupRow, ResourceGroupRow.name == EndpointRow.resource_group)
-                        .where(
-                            ResourceGroupRow.id != resource_group_id,
-                            EndpointRow.lifecycle_stage.in_(EndpointLifecycle.active_states()),
-                        )
-                    ),
-                )
-            )
-            await session.execute(
-                sa.delete(SessionDesignatedAgentRow).where(
-                    SessionDesignatedAgentRow.agent_uuid == agent.uuid,
-                    SessionDesignatedAgentRow.session_id.in_(
-                        sa.select(SessionRow.id).where(
-                            SessionRow.resource_group_id != resource_group_id,
-                            SessionRow.status.not_in(SessionStatus.terminal_statuses()),
-                        )
-                    ),
-                )
+                sa.delete(DeploymentDesignatedAgentRow).where(*deployment_designations)
             )
         if agent.resource_group_id != resource_group_id:
             async with self._v2_ops.write_ops() as w:

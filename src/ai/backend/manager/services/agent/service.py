@@ -140,11 +140,13 @@ class AgentService:
     async def update_resource_group(
         self, action: UpdateAgentResourceGroupAction
     ) -> UpdateAgentResourceGroupActionResult:
-        """
+        """update_resource_group
         Change an agent's resource group, handling the sessions running on it.
 
-        The repository atomically gates on the agent's active sessions (raising
-        AgentHasConflictingSessions when they exist and ``force`` is unset),
+        The repository atomically gates on the agent's active sessions and on its
+        designations by unterminated sessions and deployments of other resource
+        groups (raising AgentHasConflictingSessions when any exist and ``force`` is
+        unset),
         commits the group change, and returns those sessions. The returned
         sessions are then transitioned per ``policy``; their cleanup proceeds
         asynchronously. ``RESCHEDULE`` is not implemented yet.

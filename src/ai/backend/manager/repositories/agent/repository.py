@@ -204,8 +204,9 @@ class AgentRepository:
     ) -> list[KernelInfo]:
         """Change the agent's resource group, returning the kernels still on it.
 
-        Raises AgentHasConflictingSessions if the agent has active kernels and
-        ``force`` is not set, ScalingGroupNotFound if the target group does not
+        Raises AgentHasConflictingSessions if the agent has active kernels, or
+        unterminated sessions or deployments of other resource groups designate it,
+        and ``force`` is not set, ScalingGroupNotFound if the target group does not
         exist, and AgentNotFound if the agent does not exist; otherwise updates
         the group and returns those kernels.
         """
