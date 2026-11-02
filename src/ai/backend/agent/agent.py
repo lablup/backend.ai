@@ -68,6 +68,7 @@ from ai.backend.agent.errors import (
     InvalidChunkSizeError,
     KernelNotFoundError,
 )
+from ai.backend.agent.errors.agent import KernelTaskExited
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.health.heartbeat import HeartbeatTask
 from ai.backend.agent.legacy_inference_env import LegacyInferenceEnvTranslator
@@ -1486,6 +1487,7 @@ class AbstractAgent[
                             LifecycleEvent.CLEAN,
                             ev.reason,
                             suppress_events=ev.suppress_events,
+                            task_exit_status=ev.task_exit_status,
                             done_future=ev.done_future,
                         ),
                     )
@@ -1540,16 +1542,19 @@ class AbstractAgent[
                     else:
                         await self.reconstruct_resource_usage()
                         if not ev.suppress_events:
+                            exit_code = -1 if ev.task_exit_status is None else ev.task_exit_status
                             await self.anycast_and_broadcast_event(
                                 KernelTerminatedAnycastEvent(
                                     kernel_id=ev.kernel_id,
                                     session_id=ev.session_id,
                                     reason=ev.reason,
+                                    exit_code=exit_code,
                                 ),
                                 KernelTerminatedBroadcastEvent(
                                     kernel_id=ev.kernel_id,
                                     session_id=ev.session_id,
                                     reason=ev.reason,
+                                    exit_code=exit_code,
                                 ),
                             )
                     # Notify cleanup waiters after all state updates.
@@ -1683,6 +1688,7 @@ class AbstractAgent[
         exit_code: int | None = None,
         done_future: asyncio.Future[Any] | None = None,
         suppress_events: bool = False,
+        task_exit_status: int | None = None,
     ) -> None:
         cid: ContainerId | None = None
         try:
@@ -1742,6 +1748,7 @@ class AbstractAgent[
                 done_future,
                 exit_code,
                 suppress_events,
+                task_exit_status,
             ),
         )
 
@@ -3016,6 +3023,8 @@ class AbstractAgent[
                             LifecycleEvent.DESTROY,
                             KernelLifecycleEventReason.FAILED_TO_CREATE,
                         )
+                        if isinstance(e, ContainerCreationFailedError):
+                            raise
                         raise ContainerCreationFailedError(
                             f"Kernel failed to create container (k:{kernel_id!s}, detail: {e!s})"
                         ) from e
@@ -3125,6 +3134,16 @@ class AbstractAgent[
                             f"(k:{ctx.kernel_id!s}, container:{container_data['container_id']})"
                         )
                         raise ContainerStartupFailedError(err_msg) from e
+                    except KernelTaskExited as e:
+                        await self.inject_container_lifecycle_event(
+                            kernel_id,
+                            session_id,
+                            LifecycleEvent.DESTROY,
+                            KernelLifecycleEventReason.FAILED_TO_START,
+                            container_id=ContainerId(container_data["container_id"]),
+                            task_exit_status=e.exit_status,
+                        )
+                        raise
                     except BaseException:
                         await self.inject_container_lifecycle_event(
                             kernel_id,

@@ -46,6 +46,7 @@ from ai.backend.agent.containerd.profile.base import (
     KernelLaunch,
     RuntimeProfile,
     StdioMode,
+    describe_profile_failure,
     prepare_kernel_config,
     profile_skips_host_krunner,
 )
@@ -71,7 +72,11 @@ from ai.backend.agent.containerd.spec import (
     merge_env,
 )
 from ai.backend.agent.errors import UnsupportedResource
-from ai.backend.agent.errors.agent import InvalidAgentConfigError, UnsupportedBaseDistroError
+from ai.backend.agent.errors.agent import (
+    ContainerCreationFailedError,
+    InvalidAgentConfigError,
+    UnsupportedBaseDistroError,
+)
 from ai.backend.agent.errors.containerd import KernelNetworkSetupFailed, KernelVerbNotSupported
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.kernel import AbstractKernel
@@ -521,6 +526,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             environ=environ,
             data={},
             launch_plan=launch_plan,
+            profile=self._profile,
+            client=self._client,
         )
 
     async def _add_spec_jws(self, signature: str) -> None:
@@ -637,14 +644,22 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 stdio=stdio,
                 runtime_options=launch_plan.runtime_options,
             )
-        except BaseException:
+        except BaseException as e:
             await self._teardown_network()
             self._port_pool.release_many(host_ports)
             await self._free_allocations(kernel_obj.resource_spec)
             await run_in_executor_with_context(
                 None, remove_scratch, self.local_config.container.scratch_root, str(self.kernel_id)
             )
-            raise
+            if not isinstance(e, Exception):
+                raise
+            reason = describe_profile_failure(self._profile, None, str(e))
+            if reason is None:
+                raise
+            raise ContainerCreationFailedError(
+                f"Kernel failed to create container (k:{self.kernel_id!s}, detail: {e!s})",
+                failure_reason=reason,
+            ) from e
         container = self.local_config.container
         return {
             "container_id": container_id,
