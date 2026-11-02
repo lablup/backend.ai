@@ -13,6 +13,9 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Any, Final
 
+import aiofiles
+
+from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -225,6 +228,15 @@ def write_resolv_conf(dirs: ScratchDirs) -> None:
         log.warning("no usable nameserver for the kernel resolv.conf")
     dirs.resolv_conf.write_text("".join(f"{line}\n" for line in kept))
     dirs.resolv_conf.chmod(0o644)
+
+
+async def read_resource_spec(labels: Mapping[str, str]) -> KernelResourceSpec | None:
+    """The resource spec a running kernel was created with, from its config dir."""
+    config_dir = labels.get(CONFIG_DIR_LABEL)
+    if not config_dir:
+        return None
+    async with aiofiles.open(Path(config_dir) / "resource.txt") as f:
+        return await KernelResourceSpec.aread_from_file(f)
 
 
 def remove_scratch(scratch_root: Path, kernel_id: str) -> None:
