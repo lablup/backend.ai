@@ -38,6 +38,7 @@ class RolePresetData(EntityData):
     scope_type: EntityType
     scope_id: UUID | None
     auto_assign: bool
+    auto_assign_to_owner: bool
     deleted_at: datetime | None
     created_at: datetime
     updated_at: datetime

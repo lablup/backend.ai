@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from typing import Self
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import DeclaredEntityType, EntityType, GlobalEntityType
 from ai.backend.common.dto.manager.query import (
@@ -60,6 +62,13 @@ class CreateRolePresetInput(BaseRequestModel):
             "joining the scope."
         ),
     )
+    auto_assign_to_owner: bool = Field(
+        default=False,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Whether a personal project's owner is mapped to "
+            "the role made from this preset. Allowed only on a project preset."
+        ),
+    )
     permissions: list[RolePermissionPresetEntry] = Field(
         default_factory=list,
         description="Permission entries carried by the preset.",
@@ -71,6 +80,12 @@ class CreateRolePresetInput(BaseRequestModel):
         if value == GlobalEntityType():
             raise ValueError(f"scope_type must not be {GlobalEntityType()}")
         return value
+
+    @model_validator(mode="after")
+    def _validate_owner_assign_scope(self) -> Self:
+        if self.auto_assign_to_owner and self.scope_type != ProjectEntityType():
+            raise ValueError(f"auto_assign_to_owner needs scope_type {ProjectEntityType()}")
+        return self
 
 
 class UpdateRolePresetBody(BaseRequestModel):
@@ -87,6 +102,13 @@ class UpdateRolePresetBody(BaseRequestModel):
     auto_assign: bool | None = Field(
         default=None,
         description="Updated default value for the `auto_assign` flag of instantiated roles.",
+    )
+    auto_assign_to_owner: bool | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Updated value for whether a personal project's "
+            "owner is mapped to the role made from this preset. Allowed only on a project preset."
+        ),
     )
 
 
@@ -184,6 +206,10 @@ class RolePresetFilter(BaseRequestModel):
     name: StringFilter | None = Field(default=None, description="Filter by name.")
     scope_type: StringFilter | None = Field(default=None, description="Filter by scope type.")
     auto_assign: bool | None = Field(default=None, description="Filter by auto-assign flag.")
+    auto_assign_to_owner: bool | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by the assign-to-owner flag.",
+    )
     deleted: bool | None = Field(
         default=None,
         description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deleted_at`.",

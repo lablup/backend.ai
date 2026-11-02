@@ -14,6 +14,7 @@ from uuid import UUID
 
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
@@ -77,16 +78,39 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
     """이미 있는 프리셋 하나와, 호출자 한 명."""
 
     role: UserRole = UserRole.USER
+    scope_type: EntityType = ProjectEntityType()
 
     @override
     def describe(self) -> str:
-        return f"이미 있는 프리셋 하나와, {self.role.value} 한 명"
+        if self.scope_type == ProjectEntityType():
+            return f"이미 있는 프리셋 하나와, {self.role.value} 한 명"
+        return f"이미 있는 {self.scope_type} 스코프 프리셋 하나와, {self.role.value} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> APresetAndACaller:
-        preset = await seeding.creating(TestSeedRolePreset())
+        preset = await seeding.creating(TestSeedRolePreset(scope_type=self.scope_type))
         caller = await lay_a_caller(seeding, self.role)
         return APresetAndACaller(preset=seeding.made(preset), caller=seeding.made(caller))
+
+
+@dataclass(frozen=True)
+class AProjectAndADomainPresetAndSomeone(Given[Any, ManyPresetsAndACaller]):
+    """프로젝트 스코프 프리셋 하나, 도메인 스코프 프리셋 하나와, 호출자 한 명."""
+
+    role: UserRole = UserRole.USER
+
+    @override
+    def describe(self) -> str:
+        return f"프로젝트 스코프 프리셋과 도메인 스코프 프리셋 하나씩과, {self.role.value} 한 명"
+
+    @override
+    async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
+        project = await seeding.creating(TestSeedRolePreset())
+        domain = await seeding.creating(TestSeedRolePreset(scope_type=DomainEntityType()))
+        caller = await lay_a_caller(seeding, self.role)
+        return ManyPresetsAndACaller(
+            laid=(seeding.made(project), seeding.made(domain)), caller=seeding.made(caller)
+        )
 
 
 @dataclass(frozen=True)
@@ -145,11 +169,18 @@ class PresetLook:
     started: datetime
     named: str | None = None
     auto_assign: bool | None = None
+    auto_assign_to_owner: bool | None = None
     deleted: bool = False
 
     def verdicts(self, at: str, node: RolePresetNode, seeded: RolePresetData) -> list[Verdict]:
         written = WrittenByThisRun(self.started)
+        owner_assign: list[Verdict] = (
+            [Same(f"{at}auto_assign_to_owner", node.auto_assign_to_owner, True)]
+            if self.auto_assign_to_owner
+            else []
+        )
         return [
+            *owner_assign,
             Held[UUID](f"{at}id", node.id, SameAs(seeded.id, "미리 만든 프리셋의 id")),
             Held[UUID](
                 f"{at}entity_id", node.entity_id, SameAs(seeded.id, "미리 만든 프리셋의 id")
@@ -177,6 +208,8 @@ class ThePresetComesBack(Then[APresetAndACaller, RolePresetNode]):
     def says(self) -> str:
         if self.expected.named is not None:
             return "새 이름을 실은 프리셋 전체가 온다"
+        if self.expected.auto_assign_to_owner:
+            return "소유자 부여가 켜진 프리셋 전체가 온다"
         if self.expected.deleted:
             return "삭제 표시가 켜진 프리셋 전체가 온다"
         return "삭제 표시가 꺼진 프리셋 전체가 온다"
@@ -228,6 +261,40 @@ class EveryTargetComesBack(Then[ManyPresetsAndACaller, PartialBulkPayload[RolePr
                 Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
+        return verdicts
+
+
+@dataclass(frozen=True)
+class OnlyTheFirstPresetComesBack(Then[ManyPresetsAndACaller, PartialBulkPayload[RolePresetNode]]):
+    """처음 프리셋만 처리되고, 나머지 하나는 실패 목록에 온다."""
+
+    expected: PresetLook
+
+    @override
+    def says(self) -> str:
+        return "프로젝트 스코프 프리셋만 고쳐져 오고, 도메인 스코프 프리셋은 실패 목록에 온다"
+
+    @override
+    def look(
+        self,
+        laid: ManyPresetsAndACaller,
+        answered: Answered[PartialBulkPayload[RolePresetNode]],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        verdicts: list[Verdict] = [
+            Same("successes count", len(payload.successes), 1),
+            Same("failed count", len(payload.failed), 1),
+        ]
+        for node in payload.successes:
+            verdicts += self.expected.verdicts("successes[0].", node, laid.laid[0])
+        for failure in payload.failed:
+            verdicts.append(
+                Held[UUID](
+                    "failed[0].id", failure.id, SameAs(laid.laid[1].id, "두 번째 프리셋의 id")
+                )
+            )
         return verdicts
 
 

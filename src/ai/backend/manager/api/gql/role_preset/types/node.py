@@ -77,6 +77,15 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
             "from this preset."
         )
     )
+    auto_assign_to_owner: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Whether a personal project's owner is mapped to the role made from this preset. "
+                "Allowed only on a project preset."
+            ),
+        ),
+    )
     deleted: bool = gql_field(
         description=(
             "Soft-delete flag. Set by the delete mutation and cleared by the restore "
