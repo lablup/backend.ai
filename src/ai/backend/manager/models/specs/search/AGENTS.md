@@ -189,7 +189,7 @@ Depth follows the permission axis, not the foreign keys.
 
 ## Scopes a search accepts
 
-The packages with a gap or a non-obvious scope are under `Scopes a search accepts` in `KNOWLEDGE.md`. Adding or removing a Target updates them in the same change.
+The per-entity tables are under `Scopes a search accepts` in `KNOWLEDGE.md`. Adding or removing a Target updates them in the same change.
 
 | Searched | Scopes accepted |
 |---|---|

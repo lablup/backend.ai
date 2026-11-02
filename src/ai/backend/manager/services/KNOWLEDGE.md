@@ -46,7 +46,7 @@ Judgment results and their wiring/spec mapping:
 | Entity | Has a parent, handled directly | scope (create) / single / bulk | `Entity*` (own virtual entity + member_of) |
 | Global | Outside RBAC scopes, handled directly | global (gate: SA or public read) | `GlobalEntity*` (no registration) |
 | Field | No independent permission, lifetime-bound | single_entity on the owner | `FieldEntity*` (requires owner_id) |
-| Action-only | No target row (behavior / non-DB) | by the target's nature, no spec |: (service kept) |
+| Action-only | No target row (behavior / non-DB) | by the target's nature, no spec | no spec (service kept) |
 
 ## entity_type judgments: scope-providing and entity
 
