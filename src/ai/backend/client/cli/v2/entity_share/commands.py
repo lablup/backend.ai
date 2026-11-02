@@ -115,13 +115,19 @@ def get(share_id: uuid.UUID) -> None:
 
 @entity_share.command()
 @click.argument("share_id", type=click.UUID)
-def accept(share_id: uuid.UUID) -> None:
+@click.option(
+    "--project-id",
+    type=click.UUID,
+    default=None,
+    help="Answer for this project, for an offer addressed to it.",
+)
+def accept(share_id: uuid.UUID, project_id: uuid.UUID | None) -> None:
     """Take what was offered."""
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            print_result(await registry.entity_share.accept(share_id))
+            print_result(await registry.entity_share.accept(share_id, project_id))
         finally:
             await registry.close()
 
@@ -130,13 +136,19 @@ def accept(share_id: uuid.UUID) -> None:
 
 @entity_share.command()
 @click.argument("share_id", type=click.UUID)
-def reject(share_id: uuid.UUID) -> None:
+@click.option(
+    "--project-id",
+    type=click.UUID,
+    default=None,
+    help="Answer for this project, for an offer addressed to it.",
+)
+def reject(share_id: uuid.UUID, project_id: uuid.UUID | None) -> None:
     """Turn down what was offered."""
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            print_result(await registry.entity_share.reject(share_id))
+            print_result(await registry.entity_share.reject(share_id, project_id))
         finally:
             await registry.close()
 
