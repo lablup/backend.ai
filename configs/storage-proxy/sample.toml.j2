@@ -502,8 +502,8 @@
 # storage backends for artifact files (models, datasets). Each entry can be
 # object storage (S3) or VFS depending on deployment requirements.
 # Added in 25.12.0
-# Set `artifact_storage_name` when rendering this template
-[artifact-storages.{{ artifact_storage_name }}]
+# Set `artifact_storages_name` when rendering this template
+[artifact-storages.{{ artifact_storages_name }}]
     # Type of storage backend for artifacts. Determines how files are stored and
     # accessed. Options: 'object_storage' for S3-compatible storage,
     # 'vfs_storage' for local filesystem, 'git_lfs' for Git LFS (not yet
@@ -515,7 +515,7 @@
     # storage_type is 'object_storage'. Provides scalable, distributed storage
     # suitable for production deployments with large artifact collections.
     # Added in 25.12.0
-    [artifact-storages.{{ artifact_storage_name }}.object-storage]
+    [artifact-storages.{{ artifact_storages_name }}.object-storage]
       # Endpoint URL for the S3-compatible object storage service. Must include
       # the protocol (http or https) and port if non-standard. Examples: MinIO,
       # AWS S3, Google Cloud Storage with S3 compatibility enabled.
@@ -561,7 +561,7 @@
       # clients to upload directly to object storage without proxying through
       # the storage-proxy, improving performance for large files.
       # Added in 25.12.0
-      [artifact-storages.{{ artifact_storage_name }}.object-storage.presigned-upload]
+      [artifact-storages.{{ artifact_storages_name }}.object-storage.presigned-upload]
         # Minimum file size in bytes that triggers multipart upload mode. Files
         # smaller than this are uploaded in a single request. Set to None to use
         # the default behavior. Typical value is 5MB (5242880 bytes) for
@@ -584,7 +584,7 @@
       # allow clients to download directly from object storage without proxying
       # through the storage-proxy, improving performance for large files.
       # Added in 25.12.0
-      [artifact-storages.{{ artifact_storage_name }}.object-storage.presigned-download]
+      [artifact-storages.{{ artifact_storages_name }}.object-storage.presigned-download]
         # Expiration time in seconds for presigned download URLs. After this
         # duration, the URL becomes invalid and clients must request a new one.
         # Balance security (shorter) vs. usability for slow connections
@@ -596,7 +596,7 @@
     # storage_type is 'vfs_storage'. Uses local filesystem for storage, suitable
     # for development or single-node deployments.
     # Added in 25.12.0
-    [artifact-storages.{{ artifact_storage_name }}.vfs-storage]
+    [artifact-storages.{{ artifact_storages_name }}.vfs-storage]
       # Base filesystem path for VFS (Virtual File System) storage. This
       # directory serves as the root for all VFS operations. Must be an existing
       # directory with appropriate read/write permissions for the storage-proxy
@@ -634,8 +634,8 @@
 # external registries for discovering and downloading ML artifacts. Supports
 # HuggingFace Hub and Backend.AI Reservoir registries.
 # Added in 25.12.0
-# Set `artifact_registry_name` when rendering this template
-[artifact-registries.{{ artifact_registry_name }}]
+# Set `artifact_registries_name` when rendering this template
+[artifact-registries.{{ artifact_registries_name }}]
     # Type of artifact registry service. Determines how to interact with the
     # registry for downloading models and datasets. Options: 'huggingface' for
     # HuggingFace Hub, 'reservoir' for Backend.AI Reservoir.
@@ -646,7 +646,7 @@
     # 'huggingface'. Connects to HuggingFace Hub for accessing public and
     # private ML models, datasets, and spaces.
     # Added in 25.12.0
-    [artifact-registries.{{ artifact_registry_name }}.huggingface]
+    [artifact-registries.{{ artifact_registries_name }}.huggingface]
       # API endpoint URL for the HuggingFace service. Defaults to the official
       # HuggingFace Hub (https://huggingface.co). Change this to connect to
       # self-hosted HuggingFace instances or enterprise deployments.
@@ -667,7 +667,7 @@
     # registry_type is 'reservoir'. Reservoir is Backend.AI's native artifact
     # registry for managing ML models and datasets within your infrastructure.
     # Added in 25.12.0
-    [artifact-registries.{{ artifact_registry_name }}.reservoir]
+    [artifact-registries.{{ artifact_registries_name }}.reservoir]
       # API endpoint URL for the Reservoir registry service. Reservoir is
       # Backend.AI's artifact registry feature for managing ML models and
       # datasets. Can point to HuggingFace or a self-hosted Reservoir instance.

@@ -11,9 +11,9 @@ To make changes:
 2. Regenerate with the component's `generate-sample` CLI (`src/ai/backend/{component}/cli/config.py`).
    Example: for the web server, `./backend.ai web config generate-sample --overwrite --unmask-secrets`.
 
-## A DICT field of tables names its template argument
+## A DICT field of tables becomes a template argument
 
-A `composite=CompositeType.DICT` field whose entries are tables MUST set `template_arg` (e.g., `template_arg="volume_name"`). The entry key becomes `{{ volume_name }}` in the template, and generation fails without it. A DICT of plain values needs none.
+The entry key of a `composite=CompositeType.DICT` field whose entries are tables becomes a template argument named after the field key plus `_name` (`artifact-storages` → `{{ artifact_storages_name }}`). Renaming such a field renames the argument that `config render` takes. A DICT of plain values gets no argument.
 
 A template is not a configuration: write one with `./backend.ai {component} config render -t <template> -a NAME=VALUE ... -o <output>`.
 

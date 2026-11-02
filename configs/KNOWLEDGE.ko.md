@@ -27,6 +27,7 @@
 
 - `sample.toml.j2` 를 다시 생성하거나 비교하는 CI 검사는 없다. 차이는 review 에서만 발견된다.
 - template 인자를 채우기 전에는 TOML 로 파싱되지 않으므로, 채우지 않은 sample 을 설정으로 사용할 수 없다. `config render` 는 인자가 빠지면 실패하고 결과가 TOML 로 파싱되는지 확인한다. 값은 검증하지 않는다. 검증하면 일부 경로 field 가 참조하는 디렉터리를 생성하기 때문이다.
+- template 인자 이름은 DICT field key 에 `_name` 을 붙여 만든다. 스키마는 인자 이름을 정하지 않는다.
 
 ## 읽는 순서
 
@@ -38,6 +39,6 @@
 ## 설정 key 추가 확인 목록
 
 1. 컴포넌트의 `config/unified.py` 에 `BackendAIConfigMeta` 로 field 를 추가한다. `description` 과 `added_version` 은 필수다(version 은 `# Added in X.Y.Z` 주석이 된다).
-2. 다시 생성한다: `./backend.ai {component} config generate-sample --overwrite --unmask-secrets`. 표를 값으로 갖는 DICT field 를 새로 추가하면 `template_arg` 도 지정한다.
+2. 다시 생성한다: `./backend.ai {component} config generate-sample --overwrite --unmask-secrets`.
 3. 로컬 개발에 값이 필요하면 `halfstack.toml`/`ci.toml` 을 직접 갱신한다. 이 파일들은 생성되지 않는다.
 4. etcd 기반 key 라면 `unified.py` 의 etcd tree docstring 과 해당 `sample.etcd.*.json` 을 갱신한다.

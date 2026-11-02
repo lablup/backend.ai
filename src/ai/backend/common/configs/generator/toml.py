@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from ai.backend.common.configs.inspector import ConfigInspector, FieldSchema
-from ai.backend.common.exception import InvalidConfigError
 from ai.backend.common.meta import CompositeType, ConfigEnvironment, ConfigExample
 from ai.backend.common.types import BackendAISchema
 
@@ -19,25 +18,12 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 __all__ = (
-    "ConfigTemplateArgMissing",
     "TOMLGenerator",
     "generate_sample_toml",
     "generate_halfstack_toml",
 )
 
 _JINJA_MARKER = re.compile(r"\{[{%#]")
-
-
-class ConfigTemplateArgMissing(InvalidConfigError):
-    """A DICT config field of tables has no ``template_arg`` to name its key in the sample template."""
-
-    def __init__(self, field_path: str) -> None:
-        suggested = field_path.rsplit(".", 1)[-1].replace("-", "_") + "_name"
-        super().__init__(
-            f"Cannot generate the sample template: '{field_path}' is a dict of tables, "
-            "so its entry key needs a template argument. "
-            f'Add template_arg="{suggested}" to the field\'s BackendAIConfigMeta.'
-        )
 
 
 def _escape_jinja(text: str) -> str:
@@ -254,14 +240,12 @@ class TOMLGenerator:
                 hint = _escape_jinja(field.doc.deprecation_hint or "")
                 lines.append(f"{indent}# DEPRECATED in {field.doc.deprecated_version}: {hint}")
 
-        # A DICT of tables keys each entry by a template argument, filled at render time;
-        # a DICT of plain values takes `key = value` lines, so it only gets a commented example.
+        # A DICT of tables keys each entry by a template argument named after the field, filled
+        # at render time; a DICT of plain values takes `key = value` lines, so it only gets an example.
         is_dict = field.type_info.composite_type == CompositeType.DICT
         section_path = path + [key]
         if is_dict and field.children:
-            template_arg = field.type_info.template_arg
-            if template_arg is None:
-                raise ConfigTemplateArgMissing(".".join(section_path))
+            template_arg = key.replace("-", "_") + "_name"
             section_path.append(f"{{{{ {template_arg} }}}}")
             lines.append(f"{indent}# Set `{template_arg}` when rendering this template")
 

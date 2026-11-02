@@ -23,7 +23,6 @@ from ai.backend.common.configs.generator import (
     generate_sample_toml,
 )
 from ai.backend.common.configs.generator.template import render_config_template
-from ai.backend.common.configs.generator.toml import ConfigTemplateArgMissing
 from ai.backend.common.configs.inspector import FieldDocumentation, FieldSchema, FieldTypeInfo
 from ai.backend.common.meta import (
     BackendAIConfigMeta,
@@ -530,19 +529,6 @@ class _VolumesConfig(BackendAISchema):
             description="Volumes.",
             added_version="25.1.0",
             composite=CompositeType.DICT,
-            template_arg="volume_name",
-        ),
-    ]
-
-
-class _UnnamedVolumesConfig(BackendAISchema):
-    volume: Annotated[
-        dict[str, _VolumeConfig],
-        Field(default_factory=dict),
-        BackendAIConfigMeta(
-            description="Volumes.",
-            added_version="25.1.0",
-            composite=CompositeType.DICT,
         ),
     ]
 
@@ -564,10 +550,6 @@ class TestSampleTemplate:
 
         rendered = tomllib.loads(render_config_template(template, {"volume_name": "local.ssd"}))
         assert rendered["volume"]["local.ssd"]["path"] == "/vfroot"
-
-    def test_dict_of_tables_without_template_arg_fails(self) -> None:
-        with pytest.raises(ConfigTemplateArgMissing):
-            TOMLGenerator().generate(_UnnamedVolumesConfig)
 
     def test_jinja_syntax_in_text_survives_rendering(self) -> None:
         template = TOMLGenerator().generate(_VolumesConfig)

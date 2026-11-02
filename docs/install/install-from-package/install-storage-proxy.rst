@@ -29,7 +29,7 @@ local service. Refer to the
 for a detailed description of each section and item. To write a configuration
 file from the template, fill its arguments, such as
 ``backend.ai storage config render -t sample.toml.j2 -a volume_name=local
--a artifact_storage_name=minio -a artifact_registry_name=hf -o storage-proxy.toml``. A configuration example
+-a artifact_storages_name=minio -a artifact_registries_name=hf -o storage-proxy.toml``. A configuration example
 would be:
 
 .. code-block:: toml
