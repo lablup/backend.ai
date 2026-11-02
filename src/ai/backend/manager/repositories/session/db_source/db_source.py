@@ -216,11 +216,43 @@ class SessionDBSource:
         owner_access_key: AccessKey,
     ) -> list[SessionRow]:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            return await SessionRow.match_sessions(
-                db_sess,
-                id_or_name_prefix,
-                owner_access_key,
+            return await self._match_sessions(
+                db_sess, id_or_name_prefix, owner_access_key, allow_stale=True
             )
+
+    @staticmethod
+    async def _match_sessions(
+        db_sess: AsyncSession,
+        id_or_name: str,
+        access_key: AccessKey,
+        *,
+        allow_stale: bool,
+    ) -> list[SessionRow]:
+        """The sessions of ``access_key`` whose id or name equals ``id_or_name``.
+
+        An id match shuts out the name matches; up to 10 name matches come newest first.
+        """
+        id_match: sa.ColumnElement[bool]
+        try:
+            id_match = SessionRow.id == uuid.UUID(id_or_name)
+        except ValueError:
+            id_match = sa.false()
+        rank = sa.case((id_match, 0), else_=1).label("rank")
+        cond = (id_match | (SessionRow.name == id_or_name)) & (SessionRow.access_key == access_key)
+        if not allow_stale:
+            cond = cond & ~SessionRow.status.in_(DEAD_SESSION_STATUSES)
+        query = (
+            sa.select(SessionRow, rank)
+            .where(cond)
+            .order_by(rank, sa.desc(SessionRow.created_at))
+            .limit(10)
+            .execution_options(populate_existing=True)
+        )
+        rows = (await db_sess.execute(query)).all()
+        if not rows:
+            return []
+        best_rank = rows[0].rank
+        return [row.SessionRow for row in rows if row.rank == best_rank]
 
     async def get_template_by_id(
         self,
@@ -398,17 +430,29 @@ class SessionDBSource:
 
             if session_name and session_row.access_key is not None:
                 # Check the owner of the target session has any session with the same name
-                try:
-                    sess = await SessionRow.get_session(
-                        db_session,
-                        session_name,
-                        AccessKey(session_row.access_key),
+                matches = await self._match_sessions(
+                    db_session,
+                    session_name,
+                    AccessKey(session_row.access_key),
+                    allow_stale=False,
+                )
+                if len(matches) > 1:
+                    raise TooManySessionsMatched(
+                        extra_data={
+                            "matches": [
+                                {
+                                    "session_id": sess.id,
+                                    "session_name": sess.name,
+                                    "status": sess.status,
+                                    "created_at": sess.created_at,
+                                }
+                                for sess in matches
+                            ]
+                        }
                     )
-                except SessionNotFound:
-                    pass
-                else:
+                if matches:
                     raise SessionAlreadyExists(
-                        f"Duplicate session name. Session(id:{sess.id}) already has the name"
+                        f"Duplicate session name. Session(id:{matches[0].id}) already has the name"
                     )
 
             updated = await V2WriteOps(db_session).update_data(updater)
