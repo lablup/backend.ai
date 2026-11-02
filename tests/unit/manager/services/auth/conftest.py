@@ -39,7 +39,7 @@ def mock_config_provider() -> MagicMock:
 @pytest.fixture
 def mock_user_repository() -> AsyncMock:
     repo = AsyncMock(spec=UserRepository)
-    repo.get_default_dotfiles.return_value = DotfileEntries()
+    repo.get_default_auto_generated_files.return_value = DotfileEntries()
     repo.default_bootstrap_script.return_value = None
     return repo
 
