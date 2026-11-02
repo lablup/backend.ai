@@ -71,7 +71,7 @@ class SearchingByVariant(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 변형 필터로 조회 — 대상: {laid.variant.name}"
+        return f"{laid.caller.username}이 변형 필터로 조회: 대상: {laid.variant.name}"
 
     @override
     async def call(

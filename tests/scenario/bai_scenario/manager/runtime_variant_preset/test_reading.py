@@ -63,7 +63,7 @@ class ReadingById(When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVa
     @override
     def describe(self, laid: APresetAndACaller) -> str:
         target = "존재하지 않는 ID" if self.unknown else laid.preset.name
-        return f"{laid.caller.username}의 조회 요청 — 대상: {target}"
+        return f"{laid.caller.username}의 조회 요청: 대상: {target}"
 
     @override
     async def call(

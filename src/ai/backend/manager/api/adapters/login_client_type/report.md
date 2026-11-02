@@ -1,83 +1,83 @@
 ## login_client_type
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/login_client_type/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/login_client_type/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/login_client_type/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/login_client_type/adapter.py)
 
-시나리오: 미완 4 / 8
+Scenario: incomplete 4 / 8
 
-- ops 로 구성 (8)
-  - admin_create — 대표 성공 ✓ · 대표 실패 ✓
-  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - get — 대표 성공 ✓ · 대표 실패 ✓
-  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - purge — 대표 성공 ✓ · 대표 실패 ✓
-  - search — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - update — 대표 성공 ✓ · 대표 실패 ✓
+- built from ops (8)
+  - admin_create: representative success ✓ · representative rejection ✓
+  - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - get: representative success ✓ · representative rejection ✓
+  - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_update: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - purge: representative success ✓ · representative rejection ✓
+  - search: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - update: representative success ✓ · representative rejection ✓
 
 **admin_create**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 이름과 설명을 함께 지정해 생성하면 지정한 값이 그대로 담긴 노드가 반환된다](#creating-a-login-client-type-made-with-a-description-carries-it-back) | 성공 |
-| [슈퍼관리자가 이름만 지정해 생성하면 설명이 비어 있는 노드가 반환된다](#creating-the-superadmin-makes-a-login-client-type-with-a-name-alone) | 성공 |
-| [같은 이름의 종류가 이미 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다](#creating-a-login-client-type-name-already-taken-is-refused) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 종류를 생성하면 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-login-client-type) | 거부 |
-| [권한 검사를 꺼도 슈퍼관리자가 아니면 종류를 생성하지 못한다](#creating-turning-enforcement-off-does-not-let-a-user-create-a-login-client-type) | 거부 |
+| [슈퍼관리자가 이름과 설명을 함께 지정해 생성하면 지정한 값이 그대로 담긴 노드가 반환된다](#creating-a-login-client-type-made-with-a-description-carries-it-back) | answered |
+| [슈퍼관리자가 이름만 지정해 생성하면 설명이 비어 있는 노드가 반환된다](#creating-the-superadmin-makes-a-login-client-type-with-a-name-alone) | answered |
+| [같은 이름의 종류가 이미 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다](#creating-a-login-client-type-name-already-taken-is-refused) | rejected |
+| [슈퍼관리자가 아닌 사용자가 종류를 생성하면 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-login-client-type) | rejected |
+| [권한 검사를 꺼도 슈퍼관리자가 아니면 종류를 생성하지 못한다](#creating-turning-enforcement-off-does-not-let-a-user-create-a-login-client-type) | rejected |
 
 **get**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 id로 조회하면 그 종류 전체가 반환된다. 이 조회는 인증만 확인한다](#reading-a-user-granted-nothing-reads-a-login-client-type-by-id) | 성공 |
-| [존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading-reading-a-login-client-type-id-nothing-answers-to-is-refused) | 거부 |
+| [아무 권한도 없는 사용자가 id로 조회하면 그 종류 전체가 반환된다. 이 조회는 인증만 확인한다](#reading-a-user-granted-nothing-reads-a-login-client-type-by-id) | answered |
+| [존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading-reading-a-login-client-type-id-nothing-answers-to-is-refused) | rejected |
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 종류 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-login-client-types) | 성공 |
-| [슈퍼관리자가 종류 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-login-client-types-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 없는 사용자가 종류 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-login-client-types) | answered |
+| [슈퍼관리자가 종류 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-login-client-types-answers-for-the-missing-one) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 종류 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-login-client-types) | 성공 |
-| [슈퍼관리자가 종류 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-login-client-types-at-once) | 성공 |
+| [아무 권한도 없는 사용자가 종류 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-login-client-types) | answered |
+| [슈퍼관리자가 종류 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-login-client-types-at-once) | answered |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 종류를 삭제하면 삭제한 종류의 id를 담은 응답이 반환된다](#retiring-the-superadmin-deletes-a-login-client-type) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 종류를 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-delete-a-login-client-type) | 성공 |
-| [아무 권한도 없는 사용자가 종류를 삭제하면 권한 부족으로 거부된다](#retiring-a-user-granted-nothing-may-not-delete-a-login-client-type) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-deleting-a-login-client-type-id-nothing-answers-to-is-not-found) | 거부 |
+| [슈퍼관리자가 종류를 삭제하면 삭제한 종류의 id를 담은 응답이 반환된다](#retiring-the-superadmin-deletes-a-login-client-type) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 종류를 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-delete-a-login-client-type) | answered |
+| [아무 권한도 없는 사용자가 종류를 삭제하면 권한 부족으로 거부된다](#retiring-a-user-granted-nothing-may-not-delete-a-login-client-type) | rejected |
+| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-deleting-a-login-client-type-id-nothing-answers-to-is-not-found) | rejected |
 
 **search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다](#searching-a-user-granted-nothing-counts-every-login-client-type-laid) | 성공 |
+| [종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다](#searching-a-user-granted-nothing-counts-every-login-client-type-laid) | answered |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-a-login-client-type-edit-giving-no-value-changes-nothing) | 성공 |
-| [설명이 있는 종류에 설명을 비우는 수정을 하면, 설명이 없어진다](#editing-clearing-a-login-client-type-description-leaves-it-empty) | 성공 |
-| [슈퍼관리자가 종류의 이름만 바꾸면, 이름은 새 값이 되고 설명은 그대로 유지된다](#editing-renaming-a-login-client-type-leaves-its-description-alone) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 종류를 수정할 수 있다](#editing-turning-enforcement-off-lets-a-user-edit-a-login-client-type) | 성공 |
-| [아무 권한도 없는 사용자가 존재하지 않는 id를 수정하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다](#editing-a-user-granted-nothing-editing-an-unknown-login-client-type-id-is-refused-for-permission) | 거부 |
-| [아무 권한도 없는 사용자가 종류를 수정하면 권한 부족으로 거부된다. 종류는 어느 스코프에도 속하지 않아 그 권한을 받을 방법이 없다](#editing-a-user-granted-nothing-may-not-edit-a-login-client-type) | 거부 |
-| [종류 둘 중 한쪽의 이름을 다른 쪽 이름으로 바꾸면, 이름 중복으로 거부된다. 생성할 때와 달리 저장소의 제약 위반이 그대로 전파된다](#editing-renaming-a-login-client-type-to-a-name-already-taken-is-refused) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-a-login-client-type-id-nothing-answers-to-is-not-found) | 거부 |
+| [값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-a-login-client-type-edit-giving-no-value-changes-nothing) | answered |
+| [설명이 있는 종류에 설명을 비우는 수정을 하면, 설명이 없어진다](#editing-clearing-a-login-client-type-description-leaves-it-empty) | answered |
+| [슈퍼관리자가 종류의 이름만 바꾸면, 이름은 새 값이 되고 설명은 그대로 유지된다](#editing-renaming-a-login-client-type-leaves-its-description-alone) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 종류를 수정할 수 있다](#editing-turning-enforcement-off-lets-a-user-edit-a-login-client-type) | answered |
+| [아무 권한도 없는 사용자가 존재하지 않는 id를 수정하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다](#editing-a-user-granted-nothing-editing-an-unknown-login-client-type-id-is-refused-for-permission) | rejected |
+| [아무 권한도 없는 사용자가 종류를 수정하면 권한 부족으로 거부된다. 종류는 어느 스코프에도 속하지 않아 그 권한을 받을 방법이 없다](#editing-a-user-granted-nothing-may-not-edit-a-login-client-type) | rejected |
+| [종류 둘 중 한쪽의 이름을 다른 쪽 이름으로 바꾸면, 이름 중복으로 거부된다. 생성할 때와 달리 저장소의 제약 위반이 그대로 전파된다](#editing-renaming-a-login-client-type-to-a-name-already-taken-is-refused) | rejected |
+| [슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-a-login-client-type-id-nothing-answers-to-is-not-found) | rejected |
 
 ### admin_create
 
 <a id="creating-a-login-client-type-made-with-a-description-carries-it-back"></a>
 
-#### [a-login-client-type-made-with-a-description-carries-it-back](/tests/scenario/bai_scenario/manager/login_client_type/test_creating.py) — pass
+#### [a-login-client-type-made-with-a-description-carries-it-back](/tests/scenario/bai_scenario/manager/login_client_type/test_creating.py): pass
 
 슈퍼관리자가 이름과 설명을 함께 지정해 생성하면 지정한 값이 그대로 담긴 노드가 반환된다
 
@@ -93,12 +93,12 @@ Given
 
 When
 
-- LoginClientTypeAdapter.admin_create — user-1이 webui 종류를 생성
+- LoginClientTypeAdapter.admin_create: user-1이 webui 종류를 생성
 
 Then
 
 - 생성한 종류 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'webui'
   - description = '새로 지정한 설명'
   - created_at: 이 실행이 쓴 시각
@@ -106,7 +106,7 @@ Then
 
 <a id="creating-the-superadmin-makes-a-login-client-type-with-a-name-alone"></a>
 
-#### [the-superadmin-makes-a-login-client-type-with-a-name-alone](/tests/scenario/bai_scenario/manager/login_client_type/test_creating.py) — pass
+#### [the-superadmin-makes-a-login-client-type-with-a-name-alone](/tests/scenario/bai_scenario/manager/login_client_type/test_creating.py): pass
 
 슈퍼관리자가 이름만 지정해 생성하면 설명이 비어 있는 노드가 반환된다
 
@@ -122,12 +122,12 @@ Given
 
 When
 
-- LoginClientTypeAdapter.admin_create — user-1이 webui 종류를 생성
+- LoginClientTypeAdapter.admin_create: user-1이 webui 종류를 생성
 
 Then
 
 - 생성한 종류 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'webui'
   - description = None
   - created_at: 이 실행이 쓴 시각
@@ -135,7 +135,7 @@ Then
 
 <a id="creating-a-login-client-type-name-already-taken-is-refused"></a>
 
-#### [a-login-client-type-name-already-taken-is-refused](/tests/scenario/bai_scenario/manager/login_client_type/test_creating.py) — pass
+#### [a-login-client-type-name-already-taken-is-refused](/tests/scenario/bai_scenario/manager/login_client_type/test_creating.py): pass
 
 같은 이름의 종류가 이미 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다
 
@@ -156,7 +156,7 @@ Given
 
 When
 
-- LoginClientTypeAdapter.admin_create — user-1이 이미 있는 이름 client-1(으)로 다시 생성
+- LoginClientTypeAdapter.admin_create: user-1이 이미 있는 이름 client-1(으)로 다시 생성
 
 Then
 
@@ -165,7 +165,7 @@ Then
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-create-a-login-client-type"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-create-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_creating.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-create-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_creating.py): pass
 
 슈퍼관리자가 아닌 사용자가 종류를 생성하면 역할 부족으로 거부된다
 
@@ -181,7 +181,7 @@ Given
 
 When
 
-- LoginClientTypeAdapter.admin_create — user-1이 webui 종류를 생성
+- LoginClientTypeAdapter.admin_create: user-1이 webui 종류를 생성
 
 Then
 
@@ -190,7 +190,7 @@ Then
 
 <a id="creating-turning-enforcement-off-does-not-let-a-user-create-a-login-client-type"></a>
 
-#### [turning-enforcement-off-does-not-let-a-user-create-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_creating.py) — pass
+#### [turning-enforcement-off-does-not-let-a-user-create-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_creating.py): pass
 
 권한 검사를 꺼도 슈퍼관리자가 아니면 종류를 생성하지 못한다
 
@@ -206,7 +206,7 @@ Given
 
 When
 
-- LoginClientTypeAdapter.admin_create — user-1이 webui 종류를 생성
+- LoginClientTypeAdapter.admin_create: user-1이 webui 종류를 생성
 
 Then
 
@@ -217,7 +217,7 @@ Then
 
 <a id="reading-a-user-granted-nothing-reads-a-login-client-type-by-id"></a>
 
-#### [a-user-granted-nothing-reads-a-login-client-type-by-id](/tests/scenario/bai_scenario/manager/login_client_type/test_reading.py) — pass
+#### [a-user-granted-nothing-reads-a-login-client-type-by-id](/tests/scenario/bai_scenario/manager/login_client_type/test_reading.py): pass
 
 아무 권한도 없는 사용자가 id로 조회하면 그 종류 전체가 반환된다. 이 조회는 인증만 확인한다
 
@@ -238,12 +238,12 @@ Given
 
 When
 
-- LoginClientTypeAdapter.get — user-1이 client-1(으)로 조회
+- LoginClientTypeAdapter.get: user-1이 client-1(으)로 조회
 
 Then
 
 - 미리 만들어 둔 종류 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'client-1'
   - description = '미리 만들어 둔 로그인 클라이언트 종류'
   - created_at: 이 실행이 쓴 시각
@@ -251,7 +251,7 @@ Then
 
 <a id="reading-reading-a-login-client-type-id-nothing-answers-to-is-refused"></a>
 
-#### [reading-a-login-client-type-id-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/login_client_type/test_reading.py) — pass
+#### [reading-a-login-client-type-id-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/login_client_type/test_reading.py): pass
 
 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -272,7 +272,7 @@ Given
 
 When
 
-- LoginClientTypeAdapter.get — user-1이 존재하지 않는 id(으)로 조회
+- LoginClientTypeAdapter.get: user-1이 존재하지 않는 id(으)로 조회
 
 Then
 
@@ -283,7 +283,7 @@ Then
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-login-client-types"></a>
 
-#### [a-user-granted-nothing-purges-none-of-several-login-client-types](/tests/scenario/bai_scenario/manager/login_client_type/test_partial_bulk_purging.py) — pass
+#### [a-user-granted-nothing-purges-none-of-several-login-client-types](/tests/scenario/bai_scenario/manager/login_client_type/test_partial_bulk_purging.py): pass
 
 아무 권한도 없는 사용자가 종류 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -305,7 +305,7 @@ Given
 
 When
 
-- LoginClientTypeAdapter.partial_bulk_purge — user-1이 종류 2개를 한 번에 purge 함
+- LoginClientTypeAdapter.partial_bulk_purge: user-1이 종류 2개를 한 번에 purge 함
 
 Then
 
@@ -319,7 +319,7 @@ Then
 
 <a id="partial_bulk_purging-purging-several-login-client-types-answers-for-the-missing-one"></a>
 
-#### [purging-several-login-client-types-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/login_client_type/test_partial_bulk_purging.py) — pass
+#### [purging-several-login-client-types-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/login_client_type/test_partial_bulk_purging.py): pass
 
 슈퍼관리자가 종류 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -341,18 +341,18 @@ Given
 
 When
 
-- LoginClientTypeAdapter.partial_bulk_purge — user-1이 종류 2개 와 없는 id 하나를 한 번에 purge 함
+- LoginClientTypeAdapter.partial_bulk_purge: user-1이 종류 2개 와 없는 id 하나를 한 번에 purge 함
 
 Then
 
 - 종류가 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
   - successes count = 2
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'wanted-1'
   - description = '미리 만들어 둔 로그인 클라이언트 종류'
   - created_at: 이 실행이 쓴 시각
   - modified_at: 이 실행이 쓴 시각
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'other-1'
   - description = '미리 만들어 둔 로그인 클라이언트 종류'
   - created_at: 이 실행이 쓴 시각
@@ -365,7 +365,7 @@ Then
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-login-client-types"></a>
 
-#### [a-user-granted-nothing-edits-none-of-several-login-client-types](/tests/scenario/bai_scenario/manager/login_client_type/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-nothing-edits-none-of-several-login-client-types](/tests/scenario/bai_scenario/manager/login_client_type/test_partial_bulk_editing.py): pass
 
 아무 권한도 없는 사용자가 종류 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -387,7 +387,7 @@ Given
 
 When
 
-- LoginClientTypeAdapter.partial_bulk_update — user-1이 종류 2개의 설명을 한 번에 고침
+- LoginClientTypeAdapter.partial_bulk_update: user-1이 종류 2개의 설명을 한 번에 고침
 
 Then
 
@@ -401,7 +401,7 @@ Then
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-login-client-types-at-once"></a>
 
-#### [the-superadmin-edits-several-login-client-types-at-once](/tests/scenario/bai_scenario/manager/login_client_type/test_partial_bulk_editing.py) — pass
+#### [the-superadmin-edits-several-login-client-types-at-once](/tests/scenario/bai_scenario/manager/login_client_type/test_partial_bulk_editing.py): pass
 
 슈퍼관리자가 종류 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다
 
@@ -423,19 +423,19 @@ Given
 
 When
 
-- LoginClientTypeAdapter.partial_bulk_update — user-1이 종류 2개의 설명을 한 번에 고침
+- LoginClientTypeAdapter.partial_bulk_update: user-1이 종류 2개의 설명을 한 번에 고침
 
 Then
 
 - 종류가 모두 새 설명으로 오고, 실패한 것은 없다
   - successes count = 2
   - failed = []
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'wanted-1'
   - description = '한 번에 고친 설명'
   - created_at: 이 실행이 쓴 시각
   - modified_at: 이 실행이 쓴 시각
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'other-1'
   - description = '한 번에 고친 설명'
   - created_at: 이 실행이 쓴 시각
@@ -445,7 +445,7 @@ Then
 
 <a id="retiring-the-superadmin-deletes-a-login-client-type"></a>
 
-#### [the-superadmin-deletes-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_retiring.py) — pass
+#### [the-superadmin-deletes-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_retiring.py): pass
 
 슈퍼관리자가 종류를 삭제하면 삭제한 종류의 id를 담은 응답이 반환된다
 
@@ -466,7 +466,7 @@ Given
 
 When
 
-- LoginClientTypeAdapter.purge — user-1이 client-1 삭제
+- LoginClientTypeAdapter.purge: user-1이 client-1 삭제
 
 Then
 
@@ -475,7 +475,7 @@ Then
 
 <a id="retiring-turning-enforcement-off-lets-a-user-delete-a-login-client-type"></a>
 
-#### [turning-enforcement-off-lets-a-user-delete-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_retiring.py) — pass
+#### [turning-enforcement-off-lets-a-user-delete-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_retiring.py): pass
 
 권한 검사를 끄면 아무 권한도 없는 사용자도 종류를 삭제할 수 있다
 
@@ -496,7 +496,7 @@ Given
 
 When
 
-- LoginClientTypeAdapter.purge — user-1이 client-1 삭제
+- LoginClientTypeAdapter.purge: user-1이 client-1 삭제
 
 Then
 
@@ -505,7 +505,7 @@ Then
 
 <a id="retiring-a-user-granted-nothing-may-not-delete-a-login-client-type"></a>
 
-#### [a-user-granted-nothing-may-not-delete-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_retiring.py) — pass
+#### [a-user-granted-nothing-may-not-delete-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_retiring.py): pass
 
 아무 권한도 없는 사용자가 종류를 삭제하면 권한 부족으로 거부된다
 
@@ -526,7 +526,7 @@ Given
 
 When
 
-- LoginClientTypeAdapter.purge — user-1이 client-1 삭제
+- LoginClientTypeAdapter.purge: user-1이 client-1 삭제
 
 Then
 
@@ -535,7 +535,7 @@ Then
 
 <a id="retiring-deleting-a-login-client-type-id-nothing-answers-to-is-not-found"></a>
 
-#### [deleting-a-login-client-type-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/login_client_type/test_retiring.py) — pass
+#### [deleting-a-login-client-type-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/login_client_type/test_retiring.py): pass
 
 슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -556,7 +556,7 @@ Given
 
 When
 
-- LoginClientTypeAdapter.purge — user-1이 존재하지 않는 id 삭제
+- LoginClientTypeAdapter.purge: user-1이 존재하지 않는 id 삭제
 
 Then
 
@@ -567,7 +567,7 @@ Then
 
 <a id="searching-a-user-granted-nothing-counts-every-login-client-type-laid"></a>
 
-#### [a-user-granted-nothing-counts-every-login-client-type-laid](/tests/scenario/bai_scenario/manager/login_client_type/test_searching.py) — pass
+#### [a-user-granted-nothing-counts-every-login-client-type-laid](/tests/scenario/bai_scenario/manager/login_client_type/test_searching.py): pass
 
 종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다
 
@@ -589,7 +589,7 @@ Given
 
 When
 
-- LoginClientTypeAdapter.search — user-1이 필터 없이 전체 조회
+- LoginClientTypeAdapter.search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -603,7 +603,7 @@ Then
 
 <a id="editing-a-login-client-type-edit-giving-no-value-changes-nothing"></a>
 
-#### [a-login-client-type-edit-giving-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
+#### [a-login-client-type-edit-giving-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py): pass
 
 값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다
 
@@ -624,12 +624,12 @@ Given
 
 When
 
-- LoginClientTypeAdapter.update — user-1이 client-1의 아무것도 수정
+- LoginClientTypeAdapter.update: user-1이 client-1의 아무것도 수정
 
 Then
 
 - 미리 만들어 둔 종류 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'client-1'
   - description = '미리 만들어 둔 로그인 클라이언트 종류'
   - created_at: 이 실행이 쓴 시각
@@ -637,7 +637,7 @@ Then
 
 <a id="editing-clearing-a-login-client-type-description-leaves-it-empty"></a>
 
-#### [clearing-a-login-client-type-description-leaves-it-empty](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
+#### [clearing-a-login-client-type-description-leaves-it-empty](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py): pass
 
 설명이 있는 종류에 설명을 비우는 수정을 하면, 설명이 없어진다
 
@@ -658,12 +658,12 @@ Given
 
 When
 
-- LoginClientTypeAdapter.update — user-1이 client-1의 설명 수정
+- LoginClientTypeAdapter.update: user-1이 client-1의 설명 수정
 
 Then
 
 - 미리 만들어 둔 종류 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'client-1'
   - description = None
   - created_at: 이 실행이 쓴 시각
@@ -671,7 +671,7 @@ Then
 
 <a id="editing-renaming-a-login-client-type-leaves-its-description-alone"></a>
 
-#### [renaming-a-login-client-type-leaves-its-description-alone](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
+#### [renaming-a-login-client-type-leaves-its-description-alone](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py): pass
 
 슈퍼관리자가 종류의 이름만 바꾸면, 이름은 새 값이 되고 설명은 그대로 유지된다
 
@@ -692,12 +692,12 @@ Given
 
 When
 
-- LoginClientTypeAdapter.update — user-1이 client-1의 이름 수정
+- LoginClientTypeAdapter.update: user-1이 client-1의 이름 수정
 
 Then
 
 - 미리 만들어 둔 종류 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'renamed'
   - description = '미리 만들어 둔 로그인 클라이언트 종류'
   - created_at: 이 실행이 쓴 시각
@@ -705,7 +705,7 @@ Then
 
 <a id="editing-turning-enforcement-off-lets-a-user-edit-a-login-client-type"></a>
 
-#### [turning-enforcement-off-lets-a-user-edit-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
+#### [turning-enforcement-off-lets-a-user-edit-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py): pass
 
 권한 검사를 끄면 아무 권한도 없는 사용자도 종류를 수정할 수 있다
 
@@ -726,12 +726,12 @@ Given
 
 When
 
-- LoginClientTypeAdapter.update — user-1이 client-1의 이름 수정
+- LoginClientTypeAdapter.update: user-1이 client-1의 이름 수정
 
 Then
 
 - 미리 만들어 둔 종류 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'renamed'
   - description = '미리 만들어 둔 로그인 클라이언트 종류'
   - created_at: 이 실행이 쓴 시각
@@ -739,7 +739,7 @@ Then
 
 <a id="editing-a-user-granted-nothing-editing-an-unknown-login-client-type-id-is-refused-for-permission"></a>
 
-#### [a-user-granted-nothing-editing-an-unknown-login-client-type-id-is-refused-for-permission](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
+#### [a-user-granted-nothing-editing-an-unknown-login-client-type-id-is-refused-for-permission](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py): pass
 
 아무 권한도 없는 사용자가 존재하지 않는 id를 수정하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다
 
@@ -760,7 +760,7 @@ Given
 
 When
 
-- LoginClientTypeAdapter.update — user-1이 존재하지 않는 id의 이름 수정
+- LoginClientTypeAdapter.update: user-1이 존재하지 않는 id의 이름 수정
 
 Then
 
@@ -769,7 +769,7 @@ Then
 
 <a id="editing-a-user-granted-nothing-may-not-edit-a-login-client-type"></a>
 
-#### [a-user-granted-nothing-may-not-edit-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-a-login-client-type](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py): pass
 
 아무 권한도 없는 사용자가 종류를 수정하면 권한 부족으로 거부된다. 종류는 어느 스코프에도 속하지 않아 그 권한을 받을 방법이 없다
 
@@ -790,7 +790,7 @@ Given
 
 When
 
-- LoginClientTypeAdapter.update — user-1이 client-1의 이름 수정
+- LoginClientTypeAdapter.update: user-1이 client-1의 이름 수정
 
 Then
 
@@ -799,7 +799,7 @@ Then
 
 <a id="editing-renaming-a-login-client-type-to-a-name-already-taken-is-refused"></a>
 
-#### [renaming-a-login-client-type-to-a-name-already-taken-is-refused](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
+#### [renaming-a-login-client-type-to-a-name-already-taken-is-refused](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py): pass
 
 종류 둘 중 한쪽의 이름을 다른 쪽 이름으로 바꾸면, 이름 중복으로 거부된다. 생성할 때와 달리 저장소의 제약 위반이 그대로 전파된다
 
@@ -821,7 +821,7 @@ Given
 
 When
 
-- LoginClientTypeAdapter.update — user-1이 wanted-1의 이름을 other-1(으)로 수정
+- LoginClientTypeAdapter.update: user-1이 wanted-1의 이름을 other-1(으)로 수정
 
 Then
 
@@ -830,7 +830,7 @@ Then
 
 <a id="editing-the-superadmin-editing-a-login-client-type-id-nothing-answers-to-is-not-found"></a>
 
-#### [the-superadmin-editing-a-login-client-type-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py) — pass
+#### [the-superadmin-editing-a-login-client-type-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/login_client_type/test_editing.py): pass
 
 슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -851,7 +851,7 @@ Given
 
 When
 
-- LoginClientTypeAdapter.update — user-1이 존재하지 않는 id의 이름 수정
+- LoginClientTypeAdapter.update: user-1이 존재하지 않는 id의 이름 수정
 
 Then
 

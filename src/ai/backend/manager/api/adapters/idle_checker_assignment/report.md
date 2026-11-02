@@ -1,37 +1,37 @@
 ## idle_checker_assignment
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/idle_checker_assignment/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/idle_checker_assignment/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/idle_checker_assignment/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/idle_checker_assignment/adapter.py)
 
-시나리오: 미완 7 / 7
+Scenario: incomplete 7 / 7
 
-- 직접 구현 (7)
-  - admin_create — 성공 없음 · 실패 없음 (relation) — SCENARIO-GAP
-  - admin_search — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - partial_bulk_purge — 성공 있음 2 · 실패 없음 (relation) — SCENARIO-GAP
-  - partial_bulk_update — 성공 있음 2 · 실패 없음 (relation) — SCENARIO-GAP
-  - purge — 성공 없음 · 실패 없음 (relation) — SCENARIO-GAP
-  - scoped_search — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
-  - update — 성공 없음 · 실패 없음 (relation) — SCENARIO-GAP
+- direct implementation (7)
+  - admin_create: success absent · rejection absent (relation): SCENARIO-GAP
+  - admin_search: success absent · rejection absent (global_scope): SCENARIO-GAP
+  - partial_bulk_purge: success present 2 · rejection absent (relation): SCENARIO-GAP
+  - partial_bulk_update: success present 2 · rejection absent (relation): SCENARIO-GAP
+  - purge: success absent · rejection absent (relation): SCENARIO-GAP
+  - scoped_search: success absent · rejection absent (scope): SCENARIO-GAP
+  - update: success absent · rejection absent (relation): SCENARIO-GAP
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 할당 여럿을 한 번에 purge 하려 하면, 지운 것 없이 모두 찾을 수 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-assignments) | 성공 |
-| [슈퍼관리자가 할당 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지우기 전 할당으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-the-superadmin-purges-several-assignments-and-is-answered-for-the-missing-one) | 성공 |
+| [아무 권한도 받지 않은 사용자가 할당 여럿을 한 번에 purge 하려 하면, 지운 것 없이 모두 찾을 수 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-assignments) | answered |
+| [슈퍼관리자가 할당 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지우기 전 할당으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-the-superadmin-purges-several-assignments-and-is-answered-for-the-missing-one) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 할당 여럿을 한 번에 끄려 하면, 끈 것 없이 모두 찾을 수 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-disables-none-of-several-assignments) | 성공 |
-| [슈퍼관리자가 할당 여럿을 한 번에 끄면, 모두 꺼진 할당으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-disables-several-assignments-at-once) | 성공 |
+| [아무 권한도 받지 않은 사용자가 할당 여럿을 한 번에 끄려 하면, 끈 것 없이 모두 찾을 수 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-disables-none-of-several-assignments) | answered |
+| [슈퍼관리자가 할당 여럿을 한 번에 끄면, 모두 꺼진 할당으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-disables-several-assignments-at-once) | answered |
 
 ### partial_bulk_purge
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-assignments"></a>
 
-#### [a-user-granted-nothing-purges-none-of-several-assignments](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_partial_bulk_purging.py) — pass
+#### [a-user-granted-nothing-purges-none-of-several-assignments](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_partial_bulk_purging.py): pass
 
 아무 권한도 받지 않은 사용자가 할당 여럿을 한 번에 purge 하려 하면, 지운 것 없이 모두 찾을 수 없다는 이유로 실패 목록에 온다
 
@@ -56,7 +56,7 @@ Given
 
 When
 
-- IdleCheckerAssignmentAdapter.partial_bulk_purge — user-2이 할당 2개를 한 번에 purge 함
+- IdleCheckerAssignmentAdapter.partial_bulk_purge: user-2이 할당 2개를 한 번에 purge 함
 
 Then
 
@@ -70,7 +70,7 @@ Then
 
 <a id="partial_bulk_purging-the-superadmin-purges-several-assignments-and-is-answered-for-the-missing-one"></a>
 
-#### [the-superadmin-purges-several-assignments-and-is-answered-for-the-missing-one](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_partial_bulk_purging.py) — pass
+#### [the-superadmin-purges-several-assignments-and-is-answered-for-the-missing-one](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_partial_bulk_purging.py): pass
 
 슈퍼관리자가 할당 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지우기 전 할당으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -91,7 +91,7 @@ Given
 
 When
 
-- IdleCheckerAssignmentAdapter.partial_bulk_purge — user-1이 할당 2개 와 없는 id 하나를 한 번에 purge 함
+- IdleCheckerAssignmentAdapter.partial_bulk_purge: user-1이 할당 2개 와 없는 id 하나를 한 번에 purge 함
 
 Then
 
@@ -119,7 +119,7 @@ Then
 
 <a id="partial_bulk_editing-a-user-granted-nothing-disables-none-of-several-assignments"></a>
 
-#### [a-user-granted-nothing-disables-none-of-several-assignments](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-nothing-disables-none-of-several-assignments](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_partial_bulk_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 할당 여럿을 한 번에 끄려 하면, 끈 것 없이 모두 찾을 수 없다는 이유로 실패 목록에 온다
 
@@ -144,7 +144,7 @@ Given
 
 When
 
-- IdleCheckerAssignmentAdapter.partial_bulk_update — user-2이 할당 2개를 한 번에 끔
+- IdleCheckerAssignmentAdapter.partial_bulk_update: user-2이 할당 2개를 한 번에 끔
 
 Then
 
@@ -158,7 +158,7 @@ Then
 
 <a id="partial_bulk_editing-the-superadmin-disables-several-assignments-at-once"></a>
 
-#### [the-superadmin-disables-several-assignments-at-once](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_partial_bulk_editing.py) — pass
+#### [the-superadmin-disables-several-assignments-at-once](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_partial_bulk_editing.py): pass
 
 슈퍼관리자가 할당 여럿을 한 번에 끄면, 모두 꺼진 할당으로 오고 실패한 것은 없다
 
@@ -179,7 +179,7 @@ Given
 
 When
 
-- IdleCheckerAssignmentAdapter.partial_bulk_update — user-1이 할당 2개를 한 번에 끔
+- IdleCheckerAssignmentAdapter.partial_bulk_update: user-1이 할당 2개를 한 번에 끔
 
 Then
 

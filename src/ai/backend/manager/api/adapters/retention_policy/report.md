@@ -1,98 +1,98 @@
 ## retention_policy
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/retention_policy/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/retention_policy/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/retention_policy/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/retention_policy/adapter.py)
 
-시나리오: 미완 3 / 8
+Scenario: incomplete 3 / 8
 
-- ops 로 구성 (8)
-  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - create — 대표 성공 ✓ · 대표 실패 ✓
-  - get — 대표 성공 ✓ · 대표 실패 ✓
-  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - purge — 대표 성공 ✓ · 대표 실패 ✓
-  - search — 대표 성공 ✓ · 대표 실패 ✓
-  - update — 대표 성공 ✓ · 대표 실패 ✓
+- built from ops (8)
+  - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - create: representative success ✓ · representative rejection ✓
+  - get: representative success ✓ · representative rejection ✓
+  - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_update: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - purge: representative success ✓ · representative rejection ✓
+  - search: representative success ✓ · representative rejection ✓
+  - update: representative success ✓ · representative rejection ✓
 
 **create**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 deployments 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-deployments-category-is-made) | 성공 |
-| [슈퍼관리자가 login 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-login-category-is-made) | 성공 |
-| [슈퍼관리자가 logs 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-logs-category-is-made) | 성공 |
-| [슈퍼관리자가 reconcile_history 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-reconcile-history-category-is-made) | 성공 |
-| [슈퍼관리자가 roles_invitations 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-roles-invitations-category-is-made) | 성공 |
-| [슈퍼관리자가 sessions 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-sessions-category-is-made) | 성공 |
-| [슈퍼관리자가 usage_buckets 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-usage-buckets-category-is-made) | 성공 |
-| [슈퍼관리자가 usage_records 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-usage-records-category-is-made) | 성공 |
-| [활성 여부를 거짓으로 지정해 생성하면 비활성 상태가 담긴 노드가 반환된다](#creating-a-policy-made-inactive-comes-back-inactive) | 성공 |
-| [슈퍼관리자가 카테고리와 보존 일수만 지정해 생성하면, 활성 여부는 참이고 마지막 정리 시각은 비어 있는 노드가 반환된다](#creating-the-superadmin-makes-a-policy-that-is-active-and-never-swept) | 성공 |
-| [어떤 카테고리의 정책이 이미 있을 때 같은 카테고리로 다시 생성하면, 카테고리 중복으로 거부된다](#creating-a-second-policy-for-the-same-category-is-refused) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 정책을 생성하면 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-policy) | 거부 |
-| [모니터 역할이 정책을 생성하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다](#creating-the-monitor-may-not-create-a-policy) | 거부 |
-| [권한 검사를 꺼도 슈퍼관리자가 아니면 정책을 생성하지 못한다](#creating-turning-enforcement-off-does-not-let-a-user-create-a-policy) | 거부 |
+| [슈퍼관리자가 deployments 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-deployments-category-is-made) | answered |
+| [슈퍼관리자가 login 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-login-category-is-made) | answered |
+| [슈퍼관리자가 logs 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-logs-category-is-made) | answered |
+| [슈퍼관리자가 reconcile_history 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-reconcile-history-category-is-made) | answered |
+| [슈퍼관리자가 roles_invitations 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-roles-invitations-category-is-made) | answered |
+| [슈퍼관리자가 sessions 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-sessions-category-is-made) | answered |
+| [슈퍼관리자가 usage_buckets 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-usage-buckets-category-is-made) | answered |
+| [슈퍼관리자가 usage_records 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-usage-records-category-is-made) | answered |
+| [활성 여부를 거짓으로 지정해 생성하면 비활성 상태가 담긴 노드가 반환된다](#creating-a-policy-made-inactive-comes-back-inactive) | answered |
+| [슈퍼관리자가 카테고리와 보존 일수만 지정해 생성하면, 활성 여부는 참이고 마지막 정리 시각은 비어 있는 노드가 반환된다](#creating-the-superadmin-makes-a-policy-that-is-active-and-never-swept) | answered |
+| [어떤 카테고리의 정책이 이미 있을 때 같은 카테고리로 다시 생성하면, 카테고리 중복으로 거부된다](#creating-a-second-policy-for-the-same-category-is-refused) | rejected |
+| [슈퍼관리자가 아닌 사용자가 정책을 생성하면 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-policy) | rejected |
+| [모니터 역할이 정책을 생성하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다](#creating-the-monitor-may-not-create-a-policy) | rejected |
+| [권한 검사를 꺼도 슈퍼관리자가 아니면 정책을 생성하지 못한다](#creating-turning-enforcement-off-does-not-let-a-user-create-a-policy) | rejected |
 
 **get**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [정책 하나가 있고 슈퍼관리자가 id로 조회하면, 그 정책 전체가 반환된다](#reading-the-superadmin-reads-a-policy-by-id) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 조회할 수 있다](#reading-turning-enforcement-off-lets-a-user-read-a-policy) | 성공 |
-| [아무 권한도 없는 사용자가 id로 조회하면 권한 부족으로 거부된다. 인증만으로 조회되는 다른 카탈로그와 달리 이 조회는 권한 검사를 거친다](#reading-a-user-granted-nothing-may-not-read-a-policy) | 거부 |
-| [아무 권한도 없는 사용자가 존재하지 않는 id로 조회하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다](#reading-a-user-granted-nothing-reading-an-unknown-policy-id-is-refused-for-permission) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading-the-superadmin-reading-a-policy-id-nothing-answers-to-is-not-found) | 거부 |
+| [정책 하나가 있고 슈퍼관리자가 id로 조회하면, 그 정책 전체가 반환된다](#reading-the-superadmin-reads-a-policy-by-id) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 조회할 수 있다](#reading-turning-enforcement-off-lets-a-user-read-a-policy) | answered |
+| [아무 권한도 없는 사용자가 id로 조회하면 권한 부족으로 거부된다. 인증만으로 조회되는 다른 카탈로그와 달리 이 조회는 권한 검사를 거친다](#reading-a-user-granted-nothing-may-not-read-a-policy) | rejected |
+| [아무 권한도 없는 사용자가 존재하지 않는 id로 조회하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다](#reading-a-user-granted-nothing-reading-an-unknown-policy-id-is-refused-for-permission) | rejected |
+| [슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading-the-superadmin-reading-a-policy-id-nothing-answers-to-is-not-found) | rejected |
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 정책 여럿을 한 번에 완전 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-policies) | 성공 |
-| [슈퍼관리자가 정책 둘과 없는 id 하나를 한 번에 완전 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-policies-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 없는 사용자가 정책 여럿을 한 번에 완전 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-policies) | answered |
+| [슈퍼관리자가 정책 둘과 없는 id 하나를 한 번에 완전 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-policies-answers-for-the-missing-one) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-policies) | 성공 |
-| [슈퍼관리자가 정책 여럿의 보존 일수를 한 번에 바꾸면, 모두 새 일수로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-policies-at-once) | 성공 |
+| [아무 권한도 없는 사용자가 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-policies) | answered |
+| [슈퍼관리자가 정책 여럿의 보존 일수를 한 번에 바꾸면, 모두 새 일수로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-policies-at-once) | answered |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 정책을 완전 삭제하면 삭제한 정책의 id를 담은 응답이 반환된다](#retiring-the-superadmin-purges-a-policy) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 완전 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-purge-a-policy) | 성공 |
-| [아무 권한도 없는 사용자가 정책을 완전 삭제하면 권한 부족으로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-policy) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 완전 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-purging-a-policy-id-nothing-answers-to-is-not-found) | 거부 |
+| [슈퍼관리자가 정책을 완전 삭제하면 삭제한 정책의 id를 담은 응답이 반환된다](#retiring-the-superadmin-purges-a-policy) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 완전 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-purge-a-policy) | answered |
+| [아무 권한도 없는 사용자가 정책을 완전 삭제하면 권한 부족으로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-policy) | rejected |
+| [슈퍼관리자가 존재하지 않는 id를 완전 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-purging-a-policy-id-nothing-answers-to-is-not-found) | rejected |
 
 **search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [카테고리가 다른 정책 여럿 중 하나의 카테고리를 필터로 조회하면 그 카테고리의 정책 하나만 반환된다](#searching-a-category-filter-narrows-the-answer-to-that-category) | 성공 |
-| [활성과 비활성이 섞여 있을 때 활성 필터로 조회하면 활성인 정책만 반환된다](#searching-an-enabled-filter-keeps-only-the-active-policies) | 성공 |
-| [모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다](#searching-the-monitor-searches-policies-like-the-superadmin) | 성공 |
-| [카테고리가 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 집계된다](#searching-the-superadmin-counts-every-policy-laid) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-policies) | 거부 |
+| [카테고리가 다른 정책 여럿 중 하나의 카테고리를 필터로 조회하면 그 카테고리의 정책 하나만 반환된다](#searching-a-category-filter-narrows-the-answer-to-that-category) | answered |
+| [활성과 비활성이 섞여 있을 때 활성 필터로 조회하면 활성인 정책만 반환된다](#searching-an-enabled-filter-keeps-only-the-active-policies) | answered |
+| [모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다](#searching-the-monitor-searches-policies-like-the-superadmin) | answered |
+| [카테고리가 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 집계된다](#searching-the-superadmin-counts-every-policy-laid) | answered |
+| [슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-policies) | rejected |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-a-policy-edit-giving-no-value-changes-nothing) | 성공 |
-| [활성 정책의 활성 여부를 끄면 비활성 상태가 담긴 노드가 반환된다](#editing-disabling-a-policy-answers-it-inactive) | 성공 |
-| [슈퍼관리자가 보존 일수만 수정하면, 일수는 새 값이 되고 카테고리와 활성 여부는 그대로 유지된다](#editing-editing-the-retention-days-leaves-the-rest-alone) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 수정할 수 있다](#editing-turning-enforcement-off-lets-a-user-edit-a-policy) | 성공 |
-| [아무 권한도 없는 사용자가 정책을 수정하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-policy) | 거부 |
-| [정책 둘 중 한쪽의 카테고리를 다른 쪽 카테고리로 바꾸면, 카테고리 중복으로 거부된다. 생성할 때와 달리 저장소의 제약 위반이 그대로 전파된다](#editing-moving-a-policy-to-a-category-already-taken-is-refused) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-a-policy-id-nothing-answers-to-is-not-found) | 거부 |
+| [값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-a-policy-edit-giving-no-value-changes-nothing) | answered |
+| [활성 정책의 활성 여부를 끄면 비활성 상태가 담긴 노드가 반환된다](#editing-disabling-a-policy-answers-it-inactive) | answered |
+| [슈퍼관리자가 보존 일수만 수정하면, 일수는 새 값이 되고 카테고리와 활성 여부는 그대로 유지된다](#editing-editing-the-retention-days-leaves-the-rest-alone) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 수정할 수 있다](#editing-turning-enforcement-off-lets-a-user-edit-a-policy) | answered |
+| [아무 권한도 없는 사용자가 정책을 수정하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-policy) | rejected |
+| [정책 둘 중 한쪽의 카테고리를 다른 쪽 카테고리로 바꾸면, 카테고리 중복으로 거부된다. 생성할 때와 달리 저장소의 제약 위반이 그대로 전파된다](#editing-moving-a-policy-to-a-category-already-taken-is-refused) | rejected |
+| [슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-a-policy-id-nothing-answers-to-is-not-found) | rejected |
 
 ### create
 
 <a id="creating-a-policy-for-the-deployments-category-is-made"></a>
 
-#### [a-policy-for-the-deployments-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py) — pass
+#### [a-policy-for-the-deployments-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
 슈퍼관리자가 deployments 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다
 
@@ -108,12 +108,12 @@ Given
 
 When
 
-- RetentionPolicyAdapter.create — user-1이 deployments 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1이 deployments 카테고리 정책을 생성
 
 Then
 
 - 생성한 정책 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.DEPLOYMENTS: 'deployments'>
   - retention_period_days = 90
   - enabled = True
@@ -123,7 +123,7 @@ Then
 
 <a id="creating-a-policy-for-the-login-category-is-made"></a>
 
-#### [a-policy-for-the-login-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py) — pass
+#### [a-policy-for-the-login-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
 슈퍼관리자가 login 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다
 
@@ -139,12 +139,12 @@ Given
 
 When
 
-- RetentionPolicyAdapter.create — user-1이 login 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1이 login 카테고리 정책을 생성
 
 Then
 
 - 생성한 정책 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.LOGIN: 'login'>
   - retention_period_days = 90
   - enabled = True
@@ -154,7 +154,7 @@ Then
 
 <a id="creating-a-policy-for-the-logs-category-is-made"></a>
 
-#### [a-policy-for-the-logs-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py) — pass
+#### [a-policy-for-the-logs-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
 슈퍼관리자가 logs 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다
 
@@ -170,12 +170,12 @@ Given
 
 When
 
-- RetentionPolicyAdapter.create — user-1이 logs 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1이 logs 카테고리 정책을 생성
 
 Then
 
 - 생성한 정책 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.LOGS: 'logs'>
   - retention_period_days = 90
   - enabled = True
@@ -185,7 +185,7 @@ Then
 
 <a id="creating-a-policy-for-the-reconcile-history-category-is-made"></a>
 
-#### [a-policy-for-the-reconcile-history-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py) — pass
+#### [a-policy-for-the-reconcile-history-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
 슈퍼관리자가 reconcile_history 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다
 
@@ -201,12 +201,12 @@ Given
 
 When
 
-- RetentionPolicyAdapter.create — user-1이 reconcile_history 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1이 reconcile_history 카테고리 정책을 생성
 
 Then
 
 - 생성한 정책 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.RECONCILE_HISTORY: 'reconcile_history'>
   - retention_period_days = 90
   - enabled = True
@@ -216,7 +216,7 @@ Then
 
 <a id="creating-a-policy-for-the-roles-invitations-category-is-made"></a>
 
-#### [a-policy-for-the-roles-invitations-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py) — pass
+#### [a-policy-for-the-roles-invitations-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
 슈퍼관리자가 roles_invitations 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다
 
@@ -232,12 +232,12 @@ Given
 
 When
 
-- RetentionPolicyAdapter.create — user-1이 roles_invitations 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1이 roles_invitations 카테고리 정책을 생성
 
 Then
 
 - 생성한 정책 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.ROLES_INVITATIONS: 'roles_invitations'>
   - retention_period_days = 90
   - enabled = True
@@ -247,7 +247,7 @@ Then
 
 <a id="creating-a-policy-for-the-sessions-category-is-made"></a>
 
-#### [a-policy-for-the-sessions-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py) — pass
+#### [a-policy-for-the-sessions-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
 슈퍼관리자가 sessions 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다
 
@@ -263,12 +263,12 @@ Given
 
 When
 
-- RetentionPolicyAdapter.create — user-1이 sessions 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1이 sessions 카테고리 정책을 생성
 
 Then
 
 - 생성한 정책 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.SESSIONS: 'sessions'>
   - retention_period_days = 90
   - enabled = True
@@ -278,7 +278,7 @@ Then
 
 <a id="creating-a-policy-for-the-usage-buckets-category-is-made"></a>
 
-#### [a-policy-for-the-usage-buckets-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py) — pass
+#### [a-policy-for-the-usage-buckets-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
 슈퍼관리자가 usage_buckets 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다
 
@@ -294,12 +294,12 @@ Given
 
 When
 
-- RetentionPolicyAdapter.create — user-1이 usage_buckets 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1이 usage_buckets 카테고리 정책을 생성
 
 Then
 
 - 생성한 정책 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.USAGE_BUCKETS: 'usage_buckets'>
   - retention_period_days = 90
   - enabled = True
@@ -309,7 +309,7 @@ Then
 
 <a id="creating-a-policy-for-the-usage-records-category-is-made"></a>
 
-#### [a-policy-for-the-usage-records-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py) — pass
+#### [a-policy-for-the-usage-records-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
 슈퍼관리자가 usage_records 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다
 
@@ -325,12 +325,12 @@ Given
 
 When
 
-- RetentionPolicyAdapter.create — user-1이 usage_records 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1이 usage_records 카테고리 정책을 생성
 
 Then
 
 - 생성한 정책 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.USAGE_RECORDS: 'usage_records'>
   - retention_period_days = 90
   - enabled = True
@@ -340,7 +340,7 @@ Then
 
 <a id="creating-a-policy-made-inactive-comes-back-inactive"></a>
 
-#### [a-policy-made-inactive-comes-back-inactive](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py) — pass
+#### [a-policy-made-inactive-comes-back-inactive](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
 활성 여부를 거짓으로 지정해 생성하면 비활성 상태가 담긴 노드가 반환된다
 
@@ -356,12 +356,12 @@ Given
 
 When
 
-- RetentionPolicyAdapter.create — user-1이 sessions 카테고리 정책을 비활성으로 생성
+- RetentionPolicyAdapter.create: user-1이 sessions 카테고리 정책을 비활성으로 생성
 
 Then
 
 - 생성한 정책 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.SESSIONS: 'sessions'>
   - retention_period_days = 90
   - enabled = False
@@ -371,7 +371,7 @@ Then
 
 <a id="creating-the-superadmin-makes-a-policy-that-is-active-and-never-swept"></a>
 
-#### [the-superadmin-makes-a-policy-that-is-active-and-never-swept](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py) — pass
+#### [the-superadmin-makes-a-policy-that-is-active-and-never-swept](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
 슈퍼관리자가 카테고리와 보존 일수만 지정해 생성하면, 활성 여부는 참이고 마지막 정리 시각은 비어 있는 노드가 반환된다
 
@@ -387,12 +387,12 @@ Given
 
 When
 
-- RetentionPolicyAdapter.create — user-1이 sessions 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1이 sessions 카테고리 정책을 생성
 
 Then
 
 - 생성한 정책 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.SESSIONS: 'sessions'>
   - retention_period_days = 90
   - enabled = True
@@ -402,7 +402,7 @@ Then
 
 <a id="creating-a-second-policy-for-the-same-category-is-refused"></a>
 
-#### [a-second-policy-for-the-same-category-is-refused](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py) — pass
+#### [a-second-policy-for-the-same-category-is-refused](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
 어떤 카테고리의 정책이 이미 있을 때 같은 카테고리로 다시 생성하면, 카테고리 중복으로 거부된다
 
@@ -419,7 +419,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.create — user-1이 이미 있는 logs 카테고리 정책을 다시 생성
+- RetentionPolicyAdapter.create: user-1이 이미 있는 logs 카테고리 정책을 다시 생성
 
 Then
 
@@ -428,7 +428,7 @@ Then
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-create-a-policy"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-create-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-create-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
 슈퍼관리자가 아닌 사용자가 정책을 생성하면 역할 부족으로 거부된다
 
@@ -444,7 +444,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.create — user-1이 sessions 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1이 sessions 카테고리 정책을 생성
 
 Then
 
@@ -453,7 +453,7 @@ Then
 
 <a id="creating-the-monitor-may-not-create-a-policy"></a>
 
-#### [the-monitor-may-not-create-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py) — pass
+#### [the-monitor-may-not-create-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
 모니터 역할이 정책을 생성하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다
 
@@ -469,7 +469,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.create — user-1이 sessions 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1이 sessions 카테고리 정책을 생성
 
 Then
 
@@ -478,7 +478,7 @@ Then
 
 <a id="creating-turning-enforcement-off-does-not-let-a-user-create-a-policy"></a>
 
-#### [turning-enforcement-off-does-not-let-a-user-create-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py) — pass
+#### [turning-enforcement-off-does-not-let-a-user-create-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
 권한 검사를 꺼도 슈퍼관리자가 아니면 정책을 생성하지 못한다
 
@@ -494,7 +494,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.create — user-1이 sessions 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1이 sessions 카테고리 정책을 생성
 
 Then
 
@@ -505,7 +505,7 @@ Then
 
 <a id="reading-the-superadmin-reads-a-policy-by-id"></a>
 
-#### [the-superadmin-reads-a-policy-by-id](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py) — pass
+#### [the-superadmin-reads-a-policy-by-id](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py): pass
 
 정책 하나가 있고 슈퍼관리자가 id로 조회하면, 그 정책 전체가 반환된다
 
@@ -522,12 +522,12 @@ Given
 
 When
 
-- RetentionPolicyAdapter.get — user-1이 logs 카테고리 정책 조회
+- RetentionPolicyAdapter.get: user-1이 logs 카테고리 정책 조회
 
 Then
 
 - 미리 만들어 둔 정책 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.LOGS: 'logs'>
   - retention_period_days = 30
   - enabled = True
@@ -537,7 +537,7 @@ Then
 
 <a id="reading-turning-enforcement-off-lets-a-user-read-a-policy"></a>
 
-#### [turning-enforcement-off-lets-a-user-read-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py) — pass
+#### [turning-enforcement-off-lets-a-user-read-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py): pass
 
 권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 조회할 수 있다
 
@@ -554,12 +554,12 @@ Given
 
 When
 
-- RetentionPolicyAdapter.get — user-1이 logs 카테고리 정책 조회
+- RetentionPolicyAdapter.get: user-1이 logs 카테고리 정책 조회
 
 Then
 
 - 미리 만들어 둔 정책 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.LOGS: 'logs'>
   - retention_period_days = 30
   - enabled = True
@@ -569,7 +569,7 @@ Then
 
 <a id="reading-a-user-granted-nothing-may-not-read-a-policy"></a>
 
-#### [a-user-granted-nothing-may-not-read-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py) — pass
+#### [a-user-granted-nothing-may-not-read-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py): pass
 
 아무 권한도 없는 사용자가 id로 조회하면 권한 부족으로 거부된다. 인증만으로 조회되는 다른 카탈로그와 달리 이 조회는 권한 검사를 거친다
 
@@ -586,7 +586,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.get — user-1이 logs 카테고리 정책 조회
+- RetentionPolicyAdapter.get: user-1이 logs 카테고리 정책 조회
 
 Then
 
@@ -595,7 +595,7 @@ Then
 
 <a id="reading-a-user-granted-nothing-reading-an-unknown-policy-id-is-refused-for-permission"></a>
 
-#### [a-user-granted-nothing-reading-an-unknown-policy-id-is-refused-for-permission](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py) — pass
+#### [a-user-granted-nothing-reading-an-unknown-policy-id-is-refused-for-permission](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py): pass
 
 아무 권한도 없는 사용자가 존재하지 않는 id로 조회하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다
 
@@ -612,7 +612,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.get — user-1이 존재하지 않는 id 조회
+- RetentionPolicyAdapter.get: user-1이 존재하지 않는 id 조회
 
 Then
 
@@ -621,7 +621,7 @@ Then
 
 <a id="reading-the-superadmin-reading-a-policy-id-nothing-answers-to-is-not-found"></a>
 
-#### [the-superadmin-reading-a-policy-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py) — pass
+#### [the-superadmin-reading-a-policy-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py): pass
 
 슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -638,7 +638,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.get — user-1이 존재하지 않는 id 조회
+- RetentionPolicyAdapter.get: user-1이 존재하지 않는 id 조회
 
 Then
 
@@ -649,7 +649,7 @@ Then
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-policies"></a>
 
-#### [a-user-granted-nothing-purges-none-of-several-policies](/tests/scenario/bai_scenario/manager/retention_policy/test_partial_bulk_purging.py) — pass
+#### [a-user-granted-nothing-purges-none-of-several-policies](/tests/scenario/bai_scenario/manager/retention_policy/test_partial_bulk_purging.py): pass
 
 아무 권한도 없는 사용자가 정책 여럿을 한 번에 완전 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -667,7 +667,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.partial_bulk_purge — user-1이 정책 2개를 한 번에 완전 삭제
+- RetentionPolicyAdapter.partial_bulk_purge: user-1이 정책 2개를 한 번에 완전 삭제
 
 Then
 
@@ -681,7 +681,7 @@ Then
 
 <a id="partial_bulk_purging-purging-several-policies-answers-for-the-missing-one"></a>
 
-#### [purging-several-policies-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/retention_policy/test_partial_bulk_purging.py) — pass
+#### [purging-several-policies-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/retention_policy/test_partial_bulk_purging.py): pass
 
 슈퍼관리자가 정책 둘과 없는 id 하나를 한 번에 완전 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -699,20 +699,20 @@ Given
 
 When
 
-- RetentionPolicyAdapter.partial_bulk_purge — user-1이 정책 2개 와 없는 id 하나를 한 번에 완전 삭제
+- RetentionPolicyAdapter.partial_bulk_purge: user-1이 정책 2개 와 없는 id 하나를 한 번에 완전 삭제
 
 Then
 
 - 대상 정책이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
   - successes count = 2
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.LOGS: 'logs'>
   - retention_period_days = 30
   - enabled = True
   - last_swept_at = None
   - created_at: 이 실행이 쓴 시각
   - updated_at: 이 실행이 쓴 시각
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.LOGIN: 'login'>
   - retention_period_days = 30
   - enabled = True
@@ -727,7 +727,7 @@ Then
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-policies"></a>
 
-#### [a-user-granted-nothing-edits-none-of-several-policies](/tests/scenario/bai_scenario/manager/retention_policy/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-nothing-edits-none-of-several-policies](/tests/scenario/bai_scenario/manager/retention_policy/test_partial_bulk_editing.py): pass
 
 아무 권한도 없는 사용자가 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -745,7 +745,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.partial_bulk_update — user-1이 정책 2개의 보존 일수를 한 번에 수정
+- RetentionPolicyAdapter.partial_bulk_update: user-1이 정책 2개의 보존 일수를 한 번에 수정
 
 Then
 
@@ -759,7 +759,7 @@ Then
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-policies-at-once"></a>
 
-#### [the-superadmin-edits-several-policies-at-once](/tests/scenario/bai_scenario/manager/retention_policy/test_partial_bulk_editing.py) — pass
+#### [the-superadmin-edits-several-policies-at-once](/tests/scenario/bai_scenario/manager/retention_policy/test_partial_bulk_editing.py): pass
 
 슈퍼관리자가 정책 여럿의 보존 일수를 한 번에 바꾸면, 모두 새 일수로 오고 실패한 것은 없다
 
@@ -777,21 +777,21 @@ Given
 
 When
 
-- RetentionPolicyAdapter.partial_bulk_update — user-1이 정책 2개의 보존 일수를 한 번에 수정
+- RetentionPolicyAdapter.partial_bulk_update: user-1이 정책 2개의 보존 일수를 한 번에 수정
 
 Then
 
 - 대상 정책이 모두 새 보존 일수로 오고, 실패한 것은 없다
   - successes count = 2
   - failed = []
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.LOGS: 'logs'>
   - retention_period_days = 180
   - enabled = True
   - last_swept_at = None
   - created_at: 이 실행이 쓴 시각
   - updated_at: 이 실행이 쓴 시각
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.LOGIN: 'login'>
   - retention_period_days = 180
   - enabled = True
@@ -803,7 +803,7 @@ Then
 
 <a id="retiring-the-superadmin-purges-a-policy"></a>
 
-#### [the-superadmin-purges-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_retiring.py) — pass
+#### [the-superadmin-purges-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_retiring.py): pass
 
 슈퍼관리자가 정책을 완전 삭제하면 삭제한 정책의 id를 담은 응답이 반환된다
 
@@ -820,7 +820,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.purge — user-1이 logs 카테고리 정책 완전 삭제
+- RetentionPolicyAdapter.purge: user-1이 logs 카테고리 정책 완전 삭제
 
 Then
 
@@ -829,7 +829,7 @@ Then
 
 <a id="retiring-turning-enforcement-off-lets-a-user-purge-a-policy"></a>
 
-#### [turning-enforcement-off-lets-a-user-purge-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_retiring.py) — pass
+#### [turning-enforcement-off-lets-a-user-purge-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_retiring.py): pass
 
 권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 완전 삭제할 수 있다
 
@@ -846,7 +846,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.purge — user-1이 logs 카테고리 정책 완전 삭제
+- RetentionPolicyAdapter.purge: user-1이 logs 카테고리 정책 완전 삭제
 
 Then
 
@@ -855,7 +855,7 @@ Then
 
 <a id="retiring-a-user-granted-nothing-may-not-purge-a-policy"></a>
 
-#### [a-user-granted-nothing-may-not-purge-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_retiring.py) — pass
+#### [a-user-granted-nothing-may-not-purge-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_retiring.py): pass
 
 아무 권한도 없는 사용자가 정책을 완전 삭제하면 권한 부족으로 거부된다
 
@@ -872,7 +872,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.purge — user-1이 logs 카테고리 정책 완전 삭제
+- RetentionPolicyAdapter.purge: user-1이 logs 카테고리 정책 완전 삭제
 
 Then
 
@@ -881,7 +881,7 @@ Then
 
 <a id="retiring-purging-a-policy-id-nothing-answers-to-is-not-found"></a>
 
-#### [purging-a-policy-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/retention_policy/test_retiring.py) — pass
+#### [purging-a-policy-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/retention_policy/test_retiring.py): pass
 
 슈퍼관리자가 존재하지 않는 id를 완전 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -898,7 +898,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.purge — user-1이 존재하지 않는 id 완전 삭제
+- RetentionPolicyAdapter.purge: user-1이 존재하지 않는 id 완전 삭제
 
 Then
 
@@ -909,7 +909,7 @@ Then
 
 <a id="searching-a-category-filter-narrows-the-answer-to-that-category"></a>
 
-#### [a-category-filter-narrows-the-answer-to-that-category](/tests/scenario/bai_scenario/manager/retention_policy/test_searching.py) — pass
+#### [a-category-filter-narrows-the-answer-to-that-category](/tests/scenario/bai_scenario/manager/retention_policy/test_searching.py): pass
 
 카테고리가 다른 정책 여럿 중 하나의 카테고리를 필터로 조회하면 그 카테고리의 정책 하나만 반환된다
 
@@ -927,7 +927,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.search — user-1이 logs 카테고리 필터로 조회
+- RetentionPolicyAdapter.search: user-1이 logs 카테고리 필터로 조회
 
 Then
 
@@ -939,7 +939,7 @@ Then
 
 <a id="searching-an-enabled-filter-keeps-only-the-active-policies"></a>
 
-#### [an-enabled-filter-keeps-only-the-active-policies](/tests/scenario/bai_scenario/manager/retention_policy/test_searching.py) — pass
+#### [an-enabled-filter-keeps-only-the-active-policies](/tests/scenario/bai_scenario/manager/retention_policy/test_searching.py): pass
 
 활성과 비활성이 섞여 있을 때 활성 필터로 조회하면 활성인 정책만 반환된다
 
@@ -957,7 +957,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.search — user-1이 활성 필터로 조회
+- RetentionPolicyAdapter.search: user-1이 활성 필터로 조회
 
 Then
 
@@ -969,7 +969,7 @@ Then
 
 <a id="searching-the-monitor-searches-policies-like-the-superadmin"></a>
 
-#### [the-monitor-searches-policies-like-the-superadmin](/tests/scenario/bai_scenario/manager/retention_policy/test_searching.py) — pass
+#### [the-monitor-searches-policies-like-the-superadmin](/tests/scenario/bai_scenario/manager/retention_policy/test_searching.py): pass
 
 모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다
 
@@ -987,7 +987,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.search — user-1이 필터 없이 전체 조회
+- RetentionPolicyAdapter.search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -999,7 +999,7 @@ Then
 
 <a id="searching-the-superadmin-counts-every-policy-laid"></a>
 
-#### [the-superadmin-counts-every-policy-laid](/tests/scenario/bai_scenario/manager/retention_policy/test_searching.py) — pass
+#### [the-superadmin-counts-every-policy-laid](/tests/scenario/bai_scenario/manager/retention_policy/test_searching.py): pass
 
 카테고리가 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 집계된다
 
@@ -1017,7 +1017,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.search — user-1이 필터 없이 전체 조회
+- RetentionPolicyAdapter.search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -1029,7 +1029,7 @@ Then
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-policies"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-policies](/tests/scenario/bai_scenario/manager/retention_policy/test_searching.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-policies](/tests/scenario/bai_scenario/manager/retention_policy/test_searching.py): pass
 
 슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다
 
@@ -1047,7 +1047,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.search — user-1이 필터 없이 전체 조회
+- RetentionPolicyAdapter.search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -1058,7 +1058,7 @@ Then
 
 <a id="editing-a-policy-edit-giving-no-value-changes-nothing"></a>
 
-#### [a-policy-edit-giving-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py) — pass
+#### [a-policy-edit-giving-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py): pass
 
 값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다
 
@@ -1075,12 +1075,12 @@ Given
 
 When
 
-- RetentionPolicyAdapter.update — user-1이 logs 카테고리 정책의 아무것도 수정
+- RetentionPolicyAdapter.update: user-1이 logs 카테고리 정책의 아무것도 수정
 
 Then
 
 - 미리 만들어 둔 정책 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.LOGS: 'logs'>
   - retention_period_days = 30
   - enabled = True
@@ -1090,7 +1090,7 @@ Then
 
 <a id="editing-disabling-a-policy-answers-it-inactive"></a>
 
-#### [disabling-a-policy-answers-it-inactive](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py) — pass
+#### [disabling-a-policy-answers-it-inactive](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py): pass
 
 활성 정책의 활성 여부를 끄면 비활성 상태가 담긴 노드가 반환된다
 
@@ -1107,12 +1107,12 @@ Given
 
 When
 
-- RetentionPolicyAdapter.update — user-1이 logs 카테고리 정책의 활성 여부 수정
+- RetentionPolicyAdapter.update: user-1이 logs 카테고리 정책의 활성 여부 수정
 
 Then
 
 - 미리 만들어 둔 정책 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.LOGS: 'logs'>
   - retention_period_days = 30
   - enabled = False
@@ -1122,7 +1122,7 @@ Then
 
 <a id="editing-editing-the-retention-days-leaves-the-rest-alone"></a>
 
-#### [editing-the-retention-days-leaves-the-rest-alone](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py) — pass
+#### [editing-the-retention-days-leaves-the-rest-alone](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py): pass
 
 슈퍼관리자가 보존 일수만 수정하면, 일수는 새 값이 되고 카테고리와 활성 여부는 그대로 유지된다
 
@@ -1139,12 +1139,12 @@ Given
 
 When
 
-- RetentionPolicyAdapter.update — user-1이 logs 카테고리 정책의 보존 일수 수정
+- RetentionPolicyAdapter.update: user-1이 logs 카테고리 정책의 보존 일수 수정
 
 Then
 
 - 미리 만들어 둔 정책 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.LOGS: 'logs'>
   - retention_period_days = 180
   - enabled = True
@@ -1154,7 +1154,7 @@ Then
 
 <a id="editing-turning-enforcement-off-lets-a-user-edit-a-policy"></a>
 
-#### [turning-enforcement-off-lets-a-user-edit-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py) — pass
+#### [turning-enforcement-off-lets-a-user-edit-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py): pass
 
 권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 수정할 수 있다
 
@@ -1171,12 +1171,12 @@ Given
 
 When
 
-- RetentionPolicyAdapter.update — user-1이 logs 카테고리 정책의 보존 일수 수정
+- RetentionPolicyAdapter.update: user-1이 logs 카테고리 정책의 보존 일수 수정
 
 Then
 
 - 미리 만들어 둔 정책 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - category = <RetentionCategory.LOGS: 'logs'>
   - retention_period_days = 180
   - enabled = True
@@ -1186,7 +1186,7 @@ Then
 
 <a id="editing-a-user-granted-nothing-may-not-edit-a-policy"></a>
 
-#### [a-user-granted-nothing-may-not-edit-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py): pass
 
 아무 권한도 없는 사용자가 정책을 수정하면 권한 부족으로 거부된다
 
@@ -1203,7 +1203,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.update — user-1이 logs 카테고리 정책의 보존 일수 수정
+- RetentionPolicyAdapter.update: user-1이 logs 카테고리 정책의 보존 일수 수정
 
 Then
 
@@ -1212,7 +1212,7 @@ Then
 
 <a id="editing-moving-a-policy-to-a-category-already-taken-is-refused"></a>
 
-#### [moving-a-policy-to-a-category-already-taken-is-refused](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py) — pass
+#### [moving-a-policy-to-a-category-already-taken-is-refused](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py): pass
 
 정책 둘 중 한쪽의 카테고리를 다른 쪽 카테고리로 바꾸면, 카테고리 중복으로 거부된다. 생성할 때와 달리 저장소의 제약 위반이 그대로 전파된다
 
@@ -1230,7 +1230,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.update — user-1이 logs 카테고리 정책의 카테고리를 login(으)로 수정
+- RetentionPolicyAdapter.update: user-1이 logs 카테고리 정책의 카테고리를 login(으)로 수정
 
 Then
 
@@ -1239,7 +1239,7 @@ Then
 
 <a id="editing-the-superadmin-editing-a-policy-id-nothing-answers-to-is-not-found"></a>
 
-#### [the-superadmin-editing-a-policy-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py) — pass
+#### [the-superadmin-editing-a-policy-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py): pass
 
 슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -1256,7 +1256,7 @@ Given
 
 When
 
-- RetentionPolicyAdapter.update — user-1이 존재하지 않는 id의 보존 일수 수정
+- RetentionPolicyAdapter.update: user-1이 존재하지 않는 id의 보존 일수 수정
 
 Then
 
