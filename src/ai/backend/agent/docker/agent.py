@@ -108,6 +108,7 @@ from ai.backend.agent.types import (
     VolumeInfo,
 )
 from ai.backend.agent.utils import (
+    ContainerSSHFileWriter,
     closing_async,
     container_pid_to_host_pid,
     get_arch_name,
@@ -1081,26 +1082,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             else:
                 pubkey = self.internal_data["ssh_keypair"]["public_key"].encode("ascii")
                 privkey = self.internal_data["ssh_keypair"]["private_key"].encode("ascii")
-                ssh_dir = self.work_dir / ".ssh"
 
                 def _populate_ssh_config() -> None:
-                    ssh_dir.mkdir(parents=True, exist_ok=True)
-                    ssh_dir.chmod(0o700)
-                    (ssh_dir / "authorized_keys").write_bytes(pubkey)
-                    (ssh_dir / "authorized_keys").chmod(0o600)
-                    if not (ssh_dir / "id_rsa").is_file():
-                        (ssh_dir / "id_rsa").write_bytes(privkey)
-                        (ssh_dir / "id_rsa").chmod(0o600)
-                    (self.work_dir / "id_container").write_bytes(privkey)
-                    (self.work_dir / "id_container").chmod(0o600)
+                    paths = ContainerSSHFileWriter(self.work_dir, pubkey, privkey).write()
 
                     def chown_idfile(uid: int | None, gid: int | None) -> None:
-                        paths = [
-                            ssh_dir,
-                            ssh_dir / "authorized_keys",
-                            ssh_dir / "id_rsa",
-                            self.work_dir / "id_container",
-                        ]
                         self._chown_paths_if_root(paths, uid, gid)
 
                     if ouid is not None or ogid is not None:

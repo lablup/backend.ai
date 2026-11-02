@@ -5,6 +5,7 @@ import hashlib
 import io
 import ipaddress
 import logging
+import os
 import platform
 import re
 import resource
@@ -71,6 +72,42 @@ class closing_async(AbstractAsyncContextManager[_SupportsAsyncCloseT]):
 
     async def __aexit__(self, *exc_info: Any) -> None:
         await self.obj.close()
+
+
+class ContainerSSHFileWriter:
+    """Writes the SSH files of a kernel work directory, replacing symlinks instead of following them."""
+
+    _work_dir: Path
+    _public_key: bytes
+    _private_key: bytes
+
+    def __init__(self, work_dir: Path, public_key: bytes, private_key: bytes) -> None:
+        self._work_dir = work_dir
+        self._public_key = public_key
+        self._private_key = private_key
+
+    def write(self) -> list[Path]:
+        """Returns the directory and files under the work directory, ready for chown."""
+        ssh_dir = self._work_dir / ".ssh"
+        if ssh_dir.is_symlink():
+            ssh_dir.unlink()
+        ssh_dir.mkdir(parents=True, exist_ok=True)
+        ssh_dir.chmod(0o700)
+
+        authorized_keys = ssh_dir / "authorized_keys"
+        self._replace_file(authorized_keys, self._public_key)
+        id_rsa = ssh_dir / "id_rsa"
+        if id_rsa.is_symlink() or not id_rsa.is_file():
+            self._replace_file(id_rsa, self._private_key)
+        id_container = self._work_dir / "id_container"
+        self._replace_file(id_container, self._private_key)
+        return [ssh_dir, authorized_keys, id_rsa, id_container]
+
+    def _replace_file(self, path: Path, content: bytes) -> None:
+        path.unlink(missing_ok=True)
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(content)
 
 
 def generate_local_instance_id(hint: str) -> str:
