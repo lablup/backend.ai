@@ -650,7 +650,7 @@ raise InsufficientPermission(
 raise InsufficientPermission("Permission denied")
 ```
 
-### 3. Monitors do not fail an Action
+### 3. Monitors should not fail an action
 
 ```python
 class AuditLogMonitor(ActionMonitor):

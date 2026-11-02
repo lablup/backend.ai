@@ -20,7 +20,7 @@ The same strategy applies to all components:
 1. **Fixes only**: a backport migration contains schema fixes only (for example, missing
    columns, incorrect types, enum coexistence issues). Feature-level schema changes are
    never backported.
-2. **Idempotent**: both the backport migration and its duplicate on main are
+2. **Idempotent**: both the backport migration and its duplicate on main must be
    idempotent, so they are safe to re-apply on databases that may already have the change.
 3. **No manual revision editing**: do not modify the `revision` or `down_revision` of
    an existing migration that has already been released. Editing `down_revision` is

@@ -32,5 +32,5 @@ If you need to modify existing Graphene endpoints:
 
 ## Related documents
 
-- **[Strawberry GraphQL API](../../api/gql/README.md)** - the v2 GraphQL API implementation
+- **[Strawberry GraphQL API](../../api/gql/README.md)** - New GraphQL API implementation
 - **[Manager Overview](../../README.md)** - the manager component architecture

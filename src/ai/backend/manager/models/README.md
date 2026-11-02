@@ -42,7 +42,7 @@ Query methods such as `get_by_id` and `list_by_condition` belong in repositories
 ### Date/Time
 
 - Always use `sa.DateTime(timezone=True)`, stored in UTC.
-- Create a `created_at` column (it supports cursor pagination).
+- Recommend creating a `created_at` column (it supports cursor pagination).
 - Record timestamps such as `created_at` and `updated_at` from DB time automatically, not by hand.
   - On creation: `server_default=sa.func.now()`
   - On update: `onupdate=sa.func.now()` or `server_onupdate=sa.func.now()`

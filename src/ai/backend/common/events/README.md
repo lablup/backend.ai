@@ -156,4 +156,4 @@ Automatic retry is configured at message queue level:
 
 - [Background task system](../bgtask/README.md) - Long-running task processing
 - [Message queue](../message_queue/) - Message queue interface and implementation
-- [Manager Event Stream API](../../manager/api/events.py) - Event streaming via the Event Stream API
+- [Manager Event Stream API](../../manager/api/events.py) - SSE-based event streaming
