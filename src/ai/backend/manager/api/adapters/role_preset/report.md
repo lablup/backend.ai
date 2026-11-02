@@ -74,8 +74,6 @@ Scenario: incomplete 15 / 21
 | scenario | verdict |
 |---|---|
 | [슈퍼관리자가 한 스코프의 id로 프리셋을 검색하면, 그 스코프 하나에만 역할을 만드는 프리셋만 반환된다](#searching-a-scope-id-finds-the-preset-for-that-scope-alone) | answered |
-| [슈퍼관리자가 스코프 id가 비어 있는 프리셋을 검색하면, 그 타입의 모든 스코프에 역할을 만드는 프리셋만 반환된다](#searching-no-scope-id-finds-the-presets-for-every-scope-of-their-type) | answered |
-| [슈퍼관리자가 스코프 id가 있는 프리셋을 검색하면, 스코프 하나에만 역할을 만드는 프리셋만 반환된다](#searching-some-scope-id-finds-the-presets-for-one-scope) | answered |
 | [아무 권한도 받지 않은 사용자가 프리셋을 검색하려 하면, 권한 부족으로 거부된다](#searching-a-user-granted-nothing-may-not-search-presets) | rejected |
 
 **atomic_bulk_add_permissions**
@@ -554,84 +552,6 @@ Then
   - has_next_page = False
   - has_previous_page = False
 
-<a id="searching-no-scope-id-finds-the-presets-for-every-scope-of-their-type"></a>
-
-#### [no-scope-id-finds-the-presets-for-every-scope-of-their-type](/tests/scenario/bai_scenario/manager/role_preset/test_searching.py): pass
-
-슈퍼관리자가 스코프 id가 비어 있는 프리셋을 검색하면, 그 타입의 모든 스코프에 역할을 만드는 프리셋만 반환된다
-
-Given
-
-- public 하나에만 역할을 만드는 프리셋 하나와 모든 프로젝트에 역할을 만드는 프리셋 하나, 그리고 superadmin 한 명
-  - 역할 프리셋 for-public-1: global 스코프 하나에만 역할을 만들고 자동 부여는 꺼져 있다
-  - 역할 프리셋 for-every-project-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- RolePresetAdapter.search: user-1이 스코프 id가 비어 있는 프리셋을 검색
-
-Then
-
-- 모든 프로젝트에 역할을 만드는 프리셋만 반환된다
-  - items count = 1
-  - items[0].id: 미리 만든 프리셋의 id와 같다
-  - items[0].entity_id: 미리 만든 프리셋의 id와 같다
-  - items[0].name = 'for-every-project-1'
-  - items[0].scope_type = 'project'
-  - items[0].scope_id = None
-  - items[0].auto_assign = False
-  - items[0].deleted = False
-  - items[0].created_at: 이 실행이 쓴 시각
-  - items[0].updated_at: 이 실행이 쓴 시각
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="searching-some-scope-id-finds-the-presets-for-one-scope"></a>
-
-#### [some-scope-id-finds-the-presets-for-one-scope](/tests/scenario/bai_scenario/manager/role_preset/test_searching.py): pass
-
-슈퍼관리자가 스코프 id가 있는 프리셋을 검색하면, 스코프 하나에만 역할을 만드는 프리셋만 반환된다
-
-Given
-
-- public 하나에만 역할을 만드는 프리셋 하나와 모든 프로젝트에 역할을 만드는 프리셋 하나, 그리고 superadmin 한 명
-  - 역할 프리셋 for-public-1: global 스코프 하나에만 역할을 만들고 자동 부여는 꺼져 있다
-  - 역할 프리셋 for-every-project-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- RolePresetAdapter.search: user-1이 스코프 id가 있는 프리셋을 검색
-
-Then
-
-- public 하나에만 역할을 만드는 프리셋만 반환된다
-  - items count = 1
-  - items[0].id: 미리 만든 프리셋의 id와 같다
-  - items[0].entity_id: 미리 만든 프리셋의 id와 같다
-  - items[0].name = 'for-public-1'
-  - items[0].scope_type = 'public'
-  - items[0].scope_id: 미리 만든 프리셋이 지정한 스코프의 id와 같다
-  - items[0].auto_assign = False
-  - items[0].deleted = False
-  - items[0].created_at: 이 실행이 쓴 시각
-  - items[0].updated_at: 이 실행이 쓴 시각
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-
 <a id="searching-a-user-granted-nothing-may-not-search-presets"></a>
 
 #### [a-user-granted-nothing-may-not-search-presets](/tests/scenario/bai_scenario/manager/role_preset/test_searching.py): pass
@@ -652,7 +572,7 @@ Given
 
 When
 
-- RolePresetAdapter.search: user-1이 스코프 id가 있는 프리셋을 검색
+- RolePresetAdapter.search: user-1이 for-public-1이 지정한 스코프의 id를 스코프 id 필터에 지정해 검색
 
 Then
 

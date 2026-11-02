@@ -6,7 +6,6 @@ caller side by side and never a role between them.
 
 from __future__ import annotations
 
-import enum
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -290,29 +289,17 @@ class ThePresetComesBack(Then[APresetAndACaller, RolePresetNode]):
         return self.expected.verdicts("", node, laid.preset)
 
 
-class RemainingPreset(enum.Enum):
-    """검색 뒤에 남아야 하는 미리 만든 프리셋."""
-
-    FOR_PUBLIC = enum.auto()
-    FOR_EVERY_PROJECT = enum.auto()
-
-
 @dataclass(frozen=True)
-class OnlyThatPresetComesBack(
+class OnlyThePresetForPublicComesBack(
     Then[PresetsForPublicAndEveryProjectAndACaller, SearchRolePresetsPayload]
 ):
-    """미리 만든 두 프리셋 중 `remaining`이 가리키는 것만 통째로 반환된다."""
+    """미리 만든 두 프리셋 중 public 하나에만 역할을 만드는 것만 통째로 반환된다."""
 
     started: datetime
-    remaining: RemainingPreset
 
     @override
     def says(self) -> str:
-        match self.remaining:
-            case RemainingPreset.FOR_PUBLIC:
-                return f"{GlobalEntityName.PUBLIC} 하나에만 역할을 만드는 프리셋만 반환된다"
-            case RemainingPreset.FOR_EVERY_PROJECT:
-                return "모든 프로젝트에 역할을 만드는 프리셋만 반환된다"
+        return f"{GlobalEntityName.PUBLIC} 하나에만 역할을 만드는 프리셋만 반환된다"
 
     @override
     def look(
@@ -323,24 +310,10 @@ class OnlyThatPresetComesBack(
         page = answered.response
         if page is None:
             return [Refused(InsufficientPrivilege, answered.raised)]
-        match self.remaining:
-            case RemainingPreset.FOR_PUBLIC:
-                return self._verdicts_on_a_page_holding_only(
-                    page,
-                    laid.for_public,
-                    PresetLook(self.started, shown_scope_type=str(GlobalEntityName.PUBLIC)),
-                )
-            case RemainingPreset.FOR_EVERY_PROJECT:
-                return self._verdicts_on_a_page_holding_only(
-                    page, laid.for_every_project, PresetLook(self.started)
-                )
-
-    def _verdicts_on_a_page_holding_only(
-        self, page: SearchRolePresetsPayload, seeded: RolePresetData, expected: PresetLook
-    ) -> list[Verdict]:
+        expected = PresetLook(self.started, shown_scope_type=str(GlobalEntityName.PUBLIC))
         verdicts: list[Verdict] = [Same("items count", len(page.items), 1)]
         for i, node in enumerate(page.items):
-            verdicts += expected.verdicts(f"items[{i}].", node, seeded)
+            verdicts += expected.verdicts(f"items[{i}].", node, laid.for_public)
         return [
             *verdicts,
             Same("total_count", page.total_count, 1),
