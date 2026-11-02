@@ -16,8 +16,6 @@ validator runs.
 
 import ipaddress
 import logging
-from collections.abc import Sequence
-from typing import Self
 
 from ai.backend.logging.structured import StructuredLogger
 
@@ -27,24 +25,16 @@ type IPNetwork = ipaddress.IPv4Network | ipaddress.IPv6Network
 
 
 class ClientIPValidator:
-    """Client-IP allowlist of a circuit or an Ingress.
+    """Per-circuit client-IP allowlist.
 
-    Constructed from a circuit's ``allowed_client_ips`` string, or with
-    :meth:`from_networks` from an Ingress's parsed ``access.allowed_client_ips``.
-    An empty allowlist (``None``/blank, or every entry invalid) means "no
-    restriction" — every client is allowed.
+    Constructed from a circuit's ``allowed_client_ips`` string; the string is
+    parsed once at construction and the resulting networks are held as a field,
+    so repeated matching does not re-parse. An empty allowlist (``None``/blank,
+    or every entry invalid) means "no restriction" — every client is allowed.
     """
-
-    _networks: list[IPNetwork]
 
     def __init__(self, allowed_client_ips: str | None) -> None:
         self._networks = self._parse(allowed_client_ips)
-
-    @classmethod
-    def from_networks(cls, networks: Sequence[IPNetwork]) -> Self:
-        validator = cls(None)
-        validator._networks = list(networks)
-        return validator
 
     @staticmethod
     def _parse(value: str | None) -> list[IPNetwork]:
