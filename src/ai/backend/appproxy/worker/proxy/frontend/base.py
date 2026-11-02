@@ -9,7 +9,10 @@ from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.types import (
     RouteInfo,
 )
-from ai.backend.appproxy.worker.errors.ingress import IngressNotRegisteredError
+from ai.backend.appproxy.worker.errors.ingress import (
+    IngressFrontendNotRegisteredError,
+    IngressNotRegisteredError,
+)
 from ai.backend.appproxy.worker.proxy.backend.base import BaseBackend
 from ai.backend.appproxy.worker.types import Circuit, RootContext
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
@@ -73,9 +76,14 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
                 tg.create_task(self.break_circuit(circuit))
 
     async def _read_registered_ingress(self, frontend_key: IngressFrontendKey) -> Ingress:
-        ingress = await self.root_context.ingress_state.reader.get(frontend_key)
+        try:
+            ingress = await self.root_context.ingress_state.reader.get(frontend_key)
+        except IngressNotRegisteredError as e:
+            raise IngressFrontendNotRegisteredError(
+                f"frontend {frontend_key} is not registered"
+            ) from e
         if ingress is None:
-            raise IngressNotRegisteredError(f"frontend {frontend_key} was removed")
+            raise IngressFrontendNotRegisteredError(f"frontend {frontend_key} was removed")
         return ingress
 
     @staticmethod

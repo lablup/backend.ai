@@ -11,7 +11,7 @@ from aiohttp.typedefs import Handler
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.worker.config import WildcardDomainConfig
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
-from ai.backend.appproxy.worker.errors.ingress import IngressNotRegisteredError
+from ai.backend.appproxy.worker.errors.ingress import IngressFrontendNotRegisteredError
 from ai.backend.appproxy.worker.types import Circuit, SubdomainFrontendInfo
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
@@ -91,7 +91,7 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
         # exclude port number when evaluating the subdomain
         subdomain = request.host.partition(":")[0].replace(self.wildcard_config.domain, "").lower()
         if subdomain not in self.circuits:
-            raise IngressNotRegisteredError(f"E20009: Subdomain {subdomain} not registered")
+            raise IngressFrontendNotRegisteredError(f"E20009: Subdomain {subdomain} not registered")
         return subdomain
 
     @web.middleware

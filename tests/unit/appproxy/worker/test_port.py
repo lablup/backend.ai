@@ -22,7 +22,10 @@ from ai.backend.appproxy.common.types import (
     ProxyProtocol,
     RouteInfo,
 )
-from ai.backend.appproxy.worker.errors.ingress import IngressNotRegisteredError
+from ai.backend.appproxy.worker.errors.ingress import (
+    IngressFrontendNotRegisteredError,
+    IngressNotRegisteredError,
+)
 from ai.backend.appproxy.worker.proxy.frontend.http.port import PortFrontend
 from ai.backend.appproxy.worker.types import Circuit, InferenceAppInfo, PortFrontendInfo
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
@@ -197,7 +200,7 @@ class TestPortFrontend:
         self, case: _PortSlotCase, port_slot_situation: _PortSlotSituation
     ) -> None:
         situation = port_slot_situation
-        with pytest.raises(IngressNotRegisteredError):
+        with pytest.raises(IngressFrontendNotRegisteredError):
             await situation.frontend.ensure_slot_middleware(situation.request, situation.handler)
         situation.handler.assert_not_awaited()
 
