@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO, UUIDSc
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
+    "AnswerEntityShareOptions",
     "CreateEntityShareInput",
     "EntityShareRecipientInput",
     "MySearchEntitySharesInput",
@@ -146,6 +147,18 @@ class ScopedSearchEntitySharesInput(BaseRequestModel):
     before: str | None = None
     limit: int | None = None
     offset: int | None = None
+
+
+class AnswerEntityShareOptions(BaseRequestModel):
+    """Which recipient answers an offer: the caller, or a project addressed by it."""
+
+    project_id: UUID | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. The project answering an offer addressed to it. "
+            "The caller answers for themselves when omitted."
+        ),
+    )
 
 
 class MySearchEntitySharesInput(BaseRequestModel):

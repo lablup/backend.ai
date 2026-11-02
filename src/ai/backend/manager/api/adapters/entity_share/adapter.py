@@ -12,6 +12,7 @@ from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.entity_share.request import (
+    AnswerEntityShareOptions,
     CreateEntityShareInput,
     EntityShareFilter,
     EntityShareOrderBy,
@@ -132,21 +133,31 @@ class EntityShareAdapter(BaseAdapter):
             for item in result.items
         ]
 
-    async def accept(self, share_id: EntityShareID) -> EntitySharePayload:
+    async def accept(
+        self, share_id: EntityShareID, options: AnswerEntityShareOptions
+    ) -> EntitySharePayload:
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
+        answering_scope: EntityIdentifier = (
+            ProjectID(options.project_id) if options.project_id is not None else UserID(me.user_id)
+        )
         result = await self._entity_share.accept.run(
-            AcceptEntityShareAction(share_id=share_id, answering_scope=UserID(me.user_id))
+            AcceptEntityShareAction(share_id=share_id, answering_scope=answering_scope)
         )
         return EntitySharePayload(share=self._to_node(result.data))
 
-    async def reject(self, share_id: EntityShareID) -> EntitySharePayload:
+    async def reject(
+        self, share_id: EntityShareID, options: AnswerEntityShareOptions
+    ) -> EntitySharePayload:
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
+        answering_scope: EntityIdentifier = (
+            ProjectID(options.project_id) if options.project_id is not None else UserID(me.user_id)
+        )
         result = await self._entity_share.reject.run(
-            RejectEntityShareAction(share_id=share_id, answering_scope=UserID(me.user_id))
+            RejectEntityShareAction(share_id=share_id, answering_scope=answering_scope)
         )
         return EntitySharePayload(share=self._to_node(result.data))
 
