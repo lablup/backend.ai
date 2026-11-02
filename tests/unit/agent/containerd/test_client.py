@@ -11,6 +11,8 @@ from ai.backend.agent.containerd.client import ContainerdClient, ContainerdClien
 from ai.backend.agent.containerd.rpc import errors as rpc_errors
 from ai.backend.agent.containerd.rpc import types as rpc_types
 from ai.backend.agent.errors.containerd import (
+    ContainerdImageInvalid,
+    ContainerdImageNotFound,
     ContainerdOperationFailed,
     ContainerdUnavailableError,
 )
@@ -29,9 +31,22 @@ def _client_raising(monkeypatch: pytest.MonkeyPatch, method: str, error: Excepti
     [
         ("connect", (), rpc_errors.ContainerdUnavailable("down"), ContainerdUnavailableError),
         (
-            "list_containers",
-            ({},),
-            rpc_errors.ContainerdCallFailed("list_containers", "INTERNAL", "boom"),
+            "get_image_target",
+            ("img",),
+            rpc_errors.ImageNotFound("no image"),
+            ContainerdImageNotFound,
+        ),
+        (
+            "prepare_snapshot",
+            ("k", "p"),
+            rpc_errors.SnapshotParentNotFound("x"),
+            ContainerdImageNotFound,
+        ),
+        ("read_blob", ("sha256:1",), rpc_errors.BlobNotFound("no blob"), ContainerdImageInvalid),
+        (
+            "start_task",
+            ("c",),
+            rpc_errors.ContainerdCallFailed("start_task", "INTERNAL", "boom"),
             ContainerdOperationFailed,
         ),
     ],
@@ -60,4 +75,6 @@ async def test_results_pass_through(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(client._client, "get_task", AsyncMock(return_value=task))
 
     assert await client.get_task("c") is task
+    assert client.namespace == "ns"
+    assert client.snapshotter == "overlayfs"
     assert not client.connected

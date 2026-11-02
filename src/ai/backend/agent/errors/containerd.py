@@ -88,3 +88,18 @@ class ContainerdImageInvalid(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.PARSING,
             error_detail=ErrorDetail.INVALID_DATA_FORMAT,
         )
+
+
+class KernelNetworkSetupFailed(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a host command for a kernel's network namespace (ip) fails."""
+
+    error_type = "https://api.backend.ai/probs/agent/kernel-network-setup-failed"
+    error_title = "The kernel network cannot be set up."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
