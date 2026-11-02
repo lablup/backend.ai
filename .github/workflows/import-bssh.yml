@@ -75,14 +75,10 @@ jobs:
               env:
                   TAG: ${{ steps.get-tag.outputs.tag }}
               run: |
-<<<<<<< HEAD
-                  echo "Update bssh binaries to ${{ steps.get-tag.outputs.tag }}" > changes/.deps.md
-=======
-                  echo "Update bssh and bssh-server binaries to ${TAG}" > changes/.deps.md
->>>>>>> 12e7e7627 (fix(BA-8813): read workflow tag inputs from env and pin actions (#16305))
+                  echo "Update bssh binaries to ${TAG}" > changes/.deps.md
 
             - name: Create pull request
-              uses: peter-evans/create-pull-request@v7
+              uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676  # v7
               with:
                   token: ${{ secrets.OCTODOG }}
                   commit-message: "chore: Update bssh binaries to ${{ steps.get-tag.outputs.tag }}"
