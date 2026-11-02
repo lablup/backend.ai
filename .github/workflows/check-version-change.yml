@@ -18,12 +18,8 @@ jobs:
           lfs: false
       - name: Detect release PR
         uses: ./.github/actions/detect-release-pr
-<<<<<<< HEAD
-      - uses: dorny/paths-filter@v3
-        if: env.IS_RELEASE_PR != 'true'
-=======
       - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad  # v3
->>>>>>> 23de7105 (fix(BA-8813): pin the remaining third-party actions to commit SHAs (#16314))
+        if: env.IS_RELEASE_PR != 'true'
         id: filter
         with:
           filters: |
