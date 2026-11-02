@@ -1,7 +1,7 @@
 ---
 name: secret-adapter-scenarios
 type: reference
-description: what the secret adapter guarantees; the status count of stored secrets by the key holding them, the re-encryption pass that rewrites every row through the write provider, the monitor role passing the status and refused the pass
+description: what the secret adapter guarantees; the status count of stored secrets by the key holding them, the re-encryption pass that rewrites every row through the write provider, the monitor role passing the status and rejected on the pass
 scope: src/ai/backend/manager/api/adapters/secret
 keywords: [secret, scenario, adapter, superadmin, monitor, reencrypt, key provider, plaintext]
 generated:
@@ -9,36 +9,26 @@ generated:
   at: 2026-09-11
 status: draft
 ---
-# secret 어댑터 — 시나리오
+# secret adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 어긋나면 문장 쪽을 먼저
-의심한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-이 어댑터는 자체 엔티티 행을 갖지 않는다. 저장된 `secret`이 어느 키로 암호화돼 있는지 세는 상태
-조회와, 저장된 `secret` 전부를 `write_provider_type` 값이 가리키는 제공자로 다시 쓰는 재암호화뿐이다.
-둘 다 호출한 사용자가 슈퍼관리자인지 검사하는데, 상태 조회는 읽기 연산이라 모니터 역할도 통과하고
-재암호화는 쓰기 연산이라 통과하지 못한다. 한 어댑터 안에서 그 차이를 보여 주는 유일한 짝이다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-집계 대상은 키페어의 `secret_key` 컬럼 하나뿐이다. 호출자도 키페어를 가지므로 호출자의 `secret_key`
-값은 언제나 `counts` 집계에 포함되고, 저장된 `secret`이 하나도 없는 상황은 만들 수 없다.
+This adapter has no entity row of its own. It has only the status get that counts how many stored `secret` values are encrypted with each key, and the re-encryption that rewrites every stored `secret` through the provider the `write_provider_type` value refers to. Both check whether the calling user is superadmin, and the status get is a read operation so a monitor role passes too, while re-encryption is a write operation so it does not. This is the only pair that shows the difference within one adapter.
 
-키 풀은 시나리오가 직접 만들어 주입한다. 외부 서비스는 없다 — 구현된 키 제공자는 설정에서 키를 읽는
-`config` 제공자 하나뿐이고, `write_provider_type` 값을 지정하지 않으면 새 값은 평문으로 저장된다.
+The only column counted is `secret_key` of a keypair. The caller holds a keypair too, so the caller's `secret_key` value is always in the `counts` aggregate, and a situation with no stored `secret` cannot be created.
 
-## 상태 조회
+The scenario creates and injects the key pool directly. There is no external service: the only implemented key provider is the `config` provider that reads keys from config, and when the `write_provider_type` value is not specified, the new value is stored as plaintext.
 
-`counts`는 `provider_type`, `key_id` 순으로 정렬되어 반환된다. 실행마다 순서가 같으므로 그대로 비교한다.
+## Status get
 
-## 재암호화
+`counts` is returned sorted by `provider_type` and then `key_id`. The order is the same on every run, so tests compare it as is.
 
-재암호화는 모든 행을 동일하게 다룬다. 이미 `write_provider_type` 값이 가리키는 제공자의 키로 암호화된
-행도 새 데이터 키로 다시 쓰므로, "이미 그 키로 암호화된 `secret`을 다시 옮긴다" 시나리오에서도
-`reencrypted` 값이 `scanned` 값과 같다. 중간에 끊긴 재암호화는 다시 실행해 이어 가도록 설계돼 있고,
-그래서 같은 요청을 두 번 실행해도 응답이 같다.
+## Re-encryption
 
-`write_provider_type`이 `plain`이면 재암호화가 값을 평문으로 되돌린다. "`write_provider_type`이
-`plain`일 때 실행한다"와 "암호화된 `secret`을 평문으로 되돌린다" 시나리오가 그 경우다. `reencrypted` 값은
-내용이 바뀐 행의 수가 아니라 다시 쓴 행의 수이므로, 평문에서 평문으로 다시 쓴 행도 센다.
+Re-encryption treats every row the same. It rewrites even a row already encrypted with the key of the provider that the `write_provider_type` value refers to, using a new data key, so even in the scenario "move a `secret` already encrypted with that key again" the `reencrypted` value equals the `scanned` value. Re-encryption interrupted in the middle is designed to continue when run again, so running the same request twice returns the same response.
 
-"모니터 역할이 상태를 조회한다"와 "모니터 역할이 실행한다" 시나리오가 이 어댑터의 요점이다. 같은
-사용자가 상태는 조회할 수 있지만 재암호화는 실행하지 못한다.
+When `write_provider_type` is `plain`, re-encryption turns the value back to plaintext. "run when `write_provider_type` is `plain`" and "turn an encrypted `secret` back to plaintext" cover that case. The `reencrypted` value is the number of rows rewritten, not the number of rows whose content changed, so a row rewritten from plaintext to plaintext is counted too.
+
+"a monitor role user gets the status" and "a monitor role user runs" are the point of this adapter. The same user can get the status but cannot run re-encryption.
