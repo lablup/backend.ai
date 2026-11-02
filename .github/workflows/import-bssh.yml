@@ -22,21 +22,26 @@ jobs:
 
             - name: Get release tag
               id: get-tag
+              env:
+                  EVENT_NAME: ${{ github.event_name }}
+                  DISPATCH_TAG: ${{ github.event.client_payload.tag }}
+                  INPUT_TAG: ${{ github.event.inputs.tag }}
               run: |
-                  if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-                    TAG="${{ github.event.client_payload.tag }}"
-                  elif [ -n "${{ github.event.inputs.tag }}" ]; then
-                    TAG="${{ github.event.inputs.tag }}"
+                  if [ "$EVENT_NAME" = "repository_dispatch" ]; then
+                    TAG="$DISPATCH_TAG"
+                  elif [ -n "$INPUT_TAG" ]; then
+                    TAG="$INPUT_TAG"
                   else
                     # Get latest release tag
                     TAG=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/lablup/bssh/releases/latest | jq -r .tag_name)
                   fi
-                  echo "tag=$TAG" >> $GITHUB_OUTPUT
+                  echo "tag=$TAG" >> "$GITHUB_OUTPUT"
                   echo "Using tag: $TAG"
 
             - name: Download bssh binaries
+              env:
+                  TAG: ${{ steps.get-tag.outputs.tag }}
               run: |
-                  TAG="${{ steps.get-tag.outputs.tag }}"
                   for ARCH in aarch64 x86_64; do
                     URL="https://github.com/lablup/bssh/releases/download/${TAG}/bssh-linux-${ARCH}-musl.tar.gz"
                     echo "Downloading from: $URL"
@@ -67,8 +72,14 @@ jobs:
                   mv bssh.1 "${TARGET_DIR}/"
 
             - name: Add news fragment
+              env:
+                  TAG: ${{ steps.get-tag.outputs.tag }}
               run: |
+<<<<<<< HEAD
                   echo "Update bssh binaries to ${{ steps.get-tag.outputs.tag }}" > changes/.deps.md
+=======
+                  echo "Update bssh and bssh-server binaries to ${TAG}" > changes/.deps.md
+>>>>>>> 12e7e7627 (fix(BA-8813): read workflow tag inputs from env and pin actions (#16305))
 
             - name: Create pull request
               uses: peter-evans/create-pull-request@v7
