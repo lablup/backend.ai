@@ -116,7 +116,7 @@ class AUserGrantedNothingPurgesNone(
     @override
     def describe(self) -> str:
         return Says(
-            "아무 권한도 받지 않은 사용자가 자원 그룹 여럿을 한 번에 완전 삭제하려 하면, 지워진 "
+            "아무 권한도 받지 않은 사용자가 자원 그룹 여럿을 한 번에 완전 삭제하려 하면, 삭제된 "
             "것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
             english=(
                 "a user granted nothing trying to purge several resource groups at once gets "

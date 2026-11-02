@@ -99,13 +99,13 @@ class SomeoneInADomain(Given[Any, AnAskerAndWhomTheyReach]):
 
     @override
     def describe(self) -> str:
-        parts_ko = ["도메인 하나와 부르는 사람"]
+        parts_ko = ["도메인 하나와 호출자"]
         parts_en = ["one domain and one caller"]
         if self.with_neighbours:
             parts_ko.append("같은 도메인 사용자 하나와 다른 도메인 사용자 하나")
             parts_en.append("one user in the same domain and one user in another domain")
         if self.granted:
-            parts_ko.append("부르는 사람은 그 도메인 스코프의 사용자 READ 를 받았습니다")
+            parts_ko.append("호출자는 그 도메인 스코프의 사용자 READ 를 받았습니다")
             parts_en.append("the caller holds the user READ permission in that domain scope")
         return Says(", ".join(parts_ko), english=", ".join(parts_en))
 
@@ -221,7 +221,7 @@ class TwoUsersOneHoldingARole(Given[Any, AnAskerAndWhomTheyReach]):
     def describe(self) -> str:
         if self.role == UserRole.SUPERADMIN:
             return Says(
-                "도메인 하나와 사용자 둘, 첫 사람만 역할 하나를 받았고, 부르는 사람은 superadmin",
+                "도메인 하나와 사용자 둘, 첫 사람만 역할 하나를 받았고, 호출자는 superadmin",
                 english=(
                     "one domain and two users, only the first holds a role, and the caller is "
                     "the superadmin"
@@ -229,7 +229,7 @@ class TwoUsersOneHoldingARole(Given[Any, AnAskerAndWhomTheyReach]):
             )
         if not self.granted:
             return Says(
-                "도메인 하나와 사용자 둘, 첫 사람만 역할 하나를 받았고, 부르는 사람은 "
+                "도메인 하나와 사용자 둘, 첫 사람만 역할 하나를 받았고, 호출자는 "
                 "아무 권한도 받지 않았습니다",
                 english=(
                     "one domain and two users, only the first holds a role, and the caller "
@@ -238,7 +238,7 @@ class TwoUsersOneHoldingARole(Given[Any, AnAskerAndWhomTheyReach]):
             )
         return Says(
             "도메인 하나와 사용자 둘, 첫 사람만 역할 하나를 받았고, "
-            "부르는 사람은 그 도메인 스코프의 사용자 READ 를 받았습니다",
+            "호출자는 그 도메인 스코프의 사용자 READ 를 받았습니다",
             english=(
                 "one domain and two users, only the first holds a role, and the caller holds "
                 "the user READ permission in that domain scope"
@@ -305,7 +305,7 @@ class AProjectWithAMember(Given[Any, AnAskerAndWhomTheyReach]):
     def describe(self) -> str:
         return Says(
             "도메인 하나와 프로젝트 하나, 멤버 목록에 오른 사용자 하나와 오르지 않은 사용자 하나, "
-            "부르는 사람은 그 프로젝트 스코프의 사용자 READ 를 받았습니다",
+            "호출자는 그 프로젝트 스코프의 사용자 READ 를 받았습니다",
             english=(
                 "one domain and one project, one user on its roster and one not, and the caller "
                 "holds the user READ permission in that project scope"
@@ -361,7 +361,7 @@ class TwoScopes(Given[Any, AnAskerAndWhomTheyReach]):
                 ),
             )
         return Says(
-            f"도메인 둘과 둘째 도메인의 프로젝트 하나와 그 멤버 목록 사용자 하나, 부르는 사람은 "
+            f"도메인 둘과 둘째 도메인의 프로젝트 하나와 그 멤버 목록 사용자 하나, 호출자는 "
             f"{granted}",
             english=(
                 "two domains, one project of the second domain and one user on its roster, and "

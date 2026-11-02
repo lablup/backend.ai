@@ -78,7 +78,7 @@ class PurgingAnswersForTheMissingOne(
     @override
     def describe(self) -> str:
         return Says(
-            "프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워진 노드로 오고 없는 id 는 "
+            "프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 삭제된 노드로 오고 없는 id 는 "
             "대상이 없다는 이유로 실패 목록에 옵니다",
             english=(
                 "purging two presets and one unknown id at once answers the two as deleted nodes "
@@ -110,7 +110,7 @@ class AUserGrantedNothingPurgesNone(
     @override
     def describe(self) -> str:
         return Says(
-            "아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 지워진 것 "
+            "아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 삭제된 것 "
             "없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
             english=(
                 "a user granted nothing trying to purge several presets at once gets none "

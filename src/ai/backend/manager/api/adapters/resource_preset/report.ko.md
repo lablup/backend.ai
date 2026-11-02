@@ -20,8 +20,8 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets) | 성공 |
-| [프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워진 노드로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets) | 성공 |
+| [프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 삭제된 노드로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | 성공 |
 
 **partial_bulk_update**
 
@@ -54,7 +54,7 @@
 
 #### [a-user-granted-nothing-purges-none-of-several-presets](/tests/scenario/bai_scenario/manager/resource_preset/test_partial_bulk_purging.py): pass
 
-아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다
+아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다
 
 Given
 
@@ -86,7 +86,7 @@ Then
 
 #### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_preset/test_partial_bulk_purging.py): pass
 
-프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워진 노드로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
+프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 삭제된 노드로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
 
 Given
 

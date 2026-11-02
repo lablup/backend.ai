@@ -89,12 +89,12 @@ class SomeoneAndAnother(Given[Any, TwoPeopleAndTheirHistory]):
         if self.permissions:
             names = ", ".join(str(p.name) for p in self.permissions)
             grant = Says(
-                f"부르는 사람은 자기 사용자에 {names} 권한을 받았습니다",
+                f"호출자는 자기 사용자에 {names} 권한을 받았습니다",
                 english=f"the caller holds the {names} permission on their own user",
             )
         else:
             grant = Says(
-                "부르는 사람은 아무 권한도 받지 않았습니다",
+                "호출자는 아무 권한도 받지 않았습니다",
                 english="the caller holds no permission",
             )
         return Says(
@@ -145,7 +145,7 @@ class SomeoneReadingTheDomain(Given[Any, TwoPeopleAndTheirHistory]):
     @override
     def describe(self) -> str:
         return Says(
-            "도메인 하나, 부르는 사람은 도메인 스코프에서 사용자 READ 권한을 받았습니다",
+            "도메인 하나, 호출자는 도메인 스코프에서 사용자 READ 권한을 받았습니다",
             english=(
                 "one domain, and the caller holds the user READ permission in the domain scope"
             ),

@@ -18,7 +18,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [아무 권한도 받지 않은 사용자가 할당 여럿을 한 번에 purge 하려 하면, 삭제한 것 없이 모두 찾을 수 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-assignments) | 성공 |
-| [superadmin 이 할당 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지우기 전 할당으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-the-superadmin-purges-several-assignments-and-is-answered-for-the-missing-one) | 성공 |
+| [superadmin 이 할당 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 삭제하기 전 할당으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-the-superadmin-purges-several-assignments-and-is-answered-for-the-missing-one) | 성공 |
 
 **partial_bulk_update**
 
@@ -72,7 +72,7 @@ Then
 
 #### [the-superadmin-purges-several-assignments-and-is-answered-for-the-missing-one](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_partial_bulk_purging.py): pass
 
-superadmin 이 할당 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지우기 전 할당으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
+superadmin 이 할당 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 삭제하기 전 할당으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
 
 Given
 

@@ -87,7 +87,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 자원 그룹 여럿을 한 번에 완전 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-resource-groups) | 성공 |
+| [아무 권한도 받지 않은 사용자가 자원 그룹 여럿을 한 번에 완전 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-resource-groups) | 성공 |
 | [superadmin 이 자원 그룹 둘과 없는 id 하나를 한 번에 완전 삭제하면, 둘은 삭제한 그대로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-purging-several-resource-groups-answers-for-the-missing-one) | 성공 |
 
 **partial_bulk_update**
@@ -203,7 +203,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [superadmin 이 자원 그룹의 허용 도메인에 도메인을 추가하면 그 도메인 이름이 담긴 목록이 반환됩니다](#allowing-the-superadmin-allows-a-domain-for-a-resource-group) | 성공 |
-| [아무 권한도 없는 사용자가 자원 그룹의 허용 도메인에 도메인을 추가하려 하면 권한 부족으로 거부됩니다. 관계를 쓰는 단계가 양쪽 스코프의 권한을 검사합니다](#allowing-a-user-granted-nothing-may-not-allow-a-domain-for-a-resource-group) | 거부 |
+| [아무 권한도 없는 사용자가 자원 그룹의 허용 도메인에 도메인을 추가하려 하면 권한 부족으로 거부됩니다. 관계를 사용하는 단계가 양쪽 스코프의 권한을 검사합니다](#allowing-a-user-granted-nothing-may-not-allow-a-domain-for-a-resource-group) | 거부 |
 | [존재하지 않는 도메인 이름을 자원 그룹의 허용 도메인에 추가하려 하면 대상을 찾을 수 없다는 이유로 거부됩니다](#allowing-allowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found) | 거부 |
 | [존재하지 않는 도메인 이름을 자원 그룹의 허용 도메인에서 제거하려 하면 건너뛰지 않고 대상을 찾을 수 없다는 이유로 거부됩니다. 도메인 쪽에서 없는 자원 그룹 이름을 제거하는 것은 건너뜁니다](#allowing-disallowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found) | 거부 |
 
@@ -924,7 +924,7 @@ Then
 
 #### [a-user-granted-nothing-purges-none-of-several-resource-groups](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_purging.py): pass
 
-아무 권한도 받지 않은 사용자가 자원 그룹 여럿을 한 번에 완전 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다
+아무 권한도 받지 않은 사용자가 자원 그룹 여럿을 한 번에 완전 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다
 
 Given
 
@@ -2611,7 +2611,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-allow-a-domain-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
-아무 권한도 없는 사용자가 자원 그룹의 허용 도메인에 도메인을 추가하려 하면 권한 부족으로 거부됩니다. 관계를 쓰는 단계가 양쪽 스코프의 권한을 검사합니다
+아무 권한도 없는 사용자가 자원 그룹의 허용 도메인에 도메인을 추가하려 하면 권한 부족으로 거부됩니다. 관계를 사용하는 단계가 양쪽 스코프의 권한을 검사합니다
 
 Given
 

@@ -115,10 +115,10 @@ class SomeoneAndAKeyOwner(Given[Any, AKeyOwnerAndACaller]):
             parts_en.append("the target holds one extra key that is not the default")
         if self.grant:
             names = ", ".join(str(one.name) for one in self.grant)
-            parts_ko.append(f"부르는 사람은 대상에 대한 사용자 {names} 권한을 받았습니다")
+            parts_ko.append(f"호출자는 대상에 대한 사용자 {names} 권한을 받았습니다")
             parts_en.append(f"the caller holds the user {names} permission on the target")
         else:
-            parts_ko.append("부르는 사람은 아무 권한도 받지 않았습니다")
+            parts_ko.append("호출자는 아무 권한도 받지 않았습니다")
             parts_en.append("the caller holds no permission")
         return Says(", ".join(parts_ko), english=", ".join(parts_en))
 
@@ -846,7 +846,7 @@ class TheFirstPolicysKeyOnly(Then[KeysOfEveryone, Answer]):
     @override
     def says(self) -> str:
         return Says(
-            "그 정책을 쓰는 키 하나만 옵니다",
+            "그 정책을 사용하는 키 하나만 옵니다",
             english="only the one key under that policy comes back",
         )
 
@@ -1620,7 +1620,7 @@ class TheSuperadminSearchesKeysOfOnePolicy(
     def describe(self) -> str:
         return Says(
             "전역 역할이 문인 GQL 키 검색에서 superadmin 이 정책 이름을 주면, "
-            "그 정책을 쓰는 키만 옵니다",
+            "그 정책을 사용하는 키만 옵니다",
             english=(
                 "when the superadmin gives a policy name in a GQL key search gated by the "
                 "global role, only the keys under that policy come back"

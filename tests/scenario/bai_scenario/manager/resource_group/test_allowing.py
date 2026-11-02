@@ -994,7 +994,7 @@ class AUserGrantedNothingMayNotAllowADomainForAGroup(
     def describe(self) -> str:
         return Says(
             "아무 권한도 없는 사용자가 자원 그룹의 허용 도메인에 도메인을 추가하려 하면 권한 "
-            "부족으로 거부됩니다. 관계를 쓰는 단계가 양쪽 스코프의 권한을 검사합니다",
+            "부족으로 거부됩니다. 관계를 사용하는 단계가 양쪽 스코프의 권한을 검사합니다",
             english=(
                 "a user granted nothing trying to add a domain to the allowed domains of a "
                 "resource group is rejected for not enough permission. the step that writes "

@@ -100,7 +100,7 @@ class SomeoneReadingOneOfTwo(Given[Any, AReaderAndTwoUsers]):
     @override
     def describe(self) -> str:
         return Says(
-            "도메인 하나와 사용자 셋, 부르는 사람은 한 사람에 대한 사용자 읽기 권한만 받았습니다",
+            "도메인 하나와 사용자 셋, 호출자는 한 사람에 대한 사용자 읽기 권한만 받았습니다",
             english=(
                 "one domain and three users, and the caller holds the user read permission on "
                 "only one of them"

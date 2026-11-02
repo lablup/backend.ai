@@ -22,7 +22,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [아무 권한도 받지 않은 사용자가 컨테이너 레지스트리 여럿을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-registries) | 성공 |
-| [superadmin 이 컨테이너 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 영구 삭제하면, 둘은 지워지기 전 모습으로 오고 존재하지 않는 id 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-purging-several-registries-answers-for-the-missing-one) | 성공 |
+| [superadmin 이 컨테이너 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 영구 삭제하면, 둘은 삭제되기 전 모습으로 오고 존재하지 않는 id 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-purging-several-registries-answers-for-the-missing-one) | 성공 |
 
 **admin_search**
 
@@ -145,7 +145,7 @@ Then
 
 #### [purging-several-registries-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/container_registry/test_partial_bulk_purging.py): pass
 
-superadmin 이 컨테이너 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 영구 삭제하면, 둘은 지워지기 전 모습으로 오고 존재하지 않는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
+superadmin 이 컨테이너 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 영구 삭제하면, 둘은 삭제되기 전 모습으로 오고 존재하지 않는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
 
 Given
 
@@ -165,7 +165,7 @@ When
 
 Then
 
-- 미리 저장한 컨테이너 레지스트리가 모두 지워지기 전 모습으로 오고, 존재하지 않는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
+- 미리 저장한 컨테이너 레지스트리가 모두 삭제되기 전 모습으로 오고, 존재하지 않는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
   - successes count = 2
   - successes[0].id: 미리 저장한 컨테이너 레지스트리의 id 와 같다
   - successes[0].url = 'https://wanted-1.scenario.local'

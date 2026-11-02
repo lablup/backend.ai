@@ -146,13 +146,13 @@ class ATargetAndSomeone(Given[Any, ACallerAndATarget]):
             state_en = f"{self.target_status.value} user"
         if self.permissions:
             names = ", ".join(str(p.name) for p in self.permissions)
-            granted_ko = f", 부르는 사람은 대상에 대한 사용자 {names} 권한을 받았습니다"
+            granted_ko = f", 호출자는 대상에 대한 사용자 {names} 권한을 받았습니다"
             granted_en = f", with the caller holding the user {names} permission on the target"
         else:
-            granted_ko = ", 부르는 사람은 아무 권한도 받지 않았습니다"
+            granted_ko = ", 호출자는 아무 권한도 받지 않았습니다"
             granted_en = ", with the caller holding no permission"
         return Says(
-            f"도메인 하나와 대상 {state_ko} 하나, 부르는 사람 하나{granted_ko}",
+            f"도메인 하나와 대상 {state_ko} 하나, 호출자 하나{granted_ko}",
             english=f"one domain, one target {state_en}, and one caller{granted_en}",
         )
 
@@ -219,7 +219,7 @@ class SomeoneGrantedOnTheDomain(Given[Any, ASuperadminAndUsers]):
     @override
     def describe(self) -> str:
         return Says(
-            "도메인 하나와 사용자 하나, 부르는 사람은 도메인 스코프의 사용자 HARD_DELETE 권한을 "
+            "도메인 하나와 사용자 하나, 호출자는 도메인 스코프의 사용자 HARD_DELETE 권한을 "
             "받았습니다",
             english=(
                 "one domain and one user, and the caller holds the user HARD_DELETE permission "

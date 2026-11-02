@@ -90,7 +90,7 @@ class EveryRegistryIsPurged(Then[ManyRegistriesAndACaller, Purged]):
     @override
     def says(self) -> str:
         return Says(
-            "미리 저장한 컨테이너 레지스트리가 모두 지워지기 전 모습으로 오고, 존재하지 않는 "
+            "미리 저장한 컨테이너 레지스트리가 모두 삭제되기 전 모습으로 오고, 존재하지 않는 "
             "id 는 대상이 없다는 이유로 실패 목록에 옵니다",
             english=(
                 "every container registry seeded in advance comes back as it was before it was "
@@ -203,7 +203,7 @@ class TheSuperadminPurgesSeveralAndHearsOfTheMissingOne(
     def describe(self) -> str:
         return Says(
             "superadmin 이 컨테이너 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 영구 "
-            "삭제하면, 둘은 지워지기 전 모습으로 오고 존재하지 않는 id 는 대상이 없다는 이유로 "
+            "삭제하면, 둘은 삭제되기 전 모습으로 오고 존재하지 않는 id 는 대상이 없다는 이유로 "
             "실패 목록에 옵니다",
             english=(
                 "when the superadmin purges two container registries and one id that does not "

@@ -95,7 +95,7 @@ class TheSuperadminPurgesSeveral(
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 할당 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지우기 전 할당으로 "
+            "superadmin 이 할당 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 삭제하기 전 할당으로 "
             "오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
             english=(
                 "when the superadmin purges two assignments and a missing id in one call, the "

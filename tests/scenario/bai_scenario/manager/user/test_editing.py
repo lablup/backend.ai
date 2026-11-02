@@ -293,11 +293,11 @@ class SomeoneEditingAnother(Given[Any, AnEdit]):
         ]
         if self.on_target:
             names = ", ".join(str(p.name) for p in self.on_target)
-            parts_ko.append(f"부르는 사람은 대상 사용자 스코프에서 {names}를 받았습니다")
+            parts_ko.append(f"호출자는 대상 사용자 스코프에서 {names}를 받았습니다")
             parts_en.append(f"the caller holds {names} in the target user scope")
         if self.on_domain:
             names = ", ".join(str(p.name) for p in self.on_domain)
-            parts_ko.append(f"부르는 사람은 도메인 스코프에서 {names}를 받았습니다")
+            parts_ko.append(f"호출자는 도메인 스코프에서 {names}를 받았습니다")
             parts_en.append(f"the caller holds {names} in the domain scope")
         if self.key_on is not None:
             parts_ko.append("한 사람에게 기본이 아닌 키가 하나 더 있습니다")
