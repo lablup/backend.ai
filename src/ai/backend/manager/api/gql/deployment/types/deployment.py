@@ -1119,7 +1119,7 @@ class AdminRefreshDeploymentRevisionsPayload:
 # Replace deployment options types
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Input for the replaceDeploymentOptions mutation. Full-replace"
             " semantics — the supplied payload is the complete new value,"
@@ -1135,7 +1135,7 @@ class ReplaceDeploymentOptionsInputGQL(PydanticInputMixin[ReplaceDeploymentOptio
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Payload returned after replacing a deployment's options. Only"
             " the refreshed options surface is returned."
