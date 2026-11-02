@@ -9,7 +9,7 @@ from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.types import (
     RouteInfo,
 )
-from ai.backend.appproxy.worker.errors.ingress import IngressNotFoundError
+from ai.backend.appproxy.worker.errors.ingress import IngressNotRegisteredError
 from ai.backend.appproxy.worker.proxy.backend.base import BaseBackend
 from ai.backend.appproxy.worker.types import Circuit, RootContext
 from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressAccess, IngressFrontend
@@ -72,7 +72,7 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
         frontend_key = frontend.key()
         ingress = await self.root_context.ingress_state.reader.get(frontend_key)
         if ingress is None:
-            raise IngressNotFoundError(f"frontend {frontend_key} was removed")
+            raise IngressNotRegisteredError(f"frontend {frontend_key} was removed")
         return ingress
 
     @staticmethod

@@ -14,10 +14,7 @@ from ai.backend.appproxy.common.errors import (
 )
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
-from ai.backend.appproxy.worker.errors.ingress import (
-    IngressNotFoundError,
-    IngressNotRegisteredError,
-)
+from ai.backend.appproxy.worker.errors.ingress import IngressNotRegisteredError
 from ai.backend.appproxy.worker.proxy.backend import TCPBackend
 from ai.backend.appproxy.worker.types import (
     Circuit,
@@ -159,7 +156,7 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
                         port=IngressPortFrontend(number=circuit_key),
                     )
                 )
-            except (IngressNotRegisteredError, IngressNotFoundError):
+            except IngressNotRegisteredError:
                 log.trace("rejecting a TCP connection to a slot with no ingress")
                 await self._close_writer(writer)
                 return
