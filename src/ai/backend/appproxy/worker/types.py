@@ -352,7 +352,6 @@ class RootContext:
     cors_options: dict[str, aiohttp_cors.ResourceOptions]
     metrics: WorkerMetricRegistry
     health_probe: HealthProbe
-    proxy_frontend_serving: asyncio.Event
     ingress_state: IngressState
 
 
