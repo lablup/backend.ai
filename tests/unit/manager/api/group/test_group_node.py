@@ -35,7 +35,10 @@ from ai.backend.manager.api.gql_legacy.group import (
     GroupNode,
     ModifyGroupInput,
 )
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.container_registry.types import (
+    ContainerRegistryData,
+    ProjectAllowedRegistryData,
+)
 from ai.backend.manager.data.project.types import ProjectData, ProjectType
 from ai.backend.manager.models.user.row import UserRole
 
@@ -339,23 +342,35 @@ async def test_registry_field_is_lazy_and_batches_group_types() -> None:
 
     ctx = MagicMock()
     ctx.dataloader_manager = DataLoaderManager()
-    registry = ContainerRegistryData(
-        id=ContainerRegistryID(uuid4()),
-        url="https://harbor.example.com",
-        registry_name="harbor",
-        type=ContainerRegistryType.HARBOR2,
-        project="images",
-        username=None,
-        password=None,
-        ssl_verify=True,
-        is_global=False,
-        extra=None,
-    )
-    loader = ctx.processors.project.bulk_get_default_registries.run = AsyncMock(
+
+    def registry(name: str) -> ContainerRegistryData:
+        return ContainerRegistryData(
+            id=ContainerRegistryID(uuid4()),
+            url=f"https://{name}.example.com",
+            registry_name=name,
+            type=ContainerRegistryType.HARBOR2,
+            project="images",
+            username=None,
+            password=None,
+            ssl_verify=True,
+            is_global=False,
+            extra=None,
+        )
+
+    loader = ctx.processors.project.bulk_get_registries.run = AsyncMock(
         return_value=PartialBulkResult(
             items=[
-                PartialBulkEntityResult[ContainerRegistryData].succeeded(first, registry),
-                PartialBulkEntityResult[ContainerRegistryData].nothing(second),
+                PartialBulkEntityResult[list[ProjectAllowedRegistryData]].succeeded(
+                    first,
+                    [
+                        ProjectAllowedRegistryData(registry=registry("other"), is_default=False),
+                        ProjectAllowedRegistryData(registry=registry("harbor"), is_default=True),
+                    ],
+                ),
+                PartialBulkEntityResult[list[ProjectAllowedRegistryData]].succeeded(
+                    second,
+                    [ProjectAllowedRegistryData(registry=registry("other"), is_default=False)],
+                ),
             ]
         )
     )

@@ -9,16 +9,16 @@ from ai.backend.manager.actions.v2.bulk.base import BasePartialBulkAction
 
 
 @dataclass(frozen=True)
-class BulkGetProjectDefaultRegistriesAction(BasePartialBulkAction):
-    """Read the default registry of each named project, answering empty for a project
-    without one."""
+class BulkGetProjectRegistriesAction(BasePartialBulkAction):
+    """Read the registries each named project is allowed on, answering an empty list for a
+    project allowed on none."""
 
     project_ids: Sequence[ProjectID]
 
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "bulk_get_project_default_registries"
+        return "bulk_get_project_registries"
 
     @override
     @classmethod

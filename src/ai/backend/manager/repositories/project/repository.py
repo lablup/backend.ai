@@ -11,6 +11,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -20,17 +21,20 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.container_registry.types import ProjectAllowedRegistryData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
 from ai.backend.manager.errors.resource import (
     ProjectNotFound,
 )
-from ai.backend.manager.models.association_container_registries_groups.lookups import (
-    ProjectDefaultRegistriesLookup,
-)
 from ai.backend.manager.models.association_container_registries_groups.scopes import (
     ProjectContainerRegistryAssociationTarget,
+)
+from ai.backend.manager.models.association_container_registries_groups.searchable_fields import (
+    AssociationContainerRegistriesGroupsSearchableFields,
+)
+from ai.backend.manager.models.association_container_registries_groups.searchers import (
+    AssociationContainerRegistriesGroupsSearcher,
 )
 from ai.backend.manager.models.association_container_registries_groups.updaters import (
     ClearDefaultRegistryUpdater,
@@ -40,6 +44,7 @@ from ai.backend.manager.models.container_registry.queriers import BulkContainerR
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater, ProjectUpdater
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -172,22 +177,33 @@ class ProjectRepository:
             )
 
     @project_repository_resilience.apply()
-    async def fetch_default_registries(
+    async def fetch_registries(
         self, project_ids: Sequence[ProjectID]
-    ) -> Mapping[ProjectID, ContainerRegistryData]:
-        """The default registry of each named project. A project without one is absent."""
+    ) -> Mapping[ProjectID, list[ProjectAllowedRegistryData]]:
+        """The registries each named project is allowed on. A project allowed on none is
+        absent."""
+        fields = AssociationContainerRegistriesGroupsSearchableFields.own
+        searcher = AssociationContainerRegistriesGroupsSearcher(
+            pagination=NoPagination(),
+            conditions=[
+                fields.project_id.filter.in_(UUIDInMatchSpec(values=project_ids, negated=False))
+            ],
+        )
         async with self._v2_ops.read_ops() as r:
-            registry_ids = await r.lookup_entity_ids(ProjectDefaultRegistriesLookup(), project_ids)
+            associations = (await r.search_in_global(searcher)).items
             registries = await r.query_bulk_data(
-                BulkContainerRegistryQuerier(), list(set(registry_ids.values()))
+                BulkContainerRegistryQuerier(),
+                list({association.registry_id for association in associations}),
             )
-        default_registries: dict[ProjectID, ContainerRegistryData] = {}
-        for project_id, registry_id in registry_ids.items():
-            registry = registries.get(registry_id)
+        project_registries: dict[ProjectID, list[ProjectAllowedRegistryData]] = {}
+        for association in associations:
+            registry = registries.get(association.registry_id)
             if registry is None:
                 continue
-            default_registries[project_id] = registry
-        return default_registries
+            project_registries.setdefault(association.project_id, []).append(
+                ProjectAllowedRegistryData(registry=registry, is_default=association.is_default)
+            )
+        return project_registries
 
     @project_repository_resilience.apply()
     async def get_container_stats_for_period(

@@ -14,11 +14,11 @@ from ai.backend.manager.actions.v2.ops.result import (
 from ai.backend.manager.actions.v2.relation.processor import RelationActionProcessor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.container_registry.types import ProjectAllowedRegistryData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.services.project.actions.bulk_get import BulkGetProjectsAction
-from ai.backend.manager.services.project.actions.bulk_get_default_registries import (
-    BulkGetProjectDefaultRegistriesAction,
+from ai.backend.manager.services.project.actions.bulk_get_registries import (
+    BulkGetProjectRegistriesAction,
 )
 from ai.backend.manager.services.project.actions.clear_default_registry import (
     ClearProjectDefaultRegistryAction,
@@ -86,8 +86,8 @@ class ProjectProcessors:
     clear_default_registry: RelationActionProcessor[
         ClearProjectDefaultRegistryAction, ClearProjectDefaultRegistryActionResult
     ]
-    bulk_get_default_registries: PartialBulkActionProcessor[
-        BulkGetProjectDefaultRegistriesAction, ContainerRegistryData
+    bulk_get_registries: PartialBulkActionProcessor[
+        BulkGetProjectRegistriesAction, list[ProjectAllowedRegistryData]
     ]
     lookup: LookupActionProcessor[LookupProjectAction, LookupOpsResult[ProjectID]]
     get_project: SingleEntityActionProcessor[GetProjectAction, EntityOpsResult[ProjectData]]
@@ -128,8 +128,8 @@ class ProjectProcessors:
         self.clear_default_registry = relation_group.relation(
             ClearProjectDefaultRegistryAction, group_service.clear_default_registry
         )
-        self.bulk_get_default_registries = group.partial_bulk(
-            BulkGetProjectDefaultRegistriesAction, group_service.bulk_get_default_registries
+        self.bulk_get_registries = group.partial_bulk(
+            BulkGetProjectRegistriesAction, group_service.bulk_get_registries
         )
         self.lookup = group.public_lookup_ops(LookupProjectAction)
         self.get_project = group.single_get_ops(GetProjectAction)

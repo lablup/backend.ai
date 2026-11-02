@@ -59,7 +59,7 @@ from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, P
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
-from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
+from ai.backend.manager.data.container_registry.types import ProjectAllowedRegistryData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.project.types import ProjectType as DataProjectType
 from ai.backend.manager.data.user.types import UserData, UserStatus
@@ -93,8 +93,8 @@ from ai.backend.manager.models.user.searchable_fields import UserSearchableField
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.project.actions.bulk_get import BulkGetProjectsAction
-from ai.backend.manager.services.project.actions.bulk_get_default_registries import (
-    BulkGetProjectDefaultRegistriesAction,
+from ai.backend.manager.services.project.actions.bulk_get_registries import (
+    BulkGetProjectRegistriesAction,
 )
 from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.project.actions.delete_project import DeleteProjectAction
@@ -163,27 +163,21 @@ class ProjectAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
-    async def batch_load_image_commit_registries(
+    async def batch_load_registries(
         self, project_ids: Sequence[ProjectID]
-    ) -> Sequence[ImageCommitRegistry | Exception | None]:
+    ) -> Sequence[list[ProjectAllowedRegistryData] | Exception | None]:
+        """The registries each project is allowed on, checked per project."""
         if not project_ids:
             return []
-        result = await self._project.bulk_get_default_registries.run(
-            BulkGetProjectDefaultRegistriesAction(project_ids=list(project_ids))
+        result = await self._project.bulk_get_registries.run(
+            BulkGetProjectRegistriesAction(project_ids=list(project_ids))
         )
-        registries: list[ImageCommitRegistry | Exception | None] = []
+        registries: list[list[ProjectAllowedRegistryData] | Exception | None] = []
         for item in result.items:
             if item.error is not None:
                 registries.append(self.batch_load_failure(item.error))
                 continue
-            if item.value is None:
-                registries.append(None)
-                continue
-            registries.append(
-                ImageCommitRegistry(
-                    registry_name=item.value.registry_name, project_name=item.value.project
-                )
-            )
+            registries.append(item.value)
         return registries
 
     async def batch_load_by_ids(

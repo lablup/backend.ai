@@ -18,7 +18,7 @@ from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, P
 from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.container_registry.types import ProjectAllowedRegistryData
 from ai.backend.manager.data.dotfile.types import DotfileEntries
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater
@@ -29,8 +29,8 @@ from ai.backend.manager.models.resource_usage import (
 )
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
-from ai.backend.manager.services.project.actions.bulk_get_default_registries import (
-    BulkGetProjectDefaultRegistriesAction,
+from ai.backend.manager.services.project.actions.bulk_get_registries import (
+    BulkGetProjectRegistriesAction,
 )
 from ai.backend.manager.services.project.actions.clear_default_registry import (
     ClearProjectDefaultRegistryAction,
@@ -128,18 +128,16 @@ class ProjectService:
         await self._group_repository.purge_group(action.project_id)
         return PurgeProjectActionResult(project_id=action.project_id)
 
-    async def bulk_get_default_registries(
-        self, action: BulkGetProjectDefaultRegistriesAction
-    ) -> PartialBulkResult[ContainerRegistryData]:
-        found = await self._group_repository.fetch_default_registries(action.project_ids)
-        items: list[PartialBulkEntityResult[ContainerRegistryData]] = []
+    async def bulk_get_registries(
+        self, action: BulkGetProjectRegistriesAction
+    ) -> PartialBulkResult[list[ProjectAllowedRegistryData]]:
+        found = await self._group_repository.fetch_registries(action.project_ids)
+        items: list[PartialBulkEntityResult[list[ProjectAllowedRegistryData]]] = []
         for project_id in action.project_ids:
-            registry = found.get(project_id)
-            if registry is None:
-                items.append(PartialBulkEntityResult[ContainerRegistryData].nothing(project_id))
-                continue
             items.append(
-                PartialBulkEntityResult[ContainerRegistryData].succeeded(project_id, registry)
+                PartialBulkEntityResult[list[ProjectAllowedRegistryData]].succeeded(
+                    project_id, found.get(project_id, [])
+                )
             )
         return PartialBulkResult(items=items)
 
