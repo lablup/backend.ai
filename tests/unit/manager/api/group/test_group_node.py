@@ -5,7 +5,6 @@ Tests allowed_vfolder_hosts JSON serialization in CreateGroup mutation.
 
 from __future__ import annotations
 
-from dataclasses import replace
 from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import Any
@@ -19,6 +18,8 @@ from aiohttp.test_utils import TestClient
 from graphene.types import inputobjecttype
 from graphql import GraphQLInputObjectType, Undefined, coerce_input_value
 
+from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import (
     ResourceSlot,
@@ -34,7 +35,7 @@ from ai.backend.manager.api.gql_legacy.group import (
     GroupNode,
     ModifyGroupInput,
 )
-from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.project.types import ProjectData, ProjectType
 from ai.backend.manager.models.user.row import UserRole
 
@@ -338,33 +339,23 @@ async def test_registry_field_is_lazy_and_batches_group_types() -> None:
 
     ctx = MagicMock()
     ctx.dataloader_manager = DataLoaderManager()
-    project = ProjectData(
-        id=first,
-        name="project",
-        description=None,
-        is_active=True,
-        created_at=datetime.now(UTC),
-        modified_at=datetime.now(UTC),
-        integration_name=None,
-        domain_name="default",
-        total_resource_slots=ResourceSlot(),
-        allowed_vfolder_hosts=VFolderHostPermissionMap(),
-        dotfiles=b"",
-        resource_policy="default",
-        type=ProjectType.GENERAL,
-        container_registry=ImageCommitRegistry("harbor", "images"),
+    registry = ContainerRegistryData(
+        id=ContainerRegistryID(uuid4()),
+        url="https://harbor.example.com",
+        registry_name="harbor",
+        type=ContainerRegistryType.HARBOR2,
+        project="images",
+        username=None,
+        password=None,
+        ssl_verify=True,
+        is_global=False,
+        extra=None,
     )
-    loader = ctx.processors.project.bulk_get.run = AsyncMock(
+    loader = ctx.processors.project.bulk_get_default_registries.run = AsyncMock(
         return_value=PartialBulkResult(
             items=[
-                PartialBulkEntityResult[ProjectData].succeeded(
-                    first, project, description="resolved"
-                ),
-                PartialBulkEntityResult[ProjectData].succeeded(
-                    second,
-                    replace(project, id=second, container_registry=None),
-                    description="resolved",
-                ),
+                PartialBulkEntityResult[ContainerRegistryData].succeeded(first, registry),
+                PartialBulkEntityResult[ContainerRegistryData].nothing(second),
             ]
         )
     )
@@ -384,4 +375,4 @@ async def test_registry_field_is_lazy_and_batches_group_types() -> None:
         "nodes": [{"containerRegistry": '{"registry": "harbor", "project": "images"}'}],
     }
     loader.assert_awaited_once()
-    assert list(loader.call_args.args[0].ids) == [first, second]
+    assert list(loader.call_args.args[0].project_ids) == [first, second]

@@ -29,6 +29,9 @@ from ai.backend.manager.clients.container_registry.pool import (
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
+from ai.backend.manager.models.association_container_registries_groups.row import (
+    AssociationContainerRegistriesGroupsRow,
+)
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -203,7 +206,11 @@ async def target_group(
                 is_active=True,
                 domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
-                container_registry={"registry": registry_name, "project": group_name},
+            )
+        )
+        await conn.execute(
+            sa.insert(AssociationContainerRegistriesGroupsRow.__table__).values(
+                registry_id=registry_id, project_id=group_id, is_default=True
             )
         )
         virtual_entity_id = uuid.uuid4()

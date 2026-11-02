@@ -1,4 +1,4 @@
-"""프로젝트 설정과 별도로 image commit을 위한 Container Registry를 읽는다."""
+"""프로젝트의 default 레지스트리를 image commit을 위한 Container Registry로 읽는다."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -30,6 +30,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.image.registry import AllowProjectAsDefault, TestSeedContainerRegistry
 from bai_scenario.seeds.project.project import TestSeedProject
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
 from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
@@ -62,10 +63,10 @@ class ProjectWithReadPermission(Given[TestSeedingSession, ProjectAndTarget]):
     async def lay(self, seeding: TestSeedingSession) -> ProjectAndTarget:
         domain = await seeding.creating(TestSeedDomain())
         policy = await seeding.once(TestSeedProjectPolicy())
-        target = ImageCommitRegistry("registry.example.com", "images")
-        project = await seeding.creating_from_two(
-            TestSeedProject(container_registry=target if self.configured else None), domain, policy
-        )
+        project = await seeding.creating_from_two(TestSeedProject(), domain, policy)
+        registry = await seeding.creating(TestSeedContainerRegistry(project="images"))
+        if self.configured:
+            await seeding.linking(AllowProjectAsDefault(), project, registry)
         caller = await seeding.within(SomeoneOf(domain))
         if self.may_read:
             role = await seeding.creating_from(TestSeedRole(lambda one: ProjectID(one.id)), project)
@@ -73,6 +74,8 @@ class ProjectWithReadPermission(Given[TestSeedingSession, ProjectAndTarget]):
             await seeding.granting(
                 role, caller, role_id=lambda one: one.id, user_id=lambda one: UserID(one.id)
             )
+        made_registry = seeding.made(registry)
+        target = ImageCommitRegistry(made_registry.registry_name, made_registry.project)
         return ProjectAndTarget(seeding.made(project), target, seeding.made(caller))
 
 

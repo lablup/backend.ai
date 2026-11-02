@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -20,10 +20,14 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
 from ai.backend.manager.errors.resource import (
     ProjectNotFound,
+)
+from ai.backend.manager.models.association_container_registries_groups.lookups import (
+    ProjectDefaultRegistriesLookup,
 )
 from ai.backend.manager.models.association_container_registries_groups.scopes import (
     ProjectContainerRegistryAssociationTarget,
@@ -32,6 +36,7 @@ from ai.backend.manager.models.association_container_registries_groups.updaters 
     ClearDefaultRegistryUpdater,
     SetDefaultRegistryUpdater,
 )
+from ai.backend.manager.models.container_registry.queriers import BulkContainerRegistryQuerier
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater, ProjectUpdater
@@ -165,6 +170,24 @@ class ProjectRepository:
                 [ProjectContainerRegistryAssociationTarget(project_id)],
                 ClearDefaultRegistryUpdater(project_id=project_id),
             )
+
+    @project_repository_resilience.apply()
+    async def fetch_default_registries(
+        self, project_ids: Sequence[ProjectID]
+    ) -> Mapping[ProjectID, ContainerRegistryData]:
+        """The default registry of each named project. A project without one is absent."""
+        async with self._v2_ops.read_ops() as r:
+            registry_ids = await r.lookup_entity_ids(ProjectDefaultRegistriesLookup(), project_ids)
+            registries = await r.query_bulk_data(
+                BulkContainerRegistryQuerier(), list(set(registry_ids.values()))
+            )
+        default_registries: dict[ProjectID, ContainerRegistryData] = {}
+        for project_id, registry_id in registry_ids.items():
+            registry = registries.get(registry_id)
+            if registry is None:
+                continue
+            default_registries[project_id] = registry
+        return default_registries
 
     @project_repository_resilience.apply()
     async def get_container_stats_for_period(

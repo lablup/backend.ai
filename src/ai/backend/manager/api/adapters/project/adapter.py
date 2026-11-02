@@ -93,6 +93,9 @@ from ai.backend.manager.models.user.searchable_fields import UserSearchableField
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.project.actions.bulk_get import BulkGetProjectsAction
+from ai.backend.manager.services.project.actions.bulk_get_default_registries import (
+    BulkGetProjectDefaultRegistriesAction,
+)
 from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.project.actions.delete_project import DeleteProjectAction
 from ai.backend.manager.services.project.actions.partial_bulk_delete_projects import (
@@ -165,13 +168,23 @@ class ProjectAdapter(BaseAdapter):
     ) -> Sequence[ImageCommitRegistry | Exception | None]:
         if not project_ids:
             return []
-        result = await self._project.bulk_get.run(BulkGetProjectsAction(ids=list(project_ids)))
-        return [
-            item.value.container_registry
-            if item.value is not None
-            else self.batch_load_failure(item.error)
-            for item in result.items
-        ]
+        result = await self._project.bulk_get_default_registries.run(
+            BulkGetProjectDefaultRegistriesAction(project_ids=list(project_ids))
+        )
+        registries: list[ImageCommitRegistry | Exception | None] = []
+        for item in result.items:
+            if item.error is not None:
+                registries.append(self.batch_load_failure(item.error))
+                continue
+            if item.value is None:
+                registries.append(None)
+                continue
+            registries.append(
+                ImageCommitRegistry(
+                    registry_name=item.value.registry_name, project_name=item.value.project
+                )
+            )
+        return registries
 
     async def batch_load_by_ids(
         self, group_ids: Sequence[ProjectID]

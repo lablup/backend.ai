@@ -18,6 +18,7 @@ from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, P
 from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.dotfile.types import DotfileEntries
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater
@@ -28,6 +29,9 @@ from ai.backend.manager.models.resource_usage import (
 )
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
+from ai.backend.manager.services.project.actions.bulk_get_default_registries import (
+    BulkGetProjectDefaultRegistriesAction,
+)
 from ai.backend.manager.services.project.actions.clear_default_registry import (
     ClearProjectDefaultRegistryAction,
     ClearProjectDefaultRegistryActionResult,
@@ -123,6 +127,21 @@ class ProjectService:
     async def purge_group(self, action: PurgeProjectAction) -> PurgeProjectActionResult:
         await self._group_repository.purge_group(action.project_id)
         return PurgeProjectActionResult(project_id=action.project_id)
+
+    async def bulk_get_default_registries(
+        self, action: BulkGetProjectDefaultRegistriesAction
+    ) -> PartialBulkResult[ContainerRegistryData]:
+        found = await self._group_repository.fetch_default_registries(action.project_ids)
+        items: list[PartialBulkEntityResult[ContainerRegistryData]] = []
+        for project_id in action.project_ids:
+            registry = found.get(project_id)
+            if registry is None:
+                items.append(PartialBulkEntityResult[ContainerRegistryData].nothing(project_id))
+                continue
+            items.append(
+                PartialBulkEntityResult[ContainerRegistryData].succeeded(project_id, registry)
+            )
+        return PartialBulkResult(items=items)
 
     async def switch_default_registry(
         self, action: SwitchProjectDefaultRegistryAction
