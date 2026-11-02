@@ -5,9 +5,10 @@ from __future__ import annotations
 from http import HTTPStatus
 from typing import TYPE_CHECKING
 
-from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, QueryParam
 from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.dto.manager.v2.entity_share.request import (
+    AnswerEntityShareOptions,
     CreateEntityShareInput,
     MySearchEntitySharesInput,
     ScopedSearchEntitySharesInput,
@@ -32,14 +33,22 @@ class V2EntityShareHandler:
         result = await self._adapter.get(EntityShareID(path.parsed.share_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def accept(self, path: PathParam[ShareIdPathParam]) -> APIResponse:
+    async def accept(
+        self,
+        path: PathParam[ShareIdPathParam],
+        query: QueryParam[AnswerEntityShareOptions],
+    ) -> APIResponse:
         """Take what was offered."""
-        result = await self._adapter.accept(EntityShareID(path.parsed.share_id))
+        result = await self._adapter.accept(EntityShareID(path.parsed.share_id), query.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def reject(self, path: PathParam[ShareIdPathParam]) -> APIResponse:
+    async def reject(
+        self,
+        path: PathParam[ShareIdPathParam],
+        query: QueryParam[AnswerEntityShareOptions],
+    ) -> APIResponse:
         """Turn down what was offered."""
-        result = await self._adapter.reject(EntityShareID(path.parsed.share_id))
+        result = await self._adapter.reject(EntityShareID(path.parsed.share_id), query.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def revoke(self, path: PathParam[ShareIdPathParam]) -> APIResponse:
