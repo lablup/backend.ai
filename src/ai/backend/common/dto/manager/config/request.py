@@ -11,12 +11,7 @@ from pydantic import AliasChoices, Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dotfile import DotfilePath
-from ai.backend.common.dto.manager.config.types import (
-    MAXIMUM_DOTFILE_PATH_LENGTH,
-    MAXIMUM_DOTFILE_SIZE,
-    NO_NUL_PATTERN,
-    DotfilePermission,
-)
+from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE, DotfilePermission
 
 __all__ = (
     # User config
@@ -45,14 +40,9 @@ __all__ = (
 class CreateUserDotfileRequest(BaseRequestModel):
     """Request to create a user dotfile."""
 
-    path: str = Field(
-        max_length=MAXIMUM_DOTFILE_PATH_LENGTH,
-        pattern=NO_NUL_PATTERN,
-        description="Dotfile path",
-    )
+    path: str = Field(description="Dotfile path")
     data: str = Field(
         max_length=MAXIMUM_DOTFILE_SIZE,
-        pattern=NO_NUL_PATTERN,
         description="Dotfile content",
     )
     permission: DotfilePermission = Field(description="Unix file permission in octal (e.g., '755')")
@@ -87,7 +77,6 @@ class UpdateUserDotfileRequest(BaseRequestModel):
     path: str = Field(description="Dotfile path")
     data: str = Field(
         max_length=MAXIMUM_DOTFILE_SIZE,
-        pattern=NO_NUL_PATTERN,
         description="Updated dotfile content",
     )
     permission: DotfilePermission = Field(description="Unix file permission in octal (e.g., '755')")

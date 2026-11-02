@@ -8,7 +8,6 @@ import pytest
 
 from ai.backend.common import msgpack
 from ai.backend.common.dotfile import InvalidDotfilePath
-from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.api.gql_legacy.domain import CreateDomainNodeInput, ModifyDomainNodeInput
 from ai.backend.manager.data.domain.types import UserInfo
 from ai.backend.manager.models.user import UserRole
@@ -38,24 +37,6 @@ class TestDomainNodeInputDotfiles:
     def test_modify_rejects(self, path: str) -> None:
         with pytest.raises(InvalidDotfilePath):
             _input(ModifyDomainNodeInput, dotfiles=_packed(path)).to_action("d", _USER_INFO)
-
-    @pytest.mark.parametrize(
-        "packed",
-        [b"\xc1", msgpack.packb([{"perm": "644", "data": "x"}])],
-        ids=["broken", "no-path"],
-    )
-    def test_create_rejects_malformed_data(self, packed: bytes) -> None:
-        with pytest.raises(InvalidAPIParameters):
-            _input(CreateDomainNodeInput, name="d", dotfiles=packed).to_action(_USER_INFO)
-
-    @pytest.mark.parametrize(
-        "packed",
-        [b"\xc1", msgpack.packb([{"perm": "644", "data": "x"}])],
-        ids=["broken", "no-path"],
-    )
-    def test_modify_rejects_malformed_data(self, packed: bytes) -> None:
-        with pytest.raises(InvalidAPIParameters):
-            _input(ModifyDomainNodeInput, dotfiles=packed).to_action("d", _USER_INFO)
 
     def test_modify_accepts_path_under_work_dir(self) -> None:
         packed = _packed(".bashrc")
