@@ -347,7 +347,7 @@ def create(
     spec = _load_spec(spec_path, image)
     kernel_id = kernel_id or str(uuid.uuid4())
     session_id = session_id or str(uuid.uuid4())
-    # A kernel created without a manager has no session name, so the shell prompt shows "[]".
+    # Without a session name, the shell prompt shows "[]".
     session_name = spec.session_name or ""
     owner_user_id = spec.owner_user_id or str(uuid.uuid4())
 
