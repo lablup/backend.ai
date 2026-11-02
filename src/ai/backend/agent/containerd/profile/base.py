@@ -18,6 +18,7 @@ class GeneratedMountKind(enum.StrEnum):
     VFOLDER = "vfolder"
     ACCELERATOR = "accelerator"
     LOG_WRITER = "log-writer"
+    BOOTSTRAP = "bootstrap"
 
 
 class StdioMode(enum.StrEnum):
@@ -39,6 +40,12 @@ class KernelRunnerReadiness:
 
 
 @dataclass(frozen=True)
+class TlsConnectReadiness:
+    port_name: str
+    timeout_s: float
+
+
+@dataclass(frozen=True)
 class KernelLaunch:
     kernel_id: KernelId
     session_id: SessionId
@@ -55,7 +62,7 @@ class LaunchPlan:
     spec_patch: Mapping[str, Any]  # merged over base_spec by the agent
     allowed_mount_kinds: frozenset[GeneratedMountKind]
     stdio: StdioMode
-    readiness: KernelRunnerReadiness
+    readiness: KernelRunnerReadiness | TlsConnectReadiness
     runtime_options: RuntimeOptions | None = None  # runc: None
 
 
@@ -79,6 +86,16 @@ class RuntimeProfile(Protocol):
         Only the creation context and plan() see the returned config.
         """
         return config
+
+    # Provisional name. True: the image carries its own krunner, so core skips the host krunner
+    # mounts and env (and the runner and libbaihook resolution they need) but keeps the
+    # accelerator setup. The image distro is still resolved before the creation context.
+    skips_host_krunner: bool = False
+
+
+def profile_skips_host_krunner(profile: RuntimeProfile) -> bool:
+    """Read profile.skips_host_krunner; a third-party profile without it keeps the host krunner."""
+    return bool(getattr(profile, "skips_host_krunner", False))
 
 
 async def prepare_kernel_config(

@@ -50,7 +50,8 @@ def load_runtime_profiles(
             profile = ep.load()(options.get(name, {}))
         except Exception as e:  # profiles are third-party code
             raise RuntimeProfileLoadError(f"runtime profile {name!r} failed to load: {e}") from e
-        # Not isinstance(RuntimeProfile): that would also require the optional prepare().
+        # Not isinstance(RuntimeProfile): that would also require the optional prepare() and
+        # the optional skips_host_krunner data member.
         if not all(hasattr(profile, attr) for attr in ("name", "accepts", "plan")):
             raise RuntimeProfileLoadError(
                 f"runtime profile {name!r} does not implement RuntimeProfile"

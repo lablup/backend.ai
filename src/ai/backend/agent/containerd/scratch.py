@@ -15,6 +15,7 @@ from typing import Any, Final
 
 import aiofiles
 
+from ai.backend.agent.containerd.sealed import SPEC_JWS_NAME
 from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.logging.structured import StructuredLogger
 
@@ -59,6 +60,11 @@ class ScratchDirs:
     def resolv_conf(self) -> Path:
         """The kernel's /etc/resolv.conf; it is not under a mounted directory."""
         return self.root / RESOLV_CONF_NAME
+
+    @property
+    def spec_jws(self) -> Path:
+        """The sealed kernel's signed spec; it is not under a mounted directory."""
+        return self.root / SPEC_JWS_NAME
 
     @property
     def task_log(self) -> Path:
