@@ -9,25 +9,22 @@ generated:
   at: 2026-10-15
 status: draft
 ---
-# resource_preset 어댑터 — 시나리오
+# resource_preset adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 것과 실행 결과가 어긋나면 문장을 먼저
-의심한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-리소스 프리셋은 리소스 그룹에 묶이지 않으면 public 스코프에 속한다. 수정과 purge 는 권한
-그래프가 지킨다. public 에서 프리셋 수정 권한을 받은 사용자는 슈퍼관리자가 아니어도 수정할 수
-있다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-## 수정
+A resource preset belongs to the public scope unless it is tied to a resource group. The permission graph checks update and purge. A user who received the preset update permission in the public scope can update without being superadmin.
+
+## Update
 
 ## purge
 
-## 여럿 수정하기
+## Bulk update
 
-여럿 수정은 리소스 그룹을 바꾸지 않는다. 리소스 그룹은 프리셋을 누구에게 보일지를 바꾸므로
-단건 수정으로만 바꾼다.
+A bulk update does not change the resource group. The resource group changes who can see the preset, so only the single update changes the resource group.
 
-## 여럿 purge
+## Bulk purge
 
-여럿 연산은 처리하지 못한 항목 때문에 호출 전체를 거부하지 않는다. 처리한 프리셋은 처리된
-목록에, 처리하지 못한 것은 id 와 이유를 실패 목록에 싣는다.
+A bulk operation does not reject the whole call because of entries it could not process. Processed presets go into the processed list, and failures are recorded in the failure list with the id and the reason.
