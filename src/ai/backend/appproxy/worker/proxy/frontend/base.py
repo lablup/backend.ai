@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import ipaddress
 import logging
 from abc import ABCMeta, abstractmethod
 
@@ -12,7 +11,7 @@ from ai.backend.appproxy.common.types import (
 from ai.backend.appproxy.worker.errors.ingress import IngressNotRegisteredError
 from ai.backend.appproxy.worker.proxy.backend.base import BaseBackend
 from ai.backend.appproxy.worker.types import Circuit, RootContext
-from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressAccess, IngressFrontend
+from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressFrontend
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -74,18 +73,6 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
         if ingress is None:
             raise IngressNotRegisteredError(f"frontend {frontend_key} was removed")
         return ingress
-
-    @staticmethod
-    def _is_client_ip_allowed(client_ip: str | None, access: IngressAccess) -> bool:
-        if not access.allowed_client_ips:
-            return True
-        if not client_ip:
-            return False
-        try:
-            client_address = ipaddress.ip_address(client_ip)
-        except ValueError:
-            return False
-        return any(client_address in network for network in access.allowed_client_ips)
 
     @abstractmethod
     async def start(self) -> None:

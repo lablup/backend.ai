@@ -8,9 +8,21 @@ module and is unit-tested below.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from ipaddress import ip_network
+
 import pytest
 
-from ai.backend.appproxy.common.client_ip import ClientIPValidator
+from ai.backend.appproxy.common.client_ip import ClientIPValidator, IPNetwork
+
+
+@dataclass(frozen=True)
+class _NetworksAllowlistCase:
+    name: str
+    networks: list[IPNetwork]
+    client_ip: str
+    expected_restricted: bool
+    expected_allowed: bool
 
 
 class TestIPValidator:
@@ -62,3 +74,51 @@ class TestIPValidator:
 
     def test_ranges_empty_when_unrestricted(self) -> None:
         assert ClientIPValidator(None).ranges == []
+
+
+class TestIPValidatorFromNetworks:
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _NetworksAllowlistCase(
+                name="no-networks-allows-any",
+                networks=[],
+                client_ip="203.0.113.5",
+                expected_restricted=False,
+                expected_allowed=True,
+            ),
+            _NetworksAllowlistCase(
+                name="ipv4-inside",
+                networks=[ip_network("10.0.0.0/8")],
+                client_ip="10.1.2.3",
+                expected_restricted=True,
+                expected_allowed=True,
+            ),
+            _NetworksAllowlistCase(
+                name="ipv4-outside",
+                networks=[ip_network("10.0.0.0/8")],
+                client_ip="11.0.0.1",
+                expected_restricted=True,
+                expected_allowed=False,
+            ),
+            _NetworksAllowlistCase(
+                name="ipv6-inside",
+                networks=[ip_network("fd00::/8")],
+                client_ip="fd00::1",
+                expected_restricted=True,
+                expected_allowed=True,
+            ),
+            _NetworksAllowlistCase(
+                name="unparsable-client-ip",
+                networks=[ip_network("10.0.0.0/8")],
+                client_ip="not-an-ip",
+                expected_restricted=True,
+                expected_allowed=False,
+            ),
+        ],
+        ids=lambda case: case.name,
+    )
+    def test_matches_the_given_networks(self, case: _NetworksAllowlistCase) -> None:
+        validator = ClientIPValidator.from_networks(case.networks)
+        assert validator.is_restricted is case.expected_restricted
+        assert validator.is_allowed(case.client_ip) is case.expected_allowed

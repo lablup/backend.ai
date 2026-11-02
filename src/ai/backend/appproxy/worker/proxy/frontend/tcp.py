@@ -7,6 +7,7 @@ from typing import Any, override
 
 from aiohttp import web
 
+from ai.backend.appproxy.common.client_ip import ClientIPValidator
 from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.errors import (
     ServerMisconfiguredError,
@@ -104,9 +105,15 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
     def _is_peer_allowed(self, writer: asyncio.StreamWriter, access: IngressAccess) -> bool:
         # TCP carries no forwarded-for header, so the allowlist is matched
         # against the direct connection peer only.
+        validator = ClientIPValidator.from_networks(access.allowed_client_ips)
+        if not validator.is_restricted:
+            return True
         peername = writer.get_extra_info("peername")
-        peer_ip = peername[0] if peername else None
-        if not self._is_client_ip_allowed(peer_ip, access):
+        if not peername:
+            log.trace("rejecting a TCP connection with an unknown peer")
+            return False
+        peer_ip = peername[0]
+        if not validator.is_allowed(peer_ip):
             log.trace("rejecting TCP client {} (not in allowed_client_ips)", peer_ip)
             return False
         return True

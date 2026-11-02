@@ -7,6 +7,7 @@ import jwt
 from aiohttp import hdrs, web
 from aiohttp_remotes import XForwardedStrict
 
+from ai.backend.appproxy.common.client_ip import ClientIPValidator
 from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.defs import (
     ERROR_TEMPLATE_NAME,
@@ -47,8 +48,11 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
         self._xff_strict = XForwardedStrict([list(trusted_proxies)]) if trusted_proxies else None
 
     def ensure_allowed_ip(self, request: web.Request, access: IngressAccess) -> None:
+        validator = ClientIPValidator.from_networks(access.allowed_client_ips)
+        if not validator.is_restricted:
+            return
         client_ip = request.remote
-        if not self._is_client_ip_allowed(client_ip, access):
+        if not client_ip or not validator.is_allowed(client_ip):
             log.trace("rejecting client {} (not in allowed_client_ips)", client_ip)
             raise ClientIPNotAllowed("E20011: Client address not allowed")
 
