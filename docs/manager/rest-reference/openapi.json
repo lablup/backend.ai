@@ -59559,6 +59559,25 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Added in 26.10.0. The project answering an offer addressed to it. The caller answers for themselves when omitted.",
+              "title": "Project Id"
+            }
           }
         ],
         "description": "Take what was offered.\n\n**Preconditions:**\n* User privilege required.\n"
@@ -59587,6 +59606,25 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Added in 26.10.0. The project answering an offer addressed to it. The caller answers for themselves when omitted.",
+              "title": "Project Id"
             }
           }
         ],

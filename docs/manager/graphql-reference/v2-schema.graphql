@@ -11431,10 +11431,24 @@ type Mutation {
   createEntityShare(input: CreateEntityShareInput!): EntitySharePayload
 
   """Added in 26.9.0. Take what was offered."""
-  acceptEntityShare(id: UUID!): EntitySharePayload
+  acceptEntityShare(
+    id: UUID!
+
+    """
+    Added in 26.10.0. The project answering an offer addressed to it. The caller answers for themselves when omitted.
+    """
+    projectId: UUID = null
+  ): EntitySharePayload
 
   """Added in 26.9.0. Turn down what was offered."""
-  rejectEntityShare(id: UUID!): EntitySharePayload
+  rejectEntityShare(
+    id: UUID!
+
+    """
+    Added in 26.10.0. The project answering an offer addressed to it. The caller answers for themselves when omitted.
+    """
+    projectId: UUID = null
+  ): EntitySharePayload
 
   """Added in 26.9.0. Withdraw an offer before it was answered."""
   cancelEntityShare(id: UUID!): EntitySharePayload
