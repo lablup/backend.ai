@@ -5,6 +5,7 @@ backend_packages = [
     "pants.backend.python",
     "pants.backend.python.typecheck.mypy",
     "pants.backend.shell",
+    "pants.backend.codegen.protobuf.python",
     "pants.backend.experimental.python",
     "pants.backend.experimental.python.lint.ruff.check",
     "pants.backend.experimental.python.lint.ruff.format",
@@ -108,6 +109,19 @@ pants-plugins = "tools/pants-plugins.lock"
 coverage-py = "tools/coverage-py.lock"
 towncrier = "tools/towncrier.lock"
 setuptools = "tools/setuptools.lock"
+
+[protoc]
+# Gencode must match the protobuf runtime in python.lock (7.36.x <-> protoc 36.x).
+version = "36.2"
+known_versions = [
+    "36.2|linux_arm64|8b8f18bd2b30346efbc698dd5a73dd7c805f3ef8380f6dfc95c768f3f1852f6a|3631325",
+    "36.2|linux_x86_64|121f6c7afe1d4d0e3ea6aab9432038599250134cbf4474cb1167d2c7decd4278|3681545",
+    "36.2|macos_arm64|9cd98a532c5c5e0c4161314de0225de27e4c8a323917b6ea7b1b714d3ae23466|2625514",
+    "36.2|macos_x86_64|228cc7add4616cc14ca5e80dee83209d44449a7aee95a914ae748fa374efb078|2760113",
+]
+
+[python-protobuf]
+mypy_plugin = true  # also writes the *_pb2_grpc.pyi stubs
 
 [export]
 bin = [

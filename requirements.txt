@@ -136,5 +136,7 @@ types-toml
 types-tqdm<4.70
 backend.ai-krunner-alpine==5.4.0
 backend.ai-krunner-static-gnu==4.4.0
+grpcio~=1.84.1
+protobuf~=7.36.2
 
 etcd-client-py~=0.5.1
