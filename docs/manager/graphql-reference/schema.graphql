@@ -2347,9 +2347,9 @@ type Mutation {
     """Agent ID to rescan GPU alloc map"""
     agent_id: String!
   ): RescanGPUAllocMaps
-  create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair @deprecated(reason: "Deprecated since 26.10.0. Use `admin_create_keypair_v2` instead.")
-  modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair @deprecated(reason: "Deprecated since 26.10.0. Use `admin_update_keypair_v2` instead.")
-  delete_keypair(access_key: String!): DeleteKeyPair @deprecated(reason: "Deprecated since 26.10.0. Use `admin_delete_keypair_v2` instead.")
+  create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair @deprecated(reason: "Deprecated since 26.10.0. Use `adminCreateKeypairV2` instead.")
+  modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair @deprecated(reason: "Deprecated since 26.10.0. Use `adminUpdateKeypairV2` instead.")
+  delete_keypair(access_key: String!): DeleteKeyPair @deprecated(reason: "Deprecated since 26.10.0. Use `adminDeleteKeypairV2` instead.")
   rescan_images(
     """Added in 25.1.0."""
     project: String
