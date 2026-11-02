@@ -26,7 +26,7 @@ import uuid
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Final, cast
 
 import click
 
@@ -38,6 +38,9 @@ if TYPE_CHECKING:
     from ai.backend.common.types import ImageConfig
 
     from .kernel_spec import KernelCreateSpec
+
+# Without a session name, the shell prompt shows "[]".
+_FALLBACK_SESSION_NAME: Final[str] = ""
 
 
 # --- connection wiring -------------------------------------------------------
@@ -347,8 +350,7 @@ def create(
     spec = _load_spec(spec_path, image)
     kernel_id = kernel_id or str(uuid.uuid4())
     session_id = session_id or str(uuid.uuid4())
-    # Without a session name, the shell prompt shows "[]".
-    session_name = spec.session_name or ""
+    session_name = spec.session_name or _FALLBACK_SESSION_NAME
     owner_user_id = spec.owner_user_id or str(uuid.uuid4())
 
     async def _run() -> None:
