@@ -21,13 +21,7 @@ from ai.backend.appproxy.worker.types import (
     PortFrontendInfo,
     RootContext,
 )
-from ai.backend.common.dto.appproxy.v2.ingress.types import (
-    IngressAccess,
-    IngressFrontend,
-    IngressFrontendKind,
-    IngressProtocol,
-)
-from ai.backend.common.dto.appproxy.v2.ingress.types import PortFrontend as IngressPortFrontend
+from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAccess
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .base import BaseFrontend
@@ -141,18 +135,6 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
         self, circuit_key: int, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
         metrics = self.root_context.metrics
-        try:
-            ingress = await self._read_registered_ingress(
-                IngressFrontend(
-                    kind=IngressFrontendKind.PORT,
-                    protocol=IngressProtocol.TCP,
-                    port=IngressPortFrontend(number=circuit_key),
-                ).key()
-            )
-        except IngressFrontendNotRegisteredError:
-            log.trace("rejecting a TCP connection to a slot with no ingress")
-            await self._close_writer(writer)
-            return
         backend: TCPBackend | None = self.backends.get(circuit_key)
 
         if not backend:
@@ -160,6 +142,14 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
             return
 
         with with_log_context(circuit_id=backend.circuit.id):
+            try:
+                ingress = await self._read_registered_ingress(
+                    backend.circuit.to_ingress_frontend().key()
+                )
+            except IngressFrontendNotRegisteredError:
+                log.trace("rejecting a TCP connection to a slot with no ingress")
+                await self._close_writer(writer)
+                return
             if not self._is_peer_allowed(writer, ingress.access):
                 await self._close_writer(writer)
                 return

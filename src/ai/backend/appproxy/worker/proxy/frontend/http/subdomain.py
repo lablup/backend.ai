@@ -13,12 +13,6 @@ from ai.backend.appproxy.worker.config import WildcardDomainConfig
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
 from ai.backend.appproxy.worker.errors.ingress import IngressFrontendNotRegisteredError
 from ai.backend.appproxy.worker.types import Circuit, SubdomainFrontendInfo
-from ai.backend.common.dto.appproxy.v2.ingress.types import (
-    IngressFrontend,
-    IngressFrontendKind,
-    IngressProtocol,
-    WildcardFrontend,
-)
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .base import BaseHTTPFrontend
@@ -95,7 +89,10 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
 
     def parse_slot(self, request: web.Request) -> str:
         # exclude port number when evaluating the subdomain
-        return request.host.partition(":")[0].replace(self.wildcard_config.domain, "").lower()
+        subdomain = request.host.partition(":")[0].replace(self.wildcard_config.domain, "").lower()
+        if subdomain not in self.backends:
+            raise IngressFrontendNotRegisteredError(f"E20009: Subdomain {subdomain} not registered")
+        return subdomain
 
     @web.middleware
     async def ensure_slot_middleware(
@@ -103,18 +100,10 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
     ) -> web.StreamResponse:
         async def _exception_safe_handler(request: web.Request) -> web.StreamResponse:
             slot = self.parse_slot(request)
-            ingress = await self._read_registered_ingress(
-                IngressFrontend(
-                    kind=IngressFrontendKind.WILDCARD,
-                    protocol=IngressProtocol.HTTP,
-                    wildcard=WildcardFrontend(subdomain=slot),
-                ).key()
-            )
-            backend = self.backends.get(slot)
-            if backend is None:
-                raise IngressFrontendNotRegisteredError(f"E20009: Subdomain {slot} not registered")
+            backend = self.backends[slot]
             circuit = backend.circuit
             with with_log_context(circuit_id=circuit.id):
+                ingress = await self._read_registered_ingress(circuit.to_ingress_frontend().key())
                 self.ensure_allowed_ip(request, ingress.access)
                 # TODO: Check the credential against ingress.access once an ingress carries the id
                 # its tokens name.
