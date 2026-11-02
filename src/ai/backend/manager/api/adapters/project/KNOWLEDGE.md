@@ -7,6 +7,9 @@ keywords: [project, scenario, adapter, rbac, roster]
 generated:
   by: claude-code/opus-5
   at: 2026-09-10
+updated:
+  by: claude-code/opus-5.5
+  at: 2026-11-02
 status: draft
 ---
 # 프로젝트 어댑터 — 시나리오
@@ -42,3 +45,7 @@ status: draft
 ## image commit을 위한 Container Registry 조회
 
 일반 프로젝트 조회에는 image commit을 위한 Container Registry 조회가 포함되지 않는다. GraphQL에서 해당 필드를 요청하면 별도로 일괄 조회한다.
+
+- It reads the project's default registry: the `association_container_registries_groups` row with
+  `is_default` set. The `groups.container_registry` JSON is not read.
+- Read permission is checked per project. A project without a default registry answers empty.

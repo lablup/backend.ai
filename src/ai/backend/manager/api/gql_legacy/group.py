@@ -32,7 +32,10 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
 from ai.backend.manager.api.gql.base import resolve_entity_id
-from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
+from ai.backend.manager.data.container_registry.types import (
+    ImageCommitRegistry,
+    ProjectAllowedRegistryData,
+)
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.dto.container_registry_request import ImageCommitRegistryReq
@@ -193,9 +196,16 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
         self, info: graphene.ResolveInfo
     ) -> dict[str, str | None] | None:
         graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "Group.image_commit_registry")
-        result: ImageCommitRegistry | None = await loader.load(ProjectID(self.id))
-        return result.to_json() if result is not None else None
+        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "Group.registries")
+        project_registries: list[ProjectAllowedRegistryData] = await loader.load(ProjectID(self.id))
+        for project_registry in project_registries:
+            if not project_registry.is_default:
+                continue
+            registry = project_registry.registry
+            return ImageCommitRegistry(
+                registry_name=registry.registry_name, project_name=registry.project
+            ).to_json()
+        return None
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
         graph_ctx: GraphQueryContext = info.context
@@ -422,9 +432,16 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
         self, info: graphene.ResolveInfo
     ) -> dict[str, str | None] | None:
         graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "Group.image_commit_registry")
-        result: ImageCommitRegistry | None = await loader.load(ProjectID(self.id))
-        return result.to_json() if result is not None else None
+        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "Group.registries")
+        project_registries: list[ProjectAllowedRegistryData] = await loader.load(ProjectID(self.id))
+        for project_registry in project_registries:
+            if not project_registry.is_default:
+                continue
+            registry = project_registry.registry
+            return ImageCommitRegistry(
+                registry_name=registry.registry_name, project_name=registry.project
+            ).to_json()
+        return None
 
     async def resolve_scaling_groups(self, info: graphene.ResolveInfo) -> Sequence[ScalingGroup]:
         graph_ctx: GraphQueryContext = info.context
@@ -436,15 +453,15 @@ class Group(graphene.ObjectType):  # type: ignore[misc]
         return [sg.name for sg in sgroups]
 
     @classmethod
-    async def batch_load_image_commit_registry(
+    async def batch_load_registries(
         cls, graph_ctx: GraphQueryContext, project_ids: Sequence[ProjectID]
-    ) -> Sequence[ImageCommitRegistry | Exception | None]:
+    ) -> Sequence[list[ProjectAllowedRegistryData] | Exception | None]:
         return await ProjectAdapter(
             graph_ctx.processors.project,
             graph_ctx.processors.rbac,
             graph_ctx.processors.domain,
             graph_ctx.processors.user,
-        ).batch_load_image_commit_registries(project_ids)
+        ).batch_load_registries(project_ids)
 
     @classmethod
     async def load_all(
@@ -825,9 +842,7 @@ class ModifyGroup(graphene.Mutation):  # type: ignore[misc]
             await graph_ctx.processors.project.clear_default_registry.run(
                 ClearProjectDefaultRegistryAction(project_id=project_id)
             )
-        graph_ctx.dataloader_manager.get_loader(graph_ctx, "Group.image_commit_registry").clear(
-            project_id
-        )
+        graph_ctx.dataloader_manager.get_loader(graph_ctx, "Group.registries").clear(project_id)
         return cls(
             ok=True,
             msg="success",
