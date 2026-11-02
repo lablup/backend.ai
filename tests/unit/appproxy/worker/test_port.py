@@ -22,7 +22,6 @@ from ai.backend.appproxy.common.types import (
     ProxyProtocol,
     RouteInfo,
 )
-from ai.backend.appproxy.worker.errors.circuit import CircuitNotRegisteredError
 from ai.backend.appproxy.worker.errors.ingress import (
     IngressNotFoundError,
     IngressNotRegisteredError,
@@ -206,7 +205,7 @@ class TestPortFrontend:
             _RejectedPortSlotCase(
                 name="no-circuit",
                 circuit_registered=False,
-                expected_error=CircuitNotRegisteredError,
+                expected_error=IngressNotRegisteredError,
             ),
             _RejectedPortSlotCase(
                 name="ingress-never-held",

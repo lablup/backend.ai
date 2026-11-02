@@ -10,7 +10,7 @@ from aiohttp.typedefs import Handler
 
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
-from ai.backend.appproxy.worker.errors.circuit import CircuitNotRegisteredError
+from ai.backend.appproxy.worker.errors.ingress import IngressNotRegisteredError
 from ai.backend.appproxy.worker.types import Circuit, PortFrontendInfo
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
     IngressFrontend,
@@ -111,7 +111,7 @@ class PortFrontend(BaseHTTPFrontend[int]):
         port: int = request.app["port"]
         circuit = self.circuits.get(port, None)
         if circuit is None:
-            raise CircuitNotRegisteredError(f"Unregistered slot {port}")
+            raise IngressNotRegisteredError(f"Unregistered slot {port}")
         with with_log_context(circuit_id=circuit.id):
             ingress = await self._read_registered_ingress(
                 IngressFrontend(
