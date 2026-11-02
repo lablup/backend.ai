@@ -2393,9 +2393,21 @@ class ContainerdConfig(BaseConfigSchema):
         str,
         Field(default="backend-ai"),
         BackendAIConfigMeta(
-            description="containerd namespace holding the kernel containers and the images.",
+            description=(
+                "containerd namespace holding the kernel containers and the pre-imported images. "
+                "The agent only lists containers of this namespace."
+            ),
             added_version="26.10.0",
             example=ConfigExample(local="backend-ai", prod="backend-ai"),
+        ),
+    ]
+    snapshotter: Annotated[
+        str,
+        Field(default="overlayfs"),
+        BackendAIConfigMeta(
+            description="containerd snapshotter that unpacks the images and holds kernel rootfs.",
+            added_version="26.10.0",
+            example=ConfigExample(local="overlayfs", prod="overlayfs"),
         ),
     ]
 
@@ -2629,7 +2641,7 @@ class AgentSpecificConfig(BaseConfigSchema):
         ContainerdConfig,
         Field(default_factory=ContainerdConfig),
         BackendAIConfigMeta(
-            description="containerd backend settings: socket and namespace.",
+            description="containerd backend settings: socket, namespace and snapshotter.",
             added_version="26.10.0",
             composite=CompositeType.FIELD,
         ),

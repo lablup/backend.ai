@@ -28,3 +28,33 @@ class KernelVerbNotSupported(BackendAIError, web.HTTPNotImplemented):
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.NOT_IMPLEMENTED,
         )
+
+
+class ContainerdUnavailableError(BackendAIError, web.HTTPServiceUnavailable):
+    """Raised when the containerd socket cannot be used."""
+
+    error_type = "https://api.backend.ai/probs/agent/containerd-unavailable"
+    error_title = "The containerd daemon is unavailable."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class ContainerdOperationFailed(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a containerd gRPC call fails."""
+
+    error_type = "https://api.backend.ai/probs/agent/containerd-operation-failed"
+    error_title = "A containerd operation failed."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
