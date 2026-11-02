@@ -37,7 +37,7 @@ For finding and defining exceptions, see `src/ai/backend/manager/errors/AGENTS.m
 | Skill | Purpose | Use When |
 |-------|---------|----------|
 | `/local-dev` | Service management (`./dev`): start, stop, restart, crash debugging | Restarting services after code changes, debugging startup crashes |
-| `/bai-cli` | `./bai` usage: config, login, command patterns, entity reference | Testing API changes on live server, discovering CLI commands |
+| `/bai-cli` | V2 CLI usage (`./bai`): config, login, command patterns, entity reference | Testing API changes on live server, discovering CLI commands |
 | `/observability` | Logs, metrics and traces via Grafana MCP (Loki, Prometheus, Tempo, Pyroscope) | Verifying behavior after a restart |
 | `/halfstack` | Docker Compose halfstack: config, service health, DB, Valkey, etcd, supergraph | Halfstack or infrastructure troubleshooting |
 
@@ -66,10 +66,10 @@ bep-guide → ┬→ repository-guide ─┐
 test-guide → repository, service and API layer tests
 
 **Submission Flow:**
-implement → submit → quality checks → commit → PR → changelog → push
+implement → submit (quality checks → commit → PR → changelog → push)
 
 **Release Flow:**
-pre-flight → release.sh → changelog editing → RC consolidation → summary
+release (pre-flight → release.sh → changelog editing → RC consolidation → summary)
 
 **Infrastructure Flow:**
 halfstack → db-migrate → local-dev → bai-cli

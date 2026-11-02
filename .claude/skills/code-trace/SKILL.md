@@ -40,7 +40,7 @@ Flow: `API handler → Processor → Service → Repository → DB`. Handlers do
 Do not read it whole; it is generated as a single file. Extract only the block you need:
 
 ```bash
-# find the line number of a type or input
+# find the line number of a type, input or query
 grep -n "^type User\b\|^input .*User\|^type Query\|^type Mutation" supergraph.graphql
 ```
 

@@ -2,7 +2,7 @@
 
 Syntax: `./bai [admin|my] {entity} [{sub-entity}] {command} [options]`
 
-This is a guide. Verify commands with `--help`:
+**This is a guide, not a source of truth.** Always verify with `--help`:
 ```bash
 ./bai {entity} --help
 ./bai admin {entity} --help

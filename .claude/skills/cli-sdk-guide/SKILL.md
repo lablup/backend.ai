@@ -276,7 +276,7 @@ When implementing new CLI/SDK feature:
 
 ## V2 SDK/CLI (New Pattern)
 
-**All new SDK/CLI work uses the v2 pattern.**
+**All new SDK/CLI work must use the v2 pattern.**
 
 ### V2 SDK Client (`client/v2/domains_v2/`)
 

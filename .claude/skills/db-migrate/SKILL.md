@@ -60,7 +60,7 @@ Re-check status afterwards. **Downgrade may remove data or features, so verify a
 | Multiple heads detected | diverged migrations | reconcile per `alembic/AGENTS.md` (repoint your own `down_revision`, or add an empty merge migration if main has 2+ heads), then retry |
 | Cannot locate revision 'X' | bad revision id or wrong config | `./py -m alembic -c <config> history`; check typo and component |
 | Foreign key constraint violation | existing data blocks the change | review the migration's data-migration logic; fix data integrity; often needs manual intervention |
-| Cannot connect (listener absent on :5432) | PostgreSQL down or misconfig | `docker ps \| grep postgres`; see `/halfstack` |
+| Cannot connect (`connection refused` on :5432) | PostgreSQL down or misconfig | `docker ps \| grep postgres`; see `/halfstack` |
 | Migration file not found | code not pulled or wrong branch | `git pull`; verify branch |
 
 ## Safety notes
