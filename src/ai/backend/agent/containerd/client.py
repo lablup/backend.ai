@@ -32,6 +32,7 @@ __all__ = (
     "ContainerdClientConfig",
     "ImageTarget",
     "MountSpec",
+    "RuntimeOptions",
     "TaskInfo",
     "TaskState",
 )

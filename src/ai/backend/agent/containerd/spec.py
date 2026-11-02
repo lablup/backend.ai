@@ -1,13 +1,13 @@
-"""The OCI runtime spec of a kernel container."""
+"""The generic OCI runtime spec of a kernel container, and the profile patch merged over it."""
 
 from __future__ import annotations
 
 import copy
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Final
 
+from ai.backend.agent.containerd.profile.base import GeneratedMount, GeneratedMountKind
 from ai.backend.agent.utils import get_safe_ulimit
 
 OCI_VERSION: Final = "1.1.0"
@@ -132,7 +132,7 @@ def _resources(inp: SpecInput) -> dict[str, Any]:
 
 
 def build_base_spec(inp: SpecInput) -> dict[str, Any]:
-    """The kernel-independent spec: no process args, no kernel mounts."""
+    """The kernel-independent spec: no process args, no kernel mounts, no profile patch."""
     caps = [*DEFAULT_CAPABILITIES, *inp.extra_caps]
     mounts: list[dict[str, Any]] = copy.deepcopy(list(_DEFAULT_MOUNTS))
     mounts.insert(
@@ -179,14 +179,7 @@ def build_base_spec(inp: SpecInput) -> dict[str, Any]:
     }
 
 
-@dataclass(frozen=True)
-class BindMount:
-    source: Path
-    target: str
-    read_only: bool
-
-
-def _bind_mount(mount: BindMount) -> dict[str, Any]:
+def _bind_mount(mount: GeneratedMount) -> dict[str, Any]:
     return {
         "destination": mount.target,
         "type": "bind",
@@ -195,23 +188,41 @@ def _bind_mount(mount: BindMount) -> dict[str, Any]:
     }
 
 
+def merge_patch(base: Mapping[str, Any], patch: Mapping[str, Any]) -> dict[str, Any]:
+    """RFC 7386 JSON merge patch: dicts merge, lists and scalars replace, null deletes."""
+    merged = copy.deepcopy(dict(base))
+    for key, value in patch.items():
+        if value is None:
+            merged.pop(key, None)
+        elif isinstance(value, Mapping) and isinstance(merged.get(key), dict):
+            merged[key] = merge_patch(merged[key], value)
+        else:
+            merged[key] = copy.deepcopy(value)
+    return merged
+
+
 def build_launch_spec(
     base_spec: Mapping[str, Any],
     *,
     args: Sequence[str],
     env: Sequence[str],
-    mounts: Sequence[BindMount],
+    mounts: Sequence[GeneratedMount],
+    allowed_mount_kinds: frozenset[GeneratedMountKind],
+    spec_patch: Mapping[str, Any],
     cgroups_path: str,
 ) -> dict[str, Any]:
-    """Add the process args, env, cgroup path and the kernel mounts."""
+    """Add the process args, env, cgroup path and the allowed kernel mounts, then the patch."""
     spec = copy.deepcopy(dict(base_spec))
     spec["linux"]["cgroupsPath"] = cgroups_path
     spec["process"]["args"] = list(args)
     spec["process"]["env"] = list(env)
     # Shallower destinations first, so a mount is never hidden by one made before its parent.
-    ordered = sorted(mounts, key=lambda m: m.target.rstrip("/").count("/"))
+    ordered = sorted(
+        (m for m in mounts if m.kind in allowed_mount_kinds),
+        key=lambda m: m.target.rstrip("/").count("/"),
+    )
     spec["mounts"] = [*spec["mounts"], *(_bind_mount(m) for m in ordered)]
-    return spec
+    return merge_patch(spec, spec_patch)
 
 
 def merge_env(image_env: Sequence[str], kernel_env: Mapping[str, str]) -> list[str]:

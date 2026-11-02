@@ -12,6 +12,7 @@ from ai.backend.agent.containerd.client import (
     ContainerdAPI,
     ContainerRecord,
     MountSpec,
+    RuntimeOptions,
     TaskInfo,
     TaskState,
 )
@@ -50,6 +51,7 @@ async def launch_container(
     chain_id: str,
     spec: Mapping[str, Any],
     stdio: str,
+    runtime_options: RuntimeOptions | None = None,
 ) -> int:
     """Prepare the snapshot, create the container and start its task; returns the PID.
 
@@ -57,7 +59,7 @@ async def launch_container(
     """
     try:
         rootfs: Sequence[MountSpec] = await client.prepare_snapshot(record.snapshot_key, chain_id)
-        await client.create_container(record, runtime, spec)
+        await client.create_container(record, runtime, spec, runtime_options)
         pid = await client.create_task(record.id, rootfs, stdio, stdio)
         await client.start_task(record.id)
     except BaseException:

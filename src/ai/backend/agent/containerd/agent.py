@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
 import signal
 import uuid
@@ -37,8 +38,18 @@ from ai.backend.agent.containerd.lifecycle import (
     destroy_container,
     launch_container,
 )
-from ai.backend.agent.containerd.mounts import host_system_mounts, to_bind_mounts
+from ai.backend.agent.containerd.mounts import host_system_mounts, to_generated_mounts
 from ai.backend.agent.containerd.network import KernelNetwork, PortForward
+from ai.backend.agent.containerd.profile.base import (
+    GeneratedMount,
+    GeneratedMountKind,
+    KernelLaunch,
+    RuntimeProfile,
+    StdioMode,
+    prepare_kernel_config,
+)
+from ai.backend.agent.containerd.profile.loader import load_runtime_profiles, select_profile
+from ai.backend.agent.containerd.profile.runc import RuncProfile
 from ai.backend.agent.containerd.scratch import (
     CONFIG_DIR_LABEL,
     Owner,
@@ -52,7 +63,6 @@ from ai.backend.agent.containerd.scratch import (
     write_resolv_conf,
 )
 from ai.backend.agent.containerd.spec import (
-    BindMount,
     SpecInput,
     build_base_spec,
     build_launch_spec,
@@ -135,9 +145,14 @@ _CONTAINER_STATUS: Final[Mapping[TaskState, ContainerStatus]] = {
     TaskState.UNKNOWN: ContainerStatus.DEAD,
 }
 _DEFAULT_SHM_BYTES: Final = 64 * 2**20
-_RUNC_RUNTIME: Final = "io.containerd.runc.v2"
 # FIXME(containerd-mvp): no Docker client; in-tree plugins ignore the argument
 _NO_DOCKER: Final = cast(aiodocker.Docker, None)
+
+
+def _kernel_slots(kernel_config: KernelCreationConfig) -> Mapping[SlotName, Decimal]:
+    return {
+        SlotName(k): v for k, v in ResourceSlot.from_json(kernel_config["resource_slots"]).items()
+    }
 
 
 def _kernel_id_of(record: ContainerRecord) -> KernelId | None:
@@ -190,14 +205,17 @@ def _to_container(record: ContainerRecord, status: ContainerStatus) -> Container
 
 
 class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKernel]):
+    _profile: RuntimeProfile
+    _slots: Mapping[SlotName, Decimal]
     _client: ContainerdAPI
     _port_pool: PortPool
     _network: KernelNetwork
     _address: IPv4Address | None
     _resource_lock: asyncio.Lock
     _dirs: ScratchDirs
-    _bind_mounts: list[BindMount]
+    _generated_mounts: list[GeneratedMount]
     _base_spec: dict[str, Any]
+    _accelerator_targets: set[str]
 
     def __init__(
         self,
@@ -210,6 +228,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         computers: Mapping[DeviceName, ComputerContext],
         restarting: bool = False,
         *,
+        profile: RuntimeProfile,
+        slots: Mapping[SlotName, Decimal],
         client: ContainerdAPI,
         port_pool: PortPool,
         network: KernelNetwork,
@@ -225,6 +245,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             computers,
             restarting=restarting,
         )
+        self._profile = profile
+        self._slots = slots
         self._client = client
         self._port_pool = port_pool
         self._network = network
@@ -233,8 +255,9 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         self._dirs = ScratchDirs.for_kernel(
             local_config.container.scratch_root, str(ownership_data.kernel_id)
         )
-        self._bind_mounts = []
+        self._generated_mounts = []
         self._base_spec = {}
+        self._accelerator_targets = set()
 
     def _owner(self) -> Owner | None:
         """Who owns the files in the work dir, as the Docker agent decides it."""
@@ -335,7 +358,13 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 
     @override
     async def process_mounts(self, mounts: Sequence[Mount]) -> None:
-        self._bind_mounts = to_bind_mounts(mounts)
+        # Mounts at a plugin's mount targets are ACCELERATOR kind, not vfolders.
+        self._generated_mounts = [
+            dataclasses.replace(mount, kind=GeneratedMountKind.ACCELERATOR)
+            if mount.target in self._accelerator_targets
+            else mount
+            for mount in to_generated_mounts(mounts)
+        ]
 
     # cpu and mem return no Docker container fragment and are applied through the spec
     # resources; a plugin that needs one (devices, env) is refused.
@@ -365,7 +394,9 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         await run_in_executor_with_context(
             None, partial(src_path.mkdir, parents=True, exist_ok=True)
         )
-        return await computer.generate_mounts(src_path, device_alloc)
+        mounts = await computer.generate_mounts(src_path, device_alloc)
+        self._accelerator_targets.update(str(mount.dst_path) for mount in mounts)
+        return mounts
 
     @override
     def resolve_krunner_filepath(self, filename: str) -> Path:
@@ -416,9 +447,18 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 extra_caps=extra_caps,
             )
         )
-        # A failure in setup tears down what it created.
+        launch = KernelLaunch(
+            kernel_id=self.kernel_id,
+            session_id=self.session_id,
+            config=self.kernel_config,
+            slots=self._slots,
+            mounts=tuple(self._generated_mounts),
+            base_spec=self._base_spec,
+        )
+        # The netns exists before plan(); a failure in setup or plan tears it down.
         try:
             self._address = await self._network.setup(self.kernel_id)
+            launch_plan = self._profile.plan(launch)
         except BaseException:
             await self._teardown_network()
             raise
@@ -432,6 +472,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             service_ports=service_ports,
             environ=environ,
             data={},
+            launch_plan=launch_plan,
         )
 
     async def _write_config_files(
@@ -491,7 +532,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         preopen_ports: Sequence[int],
         cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
-        image_name = self.kernel_config["image"]["canonical"]
+        launch_plan = cast(ContainerdKernel, kernel_obj).launch_plan
         container_id = f"{self.kernel_id}-{uuid.uuid4().hex[:8]}"
         service_ports = kernel_obj.service_ports
         address = self._address
@@ -501,7 +542,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             sum(len(sport["container_ports"]) for sport in service_ports)
         )
         try:
-            image = await resolve_image(self._client, image_name, get_arch_name())
+            image = await resolve_image(self._client, launch_plan.rootfs_image, get_arch_name())
             pending = iter(host_ports)
             forwards = [
                 PortForward(next(pending), cport)
@@ -516,13 +557,19 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 self._base_spec,
                 args=["/opt/kernel/entrypoint.sh", *cmdargs],
                 env=merge_env(image.env, kernel_obj.environ),
-                mounts=self._bind_mounts,
+                mounts=self._generated_mounts,
+                allowed_mount_kinds=launch_plan.allowed_mount_kinds,
+                spec_patch=launch_plan.spec_patch,
                 # cgroupfs form: the native API passes no runc options, so runc uses cgroupfs.
+                # A profile enabling SystemdCgroup overrides it with spec_patch.
                 cgroups_path=f"/{self._client.namespace}/{container_id}",
+            )
+            stdio = (
+                f"file://{self._dirs.task_log}" if launch_plan.stdio is StdioMode.LOG_FILE else ""
             )
             record = ContainerRecord(
                 id=container_id,
-                image=image_name,
+                image=launch_plan.rootfs_image,
                 snapshotter=self._client.snapshotter,
                 snapshot_key=container_id,
                 labels=self._container_labels(host_ports, address),
@@ -530,10 +577,11 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             await launch_container(
                 self._client,
                 record,
-                runtime=_RUNC_RUNTIME,
+                runtime=launch_plan.runtime_handler,
                 chain_id=image.chain_id,
                 spec=spec,
-                stdio=f"file://{self._dirs.task_log}",
+                stdio=stdio,
+                runtime_options=launch_plan.runtime_options,
             )
         except BaseException:
             await self._teardown_network()
@@ -575,6 +623,9 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 class ContainerdAgent(
     AbstractAgent[ContainerdKernel, ContainerdKernelCreationContext],
 ):
+    _runtime_profiles: list[RuntimeProfile]
+    _profile_required_slots: frozenset[SlotName]
+    _runc_profile: RuncProfile
     _client: ContainerdAPI
     _network: KernelNetwork
     _orphan_ports: dict[KernelId, list[int]]
@@ -585,10 +636,19 @@ class ContainerdAgent(
         local_config: AgentUnifiedConfig,
         **kwargs: Any,
     ) -> None:
+        # Load first: a bad profile must stop the agent before any background task starts.
+        containerd_config = local_config.containerd
+        runtime_profiles = load_runtime_profiles(
+            containerd_config.runtime_profiles, containerd_config.profiles
+        )
         _check_bind_host(local_config.container.bind_host)
         _check_advertised_host(local_config.container.advertised_host or "0.0.0.0")
         super().__init__(etcd, local_config, **kwargs)
-        containerd_config = local_config.containerd
+        self._runtime_profiles = runtime_profiles
+        self._profile_required_slots = frozenset(
+            SlotName(s) for s in containerd_config.profile_required_slots
+        )
+        self._runc_profile = RuncProfile(local_config.kernel_lifecycles.init_timeout_sec)
         self._orphan_ports = {}
         self._network = KernelNetwork(
             containerd_config.bridge_name,
@@ -773,6 +833,19 @@ class ContainerdAgent(
         restarting: bool = False,
         cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None,
     ) -> ContainerdKernelCreationContext:
+        slots = _kernel_slots(kernel_config)
+        profile = select_profile(
+            self._runtime_profiles,
+            self._profile_required_slots,
+            slots,
+            builtin=self._runc_profile,
+        )
+        log.debug(
+            "runtime profile selected",
+            kernel_id=str(ownership_data.kernel_id),
+            profile=profile.name,
+        )
+        kernel_config = await prepare_kernel_config(profile, kernel_config)
         distro = await self.resolve_image_distro(kernel_config["image"])
         return ContainerdKernelCreationContext(
             ownership_data,
@@ -783,6 +856,8 @@ class ContainerdAgent(
             self.local_config,
             self.computers,
             restarting=restarting,
+            profile=profile,
+            slots=slots,
             client=self._client,
             port_pool=self.port_pool,
             network=self._network,
