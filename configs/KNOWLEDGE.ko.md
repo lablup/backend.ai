@@ -1,6 +1,6 @@
 # configs/: 배경
 
-> 규칙은 같은 디렉터리의 `AGENTS.md` 에 있다(sample.toml 은 생성 파일이므로 직접 수정하지 않는다).
+> 규칙은 같은 디렉터리의 `AGENTS.md` 에 있다(sample.toml.j2 는 생성되는 template 이므로 직접 수정하지 않는다).
 
 ## 이 디렉터리가 있는 이유
 
@@ -20,12 +20,13 @@
 
 | 종류 | 예 | 관리 |
 |---|---|---|
-| 생성되는 스키마 view | `{component}/sample.toml` | `generate-sample` 로 다시 생성한다 |
+| 생성되는 스키마 template | `{component}/sample.toml.j2` | `generate-sample` 로 다시 생성하고, `config render` 로 설정 파일을 만든다 |
 | 로컬 개발 template | `halfstack.toml`, `ci.toml`, `halfstack.alembic.ini`, `sample.conf` | 직접 관리한다 |
 | etcd seed JSON | `manager/sample.etcd.*.json` | 직접 관리한다 |
 | 서드파티 인프라 | prometheus, loki, tempo, grafana, traefik, systemd, graphql | 직접 관리한다 |
 
-- `sample.toml` 을 다시 생성하거나 비교하는 CI 검사는 없다. 차이는 review 에서만 발견된다.
+- `sample.toml.j2` 를 다시 생성하거나 비교하는 CI 검사는 없다. 차이는 review 에서만 발견된다.
+- template 인자를 채우기 전에는 TOML 로 파싱되지 않으므로, 채우지 않은 sample 을 설정으로 사용할 수 없다. `config render` 는 인자가 빠지면 실패하고 결과가 TOML 로 파싱되는지 확인한다. 값은 검증하지 않는다. 검증하면 일부 경로 field 가 참조하는 디렉터리를 생성하기 때문이다.
 
 ## 읽는 순서
 
@@ -37,6 +38,6 @@
 ## 설정 key 추가 확인 목록
 
 1. 컴포넌트의 `config/unified.py` 에 `BackendAIConfigMeta` 로 field 를 추가한다. `description` 과 `added_version` 은 필수다(version 은 `# Added in X.Y.Z` 주석이 된다).
-2. 다시 생성한다: `./backend.ai {component} config generate-sample --overwrite`
+2. 다시 생성한다: `./backend.ai {component} config generate-sample --overwrite --unmask-secrets`. 표를 값으로 갖는 DICT field 를 새로 추가하면 `template_arg` 도 지정한다.
 3. 로컬 개발에 값이 필요하면 `halfstack.toml`/`ci.toml` 을 직접 갱신한다. 이 파일들은 생성되지 않는다.
 4. etcd 기반 key 라면 `unified.py` 의 etcd tree docstring 과 해당 `sample.etcd.*.json` 을 갱신한다.

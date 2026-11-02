@@ -15,6 +15,7 @@ from ai.backend.common.configs.generator import (
     GeneratorConfig,
     TOMLGenerator,
 )
+from ai.backend.common.configs.generator.cli import render
 from ai.backend.common.meta import ConfigEnvironment
 from ai.backend.logging.structured import StructuredLogger
 
@@ -39,8 +40,8 @@ def cli() -> None:
         writable=True,
         path_type=pathlib.Path,
     ),
-    default="./configs/agent/sample.toml",
-    help="Output path for the generated sample configuration file. (default: sample.toml)",
+    default="./configs/agent/sample.toml.j2",
+    help="Output path for the generated sample template. (default: sample.toml.j2)",
 )
 @click.option(
     "-e",
@@ -68,7 +69,7 @@ def generate_sample(
     unmask_secrets: bool,
 ) -> None:
     """
-    Generate a sample configuration file from the AgentUnifiedConfig schema.
+    Generate a sample configuration template from the AgentUnifiedConfig schema.
 
     This command creates a TOML configuration file with environment-specific examples
     (local or prod), proper secret masking, and comprehensive documentation from
@@ -89,7 +90,8 @@ def generate_sample(
     header_comment = f"""
 Backend.AI Agent Configuration ({env.upper()} Environment)
 
-This is a sample configuration file for the Backend.AI Agent.
+This is a sample configuration template for the Backend.AI Agent.
+Write a configuration file with `./backend.ai ag config render -t <template> -a NAME=VALUE -o <output>`.
 All configuration options are documented with their descriptions,
 default values, and environment-specific examples.
 
@@ -114,6 +116,8 @@ Generated using BackendAIConfigMeta annotations.
 def migrate() -> None:
     """Migrate legacy configuration fields."""
 
+
+cli.add_command(render)
 
 if __name__ == "__main__":
     cli()

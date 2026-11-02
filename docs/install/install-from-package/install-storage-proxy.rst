@@ -25,8 +25,11 @@ Local configuration
 
 Backend.AI Storage Proxy uses a TOML file (``storage-proxy.toml``) to configure
 local service. Refer to the
-`storage-proxy.toml sample file <https://github.com/lablup/backend.ai/blob/main/configs/storage-proxy/sample.toml>`_
-for a detailed description of each section and item. A configuration example
+`storage-proxy.toml sample template <https://github.com/lablup/backend.ai/blob/main/configs/storage-proxy/sample.toml.j2>`_
+for a detailed description of each section and item. To write a configuration
+file from the template, fill its arguments, such as
+``backend.ai storage config render -t sample.toml.j2 -a volume_name=local
+-a artifact_storage_name=minio -a artifact_registry_name=hf -o storage-proxy.toml``. A configuration example
 would be:
 
 .. code-block:: toml

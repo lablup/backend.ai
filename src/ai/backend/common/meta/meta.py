@@ -132,6 +132,10 @@ class BackendAIConfigMeta(BackendAIFieldMeta):
     rather than specified directly.
     """
 
+    template_arg: str | None = None
+    """Template argument that names the key of a ``CompositeType.DICT`` entry in the
+    generated sample template (e.g., ``volume_name``). Required when the entries are tables."""
+
 
 @dataclass(frozen=True)
 class BackendAIAPIMeta(BackendAIFieldMeta):
