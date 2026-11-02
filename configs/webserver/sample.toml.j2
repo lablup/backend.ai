@@ -209,10 +209,6 @@
   # Set to false only for local development without HTTPS.
   # Added in 26.4.3
   cookie-secure = true
-  # SameSite attribute of session cookies: Strict, Lax, or None. None requires
-  # cookie-secure to be true.
-  # Added in 26.10.0
-  cookie-samesite = "Lax"
   # List of request security policy names to apply. These policies are processed
   # as middleware on incoming requests. Common policies include CORS handling,
   # request size limits, and rate limiting. Empty list means no additional
@@ -231,7 +227,7 @@
   # and "null" are rejected. When empty, no origin receives CORS response
   # headers.
   # Added in 26.10.0
-  cors-allowed-origins = ["https://console.example.com"]
+  cors-allowed-origins = []
 
   # Content Security Policy configuration. When set, adds CSP headers to
   # responses to protect against XSS and other injection attacks. Leave unset
