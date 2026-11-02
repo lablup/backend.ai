@@ -245,6 +245,15 @@ class PresetLook:
                 if self.shown_scope_type is not None
                 else str(seeded.scope_type),
             ),
+            (
+                Same(f"{at}scope_id", node.scope_id, None)
+                if seeded.scope_id is None
+                else Held[UUID | None](
+                    f"{at}scope_id",
+                    node.scope_id,
+                    SameAs[UUID | None](seeded.scope_id, "미리 만든 프리셋이 지정한 스코프의 id"),
+                )
+            ),
             Same(
                 f"{at}auto_assign",
                 node.auto_assign,
