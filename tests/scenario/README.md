@@ -116,4 +116,4 @@ Then
 
 The report also lists the calls an adapter provides that no scenario calls.
 
-The `describe` sentences carry both languages. The English report refuses a sentence whose English is missing.
+The `describe` sentences carry both languages. The English report rejects a sentence whose English is missing.

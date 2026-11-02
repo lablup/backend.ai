@@ -32,7 +32,7 @@ A scenario is one class. It defines its name, what it guarantees, and three step
 - If the response wraps a node, `when` unwraps it, so several rows share one checker.
 - A row that runs with changed config also implements `Configured`. It is the only place that names a config path.
 - Write `describe` with `Says` from `ai.backend.testutils.scenario_steps`: the Korean sentence and the English
-  one. Both are required; the English report refuses a sentence whose English is missing.
+  one. Both are required; the English report rejects a sentence whose English is missing.
 - Do not put identifiers in `describe`: field names, exception classes, file paths.
 
 ## How to seed rows
@@ -95,7 +95,7 @@ A scenario is one class. It defines its name, what it guarantees, and three step
 - Do not write checks that check part of a response. Checking one field passes even when the rest changes
   silently. Do not add helpers that make such checks easy to write.
 - Always check the whole response. `then` returns one of three for each field. Report sentences are written
-  in both languages; the English report refuses a sentence whose English is missing.
+  in both languages; the English report rejects a sentence whose English is missing.
 
   | What | When | Report text |
   |---|---|---|
