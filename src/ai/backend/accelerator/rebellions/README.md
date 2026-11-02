@@ -12,7 +12,7 @@ Only the assigned cards are requested through CDI (`rebellions.ai/npu=<N>`, `N` 
 Agent config:
 - `[agent] allow-compute-plugins` must include `"ai.backend.accelerator.rebellions.rebel100"`.
 - `[resource] allocation-order` must include `"rebel100"`, otherwise kernel creation fails with `ValueError: 'rebel100' is not in list`.
-Before starting the agent, register the `rebel100.device` slot type (no migration inserts it, and `agent_resources.slot_name` references `resource_slot_types`): create it with the v2 resource-slot slot-type create command as superadmin, or load `fixtures/manager/example-resource-slot-types.json` on a dev setup.
+The `rebel100.device` slot type, which `agent_resources.slot_name` references, comes from `seeds/manager/resource_slot_type/defaults.yaml` on a fresh install and from a manager migration on an upgrade.
 
 ## Operational notes
 - The runner waits 30 s for a service port to open, while vLLM loads for minutes: use the model-service path, or a wrapper that opens the port early.
