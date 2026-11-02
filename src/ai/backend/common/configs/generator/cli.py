@@ -63,7 +63,11 @@ def render(
         )
     try:
         rendered = render_config_template(template.read_text(encoding="utf-8"), args)
-    except (jinja2.UndefinedError, tomllib.TOMLDecodeError) as e:
+    except jinja2.UndefinedError as e:
+        raise click.ClickException(
+            f"Cannot render '{template}': {e}. Pass each with -a NAME=VALUE."
+        ) from e
+    except tomllib.TOMLDecodeError as e:
         raise click.ClickException(f"Cannot render '{template}': {e}") from e
     output.write_text(rendered, encoding="utf-8")
     click.echo(f"Configuration written to {output}")

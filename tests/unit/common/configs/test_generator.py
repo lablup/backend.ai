@@ -540,7 +540,7 @@ class TestSampleTemplate:
         assert "[volume.{{ volume_name }}]" in template
         with pytest.raises(tomllib.TOMLDecodeError):
             tomllib.loads(template)
-        with pytest.raises(jinja2.UndefinedError):
+        with pytest.raises(jinja2.UndefinedError, match="volume_name"):
             render_config_template(template, {})
         rendered = tomllib.loads(render_config_template(template, {"volume_name": "local"}))
         assert rendered["volume"]["local"]["path"] == "/vfroot"
