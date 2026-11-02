@@ -110,7 +110,7 @@ tests/unit/
        # Assert
        assert user.name == "Alice"
    ```
-3. **Use descriptive test names**: A test name describes what is being tested
+3. **Use descriptive test names**: A test name should describe what is being tested
 4. **Use real infrastructure when appropriate**: Do not hesitate to use real PostgreSQL, Valkey, etc. when a test covers code that interacts with them directly
 5. **Mock Backend.AI components**: Mock other Backend.AI components and external APIs, but use real infrastructure (databases, caches) when a test covers code that uses them directly
 6. **Avoid testing implementation details too deeply**: Focus on behavior, not internals
