@@ -12,56 +12,42 @@ updated:
   at: 2026-10-16
 status: draft
 ---
-# login_client_type 어댑터 — 시나리오
+# login_client_type adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 어긋나면 문장 쪽을 먼저
-의심한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-`login_client_type` 엔티티는 global 과 public 양쪽에 소속된다. 생성은 호출한 사용자가
-슈퍼관리자인지 검사하고, 지정해 수정·purge 하는 호출은 그 `login_client_type` 행에 부여된
-권한을 검사하는데 그 권한은 global 에서만 나온다. 생성과 수정·purge 모두 슈퍼관리자만 성공하지만
-거부 이유가 서로 다르다. 조회와 검색은 public 에서 READ 를 검사한다. 모든 계정이 public 소속
-역할을 자동으로 받으므로 로그인한 사용자는 모두 읽을 수 있다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-## 생성
+A `login_client_type` entity belongs to both global and public. Create checks whether the calling user is superadmin, and a call that updates or purges an entity by id checks the permission granted on that `login_client_type` row, which comes from global only. Create, update and purge all succeed only for superadmin, but the rejection reason differs. Get and search check READ in public. Every account automatically receives the public membership role, so every signed-in user can read.
 
-이름이 비어 있거나 길이 제한을 넘는 요청은 시나리오로 두지 않는다. 요청 타입이 이미 막기
-때문이다.
+## Create
 
-## 조회
+A request whose name is empty or exceeds the length limit is not a scenario. The request type already blocks it.
 
-조회는 public 에서 READ 를 검사한다. public 조회 권한만 받은 사용자가 성공하는 시나리오가 그것을
-증명하고, 대응하는 거부 시나리오는 생성 절의 역할 부족으로 거부되는 시나리오다. 존재하지 않는 id와
-닿을 수 없는 id는 같은 이유로 거부된다.
+## Get
 
-인증되지 않은 호출은 시나리오로 두지 않는다. 시나리오는 언제나 미리 만들어 둔 사용자로 호출한다.
+Get checks READ in public. The scenario where a user with only the public get permission succeeds proves it, and the matching rejection scenario is the one rejected for an insufficient role in the create section. A non-existent id and an unreachable id are rejected for the same reason.
 
-## 검색
+An unauthenticated call is not a scenario. A scenario always calls as a user prepared beforehand.
 
-이름 필터가 무엇을 좁히는지와 페이지 방식 — 기본 크기 50, `first`만 지정한 요청을 커서로 읽는지
-(BA-7927) — 는 시나리오로 두지 않는다. 필터를 조건으로 옮기고 페이지를 자르는 것은 단위 테스트의
-자리다.
+## Search
 
-## 수정
+What the name filter narrows and the paging method (the default size of 50, and whether a request that specifies only `first` is read by cursor, BA-7927, which tracks the cursor pagination decision) are not scenarios. Moving a filter into a condition and splitting a page belong to the unit tests.
 
-수정은 대상 id를 요청 본문 밖에서 별도 인자로 받는다. 시나리오가 id를 인자와 본문에 거듭 적지
-않도록 이 구조를 유지한다.
+## Update
 
-존재하지 않는 id는 슈퍼관리자와 그 밖의 사용자에게 서로 다른 이유로 거부된다. 권한 검사가 먼저
-실행되는데 존재하지 않는 행에는 부여된 권한도 없으므로, 그 검사를 통과하는 슈퍼관리자만 대상을
-찾을 수 없어 거부된다. purge 절의 같은 시나리오도 마찬가지다.
+Update takes the target id as a separate argument outside the request body. The adapter keeps this structure so that a scenario does not write the id in both the argument and the body.
 
-이름 중복은 생성할 때와 수정할 때 서로 다른 오류로 거부된다. 생성은 이 엔티티 전용 오류로
-거부하고, 수정은 저장소의 제약 위반 오류를 그대로 전파한다. 시나리오를 적기 전에 하나로 맞출
-것인지 정한다.
+Superadmin and other users are rejected for different reasons for a non-existent id. The permission check runs first and a non-existent row has no granted permission either, so only superadmin, who passes that check, is rejected for a missing target. The same applies to purge.
 
-## purge
+A duplicate name is rejected with a different error on create and on update. Create rejects it with the error dedicated to this entity, and update propagates the constraint violation error of the repository as is. Before writing the scenario, decide whether to unify them.
 
-이 어댑터에는 soft delete가 없다.
+## Purge
 
-## 여럿 수정하기
+This adapter has no delete that keeps the row.
 
-## 여럿 purge
+## Bulk update
 
-여럿 연산은 호출 전체를 거부하지 않는다. 처리한 종류는 처리된 목록에, 처리하지 못한 것은 id 와
-이유를 실패 목록에 싣는다.
+## Bulk purge
+
+A bulk operation does not reject the whole call. Processed items go into the processed list, and the failure list contains the id and the reason.

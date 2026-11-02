@@ -9,36 +9,32 @@ generated:
   at: 2026-09-10
 status: draft
 ---
-# 프로젝트 어댑터 — 시나리오
+# project adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다.
+The rules are in `AGENTS.md` in the parent directory.
 
-프로젝트는 도메인 아래에 생긴다. 생성을 지키는 것은 전역 역할이 아니라 그 도메인 스코프의
-권한이다. 도메인 생성과 여기가 다르므로 짝을 따로 적는다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-## 만들기
+A project is created under a domain. Create requires the permission of that domain scope, not a global role. This differs from domain creation, so the pair is written separately.
 
-## 명부
+## Create
 
-## 수정하기
+## Member list
 
-수정의 활성 플래그는 deprecated 다. 내리면 soft delete, 올리면 restore 를 부르고, 이미 그 상태면
-부르지 않는다. 나머지 필드는 수정으로 반영한다. 상태는 노드에 실리지 않아 시나리오는 활성 플래그로
-본다.
+## Update
 
-## 여럿 수정하기
+The active flag of update is deprecated. Deactivating it calls delete, activating it calls restore, and it is not called when the project is already in that state. The update applies the other fields. The status is not carried on the node, so scenarios read it through the active flag.
 
-여럿 수정은 프로젝트마다 단건 수정과 같은 쓰기를 한다. 프로젝트 행을 고친 뒤 그 프로젝트가 따르는
-리소스 정책 공유를 다시 적는다.
+## Updating several
 
-활성 플래그는 항목마다 단건 수정과 같은 기준으로 soft delete 와 restore 를 부른다. 실패는 항목마다
-실패 목록에 싣는다.
+Updating several performs the same write as the single update for each project. It updates the project row and then rewrites the resource policy share the project follows.
 
-## 여럿 soft delete, restore
+The active flag calls delete and restore by the same rule as the single update per entry. A failure is added to the failure list for each entry.
 
-여럿 연산은 호출 전체를 거부하지 않는다. 처리한 프로젝트는 처리된 목록에, 처리하지 못한 것은 id 와
-이유를 실패 목록에 싣는다. 여럿 purge 는 없다.
+## Deleting and restoring several
 
-## image commit을 위한 Container Registry 조회
+A bulk operation does not reject the whole call. Processed projects go into the processed list, and failures are recorded in the failure list with the id and the reason. There is no bulk purge.
 
-일반 프로젝트 조회에는 image commit을 위한 Container Registry 조회가 포함되지 않는다. GraphQL에서 해당 필드를 요청하면 별도로 일괄 조회한다.
+## Container Registry read for image commit
+
+A general project read does not include the Container Registry read for image commit. When the GraphQL request asks for that field, the adapter reads it in a separate bulk read.
