@@ -1,0 +1,6 @@
+The .proto files in this directory are copied from containerd v1.7.27
+(https://github.com/containerd/containerd), Copyright The containerd Authors,
+licensed under the Apache License, Version 2.0. Only the import closure of the
+containers, content, images, snapshots and tasks services and runtimeoptions.v1
+is kept; their `github.com/containerd/containerd/...` imports are rewritten to
+this directory's source-root-relative path.
