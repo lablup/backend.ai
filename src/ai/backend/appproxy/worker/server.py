@@ -511,12 +511,12 @@ async def proxy_frontend_serving_ctx(root_ctx: RootContext) -> AsyncIterator[Non
     # initial circuit load.
     await root_ctx.proxy_frontend.start()
     log.info("started the proxy frontend", frontend_name=type(root_ctx.proxy_frontend).__name__)
-    root_ctx.proxy_frontend_serving.set()
+    root_ctx.proxy_frontend.is_serving = True
     await root_ctx.health_probe.check_all()
     try:
         yield
     finally:
-        root_ctx.proxy_frontend_serving.clear()
+        root_ctx.proxy_frontend.is_serving = False
         try:
             await root_ctx.proxy_frontend.stop()
         except CleanupError as ee:
@@ -579,10 +579,7 @@ async def health_probe_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         )
     )
 
-    root_ctx.proxy_frontend_serving = asyncio.Event()
-    await probe.register_readiness(
-        ProxyFrontendServingHealthChecker(root_ctx.proxy_frontend_serving)
-    )
+    await probe.register_readiness(ProxyFrontendServingHealthChecker(root_ctx.proxy_frontend))
 
     # Start periodic health checking
     await probe.start()

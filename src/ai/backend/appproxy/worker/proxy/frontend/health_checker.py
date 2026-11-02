@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import asyncio
 from datetime import UTC, datetime
-from typing import override
+from typing import TYPE_CHECKING, Any, override
 
 from ai.backend.common.health_checker.abc import ServiceHealthChecker
 from ai.backend.common.health_checker.types import (
@@ -11,6 +10,9 @@ from ai.backend.common.health_checker.types import (
     ServiceGroup,
     ServiceHealth,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.appproxy.worker.proxy.frontend.base import BaseFrontend
 
 PROXY_FRONTEND: ServiceGroup = ServiceGroup("proxy-frontend")
 
@@ -21,11 +23,13 @@ _DEFAULT_TIMEOUT = 1.0
 class ProxyFrontendServingHealthChecker(ServiceHealthChecker):
     """Unhealthy until the proxy frontend opens its ports after the initial circuit load."""
 
-    _serving: asyncio.Event
+    _frontend: BaseFrontend[Any, Any]
     _timeout: float
 
-    def __init__(self, serving: asyncio.Event, *, timeout: float = _DEFAULT_TIMEOUT) -> None:
-        self._serving = serving
+    def __init__(
+        self, frontend: BaseFrontend[Any, Any], *, timeout: float = _DEFAULT_TIMEOUT
+    ) -> None:
+        self._frontend = frontend
         self._timeout = timeout
 
     @property
@@ -40,7 +44,7 @@ class ProxyFrontendServingHealthChecker(ServiceHealthChecker):
 
     @override
     async def check_service(self) -> ServiceHealth:
-        is_serving = self._serving.is_set()
+        is_serving = self._frontend.is_serving
         return ServiceHealth(
             results={
                 _SERVING_COMPONENT_ID: ComponentHealthStatus(

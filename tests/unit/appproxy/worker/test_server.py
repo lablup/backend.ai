@@ -50,29 +50,28 @@ async def test_server_main_opens_aiomonitor_on_localhost(monitor_start: MagicMoc
 
 
 @pytest.fixture
-def root_context_with_loaded_circuits() -> MagicMock:
+def root_context_with_a_frontend_not_serving() -> MagicMock:
     root_context = MagicMock()
-    root_context.proxy_frontend = MagicMock(start=AsyncMock(), stop=AsyncMock())
-    root_context.proxy_frontend_serving = asyncio.Event()
+    root_context.proxy_frontend = MagicMock(start=AsyncMock(), stop=AsyncMock(), is_serving=False)
     root_context.health_probe = MagicMock(check_all=AsyncMock())
     return root_context
 
 
 class TestProxyFrontendServingContext:
     async def test_entering_starts_the_frontend_and_refreshes_readiness(
-        self, root_context_with_loaded_circuits: MagicMock
+        self, root_context_with_a_frontend_not_serving: MagicMock
     ) -> None:
-        root_context = root_context_with_loaded_circuits
+        root_context = root_context_with_a_frontend_not_serving
         async with proxy_frontend_serving_ctx(root_context):
             root_context.proxy_frontend.start.assert_awaited_once()
-            assert root_context.proxy_frontend_serving.is_set()
+            assert root_context.proxy_frontend.is_serving
             root_context.health_probe.check_all.assert_awaited_once()
 
     async def test_leaving_stops_the_frontend_and_reports_not_serving(
-        self, root_context_with_loaded_circuits: MagicMock
+        self, root_context_with_a_frontend_not_serving: MagicMock
     ) -> None:
-        root_context = root_context_with_loaded_circuits
+        root_context = root_context_with_a_frontend_not_serving
         async with proxy_frontend_serving_ctx(root_context):
             pass
         root_context.proxy_frontend.stop.assert_awaited_once()
-        assert not root_context.proxy_frontend_serving.is_set()
+        assert not root_context.proxy_frontend.is_serving

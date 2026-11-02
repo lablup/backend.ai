@@ -29,11 +29,13 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
     root_context: RootContext
     circuits: dict[TCircuitKeyType, Circuit]
     backends: dict[TCircuitKeyType, TBackend]
+    is_serving: bool
 
     def __init__(self, root_context: RootContext) -> None:
         self.root_context = root_context
         self.circuits = {}
         self.backends = {}
+        self.is_serving = False
 
     async def register_circuit(self, circuit: Circuit, routes: list[RouteInfo]) -> None:
         metrics = self.root_context.metrics

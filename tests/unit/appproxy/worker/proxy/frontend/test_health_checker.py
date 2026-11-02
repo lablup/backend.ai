@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -19,10 +19,7 @@ class _ServingCase:
 
 @pytest.fixture
 def serving_health_checker(case: _ServingCase) -> ProxyFrontendServingHealthChecker:
-    serving = asyncio.Event()
-    if case.serving:
-        serving.set()
-    return ProxyFrontendServingHealthChecker(serving)
+    return ProxyFrontendServingHealthChecker(MagicMock(is_serving=case.serving))
 
 
 class TestProxyFrontendServingHealthChecker:
