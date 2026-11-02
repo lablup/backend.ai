@@ -92,6 +92,8 @@ pants lint --changed-since=origin/{base_branch}
    Resolves BA-XXXX
    ```
 
+   - **NEVER mention any JIRA issue other than the assigned one** — in the title or the body.
+
 3. **Decide backport targets** (before creating the PR — the trailer lives in the PR body)
 
    Backporting is automatic. There is no milestone to set; the target release branches are
