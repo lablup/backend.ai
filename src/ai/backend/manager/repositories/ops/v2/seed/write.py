@@ -113,7 +113,7 @@ class V2SeedWriteOps(V2RelationWriteOps, V2RosterWriteOps, V2ResourcePolicyWrite
         owner = UserID(project.creator_id)
         if await self._on_roster(entity, owner):
             return False
-        await self._join(entity, owner)
+        await self._join_as_owner(entity, owner)
         return True
 
     async def _restate_resource_policy_shares(self, entity: EntityIdentifier) -> None:

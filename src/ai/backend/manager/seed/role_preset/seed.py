@@ -38,6 +38,7 @@ class RolePresetSeed(SeedItem):
     scope_type: EntityType
     scope: GlobalEntityName | None = None
     auto_assign: bool
+    auto_assign_to_owner: bool = False
     permissions: dict[str, Permission]
 
     @field_validator("scope_type", mode="before")
@@ -91,6 +92,7 @@ class RolePresetSeed(SeedItem):
                 name=self.name,
                 scope_type=self.scope_type,
                 auto_assign=self.auto_assign,
+                auto_assign_to_owner=self.auto_assign_to_owner,
             ),
             field_upserters=[
                 RolePermissionPresetUpserter(entity_type=EntityType(entity_type), permission=bit)

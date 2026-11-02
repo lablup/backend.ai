@@ -7,6 +7,7 @@
             "role_name_template": null,
             "scope_type": "domain",
             "auto_assign": false,
+            "auto_assign_to_owner": false,
             "deleted_at": null,
             "created_at": "2025-09-12 09:51:58.265582+00",
             "updated_at": "2025-09-12 09:51:58.265582+00"
@@ -17,6 +18,7 @@
             "role_name_template": null,
             "scope_type": "domain",
             "auto_assign": true,
+            "auto_assign_to_owner": false,
             "deleted_at": null,
             "created_at": "2025-09-12 09:51:58.265582+00",
             "updated_at": "2025-09-12 09:51:58.265582+00"
@@ -27,6 +29,7 @@
             "role_name_template": null,
             "scope_type": "project",
             "auto_assign": false,
+            "auto_assign_to_owner": true,
             "deleted_at": null,
             "created_at": "2025-09-12 09:51:58.265582+00",
             "updated_at": "2025-09-12 09:51:58.265582+00"
@@ -37,6 +40,7 @@
             "role_name_template": null,
             "scope_type": "project",
             "auto_assign": true,
+            "auto_assign_to_owner": false,
             "deleted_at": null,
             "created_at": "2025-09-12 09:51:58.265582+00",
             "updated_at": "2025-09-12 09:51:58.265582+00"
@@ -47,6 +51,7 @@
             "role_name_template": null,
             "scope_type": "global",
             "auto_assign": true,
+            "auto_assign_to_owner": false,
             "deleted_at": null,
             "created_at": "2025-09-12 09:51:58.265582+00",
             "updated_at": "2025-09-12 09:51:58.265582+00"
@@ -57,6 +62,7 @@
             "role_name_template": null,
             "scope_type": "user",
             "auto_assign": true,
+            "auto_assign_to_owner": false,
             "deleted_at": null,
             "created_at": "2025-09-12 09:51:58.265582+00",
             "updated_at": "2025-09-12 09:51:58.265582+00"

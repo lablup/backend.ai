@@ -5,6 +5,7 @@ items:
     name: project_admin
     scope_type: project
     auto_assign: false
+    auto_assign_to_owner: true
 
     permissions:
       agent:                            [read]
