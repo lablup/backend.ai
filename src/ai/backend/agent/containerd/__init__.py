@@ -9,6 +9,7 @@ from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.types import DeviceName, SlotName
 
 from .agent import ContainerdAgent
+from .krunner import prepare_krunner_env
 from .resources import load_resources, scan_available_resources
 
 
@@ -31,10 +32,9 @@ class ContainerdAgentDiscovery(AbstractAgentDiscovery):
     ) -> Mapping[SlotName, Decimal]:
         return await scan_available_resources(compute_device_types)
 
-    # No kernel runner environments: runc kernels run their image's own command.
     @override
     async def prepare_krunner_env(self, local_config: Mapping[str, Any]) -> Mapping[str, str]:
-        return {}
+        return await prepare_krunner_env(local_config)
 
 
 def get_agent_discovery() -> AbstractAgentDiscovery:

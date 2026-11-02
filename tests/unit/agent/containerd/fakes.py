@@ -138,18 +138,10 @@ class FakeContainerd:
         self.tasks.pop(container_id, None)
 
     def add_image(
-        self,
-        image_ref: str,
-        *,
-        diff_ids: Sequence[str],
-        env: Sequence[str] = (),
-        runtime: Mapping[str, Any] | None = None,
+        self, image_ref: str, *, diff_ids: Sequence[str], env: Sequence[str] = ()
     ) -> None:
-        """Register a single-manifest image; `runtime` adds image config keys (Cmd, ...)."""
-        config = {
-            "rootfs": {"diff_ids": list(diff_ids)},
-            "config": {"Env": list(env), **(runtime or {})},
-        }
+        """Register a single-manifest image."""
+        config = {"rootfs": {"diff_ids": list(diff_ids)}, "config": {"Env": list(env)}}
         self.blobs["sha256:config"] = json.dumps(config).encode()
         self.blobs["sha256:manifest"] = json.dumps({"config": {"digest": "sha256:config"}}).encode()
         self.images[image_ref] = ImageTarget(

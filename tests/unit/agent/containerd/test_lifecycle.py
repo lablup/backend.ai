@@ -33,6 +33,7 @@ async def _launch(fake: FakeContainerd) -> int:
         runtime="io.containerd.runc.v2",
         chain_id="sha256:aa",
         spec={"ociVersion": "1.1.0"},
+        stdio="file:///scratch/task.log",
     )
 
 

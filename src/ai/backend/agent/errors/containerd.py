@@ -90,6 +90,21 @@ class ContainerdImageInvalid(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class KrunnerEnvironmentError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when the kernel runner environment cannot be extracted."""
+
+    error_type = "https://api.backend.ai/probs/agent/krunner-environment-failed"
+    error_title = "The kernel runner environment cannot be prepared."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class KernelNetworkSetupFailed(BackendAIError, web.HTTPInternalServerError):
     """Raised when a host command for a kernel's network namespace (ip) fails."""
 

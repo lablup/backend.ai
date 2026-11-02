@@ -49,16 +49,16 @@ async def launch_container(
     runtime: str,
     chain_id: str,
     spec: Mapping[str, Any],
+    stdio: str,
 ) -> int:
     """Prepare the snapshot, create the container and start its task; returns the PID.
 
-    The task has no stdio: the shim connects it to /dev/null.
     A failed step removes what was created. FIXME(containerd-mvp): no lease holds the snapshot.
     """
     try:
         rootfs: Sequence[MountSpec] = await client.prepare_snapshot(record.snapshot_key, chain_id)
         await client.create_container(record, runtime, spec)
-        pid = await client.create_task(record.id, rootfs, "", "")
+        pid = await client.create_task(record.id, rootfs, stdio, stdio)
         await client.start_task(record.id)
     except BaseException:
         try:
