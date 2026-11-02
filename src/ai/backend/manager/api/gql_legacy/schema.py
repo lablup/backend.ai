@@ -389,13 +389,13 @@ class Mutation(graphene.ObjectType):  # type: ignore[misc]
 
     # admin only
     create_keypair = CreateKeyPair.Field(
-        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `admin_create_keypair_v2` instead."
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `adminCreateKeypairV2` instead."
     )
     modify_keypair = ModifyKeyPair.Field(
-        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `admin_update_keypair_v2` instead."
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `adminUpdateKeypairV2` instead."
     )
     delete_keypair = DeleteKeyPair.Field(
-        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `admin_delete_keypair_v2` instead."
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `adminDeleteKeypairV2` instead."
     )
 
     # admin only
