@@ -148,13 +148,7 @@ async def register_worker(root_ctx: RootContext, request_id: str) -> WorkerRegis
                 or local_config.proxy_worker.port_proxy.bind_port_range
             )
         case FrontendServerMode.WILDCARD_DOMAIN:
-            if not local_config.proxy_worker.wildcard_domain:
-                raise ServerMisconfiguredError("worker:proxy-worker.wildcard-domain")
-            body["wildcard_domain"] = local_config.proxy_worker.wildcard_domain.domain
-            body["wildcard_traffic_port"] = (
-                local_config.proxy_worker.wildcard_domain.advertised_port
-                or local_config.proxy_worker.wildcard_domain.bind_addr.port
-            )
+            pass
         case FrontendServerMode.TRAEFIK:
             if not local_config.proxy_worker.traefik:
                 raise ServerMisconfiguredError("worker:proxy-worker.traefik")
@@ -164,16 +158,11 @@ async def register_worker(root_ctx: RootContext, request_id: str) -> WorkerRegis
                         raise ServerMisconfiguredError("worker:proxy-worker.traefik.port-proxy")
                     body["port_range"] = local_config.proxy_worker.traefik.port_proxy.port_range
                 case FrontendMode.WILDCARD_DOMAIN:
-                    if not local_config.proxy_worker.traefik.wildcard_domain:
-                        raise ServerMisconfiguredError(
-                            "worker:proxy-worker.traefik.wildcard-domain"
-                        )
-                    body["wildcard_domain"] = (
-                        local_config.proxy_worker.traefik.wildcard_domain.domain
-                    )
-                    body["wildcard_traffic_port"] = (
-                        local_config.proxy_worker.traefik.wildcard_domain.advertised_port
-                    )
+                    pass
+    served_wildcard_domain = local_config.proxy_worker.served_wildcard_domain()
+    if served_wildcard_domain is not None:
+        body["wildcard_domain"] = served_wildcard_domain.domain
+        body["wildcard_traffic_port"] = served_wildcard_domain.traffic_port
     try:
         async with sess.put("/api/worker", json=body, headers=headers) as resp:
             resp.raise_for_status()
