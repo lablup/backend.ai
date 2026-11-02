@@ -484,6 +484,17 @@ class TestWatcher:
         ):
             yield agent_service
 
+    async def test_watcher_port_defaults_to_watcher_service_addr_port(
+        self, agent_service: AgentService, agent_id: AgentId, mock_etcd: AsyncMock
+    ) -> None:
+        mock_etcd.get.side_effect = lambda key: {
+            f"nodes/agents/{agent_id}/ip": "192.168.1.100",
+        }.get(key)
+
+        watcher_info = await agent_service._get_watcher_info(agent_id)
+
+        assert watcher_info["addr"].port == 6009
+
     async def test_agent_start_success(
         self, watcher_service_ok: AgentService, agent_id: AgentId
     ) -> None:
