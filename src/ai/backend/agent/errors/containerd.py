@@ -58,3 +58,33 @@ class ContainerdOperationFailed(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class ContainerdImageNotFound(BackendAIError, web.HTTPNotFound):
+    """Raised when the image is not in the containerd image store of the namespace."""
+
+    error_type = "https://api.backend.ai/probs/agent/containerd-image-not-found"
+    error_title = "The image is not imported into containerd."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ContainerdImageInvalid(BackendAIError, web.HTTPInternalServerError):
+    """Raised when an image in the containerd store has no usable manifest or config."""
+
+    error_type = "https://api.backend.ai/probs/agent/containerd-image-invalid"
+    error_title = "The image in containerd cannot be used."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.INVALID_DATA_FORMAT,
+        )
