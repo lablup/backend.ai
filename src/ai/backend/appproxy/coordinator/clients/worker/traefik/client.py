@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Collection, Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass
 from typing import Final, override
 
@@ -90,21 +90,30 @@ class TraefikWorkerClient(AbstractWorkerClient):
                         "frontend_key": ingress.frontend.key(),
                     },
                 )
-        await self._run_ingress_transactions_concurrently(
-            [ingress.key() for ingress in ingresses],
-            [
+        # One transaction per ingress: etcd caps a transaction's operations (--max-txn-ops, 128).
+        # Every transaction settles before raising, or a late write could undo the next request.
+        transaction_results = await asyncio.gather(
+            *(
                 self._replace_routing_configs_and_revision(
                     ingress, worker_frontends_by_authority[ingress.authority], applied_revision
                 )
                 for ingress, applied_revision in zip(ingresses, applied_revisions, strict=True)
-            ],
+            ),
+            return_exceptions=True,
+        )
+        self._raise_failed_ingress_writes(
+            [ingress.key() for ingress in ingresses], transaction_results
         )
 
     @override
     async def remove(self, keys: Sequence[IngressKey]) -> None:
-        await self._run_ingress_transactions_concurrently(
-            keys, [self._clear_routing_configs_and_revision(ingress_key) for ingress_key in keys]
+        # One transaction per ingress: etcd caps a transaction's operations (--max-txn-ops, 128).
+        # Every transaction settles before raising, or a late write could undo the next request.
+        transaction_results = await asyncio.gather(
+            *(self._clear_routing_configs_and_revision(ingress_key) for ingress_key in keys),
+            return_exceptions=True,
         )
+        self._raise_failed_ingress_writes(keys, transaction_results)
 
     async def _clear_routing_configs_and_revision(self, ingress_key: IngressKey) -> None:
         emptied_subtrees_by_etcd_prefix = self._routing_config_factory.build_etcd_subtrees(
@@ -166,14 +175,11 @@ class TraefikWorkerClient(AbstractWorkerClient):
                 },
             )
 
-    async def _run_ingress_transactions_concurrently(
+    def _raise_failed_ingress_writes(
         self,
         ingress_keys: Sequence[IngressKey],
-        ingress_transactions: Sequence[Awaitable[None]],
+        transaction_results: Sequence[BaseException | None],
     ) -> None:
-        # One transaction per ingress: etcd caps a transaction's operations (--max-txn-ops, 128).
-        # Every transaction settles before raising, or a late write could undo the next request.
-        transaction_results = await asyncio.gather(*ingress_transactions, return_exceptions=True)
         failed_transactions = [
             (ingress_key, transaction_result)
             for ingress_key, transaction_result in zip(
