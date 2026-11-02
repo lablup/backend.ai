@@ -9,7 +9,7 @@ The User Service is a core component of Backend.AI that handles user account man
 ### Core User Management
 - **User Creation**: Create new user accounts with customizable properties
 - **User Modification**: Update user information, roles and permissions
-- **User Deletion**: Soft delete users while preserving audit trails
+- **User Deletion**: Delete users while preserving audit trails
 - **User Purging**: Remove users and all associated resources permanently
 
 ### Advanced Features
@@ -128,7 +128,7 @@ action = UpdateUserAction(
 
 ### 3. User Deletion
 
-#### Soft Delete (Preserves Data)
+#### Delete (Preserves Data)
 ```python
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
 
@@ -278,7 +278,7 @@ def mock_dependencies():
 1. **Always use transactions** for multi-step operations
 2. **Validate input data** before processing
 3. **Handle exceptions gracefully** with error messages
-4. **Use soft delete** for user removal unless purging is explicitly required
+4. **Use delete** for user removal unless purging is explicitly required
 5. **Monitor performance** for statistics operations
 6. **Test all edge cases** including concurrent operations
 

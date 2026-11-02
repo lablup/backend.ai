@@ -338,7 +338,7 @@ RunningRouteHandler manages running routes. It routes client requests to the app
 
 #### HealthCheckRouteHandler
 
-HealthCheckRouteHandler performs periodic health checks using a 3-state health classification system. The handler queries health status data from Valkey (populated by app proxy workers) and classifies routes based on readiness checks and data freshness.
+HealthCheckRouteHandler performs periodic health checks using a 3-state health classification system. The handler queries health status data from Valkey (populated by agents) and classifies routes based on readiness checks and data freshness.
 
 **3-State Health Classification:**
 - **HEALTHY**: Readiness check passes and health data is fresh
