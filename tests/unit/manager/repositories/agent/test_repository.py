@@ -1677,6 +1677,7 @@ class TestAgentDBSourceKernelFiltering:
             (SessionStatus.PENDING, EndpointLifecycle.CREATED),
             (SessionStatus.RUNNING, EndpointLifecycle.DESTROYING),
         ],
+        ids=["pending-session-created-deployment", "running-session-destroying-deployment"],
     )
     async def test_update_resource_group_unterminated_designations_gate_on_force(
         self,
