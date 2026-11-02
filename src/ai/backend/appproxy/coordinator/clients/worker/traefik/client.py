@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Collection, Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final, override
 
@@ -70,34 +70,24 @@ class TraefikWorkerClient(AbstractWorkerClient):
         """Writes nothing if any ingress is older than the revision etcd holds. Otherwise each
         ingress is written in its own transaction, so a failed write leaves the others written;
         the failures are raised together."""
-        worker_frontends_by_authority = await self._worker_frontends_by_authority({
-            ingress.authority for ingress in ingresses
-        })
-        applied_revisions_by_authority = await self._applied_revisions_by_authority(
-            worker_frontends_by_authority.keys()
+        authorities = {ingress.authority for ingress in ingresses}
+        worker_frontends_by_authority = await self._worker_frontends_by_authority(authorities)
+        applied_revisions_by_ingress_key = await self._read_applied_revisions_of_authorities(
+            authorities
         )
-        applied_revisions = [
-            applied_revisions_by_authority[ingress.authority].get(ingress.frontend.key())
-            for ingress in ingresses
-        ]
-        for ingress, applied_revision in zip(ingresses, applied_revisions, strict=True):
-            if applied_revision is not None and applied_revision.revision > ingress.revision:
-                raise TraefikIngressRevisionConflictError(
-                    f"frontend {ingress.frontend.key()} holds revision {applied_revision.revision}, "
-                    f"got {ingress.revision}",
-                    extra_data={
-                        "authority": ingress.authority,
-                        "frontend_key": ingress.frontend.key(),
-                    },
-                )
+        self._raise_if_any_ingress_is_older_than_applied(
+            ingresses, applied_revisions_by_ingress_key
+        )
         # One transaction per ingress: etcd caps a transaction's operations (--max-txn-ops, 128).
         # Every transaction settles before raising, or a late write could undo the next request.
         transaction_results = await asyncio.gather(
             *(
                 self._replace_routing_configs_and_revision(
-                    ingress, worker_frontends_by_authority[ingress.authority], applied_revision
+                    ingress,
+                    worker_frontends_by_authority[ingress.authority],
+                    applied_revisions_by_ingress_key.get(ingress.key()),
                 )
-                for ingress, applied_revision in zip(ingresses, applied_revisions, strict=True)
+                for ingress in ingresses
             ),
             return_exceptions=True,
         )
@@ -114,6 +104,23 @@ class TraefikWorkerClient(AbstractWorkerClient):
             return_exceptions=True,
         )
         self._raise_failed_ingress_writes(keys, transaction_results)
+
+    def _raise_if_any_ingress_is_older_than_applied(
+        self,
+        ingresses: Sequence[Ingress],
+        applied_revisions_by_ingress_key: Mapping[IngressKey, AppliedIngressRevision],
+    ) -> None:
+        for ingress in ingresses:
+            applied_revision = applied_revisions_by_ingress_key.get(ingress.key())
+            if applied_revision is not None and applied_revision.revision > ingress.revision:
+                raise TraefikIngressRevisionConflictError(
+                    f"frontend {ingress.frontend.key()} holds revision {applied_revision.revision}, "
+                    f"got {ingress.revision}",
+                    extra_data={
+                        "authority": ingress.authority,
+                        "frontend_key": ingress.frontend.key(),
+                    },
+                )
 
     async def _clear_routing_configs_and_revision(self, ingress_key: IngressKey) -> None:
         emptied_subtrees_by_etcd_prefix = self._routing_config_factory.build_etcd_subtrees(
@@ -228,17 +235,21 @@ class TraefikWorkerClient(AbstractWorkerClient):
             )
         return worker_frontends_by_authority
 
-    async def _applied_revisions_by_authority(
-        self, authorities: Collection[IngressAuthority]
-    ) -> dict[IngressAuthority, dict[IngressFrontendKey, AppliedIngressRevision]]:
+    async def _read_applied_revisions_of_authorities(
+        self, authorities: Iterable[IngressAuthority]
+    ) -> dict[IngressKey, AppliedIngressRevision]:
         applied_revisions_of_authorities = await asyncio.gather(
             *(self._read_applied_revisions_of_authority(authority) for authority in authorities)
         )
-        return dict(zip(authorities, applied_revisions_of_authorities, strict=True))
+        return {
+            ingress_key: applied_revision
+            for applied_revisions_of_authority in applied_revisions_of_authorities
+            for ingress_key, applied_revision in applied_revisions_of_authority.items()
+        }
 
     async def _read_applied_revisions_of_authority(
         self, authority: IngressAuthority
-    ) -> dict[IngressFrontendKey, AppliedIngressRevision]:
+    ) -> dict[IngressKey, AppliedIngressRevision]:
         async with self._etcd_call_limit:
             try:
                 applied_revision_subtrees_by_frontend_key = await self._etcd.get_prefix(
@@ -249,9 +260,9 @@ class TraefikWorkerClient(AbstractWorkerClient):
                     str(e), extra_data={"authority": authority}
                 ) from e
         return {
-            IngressFrontendKey(frontend_key): AppliedIngressRevision.model_validate(
-                applied_revision_subtree
-            )
+            IngressKey(
+                authority=authority, frontend_key=IngressFrontendKey(frontend_key)
+            ): AppliedIngressRevision.model_validate(applied_revision_subtree)
             for frontend_key, applied_revision_subtree in applied_revision_subtrees_by_frontend_key.items()
         }
 
