@@ -930,6 +930,16 @@
   # Added in 26.10.0
   initial-delay = 5.0
 
+# Configuration for the periodic storage status report to the manager.
+# Added in 26.10.0
+[storage-status-report]
+  # Seconds between two storage status reports to the manager.
+  # Added in 26.10.0
+  interval = 30.0
+  # Seconds to wait before the first storage status report.
+  # Added in 26.10.0
+  initial-delay = 10.0
+
 # Configuration overrides for running multiple agents from a single
 # configuration file. Use this field only when defining 2 or more agents;
 # defining only one agent here is redundant. When this field is populated, the

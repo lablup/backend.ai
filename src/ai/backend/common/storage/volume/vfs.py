@@ -14,6 +14,7 @@ from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfi
 from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.data.storage.types import (
     StorageAnomaly,
+    StorageBackendMetadata,
     StorageCheckState,
     StorageStatusCheckType,
     StorageStatusResultData,
@@ -28,6 +29,7 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 @dataclass
 class VfsVolumeStatusCheckArgs:
     volume_name: StorageVolumeName
+    storage_backend_metadata: StorageBackendMetadata
     mount_path: Path
     interval: float
     initial_delay: float
@@ -64,6 +66,7 @@ class VfsVolumeStatusCheck(AbstractVolumeStatusCheck):
     """
 
     _volume_name: StorageVolumeName
+    _storage_backend_metadata: StorageBackendMetadata
     _mount_path: Path
     _interval: float
     _initial_delay: float
@@ -72,6 +75,7 @@ class VfsVolumeStatusCheck(AbstractVolumeStatusCheck):
 
     def __init__(self, args: VfsVolumeStatusCheckArgs) -> None:
         self._volume_name = args.volume_name
+        self._storage_backend_metadata = args.storage_backend_metadata
         self._mount_path = args.mount_path
         self._interval = args.interval
         self._initial_delay = args.initial_delay
@@ -90,12 +94,14 @@ class VfsVolumeStatusCheck(AbstractVolumeStatusCheck):
     def create(
         cls,
         volume_name: StorageVolumeName,
+        storage_backend_metadata: StorageBackendMetadata,
         mount_path: Path,
         config: VolumeStatusCheckConfig,
     ) -> Self:
         return cls(
             VfsVolumeStatusCheckArgs(
                 volume_name=volume_name,
+                storage_backend_metadata=storage_backend_metadata,
                 mount_path=mount_path,
                 interval=config.check_interval,
                 initial_delay=config.initial_delay,
@@ -108,6 +114,10 @@ class VfsVolumeStatusCheck(AbstractVolumeStatusCheck):
     @override
     def id(self) -> StorageVolumeName:
         return self._volume_name
+
+    @override
+    def storage_backend_metadata(self) -> StorageBackendMetadata:
+        return self._storage_backend_metadata
 
     @override
     def interval(self) -> float:

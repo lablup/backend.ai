@@ -427,6 +427,16 @@
     # Replace <name> with your actual key (e.g., 'default', 'local')
     [service-discovery.endpoints.metadata.<name>]
 
+# Configuration for the periodic storage status report to the manager.
+# Added in 26.10.0
+[storage-status-report]
+  # Seconds between two storage status reports to the manager.
+  # Added in 26.10.0
+  interval = 30.0
+  # Seconds to wait before the first storage status report.
+  # Added in 26.10.0
+  initial-delay = 10.0
+
 # OpenTelemetry (OTEL) configuration for distributed tracing and metrics.
 # Enables integration with observability platforms like Jaeger, Zipkin, or
 # commercial APM solutions for request tracing across services.

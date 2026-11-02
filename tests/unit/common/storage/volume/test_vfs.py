@@ -8,7 +8,13 @@ from pathlib import Path
 import pytest
 
 from ai.backend.common.data.entity.storage_volume import StorageVolumeName
-from ai.backend.common.data.storage.types import StorageCheckState, StorageStatusCheckType
+from ai.backend.common.data.storage.types import (
+    StorageBackendCapabilities,
+    StorageBackendMetadata,
+    StorageBackendType,
+    StorageCheckState,
+    StorageStatusCheckType,
+)
 from ai.backend.common.storage.volume.vfs import (
     VfsVolumeStatusCheck,
     VfsVolumeStatusCheckArgs,
@@ -19,6 +25,9 @@ def _make_check(mount_path: Path, executor: Executor) -> VfsVolumeStatusCheck:
     return VfsVolumeStatusCheck(
         VfsVolumeStatusCheckArgs(
             volume_name=StorageVolumeName("volume-1"),
+            storage_backend_metadata=StorageBackendMetadata(
+                name=StorageBackendType("vfs"), capabilities=StorageBackendCapabilities()
+            ),
             mount_path=mount_path,
             interval=60.0,
             initial_delay=5.0,
