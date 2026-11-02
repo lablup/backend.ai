@@ -26,8 +26,9 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.session.options import AgentSelectionPolicy, HandlerOptions
 
 __all__ = (
-    "deployment_options_to_info",
+    "agent_selection_policy_from_input",
     "deployment_handler_options_from_input",
+    "deployment_options_to_info",
 )
 
 
