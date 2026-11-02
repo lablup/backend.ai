@@ -36,6 +36,7 @@ class TestRuncProfile:
             session_id=ownership_data.session_id,
             config=kernel_config,
             slots={},
+            devices=(),
             mounts=(),
             base_spec={},
         )

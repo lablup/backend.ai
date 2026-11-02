@@ -31,6 +31,12 @@ from ai.backend.agent.containerd.client import (
     ContainerRecord,
     TaskState,
 )
+from ai.backend.agent.containerd.hostconfig import (
+    HostConfigTranslation,
+    apply_to_spec,
+    merge_translations,
+    translate_fragment,
+)
 from ai.backend.agent.containerd.image import resolve_image
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.lifecycle import (
@@ -223,6 +229,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _generated_mounts: list[GeneratedMount]
     _base_spec: dict[str, Any]
     _spec_signature: str | None
+    _host_configs: list[tuple[str, HostConfigTranslation]]
+    _host_config: HostConfigTranslation
     _accelerator_targets: set[str]
 
     def __init__(
@@ -267,6 +275,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         self._base_spec = {}
         # Before the scratch dir exists: a sealed kernel without a signature fails here.
         self._spec_signature = spec_signature(kernel_config)
+        self._host_configs = []
+        self._host_config = HostConfigTranslation()
         self._accelerator_targets = set()
 
     def _owner(self) -> Owner | None:
@@ -376,8 +386,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             for mount in to_generated_mounts(mounts)
         ]
 
-    # cpu and mem return no Docker container fragment and are applied through the spec
-    # resources; a plugin that needs one (devices, env) is refused.
+    # Each plugin's Docker container fragment is translated; cpu and mem return none and are
+    # applied through the spec resources.
     @override
     async def apply_accelerator_allocation(
         self,
@@ -385,8 +395,14 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> None:
         try:
-            if await computer.generate_docker_args(_NO_DOCKER, device_alloc):
-                raise KernelVerbNotSupported(f"container arguments of {computer.key}")
+            fragment = await computer.generate_docker_args(_NO_DOCKER, device_alloc)
+            name = str(computer.key)
+            translation = await run_in_executor_with_context(
+                None, partial(translate_fragment, name, fragment)
+            )
+            host_configs = [*self._host_configs, (name, translation)]
+            self._host_config = merge_translations(host_configs)
+            self._host_configs = host_configs
         except BaseException:
             # The kernel is not registered yet, so no clean_kernel removes its scratch dir.
             await run_in_executor_with_context(
@@ -478,6 +494,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         environ: Mapping[str, str],
         service_ports: list[ServicePort],
     ) -> ContainerdKernel:
+        environ = {**environ, **dict(self._host_config.env)}
         await self._write_config_files(resource_spec, environ)
         extra_caps = (
             ("CAP_SYS_PTRACE",)
@@ -498,6 +515,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 extra_caps=extra_caps,
             )
         )
+        self._base_spec = apply_to_spec(self._base_spec, self._host_config)
         if self._spec_signature is not None:
             await self._add_spec_jws(self._spec_signature)
         launch = KernelLaunch(
@@ -505,6 +523,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             session_id=self.session_id,
             config=self.kernel_config,
             slots=self._slots,
+            devices=self._host_config.translated_devices,
             mounts=tuple(self._generated_mounts),
             base_spec=self._base_spec,
         )
