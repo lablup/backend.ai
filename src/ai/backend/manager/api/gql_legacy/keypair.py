@@ -18,7 +18,12 @@ from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
+<<<<<<< HEAD
 from ai.backend.manager.models.keypair import (
+=======
+from ai.backend.manager.models.keypair.row import (
+    KEYPAIR_SECRET_KEY_CONTEXT,
+>>>>>>> 432861232 (fix(BA-8831): route the legacy keypair modify and delete mutations through processors (#16318))
     keypairs,
     prepare_new_keypair,
 )
@@ -43,20 +48,39 @@ __all__ = (
     "UserInfo",
 )
 
+<<<<<<< HEAD
+=======
+from ai.backend.common.data.entity.keypair import KeyPairID
+from ai.backend.common.data.entity.user import UserID
+>>>>>>> 432861232 (fix(BA-8831): route the legacy keypair modify and delete mutations through processors (#16318))
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import agg_to_array
+<<<<<<< HEAD
+=======
+from ai.backend.manager.services.user.actions.keypair_ops import (
+    AdminCreateKeypairAction,
+    PurgeKeypairAction,
+    UpdateKeypairAction,
+)
+from ai.backend.manager.services.user.actions.lookup import LookupUserAction
+from ai.backend.manager.services.user.actions.lookup_keypair import LookupKeypairByAccessKeyAction
+from ai.backend.manager.types import OptionalState
+>>>>>>> 432861232 (fix(BA-8831): route the legacy keypair modify and delete mutations through processors (#16318))
 
 from .base import (
     Item,
     PaginatedList,
     batch_multiresult,
     batch_result,
+<<<<<<< HEAD
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
+=======
+>>>>>>> 432861232 (fix(BA-8831): route the legacy keypair modify and delete mutations through processors (#16318))
 )
 
 
@@ -549,6 +573,15 @@ class ModifyKeyPairInput(graphene.InputObjectType):  # type: ignore[misc]
     concurrency_limit = graphene.Int(required=False)  # deprecated and ignored
     rate_limit = graphene.Int(required=False)
 
+    def to_action(self, keypair_id: KeyPairID) -> UpdateKeypairAction:
+        return UpdateKeypairAction(
+            keypair_id=keypair_id,
+            is_active=OptionalState.from_graphql(self.is_active),
+            is_admin=OptionalState.from_graphql(self.is_admin),
+            resource_policy=OptionalState.from_graphql(self.resource_policy),
+            rate_limit=OptionalState.from_graphql(self.rate_limit),
+        )
+
 
 class CreateKeyPair(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
@@ -609,15 +642,20 @@ class ModifyKeyPair(graphene.Mutation):  # type: ignore[misc]
         access_key: AccessKey,
         props: ModifyKeyPairInput,
     ) -> ModifyKeyPair:
-        ctx: GraphQueryContext = info.context
-        data: dict[str, Any] = {}
-        set_if_set(props, data, "is_active")
-        set_if_set(props, data, "is_admin")
-        set_if_set(props, data, "resource_policy")
-        set_if_set(props, data, "rate_limit")
+        graph_ctx: GraphQueryContext = info.context
+        keypair = await graph_ctx.processors.user.lookup_keypair.run(
+            LookupKeypairByAccessKeyAction(access_key=access_key)
+        )
         # props.concurrency_limit is always ignored
+<<<<<<< HEAD
         update_query = sa.update(keypairs).values(data).where(keypairs.c.access_key == access_key)
         return await simple_db_mutate(cls, ctx, update_query)
+=======
+        await graph_ctx.processors.user.update_keypair.run(
+            props.to_action(KeyPairID(keypair.field_id))
+        )
+        return cls(ok=True, msg="success")
+>>>>>>> 432861232 (fix(BA-8831): route the legacy keypair modify and delete mutations through processors (#16318))
 
 
 class DeleteKeyPair(graphene.Mutation):  # type: ignore[misc]
@@ -636,6 +674,7 @@ class DeleteKeyPair(graphene.Mutation):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         access_key: AccessKey,
     ) -> DeleteKeyPair:
+<<<<<<< HEAD
         from ai.backend.manager.models.user.row import UserRow
 
         ctx: GraphQueryContext = info.context
@@ -655,3 +694,13 @@ class DeleteKeyPair(graphene.Mutation):  # type: ignore[misc]
                 is_private=False,
             )
         return result
+=======
+        graph_ctx: GraphQueryContext = info.context
+        keypair = await graph_ctx.processors.user.lookup_keypair.run(
+            LookupKeypairByAccessKeyAction(access_key=access_key)
+        )
+        await graph_ctx.processors.user.purge_keypair.run(
+            PurgeKeypairAction(keypair_id=KeyPairID(keypair.field_id))
+        )
+        return cls(ok=True, msg="success")
+>>>>>>> 432861232 (fix(BA-8831): route the legacy keypair modify and delete mutations through processors (#16318))
