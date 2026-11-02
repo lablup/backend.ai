@@ -26,7 +26,7 @@
 | 서드파티 인프라 | prometheus, loki, tempo, grafana, traefik, systemd, graphql | 직접 관리한다 |
 
 - `sample.toml.j2` 를 다시 생성하거나 비교하는 CI 검사는 없다. 차이는 review 에서만 발견된다.
-- template 인자를 채우기 전에는 TOML 로 파싱되지 않으므로, 채우지 않은 sample 을 설정으로 쓸 수 없다. `config render` 는 인자가 빠지면 실패하고 결과가 TOML 로 파싱되는지 확인한다. 값은 검증하지 않는다. 검증하면 일부 경로 field 가 가리키는 디렉터리를 만들기 때문이다.
+- template 인자를 채우기 전에는 TOML 로 파싱되지 않으므로, 채우지 않은 sample 을 설정으로 사용할 수 없다. `config render` 는 인자가 빠지면 실패하고 결과가 TOML 로 파싱되는지 확인한다. 값은 검증하지 않는다. 검증하면 일부 경로 field 가 참조하는 디렉터리를 생성하기 때문이다.
 
 ## 읽는 순서
 
