@@ -29,6 +29,8 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     AdminSearchResourceGroupsInput,
     CreateResourceGroupInput,
+    CreateResourceGroupSchedulerOptionsConfigInput,
+    CreateResourceGroupSchedulerOptionsInput,
     PartialBulkPurgeResourceGroupsInput,
     PartialBulkUpdateResourceGroupsInput,
     ReplaceResourceGroupDefaultDeploymentOptionsInput,
@@ -43,7 +45,7 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     UpdateResourceGroupConfigInput,
     UpdateResourceGroupFairShareSpecInput,
     UpdateResourceGroupInput,
-    UpdateResourceGroupSchedulerOptionsConfigInput,
+    UpdateResourceGroupSchedulerOptionsInput,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     AllowedDomainsPayload,
@@ -59,6 +61,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ResourceGroupNetworkConfigInfo,
     ResourceGroupSchedulerConfigInfo,
     ResourceGroupSchedulerOptionsConfigInfo,
+    ResourceGroupSchedulerOptionsInfo,
     ResourceGroupStatusInfo,
     ResourceInfoNode,
     UpdateResourceGroupConfigPayloadNode,
@@ -502,10 +505,15 @@ class ResourceGroupAdapter(BaseAdapter):
         Returns:
             Pydantic payload containing the created resource group node.
         """
-        num_retries_to_skip = (
-            input.scheduler_config.num_retries_to_skip
-            if input.scheduler_config is not None
-            else None
+        scheduler_options = (
+            input.scheduler_options
+            if input.scheduler_options is not None
+            else CreateResourceGroupSchedulerOptionsInput()
+        )
+        scheduler_options_config = (
+            scheduler_options.config
+            if scheduler_options.config is not None
+            else CreateResourceGroupSchedulerOptionsConfigInput()
         )
         creator = ResourceGroupCreator(
             name=input.name,
@@ -518,13 +526,21 @@ class ResourceGroupAdapter(BaseAdapter):
             is_public=input.is_public,
             is_default=input.is_default,
             scheduler_opts=ResourceGroupOpts(
-                allowed_session_types=input.allowed_session_types,
-                pending_timeout=timedelta(seconds=input.pending_timeout),
+                allowed_session_types=scheduler_options.allowed_session_types,
+                pending_timeout=timedelta(seconds=scheduler_options.pending_timeout),
                 config=(
                     {}
-                    if num_retries_to_skip is None
-                    else {NUM_RETRIES_TO_SKIP_CONFIG_KEY: num_retries_to_skip}
+                    if scheduler_options_config.num_retries_to_skip is None
+                    else {
+                        NUM_RETRIES_TO_SKIP_CONFIG_KEY: scheduler_options_config.num_retries_to_skip
+                    }
                 ),
+                agent_selection_strategy=scheduler_options.agent_selection_strategy,
+                agent_selector_config=scheduler_options.agent_selector_config,
+                allow_fractional_resource_fragmentation=(
+                    scheduler_options.allow_fractional_resource_fragmentation
+                ),
+                route_cleanup_target_statuses=scheduler_options.route_cleanup_target_statuses,
             ),
         )
         action_result = await self._resource_group.create_resource_group.run(
@@ -578,6 +594,10 @@ class ResourceGroupAdapter(BaseAdapter):
     def _to_updater(
         self, resource_group_id: ResourceGroupID, input: UpdateResourceGroupInput
     ) -> ResourceGroupUpdater:
+        scheduler_options = OptionalState[UpdateResourceGroupSchedulerOptionsInput].from_unset(
+            input.scheduler_options
+        )
+        scheduler_options_config = scheduler_options.and_optional(lambda options: options.config)
         scheduler: OptionalState[str] = OptionalState.nop()
         if not isinstance(input.scheduler_type, Unset) and input.scheduler_type is not None:
             scheduler = OptionalState.update(SchedulerType(input.scheduler_type).value)
@@ -606,13 +626,27 @@ class ResourceGroupAdapter(BaseAdapter):
             use_host_network=OptionalState.from_unset(input.use_host_network),
             scheduler=scheduler,
             preemption_config=preemption_config,
-            allowed_session_types=OptionalState.from_unset(input.allowed_session_types),
-            pending_timeout=OptionalState.from_unset(input.pending_timeout).map(
-                lambda seconds: timedelta(seconds=seconds)
+            allowed_session_types=scheduler_options.and_optional(
+                lambda options: options.allowed_session_types
             ),
-            num_retries_to_skip=OptionalState[UpdateResourceGroupSchedulerOptionsConfigInput]
-            .from_unset(input.scheduler_config)
-            .and_tri(lambda scheduler_config: scheduler_config.num_retries_to_skip),
+            pending_timeout=scheduler_options.and_optional(
+                lambda options: options.pending_timeout
+            ).map(lambda seconds: timedelta(seconds=seconds)),
+            num_retries_to_skip=scheduler_options_config.and_tri(
+                lambda config: config.num_retries_to_skip
+            ),
+            agent_selection_strategy=scheduler_options.and_optional(
+                lambda options: options.agent_selection_strategy
+            ),
+            agent_selector_config=scheduler_options.and_optional(
+                lambda options: options.agent_selector_config
+            ),
+            allow_fractional_resource_fragmentation=scheduler_options.and_optional(
+                lambda options: options.allow_fractional_resource_fragmentation
+            ),
+            route_cleanup_target_statuses=scheduler_options.and_optional(
+                lambda options: options.route_cleanup_target_statuses
+            ),
         )
 
     def _to_partial_bulk_payload(
@@ -762,9 +796,7 @@ class ResourceGroupAdapter(BaseAdapter):
                 use_host_network=input.use_host_network,
                 scheduler_type=input.scheduler_type,
                 preemption=input.preemption,
-                allowed_session_types=input.allowed_session_types,
-                pending_timeout=input.pending_timeout,
-                scheduler_config=input.scheduler_config,
+                scheduler_options=input.scheduler_options,
             ),
         )
         return UpdateResourceGroupConfigPayloadNode(resource_group=payload.resource_group)
@@ -1128,11 +1160,21 @@ class ResourceGroupAdapter(BaseAdapter):
                     preemption_min_runtime=data.scheduler.options.preemption.preemption_min_runtime.total_seconds(),
                     victim_scope=data.scheduler.options.preemption.victim_scope,
                 ),
-                allowed_session_types=data.scheduler.options.allowed_session_types,
-                pending_timeout=data.scheduler.options.pending_timeout.total_seconds(),
-                config=ResourceGroupSchedulerOptionsConfigInfo(
-                    num_retries_to_skip=data.scheduler.options.config.get(
-                        NUM_RETRIES_TO_SKIP_CONFIG_KEY
+                options=ResourceGroupSchedulerOptionsInfo(
+                    allowed_session_types=data.scheduler.options.allowed_session_types,
+                    pending_timeout=data.scheduler.options.pending_timeout.total_seconds(),
+                    config=ResourceGroupSchedulerOptionsConfigInfo(
+                        num_retries_to_skip=data.scheduler.options.config.get(
+                            NUM_RETRIES_TO_SKIP_CONFIG_KEY
+                        ),
+                    ),
+                    agent_selection_strategy=data.scheduler.options.agent_selection_strategy,
+                    agent_selector_config=dict(data.scheduler.options.agent_selector_config),
+                    allow_fractional_resource_fragmentation=(
+                        data.scheduler.options.allow_fractional_resource_fragmentation
+                    ),
+                    route_cleanup_target_statuses=(
+                        data.scheduler.options.route_cleanup_target_statuses
                     ),
                 ),
             ),

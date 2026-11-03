@@ -148,7 +148,7 @@
 |---|---|
 | [기본 그룹이 없을 때 슈퍼관리자가 기본으로 지정해 만들면 기본인 그룹이 반환된다](#creating-a-resource-group-made-as-the-default-answers-default) | 성공 |
 | [슈퍼관리자가 이름만 주고 리소스 그룹을 만들면, 활성이고 공개이며 기본이 아닌 그룹 전체가 코드의 기본값으로 채워져 반환된다](#creating-the-superadmin-makes-a-resource-group) | 성공 |
-| [슈퍼관리자가 활성·공개 여부, 스케줄러, 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수를 지정해 리소스 그룹을 만들면 지정한 값으로 채워진 그룹 전체가 반환된다](#creating-the-superadmin-makes-a-resource-group-with-its-status-and-scheduler-options) | 성공 |
+| [슈퍼관리자가 활성·공개 여부, 스케줄러, 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수, 에이전트 선택 전략, 분할 자원 조각화 허용 여부, 자동 정리할 라우트 상태를 지정해 리소스 그룹을 만들면 지정한 값으로 채워진 그룹 전체가 반환된다](#creating-the-superadmin-makes-a-resource-group-with-its-status-and-scheduler-options) | 성공 |
 | [이미 어떤 그룹이 쓰고 있는 이름으로 만들려 하면 이름 중복으로 거부된다](#creating-a-name-another-resource-group-already-holds-is-refused) | 거부 |
 | [슈퍼관리자가 아닌 사용자가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-make-a-resource-group) | 거부 |
 | [모니터가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다](#creating-the-monitor-may-not-make-a-resource-group) | 거부 |
@@ -194,7 +194,7 @@
 | [아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 그룹이 반환된다](#editing-an-edit-naming-no-field-changes-nothing) | 성공 |
 | [활성 그룹을 비활성으로 바꾸면 비활성인 그룹이 반환된다](#editing-deactivating-a-resource-group-answers-it-inactive) | 성공 |
 | [기본 그룹이 없을 때 그룹을 기본으로 바꾸면 기본인 그룹이 반환된다](#editing-making-a-resource-group-the-default-answers-it-default) | 성공 |
-| [슈퍼관리자가 선점 설정과 함께 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수를 바꾸면 그 값들이 모두 새 값인 그룹 전체가 반환된다](#editing-the-superadmin-changes-the-scheduler-options-with-the-preemption-config) | 성공 |
+| [슈퍼관리자가 선점 설정과 함께 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수, 에이전트 선택 전략, 에이전트 선택기 설정, 분할 자원 조각화 허용 여부, 자동 정리할 라우트 상태를 바꾸면 그 값들이 모두 새 값인 그룹 전체가 반환된다](#editing-the-superadmin-changes-the-scheduler-options-with-the-preemption-config) | 성공 |
 | [슈퍼관리자가 설명만 바꾸면 설명은 새 값이고 나머지는 그대로인 그룹 전체가 반환된다](#editing-the-superadmin-changing-the-description-leaves-the-rest) | 성공 |
 | [아무 권한도 없는 사용자가 설명을 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-resource-group) | 거부 |
 | [기본 그룹이 따로 있을 때 다른 그룹을 기본으로 바꾸려 하면 기본 그룹이 이미 있다는 이유로 거부된다](#editing-making-a-second-resource-group-the-default-is-refused) | 거부 |
@@ -351,9 +351,13 @@ Then
   - items[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[0].scheduler.preemption.preemption_min_runtime = 0.0
   - items[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - items[0].scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - items[0].scheduler.pending_timeout = 0.0
-  - items[0].scheduler.config.num_retries_to_skip = None
+  - items[0].scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - items[0].scheduler.options.pending_timeout = 0.0
+  - items[0].scheduler.options.config.num_retries_to_skip = None
+  - items[0].scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - items[0].scheduler.options.agent_selector_config = {}
+  - items[0].scheduler.options.allow_fractional_resource_fragmentation = True
+  - items[0].scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - items[0].default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - items[0].default_session_options: 무시함: 설치본이 정한 기본값이다
   - items[1].id: 무시함: 데이터베이스가 만든다
@@ -372,9 +376,13 @@ Then
   - items[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[1].scheduler.preemption.preemption_min_runtime = 0.0
   - items[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - items[1].scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - items[1].scheduler.pending_timeout = 0.0
-  - items[1].scheduler.config.num_retries_to_skip = None
+  - items[1].scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - items[1].scheduler.options.pending_timeout = 0.0
+  - items[1].scheduler.options.config.num_retries_to_skip = None
+  - items[1].scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - items[1].scheduler.options.agent_selector_config = {}
+  - items[1].scheduler.options.allow_fractional_resource_fragmentation = True
+  - items[1].scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - items[1].default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - items[1].default_session_options: 무시함: 설치본이 정한 기본값이다
   - items[2] = None
@@ -479,9 +487,13 @@ Then
   - items[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[0].scheduler.preemption.preemption_min_runtime = 0.0
   - items[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - items[0].scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - items[0].scheduler.pending_timeout = 0.0
-  - items[0].scheduler.config.num_retries_to_skip = None
+  - items[0].scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - items[0].scheduler.options.pending_timeout = 0.0
+  - items[0].scheduler.options.config.num_retries_to_skip = None
+  - items[0].scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - items[0].scheduler.options.agent_selector_config = {}
+  - items[0].scheduler.options.allow_fractional_resource_fragmentation = True
+  - items[0].scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - items[0].default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - items[0].default_session_options: 무시함: 설치본이 정한 기본값이다
   - items[1].id: 무시함: 데이터베이스가 만든다
@@ -500,9 +512,13 @@ Then
   - items[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[1].scheduler.preemption.preemption_min_runtime = 0.0
   - items[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - items[1].scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - items[1].scheduler.pending_timeout = 0.0
-  - items[1].scheduler.config.num_retries_to_skip = None
+  - items[1].scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - items[1].scheduler.options.pending_timeout = 0.0
+  - items[1].scheduler.options.config.num_retries_to_skip = None
+  - items[1].scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - items[1].scheduler.options.agent_selector_config = {}
+  - items[1].scheduler.options.allow_fractional_resource_fragmentation = True
+  - items[1].scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - items[1].default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - items[1].default_session_options: 무시함: 설치본이 정한 기본값이다
   - items[2] = None
@@ -553,9 +569,13 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - scheduler.pending_timeout = 0.0
-  - scheduler.config.num_retries_to_skip = None
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.agent_selector_config = {}
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -599,9 +619,13 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - scheduler.pending_timeout = 0.0
-  - scheduler.config.num_retries_to_skip = None
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.agent_selector_config = {}
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -1015,9 +1039,13 @@ Then
   - successes[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[0].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - successes[0].scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - successes[0].scheduler.pending_timeout = 0.0
-  - successes[0].scheduler.config.num_retries_to_skip = None
+  - successes[0].scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - successes[0].scheduler.options.pending_timeout = 0.0
+  - successes[0].scheduler.options.config.num_retries_to_skip = None
+  - successes[0].scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - successes[0].scheduler.options.agent_selector_config = {}
+  - successes[0].scheduler.options.allow_fractional_resource_fragmentation = True
+  - successes[0].scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - successes[0].default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - successes[0].default_session_options: 무시함: 설치본이 정한 기본값이다
   - successes[1].id: 무시함: 데이터베이스가 만든다
@@ -1036,9 +1064,13 @@ Then
   - successes[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[1].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - successes[1].scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - successes[1].scheduler.pending_timeout = 0.0
-  - successes[1].scheduler.config.num_retries_to_skip = None
+  - successes[1].scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - successes[1].scheduler.options.pending_timeout = 0.0
+  - successes[1].scheduler.options.config.num_retries_to_skip = None
+  - successes[1].scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - successes[1].scheduler.options.agent_selector_config = {}
+  - successes[1].scheduler.options.allow_fractional_resource_fragmentation = True
+  - successes[1].scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - successes[1].default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - successes[1].default_session_options: 무시함: 설치본이 정한 기본값이다
   - failed count = 1
@@ -1121,9 +1153,13 @@ Then
   - successes[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[0].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - successes[0].scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - successes[0].scheduler.pending_timeout = 0.0
-  - successes[0].scheduler.config.num_retries_to_skip = None
+  - successes[0].scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - successes[0].scheduler.options.pending_timeout = 0.0
+  - successes[0].scheduler.options.config.num_retries_to_skip = None
+  - successes[0].scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - successes[0].scheduler.options.agent_selector_config = {}
+  - successes[0].scheduler.options.allow_fractional_resource_fragmentation = True
+  - successes[0].scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - successes[0].default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - successes[0].default_session_options: 무시함: 설치본이 정한 기본값이다
   - successes[1].id: 무시함: 데이터베이스가 만든다
@@ -1142,9 +1178,13 @@ Then
   - successes[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[1].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - successes[1].scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - successes[1].scheduler.pending_timeout = 0.0
-  - successes[1].scheduler.config.num_retries_to_skip = None
+  - successes[1].scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - successes[1].scheduler.options.pending_timeout = 0.0
+  - successes[1].scheduler.options.config.num_retries_to_skip = None
+  - successes[1].scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - successes[1].scheduler.options.agent_selector_config = {}
+  - successes[1].scheduler.options.allow_fractional_resource_fragmentation = True
+  - successes[1].scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - successes[1].default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - successes[1].default_session_options: 무시함: 설치본이 정한 기본값이다
   - failed = []
@@ -1790,9 +1830,13 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - scheduler.pending_timeout = 0.0
-  - scheduler.config.num_retries_to_skip = None
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.agent_selector_config = {}
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -1835,9 +1879,13 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - scheduler.pending_timeout = 0.0
-  - scheduler.config.num_retries_to_skip = None
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.agent_selector_config = {}
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -1845,7 +1893,7 @@ Then
 
 #### [the-superadmin-makes-a-resource-group-with-its-status-and-scheduler-options](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py): pass
 
-슈퍼관리자가 활성·공개 여부, 스케줄러, 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수를 지정해 리소스 그룹을 만들면 지정한 값으로 채워진 그룹 전체가 반환된다
+슈퍼관리자가 활성·공개 여부, 스케줄러, 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수, 에이전트 선택 전략, 분할 자원 조각화 허용 여부, 자동 정리할 라우트 상태를 지정해 리소스 그룹을 만들면 지정한 값으로 채워진 그룹 전체가 반환된다
 
 Given
 
@@ -1859,7 +1907,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.create: user-1이 batch-only을 비활성·비공개로, 후입선출 스케줄러와 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수를 지정해 생성
+- ResourceGroupAdapter.create: user-1이 batch-only을 비활성·비공개로, 후입선출 스케줄러와 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수, 에이전트 선택 전략, 분할 자원 조각화 허용 여부, 자동 정리할 라우트 상태를 지정해 생성
 
 Then
 
@@ -1880,9 +1928,13 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.allowed_session_types = [<SessionTypes.BATCH: 'batch'>]
-  - scheduler.pending_timeout = 60.0
-  - scheduler.config.num_retries_to_skip = 3
+  - scheduler.options.allowed_session_types = [<SessionTypes.BATCH: 'batch'>]
+  - scheduler.options.pending_timeout = 60.0
+  - scheduler.options.config.num_retries_to_skip = 3
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.CONCENTRATED: 'concentrated'>
+  - scheduler.options.agent_selector_config = {}
+  - scheduler.options.allow_fractional_resource_fragmentation = False
+  - scheduler.options.route_cleanup_target_statuses = ['unhealthy', 'degraded']
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -2266,9 +2318,13 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - scheduler.pending_timeout = 0.0
-  - scheduler.config.num_retries_to_skip = None
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.agent_selector_config = {}
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -2312,9 +2368,13 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - scheduler.pending_timeout = 0.0
-  - scheduler.config.num_retries_to_skip = None
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.agent_selector_config = {}
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -2416,9 +2476,13 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - scheduler.pending_timeout = 0.0
-  - scheduler.config.num_retries_to_skip = None
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.agent_selector_config = {}
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -2462,9 +2526,13 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - scheduler.pending_timeout = 0.0
-  - scheduler.config.num_retries_to_skip = None
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.agent_selector_config = {}
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -2508,9 +2576,13 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - scheduler.pending_timeout = 0.0
-  - scheduler.config.num_retries_to_skip = None
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.agent_selector_config = {}
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -2554,9 +2626,13 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - scheduler.pending_timeout = 0.0
-  - scheduler.config.num_retries_to_skip = None
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.agent_selector_config = {}
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -2564,7 +2640,7 @@ Then
 
 #### [the-superadmin-changes-the-scheduler-options-with-the-preemption-config](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
-슈퍼관리자가 선점 설정과 함께 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수를 바꾸면 그 값들이 모두 새 값인 그룹 전체가 반환된다
+슈퍼관리자가 선점 설정과 함께 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수, 에이전트 선택 전략, 에이전트 선택기 설정, 분할 자원 조각화 허용 여부, 자동 정리할 라우트 상태를 바꾸면 그 값들이 모두 새 값인 그룹 전체가 반환된다
 
 Given
 
@@ -2579,7 +2655,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update: user-1이 resource-group-1의 선점 설정, 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수를 함께 수정
+- ResourceGroupAdapter.update: user-1이 resource-group-1의 선점 설정, 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수, 에이전트 선택 전략, 에이전트 선택기 설정, 분할 자원 조각화 허용 여부, 자동 정리할 라우트 상태를 함께 수정
 
 Then
 
@@ -2600,9 +2676,13 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>]
-  - scheduler.pending_timeout = 60.0
-  - scheduler.config.num_retries_to_skip = 3
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>]
+  - scheduler.options.pending_timeout = 60.0
+  - scheduler.options.config.num_retries_to_skip = 3
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.CONCENTRATED: 'concentrated'>
+  - scheduler.options.agent_selector_config = {'kernel_counts_weight': 2}
+  - scheduler.options.allow_fractional_resource_fragmentation = False
+  - scheduler.options.route_cleanup_target_statuses = ['degraded']
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -2646,9 +2726,13 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - scheduler.pending_timeout = 0.0
-  - scheduler.config.num_retries_to_skip = None
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.agent_selector_config = {}
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -3133,9 +3217,13 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.RESCHEDULE: 'reschedule'>
   - scheduler.preemption.preemption_min_runtime = 60.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.PROJECT: 'project'>
-  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - scheduler.pending_timeout = 0.0
-  - scheduler.config.num_retries_to_skip = None
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.agent_selector_config = {}
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -3179,9 +3267,13 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - scheduler.pending_timeout = 0.0
-  - scheduler.config.num_retries_to_skip = None
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.agent_selector_config = {}
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -3225,9 +3317,13 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - scheduler.pending_timeout = 0.0
-  - scheduler.config.num_retries_to_skip = None
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.agent_selector_config = {}
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -3303,9 +3399,13 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - scheduler.pending_timeout = 0.0
-  - scheduler.config.num_retries_to_skip = None
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.agent_selector_config = {}
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -3349,9 +3449,13 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
-  - scheduler.pending_timeout = 0.0
-  - scheduler.config.num_retries_to_skip = None
+  - scheduler.options.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.options.pending_timeout = 0.0
+  - scheduler.options.config.num_retries_to_skip = None
+  - scheduler.options.agent_selection_strategy = <AgentSelectionStrategy.DISPERSED: 'dispersed'>
+  - scheduler.options.agent_selector_config = {}
+  - scheduler.options.allow_fractional_resource_fragmentation = True
+  - scheduler.options.route_cleanup_target_statuses = ['unhealthy']
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 

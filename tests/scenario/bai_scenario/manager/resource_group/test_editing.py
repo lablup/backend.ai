@@ -15,13 +15,19 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     UpdateResourceGroupConfigInput,
     UpdateResourceGroupInput,
     UpdateResourceGroupSchedulerOptionsConfigInput,
+    UpdateResourceGroupSchedulerOptionsInput,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import ResourceGroupDetailNode
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     PreemptionModeDTO,
     SchedulerTypeDTO,
 )
-from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope, SessionTypes
+from ai.backend.common.types import (
+    AgentSelectionStrategy,
+    PreemptionOrder,
+    PreemptionVictimScope,
+    SessionTypes,
+)
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -142,7 +148,7 @@ class EditingTheConfig(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGrou
 class EditingTheSchedulerOptions(
     When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
-    """id로 선점 설정과 함께 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수를 바꾼다."""
+    """id로 선점 설정과 함께 스케줄러 옵션 전부를 바꾼다."""
 
     @override
     def operation(self) -> str:
@@ -152,7 +158,8 @@ class EditingTheSchedulerOptions(
     def describe(self, laid: AGroupAndACaller) -> str:
         return (
             f"{laid.caller.username}이 {laid.group.name}의 선점 설정, 허용 세션 타입, "
-            "대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수를 함께 수정"
+            "대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수, 에이전트 선택 전략, 에이전트 선택기 설정, "
+            "분할 자원 조각화 허용 여부, 자동 정리할 라우트 상태를 함께 수정"
         )
 
     @override
@@ -164,10 +171,16 @@ class EditingTheSchedulerOptions(
                 await adapter.lookup_name(laid.group.name),
                 UpdateResourceGroupInput(
                     preemption=PreemptionConfigInputDTO(enabled=True),
-                    allowed_session_types=[SessionTypes.INTERACTIVE],
-                    pending_timeout=60,
-                    scheduler_config=UpdateResourceGroupSchedulerOptionsConfigInput(
-                        num_retries_to_skip=3
+                    scheduler_options=UpdateResourceGroupSchedulerOptionsInput(
+                        allowed_session_types=[SessionTypes.INTERACTIVE],
+                        pending_timeout=60,
+                        config=UpdateResourceGroupSchedulerOptionsConfigInput(
+                            num_retries_to_skip=3
+                        ),
+                        agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
+                        agent_selector_config={"kernel_counts_weight": 2},
+                        allow_fractional_resource_fragmentation=False,
+                        route_cleanup_target_statuses=["degraded"],
                     ),
                 ),
             )
@@ -196,8 +209,10 @@ class ClearingTheRetriesToSkip(
             payload = await adapter.update_config(
                 UpdateResourceGroupConfigInput(
                     resource_group_name=laid.group.name,
-                    scheduler_config=UpdateResourceGroupSchedulerOptionsConfigInput(
-                        num_retries_to_skip=None
+                    scheduler_options=UpdateResourceGroupSchedulerOptionsInput(
+                        config=UpdateResourceGroupSchedulerOptionsConfigInput(
+                            num_retries_to_skip=None
+                        ),
                     ),
                 )
             )
@@ -502,8 +517,9 @@ class TheSuperadminChangesTheSchedulerOptions(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 선점 설정과 함께 허용 세션 타입, 대기 제한 시간, "
-            "대기 세션 건너뛰기 재시도 횟수를 바꾸면 그 값들이 모두 새 값인 그룹 전체가 반환된다"
+            "슈퍼관리자가 선점 설정과 함께 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수, "
+            "에이전트 선택 전략, 에이전트 선택기 설정, 분할 자원 조각화 허용 여부, 자동 정리할 라우트 상태를 "
+            "바꾸면 그 값들이 모두 새 값인 그룹 전체가 반환된다"
         )
 
     @override
@@ -523,6 +539,10 @@ class TheSuperadminChangesTheSchedulerOptions(
                 allowed_session_types=[SessionTypes.INTERACTIVE],
                 pending_timeout=60.0,
                 num_retries_to_skip=3,
+                agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
+                agent_selector_config={"kernel_counts_weight": 2},
+                allow_fractional_resource_fragmentation=False,
+                route_cleanup_target_statuses=["degraded"],
             )
         )
 

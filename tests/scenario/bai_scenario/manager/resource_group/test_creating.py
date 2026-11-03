@@ -12,11 +12,12 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     CreateResourceGroupInput,
     CreateResourceGroupSchedulerOptionsConfigInput,
+    CreateResourceGroupSchedulerOptionsInput,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import ResourceGroupDetailNode
 from ai.backend.common.dto.manager.v2.resource_group.types import SchedulerTypeDTO
 from ai.backend.common.exception import ResourceGroupConflict
-from ai.backend.common.types import SessionTypes
+from ai.backend.common.types import AgentSelectionStrategy, SessionTypes
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource import DefaultResourceGroupAlreadyExists
@@ -81,7 +82,8 @@ class CreatingWithStatusAndSchedulerOptions(
     def describe(self, laid: ACaller) -> str:
         return (
             f"{laid.caller.username}이 {self.named}을 비활성·비공개로, 후입선출 스케줄러와 "
-            "허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수를 지정해 생성"
+            "허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수, 에이전트 선택 전략, "
+            "분할 자원 조각화 허용 여부, 자동 정리할 라우트 상태를 지정해 생성"
         )
 
     @override
@@ -94,10 +96,15 @@ class CreatingWithStatusAndSchedulerOptions(
                     is_active=False,
                     is_public=False,
                     scheduler_type=SchedulerTypeDTO.LIFO,
-                    allowed_session_types=[SessionTypes.BATCH],
-                    pending_timeout=60,
-                    scheduler_config=CreateResourceGroupSchedulerOptionsConfigInput(
-                        num_retries_to_skip=3
+                    scheduler_options=CreateResourceGroupSchedulerOptionsInput(
+                        allowed_session_types=[SessionTypes.BATCH],
+                        pending_timeout=60,
+                        config=CreateResourceGroupSchedulerOptionsConfigInput(
+                            num_retries_to_skip=3
+                        ),
+                        agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
+                        allow_fractional_resource_fragmentation=False,
+                        route_cleanup_target_statuses=["unhealthy", "degraded"],
                     ),
                 )
             )
@@ -148,7 +155,8 @@ class TheSuperadminMakesAGroupWithItsStatusAndSchedulerOptions(
     def describe(self) -> str:
         return (
             "슈퍼관리자가 활성·공개 여부, 스케줄러, 허용 세션 타입, 대기 제한 시간, "
-            "대기 세션 건너뛰기 재시도 횟수를 지정해 리소스 그룹을 만들면 지정한 값으로 채워진 그룹 전체가 반환된다"
+            "대기 세션 건너뛰기 재시도 횟수, 에이전트 선택 전략, 분할 자원 조각화 허용 여부, "
+            "자동 정리할 라우트 상태를 지정해 리소스 그룹을 만들면 지정한 값으로 채워진 그룹 전체가 반환된다"
         )
 
     @override
@@ -170,6 +178,9 @@ class TheSuperadminMakesAGroupWithItsStatusAndSchedulerOptions(
             allowed_session_types=(SessionTypes.BATCH,),
             pending_timeout=60.0,
             num_retries_to_skip=3,
+            agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
+            allow_fractional_resource_fragmentation=False,
+            route_cleanup_target_statuses=("unhealthy", "degraded"),
         )
 
 

@@ -26,12 +26,13 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInput
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
-from ai.backend.common.types import PreemptionVictimScope, SessionTypes
+from ai.backend.common.types import AgentSelectionStrategy, PreemptionVictimScope, SessionTypes
 
 __all__ = (
     "AdminSearchResourceGroupsInput",
     "CreateResourceGroupInput",
     "CreateResourceGroupSchedulerOptionsConfigInput",
+    "CreateResourceGroupSchedulerOptionsInput",
     "DeleteResourceGroupInput",
     "PartialBulkPurgeResourceGroupsInput",
     "PartialBulkUpdateResourceGroupItemInput",
@@ -53,6 +54,7 @@ __all__ = (
     "UpdateResourceGroupFairShareSpecInput",
     "UpdateResourceGroupInput",
     "UpdateResourceGroupSchedulerOptionsConfigInput",
+    "UpdateResourceGroupSchedulerOptionsInput",
 )
 
 
@@ -63,6 +65,49 @@ class CreateResourceGroupSchedulerOptionsConfigInput(BaseRequestModel):
         default=None,
         ge=0,
         description="Number of scheduling retries before a pending session is skipped.",
+    )
+
+
+class CreateResourceGroupSchedulerOptionsInput(BaseRequestModel):
+    """Input for a new resource group's scheduler options."""
+
+    allowed_session_types: list[SessionTypes] = Field(
+        default_factory=lambda: [
+            SessionTypes.INTERACTIVE,
+            SessionTypes.BATCH,
+            SessionTypes.INFERENCE,
+        ],
+        description="Session types that may be created in the resource group.",
+    )
+    pending_timeout: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Seconds a session may stay pending before it is cancelled (0 = no timeout).",
+    )
+    config: CreateResourceGroupSchedulerOptionsConfigInput | None = Field(
+        default=None,
+        description="The ``config`` section of the scheduler options.",
+    )
+    agent_selection_strategy: AgentSelectionStrategy = Field(
+        default=AgentSelectionStrategy.DISPERSED,
+        description="How agents are chosen for a session's kernels.",
+    )
+    agent_selector_config: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Options of the agent selector.",
+    )
+    allow_fractional_resource_fragmentation: bool = Field(
+        default=True,
+        description=(
+            "Whether an agent may start a kernel that fragments a fractional resource request."
+        ),
+    )
+    route_cleanup_target_statuses: list[str] = Field(
+        default_factory=lambda: ["unhealthy"],
+        description=(
+            "Route health statuses (healthy/unhealthy/degraded) whose routes are cleaned up"
+            " automatically."
+        ),
     )
 
 
@@ -116,22 +161,9 @@ class CreateResourceGroupInput(BaseRequestModel):
         default=SchedulerTypeDTO.FIFO,
         description="Scheduler type value (fifo/lifo/drf/fair-share).",
     )
-    allowed_session_types: list[SessionTypes] = Field(
-        default_factory=lambda: [
-            SessionTypes.INTERACTIVE,
-            SessionTypes.BATCH,
-            SessionTypes.INFERENCE,
-        ],
-        description="Session types that may be created in the resource group.",
-    )
-    pending_timeout: float = Field(
-        default=0.0,
-        ge=0.0,
-        description=("Seconds a session may stay pending before it is cancelled (0 = no timeout)."),
-    )
-    scheduler_config: CreateResourceGroupSchedulerOptionsConfigInput | None = Field(
+    scheduler_options: CreateResourceGroupSchedulerOptionsInput | None = Field(
         default=None,
-        description="The ``config`` section of the scheduler options.",
+        description="Scheduler options. Omit to use the defaults.",
     )
 
     @field_validator("name", mode="before")
@@ -187,6 +219,50 @@ class UpdateResourceGroupSchedulerOptionsConfigInput(BaseRequestModel):
         description=(
             "Number of scheduling retries before a pending session is skipped."
             " Omit to leave unchanged; null clears."
+        ),
+    )
+
+
+class UpdateResourceGroupSchedulerOptionsInput(BaseRequestModel):
+    """Input for updating a resource group's scheduler options. Omitted keys are kept."""
+
+    allowed_session_types: list[SessionTypes] | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Session types that may be created in the resource group. Omit to leave unchanged."
+        ),
+    )
+    pending_timeout: Annotated[float, Field(ge=0.0)] | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Seconds a session may stay pending before it is cancelled (0 = no timeout)."
+            " Omit to leave unchanged."
+        ),
+    )
+    config: UpdateResourceGroupSchedulerOptionsConfigInput | None | Unset = Field(
+        default=UNSET,
+        description="The ``config`` section of the scheduler options. Omit to leave unchanged.",
+    )
+    agent_selection_strategy: AgentSelectionStrategy | None | Unset = Field(
+        default=UNSET,
+        description="How agents are chosen for a session's kernels. Omit to leave unchanged.",
+    )
+    agent_selector_config: dict[str, Any] | None | Unset = Field(
+        default=UNSET,
+        description="Options of the agent selector. Omit to leave unchanged.",
+    )
+    allow_fractional_resource_fragmentation: bool | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Whether an agent may start a kernel that fragments a fractional resource request."
+            " Omit to leave unchanged."
+        ),
+    )
+    route_cleanup_target_statuses: list[str] | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Route health statuses (healthy/unhealthy/degraded) whose routes are cleaned up"
+            " automatically. Omit to leave unchanged."
         ),
     )
 
@@ -256,22 +332,9 @@ class UpdateResourceGroupInput(BaseRequestModel):
         default=UNSET,
         description="Preemption configuration. Omit to leave unchanged.",
     )
-    allowed_session_types: list[SessionTypes] | None | Unset = Field(
+    scheduler_options: UpdateResourceGroupSchedulerOptionsInput | None | Unset = Field(
         default=UNSET,
-        description=(
-            "Session types that may be created in the resource group. Omit to leave unchanged."
-        ),
-    )
-    pending_timeout: Annotated[float, Field(ge=0.0)] | None | Unset = Field(
-        default=UNSET,
-        description=(
-            "Seconds a session may stay pending before it is cancelled (0 = no timeout)."
-            " Omit to leave unchanged."
-        ),
-    )
-    scheduler_config: UpdateResourceGroupSchedulerOptionsConfigInput | None | Unset = Field(
-        default=UNSET,
-        description="The ``config`` section of the scheduler options. Omit to leave unchanged.",
+        description="Scheduler options. Omit to leave unchanged; omitted keys are kept.",
     )
 
 
@@ -463,22 +526,9 @@ class UpdateResourceGroupConfigInput(BaseRequestModel):
         default=UNSET,
         description="Preemption configuration. Omit to leave unchanged.",
     )
-    allowed_session_types: list[SessionTypes] | None | Unset = Field(
+    scheduler_options: UpdateResourceGroupSchedulerOptionsInput | None | Unset = Field(
         default=UNSET,
-        description=(
-            "Session types that may be created in the resource group. Omit to leave unchanged."
-        ),
-    )
-    pending_timeout: Annotated[float, Field(ge=0.0)] | None | Unset = Field(
-        default=UNSET,
-        description=(
-            "Seconds a session may stay pending before it is cancelled (0 = no timeout)."
-            " Omit to leave unchanged."
-        ),
-    )
-    scheduler_config: UpdateResourceGroupSchedulerOptionsConfigInput | None | Unset = Field(
-        default=UNSET,
-        description="The ``config`` section of the scheduler options. Omit to leave unchanged.",
+        description="Scheduler options. Omit to leave unchanged; omitted keys are kept.",
     )
 
 
