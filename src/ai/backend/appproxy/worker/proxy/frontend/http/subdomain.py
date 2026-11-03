@@ -109,6 +109,7 @@ class SubdomainFrontend(BaseHTTPFrontend):
                 protocol=IngressProtocol.HTTP,
                 wildcard=WildcardFrontend(subdomain=subdomain),
             ).key()
+            ingress = await self._read_registered_ingress(frontend_key)
             backend = self.backends.get(frontend_key)
             if backend is None:
                 raise IngressFrontendNotRegisteredError(
@@ -116,9 +117,8 @@ class SubdomainFrontend(BaseHTTPFrontend):
                 )
             # TODO: Use the ingress id once ingresses are stored as their own entity.
             with with_log_context(circuit_id=backend.circuit_id):
-                ingress = await self._read_registered_ingress(frontend_key)
                 self.ensure_allowed_ip(request, ingress.access)
-                self.ensure_credential(request, backend.circuit)
+                self.ensure_credential(request, ingress, backend)
                 request["backend"] = backend
                 return await handler(request)
 

@@ -52,15 +52,19 @@ class BaseHTTPFrontend(BaseFrontend[HTTPBackend]):
             log.trace("rejecting client {} (not in allowed_client_ips)", client_ip)
             raise ClientIPNotAllowed("E20011: Client address not allowed")
 
-    def ensure_credential(self, request: web.Request, circuit: Circuit | None) -> None:
-        match circuit:
-            case Circuit():
+    def ensure_credential(
+        self, request: web.Request, ingress: Ingress, backend: HTTPBackend
+    ) -> None:
+        match backend.circuit:
+            case Circuit() as circuit:
                 self._ensure_circuit_credential(request, circuit)
             case None:
-                # TODO: Judge the credential by the ingress access once an ingress carries the id
-                # its tokens name. Until then a backend registered without a circuit passes every
-                # request.
-                pass
+                self._ensure_ingress_credential(request, ingress.access)
+
+    # TODO: Judge the credential by the ingress access once an ingress carries the id its tokens
+    # name. Until then a backend registered without a circuit passes every request.
+    def _ensure_ingress_credential(self, request: web.Request, access: IngressAccess) -> None:
+        pass
 
     # TODO: Legacy credential check by the circuit's settings. Remove it once ensure_credential
     # judges the ingress access.
