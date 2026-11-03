@@ -16,7 +16,6 @@ from decimal import Decimal
 from functools import partial
 from http import HTTPStatus
 from importlib.resources import files
-from io import StringIO
 from pathlib import Path
 from subprocess import CalledProcessError
 from subprocess import run as subprocess_run
@@ -55,6 +54,13 @@ from ai.backend.agent.config.unified import (
     ContainerLogDriver,
     ContainerSandboxType,
     ScratchType,
+)
+from ai.backend.agent.config_file import (
+    BaseKernelConfigFile,
+    DockerCredsFile,
+    EnvironFile,
+    ResourceFile,
+    SessionNameFile,
 )
 from ai.backend.agent.defs import SESSION_NAME_CONFIG_FILENAME
 from ai.backend.agent.dotfile import DotfileTargetResolver
@@ -1017,36 +1023,26 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
                 await run_in_executor_with_context(None, _write_user_bootstrap_script)
 
-            with StringIO() as buf:
-                for k, v in environ.items():
-                    buf.write(f"{k}={v}\n")
-                accel_envs = self.computer_docker_args.get("Env", [])
-                for env in accel_envs:
-                    buf.write(f"{env}\n")
-                await run_in_executor_with_context(
-                    None,
-                    (self.config_dir / "environ.txt").write_bytes,
-                    buf.getvalue().encode("utf8"),
-                )
-
-            await run_in_executor_with_context(
-                None,
-                (self.config_dir / SESSION_NAME_CONFIG_FILENAME).write_text,
-                self.kernel_config["session_name"],
-            )
-
-            with StringIO() as buf:
-                resource_spec.write_to_file(buf)
-                for dev_type, device_alloc in resource_spec.allocations.items():
-                    device_plugin = self.computers[dev_type].instance
-                    kvpairs = await device_plugin.generate_resource_data(device_alloc)
-                    for k, v in kvpairs.items():
-                        buf.write(f"{k}={v}\n")
-                await run_in_executor_with_context(
-                    None,
-                    (self.config_dir / "resource.txt").write_bytes,
-                    buf.getvalue().encode("utf8"),
-                )
+            config_files: list[BaseKernelConfigFile] = [
+                EnvironFile(
+                    path=self.config_dir / "environ.txt",
+                    environ=environ,
+                    extra_lines=self.computer_docker_args.get("Env", []),
+                    encoding="utf8",
+                ),
+                SessionNameFile(
+                    path=self.config_dir / SESSION_NAME_CONFIG_FILENAME,
+                    session_name=self.kernel_config["session_name"],
+                ),
+                ResourceFile(
+                    path=self.config_dir / "resource.txt",
+                    resource_spec=resource_spec,
+                    computers=self.computers,
+                    encoding="utf8",
+                ),
+            ]
+            for config_file in config_files:
+                await config_file.write()
 
         shutil.copyfile(self.config_dir / "environ.txt", self.config_dir / "environ_base.txt")
         shutil.copyfile(self.config_dir / "resource.txt", self.config_dir / "resource_base.txt")
@@ -1054,11 +1050,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         # TODO: refactor out dotfiles/sshkey initialization to the base agent?
         docker_creds = self.internal_data.get("docker_credentials")
         if docker_creds:
-            await run_in_executor_with_context(
-                None,
-                (self.config_dir / "docker-creds.json").write_bytes,
-                dump_json(docker_creds),
-            )
+            await DockerCredsFile(
+                path=self.config_dir / "docker-creds.json",
+                docker_creds=docker_creds,
+                encoding="utf8",
+            ).write()
 
         # Create SSH keypair only if ssh_keypair internal_data exists and
         # /home/work/.ssh folder is not mounted.

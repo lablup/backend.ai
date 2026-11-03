@@ -13,7 +13,6 @@ import uuid
 from collections.abc import Coroutine, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from importlib.resources import files
-from io import StringIO
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -35,6 +34,12 @@ from ai.backend.agent.agent import (
     ScanImagesResult,
 )
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ScratchType
+from ai.backend.agent.config_file import (
+    BaseKernelConfigFile,
+    EnvironFile,
+    ResourceFile,
+    SessionNameFile,
+)
 from ai.backend.agent.defs import SESSION_NAME_CONFIG_FILENAME
 from ai.backend.agent.dotfile import DotfileTargetResolver
 from ai.backend.agent.errors import K8sError, UnsupportedResource
@@ -579,34 +584,22 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     if os.geteuid() == 0:
                         os.chown(str(file_path), uid, gid)
 
-            with StringIO() as buf:
-                for k, v in environ.items():
-                    buf.write(f"{k}={v}\n")
-                # accel_envs = self.computer_docker_args.get('Env', [])
-                # for env in accel_envs:
-                #     buf.write(f'{env}\n')
-                await run_in_executor_with_context(
-                    None,
-                    functools.partial(_write_config, "environ.txt", buf.getvalue()),
-                )
-
-            await run_in_executor_with_context(
-                None,
-                functools.partial(
-                    _write_config, SESSION_NAME_CONFIG_FILENAME, self.kernel_config["session_name"]
+            config_files: list[BaseKernelConfigFile] = [
+                EnvironFile(path=self.config_dir / "environ.txt", environ=environ),
+                SessionNameFile(
+                    path=self.config_dir / SESSION_NAME_CONFIG_FILENAME,
+                    session_name=self.kernel_config["session_name"],
                 ),
-            )
-
-            with StringIO() as buf:
-                resource_spec.write_to_file(buf)
-                for dev_type, device_alloc in resource_spec.allocations.items():
-                    computer_self = self.computers[dev_type]
-                    kvpairs = await computer_self.instance.generate_resource_data(device_alloc)
-                    for k, v in kvpairs.items():
-                        buf.write(f"{k}={v}\n")
+                ResourceFile(
+                    path=self.config_dir / "resource.txt",
+                    resource_spec=resource_spec,
+                    computers=self.computers,
+                ),
+            ]
+            for config_file in config_files:
+                content = await config_file.render()
                 await run_in_executor_with_context(
-                    None,
-                    functools.partial(_write_config, "resource.txt", buf.getvalue()),
+                    None, functools.partial(_write_config, config_file.path.name, content)
                 )
 
             docker_creds = self.internal_data.get("docker_credentials")
