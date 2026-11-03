@@ -6,6 +6,7 @@ from ai.backend.common.data.entity.container_registry import (
     AssociationContainerRegistriesGroupsID,
     ContainerRegistryID,
 )
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityData
 
@@ -54,6 +55,14 @@ class AssociationContainerRegistriesGroupsData:
     project_id: ProjectID
     registry_id: ContainerRegistryID
     is_default: bool
+
+
+@dataclass(frozen=True)
+class DomainContainerRegistryRelationData:
+    """A container registry a domain is allowed on."""
+
+    domain_id: DomainID
+    container_registry_id: ContainerRegistryID
 
 
 @dataclass(frozen=True)
