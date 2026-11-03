@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.types import DeploymentScope
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid, resolve_entity_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -345,7 +346,7 @@ async def delete_model_deployment(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version="26.4.4",
+        added_version=NEXT_RELEASE_VERSION,
         description=(
             "Fully replace the ``options`` surface of a deployment. "
             "Replace semantics — the supplied payload is the complete new value, "
