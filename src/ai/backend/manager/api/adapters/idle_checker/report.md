@@ -17,8 +17,8 @@ Scenario: incomplete 6 / 6
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 검사기 여럿을 한 번에 purge 하려 하면, 지운 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-checkers) | answered |
-| [슈퍼관리자가 검사기 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지운 검사기로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-the-superadmin-purges-several-and-is-answered-for-the-missing-one) | answered |
+| [when a user granted nothing tries to purge several idle checkers in one call, none is deleted and all come back in the failed list for lack of permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-checkers) | answered |
+| [when the superadmin purges two idle checkers and a missing id in one call, the two come back as deleted idle checkers and the missing id comes back in the failed list because no target answers to it](#partial_bulk_purging-the-superadmin-purges-several-and-is-answered-for-the-missing-one) | answered |
 
 ### admin_partial_bulk_purge
 
@@ -26,63 +26,63 @@ Scenario: incomplete 6 / 6
 
 #### [a-user-granted-nothing-purges-none-of-several-checkers](/tests/scenario/bai_scenario/manager/idle_checker/test_partial_bulk_purging.py): pass
 
-아무 권한도 받지 않은 사용자가 검사기 여럿을 한 번에 purge 하려 하면, 지운 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user granted nothing tries to purge several idle checkers in one call, none is deleted and all come back in the failed list for lack of permission
 
 Given
 
-- 유휴 검사기 2개와, 일반 사용자 한 명
-  - 유휴 검사기 idle-checker-1: 대화형 세션을 3600초 뒤에 끝낸다
-  - 유휴 검사기 idle-checker-2: 대화형 세션을 3600초 뒤에 끝낸다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 idle checkers and one regular user
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Idle checker idle-checker-2: ends interactive sessions after 3600 seconds
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- IdleCheckerAdapter.admin_partial_bulk_purge: user-1이 검사기 2개를 한 번에 purge 함
+- IdleCheckerAdapter.admin_partial_bulk_purge: user-1 purges 2 idle checkers in one call
 
 Then
 
-- 지운 검사기 없이 대상이 모두 실패 목록에 온다
+- no checker is deleted and every target comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 1번째로 심은 검사기와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 2번째로 심은 검사기와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the checker seeded in advance number 1
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the checker seeded in advance number 2
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_purging-the-superadmin-purges-several-and-is-answered-for-the-missing-one"></a>
 
 #### [the-superadmin-purges-several-and-is-answered-for-the-missing-one](/tests/scenario/bai_scenario/manager/idle_checker/test_partial_bulk_purging.py): pass
 
-슈퍼관리자가 검사기 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지운 검사기로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+when the superadmin purges two idle checkers and a missing id in one call, the two come back as deleted idle checkers and the missing id comes back in the failed list because no target answers to it
 
 Given
 
-- 유휴 검사기 2개와, 슈퍼관리자 한 명
-  - 유휴 검사기 idle-checker-1: 대화형 세션을 3600초 뒤에 끝낸다
-  - 유휴 검사기 idle-checker-2: 대화형 세션을 3600초 뒤에 끝낸다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 idle checkers and one superadmin
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Idle checker idle-checker-2: ends interactive sessions after 3600 seconds
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- IdleCheckerAdapter.admin_partial_bulk_purge: user-1이 검사기 2개 와 없는 id 하나를 한 번에 purge 함
+- IdleCheckerAdapter.admin_partial_bulk_purge: user-1 purges 2 idle checkers and a missing id in one call
 
 Then
 
-- 심은 검사기가 모두 지운 모습으로 오고, 없는 id 는 대상 없음 이유로 실패 목록에 온다
+- every checker seeded in advance comes back deleted and an unknown id comes back in the failed list because no target answers to it
   - successes count = 2
   - failed count = 1
-  - successes[0]: 1번째로 심은 검사기 전체와 같다
-  - successes[1]: 2번째로 심은 검사기 전체와 같다
-  - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 'not found'를 담은 이유
+  - successes[0]: same as the whole checker seeded in advance number 1
+  - successes[1]: same as the whole checker seeded in advance number 2
+  - failed[0].id: same as the unknown id put in the request
+  - failed[0].message: a reason containing 'not found'
 

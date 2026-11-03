@@ -1296,6 +1296,8 @@ configure_backendai() {
 
   ./backend.ai mgr seed apply seeds/manager seeds/examples/manager
   ./backend.ai mgr permissions provision
+  # The example domain admins are granted roles that `permissions provision` creates.
+  ./backend.ai mgr seed apply seeds/examples/domain_admin
 
   # Populate artifact registries only when the storage halfstack profile is
   # active; the example registry points at the local MinIO and depends on

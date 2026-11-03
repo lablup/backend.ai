@@ -20,33 +20,33 @@ Scenario: incomplete 6 / 9
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets) | answered |
-| [프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워진 노드로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | answered |
+| [a user granted nothing trying to purge several presets at once gets none purged and every one in the failed list for not enough permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets) | answered |
+| [purging two presets and one unknown id at once answers the two as deleted nodes and the unknown id in the failed list because no target answers to it](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | answered |
 
 **partial_bulk_update**
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | answered |
-| [슈퍼관리자가 프리셋 여럿의 공유 메모리를 한 번에 바꾸면, 모두 새 공유 메모리로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | answered |
-| [프리셋 여럿을 고치며 하나의 자원을 필수 슬롯 없이 바꾸면, 요청 전체가 입력 오류로 거부된다](#partial_bulk_editing-editing-several-with-slots-missing-intrinsic-ones-is-refused) | rejected |
+| [a user granted nothing trying to edit several presets at once gets none edited and every one in the failed list for not enough permission](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | answered |
+| [when the superadmin changes the shared memory of several presets at once, they all come back with the new shared memory and nothing failed](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | answered |
+| [editing several presets with the resources of one changed without the intrinsic slots rejects the whole request as invalid input](#partial_bulk_editing-editing-several-with-slots-missing-intrinsic-ones-is-refused) | rejected |
 
 **purge**
 
 | scenario | verdict |
 |---|---|
-| [슈퍼관리자가 프리셋을 purge 하면 지운 프리셋의 id 가 온다](#purging-the-superadmin-purges-a-preset) | answered |
-| [아무 권한도 받지 않은 사용자가 프리셋을 purge 하려 하면 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-purge-a-preset) | rejected |
-| [슈퍼관리자가 없는 id 의 프리셋을 purge 하려 하면 대상이 없다는 것으로 거부된다](#purging-purging-an-id-nothing-answers-to-is-not-found) | rejected |
+| [when the superadmin purges a preset, the id of the deleted preset comes back](#purging-the-superadmin-purges-a-preset) | answered |
+| [a user granted nothing trying to purge a preset is rejected for not enough permission](#purging-a-user-granted-nothing-may-not-purge-a-preset) | rejected |
+| [when the superadmin tries to purge the preset of an unknown id, the call is rejected as no such target](#purging-purging-an-id-nothing-answers-to-is-not-found) | rejected |
 
 **update**
 
 | scenario | verdict |
 |---|---|
-| [public 에서 수정 권한을 받은 사용자가 프리셋의 이름을 바꾸면, 새 이름의 프리셋이 온다](#editing-a-user-granted-update-in-public-renames-a-preset) | answered |
-| [슈퍼관리자가 프리셋의 이름만 바꾸면, 이름은 새 값이 되고 나머지는 그대로 남는다](#editing-the-superadmin-renames-a-preset) | answered |
-| [아무 권한도 받지 않은 사용자가 프리셋을 수정하려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-preset) | rejected |
-| [슈퍼관리자가 없는 id 의 프리셋을 수정하려 하면 대상이 없다는 것으로 거부된다](#editing-editing-an-id-nothing-answers-to-is-not-found) | rejected |
+| [a user granted update in public renaming a preset gets the preset under the new name](#editing-a-user-granted-update-in-public-renames-a-preset) | answered |
+| [when the superadmin renames a preset, the name takes the new value and the rest stays as it was](#editing-the-superadmin-renames-a-preset) | answered |
+| [a user granted nothing trying to edit a preset is rejected for not enough permission](#editing-a-user-granted-nothing-may-not-edit-a-preset) | rejected |
+| [when the superadmin tries to edit the preset of an unknown id, the call is rejected as no such target](#editing-editing-an-id-nothing-answers-to-is-not-found) | rejected |
 
 ### partial_bulk_purge
 
@@ -54,75 +54,75 @@ Scenario: incomplete 6 / 9
 
 #### [a-user-granted-nothing-purges-none-of-several-presets](/tests/scenario/bai_scenario/manager/resource_preset/test_partial_bulk_purging.py): pass
 
-아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+a user granted nothing trying to purge several presets at once gets none purged and every one in the failed list for not enough permission
 
 Given
 
-- 프리셋 2개와 일반 사용자 한 명
-  - 리소스 프리셋 preset-1: 리소스 그룹에 묶이지 않아 public 에 속한다
-  - 리소스 프리셋 preset-2: 리소스 그룹에 묶이지 않아 public 에 속한다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 presets and one regular user
+  - Resource preset preset-1: belongs to public because it is bound to no resource group
+  - Resource preset preset-2: belongs to public because it is bound to no resource group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourcePresetAdapter.partial_bulk_purge: user-1이 프리셋 2개를 한 번에 purge 함
+- ResourcePresetAdapter.partial_bulk_purge: user-1 purges 2 presets at once
 
 Then
 
-- 처리된 프리셋 없이 대상이 모두 실패 목록에 온다
+- no preset is processed and every target comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상 프리셋의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 프리셋의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the target preset
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target preset
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_purging-purging-several-answers-for-the-missing-one"></a>
 
 #### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_preset/test_partial_bulk_purging.py): pass
 
-프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워진 노드로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+purging two presets and one unknown id at once answers the two as deleted nodes and the unknown id in the failed list because no target answers to it
 
 Given
 
-- 프리셋 2개와 슈퍼관리자 한 명
-  - 리소스 프리셋 preset-1: 리소스 그룹에 묶이지 않아 public 에 속한다
-  - 리소스 프리셋 preset-2: 리소스 그룹에 묶이지 않아 public 에 속한다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 presets and one superadmin
+  - Resource preset preset-1: belongs to public because it is bound to no resource group
+  - Resource preset preset-2: belongs to public because it is bound to no resource group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourcePresetAdapter.partial_bulk_purge: user-1이 프리셋 2개 와 없는 id 하나를 한 번에 purge 함
+- ResourcePresetAdapter.partial_bulk_purge: user-1 purges 2 presets and one unknown id at once
 
 Then
 
-- 대상 프리셋이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+- every target preset comes back in the processed list and an unknown id comes back in the failed list because no target answers to it
   - successes count = 2
-  - successes[0].id: 미리 만든 프리셋의 id와 같다
-  - successes[0].entity_id: 미리 만든 프리셋의 id와 같다
+  - successes[0].id: same as the id of the preset seeded in advance
+  - successes[0].entity_id: same as the id of the preset seeded in advance
   - successes[0].name = 'preset-1'
   - successes[0].resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
   - successes[0].shared_memory = None
   - successes[0].resource_group_name = None
-  - successes[1].id: 미리 만든 프리셋의 id와 같다
-  - successes[1].entity_id: 미리 만든 프리셋의 id와 같다
+  - successes[1].id: same as the id of the preset seeded in advance
+  - successes[1].entity_id: same as the id of the preset seeded in advance
   - successes[1].name = 'preset-2'
   - successes[1].resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
   - successes[1].shared_memory = None
   - successes[1].resource_group_name = None
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 'not found'를 담은 이유
+  - failed[0].id: same as the unknown id put in the request
+  - failed[0].message: a reason containing 'not found'
 
 ### partial_bulk_update
 
@@ -130,68 +130,68 @@ Then
 
 #### [a-user-granted-nothing-edits-none-of-several-presets](/tests/scenario/bai_scenario/manager/resource_preset/test_partial_bulk_editing.py): pass
 
-아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+a user granted nothing trying to edit several presets at once gets none edited and every one in the failed list for not enough permission
 
 Given
 
-- 프리셋 2개와 일반 사용자 한 명
-  - 리소스 프리셋 preset-1: 리소스 그룹에 묶이지 않아 public 에 속한다
-  - 리소스 프리셋 preset-2: 리소스 그룹에 묶이지 않아 public 에 속한다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 presets and one regular user
+  - Resource preset preset-1: belongs to public because it is bound to no resource group
+  - Resource preset preset-2: belongs to public because it is bound to no resource group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourcePresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 공유 메모리를 한 번에 바꿈
+- ResourcePresetAdapter.partial_bulk_update: user-1 changes the shared memory of 2 presets at once
 
 Then
 
-- 처리된 프리셋 없이 대상이 모두 실패 목록에 온다
+- no preset is processed and every target comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상 프리셋의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 프리셋의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the target preset
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target preset
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-presets-at-once"></a>
 
 #### [the-superadmin-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/resource_preset/test_partial_bulk_editing.py): pass
 
-슈퍼관리자가 프리셋 여럿의 공유 메모리를 한 번에 바꾸면, 모두 새 공유 메모리로 오고 실패한 것은 없다
+when the superadmin changes the shared memory of several presets at once, they all come back with the new shared memory and nothing failed
 
 Given
 
-- 프리셋 2개와 슈퍼관리자 한 명
-  - 리소스 프리셋 preset-1: 리소스 그룹에 묶이지 않아 public 에 속한다
-  - 리소스 프리셋 preset-2: 리소스 그룹에 묶이지 않아 public 에 속한다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 presets and one superadmin
+  - Resource preset preset-1: belongs to public because it is bound to no resource group
+  - Resource preset preset-2: belongs to public because it is bound to no resource group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourcePresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 공유 메모리를 한 번에 바꿈
+- ResourcePresetAdapter.partial_bulk_update: user-1 changes the shared memory of 2 presets at once
 
 Then
 
-- 대상 프리셋이 모두 처리된 목록에 오고, 실패한 것은 없다
+- every target preset comes back in the processed list and nothing failed
   - successes count = 2
-  - successes[0].id: 미리 만든 프리셋의 id와 같다
-  - successes[0].entity_id: 미리 만든 프리셋의 id와 같다
+  - successes[0].id: same as the id of the preset seeded in advance
+  - successes[0].entity_id: same as the id of the preset seeded in advance
   - successes[0].name = 'preset-1'
   - successes[0].resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
   - successes[0].shared_memory = BinarySizeInfo(expr='1073741824', display='1g')
   - successes[0].resource_group_name = None
-  - successes[1].id: 미리 만든 프리셋의 id와 같다
-  - successes[1].entity_id: 미리 만든 프리셋의 id와 같다
+  - successes[1].id: same as the id of the preset seeded in advance
+  - successes[1].entity_id: same as the id of the preset seeded in advance
   - successes[1].name = 'preset-2'
   - successes[1].resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
   - successes[1].shared_memory = BinarySizeInfo(expr='1073741824', display='1g')
@@ -202,28 +202,28 @@ Then
 
 #### [editing-several-with-slots-missing-intrinsic-ones-is-refused](/tests/scenario/bai_scenario/manager/resource_preset/test_partial_bulk_editing.py): pass
 
-프리셋 여럿을 고치며 하나의 자원을 필수 슬롯 없이 바꾸면, 요청 전체가 입력 오류로 거부된다
+editing several presets with the resources of one changed without the intrinsic slots rejects the whole request as invalid input
 
 Given
 
-- 프리셋 2개와 슈퍼관리자 한 명
-  - 리소스 프리셋 preset-1: 리소스 그룹에 묶이지 않아 public 에 속한다
-  - 리소스 프리셋 preset-2: 리소스 그룹에 묶이지 않아 public 에 속한다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 presets and one superadmin
+  - Resource preset preset-1: belongs to public because it is bound to no resource group
+  - Resource preset preset-2: belongs to public because it is bound to no resource group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourcePresetAdapter.partial_bulk_update: user-1이 프리셋 2개를 한 번에 고치며 첫째의 자원을 필수 슬롯 없이 바꿈
+- ResourcePresetAdapter.partial_bulk_update: user-1 edits 2 presets at once, changing the resources of the first without the intrinsic slots
 
 Then
 
-- 거부된다
-  - 거부: InvalidAPIParameters
+- the call is rejected
+  - rejected: InvalidAPIParameters
 
 ### purge
 
@@ -231,79 +231,79 @@ Then
 
 #### [the-superadmin-purges-a-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_purging.py): pass
 
-슈퍼관리자가 프리셋을 purge 하면 지운 프리셋의 id 가 온다
+when the superadmin purges a preset, the id of the deleted preset comes back
 
 Given
 
-- 프리셋 하나와 슈퍼관리자 한 명
-  - 리소스 프리셋 preset-1: 리소스 그룹에 묶이지 않아 public 에 속한다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one preset and one superadmin
+  - Resource preset preset-1: belongs to public because it is bound to no resource group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourcePresetAdapter.purge: user-1이 preset-1을 purge 함
+- ResourcePresetAdapter.purge: user-1 purges preset-1
 
 Then
 
-- 지운 프리셋의 id 가 온다
-  - id: 미리 만든 프리셋의 id와 같다
+- the id of the deleted preset comes back
+  - id: same as the id of the preset seeded in advance
 
 <a id="purging-a-user-granted-nothing-may-not-purge-a-preset"></a>
 
 #### [a-user-granted-nothing-may-not-purge-a-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_purging.py): pass
 
-아무 권한도 받지 않은 사용자가 프리셋을 purge 하려 하면 권한 부족으로 거부된다
+a user granted nothing trying to purge a preset is rejected for not enough permission
 
 Given
 
-- 프리셋 하나와 일반 사용자 한 명
-  - 리소스 프리셋 preset-1: 리소스 그룹에 묶이지 않아 public 에 속한다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one preset and one regular user
+  - Resource preset preset-1: belongs to public because it is bound to no resource group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourcePresetAdapter.purge: user-1이 preset-1을 purge 함
+- ResourcePresetAdapter.purge: user-1 purges preset-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="purging-purging-an-id-nothing-answers-to-is-not-found"></a>
 
 #### [purging-an-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_preset/test_purging.py): pass
 
-슈퍼관리자가 없는 id 의 프리셋을 purge 하려 하면 대상이 없다는 것으로 거부된다
+when the superadmin tries to purge the preset of an unknown id, the call is rejected as no such target
 
 Given
 
-- 프리셋 하나와 슈퍼관리자 한 명
-  - 리소스 프리셋 preset-1: 리소스 그룹에 묶이지 않아 public 에 속한다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one preset and one superadmin
+  - Resource preset preset-1: belongs to public because it is bound to no resource group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourcePresetAdapter.purge: user-1이 없는 id을 purge 함
+- ResourcePresetAdapter.purge: user-1 purges an unknown id
 
 Then
 
-- 거부된다
-  - 거부: ResourcePresetNotFound
+- the call is rejected
+  - rejected: ResourcePresetNotFound
 
 ### update
 
@@ -311,32 +311,32 @@ Then
 
 #### [a-user-granted-update-in-public-renames-a-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_editing.py): pass
 
-public 에서 수정 권한을 받은 사용자가 프리셋의 이름을 바꾸면, 새 이름의 프리셋이 온다
+a user granted update in public renaming a preset gets the preset under the new name
 
 Given
 
-- 프리셋 하나와 public 에서 UPDATE 권한을 받은 일반 사용자 한 명
-  - 리소스 프리셋 preset-1: 리소스 그룹에 묶이지 않아 public 에 속한다
-  - 도메인 home-1
-  - public 에서 리소스 프리셋 UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 preset-writer-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 preset-writer-1: resource_preset 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 preset-writer-1 보유
+- one preset and one regular user granted UPDATE in public
+  - Resource preset preset-1: belongs to public because it is bound to no resource group
+  - Domain home-1
+  - Prepare a user granted the UPDATE permission on resource presets in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: UPDATE allowed on every resource_preset
+    - regular user user-1: holds Role preset-writer-1
 
 When
 
-- ResourcePresetAdapter.update: user-1이 preset-1의 이름을 바꿈
+- ResourcePresetAdapter.update: user-1 renames preset-1
 
 Then
 
-- 미리 만든 프리셋 전체가 온다
-  - id: 미리 만든 프리셋의 id와 같다
-  - entity_id: 미리 만든 프리셋의 id와 같다
+- the whole preset seeded in advance comes back
+  - id: same as the id of the preset seeded in advance
+  - entity_id: same as the id of the preset seeded in advance
   - name = 'renamed-preset'
   - resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
   - shared_memory = None
@@ -346,28 +346,28 @@ Then
 
 #### [the-superadmin-renames-a-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_editing.py): pass
 
-슈퍼관리자가 프리셋의 이름만 바꾸면, 이름은 새 값이 되고 나머지는 그대로 남는다
+when the superadmin renames a preset, the name takes the new value and the rest stays as it was
 
 Given
 
-- 프리셋 하나와 슈퍼관리자 한 명
-  - 리소스 프리셋 preset-1: 리소스 그룹에 묶이지 않아 public 에 속한다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one preset and one superadmin
+  - Resource preset preset-1: belongs to public because it is bound to no resource group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourcePresetAdapter.update: user-1이 preset-1의 이름을 바꿈
+- ResourcePresetAdapter.update: user-1 renames preset-1
 
 Then
 
-- 미리 만든 프리셋 전체가 온다
-  - id: 미리 만든 프리셋의 id와 같다
-  - entity_id: 미리 만든 프리셋의 id와 같다
+- the whole preset seeded in advance comes back
+  - id: same as the id of the preset seeded in advance
+  - entity_id: same as the id of the preset seeded in advance
   - name = 'renamed-preset'
   - resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
   - shared_memory = None
@@ -377,51 +377,51 @@ Then
 
 #### [a-user-granted-nothing-may-not-edit-a-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_editing.py): pass
 
-아무 권한도 받지 않은 사용자가 프리셋을 수정하려 하면 권한 부족으로 거부된다
+a user granted nothing trying to edit a preset is rejected for not enough permission
 
 Given
 
-- 프리셋 하나와 일반 사용자 한 명
-  - 리소스 프리셋 preset-1: 리소스 그룹에 묶이지 않아 public 에 속한다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one preset and one regular user
+  - Resource preset preset-1: belongs to public because it is bound to no resource group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ResourcePresetAdapter.update: user-1이 preset-1의 이름을 바꿈
+- ResourcePresetAdapter.update: user-1 renames preset-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="editing-editing-an-id-nothing-answers-to-is-not-found"></a>
 
 #### [editing-an-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_preset/test_editing.py): pass
 
-슈퍼관리자가 없는 id 의 프리셋을 수정하려 하면 대상이 없다는 것으로 거부된다
+when the superadmin tries to edit the preset of an unknown id, the call is rejected as no such target
 
 Given
 
-- 프리셋 하나와 슈퍼관리자 한 명
-  - 리소스 프리셋 preset-1: 리소스 그룹에 묶이지 않아 public 에 속한다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one preset and one superadmin
+  - Resource preset preset-1: belongs to public because it is bound to no resource group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ResourcePresetAdapter.update: user-1이 없는 id의 이름을 바꿈
+- ResourcePresetAdapter.update: user-1 renames an unknown id
 
 Then
 
-- 거부된다
-  - 거부: ResourcePresetNotFound
+- the call is rejected
+  - rejected: ResourcePresetNotFound
 

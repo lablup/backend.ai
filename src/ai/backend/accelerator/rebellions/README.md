@@ -1,8 +1,8 @@
 # Backend.AI Accelerator Plugin for Rebellions ATOM and REBEL
 
 ## Installation
-1. Copy `rbln-smi` binary to local agent directory and apply setuid bit on behalf of root account by running `sudo chmod u+s ./rbln-smi`
-2. Create `atom.toml` configuration file where `[general].rbln_stat_path` is set to the absolute path of binary copied at step 1
+1. Copy the `rbln-smi` binary to the local agent directory and set the setuid bit for the root account with `sudo chmod u+s ./rbln-smi`.
+2. Create the `atom.toml` configuration file and set `[general].rbln_stat_path` to the absolute path of the binary copied in step 1.
 
 ## REBEL (Rebel100)
 The `rebel100` plugin (slot `rebel100.device`, whole cards only, device name `RBLN-CR13`) reads `rebel100.toml` instead of `atom.toml`, searched in the working directory, `~/.config/backend.ai/` and `/etc/backend.ai/` (see `rebel100.toml.example`).

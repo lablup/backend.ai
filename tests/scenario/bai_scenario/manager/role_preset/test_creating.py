@@ -20,6 +20,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Refused,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -42,7 +43,7 @@ class TheSuperadmin(Given[Any, UserData]):
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자 한 명"
+        return Says("superadmin 한 명", english="one superadmin")
 
     @override
     async def lay(self, seeding: Any) -> UserData:
@@ -60,7 +61,10 @@ class CreatingWithOwnerAssign(When[UserData, RolePresetAdapter, RolePresetNode])
 
     @override
     def describe(self, laid: UserData) -> str:
-        return f"{laid.username}이 소유자 부여를 켠 프로젝트 스코프 프리셋을 만듦"
+        return Says(
+            f"{laid.username} 이 소유자 부여를 켠 프로젝트 스코프 프리셋을 만듭니다",
+            english=f"{laid.username} creates a project-scope preset with owner assignment on",
+        )
 
     @override
     async def call(self, adapter: RolePresetAdapter, laid: UserData) -> RolePresetNode:
@@ -79,7 +83,10 @@ class OwnerAssignComesBackOn(Then[UserData, RolePresetNode]):
 
     @override
     def says(self) -> str:
-        return "소유자 부여가 켜진 프리셋이 온다"
+        return Says(
+            "소유자 부여가 켜진 프리셋이 응답으로 옵니다",
+            english="the preset with owner assignment turned on comes back",
+        )
 
     @override
     def look(self, laid: UserData, answered: Answered[RolePresetNode]) -> list[Verdict]:
@@ -102,7 +109,12 @@ class AProjectPresetIsMadeWithOwnerAssign(
 
     @override
     def describe(self) -> str:
-        return "프로젝트 스코프 프리셋을 소유자 부여를 켜고 만들면, 켜진 프리셋이 온다"
+        return Says(
+            "프로젝트 스코프 프리셋을 소유자 부여를 켜고 만들면, 켜진 프리셋이 응답으로 옵니다",
+            english=(
+                "creating a project-scope preset with owner assignment on brings it back turned on"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, UserData]:

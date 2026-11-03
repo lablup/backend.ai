@@ -25,6 +25,7 @@ from ai.backend.manager.models.login_session.creators import (
     LoginSessionCreator,
 )
 from ai.backend.manager.secret.types import SecretValue
+from ai.backend.testutils.scenario_steps import Language, Says, in_language
 from bai_scenario.seeds.seeder import TestSeedFieldCreator
 
 
@@ -40,8 +41,16 @@ class TestSeedKeypairOf(TestSeedFieldCreator[UserData, KeyPairData]):
 
     @override
     def kind(self) -> str:
-        state = "활성" if self.is_active else "비활성"
-        return f"기본이 아닌 {state} 키 하나를 더 갖는다"
+        state = (
+            Says("활성", english="active") if self.is_active else Says("비활성", english="inactive")
+        )
+        return Says(
+            f"기본이 아닌 {state} 키페어 하나를 더 갖습니다",
+            english=(
+                f"has one more {in_language(state, Language.ENGLISH)} keypair "
+                "besides the default one"
+            ),
+        )
 
     @override
     def owner_id(self, owner: UserData) -> UserID:
@@ -71,7 +80,7 @@ class TestSeedLoginSessionOf(TestSeedFieldCreator[UserData, LoginSessionData]):
 
     @override
     def kind(self) -> str:
-        return "활성 로그인 세션 하나를 갖는다"
+        return Says("활성 로그인 세션 하나를 갖습니다", english="has one active login session")
 
     @override
     def owner_id(self, owner: UserData) -> UserID:
@@ -90,7 +99,10 @@ class TestSeedLoginHistoryOf(TestSeedFieldCreator[UserData, LoginHistoryData]):
 
     @override
     def kind(self) -> str:
-        return "성공한 로그인 기록 하나를 갖는다"
+        return Says(
+            "성공한 로그인 이력 하나를 갖습니다",
+            english="has one successful login record",
+        )
 
     @override
     def owner_id(self, owner: UserData) -> UserID:

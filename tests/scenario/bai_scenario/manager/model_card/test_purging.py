@@ -19,6 +19,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Held,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -44,7 +45,12 @@ class PurgingTheCard(When[ModelCardsAndACaller, ModelCardAdapter, Purged]):
 
     @override
     def describe(self, laid: ModelCardsAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.cards[0].name}을 purge 함, 폴더는 그대로 둠"
+        return Says(
+            f"{laid.caller.username}이 {laid.cards[0].name}을 purge 하고 vfolder 는 그대로 둡니다",
+            english=(
+                f"{laid.caller.username} purges {laid.cards[0].name} and leaves the vfolder alone"
+            ),
+        )
 
     @override
     async def call(self, adapter: ModelCardAdapter, laid: ModelCardsAndACaller) -> Purged:
@@ -58,14 +64,26 @@ class ThePurgedCardsId(Then[ModelCardsAndACaller, Purged]):
 
     @override
     def says(self) -> str:
-        return "purge 한 카드의 id"
+        return Says(
+            "purge 한 카드의 id 가 응답으로 옵니다",
+            english="the id of the purged card comes back",
+        )
 
     @override
     def look(self, laid: ModelCardsAndACaller, answered: Answered[Purged]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]
-        return [Held[UUID]("id", payload.id, SameAs(laid.cards[0].id, "미리 만든 카드"))]
+        return [
+            Held[UUID](
+                "id",
+                payload.id,
+                SameAs(
+                    laid.cards[0].id,
+                    Says("미리 저장한 카드", english="the card created in advance"),
+                ),
+            )
+        ]
 
 
 @dataclass(frozen=True)
@@ -78,9 +96,13 @@ class AUserGrantedPurgePurgesTheCard(
 
     @override
     def describe(self) -> str:
-        return (
-            "프로젝트에서 모델 카드 purge 권한을 받은 사용자가 카드를 purge 하면, "
-            "그 카드의 id 가 온다"
+        return Says(
+            "프로젝트에서 모델 카드 purge 권한을 받은 사용자가 카드를 purge 하면 그 카드의 id "
+            "가 응답으로 옵니다",
+            english=(
+                "when a user granted purge permission on model cards in the project purges a "
+                "card, the id of that card comes back"
+            ),
         )
 
     @override
@@ -106,7 +128,13 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 모델 카드를 purge 하려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 모델 카드를 purge 하려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing tries to purge a model card, "
+                "the call is rejected for lack of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ModelCardsAndACaller]:

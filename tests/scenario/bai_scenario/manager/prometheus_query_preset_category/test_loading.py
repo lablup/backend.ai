@@ -18,7 +18,7 @@ from ai.backend.manager.api.adapters.prometheus_query_preset_category.adapter im
     PrometheusQueryPresetCategoryAdapter,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.prometheus_query_preset_category import (
     LoadedCategory,
     ManyCategoriesAndACaller,
@@ -45,7 +45,14 @@ class LoadingTheLaidAndOneUnknown(When[ManyCategoriesAndACaller, Adapter, Loaded
 
     @override
     def describe(self, laid: ManyCategoriesAndACaller) -> str:
-        return f"{laid.caller.username}이 미리 만들어 둔 카테고리 {len(laid.laid)}개의 id와 없는 id 하나를 한 번에 조회"
+        return Says(
+            f"{laid.caller.username}이 미리 저장한 카테고리 {len(laid.laid)}개의 id 와 없는 id "
+            "하나를 한 번에 조회합니다",
+            english=(
+                f"{laid.caller.username} loads the ids of the {len(laid.laid)} categories "
+                "seeded in advance and one missing id in one call"
+            ),
+        )
 
     @override
     async def call(self, adapter: Adapter, laid: ManyCategoriesAndACaller) -> Loaded:
@@ -64,7 +71,10 @@ class LoadingNothing(When[ManyCategoriesAndACaller, Adapter, Loaded]):
 
     @override
     def describe(self, laid: ManyCategoriesAndACaller) -> str:
-        return f"{laid.caller.username}이 빈 id 목록으로 조회"
+        return Says(
+            f"{laid.caller.username}이 빈 id 목록으로 조회합니다",
+            english=f"{laid.caller.username} loads with an empty id list",
+        )
 
     @override
     async def call(self, adapter: Adapter, laid: ManyCategoriesAndACaller) -> Loaded:
@@ -82,9 +92,14 @@ class TheLaidAndTheUnknownComeBackInOrder(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "카테고리 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 "
-            "거부로 반환되고 순서가 요청한 순서와 같다"
+            "거부로 반환되고 순서가 요청한 순서와 같습니다",
+            english=(
+                "when two categories and one missing id are loaded in one call, the two that "
+                "exist come back as nodes and the missing one as a rejection, in the order "
+                "requested"
+            ),
         )
 
     @override
@@ -110,7 +125,12 @@ class AnEmptyListAnswersNothing(
 
     @override
     def describe(self) -> str:
-        return "카테고리가 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환된다"
+        return Says(
+            "카테고리가 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환됩니다",
+            english=(
+                "even when categories exist, loading with an empty id list answers an empty list"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyCategoriesAndACaller]:

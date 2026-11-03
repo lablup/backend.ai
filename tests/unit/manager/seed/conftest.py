@@ -655,6 +655,14 @@ _PROJECT_MEMBERS: list[dict[str, str]] = [
     {"project_id": _PROJECTS["model-store.yaml"]["id"], "user_id": _USERS["member.yaml"]["id"]},
 ]
 
+# Domain admin items written for the tests: `member` granted the `domain_admin` role of
+# the `default` domain.
+_DOMAIN_ADMINS: list[dict[str, str]] = [
+    {"domain_id": _DOMAINS["default.yaml"]["id"], "user_id": _USERS["member.yaml"]["id"]},
+]
+# The role of the `domain_admin` preset in the `default` domain.
+_DOMAIN_ADMIN_ROLE_ID = "0198a5a0-0000-7000-8000-000000001401"
+
 # The tables a seed kind writes, and the graph tables the creation path writes beside them.
 _SEED_TABLES: list[Table | type[HasTable]] = [
     AppConfigDefinitionRow,
@@ -738,14 +746,17 @@ def role_seed_dir(tmp_path: Path) -> Path:
     """A directory of role seed files, the shape `seeds/manager/role_preset/` has."""
     directory = tmp_path / "role_preset"
     directory.mkdir()
-    declared = PermissionKinds().declared()
     for file_name, role in _ROLES.items():
-        permissions = {kind: [] for kind in declared} | role["permissions"]
-        item = role | {"permissions": permissions}
         (directory / file_name).write_text(
-            yaml.safe_dump({"kind": "role_preset", "version": 1, "items": [item]})
+            yaml.safe_dump({"kind": "role_preset", "version": 1, "items": [_preset_item(role)]})
         )
     return directory
+
+
+def _preset_item(role: dict[str, Any]) -> dict[str, Any]:
+    """A role file's item with every entity type stated, as a role file must."""
+    permissions = {kind: [] for kind in PermissionKinds().declared()} | role["permissions"]
+    return role | {"permissions": permissions}
 
 
 @pytest.fixture
@@ -1059,6 +1070,11 @@ def default_domain_id() -> str:
 
 
 @pytest.fixture
+def research_domain_id() -> str:
+    return str(_DOMAINS["research.yaml"]["id"])
+
+
+@pytest.fixture
 def resource_group_seed_dir(tmp_path: Path) -> Path:
     """A directory with one `resource_group` seed file."""
     directory = tmp_path / "resource_group"
@@ -1339,5 +1355,41 @@ def project_member_seed_dir(role_kind_seed_dir: Path) -> Path:
     auto_assign role the items name are written first."""
     (role_kind_seed_dir / "project-members.yaml").write_text(
         yaml.safe_dump({"kind": "project_member", "version": 1, "items": _PROJECT_MEMBERS})
+    )
+    return role_kind_seed_dir
+
+
+@pytest.fixture
+def domain_admin_role_id() -> str:
+    return _DOMAIN_ADMIN_ROLE_ID
+
+
+@pytest.fixture
+def domain_admin_seed_dir(role_kind_seed_dir: Path) -> Path:
+    """The role directory plus the `domain_admin` preset, the role made from it in the
+    `default` domain, and one domain_admin file, so the role the items name is written
+    first."""
+    preset = _preset_item(_ROLES["domain-admin.yaml"])
+    (role_kind_seed_dir / "preset-domain-admin.yaml").write_text(
+        yaml.safe_dump({"kind": "role_preset", "version": 1, "items": [preset]})
+    )
+    domain_id = _DOMAINS["default.yaml"]["id"]
+    (role_kind_seed_dir / "role-domain-admin.yaml").write_text(
+        yaml.safe_dump({
+            "kind": "role",
+            "version": 1,
+            "items": [
+                {
+                    "id": _DOMAIN_ADMIN_ROLE_ID,
+                    "name": f"domain_admin-{domain_id[:8]}",
+                    "scope_type": "domain",
+                    "scope_id": domain_id,
+                    "role_preset_id": preset["id"],
+                }
+            ],
+        })
+    )
+    (role_kind_seed_dir / "domain-admins.yaml").write_text(
+        yaml.safe_dump({"kind": "domain_admin", "version": 1, "items": _DOMAIN_ADMINS})
     )
     return role_kind_seed_dir

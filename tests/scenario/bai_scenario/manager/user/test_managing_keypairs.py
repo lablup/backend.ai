@@ -41,6 +41,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Skipped,
     Then,
@@ -99,7 +100,7 @@ class AKeyOwnerAndACaller:
 
 @dataclass(frozen=True)
 class SomeoneAndAKeyOwner(Given[Any, AKeyOwnerAndACaller]):
-    """한 도메인의 대상 사용자와 부르는 사람, 그리고 부르는 사람이 대상에 받은 권한."""
+    """한 도메인의 대상 사용자와 호출자, 그리고 호출자가 대상에 받은 권한."""
 
     grant: tuple[Permission, ...] = ()
     extra: bool = False
@@ -107,15 +108,19 @@ class SomeoneAndAKeyOwner(Given[Any, AKeyOwnerAndACaller]):
 
     @override
     def describe(self) -> str:
-        parts = ["도메인 하나와 대상 사용자, 부르는 사용자"]
+        parts_ko = ["도메인 하나와 대상 사용자"]
+        parts_en = ["one domain and one target user"]
         if self.extra:
-            parts.append("대상에게 기본 아닌 키 하나")
+            parts_ko.append("대상에게 기본 아닌 키 하나")
+            parts_en.append("the target holds one extra key that is not the default")
         if self.grant:
             names = ", ".join(str(one.name) for one in self.grant)
-            parts.append(f"부르는 사람은 대상에 대한 사용자 {names} 권한을 받았다")
+            parts_ko.append(f"호출자는 대상에 대한 사용자 {names} 권한을 받았습니다")
+            parts_en.append(f"the caller holds the user {names} permission on the target")
         else:
-            parts.append("부르는 사람은 아무 권한도 받지 않았다")
-        return ", ".join(parts)
+            parts_ko.append("호출자는 아무 권한도 받지 않았습니다")
+            parts_en.append("the caller holds no permission")
+        return Says(", ".join(parts_ko), english=", ".join(parts_en))
 
     @override
     async def lay(self, seeding: Any) -> AKeyOwnerAndACaller:
@@ -157,7 +162,10 @@ class SomeoneUnderTheirOwnPolicy(
 
     @override
     def kind(self) -> str:
-        return "자기 키페어 정책을 가진 사용자 한 명 준비"
+        return Says(
+            "자기 키페어 정책을 가진 사용자 한 명 준비",
+            english="Prepare one user holding their own keypair policy",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> tuple[Laid[UserData], Laid[KeyPairResourcePolicyData]]:
@@ -182,7 +190,12 @@ class ASuperadminAndTwoUsers(Given[Any, KeysOfEveryone]):
 
     @override
     def describe(self) -> str:
-        return "도메인 하나와 사용자 둘, 슈퍼관리자 한 명, 저마다 다른 키페어 정책"
+        return Says(
+            "도메인 하나와 사용자 둘, superadmin 한 명, 저마다 다른 키페어 정책",
+            english=(
+                "one domain, two users, one superadmin, and a different keypair policy for each"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> KeysOfEveryone:
@@ -205,7 +218,12 @@ class SomeoneReadingTheDomain(Given[Any, KeysOfEveryone]):
 
     @override
     def describe(self) -> str:
-        return "도메인 하나와, 그 도메인 스코프에서 사용자 READ 권한을 받은 사용자 한 명"
+        return Says(
+            "도메인 하나와, 그 도메인 스코프에서 사용자 READ 권한을 받은 사용자 한 명",
+            english=(
+                "one domain and one user granted the user READ permission in the domain scope"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> KeysOfEveryone:
@@ -265,8 +283,22 @@ class MakingAKeyForTheTarget(When[AKeyOwnerAndACaller, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: AKeyOwnerAndACaller) -> str:
-        policy = "없는 정책" if self.missing_policy else laid.policy.name
-        return f"{laid.caller.username}이 {laid.target.username}에게 {policy}으로 키를 만듦"
+        if self.missing_policy:
+            return Says(
+                f"{laid.caller.username}이 {laid.target.username}에게 없는 정책으로 키를 생성합니다",
+                english=(
+                    f"{laid.caller.username} creates a key for {laid.target.username} "
+                    "under a policy that does not exist"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username}이 {laid.target.username}에게 {laid.policy.name}으로 "
+            "키를 생성합니다",
+            english=(
+                f"{laid.caller.username} creates a key for {laid.target.username} under "
+                f"{laid.policy.name}"
+            ),
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: AKeyOwnerAndACaller) -> Answer:
@@ -291,8 +323,21 @@ class ChangingTheExtraKey(When[AKeyOwnerAndACaller, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: AKeyOwnerAndACaller) -> str:
-        extra = "와 없는 정책" if self.missing_policy else ""
-        return f"{laid.caller.username}이 {laid.target.username}의 키에 요청 한도{extra}를 줌"
+        if self.missing_policy:
+            return Says(
+                f"{laid.caller.username}이 {laid.target.username}의 키에 요청 한도와 없는 정책을 "
+                "지정합니다",
+                english=(
+                    f"{laid.caller.username} gives a rate limit and a policy that does not "
+                    f"exist to the key of {laid.target.username}"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username}이 {laid.target.username}의 키에 요청 한도를 지정합니다",
+            english=(
+                f"{laid.caller.username} gives a rate limit to the key of {laid.target.username}"
+            ),
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: AKeyOwnerAndACaller) -> Answer:
@@ -316,7 +361,10 @@ class DeletingTheExtraKey(When[AKeyOwnerAndACaller, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: AKeyOwnerAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.target.username}의 기본 아닌 키를 지움"
+        return Says(
+            f"{laid.caller.username}이 {laid.target.username}의 기본 아닌 키를 삭제합니다",
+            english=(f"{laid.caller.username} deletes the extra key of {laid.target.username}"),
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: AKeyOwnerAndACaller) -> Answer:
@@ -334,7 +382,10 @@ class DeletingTheDefaultKey(When[AKeyOwnerAndACaller, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: AKeyOwnerAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.target.username}의 기본 키를 지움"
+        return Says(
+            f"{laid.caller.username}이 {laid.target.username}의 기본 키를 삭제합니다",
+            english=f"{laid.caller.username} deletes the default key of {laid.target.username}",
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: AKeyOwnerAndACaller) -> Answer:
@@ -353,7 +404,12 @@ class ReadingTheExtraKey(When[AKeyOwnerAndACaller, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: AKeyOwnerAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.target.username}의 키를 access key로 읽음"
+        return Says(
+            f"{laid.caller.username}이 {laid.target.username}의 키를 access key 로 읽습니다",
+            english=(
+                f"{laid.caller.username} reads the key of {laid.target.username} by access key"
+            ),
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: AKeyOwnerAndACaller) -> Answer:
@@ -371,7 +427,14 @@ class RegisteringAnSSHKey(When[AKeyOwnerAndACaller, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: AKeyOwnerAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.target.username}의 기본 키에 SSH 키를 등록하고 읽음"
+        return Says(
+            f"{laid.caller.username}이 {laid.target.username}의 기본 키에 SSH 키를 등록하고 "
+            "읽습니다",
+            english=(
+                f"{laid.caller.username} registers an SSH key on the default key of "
+                f"{laid.target.username} and reads it"
+            ),
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: AKeyOwnerAndACaller) -> Answer:
@@ -398,7 +461,14 @@ class ClearingTheSSHKey(When[AKeyOwnerAndACaller, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: AKeyOwnerAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.target.username}의 기본 키에서 SSH 키를 지우고 읽음"
+        return Says(
+            f"{laid.caller.username}이 {laid.target.username}의 기본 키에서 SSH 키를 삭제하고 "
+            "읽습니다",
+            english=(
+                f"{laid.caller.username} deletes the SSH key from the default key of "
+                f"{laid.target.username} and reads it"
+            ),
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: AKeyOwnerAndACaller) -> Answer:
@@ -419,7 +489,10 @@ class ReadingTheSSHKey(When[AKeyOwnerAndACaller, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: AKeyOwnerAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.target.username}의 SSH 공개키를 읽음"
+        return Says(
+            f"{laid.caller.username}이 {laid.target.username}의 SSH 공개키를 읽습니다",
+            english=(f"{laid.caller.username} reads the SSH public key of {laid.target.username}"),
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: AKeyOwnerAndACaller) -> Answer:
@@ -439,7 +512,10 @@ class SearchingEveryKey(When[KeysOfEveryone, UserAdapter, Answer]):
 
     @override
     def describe(self, laid: KeysOfEveryone) -> str:
-        return f"{laid.caller.username}이 페이지 인자 없이 모든 키를 훑음"
+        return Says(
+            f"{laid.caller.username}이 페이지 인자 없이 모든 키를 조회합니다",
+            english=f"{laid.caller.username} searches every key without page arguments",
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: KeysOfEveryone) -> Answer:
@@ -460,8 +536,18 @@ class SearchingKeysOverGQL(When[KeysOfEveryone, UserAdapter, Answer]):
     @override
     def describe(self, laid: KeysOfEveryone) -> str:
         if self.by_first_policy:
-            return f"{laid.caller.username}이 {laid.owners[0][1].name}으로 걸러 GQL 키 검색"
-        return f"{laid.caller.username}이 GQL로 모든 키를 훑음"
+            return Says(
+                f"{laid.caller.username}이 {laid.owners[0][1].name}으로 필터 기반 GQL 키 검색을 "
+                "합니다",
+                english=(
+                    f"{laid.caller.username} searches keys over GQL with a filter on "
+                    f"{laid.owners[0][1].name}"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username}이 GQL 로 모든 키를 조회합니다",
+            english=f"{laid.caller.username} searches every key over GQL",
+        )
 
     @override
     async def call(self, adapter: UserAdapter, laid: KeysOfEveryone) -> Answer:
@@ -491,9 +577,11 @@ class TestSeededKeyLook:
     ) -> list[Verdict]:
         extra = _extra_of(laid)
         written = WrittenByThisRun(self.started)
+        seeded = Says("미리 저장한 키", english="the key seeded in advance")
+        owner = Says("키 소유자", english="the key owner")
         return [
-            Held("id", node.id, SameAs(str(extra.access_key), "심은 키")),
-            Held("access_key", node.access_key, SameAs(str(extra.access_key), "심은 키")),
+            Held("id", node.id, SameAs(str(extra.access_key), seeded)),
+            Held("access_key", node.access_key, SameAs(str(extra.access_key), seeded)),
             Same("is_active", node.is_active, True),
             Same("is_admin", node.is_admin, False),
             Same("is_default", node.is_default, False),
@@ -502,7 +590,7 @@ class TestSeededKeyLook:
             Same("ssh_public_key", node.ssh_public_key, ""),
             Same("num_queries", node.num_queries, 0),
             Same("last_used", node.last_used, None),
-            Held("user_id", node.user_id, SameAs(laid.target.id, "키의 주인")),
+            Held("user_id", node.user_id, SameAs(laid.target.id, owner)),
             Held("created_at", node.created_at, written),
             Held("modified_at", node.modified_at, written),
         ]
@@ -515,9 +603,11 @@ class TestSeededKeyLook:
         at: str,
     ) -> list[Verdict]:
         written = WrittenByThisRun(self.started)
+        random_key = Says("시드가 만든 난수 키입니다", english="it is a random key the seed made")
+        owner_says = Says("키 소유자", english="the key owner")
         return [
-            Skipped(f"{at}id", "시드가 만든 난수 키다"),
-            Skipped(f"{at}access_key", "시드가 만든 난수 키다"),
+            Skipped(f"{at}id", random_key),
+            Skipped(f"{at}access_key", random_key),
             Same(f"{at}is_active", node.is_active, True),
             Same(
                 f"{at}is_admin",
@@ -530,7 +620,7 @@ class TestSeededKeyLook:
             Same(f"{at}ssh_public_key", node.ssh_public_key, ""),
             Same(f"{at}num_queries", node.num_queries, 0),
             Same(f"{at}last_used", node.last_used, None),
-            Held(f"{at}user_id", node.user_id, SameAs(owner.id, "키의 주인")),
+            Held(f"{at}user_id", node.user_id, SameAs(owner.id, owner_says)),
             Held(f"{at}created_at", node.created_at, written),
             Held(f"{at}modified_at", node.modified_at, written),
         ]
@@ -544,7 +634,10 @@ class TheNewKey(Then[AKeyOwnerAndACaller, Answer]):
 
     @override
     def says(self) -> str:
-        return "만든 키 전체와 secret이 온다"
+        return Says(
+            "생성한 키 전체와 secret 이 응답으로 옵니다",
+            english="the whole key created and its secret come back",
+        )
 
     @override
     def look(self, laid: AKeyOwnerAndACaller, answered: Answered[Answer]) -> list[Verdict]:
@@ -561,7 +654,10 @@ class TheNewKey(Then[AKeyOwnerAndACaller, Answer]):
                 rate_limit=CREATED_RATE_LIMIT,
                 resource_policy=laid.policy.name,
             ),
-            Skipped("secret_key", "매니저가 만든다"),
+            Skipped(
+                "secret_key",
+                Says("매니저가 생성합니다", english="the manager creates it"),
+            ),
         ]
 
 
@@ -573,7 +669,10 @@ class TheChangedKey(Then[AKeyOwnerAndACaller, Answer]):
 
     @override
     def says(self) -> str:
-        return "요청 한도만 바뀐 키 전체가 온다"
+        return Says(
+            "요청 한도만 변경된 키 전체가 응답으로 옵니다",
+            english="the whole key with only the rate limit changed comes back",
+        )
 
     @override
     def look(self, laid: AKeyOwnerAndACaller, answered: Answered[Answer]) -> list[Verdict]:
@@ -591,7 +690,10 @@ class TheReadKey(Then[AKeyOwnerAndACaller, Answer]):
 
     @override
     def says(self) -> str:
-        return "심은 키 전체가 온다"
+        return Says(
+            "미리 저장한 키 전체가 응답으로 옵니다",
+            english="the whole key seeded in advance comes back",
+        )
 
     @override
     def look(self, laid: AKeyOwnerAndACaller, answered: Answered[Answer]) -> list[Verdict]:
@@ -607,7 +709,10 @@ class TheDeletedKey(Then[AKeyOwnerAndACaller, Answer]):
 
     @override
     def says(self) -> str:
-        return "지운 키의 access key가 온다"
+        return Says(
+            "삭제한 키의 access key 가 응답으로 옵니다",
+            english="the access key of the deleted key comes back",
+        )
 
     @override
     def look(self, laid: AKeyOwnerAndACaller, answered: Answered[Answer]) -> list[Verdict]:
@@ -618,7 +723,10 @@ class TheDeletedKey(Then[AKeyOwnerAndACaller, Answer]):
             Held(
                 "access_key",
                 payload.access_key,
-                SameAs(str(_extra_of(laid).access_key), "심은 키"),
+                SameAs(
+                    str(_extra_of(laid).access_key),
+                    Says("미리 저장한 키", english="the key seeded in advance"),
+                ),
             )
         ]
 
@@ -631,7 +739,13 @@ class TheSSHKeyAfterwards(Then[AKeyOwnerAndACaller, Answer]):
 
     @override
     def says(self) -> str:
-        return "대상 기본 키가 오고, 뒤이은 읽기에서 공개키가 바뀌어 있다"
+        return Says(
+            "대상의 기본 키가 오고, 뒤이은 읽기에서 공개키가 변경되어 있습니다",
+            english=(
+                "the default key of the target comes back, and the public key is changed "
+                "in the read that follows"
+            ),
+        )
 
     @override
     def look(self, laid: AKeyOwnerAndACaller, answered: Answered[Answer]) -> list[Verdict]:
@@ -639,8 +753,15 @@ class TheSSHKeyAfterwards(Then[AKeyOwnerAndACaller, Answer]):
         if not isinstance(after, SSHAfterwards):
             return [Refused(GenericBadRequest, answered.raised)]
         return [
-            Held("access_key", after.answered, SameAs(after.default_key, "대상의 기본 키")),
-            Same("뒤이은 읽기의 ssh_public_key", after.public_key, self.public_key),
+            Held(
+                "access_key",
+                after.answered,
+                SameAs(
+                    after.default_key,
+                    Says("대상의 기본 키", english="the default key of the target"),
+                ),
+            ),
+            Same("the ssh_public_key of the read that follows", after.public_key, self.public_key),
         ]
 
 
@@ -650,7 +771,10 @@ class TheSSHPublicKey(Then[AKeyOwnerAndACaller, Answer]):
 
     @override
     def says(self) -> str:
-        return "access key와 공개키만 온다"
+        return Says(
+            "access key 와 공개키만 응답으로 옵니다",
+            english="only the access key and the public key come back",
+        )
 
     @override
     def look(self, laid: AKeyOwnerAndACaller, answered: Answered[Answer]) -> list[Verdict]:
@@ -661,7 +785,10 @@ class TheSSHPublicKey(Then[AKeyOwnerAndACaller, Answer]):
             Held(
                 "keypair.access_key",
                 read.payload.keypair.access_key,
-                SameAs(read.default_key, "대상의 기본 키"),
+                SameAs(
+                    read.default_key,
+                    Says("대상의 기본 키", english="the default key of the target"),
+                ),
             ),
             Same("keypair.ssh_public_key", read.payload.keypair.ssh_public_key, ""),
         ]
@@ -685,7 +812,10 @@ class EveryKeyComes(Then[KeysOfEveryone, Answer]):
 
     @override
     def says(self) -> str:
-        return "모든 사용자의 키가 주인 순으로 온다"
+        return Says(
+            "모든 사용자의 키가 소유자 순으로 옵니다",
+            english="every user's key comes back in owner order",
+        )
 
     @override
     def look(self, laid: KeysOfEveryone, answered: Answered[Answer]) -> list[Verdict]:
@@ -715,7 +845,10 @@ class TheFirstPolicysKeyOnly(Then[KeysOfEveryone, Answer]):
 
     @override
     def says(self) -> str:
-        return "그 정책을 쓰는 키 하나만 온다"
+        return Says(
+            "그 정책을 사용하는 키 하나만 옵니다",
+            english="only the one key under that policy comes back",
+        )
 
     @override
     def look(self, laid: KeysOfEveryone, answered: Answered[Answer]) -> list[Verdict]:
@@ -753,9 +886,14 @@ class AUserGrantedUpdateMakesAKeyForAnother(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 아니어도 대상 사용자 스코프에서 UPDATE를 받은 사용자가 정책을 주고 키를 "
-            "만들면, 기본 아닌 새 키와 secret이 온다"
+        return Says(
+            "superadmin 이 아니어도 대상 사용자 스코프에서 UPDATE 를 받은 사용자가 정책을 주고 "
+            "키를 생성하면, 기본 아닌 새 키와 secret 이 응답으로 옵니다",
+            english=(
+                "when a user granted UPDATE in the target user scope, not the superadmin, "
+                "creates a key under a policy, a new key that is not the default and its "
+                "secret come back"
+            ),
         )
 
     @override
@@ -781,7 +919,13 @@ class AUserGrantedNothingMayNotMakeAKeyForAnother(
 
     @override
     def describe(self) -> str:
-        return "역할 없이 키를 만들려 하면, 엔티티 권한 문이 막는다"
+        return Says(
+            "역할 없이 키를 생성하려 하면, 엔티티 권한 문이 막습니다",
+            english=(
+                "a user holding no role who tries to create a key is rejected by the entity "
+                "permission gate"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
@@ -806,7 +950,13 @@ class AKeyMayNotBeMadeUnderAMissingPolicy(
 
     @override
     def describe(self) -> str:
-        return "권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막는다"
+        return Says(
+            "권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막습니다",
+            english=(
+                "when a user holding the permission gives a policy name that does not exist, "
+                "input validation rejects it"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
@@ -833,9 +983,14 @@ class AGrantedUserChangesOnlyTheRateLimit(
 
     @override
     def describe(self) -> str:
-        return (
-            "대상 스코프에서 READ와 UPDATE를 받은 사용자가 요청 한도만 주면, 나머지는 그대로이고 "
-            "한도만 바뀐 키 노드가 온다"
+        return Says(
+            "대상 스코프에서 READ 와 UPDATE 를 받은 사용자가 요청 한도만 주면, 나머지는 그대로이고 "
+            "한도만 변경된 키 노드가 응답으로 옵니다",
+            english=(
+                "when a user granted READ and UPDATE in the target scope gives only a rate "
+                "limit, the key node comes back with everything else unchanged and only the "
+                "rate limit changed"
+            ),
         )
 
     @override
@@ -861,7 +1016,13 @@ class AUserGrantedNothingMayNotChangeAnothersKey(
 
     @override
     def describe(self) -> str:
-        return "역할 없이 바꾸려 하면, 소유자 조회 단계가 막는다"
+        return Says(
+            "역할 없이 변경하려 하면, 소유자 조회 단계가 막습니다",
+            english=(
+                "a user holding no role who tries to change a key is rejected at the owner "
+                "lookup step"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
@@ -886,7 +1047,13 @@ class AReaderMayNotChangeAnothersKey(
 
     @override
     def describe(self) -> str:
-        return "READ만 받고 바꾸려 하면, 엔티티 권한 문이 막는다"
+        return Says(
+            "READ 만 받고 변경하려 하면, 엔티티 권한 문이 막습니다",
+            english=(
+                "a user holding only READ who tries to change a key is rejected by the "
+                "entity permission gate"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
@@ -911,7 +1078,13 @@ class AKeyMayNotBeMovedToAMissingPolicy(
 
     @override
     def describe(self) -> str:
-        return "권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막는다"
+        return Says(
+            "권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막습니다",
+            english=(
+                "when a user holding the permission gives a policy name that does not exist, "
+                "input validation rejects it"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
@@ -936,7 +1109,14 @@ class AGrantedUserDeletesAnothersExtraKey(
 
     @override
     def describe(self) -> str:
-        return "대상 스코프에서 READ와 UPDATE를 받은 사용자가 지우면, 지운 키의 access key가 답으로 온다"
+        return Says(
+            "대상 스코프에서 READ 와 UPDATE 를 받은 사용자가 삭제하면, "
+            "삭제한 키의 access key 가 응답으로 옵니다",
+            english=(
+                "when a user granted READ and UPDATE in the target scope deletes a key, the "
+                "access key of the deleted key comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
@@ -961,7 +1141,13 @@ class AUserGrantedNothingMayNotDeleteAnothersKey(
 
     @override
     def describe(self) -> str:
-        return "역할 없이 지우려 하면, 소유자 조회 단계가 막는다"
+        return Says(
+            "역할 없이 삭제하려 하면, 소유자 조회 단계가 막습니다",
+            english=(
+                "a user holding no role who tries to delete a key is rejected at the owner "
+                "lookup step"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
@@ -986,7 +1172,13 @@ class AReaderMayNotDeleteAnothersKey(
 
     @override
     def describe(self) -> str:
-        return "READ만 받고 지우려 하면, 엔티티 권한 문이 막는다"
+        return Says(
+            "READ 만 받고 삭제하려 하면, 엔티티 권한 문이 막습니다",
+            english=(
+                "a user holding only READ who tries to delete a key is rejected by the "
+                "entity permission gate"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
@@ -1011,7 +1203,13 @@ class AnothersDefaultKeyMayNotBeDeleted(
 
     @override
     def describe(self) -> str:
-        return "권한 받은 사용자가 대상의 기본 키를 지우려 하면, 입력 검증이 막는다"
+        return Says(
+            "권한 받은 사용자가 대상의 기본 키를 삭제하려 하면, 입력 검증이 막습니다",
+            english=(
+                "when a user holding the permission tries to delete the target's default key, "
+                "input validation rejects it"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
@@ -1038,7 +1236,13 @@ class AGrantedUserReadsAnothersKey(
 
     @override
     def describe(self) -> str:
-        return "대상 스코프에서 READ를 받은 사용자가 읽으면, 그 키 노드 전체가 온다"
+        return Says(
+            "대상 스코프에서 READ 를 받은 사용자가 읽으면, 그 키 노드 전체가 응답으로 옵니다",
+            english=(
+                "when a user granted READ in the target scope reads a key, that whole key "
+                "node comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
@@ -1063,7 +1267,13 @@ class AUserGrantedNothingMayNotReadAnothersKey(
 
     @override
     def describe(self) -> str:
-        return "역할 없이 읽으려 하면, 소유자 조회 단계가 막는다"
+        return Says(
+            "역할 없이 읽으려 하면, 소유자 조회 단계가 막습니다",
+            english=(
+                "a user holding no role who tries to read a key is rejected at the owner "
+                "lookup step"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
@@ -1088,9 +1298,14 @@ class AGrantedUserRegistersAnothersSSHKey(
 
     @override
     def describe(self) -> str:
-        return (
-            "대상 스코프에서 READ와 UPDATE를 받은 사용자가 공개키와 개인키를 주면, 형식 검사 없이 "
-            "덮어쓰고 access key가 답으로 온다"
+        return Says(
+            "대상 스코프에서 READ 와 UPDATE 를 받은 사용자가 공개키와 개인키를 주면, "
+            "형식 검사 없이 덮어쓰고 access key 가 응답으로 옵니다",
+            english=(
+                "when a user granted READ and UPDATE in the target scope gives a public key "
+                "and a private key, they overwrite the stored one without a format check and "
+                "the access key comes back"
+            ),
         )
 
     @override
@@ -1116,7 +1331,13 @@ class AUserGrantedNothingMayNotRegisterAnothersSSHKey(
 
     @override
     def describe(self) -> str:
-        return "역할 없이 등록하려 하면, 소유자 조회 단계가 막는다"
+        return Says(
+            "역할 없이 등록하려 하면, 소유자 조회 단계가 막습니다",
+            english=(
+                "a user holding no role who tries to register an SSH key is rejected at the "
+                "owner lookup step"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
@@ -1141,7 +1362,13 @@ class AReaderMayNotRegisterAnothersSSHKey(
 
     @override
     def describe(self) -> str:
-        return "READ만 받고 등록하려 하면, 엔티티 권한 문이 막는다"
+        return Says(
+            "READ 만 받고 등록하려 하면, 엔티티 권한 문이 막습니다",
+            english=(
+                "a user holding only READ who tries to register an SSH key is rejected by "
+                "the entity permission gate"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
@@ -1166,7 +1393,14 @@ class AGrantedUserClearsAnothersSSHKey(
 
     @override
     def describe(self) -> str:
-        return "대상 스코프에서 READ와 UPDATE를 받은 사용자가 지우면, access key가 오고 공개키가 비워진다"
+        return Says(
+            "대상 스코프에서 READ 와 UPDATE 를 받은 사용자가 삭제하면, "
+            "access key 가 오고 공개키가 비워집니다",
+            english=(
+                "when a user granted READ and UPDATE in the target scope deletes the SSH "
+                "key, the access key comes back and the public key is emptied"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
@@ -1191,7 +1425,13 @@ class AUserGrantedNothingMayNotClearAnothersSSHKey(
 
     @override
     def describe(self) -> str:
-        return "역할 없이 지우려 하면, 소유자 조회 단계가 막는다"
+        return Says(
+            "역할 없이 삭제하려 하면, 소유자 조회 단계가 막습니다",
+            english=(
+                "a user holding no role who tries to delete a key is rejected at the owner "
+                "lookup step"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
@@ -1216,7 +1456,13 @@ class AReaderMayNotClearAnothersSSHKey(
 
     @override
     def describe(self) -> str:
-        return "READ만 받고 지우려 하면, 엔티티 권한 문이 막는다"
+        return Says(
+            "READ 만 받고 삭제하려 하면, 엔티티 권한 문이 막습니다",
+            english=(
+                "a user holding only READ who tries to delete a key is rejected by the "
+                "entity permission gate"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
@@ -1241,9 +1487,13 @@ class AGrantedUserReadsAnothersSSHPublicKey(
 
     @override
     def describe(self) -> str:
-        return (
-            "대상 스코프에서 READ를 받은 사용자가 읽으면, access key와 공개키만 오고 개인키는 "
-            "오지 않는다"
+        return Says(
+            "대상 스코프에서 READ 를 받은 사용자가 읽으면, access key 와 공개키만 오고 "
+            "개인키는 오지 않습니다",
+            english=(
+                "when a user granted READ in the target scope reads the SSH key, only the "
+                "access key and the public key come back and the private key does not"
+            ),
         )
 
     @override
@@ -1269,7 +1519,13 @@ class AUserGrantedNothingMayNotReadAnothersSSHPublicKey(
 
     @override
     def describe(self) -> str:
-        return "역할 없이 읽으려 하면, 소유자 조회 단계가 막는다"
+        return Says(
+            "역할 없이 읽으려 하면, 소유자 조회 단계가 막습니다",
+            english=(
+                "a user holding no role who tries to read a key is rejected at the owner "
+                "lookup step"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyOwnerAndACaller]:
@@ -1296,9 +1552,14 @@ class TheSuperadminSearchesEveryKey(
 
     @override
     def describe(self) -> str:
-        return (
-            "전역 역할이 문인 키 검색에서 슈퍼관리자가 페이지 인자 없이 훑으면, 모든 사용자의 키가 "
-            "오고 limit 자리는 비어서 온다"
+        return Says(
+            "전역 역할이 문인 키 검색에서 superadmin 이 페이지 인자 없이 조회하면, "
+            "모든 사용자의 키가 오고 limit 자리는 비어서 옵니다",
+            english=(
+                "when the superadmin searches without page arguments in a key search gated by "
+                "the global role, every user's key comes back and the limit field comes back "
+                "empty"
+            ),
         )
 
     @override
@@ -1324,7 +1585,13 @@ class OnlyTheSuperadminMaySearchEveryKey(
 
     @override
     def describe(self) -> str:
-        return "권한 받은 사용자가 키 전체 검색을 하려 하면, 전역 역할 문이 막는다"
+        return Says(
+            "권한 받은 사용자가 키 전체 검색을 하려 하면, 전역 역할 문이 막습니다",
+            english=(
+                "a user holding the permission is rejected by the global role gate when "
+                "searching every key"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, KeysOfEveryone]:
@@ -1351,7 +1618,14 @@ class TheSuperadminSearchesKeysOfOnePolicy(
 
     @override
     def describe(self) -> str:
-        return "전역 역할이 문인 GQL 키 검색에서 슈퍼관리자가 정책 이름을 주면, 그 정책을 쓰는 키만 온다"
+        return Says(
+            "전역 역할이 문인 GQL 키 검색에서 superadmin 이 정책 이름을 주면, "
+            "그 정책을 사용하는 키만 옵니다",
+            english=(
+                "when the superadmin gives a policy name in a GQL key search gated by the "
+                "global role, only the keys under that policy come back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, KeysOfEveryone]:
@@ -1376,7 +1650,13 @@ class OnlyTheSuperadminMaySearchKeysOverGQL(
 
     @override
     def describe(self) -> str:
-        return "권한 받은 사용자가 GQL 키 검색을 하려 하면, 전역 역할 문이 막는다"
+        return Says(
+            "권한 받은 사용자가 GQL 키 검색을 하려 하면, 전역 역할 문이 막습니다",
+            english=(
+                "a user holding the permission is rejected by the global role gate when "
+                "searching keys over GQL"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, KeysOfEveryone]:

@@ -18,6 +18,7 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.creators impor
     RolePermissionPresetCreator,
 )
 from ai.backend.manager.models.rbac_models.role_preset.creators import RolePresetCreator
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import Naming, TestSeedFieldCreator, TestSeedRow
 
 
@@ -30,13 +31,19 @@ class TestSeedRolePreset(TestSeedRow[RolePresetData]):
 
     @override
     def kind(self) -> str:
-        return "역할 프리셋"
+        return Says("역할 프리셋", english="Role preset")
 
     @override
     def detail(self) -> str:
         if self.scope_type == ProjectEntityType():
-            return "프로젝트 스코프용이고 자동 부여는 꺼져 있다"
-        return f"{self.scope_type} 스코프용이고 자동 부여는 꺼져 있다"
+            return Says(
+                "프로젝트 스코프용이고 자동 부여는 비활성입니다",
+                english="for the project scope, with automatic grant disabled",
+            )
+        return Says(
+            f"{self.scope_type} 스코프용이고 자동 부여는 비활성입니다",
+            english=f"for the {self.scope_type} scope, with automatic grant disabled",
+        )
 
     @override
     def name(self, naming: Naming) -> str:
@@ -56,7 +63,11 @@ class TestSeedRolePresetPermission(TestSeedFieldCreator[RolePresetData, RolePerm
 
     @override
     def kind(self) -> str:
-        return f"{self.entity_type} 전체에 {self.permission.name or int(self.permission)} 허용 항목"
+        permission = self.permission.name or int(self.permission)
+        return Says(
+            f"{self.entity_type} 전체에 {permission} 허용",
+            english=f"{permission} allowed on every {self.entity_type}",
+        )
 
     @override
     def owner_id(self, owner: RolePresetData) -> RolePresetID:

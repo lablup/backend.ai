@@ -21,7 +21,7 @@ from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
     RuntimeVariantPresetAdapter,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.runtime_variant_preset import (
     EveryLaidPresetComesBack,
     ManyPresetsAndACaller,
@@ -32,7 +32,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-EDITED = "한 번에 고친 설명"
+EDITED = Says("한 번에 수정한 설명", english="the description updated in one call")
 
 type Edited = PartialBulkPayload[RuntimeVariantPresetNode]
 type EditingStep = Scenario[
@@ -50,7 +50,14 @@ class EditingEveryLaid(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, 
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 프리셋 {len(laid.laid)}개의 설명을 한 번에 고침"
+        return Says(
+            f"{laid.caller.username}이 런타임 파라미터 {len(laid.laid)}개의 설명을 한 번에 "
+            "수정합니다",
+            english=(
+                f"{laid.caller.username} updates the description of {len(laid.laid)} presets "
+                "in one call"
+            ),
+        )
 
     @override
     async def call(
@@ -79,7 +86,14 @@ class TheSuperadminEditsSeveralPresets(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 프리셋 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다"
+        return Says(
+            "superadmin 이 런타임 파라미터 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 "
+            "실패한 것은 없습니다",
+            english=(
+                "when the superadmin changes the description of several presets in one call, "
+                "they all come back with the new description and nothing failed"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
@@ -104,9 +118,14 @@ class AUserGrantedNothingEditsNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 없는 사용자가 런타임 파라미터 여럿을 한 번에 수정하려 하면, 수정된 것 "
+            "없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to update several presets in one call, "
+                "nothing is updated and every one comes back in the failed list for lack of "
+                "permission"
+            ),
         )
 
     @override

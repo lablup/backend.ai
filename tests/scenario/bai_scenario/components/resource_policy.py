@@ -85,11 +85,14 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.domain import WAS_HERE, Mentions, WrittenByThisRun
 from bai_scenario.seeds.domain.domain import TestSeedDomain
@@ -304,7 +307,7 @@ class ProjectPolicies(Family[ProjectResourcePolicyData, ProjectResourcePolicyNod
     @property
     @override
     def kind(self) -> str:
-        return "프로젝트 정책"
+        return Says("프로젝트 정책", english="project policy")
 
     @property
     @override
@@ -372,7 +375,7 @@ class ProjectPolicies(Family[ProjectResourcePolicyData, ProjectResourcePolicyNod
                 max_quota_scope_size=BinarySizeInput(expr="1g"),
                 max_network_count=5,
             ),
-            "모든 값을 지정해",
+            Says("모든 값을 지정해", english="all values given"),
             {
                 "name": name,
                 "max_vfolder_count": 20,
@@ -385,17 +388,20 @@ class ProjectPolicies(Family[ProjectResourcePolicyData, ProjectResourcePolicyNod
     def one_limit(self) -> Edit:
         return Edit(
             UpdateProjectResourcePolicyInput(max_vfolder_count=20),
-            "폴더 수 20으로 변경",
+            Says("vfolder 수 20으로 변경", english="the vfolder count changed to 20"),
             {"max_vfolder_count": 20},
         )
 
     @override
     def nothing(self) -> Edit:
-        return Edit(UpdateProjectResourcePolicyInput(), "빈 요청")
+        return Edit(UpdateProjectResourcePolicyInput(), Says("빈 요청", english="an empty request"))
 
     @override
     def clearing_a_non_nullable(self) -> Edit:
-        return Edit(UpdateProjectResourcePolicyInput(max_vfolder_count=None), "폴더 수 비우기")
+        return Edit(
+            UpdateProjectResourcePolicyInput(max_vfolder_count=None),
+            Says("vfolder 수 비우기", english="the vfolder count cleared"),
+        )
 
     @override
     async def create(self, adapter: ResourcePolicyAdapter, asked: Any) -> ProjectResourcePolicyNode:
@@ -464,7 +470,7 @@ class KeypairPolicies(OwnFamily[KeyPairResourcePolicyData, KeypairResourcePolicy
     @property
     @override
     def kind(self) -> str:
-        return "키페어 정책"
+        return Says("키페어 정책", english="keypair policy")
 
     @property
     @override
@@ -633,25 +639,38 @@ class KeypairPolicies(OwnFamily[KeyPairResourcePolicyData, KeypairResourcePolicy
 
     @override
     def everything(self, name: str) -> Ask:
-        return self._ask(name, "모든 값을 지정해")
+        return self._ask(name, Says("모든 값을 지정해", english="all values given"))
 
     @override
     def only_required(self, name: str) -> Ask:
         return self._ask(
             name,
-            "대기 세션 수·우선순위 상한·대기 자원 슬롯을 생략하고",
+            Says(
+                "대기 세션 수, 우선순위 상한, 대기 자원 슬롯을 생략하고",
+                english=(
+                    "the pending session count, the priority cap and the pending resource "
+                    "slots left out"
+                ),
+            ),
             pending_count=None,
             priority=None,
             pending_cpu=None,
         )
 
     def unlimited_slot(self, name: str) -> Ask:
-        return self._ask(name, "cpu 슬롯을 무제한으로 지정해", cpu="Infinity")
+        return self._ask(
+            name,
+            Says("cpu 슬롯을 무제한으로 지정해", english="the cpu slot set to unlimited"),
+            cpu="Infinity",
+        )
 
     def priority_out_of_range(self, name: str) -> Ask:
         return self._ask(
             name,
-            "우선순위 상한을 세션 우선순위 범위 밖 값으로 지정해",
+            Says(
+                "우선순위 상한을 세션 우선순위 범위 밖 값으로 지정해",
+                english="the priority cap set to a value outside the session priority range",
+            ),
             priority=SESSION_PRIORITY_MAX + 1,
         )
 
@@ -659,19 +678,19 @@ class KeypairPolicies(OwnFamily[KeyPairResourcePolicyData, KeypairResourcePolicy
     def one_limit(self) -> Edit:
         return Edit(
             UpdateKeypairResourcePolicyInput(max_concurrent_sessions=7),
-            "동시 세션 수 7로 변경",
+            Says("동시 세션 수 7 로 변경", english="the concurrent session count changed to 7"),
             {"max_concurrent_sessions": 7},
         )
 
     @override
     def nothing(self) -> Edit:
-        return Edit(UpdateKeypairResourcePolicyInput(), "빈 요청")
+        return Edit(UpdateKeypairResourcePolicyInput(), Says("빈 요청", english="an empty request"))
 
     @override
     def clearing_a_nullable(self) -> Edit:
         return Edit(
             UpdateKeypairResourcePolicyInput(max_pending_session_count=None),
-            "대기 세션 수 비우기",
+            Says("대기 세션 수 비우기", english="the pending session count cleared"),
             {"max_pending_session_count": None},
         )
 
@@ -679,13 +698,16 @@ class KeypairPolicies(OwnFamily[KeyPairResourcePolicyData, KeypairResourcePolicy
     def clearing_a_non_nullable(self) -> Edit:
         return Edit(
             UpdateKeypairResourcePolicyInput(max_concurrent_sessions=None),
-            "동시 세션 수 비우기",
+            Says("동시 세션 수 비우기", english="the concurrent session count cleared"),
         )
 
     def priority_moved_out_of_range(self) -> Edit:
         return Edit(
             UpdateKeypairResourcePolicyInput(max_priority=SESSION_PRIORITY_MAX + 1),
-            "우선순위 상한을 세션 우선순위 범위 밖으로 변경",
+            Says(
+                "우선순위 상한을 세션 우선순위 범위 밖으로 변경",
+                english="the priority cap changed to a value outside the session priority range",
+            ),
         )
 
     @override
@@ -773,7 +795,7 @@ class UserPolicies(OwnFamily[UserResourcePolicyData, UserResourcePolicyNode]):
     @property
     @override
     def kind(self) -> str:
-        return "사용자 정책"
+        return Says("사용자 정책", english="user policy")
 
     @property
     @override
@@ -871,35 +893,42 @@ class UserPolicies(OwnFamily[UserResourcePolicyData, UserResourcePolicyNode]):
 
     @override
     def everything(self, name: str) -> Ask:
-        return self._ask(name, "모든 값을 지정해", logins=3)
+        return self._ask(name, Says("모든 값을 지정해", english="all values given"), logins=3)
 
     @override
     def only_required(self, name: str) -> Ask:
-        return self._ask(name, "동시 로그인 수를 생략하고", logins=None)
+        return self._ask(
+            name,
+            Says("동시 로그인 수를 생략하고", english="the concurrent login count left out"),
+            logins=None,
+        )
 
     @override
     def one_limit(self) -> Edit:
         return Edit(
             UpdateUserResourcePolicyInput(max_vfolder_count=20),
-            "폴더 수 20으로 변경",
+            Says("vfolder 수 20으로 변경", english="the vfolder count changed to 20"),
             {"max_vfolder_count": 20},
         )
 
     @override
     def nothing(self) -> Edit:
-        return Edit(UpdateUserResourcePolicyInput(), "빈 요청")
+        return Edit(UpdateUserResourcePolicyInput(), Says("빈 요청", english="an empty request"))
 
     @override
     def clearing_a_nullable(self) -> Edit:
         return Edit(
             UpdateUserResourcePolicyInput(max_concurrent_logins=None),
-            "동시 로그인 수 비우기",
+            Says("동시 로그인 수 비우기", english="the concurrent login count cleared"),
             {"max_concurrent_logins": None},
         )
 
     @override
     def clearing_a_non_nullable(self) -> Edit:
-        return Edit(UpdateUserResourcePolicyInput(max_vfolder_count=None), "폴더 수 비우기")
+        return Edit(
+            UpdateUserResourcePolicyInput(max_vfolder_count=None),
+            Says("vfolder 수 비우기", english="the vfolder count cleared"),
+        )
 
     @override
     async def create(self, adapter: ResourcePolicyAdapter, asked: Any) -> UserResourcePolicyNode:
@@ -1021,7 +1050,10 @@ class SomeoneHeldToPolicies(TestSeedNest[LaidHolder]):
 
     @override
     def kind(self) -> str:
-        return "정책이 할당된 사용자 한 명 준비"
+        return Says(
+            "정책이 할당된 사용자 한 명 준비",
+            english="Prepare one user with policies assigned",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> LaidHolder:
@@ -1054,7 +1086,13 @@ class ReadingOwnPolicies(TestSeedNest[Laid[None]]):
 
     @override
     def kind(self) -> str:
-        return f"자기 스코프에서 {self.entity_type} 읽기 권한을 주는 역할 부여"
+        return Says(
+            f"자기 스코프에서 {self.entity_type} 읽기 권한을 주는 역할 부여",
+            english=(
+                "Prepare the role assignment that grants read permission on "
+                f"{self.entity_type} in the user's own scope"
+            ),
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[None]:
@@ -1088,7 +1126,11 @@ class APolicyAndSomeone(Given[Any, APolicyAndACaller[Any]]):
 
     @override
     def describe(self) -> str:
-        return f"아무도 사용하지 않는 {self.family.kind} 하나와, {self.role.value} 한 명"
+        kind = self.family.kind
+        return Says(
+            f"아무도 사용하지 않는 {kind} 하나와, {self.role.value} 한 명",
+            english=(f"one unused {in_language(kind, Language.ENGLISH)} and one {self.role.value}"),
+        )
 
     @override
     async def lay(self, seeding: Any) -> APolicyAndACaller[Any]:
@@ -1106,7 +1148,14 @@ class AHeldPolicyAndSomeone(Given[Any, APolicyAndACaller[Any]]):
 
     @override
     def describe(self) -> str:
-        return f"{self.role.value} 한 명과, 그 사용자에게 아직 할당된 {self.family.kind}"
+        kind = self.family.kind
+        return Says(
+            f"{self.role.value} 한 명과, 그 사용자에게 아직 할당된 {kind}",
+            english=(
+                f"one {self.role.value} and the {in_language(kind, Language.ENGLISH)} "
+                "still assigned to that user"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> APolicyAndACaller[Any]:
@@ -1126,8 +1175,13 @@ class ManyPoliciesAndSomeone(Given[Any, ManyPoliciesAndACaller[Any]]):
 
     @override
     def describe(self) -> str:
-        return (
-            f"{self.family.kind} {self.besides + 2}개와, 그중 하나가 할당된 {self.role.value} 한 명"
+        kind = self.family.kind
+        return Says(
+            f"{kind} {self.besides + 2}개와, 그중 하나가 할당된 {self.role.value} 한 명",
+            english=(
+                f"{self.besides + 2} policies of the {in_language(kind, Language.ENGLISH)} "
+                f"kind and one {self.role.value} with one of them assigned"
+            ),
         )
 
     @override
@@ -1155,10 +1209,18 @@ class SeveralPoliciesAndSomeone(Given[Any, SeveralPoliciesAndACaller[Any]]):
 
     @override
     def describe(self) -> str:
-        said = f"아무도 사용하지 않는 {self.family.kind} {self.unused}개와, {self.role.value} 한 명"
+        kind = self.family.kind
+        kind_en = in_language(kind, Language.ENGLISH)
+        said_ko = f"아무도 사용하지 않는 {kind} {self.unused}개와, {self.role.value} 한 명"
+        said_en = f"{self.unused} unused policies of the {kind_en} kind and one {self.role.value}"
         if self.with_held:
-            return f"{said}, 그 사용자에게 할당된 {self.family.kind}도 대상에 넣음"
-        return said
+            return Says(
+                f"{said_ko}, 그 사용자에게 할당된 {kind}도 대상에 넣음",
+                english=(
+                    f"{said_en}, with the {kind_en} assigned to that user also among the targets"
+                ),
+            )
+        return Says(said_ko, english=said_en)
 
     @override
     async def lay(self, seeding: Any) -> SeveralPoliciesAndACaller[Any]:
@@ -1182,9 +1244,20 @@ class SomeoneHeldToTheirPolicy(Given[Any, APolicyAndACaller[Any]]):
 
     @override
     def describe(self) -> str:
+        kind = self.family.kind
+        kind_en = in_language(kind, Language.ENGLISH)
         if self.granted:
-            return f"{self.family.kind}이 할당된 사용자 한 명, 자기 스코프에서 그 정책을 읽을 권한 있음"
-        return f"{self.family.kind}이 할당된 사용자 한 명, 아무 권한도 없음"
+            return Says(
+                f"{kind}이 할당된 사용자 한 명, 자기 스코프에서 그 정책을 읽을 권한 있음",
+                english=(
+                    f"one user with a {kind_en} assigned, allowed to read that policy "
+                    "in their own scope"
+                ),
+            )
+        return Says(
+            f"{kind}이 할당된 사용자 한 명, 아무 권한도 없음",
+            english=f"one user with a {kind_en} assigned and no permission",
+        )
 
     @override
     async def lay(self, seeding: Any) -> APolicyAndACaller[Any]:
@@ -1209,8 +1282,22 @@ class SomeoneWithAnotherKey(Given[Any, APolicyAndACaller[Any]]):
     @override
     def describe(self) -> str:
         if self.active:
-            return "기본 키페어 외에 다른 키페어 정책이 할당된 활성 키페어를 하나 더 가진 사용자, 읽기 권한 있음"
-        return "기본 키페어는 비활성이고 다른 키페어 정책이 할당된 활성 키페어를 하나 더 가진 사용자, 읽기 권한 있음"
+            return Says(
+                "기본 키페어 외에 다른 키페어 정책이 할당된 활성 키페어를 하나 더 가진 사용자, "
+                "읽기 권한 있음",
+                english=(
+                    "a user with one more active keypair, besides the default keypair, that "
+                    "holds a different keypair policy, and with read permission"
+                ),
+            )
+        return Says(
+            "기본 키페어는 비활성이고 다른 키페어 정책이 할당된 활성 키페어를 하나 더 가진 사용자, "
+            "읽기 권한 있음",
+            english=(
+                "a user whose default keypair is inactive and who has one more active keypair "
+                "holding a different keypair policy, and with read permission"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> APolicyAndACaller[Any]:
@@ -1228,7 +1315,12 @@ class SomeoneWithNoActiveKey(Given[Any, APolicyAndACaller[Any]]):
 
     @override
     def describe(self) -> str:
-        return "활성 키페어가 없는 사용자, 자기 스코프에서 키페어 정책 읽기 권한 있음"
+        return Says(
+            "활성 키페어가 없는 사용자, 자기 스코프에서 키페어 정책 읽기 권한 있음",
+            english=(
+                "a user with no active keypair, allowed to read keypair policies in their own scope"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> APolicyAndACaller[Any]:
@@ -1251,7 +1343,13 @@ class ThePolicyNode(Then[APolicyAndACaller[Any], Any]):
 
     @override
     def says(self) -> str:
-        return f"미리 만들어 둔 {self.family.kind} 전체가 반환된다"
+        kind = self.family.kind
+        return Says(
+            f"미리 저장한 {kind} 전체가 반환됩니다",
+            english=(
+                f"the whole {in_language(kind, Language.ENGLISH)} seeded in advance comes back"
+            ),
+        )
 
     @override
     def look(self, laid: APolicyAndACaller[Any], answered: Answered[Any]) -> list[Verdict]:
@@ -1272,7 +1370,11 @@ class TheNewPolicyNode(Then[Any, Any]):
 
     @override
     def says(self) -> str:
-        return f"생성한 {self.family.kind} 전체가 반환된다"
+        kind = self.family.kind
+        return Says(
+            f"생성한 {kind} 전체가 반환됩니다",
+            english=f"the whole {in_language(kind, Language.ENGLISH)} just created comes back",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[Any]) -> list[Verdict]:
@@ -1290,7 +1392,14 @@ class EveryLaidPolicyIsFound(Then[ManyPoliciesAndACaller[Any], Searched]):
 
     @override
     def says(self) -> str:
-        return f"미리 만들어 둔 {self.family.kind}이 모두, 그리고 그것만 반환된다"
+        kind = self.family.kind
+        return Says(
+            f"미리 저장한 {kind}이 모두, 그리고 그것만 반환됩니다",
+            english=(
+                f"every {in_language(kind, Language.ENGLISH)} seeded in advance comes back, "
+                "and only those"
+            ),
+        )
 
     @override
     def look(
@@ -1317,7 +1426,13 @@ class OnlyTheNamedOneIsFound(Then[ManyPoliciesAndACaller[Any], Searched]):
 
     @override
     def says(self) -> str:
-        return f"필터에 맞는 {self.family.kind} 하나만 반환된다"
+        kind = self.family.kind
+        return Says(
+            f"필터에 맞는 {kind} 하나만 반환됩니다",
+            english=(
+                f"only the one {in_language(kind, Language.ENGLISH)} the filter names comes back"
+            ),
+        )
 
     @override
     def look(
@@ -1347,12 +1462,21 @@ class EveryUnusedTargetIsProcessed(Then[SeveralPoliciesAndACaller[Any], PartialB
 
     @override
     def says(self) -> str:
+        kind = self.family.kind
+        kind_en = in_language(kind, Language.ENGLISH)
         if self.missing is not None:
-            return (
-                f"대상 {self.family.kind}이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 "
-                "이유로 실패 목록에 온다"
+            return Says(
+                f"대상 {kind}이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 "
+                "이유로 실패 목록에 옵니다",
+                english=(
+                    f"every target {kind_en} comes back in the processed list and an unknown "
+                    "id comes back in the failed list because no target answers to it"
+                ),
             )
-        return f"대상 {self.family.kind}이 모두 처리된 목록에 오고, 실패한 것은 없다"
+        return Says(
+            f"대상 {kind}이 모두 처리된 목록에 오고, 실패한 것은 없습니다",
+            english=f"every target {kind_en} comes back in the processed list and nothing failed",
+        )
 
     @override
     def look(
@@ -1371,7 +1495,14 @@ class EveryUnusedTargetIsProcessed(Then[SeveralPoliciesAndACaller[Any], PartialB
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the unknown id put in the request"),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -1387,9 +1518,15 @@ class OnlyTheHeldOneFails(Then[SeveralPoliciesAndACaller[Any], PartialBulkPayloa
 
     @override
     def says(self) -> str:
-        return (
-            f"아무도 사용하지 않는 {self.family.kind}은 처리된 목록에 오고, 아직 할당된 것은 "
-            "참조 중이라는 이유로 실패 목록에 온다"
+        kind = self.family.kind
+        kind_en = in_language(kind, Language.ENGLISH)
+        return Says(
+            f"아무도 사용하지 않는 {kind}은 처리된 목록에 오고, 아직 할당된 것은 "
+            "참조 중이라는 이유로 실패 목록에 옵니다",
+            english=(
+                f"the unused {kind_en} comes back in the processed list and the one still "
+                "assigned comes back in the failed list because it is still referenced"
+            ),
         )
 
     @override
@@ -1411,7 +1548,13 @@ class OnlyTheHeldOneFails(Then[SeveralPoliciesAndACaller[Any], PartialBulkPayloa
                 Held[UUID](
                     "failed[0].id",
                     failure.id,
-                    SameAs(laid.held.uuid, "호출자에게 할당된 정책의 id"),
+                    SameAs(
+                        laid.held.uuid,
+                        Says(
+                            "호출자에게 할당된 정책의 id",
+                            english="the id of the policy assigned to the caller",
+                        ),
+                    ),
                 ),
                 Held("failed[0].message", failure.message, Mentions(self.reason)),
             ]
@@ -1427,7 +1570,14 @@ class NoTargetIsProcessed(Then[SeveralPoliciesAndACaller[Any], PartialBulkPayloa
 
     @override
     def says(self) -> str:
-        return f"처리된 {self.family.kind} 없이 대상이 모두 실패 목록에 온다"
+        kind = self.family.kind
+        return Says(
+            f"처리된 {kind} 없이 대상이 모두 실패 목록에 옵니다",
+            english=(
+                f"no {in_language(kind, Language.ENGLISH)} is processed and every target "
+                "comes back in the failed list"
+            ),
+        )
 
     @override
     def look(
@@ -1442,7 +1592,13 @@ class NoTargetIsProcessed(Then[SeveralPoliciesAndACaller[Any], PartialBulkPayloa
         ]
         for i, (failure, policy) in enumerate(zip(payload.failed, laid.targets, strict=False)):
             verdicts += [
-                Held[UUID](f"failed[{i}].id", failure.id, SameAs(policy.uuid, "대상 정책의 id")),
+                Held[UUID](
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(
+                        policy.uuid, Says("대상 정책의 id", english="the id of the target policy")
+                    ),
+                ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]
         return verdicts

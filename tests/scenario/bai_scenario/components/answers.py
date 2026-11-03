@@ -13,6 +13,7 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Refused,
     Same,
+    Says,
     Then,
     Told,
     Verdict,
@@ -31,7 +32,7 @@ class MissingResponse(Verdict):
             problem = "응답이 반환되어야 하는데 비어 있다"
         else:
             problem = f"응답 대신 {type(self.raised).__name__} 예외가 발생했다"
-        return Told("응답이 반환된다", problems=(problem,))
+        return Told(Says("응답이 반환됩니다", english="a response comes back"), problems=(problem,))
 
 
 @dataclass(frozen=True)
@@ -40,7 +41,7 @@ class NothingIsFound(Then[Any, Any]):
 
     @override
     def says(self) -> str:
-        return "답이 비어 있다"
+        return Says("응답이 비어 있습니다", english="the answer is empty")
 
     @override
     def look(self, laid: Any, answered: Answered[Any]) -> list[Verdict]:
@@ -63,7 +64,7 @@ class TheCallIsRefused(Then[Any, Any]):
 
     @override
     def says(self) -> str:
-        return "거부된다"
+        return Says("거부됩니다", english="the call is rejected")
 
     @override
     def look(self, laid: Any, answered: Answered[Any]) -> list[Verdict]:

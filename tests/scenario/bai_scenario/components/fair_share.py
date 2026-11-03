@@ -25,10 +25,13 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Same,
+    Says,
     Skipped,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
 from bai_scenario.components.resource_group import SomeoneGrantedOnTheGroup
@@ -60,8 +63,18 @@ class DomainsInAGroupAndSomeone(Given[Any, DomainsInAGroupAndACaller]):
     def describe(self) -> str:
         who = role_named(self.role)
         if self.granted is not None:
-            who = f"그 그룹 범위의 {self.granted.name} 역할을 받은 {who}"
-        return f"리소스 그룹 하나와 도메인 {1 + self.besides}개, 그리고 {who} 한 명"
+            who_ko = f"그 그룹 범위의 {self.granted.name} 역할을 받은 {who}"
+            who_en = (
+                f"the {in_language(who, Language.ENGLISH)} granted the {self.granted.name} role "
+                "in the resource group scope"
+            )
+        else:
+            who_ko = who
+            who_en = f"one {in_language(who, Language.ENGLISH)}"
+        return Says(
+            f"리소스 그룹 하나와 도메인 {1 + self.besides}개, 그리고 {who_ko} 한 명",
+            english=f"one resource group and {1 + self.besides} domains, and {who_en}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> DomainsInAGroupAndACaller:
@@ -89,7 +102,13 @@ class TheDomainWeight(Then[DomainsInAGroupAndACaller, DomainFairShareNode]):
 
     @override
     def says(self) -> str:
-        return "정한 가중치를 실은 기록이 오고, 나머지 설정은 그룹 기본값이다"
+        return Says(
+            "정한 가중치를 담은 기록이 오고, 나머지 설정은 그룹 기본값입니다",
+            english=(
+                "the record comes back carrying the weight just set and the rest of the settings "
+                "are the group defaults"
+            ),
+        )
 
     @override
     def look(
@@ -102,7 +121,7 @@ class TheDomainWeight(Then[DomainsInAGroupAndACaller, DomainFairShareNode]):
         snapshot = node.calculation_snapshot
         written = WrittenByThisRun(self.started)
         return [
-            Skipped("id", "데이터베이스가 만든다"),
+            Skipped("id", Says("데이터베이스가 생성합니다", english="the database generates it")),
             Same("resource_group_name", node.resource_group_name, laid.group.name),
             Same("domain_name", node.domain_name, laid.domains[0].name),
             Same("spec.weight", spec.weight, WEIGHT),
@@ -118,8 +137,14 @@ class TheDomainWeight(Then[DomainsInAGroupAndACaller, DomainFairShareNode]):
                 [],
             ),
             Same("calculation_snapshot.normalized_usage", snapshot.normalized_usage, Decimal(0)),
-            Skipped("calculation_snapshot.lookback_start", "쓴 날짜에 따라 달라진다"),
-            Skipped("calculation_snapshot.lookback_end", "쓴 날짜에 따라 달라진다"),
+            Skipped(
+                "calculation_snapshot.lookback_start",
+                Says("쓴 날짜에 따라 달라집니다", english="it depends on the date written"),
+            ),
+            Skipped(
+                "calculation_snapshot.lookback_end",
+                Says("쓴 날짜에 따라 달라집니다", english="it depends on the date written"),
+            ),
             Held("calculation_snapshot.last_calculated_at", snapshot.last_calculated_at, written),
             Held("created_at", node.created_at, written),
             Held("updated_at", node.updated_at, written),
@@ -132,7 +157,10 @@ class EveryWeightIsWritten(Then[DomainsInAGroupAndACaller, BulkUpsertDomainFairS
 
     @override
     def says(self) -> str:
-        return "도메인 수만큼 정했다는 개수가 온다"
+        return Says(
+            "도메인 수만큼 정했다는 개수가 옵니다",
+            english="a count comes back saying how many domains were set",
+        )
 
     @override
     def look(

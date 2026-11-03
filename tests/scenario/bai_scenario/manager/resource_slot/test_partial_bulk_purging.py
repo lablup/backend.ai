@@ -24,6 +24,7 @@ from ai.backend.testutils.scenario_steps import (
     Held,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -60,8 +61,15 @@ class PurgingEverySlotType(When[ManySlotTypesAndACaller, ResourceSlotAdapter, Pu
 
     @override
     def describe(self, laid: ManySlotTypesAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 슬롯 종류 {len(laid.laid)}개{besides}를 한 번에 삭제함"
+        besides_ko = "와 없는 id 하나" if self.missing is not None else ""
+        besides_en = " and one missing id" if self.missing is not None else ""
+        return Says(
+            f"{laid.caller.username} 이 자원 슬롯 유형 {len(laid.laid)}개{besides_ko}를 한 번에 "
+            "영구 삭제합니다",
+            english=(
+                f"{laid.caller.username} purges {len(laid.laid)} slot types{besides_en} at once"
+            ),
+        )
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: ManySlotTypesAndACaller) -> Purged:
@@ -82,9 +90,13 @@ class EverySlotTypeIsPurged(Then[ManySlotTypesAndACaller, Purged]):
 
     @override
     def says(self) -> str:
-        return (
-            "미리 만들어 둔 슬롯 종류가 모두 지워지기 전 모습으로 오고, 없는 id 는 대상이 없다는 "
-            "이유로 실패 목록에 온다"
+        return Says(
+            "미리 저장한 자원 슬롯 유형이 모두 삭제되기 전 모습으로 오고, 없는 id 는 대상이 "
+            "없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "every slot type stored in advance comes back in the form before deletion, and "
+                "the missing id comes back in the failed list because nothing answers to it"
+            ),
         )
 
     @override
@@ -114,7 +126,14 @@ class EverySlotTypeIsPurged(Then[ManySlotTypesAndACaller, Purged]):
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the missing id put in the request"),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -128,7 +147,10 @@ class NoSlotTypeIsPurged(Then[ManySlotTypesAndACaller, Purged]):
 
     @override
     def says(self) -> str:
-        return "처리된 슬롯 종류 없이 대상이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 자원 슬롯 유형 없이 대상이 모두 실패 목록에 옵니다",
+            english="no slot type is processed and every target comes back in the failed list",
+        )
 
     @override
     def look(self, laid: ManySlotTypesAndACaller, answered: Answered[Purged]) -> list[Verdict]:
@@ -144,7 +166,13 @@ class NoSlotTypeIsPurged(Then[ManySlotTypesAndACaller, Purged]):
                 Held[UUID](
                     f"failed[{i}].id",
                     failure.id,
-                    SameAs(seed.entity_id(), "미리 만들어 둔 슬롯 종류의 id"),
+                    SameAs(
+                        seed.entity_id(),
+                        Says(
+                            "미리 저장한 자원 슬롯 유형의 id",
+                            english="the id of the slot type stored in advance",
+                        ),
+                    ),
                 ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]
@@ -163,9 +191,15 @@ class TheSuperadminPurgesSeveralAndHearsOfTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무것도 참조하지 않는 슬롯 종류 둘과 없는 id 하나를 슈퍼관리자가 한 번에 삭제하면, "
-            "둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무것도 참조하지 않는 자원 슬롯 유형 둘과 없는 id 하나를 superadmin 이 한 번에 "
+            "영구 삭제하면, 둘은 삭제되기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 "
+            "실패 목록에 옵니다",
+            english=(
+                "when the superadmin purges two slot types nothing refers to and one missing id "
+                "at once, the two come back in the form before deletion and the missing id comes "
+                "back in the failed list because nothing answers to it"
+            ),
         )
 
     @override
@@ -191,9 +225,14 @@ class AUserGrantedNothingPurgesNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 슬롯 종류 여럿을 한 번에 삭제하려 하면, 지워진 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 없는 사용자가 자원 슬롯 유형 여럿을 한 번에 영구 삭제하려 하면, "
+            "삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to purge several slot types at once, none is "
+                "deleted and every one comes back in the failed list because the user has no "
+                "permission"
+            ),
         )
 
     @override

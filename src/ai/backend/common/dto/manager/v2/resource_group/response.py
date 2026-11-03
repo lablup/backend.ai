@@ -23,12 +23,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     SchedulerTypeDTO,
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInfo
-from ai.backend.common.types import (
-    AgentSelectionStrategy,
-    PreemptionOrder,
-    PreemptionVictimScope,
-    SessionTypes,
-)
+from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
 
 __all__ = (
     "AdminSearchResourceGroupsPayload",
@@ -46,8 +41,6 @@ __all__ = (
     "ResourceGroupNetworkConfigInfo",
     "ResourceGroupNode",
     "ResourceGroupSchedulerConfigInfo",
-    "ResourceGroupSchedulerOptionsConfigInfo",
-    "ResourceGroupSchedulerOptionsInfo",
     "ResourceGroupStatusInfo",
     "ResourceInfoNode",
     "UpdateResourceGroupConfigPayloadNode",
@@ -188,44 +181,6 @@ class ResourceGroupNetworkConfigInfo(BaseResponseModel):
     )
 
 
-class ResourceGroupSchedulerOptionsConfigInfo(BaseResponseModel):
-    """The ``config`` section of a resource group's scheduler options."""
-
-    num_retries_to_skip: int | None = Field(
-        default=None,
-        description="Number of scheduling retries before a pending session is skipped.",
-    )
-
-
-class ResourceGroupSchedulerOptionsInfo(BaseResponseModel):
-    """Scheduler options of a resource group, other than the preemption configuration."""
-
-    allowed_session_types: list[SessionTypes] = Field(
-        description="Session types that may be created in the resource group."
-    )
-    pending_timeout: float = Field(
-        description="Seconds a session may stay pending before it is cancelled (0 = no timeout)."
-    )
-    config: ResourceGroupSchedulerOptionsConfigInfo = Field(
-        description="The ``config`` section of the scheduler options."
-    )
-    agent_selection_strategy: AgentSelectionStrategy = Field(
-        description="How agents are chosen for a session's kernels."
-    )
-    agent_selector_config: dict[str, Any] = Field(description="Options of the agent selector.")
-    allow_fractional_resource_fragmentation: bool = Field(
-        description=(
-            "Whether an agent may start a kernel that fragments a fractional resource request."
-        )
-    )
-    route_cleanup_target_statuses: list[str] = Field(
-        description=(
-            "Route health statuses (healthy/unhealthy/degraded) whose routes are cleaned up"
-            " automatically."
-        )
-    )
-
-
 class ResourceGroupSchedulerConfigInfo(BaseResponseModel):
     """Scheduler configuration DTO for a resource group."""
 
@@ -234,9 +189,6 @@ class ResourceGroupSchedulerConfigInfo(BaseResponseModel):
     )
     preemption: PreemptionConfigInfo = Field(
         description="Preemption configuration for this resource group."
-    )
-    options: ResourceGroupSchedulerOptionsInfo = Field(
-        description="Scheduler options other than the preemption configuration."
     )
 
 

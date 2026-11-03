@@ -22,6 +22,7 @@ from ai.backend.testutils.scenario_steps import (
     Held,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -55,8 +56,19 @@ class PurgingEveryCard(When[ModelCardsAndACaller, ModelCardAdapter, Purged]):
 
     @override
     def describe(self, laid: ModelCardsAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 카드 {len(laid.cards)}개{besides}를 한 번에 purge 함"
+        if self.missing is not None:
+            return Says(
+                f"{laid.caller.username}이 카드 {len(laid.cards)}개와 없는 id 하나를 한 번에 "
+                "purge 합니다",
+                english=(
+                    f"{laid.caller.username} purges {len(laid.cards)} cards "
+                    "and one missing id at once"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username}이 카드 {len(laid.cards)}개를 한 번에 purge 합니다",
+            english=f"{laid.caller.username} purges {len(laid.cards)} cards at once",
+        )
 
     @override
     async def call(self, adapter: ModelCardAdapter, laid: ModelCardsAndACaller) -> Purged:
@@ -77,9 +89,17 @@ class EveryCardIsPurged(Then[ModelCardsAndACaller, Purged]):
     @override
     def says(self) -> str:
         if self.missing is None:
-            return "대상 카드가 모두 처리된 목록에 오고, 실패한 것은 없다"
-        return (
-            "대상 카드가 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+            return Says(
+                "대상 카드가 모두 처리된 목록에 오고 실패한 것은 없습니다",
+                english="every target card comes back in the processed list and nothing failed",
+            )
+        return Says(
+            "대상 카드가 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 "
+            "옵니다",
+            english=(
+                "every target card comes back in the processed list, and the unknown id comes "
+                "back in the failed list as not found"
+            ),
         )
 
     @override
@@ -96,7 +116,14 @@ class EveryCardIsPurged(Then[ModelCardsAndACaller, Purged]):
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the unknown id put in the request"),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("No such model card")),
             ]
         return verdicts
@@ -114,9 +141,13 @@ class AUserGrantedPurgePurgesSeveral(
 
     @override
     def describe(self) -> str:
-        return (
-            "프로젝트에서 모델 카드 purge 권한을 받은 사용자가 카드 둘을 한 번에 purge 하면, "
-            "둘 다 처리된 목록에 오고 실패한 것은 없다"
+        return Says(
+            "프로젝트에서 모델 카드 purge 권한을 받은 사용자가 카드 둘을 한 번에 purge 하면 "
+            "둘 다 처리된 목록에 오고 실패한 것은 없습니다",
+            english=(
+                "when a user granted purge permission on model cards in the project purges "
+                "two cards at once, both come back in the processed list and nothing failed"
+            ),
         )
 
     @override
@@ -145,10 +176,16 @@ class PurgingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 카드 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 "
-            "없는 id 는 대상이 없다는 이유로 실패 목록에 온다. 권한 검사는 슈퍼관리자를 먼저 "
-            "통과시키므로 없는 id 가 purge 까지 간다"
+        return Says(
+            "superadmin 이 카드 둘과 없는 id 하나를 한 번에 purge 하면 둘은 처리된 목록에 오고, "
+            "없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다. 권한 검사는 superadmin 을 먼저 "
+            "통과시키므로 없는 id 가 purge 까지 갑니다",
+            english=(
+                "when the superadmin purges two cards and one unknown id at once, the two come "
+                "back in the processed list and the unknown id comes back in the failed list "
+                "as not found. The permission check passes the superadmin first, so the "
+                "unknown id reaches the purge"
+            ),
         )
 
     @override
@@ -174,9 +211,13 @@ class AUserGrantedNothingPurgesNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 카드 여럿을 한 번에 purge 하려 하면, "
-            "purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 카드 여럿을 한 번에 purge 하려 하면 purge 된 것 "
+            "없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to purge several cards at once, nothing "
+                "is purged and all come back in the failed list for lack of permission"
+            ),
         )
 
     @override

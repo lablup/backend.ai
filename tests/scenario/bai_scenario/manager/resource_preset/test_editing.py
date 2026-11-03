@@ -16,7 +16,7 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource import ResourcePresetNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_preset import (
     APresetAndACaller,
@@ -46,8 +46,12 @@ class Renaming(When[APresetAndACaller, ResourcePresetAdapter, ResourcePresetNode
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        target = "없는 id" if self.unknown else laid.preset.name
-        return f"{laid.caller.username}이 {target}의 이름을 바꿈"
+        target_ko = "없는 id" if self.unknown else laid.preset.name
+        target_en = "an unknown id" if self.unknown else laid.preset.name
+        return Says(
+            f"{laid.caller.username}이 {target_ko}의 이름을 변경합니다",
+            english=f"{laid.caller.username} renames {target_en}",
+        )
 
     @override
     async def call(
@@ -69,7 +73,13 @@ class TheSuperadminRenamesAPreset(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 프리셋의 이름만 바꾸면, 이름은 새 값이 되고 나머지는 그대로 남는다"
+        return Says(
+            "superadmin 이 프리셋의 이름만 변경하면, 이름은 새 값이 되고 나머지는 그대로 남습니다",
+            english=(
+                "when the superadmin renames a preset, the name takes the new value and the "
+                "rest stays as it was"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
@@ -94,8 +104,13 @@ class AUserGrantedUpdateRenamesAPreset(
 
     @override
     def describe(self) -> str:
-        return (
-            "public 에서 수정 권한을 받은 사용자가 프리셋의 이름을 바꾸면, 새 이름의 프리셋이 온다"
+        return Says(
+            "public 에서 수정 권한을 받은 사용자가 프리셋의 이름을 변경하면, 새 이름의 프리셋이 "
+            "반환됩니다",
+            english=(
+                "a user granted update in public renaming a preset gets the preset under the "
+                "new name"
+            ),
         )
 
     @override
@@ -121,7 +136,13 @@ class AUserGrantedNothingMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 프리셋을 수정하려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 프리셋을 수정하려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "a user granted nothing trying to edit a preset is rejected for not enough "
+                "permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
@@ -146,7 +167,13 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 없는 id 의 프리셋을 수정하려 하면 대상이 없다는 것으로 거부된다"
+        return Says(
+            "superadmin 이 없는 id 의 프리셋을 수정하려 하면 대상이 없다는 것으로 거부됩니다",
+            english=(
+                "when the superadmin tries to edit the preset of an unknown id, the call is "
+                "rejected as no such target"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:

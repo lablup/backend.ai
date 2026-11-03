@@ -14,9 +14,11 @@ generated:
 status: stable
 ---
 
-# Deployment preset service — Knowledge
+# Deployment preset service: Knowledge
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
+
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 A deployment preset is the template a deployment is created from. It states the
 resource slot amounts along with it, so this package covers two tables.
@@ -59,6 +61,6 @@ answers the entity type, shape, operation, gate and backing.
 ## Only the inside is named DeploymentPreset
 
 - The table is `deployment_revision_presets`, and the GraphQL types and DTOs keep that
-  name — changing them breaks schema compatibility and needs a migration.
+  name: changing them breaks schema compatibility and needs a migration.
 - The inside (actions, specs, repository, service) shortens to `DeploymentPreset`, which
   is also what the entity type and `DeploymentPresetID` are named.

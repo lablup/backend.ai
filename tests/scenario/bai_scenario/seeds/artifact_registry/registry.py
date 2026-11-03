@@ -11,6 +11,7 @@ from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryDa
 from ai.backend.manager.models.artifact_registries.creators import ArtifactRegistryMetaCreator
 from ai.backend.manager.models.huggingface_registry.creators import HuggingFaceRegistryCreator
 from ai.backend.manager.models.reservoir_registry.creators import ReservoirRegistryCreator
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import Naming, TestSeedRegistryPair, TestSeedRow
 
 
@@ -24,11 +25,11 @@ class TestSeedHuggingFaceRegistry(TestSeedRow[HuggingFaceRegistryData]):
 
     @override
     def kind(self) -> str:
-        return "HuggingFace 레지스트리"
+        return Says("허깅 페이스 레지스트리", english="HuggingFace registry")
 
     @override
     def detail(self) -> str:
-        return f"{self.url} 을 가리킨다"
+        return Says(f"{self.url} 을 참조합니다", english=f"refers to {self.url}")
 
     @override
     def name(self, naming: Naming) -> str:
@@ -54,11 +55,11 @@ class TestSeedReservoirRegistry(TestSeedRow[ReservoirRegistryData]):
 
     @override
     def kind(self) -> str:
-        return "Reservoir 레지스트리"
+        return Says("Reservoir 레지스트리", english="Reservoir registry")
 
     @override
     def detail(self) -> str:
-        return f"{self.endpoint} 을 가리킨다"
+        return Says(f"{self.endpoint} 을 참조합니다", english=f"refers to {self.endpoint}")
 
     @override
     def name(self, naming: Naming) -> str:

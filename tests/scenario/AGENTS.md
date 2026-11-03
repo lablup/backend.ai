@@ -31,9 +31,8 @@ A scenario is one class. It defines its name, what it guarantees, and three step
   called.
 - If the response wraps a node, `when` unwraps it, so several rows share one checker.
 - A row that runs with changed config also implements `Configured`. It is the only place that names a config path.
-- Write `describe` with `Says` from `ai.backend.testutils.scenario_steps`: the Korean sentence, and the English
-  one beside it. Write the Korean sentence first and add the English one after it passes review. A `Says`
-  without English is written in Korean in both reports.
+- Write `describe` with `Says` from `ai.backend.testutils.scenario_steps`: the Korean sentence and the English
+  one. Both are required; the English report rejects a sentence whose English is missing.
 - Do not put identifiers in `describe`: field names, exception classes, file paths.
 
 ## How to seed rows
@@ -95,14 +94,14 @@ A scenario is one class. It defines its name, what it guarantees, and three step
 
 - Do not write checks that check part of a response. Checking one field passes even when the rest changes
   silently. Do not add helpers that make such checks easy to write.
-- Always check the whole response. `then` returns one of three for each field. Report sentences are still Korean
-  until they gain English; the table shows them in English.
+- Always check the whole response. `then` returns one of three for each field. Report sentences are written
+  in both languages; the English report rejects a sentence whose English is missing.
 
   | What | When | Report text |
   |---|---|---|
   | `Same` | The scenario can state the value | `name = 'host-1'` |
   | `Held` | The value cannot be stated, only a condition | `created_at: time written by this run` |
-  | `Skipped` | It cannot be checked, and the reason can be stated | `id: ignored — the database generates it` |
+  | `Skipped` | It cannot be checked, and the reason can be stated | `id: skipped: the database generates it` |
 
 - No field is left without one. A field left out passes silently.
 - The condition of `Held` is a `Condition` implementation. The condition says what it is, and that text does not

@@ -26,6 +26,7 @@ from ai.backend.testutils.scenario_steps import (
     Held,
     Same,
     SameAs,
+    Says,
     Skipped,
     Verdict,
 )
@@ -60,7 +61,10 @@ class WritingDomains(TestSeedNest[Laid[None]]):
 
     @override
     def kind(self) -> str:
-        return "도메인 수정 권한을 받은 사용자 준비"
+        return Says(
+            "도메인 수정 권한을 받은 사용자 준비",
+            english="Prepare a user granted permission to update the domain",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[None]:
@@ -90,9 +94,19 @@ class LabeledDomainsAndSomeone(Given[Any, LabeledDomainsAndACaller]):
 
     @override
     def describe(self) -> str:
+        role = self.role.value
         labeled = f"라벨 {len(self.keys)}개씩 붙은 " if self.keys else ""
         granted = f"그중 {self.writable}개에 수정 권한을 받은 " if self.writable else ""
-        return f"{labeled}도메인 {self.targets}개와, {granted}{self.role.value} 한 명"
+        english = (
+            f"{self.targets} domains"
+            + (f" with {len(self.keys)} labels each" if self.keys else "")
+            + f" and one {role}"
+            + (f" granted permission to update {self.writable} of them" if self.writable else "")
+        )
+        return Says(
+            f"{labeled}도메인 {self.targets}개와, {granted}{role} 한 명",
+            english=english,
+        )
 
     @override
     async def lay(self, seeding: Any) -> LabeledDomainsAndACaller:
@@ -134,7 +148,11 @@ class LabelLook:
         written = WrittenByThisRun(self.started)
         verdicts: list[Verdict] = [
             Same(f"{prefix}entity_type", node.entity_type, LABELED),
-            Held[UUID](f"{prefix}entity_id", node.entity_id, SameAs(on.id, "대상 도메인의 id")),
+            Held[UUID](
+                f"{prefix}entity_id",
+                node.entity_id,
+                SameAs(on.id, Says("대상 도메인의 id", english="the id of the target domain")),
+            ),
             Same(f"{prefix}key", node.key, key),
             Same(f"{prefix}value", node.value, value),
             Held(f"{prefix}created_at", node.created_at, written),
@@ -143,11 +161,38 @@ class LabelLook:
         if laid is None:
             return [
                 *verdicts,
-                Skipped(f"{prefix}id", "데이터베이스가 만든다"),
-                Held[UUID](f"{prefix}field_id", node.field_id, SameAs(node.id, "라벨 id")),
+                Skipped(
+                    f"{prefix}id",
+                    Says("데이터베이스가 생성합니다", english="the database generates it"),
+                ),
+                Held[UUID](
+                    f"{prefix}field_id",
+                    node.field_id,
+                    SameAs(node.id, Says("라벨 id", english="the label id")),
+                ),
             ]
         return [
             *verdicts,
-            Held[UUID](f"{prefix}id", node.id, SameAs(laid.id, "미리 붙인 라벨의 id")),
-            Held[UUID](f"{prefix}field_id", node.field_id, SameAs(laid.id, "미리 붙인 라벨의 id")),
+            Held[UUID](
+                f"{prefix}id",
+                node.id,
+                SameAs(
+                    laid.id,
+                    Says(
+                        "미리 붙인 라벨의 id",
+                        english="the id of the label attached in advance",
+                    ),
+                ),
+            ),
+            Held[UUID](
+                f"{prefix}field_id",
+                node.field_id,
+                SameAs(
+                    laid.id,
+                    Says(
+                        "미리 붙인 라벨의 id",
+                        english="the id of the label attached in advance",
+                    ),
+                ),
+            ),
         ]

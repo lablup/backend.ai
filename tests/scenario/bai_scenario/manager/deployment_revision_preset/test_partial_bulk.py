@@ -22,7 +22,7 @@ from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
     DeploymentRevisionPresetAdapter,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.deployment_revision_preset import (
     LAID_DESCRIPTION,
     EveryPresetComesBack,
@@ -34,7 +34,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-EDITED = "한 번에 고친 설명"
+EDITED = Says("한 번에 수정한 설명", english="the description edited at once")
 
 type Answer = PartialBulkPayload[DeploymentRevisionPresetNode]
 type PresetStep = Scenario[
@@ -52,7 +52,13 @@ class EditingEveryPreset(When[PresetsAndACaller, DeploymentRevisionPresetAdapter
 
     @override
     def describe(self, laid: PresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 프리셋 {len(laid.presets)}개의 설명을 한 번에 고침"
+        return Says(
+            f"{laid.caller.username} 이 프리셋 {len(laid.presets)}개의 설명을 한 번에 수정합니다",
+            english=(
+                f"{laid.caller.username} changes the description of {len(laid.presets)} presets "
+                "at once"
+            ),
+        )
 
     @override
     async def call(
@@ -81,8 +87,15 @@ class PurgingEveryPreset(When[PresetsAndACaller, DeploymentRevisionPresetAdapter
 
     @override
     def describe(self, laid: PresetsAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 프리셋 {len(laid.presets)}개{besides}를 한 번에 purge 함"
+        besides_ko = " 와 없는 id 하나" if self.missing is not None else ""
+        besides_en = " and one unknown id" if self.missing is not None else ""
+        return Says(
+            f"{laid.caller.username} 이 프리셋 {len(laid.presets)}개{besides_ko}를 한 번에 "
+            "purge 합니다",
+            english=(
+                f"{laid.caller.username} purges {len(laid.presets)} presets{besides_en} at once"
+            ),
+        )
 
     @override
     async def call(
@@ -107,7 +120,14 @@ class TheSuperadminEditsSeveralPresets(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 프리셋 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다"
+        return Says(
+            "superadmin 이 프리셋 여럿의 설명을 한 번에 변경하면, 모두 새 설명으로 오고 실패한 "
+            "것은 없습니다",
+            english=(
+                "when a superadmin changes the description of several presets at once, every "
+                "preset comes back with the new description and nothing failed"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, PresetsAndACaller]:
@@ -132,9 +152,14 @@ class AReaderEditsNoPreset(
 
     @override
     def describe(self) -> str:
-        return (
-            "프리셋을 읽을 수만 있는 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "프리셋을 읽을 수만 있는 사용자가 프리셋 여럿을 한 번에 수정하려 하면, 수정된 것 없이 "
+            "모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user who can only read presets tries to update several presets at once, "
+                "nothing is updated and every preset comes back in the failed list because the "
+                "user lacks permission"
+            ),
         )
 
     @override
@@ -162,9 +187,14 @@ class PurgingAnswersForTheMissingPreset(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 "
-            "모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "superadmin 이 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 "
+            "모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a superadmin purges two presets and one unknown id at once, the two come "
+                "back as they were before the purge and the unknown id comes back in the failed "
+                "list because no target answers to it"
+            ),
         )
 
     @override
@@ -190,9 +220,14 @@ class AReaderPurgesNoPreset(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "프리셋을 읽을 수만 있는 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, purge 된 "
-            "것 없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+            "것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user who can only read presets tries to purge several presets at once, "
+                "nothing is purged and every preset comes back in the failed list because the user "
+                "lacks permission"
+            ),
         )
 
     @override

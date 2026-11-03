@@ -27,6 +27,8 @@ status: draft
 This domain reads the time series Prometheus answers, not a table. The storage layer is
 `repositories/metric`, and under it sits the metric store rather than the DB.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## What an operation names decides its shape
 
 - The metric names name no row, so that read is global-shaped.

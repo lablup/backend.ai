@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.request import (
 from ai.backend.common.dto.manager.v2.runtime_variant.response import SearchRuntimeVariantsPayload
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.runtime_variant import (
     EveryLaidVariantIsCounted,
     ManyVariantsAndACaller,
@@ -45,7 +45,10 @@ class SearchingEveryVariant(When[ManyVariantsAndACaller, RuntimeVariantAdapter, 
 
     @override
     def describe(self, laid: ManyVariantsAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체 조회"
+        return Says(
+            f"{laid.caller.username}이 필터 없이 전체를 조회합니다",
+            english=f"{laid.caller.username} reads everything with no filter",
+        )
 
     @override
     async def call(self, adapter: RuntimeVariantAdapter, laid: ManyVariantsAndACaller) -> Searched:
@@ -63,7 +66,10 @@ class SearchingByName(When[ManyVariantsAndACaller, RuntimeVariantAdapter, Search
 
     @override
     def describe(self, laid: ManyVariantsAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.named.name} 이름 필터로 조회"
+        return Says(
+            f"{laid.caller.username}이 {laid.named.name} 이름 필터로 조회합니다",
+            english=(f"{laid.caller.username} reads with the name filter {laid.named.name}"),
+        )
 
     @override
     async def call(self, adapter: RuntimeVariantAdapter, laid: ManyVariantsAndACaller) -> Searched:
@@ -85,7 +91,14 @@ class AUserGrantedNothingCountsEveryVariant(
 
     @override
     def describe(self) -> str:
-        return "변형 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다"
+        return Says(
+            "인퍼런스 런타임 종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 "
+            "집계됩니다",
+            english=(
+                "when two runtime variants exist and a user granted nothing reads with no "
+                "filter, both are counted"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyVariantsAndACaller]:
@@ -110,7 +123,14 @@ class ANameFilterNarrows(
 
     @override
     def describe(self) -> str:
-        return "변형 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 변형만 남는다"
+        return Says(
+            "인퍼런스 런타임 종류 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 "
+            "인퍼런스 런타임 종류만 남습니다",
+            english=(
+                "when one of several runtime variants is named in a filter, only the runtime "
+                "variant of that name is left in the response"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyVariantsAndACaller]:
@@ -135,8 +155,13 @@ class OmittingThePageSizeGivesTen(
 
     @override
     def describe(self) -> str:
-        return (
-            "변형 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다"
+        return Says(
+            "인퍼런스 런타임 종류 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 "
+            "페이지가 있다고 응답합니다",
+            english=(
+                "when eleven runtime variants exist and the read gives no size, ten come back "
+                "and the response says there is a next page"
+            ),
         )
 
     @override

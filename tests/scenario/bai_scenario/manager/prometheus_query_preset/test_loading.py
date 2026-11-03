@@ -16,7 +16,7 @@ from ai.backend.manager.api.adapters.prometheus_query_preset.adapter import (
     PrometheusQueryPresetAdapter,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.prometheus_query_preset import (
     ManyPresetsAndACaller,
     ManyPresetsAndSomeone,
@@ -46,7 +46,14 @@ class LoadingTheLaidAndOneUnknown(
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 미리 만들어 둔 프리셋 {len(laid.laid)}개의 id와 없는 id 하나를 한 번에 조회"
+        return Says(
+            f"{laid.caller.username}이 미리 저장한 프리셋 {len(laid.laid)}개의 id 와 없는 id 하나를 "
+            "한 번에 조회합니다",
+            english=(
+                f"{laid.caller.username} reads the ids of {len(laid.laid)} presets seeded in "
+                "advance and one absent id at once"
+            ),
+        )
 
     @override
     async def call(
@@ -67,7 +74,10 @@ class LoadingNothing(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, L
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 빈 id 목록으로 조회"
+        return Says(
+            f"{laid.caller.username}이 빈 id 목록으로 조회합니다",
+            english=f"{laid.caller.username} reads with an empty id list",
+        )
 
     @override
     async def call(
@@ -87,9 +97,14 @@ class TheLaidAndTheUnknownComeBackInOrder(
 
     @override
     def describe(self) -> str:
-        return (
-            "프리셋 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 "
-            "빈 항목으로 반환되고 순서가 요청한 순서와 같다"
+        return Says(
+            "프리셋 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 빈 "
+            "항목으로 반환되고 순서가 요청한 순서와 같습니다",
+            english=(
+                "when two presets and one absent id are read at once, the two present ones "
+                "come back as nodes and the absent one as an empty item, in the requested "
+                "order"
+            ),
         )
 
     @override
@@ -115,7 +130,10 @@ class AnEmptyListAnswersNothing(
 
     @override
     def describe(self) -> str:
-        return "프리셋이 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환된다"
+        return Says(
+            "프리셋이 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환됩니다",
+            english=("even when presets exist, reading an empty id list answers an empty response"),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:

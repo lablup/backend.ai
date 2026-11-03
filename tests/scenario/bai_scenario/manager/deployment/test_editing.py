@@ -18,7 +18,15 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    Given,
+    Language,
+    Says,
+    Scenario,
+    Then,
+    When,
+    in_language,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.deployment import (
     ADeploymentAndACaller,
@@ -54,20 +62,35 @@ class Editing(When[ADeploymentAndACaller, DeploymentAdapter, DeploymentNode]):
 
     @override
     def describe(self, laid: ADeploymentAndACaller) -> str:
-        changed = []
+        changed: list[Says] = []
         if self.named is not None:
-            changed.append(f"이름을 {self.named}으로")
+            changed.append(Says(f"이름을 {self.named}으로", english=f"name to {self.named}"))
         if self.replicas is not None:
-            changed.append(f"복제 수를 {self.replicas}으로")
+            changed.append(
+                Says(f"복제 수를 {self.replicas}으로", english=f"replica count to {self.replicas}")
+            )
         if self.clearing_tags:
-            changed.append("태그를 비우도록")
+            changed.append(Says("태그를 비우도록", english="clearing the tags"))
         if self.opening is not None:
-            changed.append("바깥에 열도록" if self.opening else "바깥에 닫도록")
+            changed.append(
+                Says("바깥에 열도록", english="opening it to the public")
+                if self.opening
+                else Says("바깥에 닫도록", english="closing it to the public")
+            )
         called = (
-            "아무것도 갖지 않은 id" if self.other is not None else laid.deployment.metadata.name
+            Says("아무것도 갖지 않은 id", english="an id nothing answers to")
+            if self.other is not None
+            else laid.deployment.metadata.name
         )
-        return (
-            f"{laid.caller.username}이 {called}를 {', '.join(changed) or '아무것도 대지 않고'} 수정"
+        korean = ", ".join(in_language(one, Language.KOREAN) for one in changed)
+        english = ", ".join(in_language(one, Language.ENGLISH) for one in changed)
+        english_change = f" with {english}" if english else " without giving a value"
+        return Says(
+            f"{laid.caller.username} 이 {called}를 {korean or '아무것도 지정하지 않고'} 수정합니다",
+            english=(
+                f"{laid.caller.username} updates {in_language(called, Language.ENGLISH)}"
+                f"{english_change}"
+            ),
         )
 
     @override
@@ -101,7 +124,13 @@ class TheNameChangesAndNothingElse(
 
     @override
     def describe(self) -> str:
-        return "수정 권한을 받은 사용자가 이름을 바꾸면, 이름만 새 값이 되고 나머지는 그대로다"
+        return Says(
+            "수정 권한을 받은 사용자가 이름을 변경하면, 이름만 새 값이 되고 나머지는 그대로입니다",
+            english=(
+                "when a user granted update changes the name, only the name becomes the new value "
+                "and everything else stays the same"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
@@ -128,7 +157,13 @@ class TheReplicaCountChanges(
 
     @override
     def describe(self) -> str:
-        return "수정 권한을 받은 사용자가 복제 수를 올리면, 두려는 복제 수가 새 값이 된다"
+        return Says(
+            "수정 권한을 받은 사용자가 복제 수를 올리면, 두려는 복제 수가 새 값이 됩니다",
+            english=(
+                "when a user granted update raises the replica count, the intended replica count "
+                "becomes the new value"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
@@ -155,7 +190,10 @@ class TheTagsAreCleared(
 
     @override
     def describe(self) -> str:
-        return "태그가 붙은 배포의 태그를 비우면, 태그가 하나도 남지 않는다"
+        return Says(
+            "태그가 붙은 배포의 태그를 비우면, 태그가 하나도 남지 않습니다",
+            english="clearing the tags of a deployment that holds tags leaves no tag",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
@@ -182,7 +220,13 @@ class ItIsOpenedToThePublic(
 
     @override
     def describe(self) -> str:
-        return "공개가 아닌 배포를 수정 권한을 받은 사용자가 공개로 바꾸면, 공개로 바뀐 상태가 온다"
+        return Says(
+            "공개가 아닌 배포를 수정 권한을 받은 사용자가 공개로 변경하면, 공개로 변경된 상태가 옵니다",
+            english=(
+                "when a user granted update changes a deployment that is not public to public, "
+                "the state comes back changed to public"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
@@ -209,9 +253,14 @@ class TheSuperadminEditsAnothers(
 
     @override
     def describe(self) -> str:
-        return (
-            "다른 사람이 만든 배포의 이름을 아무 권한도 받지 않은 슈퍼관리자가 바꾸면, "
-            "이름만 새 값이 된다. 역할이 권한 그래프를 지나간다"
+        return Says(
+            "다른 사람이 생성한 배포의 이름을 아무 권한도 받지 않은 superadmin 이 변경하면, "
+            "이름만 새 값이 됩니다. 역할이 권한 그래프를 지나갑니다",
+            english=(
+                "when a superadmin holding no grant changes the name of a deployment another user "
+                "created, only the name becomes the new value; the role passes through the "
+                "permission graph"
+            ),
         )
 
     @override
@@ -237,7 +286,13 @@ class ReadingIsNotEnoughToEdit(
 
     @override
     def describe(self) -> str:
-        return "읽기 권한만 받은 사용자가 배포를 수정하면, 권한 부족으로 거부된다"
+        return Says(
+            "읽기 권한만 받은 사용자가 배포를 수정하면, 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted only read updates a deployment, the call is rejected for "
+                "lack of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
@@ -262,7 +317,13 @@ class EditingAnUnknownIdIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아무것도 갖지 않은 id를 수정하면, 대상이 없다는 것으로 거부된다"
+        return Says(
+            "superadmin 이 아무것도 갖지 않은 id 를 수정하면, 대상이 없다는 것으로 거부됩니다",
+            english=(
+                "when a superadmin updates an id nothing answers to, the call is rejected as not "
+                "found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:

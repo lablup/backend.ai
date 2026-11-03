@@ -24,6 +24,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Refused,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -55,7 +56,11 @@ class SoftDeleting(When[ADomainAndACaller, DomainAdapter, Deleted]):
 
     @override
     def describe(self, laid: ADomainAndACaller) -> str:
-        return f"{laid.caller.username}이 {self.named or laid.domain.name}을 soft delete 함"
+        name = self.named or laid.domain.name
+        return Says(
+            f"{laid.caller.username}이 {name}을 soft delete 합니다",
+            english=f"{laid.caller.username} soft deletes {name}",
+        )
 
     @override
     async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> Deleted:
@@ -73,7 +78,12 @@ class SoftDeletingThenRestoring(When[ADomainAndACaller, DomainAdapter, Deleted])
 
     @override
     def describe(self, laid: ADomainAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.domain.name}을 soft delete 했다가 restore 함"
+        return Says(
+            f"{laid.caller.username}이 {laid.domain.name}을 soft delete 한 뒤 restore 합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {laid.domain.name} and then restores it"
+            ),
+        )
 
     @override
     async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> Deleted:
@@ -92,7 +102,10 @@ class SoftDeletingTwice(When[ADomainAndACaller, DomainAdapter, Deleted]):
 
     @override
     def describe(self, laid: ADomainAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.domain.name}을 두 번 soft delete 함"
+        return Says(
+            f"{laid.caller.username}이 {laid.domain.name}을 두 번 soft delete 합니다",
+            english=f"{laid.caller.username} soft deletes {laid.domain.name} twice",
+        )
 
     @override
     async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> Deleted:
@@ -111,7 +124,10 @@ class Restoring(When[ADomainAndACaller, DomainAdapter, Deleted]):
 
     @override
     def describe(self, laid: ADomainAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.domain.name}을 restore 함"
+        return Says(
+            f"{laid.caller.username}이 {laid.domain.name}을 restore 합니다",
+            english=f"{laid.caller.username} restores {laid.domain.name}",
+        )
 
     @override
     async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> Deleted:
@@ -131,7 +147,11 @@ class Purging(When[ADomainAndACaller, DomainAdapter, Deleted]):
 
     @override
     def describe(self, laid: ADomainAndACaller) -> str:
-        return f"{laid.caller.username}이 {self.named or laid.domain.name}을 purge 함"
+        name = self.named or laid.domain.name
+        return Says(
+            f"{laid.caller.username}이 {name}을 purge 합니다",
+            english=f"{laid.caller.username} purges {name}",
+        )
 
     @override
     async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> Deleted:
@@ -147,7 +167,10 @@ class ItSaysItWasDone(Then[ADomainAndACaller, Deleted]):
 
     @override
     def says(self) -> str:
-        return "했다는 답이 온다"
+        return Says(
+            "했다는 응답이 옵니다",
+            english="the answer says it was done",
+        )
 
     @override
     def look(self, laid: ADomainAndACaller, answered: Answered[Deleted]) -> list[Verdict]:
@@ -167,7 +190,10 @@ class TheSuperadminSoftDeletesADomain(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 도메인을 soft delete 하면, soft delete 했다는 답이 온다"
+        return Says(
+            "superadmin 이 도메인을 soft delete 하면, soft delete 했다는 응답이 옵니다",
+            english="when the superadmin soft deletes a domain, the answer says it was done",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
@@ -192,7 +218,10 @@ class RestoringSaysItRestored(
 
     @override
     def describe(self) -> str:
-        return "soft delete 된 도메인을 restore 하면, restore 했다는 답이 온다"
+        return Says(
+            "soft delete 된 도메인을 restore 하면, restore 했다는 응답이 옵니다",
+            english="when a soft-deleted domain is restored, the answer says it was restored",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
@@ -217,7 +246,10 @@ class PurgingADomainNothingRefersTo(
 
     @override
     def describe(self) -> str:
-        return "아무것도 딸려 있지 않은 도메인은 purge 할 수 있다"
+        return Says(
+            "아무것도 딸려 있지 않은 도메인은 purge 할 수 있습니다",
+            english="a domain nothing else refers to can be purged",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
@@ -242,7 +274,10 @@ class ANameNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "아무 도메인도 갖지 않은 이름을 soft delete 하려 하면 대상이 없다는 것으로 거부된다"
+        return Says(
+            "아무 도메인도 갖지 않은 이름을 soft delete 하려 하면 대상이 없다는 것으로 거부됩니다",
+            english=("soft-deleting a name no domain answers to is rejected as not found"),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
@@ -267,7 +302,10 @@ class AUserGrantedNothingMayNotSoftDelete(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자는 도메인을 soft delete 할 수 없다"
+        return Says(
+            "아무 권한도 받지 않은 사용자는 도메인을 soft delete 할 수 없습니다",
+            english="a user granted nothing cannot soft delete a domain",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
@@ -292,7 +330,14 @@ class SoftDeletingASoftDeletedDomainAgain(
 
     @override
     def describe(self) -> str:
-        return "이미 soft delete 된 도메인을 슈퍼관리자가 다시 soft delete 하면, soft delete 했다는 답이 온다"
+        return Says(
+            "이미 soft delete 된 도메인을 superadmin 이 다시 soft delete 하면, "
+            "soft delete 했다는 응답이 옵니다",
+            english=(
+                "when the superadmin soft deletes an already soft-deleted domain again, "
+                "the answer says it was done"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
@@ -317,7 +362,10 @@ class AUserGrantedNothingMayNotRestore(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자는 도메인을 restore 할 수 없다"
+        return Says(
+            "아무 권한도 받지 않은 사용자는 도메인을 restore 할 수 없습니다",
+            english="a user granted nothing cannot restore a domain",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
@@ -342,7 +390,14 @@ class RestoringAnActiveDomain(
 
     @override
     def describe(self) -> str:
-        return "soft delete 되지 않은 도메인을 슈퍼관리자가 restore 하면, restore 했다는 답이 온다"
+        return Says(
+            "soft delete 되지 않은 도메인을 superadmin 이 restore 하면, "
+            "restore 했다는 응답이 옵니다",
+            english=(
+                "when the superadmin restores a domain that is not soft-deleted, "
+                "the answer says it was restored"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
@@ -367,7 +422,12 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자는 아무것도 딸리지 않은 도메인이라도 purge 할 수 없다"
+        return Says(
+            "아무 권한도 받지 않은 사용자는 아무것도 딸리지 않은 도메인이라도 purge 할 수 없습니다",
+            english=(
+                "a user granted nothing cannot purge a domain even when nothing else refers to it"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
@@ -392,7 +452,10 @@ class ADomainHoldingAProjectIsNotPurged(
 
     @override
     def describe(self) -> str:
-        return "프로젝트가 딸린 도메인은 슈퍼관리자라도 purge 할 수 없다"
+        return Says(
+            "프로젝트가 딸린 도메인은 superadmin 이라도 purge 할 수 없습니다",
+            english="a domain holding a project cannot be purged even by the superadmin",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
@@ -417,7 +480,10 @@ class ADomainHoldingAUserIsNotPurged(
 
     @override
     def describe(self) -> str:
-        return "사용자가 딸린 도메인은 슈퍼관리자라도 purge 할 수 없다"
+        return Says(
+            "사용자가 딸린 도메인은 superadmin 이라도 purge 할 수 없습니다",
+            english="a domain holding a user cannot be purged even by the superadmin",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
@@ -442,7 +508,10 @@ class PurgingANameNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "아무 도메인도 갖지 않은 이름을 purge 하려 하면 대상이 없다는 것으로 거부된다"
+        return Says(
+            "아무 도메인도 갖지 않은 이름을 purge 하려 하면 대상이 없다는 것으로 거부됩니다",
+            english="purging a name no domain answers to is rejected as not found",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:

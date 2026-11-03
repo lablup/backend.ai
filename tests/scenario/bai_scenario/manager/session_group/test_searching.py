@@ -24,6 +24,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Held,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -55,7 +56,13 @@ class SearchingTheProject(When[Laid, SessionGroupAdapter, Searched]):
 
     @override
     def describe(self, laid: Laid) -> str:
-        return f"{laid.caller.username}이 {laid.project.name} 프로젝트로 걸러 전체 검색"
+        return Says(
+            f"{laid.caller.username} 이 {laid.project.name} 프로젝트를 필터로 전체 검색합니다",
+            english=(
+                f"{laid.caller.username} searches everything filtered by the project "
+                f"{laid.project.name}"
+            ),
+        )
 
     @override
     async def call(self, adapter: SessionGroupAdapter, laid: Laid) -> Searched:
@@ -73,7 +80,14 @@ class BothGroupsOfTheProject(Then[Laid, Searched]):
 
     @override
     def says(self) -> str:
-        return "그 프로젝트의 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹이 모두 온다"
+        return Says(
+            "그 프로젝트의 사용자가 생성한 세션 그룹과 배포의 replica group 이 가진 세션 그룹이 "
+            "모두 옵니다",
+            english=(
+                "the session group the user created in that project and the session group held by "
+                "the deployment's replica group both come back"
+            ),
+        )
 
     @override
     def look(self, laid: Laid, answered: Answered[Searched]) -> list[Verdict]:
@@ -86,7 +100,13 @@ class BothGroupsOfTheProject(Then[Laid, Searched]):
                 [one.entity_id for one in payload.items],
                 TheseGroups(
                     frozenset({laid.users_group.id, laid.deployment_group.id}),
-                    "사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹",
+                    Says(
+                        "사용자가 생성한 세션 그룹과 배포의 replica group 이 가진 세션 그룹",
+                        english=(
+                            "the session group the user created and the session group held by the "
+                            "deployment's replica group"
+                        ),
+                    ),
                 ),
             ),
             Same("total_count", payload.total_count, 2),
@@ -105,10 +125,16 @@ class TheSuperadminFindsBothGroups(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 슈퍼관리자가 한 프로젝트로 걸러 전체 검색하면, 그 프로젝트의 "
-            "사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹이 모두 온다. 이 문은 역할이라 행위자가 "
-            "슈퍼관리자다"
+        return Says(
+            "아무 권한도 받지 않은 superadmin 이 한 프로젝트를 필터로 전체 검색하면, 그 "
+            "프로젝트의 사용자가 생성한 세션 그룹과 배포의 replica group 이 가진 세션 그룹이 모두 "
+            "옵니다. 이 동작은 역할이라 요청한 사용자가 superadmin 입니다",
+            english=(
+                "when a superadmin with no grant searches everything filtered by one project, the "
+                "session group the user created in that project and the session group held by the "
+                "deployment's replica group both come back; a role checks this operation, so the "
+                "requesting user is a superadmin"
+            ),
         )
 
     @override
@@ -134,9 +160,13 @@ class AGrantedUserMayNotSearchEverything(
 
     @override
     def describe(self) -> str:
-        return (
-            "그 프로젝트에서 세션 그룹 읽기 권한을 받았어도 슈퍼관리자가 아닌 사용자가 전체 "
-            "검색하면, 역할로 거부된다"
+        return Says(
+            "그 프로젝트에서 세션 그룹 읽기 권한을 받았어도 superadmin 이 아닌 사용자가 전체 "
+            "검색하면, 역할로 거부됩니다",
+            english=(
+                "when a user granted session group read in that project but not a superadmin "
+                "searches everything, the role rejects it"
+            ),
         )
 
     @override

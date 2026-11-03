@@ -30,6 +30,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -62,7 +63,12 @@ class ChangingBothRanks(When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Ed
 
     @override
     def describe(self, laid: TwoEntriesAndACaller) -> str:
-        return f"{laid.caller.username}이 allow_list 둘의 순위를 한 번에 {RANK}(으)로 변경"
+        return Says(
+            f"{laid.caller.username}이 allow_list 둘의 순위를 한 번에 {RANK}(으)로 변경합니다",
+            english=(
+                f"{laid.caller.username} changes the rank of both allow_lists to {RANK} in one call"
+            ),
+        )
 
     @override
     async def call(self, adapter: AppConfigAllowListAdapter, laid: TwoEntriesAndACaller) -> Edited:
@@ -85,7 +91,10 @@ class BothAreReranked(Then[TwoEntriesAndACaller, Edited]):
 
     @override
     def says(self) -> str:
-        return "allow_list 둘이 모두 새 순위로 오고, 실패한 것은 없다"
+        return Says(
+            "allow_list 둘이 모두 새 순위로 오고, 실패한 것은 없습니다",
+            english="both allow_lists come back with the new rank and none failed",
+        )
 
     @override
     def look(self, laid: TwoEntriesAndACaller, answered: Answered[Edited]) -> list[Verdict]:
@@ -100,7 +109,11 @@ class BothAreReranked(Then[TwoEntriesAndACaller, Edited]):
         ]
         for i, (node, entry) in enumerate(zip(payload.successes, targets, strict=False)):
             verdicts += [
-                Held[UUID](f"successes[{i}].id", node.id, SameAs(entry.id, "준비한 ID")),
+                Held[UUID](
+                    f"successes[{i}].id",
+                    node.id,
+                    SameAs(entry.id, Says("준비한 ID", english="the ID seeded in advance")),
+                ),
                 Same(f"successes[{i}].config_name", node.config_name, entry.config_name),
                 Same(f"successes[{i}].scope_type", node.scope_type, entry.scope_type),
                 Same(f"successes[{i}].rank", node.rank, RANK),
@@ -115,7 +128,13 @@ class NeitherIsReranked(Then[TwoEntriesAndACaller, Edited]):
 
     @override
     def says(self) -> str:
-        return "처리된 allow_list 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "처리된 allow_list 없이 둘 다 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "no allow_list is processed and both come back in the failed list "
+                "for lack of permission"
+            ),
+        )
 
     @override
     def look(self, laid: TwoEntriesAndACaller, answered: Answered[Edited]) -> list[Verdict]:
@@ -129,7 +148,11 @@ class NeitherIsReranked(Then[TwoEntriesAndACaller, Edited]):
         ]
         for i, (failure, entry) in enumerate(zip(payload.failed, targets, strict=False)):
             verdicts += [
-                Held[UUID](f"failed[{i}].id", failure.id, SameAs(entry.id, "준비한 ID")),
+                Held[UUID](
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(entry.id, Says("준비한 ID", english="the ID seeded in advance")),
+                ),
                 Held(f"failed[{i}].message", failure.message, Mentions("Insufficient permission")),
             ]
         return verdicts
@@ -147,7 +170,14 @@ class TheSuperadminReranksBoth(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 allow_list 둘의 순위를 한 번에 바꾸면, 둘 다 새 순위로 오고 실패한 것은 없다"
+        return Says(
+            "superadmin 이 allow_list 둘의 순위를 한 번에 변경하면, "
+            "둘 다 새 순위로 오고 실패한 것은 없습니다",
+            english=(
+                "when the superadmin changes the rank of both allow_lists in one call, "
+                "both come back with the new rank and none failed"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoEntriesAndACaller]:
@@ -172,9 +202,14 @@ class AUserGrantedNothingReranksNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "권한이 없는 일반 사용자가 allow_list 둘의 순위를 한 번에 바꾸려 하면, 바뀐 것 없이 "
-            "둘 다 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "권한이 없는 일반 사용자가 allow_list 둘의 순위를 한 번에 변경하려 하면, 변경된 것 "
+            "없이 둘 다 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a plain user without permission tries to change the rank of both "
+                "allow_lists in one call, none is changed and both come back in the failed "
+                "list for lack of permission"
+            ),
         )
 
     @override

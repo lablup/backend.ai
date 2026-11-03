@@ -23,7 +23,18 @@ from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.testutils.scenario_steps import Answered, Given, Held, Same, Skipped, Then, Verdict
+from ai.backend.testutils.scenario_steps import (
+    Answered,
+    Given,
+    Held,
+    Language,
+    Same,
+    Says,
+    Skipped,
+    Then,
+    Verdict,
+    in_language,
+)
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.resource_allocation import AmountOf
@@ -77,7 +88,10 @@ class SomeoneReadingAgentsIn(TestSeedNest[Laid[UserData]]):
 
     @override
     def kind(self) -> str:
-        return "리소스 그룹의 에이전트 조회 권한을 받은 사용자 준비"
+        return Says(
+            "리소스 그룹의 에이전트 조회 권한을 받은 사용자 준비",
+            english="Prepare a user granted permission to read agents in the resource group",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[UserData]:
@@ -101,9 +115,18 @@ class AnAgentAndSomeone(Given[Any, AnAgentAndACaller]):
 
     @override
     def describe(self) -> str:
+        role = role_named(self.role)
         if self.granted:
-            return f"에이전트 하나와, 그것을 읽을 수 있는 {role_named(self.role)} 한 명"
-        return f"에이전트 하나와, {role_named(self.role)} 한 명"
+            return Says(
+                f"에이전트 하나와, 그것을 읽을 수 있는 {role} 한 명",
+                english=(
+                    f"one agent and one {in_language(role, Language.ENGLISH)} who can read it"
+                ),
+            )
+        return Says(
+            f"에이전트 하나와, {role} 한 명",
+            english=f"one agent and one {in_language(role, Language.ENGLISH)}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AnAgentAndACaller:
@@ -126,7 +149,13 @@ class TwoAgentsAndSomeoneReadingOne(Given[Any, TwoAgentsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return "리소스 그룹이 다른 에이전트 둘과, 한쪽 그룹의 에이전트만 읽을 수 있는 일반 사용자 한 명"
+        return Says(
+            "리소스 그룹이 다른 에이전트 둘과, 한쪽 그룹의 에이전트만 읽을 수 있는 일반 사용자 한 명",
+            english=(
+                "two agents in different resource groups and one Regular user who can read "
+                "the agents of one group only"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> TwoAgentsAndACaller:
@@ -174,12 +203,23 @@ class AgentsReportingSlots(Given[Any, ReportedSlotsAndACaller]):
 
     @override
     def describe(self) -> str:
-        caller = f"{role_named(self.role)} 한 명"
+        role = role_named(self.role)
+        role_ko = str(role)
+        role_en = in_language(role, Language.ENGLISH)
+        caller_ko = f"{role_ko} 한 명"
+        caller_en = f"one {role_en}"
         if self.granted:
-            caller = f"에이전트를 읽을 수 있는 {caller}"
+            caller_ko = f"에이전트를 읽을 수 있는 {caller_ko}"
+            caller_en = f"one {role_en} who can read agents"
         if self.agents == 1:
-            return f"슬롯 {self.slots}개를 보고한 에이전트 1개와, {caller}"
-        return f"슬롯 {self.slots}개씩 보고한 에이전트 {self.agents}개와, {caller}"
+            return Says(
+                f"슬롯 {self.slots}개를 보고한 에이전트 1개와, {caller_ko}",
+                english=f"one agent reporting {self.slots} slots and {caller_en}",
+            )
+        return Says(
+            f"슬롯 {self.slots}개씩 보고한 에이전트 {self.agents}개와, {caller_ko}",
+            english=(f"{self.agents} agents each reporting {self.slots} slots and {caller_en}"),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ReportedSlotsAndACaller:
@@ -228,7 +268,10 @@ def reported_slot_verdicts(
     """Every place of one agent resource node."""
     return [
         Same(f"{at}id", node.id, f"{agent.agent_id}:{slot.name}"),
-        Skipped(f"{at}field_id", "데이터베이스가 만든다"),
+        Skipped(
+            f"{at}field_id",
+            Says("데이터베이스가 생성합니다", english="the database generates it"),
+        ),
         Same(f"{at}agent_id", node.agent_id, agent.agent_id),
         Same(f"{at}slot_name", node.slot_name, slot.name),
         Held(f"{at}capacity", node.capacity, AmountOf(slot.capacity)),
@@ -264,7 +307,10 @@ class TheReportedSlot(Then[ReportedSlotsAndACaller, AgentResourceNode]):
 
     @override
     def says(self) -> str:
-        return "보고된 슬롯 행 전체가 반환된다"
+        return Says(
+            "보고된 슬롯 행 전체가 반환됩니다",
+            english="the whole reported slot row comes back",
+        )
 
     @override
     def look(
@@ -288,8 +334,14 @@ class TheReportedSlots(Then[ReportedSlotsAndACaller, AdminSearchAgentResourcesPa
     @override
     def says(self) -> str:
         if self.in_order:
-            return "보고된 슬롯 행 전체가 이 순서대로 반환된다"
-        return "보고된 슬롯 행 전체가 반환된다"
+            return Says(
+                "보고된 슬롯 행 전체가 이 순서대로 반환됩니다",
+                english="the whole reported slot rows come back in this order",
+            )
+        return Says(
+            "보고된 슬롯 행 전체가 반환됩니다",
+            english="the whole reported slot rows come back",
+        )
 
     @override
     def look(
@@ -319,7 +371,13 @@ class TheFirstReportedSlots(Then[ReportedSlotsAndACaller, AdminSearchAgentResour
 
     @override
     def says(self) -> str:
-        return "슬롯 이름 순서로 앞선 행 전체가 반환되고 다음 페이지가 있다고 응답한다"
+        return Says(
+            "슬롯 이름 순서로 앞선 행 전체가 반환되고 다음 페이지가 있다고 응답합니다",
+            english=(
+                "the rows first in slot name order come back and the answer says another "
+                "page follows"
+            ),
+        )
 
     @override
     def look(

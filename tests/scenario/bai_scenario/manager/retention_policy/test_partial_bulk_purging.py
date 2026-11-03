@@ -26,6 +26,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -60,8 +61,15 @@ class PurgingEveryPolicy(When[ManyPoliciesAndACaller, RetentionPolicyAdapter, Pu
 
     @override
     def describe(self, laid: ManyPoliciesAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 정책 {len(laid.laid)}개{besides}를 한 번에 완전 삭제"
+        besides_ko = "와 없는 id 하나" if self.missing is not None else ""
+        besides_en = " and one missing id" if self.missing is not None else ""
+        return Says(
+            f"{laid.caller.username} 이 정책 {len(laid.laid)}개{besides_ko}를 한 번에 영구 "
+            "삭제합니다",
+            english=(
+                f"{laid.caller.username} purges {len(laid.laid)} policies{besides_en} at once"
+            ),
+        )
 
     @override
     async def call(self, adapter: RetentionPolicyAdapter, laid: ManyPoliciesAndACaller) -> Purged:
@@ -82,9 +90,17 @@ class EveryPolicyIsPurged(Then[ManyPoliciesAndACaller, Purged]):
     @override
     def says(self) -> str:
         if self.missing is None:
-            return "대상 정책이 모두 처리된 목록에 오고, 실패한 것은 없다"
-        return (
-            "대상 정책이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+            return Says(
+                "대상 정책이 모두 처리된 목록에 오고, 실패한 것은 없습니다",
+                english=("every target policy comes back in the processed list and nothing failed"),
+            )
+        return Says(
+            "대상 정책이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 "
+            "옵니다",
+            english=(
+                "every target policy comes back in the processed list, and the missing id comes "
+                "back in the failed list because nothing answers to it"
+            ),
         )
 
     @override
@@ -106,7 +122,14 @@ class EveryPolicyIsPurged(Then[ManyPoliciesAndACaller, Purged]):
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the missing id put in the request"),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -125,9 +148,14 @@ class PurgingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 정책 둘과 없는 id 하나를 한 번에 완전 삭제하면, 둘은 처리된 목록에 오고 "
-            "없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "superadmin 이 정책 둘과 없는 id 하나를 한 번에 영구 삭제하면, 둘은 처리된 목록에 "
+            "오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when the superadmin purges two policies and one missing id at once, the two "
+                "come back in the processed list and the missing id comes back in the failed "
+                "list because nothing answers to it"
+            ),
         )
 
     @override
@@ -153,9 +181,14 @@ class AUserGrantedNothingPurgesNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 정책 여럿을 한 번에 완전 삭제하려 하면, 지워진 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 없는 사용자가 정책 여럿을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 "
+            "모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to purge several policies at once, none is "
+                "deleted and every one comes back in the failed list because the user has no "
+                "permission"
+            ),
         )
 
     @override

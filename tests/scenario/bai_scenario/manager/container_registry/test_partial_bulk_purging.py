@@ -22,6 +22,7 @@ from ai.backend.testutils.scenario_steps import (
     Held,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -56,10 +57,15 @@ class PurgingEveryRegistry(When[ManyRegistriesAndACaller, ContainerRegistryAdapt
 
     @override
     def describe(self, laid: ManyRegistriesAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return (
-            f"{laid.caller.username}이 레지스트리 {len(laid.registries)}개{besides}를 "
-            "한 번에 영구 삭제함"
+        besides_ko = "와 존재하지 않는 id 하나" if self.missing is not None else ""
+        besides_en = " and one id that does not exist" if self.missing is not None else ""
+        return Says(
+            f"{laid.caller.username}이 컨테이너 레지스트리 {len(laid.registries)}개{besides_ko}를 "
+            "한 번에 영구 삭제합니다",
+            english=(
+                f"{laid.caller.username} purges {len(laid.registries)} container registries"
+                f"{besides_en} at once"
+            ),
         )
 
     @override
@@ -83,9 +89,14 @@ class EveryRegistryIsPurged(Then[ManyRegistriesAndACaller, Purged]):
 
     @override
     def says(self) -> str:
-        return (
-            "미리 만들어 둔 레지스트리가 모두 지워지기 전 모습으로 오고, 없는 id 는 대상이 "
-            "없다는 이유로 실패 목록에 온다"
+        return Says(
+            "미리 저장한 컨테이너 레지스트리가 모두 삭제되기 전 모습으로 오고, 존재하지 않는 "
+            "id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "every container registry seeded in advance comes back as it was before it was "
+                "purged, and the id that does not exist comes back in the failed list because "
+                "there is no such target"
+            ),
         )
 
     @override
@@ -100,7 +111,15 @@ class EveryRegistryIsPurged(Then[ManyRegistriesAndACaller, Purged]):
             at = f"successes[{i}]."
             verdicts += [
                 Held[UUID](
-                    f"{at}id", node.id, SameAs(registry.id, "미리 만들어 둔 레지스트리의 id")
+                    f"{at}id",
+                    node.id,
+                    SameAs(
+                        registry.id,
+                        Says(
+                            "미리 저장한 컨테이너 레지스트리의 id",
+                            english="the id of the container registry seeded in advance",
+                        ),
+                    ),
                 ),
                 Same(f"{at}url", node.url, registry.url),
                 Same(f"{at}registry_name", node.registry_name, registry.registry_name),
@@ -114,7 +133,17 @@ class EveryRegistryIsPurged(Then[ManyRegistriesAndACaller, Purged]):
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says(
+                            "요청에 넣은, 존재하지 않는 id",
+                            english="the id that does not exist put in the request",
+                        ),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -128,7 +157,10 @@ class NoRegistryIsPurged(Then[ManyRegistriesAndACaller, Purged]):
 
     @override
     def says(self) -> str:
-        return "처리된 레지스트리 없이 대상이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 컨테이너 레지스트리 없이 대상이 모두 실패 목록에 옵니다",
+            english="no container registry is processed and every target comes back in the failed list",
+        )
 
     @override
     def look(self, laid: ManyRegistriesAndACaller, answered: Answered[Purged]) -> list[Verdict]:
@@ -144,7 +176,13 @@ class NoRegistryIsPurged(Then[ManyRegistriesAndACaller, Purged]):
                 Held[UUID](
                     f"failed[{i}].id",
                     failure.id,
-                    SameAs(registry.id, "미리 만들어 둔 레지스트리의 id"),
+                    SameAs(
+                        registry.id,
+                        Says(
+                            "미리 저장한 컨테이너 레지스트리의 id",
+                            english="the id of the container registry seeded in advance",
+                        ),
+                    ),
                 ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]
@@ -163,9 +201,15 @@ class TheSuperadminPurgesSeveralAndHearsOfTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 레지스트리 둘과 없는 id 하나를 한 번에 영구 삭제하면, 둘은 지워지기 전 "
-            "모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "superadmin 이 컨테이너 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 영구 "
+            "삭제하면, 둘은 삭제되기 전 모습으로 오고 존재하지 않는 id 는 대상이 없다는 이유로 "
+            "실패 목록에 옵니다",
+            english=(
+                "when the superadmin purges two container registries and one id that does not "
+                "exist at once, the two come back as they were before purging and the id that "
+                "does not exist comes back in the failed list because there is no such target"
+            ),
         )
 
     @override
@@ -191,9 +235,14 @@ class AUserGrantedNothingPurgesNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 레지스트리 여럿을 한 번에 영구 삭제하려 하면, 지워진 것 "
-            "없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 컨테이너 레지스트리 여럿을 한 번에 영구 삭제하려 "
+            "하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to purge several container registries at "
+                "once, nothing is purged and all come back in the failed list because there is "
+                "no permission"
+            ),
         )
 
     @override

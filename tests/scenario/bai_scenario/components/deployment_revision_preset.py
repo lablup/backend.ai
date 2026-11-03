@@ -22,18 +22,21 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.domain import Mentions
 from bai_scenario.components.system import lay_a_public_reader, role_named
 from bai_scenario.seeds.deployment.revision_preset import TestSeedDeploymentRevisionPreset
 from bai_scenario.seeds.runtime_variant.runtime_variant import TestSeedRuntimeVariant
 
-LAID_DESCRIPTION = "미리 만들어 둔 프리셋"
+LAID_DESCRIPTION = Says("미리 저장한 프리셋", english="a preset seeded in advance")
 
 
 @dataclass(frozen=True)
@@ -53,9 +56,13 @@ class PresetsAndSomeone(Given[Any, PresetsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return (
-            f"변형 하나와 그 변형의 배포 리비전 프리셋 {self.count}개, 그리고 "
-            f"{role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"변형 하나와 그 변형의 배포 리비전 프리셋 {self.count}개, 그리고 {who} 한 명",
+            english=(
+                f"one runtime variant and {self.count} deployment revision presets of it, "
+                f"and one {in_language(who, Language.ENGLISH)}"
+            ),
         )
 
     @override
@@ -83,11 +90,21 @@ class EveryPresetComesBack(
 
     @override
     def says(self) -> str:
+        described = in_language(self.description, Language.ENGLISH)
         if self.missing is None:
-            return f"프리셋이 모두 설명 '{self.description}'으로 오고, 실패한 것은 없다"
-        return (
+            return Says(
+                f"프리셋이 모두 설명 '{self.description}'으로 오고, 실패한 것은 없습니다",
+                english=(
+                    f"every preset comes back with the description '{described}' and nothing failed"
+                ),
+            )
+        return Says(
             f"프리셋이 모두 설명 '{self.description}'으로 오고, 없는 id 는 대상이 없다는 "
-            "이유로 실패 목록에 온다"
+            "이유로 실패 목록에 옵니다",
+            english=(
+                f"every preset comes back with the description '{described}' and an unknown id "
+                "comes back in the failed list because no target answers to it"
+            ),
         )
 
     @override
@@ -104,7 +121,17 @@ class EveryPresetComesBack(
         ]
         for i, (node, preset) in enumerate(zip(payload.successes, laid.presets, strict=False)):
             verdicts += [
-                Held[UUID](f"successes[{i}].id", node.id, SameAs(preset.id, "심은 프리셋의 id")),
+                Held[UUID](
+                    f"successes[{i}].id",
+                    node.id,
+                    SameAs(
+                        preset.id,
+                        Says(
+                            "미리 저장한 프리셋의 id",
+                            english="the id of the preset seeded in advance",
+                        ),
+                    ),
+                ),
                 Same(f"successes[{i}].description", node.description, self.description),
             ]
         if self.missing is None:
@@ -112,7 +139,14 @@ class EveryPresetComesBack(
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the unknown id put in the request"),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -128,7 +162,10 @@ class NoPresetIsProcessed(
 
     @override
     def says(self) -> str:
-        return "처리된 프리셋 없이 프리셋이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 프리셋 없이 프리셋이 모두 실패 목록에 옵니다",
+            english="no preset is processed and every preset comes back in the failed list",
+        )
 
     @override
     def look(
@@ -145,7 +182,17 @@ class NoPresetIsProcessed(
         ]
         for i, (failure, preset) in enumerate(zip(payload.failed, laid.presets, strict=False)):
             verdicts += [
-                Held[UUID](f"failed[{i}].id", failure.id, SameAs(preset.id, "심은 프리셋의 id")),
+                Held[UUID](
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(
+                        preset.id,
+                        Says(
+                            "미리 저장한 프리셋의 id",
+                            english="the id of the preset seeded in advance",
+                        ),
+                    ),
+                ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]
         return verdicts

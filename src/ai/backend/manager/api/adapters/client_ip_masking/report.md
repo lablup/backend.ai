@@ -15,38 +15,38 @@ Scenario: incomplete 2 / 5
 
 | scenario | verdict |
 |---|---|
-| [모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다](#searching-the-monitor-searches-masking-policies-like-the-superadmin) | answered |
-| [대상이 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 집계된다](#searching-the-superadmin-counts-every-masking-policy-laid) | answered |
-| [슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-masking-policies) | rejected |
+| [when the monitor role reads without a filter, the same response as the superadmin comes back. The superadmin check allows the monitor's read](#searching-the-monitor-searches-masking-policies-like-the-superadmin) | answered |
+| [when two policies of different targets exist and the superadmin reads without a filter, both are counted](#searching-the-superadmin-counts-every-masking-policy-laid) | answered |
+| [when a user who is not the superadmin requests a read of everything, it is rejected because the role is insufficient](#searching-a-user-who-is-not-the-superadmin-may-not-search-masking-policies) | rejected |
 
 **partial_bulk_purge**
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 정책 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-masking-policies) | answered |
-| [슈퍼관리자가 정책 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-masking-policies-answers-for-the-missing-one) | answered |
+| [when a user granted nothing tries to purge several policies at once, nothing is purged and every one comes back in the failed list because there is no permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-masking-policies) | answered |
+| [when the superadmin purges two policies and an unknown id at once, the two come back in the processed list and the unknown id comes back in the failed list because no target answers to it](#partial_bulk_purging-purging-several-masking-policies-answers-for-the-missing-one) | answered |
 
 **purge**
 
 | scenario | verdict |
 |---|---|
-| [슈퍼관리자가 정책을 id로 삭제하면 삭제한 정책 전체를 담은 응답이 반환된다](#retiring-the-superadmin-purges-a-masking-policy) | answered |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-purge-a-masking-policy) | answered |
-| [아무 권한도 없는 사용자가 정책을 삭제하면 권한 부족으로 거부된다. 등록이 역할 부족으로 거부되는 것과는 다른 검사다](#retiring-a-user-granted-nothing-may-not-purge-a-masking-policy) | rejected |
-| [아무 권한도 없는 사용자가 존재하지 않는 id를 삭제하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다](#retiring-a-user-granted-nothing-purging-an-unknown-masking-policy-id-is-refused-for-permission) | rejected |
-| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-purging-a-masking-policy-id-nothing-answers-to-is-not-found) | rejected |
+| [when the superadmin deletes a policy by id, a response comes back carrying the whole deleted policy](#retiring-the-superadmin-purges-a-masking-policy) | answered |
+| [turning permission enforcement off lets even a user granted nothing delete a policy](#retiring-turning-enforcement-off-lets-a-user-purge-a-masking-policy) | answered |
+| [when a user granted nothing deletes a policy, it is rejected for a lack of permission. This is a different check from the registration rejected for an insufficient role](#retiring-a-user-granted-nothing-may-not-purge-a-masking-policy) | rejected |
+| [when a user granted nothing deletes an id nothing answers to, it is rejected for a lack of permission rather than a missing target, because the permission check runs first and no permission is granted on a row that does not exist](#retiring-a-user-granted-nothing-purging-an-unknown-masking-policy-id-is-refused-for-permission) | rejected |
+| [when the superadmin deletes an id nothing answers to, it is rejected because the target cannot be found](#retiring-purging-a-masking-policy-id-nothing-answers-to-is-not-found) | rejected |
 
 **upsert**
 
 | scenario | verdict |
 |---|---|
-| [대상과 모드만 지정해 등록하면 두 접두 길이가 비어 있는 노드가 반환된다](#upserting-a-masking-policy-put-without-prefixes-carries-empty-prefixes) | answered |
-| [접두 길이가 있는 정책의 대상에 대상과 모드만 지정해 다시 등록하면 접두 길이가 비워진다. 등록은 기존 값과 병합하지 않고 행을 통째로 바꾼다](#upserting-putting-a-policy-again-without-prefixes-clears-the-stored-prefixes) | answered |
-| [이미 정책이 있는 대상에 다른 모드로 등록하면, 새 행이 아니라 같은 id의 행이 새 모드로 바뀐 노드가 반환된다](#upserting-putting-a-policy-on-a-target-that-has-one-rewrites-the-same-row) | answered |
-| [정책이 없을 때 슈퍼관리자가 대상·모드·두 접두 길이를 지정해 등록하면 지정한 값이 그대로 담긴 노드가 반환된다](#upserting-the-superadmin-puts-a-masking-policy-on-a-target) | answered |
-| [슈퍼관리자가 아닌 사용자가 정책을 등록하면 역할 부족으로 거부된다](#upserting-a-user-who-is-not-the-superadmin-may-not-put-a-masking-policy) | rejected |
-| [모니터 역할이 정책을 등록하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다](#upserting-the-monitor-may-not-put-a-masking-policy) | rejected |
-| [권한 검사를 꺼도 슈퍼관리자가 아니면 정책을 등록하지 못한다](#upserting-turning-enforcement-off-does-not-let-a-user-put-a-masking-policy) | rejected |
+| [when it is registered with only a target and a mode, the node comes back with both prefix lengths empty](#upserting-a-masking-policy-put-without-prefixes-carries-empty-prefixes) | answered |
+| [when a policy with prefix lengths is registered again on its target with only a target and a mode, the prefix lengths are cleared. Registration does not merge with the existing values but changes the row as a whole](#upserting-putting-a-policy-again-without-prefixes-clears-the-stored-prefixes) | answered |
+| [when a policy is registered on a target that already has one in a different mode, the node comes back with the row of the same id changed to the new mode rather than a new row](#upserting-putting-a-policy-on-a-target-that-has-one-rewrites-the-same-row) | answered |
+| [when no policy exists and the superadmin registers one with a target, a mode and two prefix lengths, the node comes back carrying the given values](#upserting-the-superadmin-puts-a-masking-policy-on-a-target) | answered |
+| [when a user who is not the superadmin registers a policy, it is rejected because the role is insufficient](#upserting-a-user-who-is-not-the-superadmin-may-not-put-a-masking-policy) | rejected |
+| [when the monitor role registers a policy, it is rejected because the role is insufficient. The monitor passes only reads in the superadmin check](#upserting-the-monitor-may-not-put-a-masking-policy) | rejected |
+| [turning permission enforcement off still does not let a user who is not the superadmin register a policy](#upserting-turning-enforcement-off-does-not-let-a-user-put-a-masking-policy) | rejected |
 
 ### admin_search
 
@@ -54,27 +54,27 @@ Scenario: incomplete 2 / 5
 
 #### [the-monitor-searches-masking-policies-like-the-superadmin](/tests/scenario/bai_scenario/manager/client_ip_masking/test_searching.py): pass
 
-모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다
+when the monitor role reads without a filter, the same response as the superadmin comes back. The superadmin check allows the monitor's read
 
 Given
 
-- 대상이 다른 클라이언트 IP 마스킹 정책 둘과, 모니터 한 명
-  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
-  - 클라이언트 IP 마스킹 정책 login_history: truncate 모드, 접두 길이 v4 24, v6 48
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 모니터 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two client IP masking policies of different targets and one monitor
+  - client IP masking policy default: truncate mode, prefix length v4 24, v6 48
+  - client IP masking policy login_history: truncate mode, prefix length v4 24, v6 48
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - monitor user-1: has their own keypair and personal project
 
 When
 
-- ClientIPMaskingAdapter.admin_search: user-1이 필터 없이 전체 조회
+- ClientIPMaskingAdapter.admin_search: user-1 reads every masking policy without a filter
 
 Then
 
-- 응답에 나와야 하는 정책만 반환된다
+- only the policies that must appear in the answer come back
   - items = ['default', 'login_history']
   - total_count = 2
   - has_next_page = False
@@ -84,27 +84,27 @@ Then
 
 #### [the-superadmin-counts-every-masking-policy-laid](/tests/scenario/bai_scenario/manager/client_ip_masking/test_searching.py): pass
 
-대상이 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 집계된다
+when two policies of different targets exist and the superadmin reads without a filter, both are counted
 
 Given
 
-- 대상이 다른 클라이언트 IP 마스킹 정책 둘과, 슈퍼관리자 한 명
-  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
-  - 클라이언트 IP 마스킹 정책 login_history: truncate 모드, 접두 길이 v4 24, v6 48
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two client IP masking policies of different targets and one superadmin
+  - client IP masking policy default: truncate mode, prefix length v4 24, v6 48
+  - client IP masking policy login_history: truncate mode, prefix length v4 24, v6 48
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ClientIPMaskingAdapter.admin_search: user-1이 필터 없이 전체 조회
+- ClientIPMaskingAdapter.admin_search: user-1 reads every masking policy without a filter
 
 Then
 
-- 응답에 나와야 하는 정책만 반환된다
+- only the policies that must appear in the answer come back
   - items = ['default', 'login_history']
   - total_count = 2
   - has_next_page = False
@@ -114,28 +114,28 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-search-masking-policies](/tests/scenario/bai_scenario/manager/client_ip_masking/test_searching.py): pass
 
-슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다
+when a user who is not the superadmin requests a read of everything, it is rejected because the role is insufficient
 
 Given
 
-- 대상이 다른 클라이언트 IP 마스킹 정책 둘과, 일반 사용자 한 명
-  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
-  - 클라이언트 IP 마스킹 정책 login_history: truncate 모드, 접두 길이 v4 24, v6 48
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two client IP masking policies of different targets and one regular user
+  - client IP masking policy default: truncate mode, prefix length v4 24, v6 48
+  - client IP masking policy login_history: truncate mode, prefix length v4 24, v6 48
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ClientIPMaskingAdapter.admin_search: user-1이 필터 없이 전체 조회
+- ClientIPMaskingAdapter.admin_search: user-1 reads every masking policy without a filter
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### partial_bulk_purge
 
@@ -143,77 +143,77 @@ Then
 
 #### [a-user-granted-nothing-purges-none-of-several-masking-policies](/tests/scenario/bai_scenario/manager/client_ip_masking/test_partial_bulk_purging.py): pass
 
-아무 권한도 없는 사용자가 정책 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user granted nothing tries to purge several policies at once, nothing is purged and every one comes back in the failed list because there is no permission
 
 Given
 
-- 대상이 다른 클라이언트 IP 마스킹 정책 둘과, 일반 사용자 한 명
-  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
-  - 클라이언트 IP 마스킹 정책 login_history: truncate 모드, 접두 길이 v4 24, v6 48
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two client IP masking policies of different targets and one regular user
+  - client IP masking policy default: truncate mode, prefix length v4 24, v6 48
+  - client IP masking policy login_history: truncate mode, prefix length v4 24, v6 48
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ClientIPMaskingAdapter.partial_bulk_purge: user-1이 정책 2개를 한 번에 purge 함
+- ClientIPMaskingAdapter.partial_bulk_purge: user-1 purges 2 client IP masking policies at once
 
 Then
 
-- 처리된 정책 없이 대상이 모두 실패 목록에 온다
+- no policy is processed and every target comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상 정책의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 정책의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the target policy
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target policy
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_purging-purging-several-masking-policies-answers-for-the-missing-one"></a>
 
 #### [purging-several-masking-policies-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/client_ip_masking/test_partial_bulk_purging.py): pass
 
-슈퍼관리자가 정책 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+when the superadmin purges two policies and an unknown id at once, the two come back in the processed list and the unknown id comes back in the failed list because no target answers to it
 
 Given
 
-- 대상이 다른 클라이언트 IP 마스킹 정책 둘과, 슈퍼관리자 한 명
-  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
-  - 클라이언트 IP 마스킹 정책 login_history: truncate 모드, 접두 길이 v4 24, v6 48
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two client IP masking policies of different targets and one superadmin
+  - client IP masking policy default: truncate mode, prefix length v4 24, v6 48
+  - client IP masking policy login_history: truncate mode, prefix length v4 24, v6 48
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ClientIPMaskingAdapter.partial_bulk_purge: user-1이 정책 2개 와 없는 id 하나를 한 번에 purge 함
+- ClientIPMaskingAdapter.partial_bulk_purge: user-1 purges 2 client IP masking policies and one unknown id at once
 
 Then
 
-- 정책이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+- every policy comes back in the processed list and the unknown id comes back in the failed list because no target answers to it
   - successes count = 2
-  - id: 미리 만들어 둔 정책와 같다
+  - id: same as the policy made in advance
   - target_type = 'default'
   - mode = 'truncate'
   - ipv4_prefix = 24
   - ipv6_prefix = 48
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
-  - id: 미리 만들어 둔 정책와 같다
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+  - id: same as the policy made in advance
   - target_type = 'login_history'
   - mode = 'truncate'
   - ipv4_prefix = 24
   - ipv6_prefix = 48
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 'not found'를 담은 이유
+  - failed[0].id: same as the unknown id put in the request
+  - failed[0].message: a reason containing 'not found'
 
 ### purge
 
@@ -221,143 +221,143 @@ Then
 
 #### [the-superadmin-purges-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py): pass
 
-슈퍼관리자가 정책을 id로 삭제하면 삭제한 정책 전체를 담은 응답이 반환된다
+when the superadmin deletes a policy by id, a response comes back carrying the whole deleted policy
 
 Given
 
-- 클라이언트 IP 마스킹 정책 하나와, 슈퍼관리자 한 명
-  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one client IP masking policy and one superadmin
+  - client IP masking policy default: truncate mode, prefix length v4 24, v6 48
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ClientIPMaskingAdapter.purge: user-1이 default 대상 정책 삭제
+- ClientIPMaskingAdapter.purge: user-1 deletes the policy for default
 
 Then
 
-- 삭제한 정책 전체가 반환된다
-  - id: 미리 만들어 둔 정책와 같다
+- the whole deleted policy comes back
+  - id: same as the policy made in advance
   - target_type = 'default'
   - mode = 'truncate'
   - ipv4_prefix = 24
   - ipv6_prefix = 48
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="retiring-turning-enforcement-off-lets-a-user-purge-a-masking-policy"></a>
 
 #### [turning-enforcement-off-lets-a-user-purge-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py): pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 삭제할 수 있다
+turning permission enforcement off lets even a user granted nothing delete a policy
 
 Given
 
-- 클라이언트 IP 마스킹 정책 하나와, 일반 사용자 한 명
-  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one client IP masking policy and one regular user
+  - client IP masking policy default: truncate mode, prefix length v4 24, v6 48
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ClientIPMaskingAdapter.purge: user-1이 default 대상 정책 삭제
+- ClientIPMaskingAdapter.purge: user-1 deletes the policy for default
 
 Then
 
-- 삭제한 정책 전체가 반환된다
-  - id: 미리 만들어 둔 정책와 같다
+- the whole deleted policy comes back
+  - id: same as the policy made in advance
   - target_type = 'default'
   - mode = 'truncate'
   - ipv4_prefix = 24
   - ipv6_prefix = 48
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="retiring-a-user-granted-nothing-may-not-purge-a-masking-policy"></a>
 
 #### [a-user-granted-nothing-may-not-purge-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py): pass
 
-아무 권한도 없는 사용자가 정책을 삭제하면 권한 부족으로 거부된다. 등록이 역할 부족으로 거부되는 것과는 다른 검사다
+when a user granted nothing deletes a policy, it is rejected for a lack of permission. This is a different check from the registration rejected for an insufficient role
 
 Given
 
-- 클라이언트 IP 마스킹 정책 하나와, 일반 사용자 한 명
-  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one client IP masking policy and one regular user
+  - client IP masking policy default: truncate mode, prefix length v4 24, v6 48
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ClientIPMaskingAdapter.purge: user-1이 default 대상 정책 삭제
+- ClientIPMaskingAdapter.purge: user-1 deletes the policy for default
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="retiring-a-user-granted-nothing-purging-an-unknown-masking-policy-id-is-refused-for-permission"></a>
 
 #### [a-user-granted-nothing-purging-an-unknown-masking-policy-id-is-refused-for-permission](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py): pass
 
-아무 권한도 없는 사용자가 존재하지 않는 id를 삭제하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다
+when a user granted nothing deletes an id nothing answers to, it is rejected for a lack of permission rather than a missing target, because the permission check runs first and no permission is granted on a row that does not exist
 
 Given
 
-- 클라이언트 IP 마스킹 정책 하나와, 일반 사용자 한 명
-  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one client IP masking policy and one regular user
+  - client IP masking policy default: truncate mode, prefix length v4 24, v6 48
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ClientIPMaskingAdapter.purge: user-1이 존재하지 않는 id 삭제
+- ClientIPMaskingAdapter.purge: user-1 deletes an id nothing answers to
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="retiring-purging-a-masking-policy-id-nothing-answers-to-is-not-found"></a>
 
 #### [purging-a-masking-policy-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py): pass
 
-슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
+when the superadmin deletes an id nothing answers to, it is rejected because the target cannot be found
 
 Given
 
-- 클라이언트 IP 마스킹 정책 하나와, 슈퍼관리자 한 명
-  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one client IP masking policy and one superadmin
+  - client IP masking policy default: truncate mode, prefix length v4 24, v6 48
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ClientIPMaskingAdapter.purge: user-1이 존재하지 않는 id 삭제
+- ClientIPMaskingAdapter.purge: user-1 deletes an id nothing answers to
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 ### upsert
 
@@ -365,200 +365,200 @@ Then
 
 #### [a-masking-policy-put-without-prefixes-carries-empty-prefixes](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py): pass
 
-대상과 모드만 지정해 등록하면 두 접두 길이가 비어 있는 노드가 반환된다
+when it is registered with only a target and a mode, the node comes back with both prefix lengths empty
 
 Given
 
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ClientIPMaskingAdapter.upsert: user-1이 default 대상에 truncate 모드 정책을 등록
+- ClientIPMaskingAdapter.upsert: user-1 registers a truncate mode policy on the default target
 
 Then
 
-- 등록한 정책 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole registered policy comes back
+  - id: skipped: the database generates it
   - target_type = 'default'
   - mode = 'truncate'
   - ipv4_prefix = None
   - ipv6_prefix = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="upserting-putting-a-policy-again-without-prefixes-clears-the-stored-prefixes"></a>
 
 #### [putting-a-policy-again-without-prefixes-clears-the-stored-prefixes](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py): pass
 
-접두 길이가 있는 정책의 대상에 대상과 모드만 지정해 다시 등록하면 접두 길이가 비워진다. 등록은 기존 값과 병합하지 않고 행을 통째로 바꾼다
+when a policy with prefix lengths is registered again on its target with only a target and a mode, the prefix lengths are cleared. Registration does not merge with the existing values but changes the row as a whole
 
 Given
 
-- 클라이언트 IP 마스킹 정책 하나와, 슈퍼관리자 한 명
-  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one client IP masking policy and one superadmin
+  - client IP masking policy default: truncate mode, prefix length v4 24, v6 48
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ClientIPMaskingAdapter.upsert: user-1이 default 대상에 truncate 모드 정책을 다시 등록
+- ClientIPMaskingAdapter.upsert: user-1 registers a truncate mode policy on the default target again
 
 Then
 
-- 같은 id의 행이 지정한 값으로 바뀌어 반환된다
-  - id: 미리 만들어 둔 정책와 같다
+- the row with the same id comes back changed to the given values
+  - id: same as the policy made in advance
   - target_type = 'default'
   - mode = 'truncate'
   - ipv4_prefix = None
   - ipv6_prefix = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="upserting-putting-a-policy-on-a-target-that-has-one-rewrites-the-same-row"></a>
 
 #### [putting-a-policy-on-a-target-that-has-one-rewrites-the-same-row](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py): pass
 
-이미 정책이 있는 대상에 다른 모드로 등록하면, 새 행이 아니라 같은 id의 행이 새 모드로 바뀐 노드가 반환된다
+when a policy is registered on a target that already has one in a different mode, the node comes back with the row of the same id changed to the new mode rather than a new row
 
 Given
 
-- 클라이언트 IP 마스킹 정책 하나와, 슈퍼관리자 한 명
-  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one client IP masking policy and one superadmin
+  - client IP masking policy default: truncate mode, prefix length v4 24, v6 48
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ClientIPMaskingAdapter.upsert: user-1이 default 대상에 drop 모드 정책을 접두 길이와 함께 다시 등록
+- ClientIPMaskingAdapter.upsert: user-1 registers a drop mode policy on the default target again with prefix lengths
 
 Then
 
-- 같은 id의 행이 지정한 값으로 바뀌어 반환된다
-  - id: 미리 만들어 둔 정책와 같다
+- the row with the same id comes back changed to the given values
+  - id: same as the policy made in advance
   - target_type = 'default'
   - mode = 'drop'
   - ipv4_prefix = 24
   - ipv6_prefix = 48
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="upserting-the-superadmin-puts-a-masking-policy-on-a-target"></a>
 
 #### [the-superadmin-puts-a-masking-policy-on-a-target](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py): pass
 
-정책이 없을 때 슈퍼관리자가 대상·모드·두 접두 길이를 지정해 등록하면 지정한 값이 그대로 담긴 노드가 반환된다
+when no policy exists and the superadmin registers one with a target, a mode and two prefix lengths, the node comes back carrying the given values
 
 Given
 
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ClientIPMaskingAdapter.upsert: user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
+- ClientIPMaskingAdapter.upsert: user-1 registers a truncate mode policy on the default target with prefix lengths
 
 Then
 
-- 등록한 정책 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole registered policy comes back
+  - id: skipped: the database generates it
   - target_type = 'default'
   - mode = 'truncate'
   - ipv4_prefix = 24
   - ipv6_prefix = 48
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="upserting-a-user-who-is-not-the-superadmin-may-not-put-a-masking-policy"></a>
 
 #### [a-user-who-is-not-the-superadmin-may-not-put-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py): pass
 
-슈퍼관리자가 아닌 사용자가 정책을 등록하면 역할 부족으로 거부된다
+when a user who is not the superadmin registers a policy, it is rejected because the role is insufficient
 
 Given
 
-- 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ClientIPMaskingAdapter.upsert: user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
+- ClientIPMaskingAdapter.upsert: user-1 registers a truncate mode policy on the default target with prefix lengths
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 <a id="upserting-the-monitor-may-not-put-a-masking-policy"></a>
 
 #### [the-monitor-may-not-put-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py): pass
 
-모니터 역할이 정책을 등록하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다
+when the monitor role registers a policy, it is rejected because the role is insufficient. The monitor passes only reads in the superadmin check
 
 Given
 
-- 모니터 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 모니터 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one monitor
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - monitor user-1: has their own keypair and personal project
 
 When
 
-- ClientIPMaskingAdapter.upsert: user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
+- ClientIPMaskingAdapter.upsert: user-1 registers a truncate mode policy on the default target with prefix lengths
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 <a id="upserting-turning-enforcement-off-does-not-let-a-user-put-a-masking-policy"></a>
 
 #### [turning-enforcement-off-does-not-let-a-user-put-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py): pass
 
-권한 검사를 꺼도 슈퍼관리자가 아니면 정책을 등록하지 못한다
+turning permission enforcement off still does not let a user who is not the superadmin register a policy
 
 Given
 
-- 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ClientIPMaskingAdapter.upsert: user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
+- ClientIPMaskingAdapter.upsert: user-1 registers a truncate mode policy on the default target with prefix lengths
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 

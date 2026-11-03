@@ -22,6 +22,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Refused,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -50,7 +51,10 @@ class SearchingEveryDomain(When[ManyDomainsAndACaller, DomainAdapter, Searched])
 
     @override
     def describe(self, laid: ManyDomainsAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체 조회"
+        return Says(
+            f"{laid.caller.username}이 필터 없이 전체를 조회합니다",
+            english=f"{laid.caller.username} searches every domain without a filter",
+        )
 
     @override
     async def call(self, adapter: DomainAdapter, laid: ManyDomainsAndACaller) -> Searched:
@@ -68,7 +72,10 @@ class SearchingByName(When[ManyDomainsAndACaller, DomainAdapter, Searched]):
 
     @override
     def describe(self, laid: ManyDomainsAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.named.name}으로 걸러 조회"
+        return Says(
+            f"{laid.caller.username}이 {laid.named.name}으로 필터 기반 조회합니다",
+            english=f"{laid.caller.username} searches with a filter on {laid.named.name}",
+        )
 
     @override
     async def call(self, adapter: DomainAdapter, laid: ManyDomainsAndACaller) -> Searched:
@@ -90,7 +97,14 @@ class SoftDeletingOneThenSearching(When[ManyDomainsAndACaller, DomainAdapter, Se
 
     @override
     def describe(self, laid: ManyDomainsAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.named.name}을 soft delete 한 뒤 필터 없이 전체 조회"
+        return Says(
+            f"{laid.caller.username}이 {laid.named.name}을 soft delete 한 뒤 필터 없이 전체를 "
+            "조회합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {laid.named.name} and then searches "
+                "every domain without a filter"
+            ),
+        )
 
     @override
     async def call(self, adapter: DomainAdapter, laid: ManyDomainsAndACaller) -> Searched:
@@ -105,7 +119,10 @@ class EveryLaidDomainIsCounted(Then[ManyDomainsAndACaller, Searched]):
 
     @override
     def says(self) -> str:
-        return "미리 만든 도메인이 모두 나온다"
+        return Says(
+            "미리 저장한 도메인이 모두 나옵니다",
+            english="every domain seeded in advance comes back",
+        )
 
     @override
     def look(self, laid: ManyDomainsAndACaller, answered: Answered[Searched]) -> list[Verdict]:
@@ -130,7 +147,10 @@ class OnlyTheNamedOneIsLeft(Then[ManyDomainsAndACaller, Searched]):
 
     @override
     def says(self) -> str:
-        return "걸러낸 그 도메인 하나만 남는다"
+        return Says(
+            "필터로 걸러낸 그 도메인 하나만 남습니다",
+            english="only the domain that the filter named is left",
+        )
 
     @override
     def look(self, laid: ManyDomainsAndACaller, answered: Answered[Searched]) -> list[Verdict]:
@@ -155,7 +175,13 @@ class TheAnswerCountsEveryDomainLaid(
 
     @override
     def describe(self) -> str:
-        return "이 시나리오가 미리 만든 도메인이 넷일 때, 필터 없는 조회는 그 넷이 모두 나온다"
+        return Says(
+            "이 시나리오가 미리 저장한 도메인이 넷일 때, 필터 없는 조회는 그 넷이 모두 나옵니다",
+            english=(
+                "when this scenario seeded four domains, "
+                "a search without a filter brings back all four"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyDomainsAndACaller]:
@@ -180,7 +206,14 @@ class ANameFilterNarrows(
 
     @override
     def describe(self) -> str:
-        return "도메인 여럿 중 하나의 이름으로 걸러 조회하면, 답에는 그 이름의 도메인만 남는다"
+        return Says(
+            "도메인 여럿 중 하나의 이름으로 필터 기반 조회하면, "
+            "응답에는 그 이름의 도메인만 남습니다",
+            english=(
+                "when several domains are searched with a filter on the name of one, "
+                "only the domain of that name is left in the answer"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyDomainsAndACaller]:
@@ -205,7 +238,13 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 전체 도메인 조회를 요청하면 역할로 막힌다"
+        return Says(
+            "superadmin 이 아닌 사용자가 전체 도메인 조회를 요청하면 역할로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin asks to search every domain, "
+                "the role rejects it"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyDomainsAndACaller]:
@@ -230,7 +269,14 @@ class SoftDeletedDomainsAreCountedToo(
 
     @override
     def describe(self) -> str:
-        return "미리 만든 도메인 중 하나를 soft delete 한 뒤 필터 없이 search 하면, 그것까지 모두 나온다"
+        return Says(
+            "미리 저장한 도메인 중 하나를 soft delete 한 뒤 필터 없이 search 하면, "
+            "그것까지 모두 나옵니다",
+            english=(
+                "when one of the domains seeded in advance is soft-deleted and every "
+                "domain is searched without a filter, that one comes back too"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyDomainsAndACaller]:

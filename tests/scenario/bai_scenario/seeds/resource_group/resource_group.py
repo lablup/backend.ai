@@ -20,11 +20,8 @@ from ai.backend.manager.models.resource_group.creators import (
     ResourceGroupForKeypairRelationCreator,
     ResourceGroupForProjectRelationCreator,
 )
-from ai.backend.manager.models.resource_group.types import (
-    NUM_RETRIES_TO_SKIP_CONFIG_KEY,
-    ResourceGroupOpts,
-)
-from bai_scenario.seeds.seeder import Naming, TestSeedLink, TestSeedRow
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import Naming, TestSeedLink, TestSeedRow, joined
 
 
 @dataclass(frozen=True)
@@ -36,22 +33,24 @@ class TestSeedResourceGroup(TestSeedRow[ResourceGroupData]):
     description: str | None = None
     is_active: bool = True
     is_default: bool = False
-    num_retries_to_skip: int | None = None
 
     @override
     def kind(self) -> str:
-        return "리소스 그룹"
+        return Says("자원 그룹", english="Resource group")
 
     @override
     def detail(self) -> str:
-        parts = [f"{self.scheduler} 스케줄러를 쓴다"]
+        parts = [
+            Says(
+                f"{self.scheduler} 스케줄러를 사용합니다",
+                english=f"uses the {self.scheduler} scheduler",
+            )
+        ]
         if not self.is_active:
-            parts.append("비활성")
+            parts.append(Says("비활성", english="inactive"))
         if self.is_default:
-            parts.append("기본 그룹")
-        if self.num_retries_to_skip is not None:
-            parts.append(f"대기 세션 건너뛰기 재시도 횟수가 {self.num_retries_to_skip}")
-        return ", ".join(parts)
+            parts.append(Says("기본 그룹", english="default group"))
+        return joined(parts)
 
     @override
     def name(self, naming: Naming) -> str:
@@ -66,13 +65,6 @@ class TestSeedResourceGroup(TestSeedRow[ResourceGroupData]):
             description=self.description,
             is_active=self.is_active,
             is_default=self.is_default,
-            scheduler_opts=(
-                None
-                if self.num_retries_to_skip is None
-                else ResourceGroupOpts(
-                    config={NUM_RETRIES_TO_SKIP_CONFIG_KEY: self.num_retries_to_skip}
-                )
-            ),
         )
 
 
@@ -82,7 +74,7 @@ class LinkToDomain(TestSeedLink[DomainData, ResourceGroupData]):
 
     @override
     def kind(self) -> str:
-        return "의 세션이 쓸 수 있는"
+        return Says("의 세션이 사용할 수 있는", english="whose sessions can use")
 
     @override
     def scope_id(self, scope: DomainData) -> DomainID:
@@ -103,7 +95,7 @@ class LinkToProject(TestSeedLink[ProjectData, ResourceGroupData]):
 
     @override
     def kind(self) -> str:
-        return "의 세션이 쓸 수 있는"
+        return Says("의 세션이 사용할 수 있는", english="whose sessions can use")
 
     @override
     def scope_id(self, scope: ProjectData) -> ProjectID:
@@ -126,7 +118,10 @@ class LinkToKeypair(TestSeedLink[UserData, ResourceGroupData]):
 
     @override
     def kind(self) -> str:
-        return "의 키로 요청한 세션만 쓸 수 있는"
+        return Says(
+            "의 키로 요청한 세션만 사용할 수 있는",
+            english="whose sessions requested with its key can use",
+        )
 
     @override
     def scope_id(self, scope: UserData) -> UserID:

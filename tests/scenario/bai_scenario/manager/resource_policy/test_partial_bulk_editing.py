@@ -13,7 +13,15 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    Given,
+    Language,
+    Says,
+    Scenario,
+    Then,
+    When,
+    in_language,
+)
 from bai_scenario.components.resource_policy import (
     FAMILIES,
     EveryUnusedTargetIsProcessed,
@@ -44,9 +52,15 @@ class EditingEveryTarget(When[SeveralPoliciesAndACaller[Any], ResourcePolicyAdap
 
     @override
     def describe(self, laid: SeveralPoliciesAndACaller[Any]) -> str:
-        return (
-            f"{laid.caller.username}이 {self.family.kind} {len(laid.targets)}개를 한 번에 수정 "
-            f"({self.family.one_limit().says})"
+        kind = self.family.kind
+        kind_en = in_language(kind, Language.ENGLISH)
+        edit = self.family.one_limit().says
+        return Says(
+            f"{laid.caller.username}이 {kind} {len(laid.targets)}개를 한 번에 수정합니다 ({edit})",
+            english=(
+                f"{laid.caller.username} updates {len(laid.targets)} policies of the {kind_en} "
+                f"kind at once ({in_language(edit, Language.ENGLISH)})"
+            ),
         )
 
     @override
@@ -73,9 +87,16 @@ class TheSuperadminEditsSeveralPolicies(
 
     @override
     def describe(self) -> str:
-        return (
-            f"슈퍼관리자가 {self.family.kind} 여럿의 한도 하나를 한 번에 바꾸면, 모두 그 한도만 "
-            "새 값으로 오고 실패한 것은 없다"
+        kind = self.family.kind
+        kind_en = in_language(kind, Language.ENGLISH)
+        return Says(
+            f"superadmin 이 {kind} 여럿의 한도 하나를 한 번에 변경하면, 모두 그 한도만 새 값으로 "
+            "오고 실패한 것은 없습니다",
+            english=(
+                f"when the superadmin changes one limit of several policies of the {kind_en} "
+                "kind at once, they all come back with only that limit at the new value and "
+                "nothing failed"
+            ),
         )
 
     @override
@@ -105,9 +126,16 @@ class AUserGrantedNothingEditsNone(
 
     @override
     def describe(self) -> str:
-        return (
-            f"아무 권한도 받지 않은 사용자가 {self.family.kind} 여럿을 한 번에 수정하려 하면, "
-            "수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+        kind = self.family.kind
+        kind_en = in_language(kind, Language.ENGLISH)
+        return Says(
+            f"아무 권한도 받지 않은 사용자가 {kind} 여럿을 한 번에 수정하려 하면, 수정된 것 "
+            "없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                f"a user granted nothing trying to edit several policies of the {kind_en} kind "
+                "at once gets none edited and every one in the failed list for not enough "
+                "permission"
+            ),
         )
 
     @override

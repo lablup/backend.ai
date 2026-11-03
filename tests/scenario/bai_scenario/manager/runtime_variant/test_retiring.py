@@ -23,7 +23,7 @@ from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVaria
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.runtime_variant import (
     AVariantAndACaller,
@@ -56,7 +56,11 @@ class Deleting(When[AVariantAndACaller, RuntimeVariantAdapter, DeleteRuntimeVari
     @override
     def describe(self, laid: AVariantAndACaller) -> str:
         target = "존재하지 않는 id" if self.unknown else laid.variant.name
-        return f"{laid.caller.username}이 {target} 삭제"
+        target_en = "an unknown id" if self.unknown else laid.variant.name
+        return Says(
+            f"{laid.caller.username}이 {target} 를 삭제합니다",
+            english=f"{laid.caller.username} deletes {target_en}",
+        )
 
     @override
     async def call(
@@ -78,7 +82,12 @@ class DeletingMany(
 
     @override
     def describe(self, laid: ManyVariantsAndACaller) -> str:
-        return f"{laid.caller.username}이 {len(laid.laid)}개를 한 번에 삭제"
+        return Says(
+            f"{laid.caller.username}이 {len(laid.laid)}개를 한 번에 삭제합니다",
+            english=(
+                f"{laid.caller.username} deletes {len(laid.laid)} runtime variants in one call"
+            ),
+        )
 
     @override
     async def call(
@@ -102,7 +111,12 @@ class DeletingWithAnUnknownIdBehind(
 
     @override
     def describe(self, laid: AVariantAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.variant.name}(와)과 없는 id를 한 번에 삭제"
+        return Says(
+            f"{laid.caller.username}이 {laid.variant.name} 와 없는 id 를 한 번에 삭제합니다",
+            english=(
+                f"{laid.caller.username} deletes {laid.variant.name} and one unknown id in one call"
+            ),
+        )
 
     @override
     async def call(
@@ -126,7 +140,14 @@ class TheSuperadminDeletesAVariant(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 변형을 삭제하면 삭제한 변형의 id를 담은 응답이 반환된다"
+        return Says(
+            "superadmin 이 인퍼런스 런타임 종류를 삭제하면 삭제한 인퍼런스 런타임 종류의 id 를 담은 "
+            "응답이 반환됩니다",
+            english=(
+                "when the superadmin deletes a runtime variant, a response carrying the id of "
+                "the deleted runtime variant comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
@@ -153,7 +174,13 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 id 를 삭제하면 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when the superadmin deletes an id that nothing answers to, it is rejected "
+                "because the target cannot be found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
@@ -180,7 +207,13 @@ class AUserGrantedNothingMayNotDelete(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 변형을 삭제하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 인퍼런스 런타임 종류를 삭제하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing deletes a runtime variant, it is rejected for lack "
+                "of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
@@ -208,7 +241,13 @@ class EnforcementOffLetsAnyoneDelete(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 끄면 아무 권한도 없는 사용자도 변형을 삭제할 수 있다"
+        return Says(
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 인퍼런스 런타임 종류를 삭제할 수 있습니다",
+            english=(
+                "turning the permission check off lets even a user granted nothing delete "
+                "a runtime variant"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:
@@ -242,7 +281,14 @@ class ManyAreDeletedAtOnce(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 변형 둘을 한 번에 삭제하면, 둘 다 삭제된 목록에 반환되고 실패 목록은 비어 있다"
+        return Says(
+            "superadmin 이 인퍼런스 런타임 종류 둘을 한 번에 삭제하면, 둘 다 삭제된 목록에 반환되고 "
+            "실패 목록은 비어 있습니다",
+            english=(
+                "when the superadmin deletes two runtime variants in one call, both come back "
+                "in the deleted list and the failed list is empty"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyVariantsAndACaller]:
@@ -271,9 +317,13 @@ class AnUnknownIdInTheListFailsAlone(
 
     @override
     def describe(self) -> str:
-        return (
-            "있는 id 뒤에 없는 id를 붙여 한 번에 삭제하면, 있는 것은 삭제된 목록에, "
-            "없는 id는 실패 목록에 반환된다"
+        return Says(
+            "있는 id 뒤에 없는 id 를 붙여 한 번에 삭제하면, 있는 것은 삭제된 목록에, 없는 id 는 "
+            "실패 목록에 반환됩니다",
+            english=(
+                "when an unknown id is added behind an existing id in one delete call, the "
+                "existing one comes back in the deleted list and the unknown id in the failed list"
+            ),
         )
 
     @override
@@ -306,9 +356,13 @@ class AUserGrantedNothingHasEveryVariantRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 변형 둘을 한 번에 삭제하면, 둘 다 실패 목록에 반환되고 "
-            "아무것도 삭제되지 않는다"
+        return Says(
+            "아무 권한도 없는 사용자가 인퍼런스 런타임 종류 둘을 한 번에 삭제하면, 둘 다 실패 목록에 "
+            "반환되고 아무것도 삭제되지 않습니다",
+            english=(
+                "when a user granted nothing deletes two runtime variants in one call, both come "
+                "back in the failed list and nothing is deleted"
+            ),
         )
 
     @override

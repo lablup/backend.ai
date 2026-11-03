@@ -12,12 +12,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 
-__all__ = (
-    "NUM_RETRIES_TO_SKIP_CONFIG_KEY",
-    "ResourceGroupOpts",
-)
-
-NUM_RETRIES_TO_SKIP_CONFIG_KEY = "num_retries_to_skip"
+__all__ = ("ResourceGroupOpts",)
 
 
 class ResourceGroupOpts(BackendAISchema):

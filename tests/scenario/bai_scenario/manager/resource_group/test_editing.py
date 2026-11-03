@@ -14,26 +14,19 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     PreemptionConfigInputDTO,
     UpdateResourceGroupConfigInput,
     UpdateResourceGroupInput,
-    UpdateResourceGroupSchedulerOptionsConfigInput,
-    UpdateResourceGroupSchedulerOptionsInput,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import ResourceGroupDetailNode
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     PreemptionModeDTO,
     SchedulerTypeDTO,
 )
-from ai.backend.common.types import (
-    AgentSelectionStrategy,
-    PreemptionOrder,
-    PreemptionVictimScope,
-    SessionTypes,
-)
+from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource import DefaultResourceGroupAlreadyExists
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_group import (
     AGroupAndACaller,
@@ -70,16 +63,29 @@ class Editing(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNo
 
     @override
     def describe(self, laid: AGroupAndACaller) -> str:
-        target = "존재하지 않는 이름" if self.unknown else laid.group.name
-        changes: list[str] = []
+        target_ko = "존재하지 않는 이름" if self.unknown else laid.group.name
+        target_en = "a name that does not exist" if self.unknown else laid.group.name
+        changes_ko: list[str] = []
+        changes_en: list[str] = []
         if self.described is not None:
-            changes.append("설명을 새것으로")
+            changes_ko.append("설명을 새것으로")
+            changes_en.append("changing the description to a new value")
         if self.is_active is not None:
-            changes.append(f"활성을 {self.is_active}로")
+            changes_ko.append(f"활성을 {self.is_active}로")
+            changes_en.append(f"setting active to {self.is_active}")
         if self.is_default is not None:
-            changes.append(f"기본을 {self.is_default}로")
-        what = ", ".join(changes) if changes else "아무것도 지정하지 않고"
-        return f"{laid.caller.username}이 {target}을 {what} 수정"
+            changes_ko.append(f"기본을 {self.is_default}로")
+            changes_en.append(f"setting default to {self.is_default}")
+        if changes_ko:
+            what_ko = ", ".join(changes_ko)
+            what_en = ", " + ", ".join(changes_en)
+        else:
+            what_ko = "아무것도 지정하지 않고"
+            what_en = " naming no field"
+        return Says(
+            f"{laid.caller.username}이 {target_ko}을 {what_ko} 수정합니다",
+            english=f"{laid.caller.username} updates {target_en}{what_en}",
+        )
 
     @override
     async def call(
@@ -112,8 +118,16 @@ class EditingTheConfig(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGrou
 
     @override
     def describe(self, laid: AGroupAndACaller) -> str:
-        what = "선점 설정을" if self.preemption else "스케줄러·공개·네트워크 설정을"
-        return f"{laid.caller.username}이 {laid.group.name}의 {what} 수정"
+        if self.preemption:
+            what_ko = "선점 설정을"
+            what_en = "the preemption config"
+        else:
+            what_ko = "스케줄러, 공개, 네트워크 설정을"
+            what_en = "the scheduler, visibility and network config"
+        return Says(
+            f"{laid.caller.username}이 {laid.group.name}의 {what_ko} 수정합니다",
+            english=f"{laid.caller.username} updates {what_en} of {laid.group.name}",
+        )
 
     @override
     async def call(
@@ -145,81 +159,6 @@ class EditingTheConfig(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGrou
 
 
 @dataclass(frozen=True)
-class EditingTheSchedulerOptions(
-    When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
-):
-    """id로 선점 설정과 함께 스케줄러 옵션 전부를 바꾼다."""
-
-    @override
-    def operation(self) -> str:
-        return "update"
-
-    @override
-    def describe(self, laid: AGroupAndACaller) -> str:
-        return (
-            f"{laid.caller.username}이 {laid.group.name}의 선점 설정, 허용 세션 타입, "
-            "대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수, 에이전트 선택 전략, 에이전트 선택기 설정, "
-            "분할 자원 조각화 허용 여부, 자동 정리할 라우트 상태를 함께 수정"
-        )
-
-    @override
-    async def call(
-        self, adapter: ResourceGroupAdapter, laid: AGroupAndACaller
-    ) -> ResourceGroupDetailNode:
-        with ActingAs(laid.caller):
-            payload = await adapter.update(
-                await adapter.lookup_name(laid.group.name),
-                UpdateResourceGroupInput(
-                    preemption=PreemptionConfigInputDTO(enabled=True),
-                    scheduler_options=UpdateResourceGroupSchedulerOptionsInput(
-                        allowed_session_types=[SessionTypes.INTERACTIVE],
-                        pending_timeout=60,
-                        config=UpdateResourceGroupSchedulerOptionsConfigInput(
-                            num_retries_to_skip=3
-                        ),
-                        agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
-                        agent_selector_config={"kernel_counts_weight": 2},
-                        allow_fractional_resource_fragmentation=False,
-                        route_cleanup_target_statuses=["degraded"],
-                    ),
-                ),
-            )
-        return payload.resource_group
-
-
-@dataclass(frozen=True)
-class ClearingTheRetriesToSkip(
-    When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
-):
-    """이름으로 대기 세션 건너뛰기 재시도 횟수를 비운다."""
-
-    @override
-    def operation(self) -> str:
-        return "update_config"
-
-    @override
-    def describe(self, laid: AGroupAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.group.name}의 대기 세션 건너뛰기 재시도 횟수를 비우도록 수정"
-
-    @override
-    async def call(
-        self, adapter: ResourceGroupAdapter, laid: AGroupAndACaller
-    ) -> ResourceGroupDetailNode:
-        with ActingAs(laid.caller):
-            payload = await adapter.update_config(
-                UpdateResourceGroupConfigInput(
-                    resource_group_name=laid.group.name,
-                    scheduler_options=UpdateResourceGroupSchedulerOptionsInput(
-                        config=UpdateResourceGroupSchedulerOptionsConfigInput(
-                            num_retries_to_skip=None
-                        ),
-                    ),
-                )
-            )
-        return payload.resource_group
-
-
-@dataclass(frozen=True)
 class TheSuperadminChangesTheDescription(
     Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
@@ -231,7 +170,13 @@ class TheSuperadminChangesTheDescription(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 설명만 바꾸면 설명은 새 값이고 나머지는 그대로인 그룹 전체가 반환된다"
+        return Says(
+            "superadmin 이 설명만 바꾸면 설명은 새 값이고 나머지는 그대로인 그룹 전체가 반환됩니다",
+            english=(
+                "when the superadmin changes only the description, the whole group comes back "
+                "with the new description and the rest unchanged"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
@@ -258,7 +203,10 @@ class DeactivatingAGroup(
 
     @override
     def describe(self) -> str:
-        return "활성 그룹을 비활성으로 바꾸면 비활성인 그룹이 반환된다"
+        return Says(
+            "활성 그룹을 비활성으로 바꾸면 비활성인 그룹이 반환됩니다",
+            english="deactivating an active group answers the group as inactive",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
@@ -285,7 +233,12 @@ class MakingAGroupTheDefault(
 
     @override
     def describe(self) -> str:
-        return "기본 그룹이 없을 때 그룹을 기본으로 바꾸면 기본인 그룹이 반환된다"
+        return Says(
+            "기본 그룹이 없을 때 그룹을 기본으로 바꾸면 기본인 그룹이 반환됩니다",
+            english=(
+                "when no default group exists, making a group the default answers it as the default"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
@@ -310,7 +263,14 @@ class ASecondDefaultIsRefused(
 
     @override
     def describe(self) -> str:
-        return "기본 그룹이 따로 있을 때 다른 그룹을 기본으로 바꾸려 하면 기본 그룹이 이미 있다는 이유로 거부된다"
+        return Says(
+            "기본 그룹이 따로 있을 때 다른 그룹을 기본으로 바꾸려 하면 기본 그룹이 이미 있다는 "
+            "이유로 거부됩니다",
+            english=(
+                "when another default group exists, making a different group the default is "
+                "rejected because a default group already exists"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
@@ -337,7 +297,10 @@ class AnEmptyEditChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 그룹이 반환된다"
+        return Says(
+            "아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 그룹이 반환됩니다",
+            english="an edit naming no field answers the group with nothing changed",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
@@ -364,7 +327,14 @@ class AUserGrantedUpdateOnTheGroupEditsIt(
 
     @override
     def describe(self) -> str:
-        return "그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 설명을 바꾸면 설명이 새 값인 그룹이 반환된다"
+        return Says(
+            "그 자원 그룹에 부여된 역할로 수정 권한을 받은 사용자가 설명을 바꾸면 설명이 새 "
+            "값인 그룹이 반환됩니다",
+            english=(
+                "a user granted update through the role granted on the resource group changing "
+                "the description gets the group with the new description"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
@@ -389,7 +359,13 @@ class AUserGrantedNothingMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 설명을 바꾸려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 설명을 바꾸려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "a user granted nothing trying to change the description is rejected for not "
+                "enough permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
@@ -414,7 +390,13 @@ class TheSuperadminEditingAnUnknownNameIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when the superadmin edits a name nothing answers to, the call is rejected "
+                "because no target answers to it"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
@@ -441,9 +423,14 @@ class TheSuperadminChangesTheConfig(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 스케줄러를 후입선출로, 비공개로, 호스트 네트워크로, 프록시 주소를 지정해 "
-            "설정을 바꾸면 그 값들이 새 값인 그룹 전체가 반환된다"
+        return Says(
+            "superadmin 이 스케줄러를 후입선출로, 비공개로, 호스트 네트워크로, 프록시 주소를 "
+            "지정해 설정을 바꾸면 그 값들이 새 값인 그룹 전체가 반환됩니다",
+            english=(
+                "when the superadmin changes the config to a last-in-first-out scheduler, "
+                "private visibility, host network and a given proxy address, the whole group "
+                "comes back with those values"
+            ),
         )
 
     @override
@@ -479,7 +466,13 @@ class TheSuperadminChangesThePreemptionConfig(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 선점 설정을 바꾸면 선점 설정이 새 값인 그룹 전체가 반환된다"
+        return Says(
+            "superadmin 이 선점 설정을 바꾸면 선점 설정이 새 값인 그룹 전체가 반환됩니다",
+            english=(
+                "when the superadmin changes the preemption config, the whole group comes back "
+                "with the new preemption values"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
@@ -505,79 +498,6 @@ class TheSuperadminChangesThePreemptionConfig(
 
 
 @dataclass(frozen=True)
-class TheSuperadminChangesTheSchedulerOptions(
-    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
-):
-    started: datetime
-
-    @override
-    def summary(self) -> str:
-        return "the-superadmin-changes-the-scheduler-options-with-the-preemption-config"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "슈퍼관리자가 선점 설정과 함께 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수, "
-            "에이전트 선택 전략, 에이전트 선택기 설정, 분할 자원 조각화 허용 여부, 자동 정리할 라우트 상태를 "
-            "바꾸면 그 값들이 모두 새 값인 그룹 전체가 반환된다"
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
-        return AGroupAndSomeone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
-        return EditingTheSchedulerOptions()
-
-    @override
-    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
-        return TheGroupNode(
-            GroupLook(
-                started=self.started,
-                preemption_enabled=True,
-                allowed_session_types=[SessionTypes.INTERACTIVE],
-                pending_timeout=60.0,
-                num_retries_to_skip=3,
-                agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
-                agent_selector_config={"kernel_counts_weight": 2},
-                allow_fractional_resource_fragmentation=False,
-                route_cleanup_target_statuses=["degraded"],
-            )
-        )
-
-
-@dataclass(frozen=True)
-class TheSuperadminClearsTheRetriesToSkip(
-    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
-):
-    started: datetime
-
-    @override
-    def summary(self) -> str:
-        return "the-superadmin-clears-the-retries-to-skip"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "대기 세션 건너뛰기 재시도 횟수가 있는 그룹에서 슈퍼관리자가 그 값을 비우면 "
-            "재시도 횟수가 없고 나머지는 그대로인 그룹 전체가 반환된다"
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
-        return AGroupAndSomeone(role=UserRole.SUPERADMIN, num_retries_to_skip=3)
-
-    @override
-    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
-        return ClearingTheRetriesToSkip()
-
-    @override
-    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
-        return TheGroupNode(GroupLook(started=self.started, num_retries_to_skip=None))
-
-
-@dataclass(frozen=True)
 class AUserGrantedNothingMayNotEditTheConfig(
     Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
@@ -587,7 +507,13 @@ class AUserGrantedNothingMayNotEditTheConfig(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 설정을 바꾸려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 설정을 바꾸려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "a user granted nothing trying to change the config is rejected for not enough "
+                "permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
@@ -613,8 +539,6 @@ SCENARIOS: list[EditingStep] = [
     TheSuperadminEditingAnUnknownNameIsNotFound(),
     TheSuperadminChangesTheConfig(started=datetime.now(UTC)),
     TheSuperadminChangesThePreemptionConfig(started=datetime.now(UTC)),
-    TheSuperadminChangesTheSchedulerOptions(started=datetime.now(UTC)),
-    TheSuperadminClearsTheRetriesToSkip(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotEditTheConfig(),
 ]
 

@@ -18,7 +18,7 @@ from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAd
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_slot import (
     ASlotTypeAndACaller,
@@ -53,12 +53,23 @@ class Editing(When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNod
     @override
     def describe(self, laid: ASlotTypeAndACaller) -> str:
         target = UNKNOWN if self.unknown else laid.slot_type.slot_name
-        changing = []
+        changing_ko = []
+        changing_en = []
         if self.display_name is not None:
-            changing.append("표시 이름")
+            changing_ko.append("표시 이름")
+            changing_en.append("display name")
         if self.enabled is not None:
-            changing.append("사용 여부")
-        return f"{laid.caller.username}이 {target}의 {' 및 '.join(changing) or '아무것도'} 수정"
+            changing_ko.append("사용 여부")
+            changing_en.append("enabled flag")
+        if not changing_ko:
+            return Says(
+                f"{laid.caller.username} 이 {target}에서 값을 지정하지 않고 수정합니다",
+                english=f"{laid.caller.username} edits {target} without giving a value",
+            )
+        return Says(
+            f"{laid.caller.username} 이 {target}의 {' 및 '.join(changing_ko)} 변경을 요청합니다",
+            english=(f"{laid.caller.username} edits the {' and '.join(changing_en)} of {target}"),
+        )
 
     @override
     async def call(
@@ -85,7 +96,14 @@ class TheDisplayNameChangesAndTheRestStays(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 이름으로 지정해 표시 이름만 수정하면, 표시 이름은 새 값이 되고 나머지는 그대로 유지된다"
+        return Says(
+            "superadmin 이 이름으로 지정해 표시 이름만 수정하면, 표시 이름은 새 값이 되고 "
+            "나머지는 그대로 유지됩니다",
+            english=(
+                "when the superadmin edits only the display name of a slot type named by its "
+                "name, the display name becomes the new value and the rest stays"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
@@ -110,7 +128,14 @@ class DisablingIt(
 
     @override
     def describe(self) -> str:
-        return "사용 중인 슬롯 종류의 사용 여부를 끄면, 사용하지 않는 상태가 담긴 노드가 반환된다"
+        return Says(
+            "사용 중인 자원 슬롯 유형의 사용 여부를 끄면, 사용하지 않는 상태가 담긴 노드가 "
+            "반환됩니다",
+            english=(
+                "turning off the enabled flag of a slot type that is in use brings back a node "
+                "that is not enabled"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
@@ -135,7 +160,14 @@ class AnEmptyEditChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "슬롯 이름만 지정하고 나머지를 모두 생략해 수정하면 아무것도 바뀌지 않은 노드가 반환된다"
+        return Says(
+            "슬롯 이름만 지정하고 나머지를 모두 생략해 수정하면 아무것도 바뀌지 않은 노드가 "
+            "반환됩니다",
+            english=(
+                "editing a slot type with only its name and every other value omitted brings "
+                "back a node that changed nothing"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
@@ -160,7 +192,13 @@ class TheSuperadminEditingAnUnknownNameIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when the superadmin edits a name nothing answers to, the call is rejected as "
+                "not found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
@@ -185,7 +223,12 @@ class AUserWhoIsNotTheSuperadminMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 슬롯 종류를 수정하면 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 자원 슬롯 유형을 수정하면 역할 부족으로 거부됩니다",
+            english=(
+                "a user who is not the superadmin editing a slot type is rejected for lack of role"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
@@ -210,9 +253,15 @@ class AUserWithoutTheRoleEditingAnUnknownNameIsRefusedByRole(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 아닌 사용자가 존재하지 않는 이름을 수정하면 대상 없음이 아니라 역할 부족으로 거부된다. "
-            "호출한 사용자가 쓸 수 있는지를 이름을 풀어내기 전에 검사하기 때문이다"
+        return Says(
+            "superadmin 이 아닌 사용자가 존재하지 않는 이름을 수정하면 대상 없음이 아니라 "
+            "역할 부족으로 거부됩니다. 호출한 사용자가 쓸 수 있는지를 이름을 풀어내기 전에 "
+            "검사하기 때문입니다",
+            english=(
+                "when a user who is not the superadmin edits a name nothing answers to, the call "
+                "is rejected for lack of role, not as not found, because whether the caller can "
+                "use it is checked before the name is resolved"
+            ),
         )
 
     @override
@@ -239,7 +288,13 @@ class EnforcementOffStillNeedsTheSuperadmin(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 수정하지 못한다"
+        return Says(
+            "권한 검사를 꺼도 superadmin 이 아니면 자원 슬롯 유형을 수정하지 못합니다",
+            english=(
+                "turning permission checks off still does not let a user who is not the "
+                "superadmin edit a slot type"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:

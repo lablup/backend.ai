@@ -21,7 +21,15 @@ from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.testutils.scenario_steps import Condition, Held, Same, SameAs, Skipped, Verdict
+from ai.backend.testutils.scenario_steps import (
+    Condition,
+    Held,
+    Same,
+    SameAs,
+    Says,
+    Skipped,
+    Verdict,
+)
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
 from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
@@ -59,7 +67,10 @@ class AGrant(TestSeedNest[Laid[None]]):
     @override
     def kind(self) -> str:
         names = ", ".join(str(one.name) for one in self.permissions)
-        return f"사용자 {names} 권한을 준 역할 배정"
+        return Says(
+            f"사용자 {names} 권한을 부여한 역할 배정",
+            english=f"a role assignment granting the user the {names} permissions",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[None]:
@@ -79,7 +90,10 @@ class AKeyIsThere(Condition[str | None]):
 
     @override
     def says(self) -> str:
-        return "그 사용자의 기본 키가 채워져 있다"
+        return Says(
+            "그 사용자의 기본 키가 채워져 있습니다",
+            english="the user's main access key is filled",
+        )
 
     @override
     def holds(self, got: str | None) -> bool:
@@ -118,7 +132,13 @@ class UserNodeLook:
             )
         )
         return [
-            Held(f"{at}id", node.id, SameAs(expected.id, "심은 사용자")),
+            Held(
+                f"{at}id",
+                node.id,
+                SameAs(
+                    expected.id, Says("미리 저장한 사용자", english="the user seeded in advance")
+                ),
+            ),
             Same(f"{at}basic_info.username", node.basic_info.username, expected.username),
             Same(f"{at}basic_info.email", node.basic_info.email, expected.email),
             Same(f"{at}basic_info.full_name", node.basic_info.full_name, expected.full_name),
@@ -182,8 +202,22 @@ class KeypairNodeLook:
     def verdicts(self, node: KeypairNode, expected: KeyPairData, owner: UserData) -> list[Verdict]:
         written = WrittenByThisRun(self.started)
         return [
-            Held("id", node.id, SameAs(str(expected.access_key), "심은 키")),
-            Held("access_key", node.access_key, SameAs(str(expected.access_key), "심은 키")),
+            Held(
+                "id",
+                node.id,
+                SameAs(
+                    str(expected.access_key),
+                    Says("미리 저장한 키페어", english="the keypair seeded in advance"),
+                ),
+            ),
+            Held(
+                "access_key",
+                node.access_key,
+                SameAs(
+                    str(expected.access_key),
+                    Says("미리 저장한 키페어", english="the keypair seeded in advance"),
+                ),
+            ),
             Same("is_active", node.is_active, expected.is_active),
             Same("is_admin", node.is_admin, expected.is_admin),
             Same("is_default", node.is_default, expected.is_default),
@@ -192,7 +226,11 @@ class KeypairNodeLook:
             Same("ssh_public_key", node.ssh_public_key, expected.ssh_public_key),
             Same("num_queries", node.num_queries, 0),
             Same("last_used", node.last_used, None),
-            Held("user_id", node.user_id, SameAs(owner.id, "키의 주인")),
+            Held(
+                "user_id",
+                node.user_id,
+                SameAs(owner.id, Says("키페어 소유자", english="the keypair owner")),
+            ),
             Held("created_at", node.created_at, written),
             Held("modified_at", node.modified_at, written),
         ]
@@ -211,17 +249,32 @@ class KeypairNodeLook:
         """방금 만들어진 키. 키 값과 SSH 키는 매니저가 만든다."""
         written = WrittenByThisRun(self.started)
         return [
-            Skipped("id", "매니저가 만든 access key다"),
-            Skipped("access_key", "매니저가 만든다"),
+            Skipped(
+                "id",
+                Says(
+                    "매니저가 생성한 access key 입니다",
+                    english="it is the access key the manager created",
+                ),
+            ),
+            Skipped("access_key", Says("매니저가 생성합니다", english="the manager creates it")),
             Same("is_active", node.is_active, is_active),
             Same("is_admin", node.is_admin, is_admin),
             Same("is_default", node.is_default, is_default),
             Same("rate_limit", node.rate_limit, rate_limit),
             Same("resource_policy", node.resource_policy, resource_policy),
-            Skipped("ssh_public_key", "매니저가 만든 RSA 키다"),
+            Skipped(
+                "ssh_public_key",
+                Says(
+                    "매니저가 생성한 RSA 키입니다", english="it is the RSA key the manager created"
+                ),
+            ),
             Same("num_queries", node.num_queries, 0),
             Same("last_used", node.last_used, None),
-            Held("user_id", node.user_id, SameAs(owner.id, "키의 주인")),
+            Held(
+                "user_id",
+                node.user_id,
+                SameAs(owner.id, Says("키페어 소유자", english="the keypair owner")),
+            ),
             Held("created_at", node.created_at, written),
             Held("modified_at", node.modified_at, written),
         ]

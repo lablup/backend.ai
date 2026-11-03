@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.types import SessionId
-from ai.backend.manager.errors.kernel import InvalidSessionData
+from ai.backend.manager.errors.kernel import InvalidSessionData, SessionNotFound
 from ai.backend.manager.models.kernel.row import kernels
 from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
 
@@ -23,7 +23,13 @@ async def _find_dependency_sessions(
     root_session_id: SessionId,
     db_session: SASession,
 ) -> dict[str, list[Any] | str]:
-    session = await SessionRow.get_session_by_id(db_session, root_session_id)
+    session = (
+        await db_session.execute(
+            sa.select(SessionRow.id, SessionRow.name).where(SessionRow.id == root_session_id)
+        )
+    ).first()
+    if session is None:
+        raise SessionNotFound(f"Session (id={root_session_id}) does not exist.")
 
     session_id = str(session.id)
     session_name = session.name

@@ -26,12 +26,15 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
@@ -68,7 +71,11 @@ class APolicyAndSomeone(Given[Any, APolicyAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"보존 정책 하나와, {role_named(self.role)} 한 명"
+        named = role_named(self.role)
+        return Says(
+            f"보존 정책 하나와, {named} 한 명",
+            english=f"one retention policy and one {in_language(named, Language.ENGLISH)}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> APolicyAndACaller:
@@ -89,7 +96,14 @@ class TwoPoliciesAndSomeone(Given[Any, ManyPoliciesAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"카테고리가 다른 보존 정책 둘과, {role_named(self.role)} 한 명"
+        named = role_named(self.role)
+        return Says(
+            f"카테고리가 다른 보존 정책 둘과, {named} 한 명",
+            english=(
+                "two retention policies of different categories and "
+                f"one {in_language(named, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyPoliciesAndACaller:
@@ -111,7 +125,14 @@ class AnActiveAndAnInactivePolicy(Given[Any, ManyPoliciesAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"활성 보존 정책 하나와 비활성 하나, 그리고 {role_named(self.role)} 한 명"
+        named = role_named(self.role)
+        return Says(
+            f"활성 보존 정책 하나와 비활성 하나, 그리고 {named} 한 명",
+            english=(
+                "one active retention policy, one inactive and "
+                f"one {in_language(named, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyPoliciesAndACaller:
@@ -137,7 +158,7 @@ def policy_verdicts(
 ) -> list[Verdict]:
     """Every place of one policy node."""
     return [
-        Skipped("id", "데이터베이스가 만든다"),
+        Skipped("id", Says("데이터베이스가 생성합니다", english="the database generates it")),
         Same("category", node.category, category),
         Same("retention_period_days", node.retention_period_days, days),
         Same("enabled", node.enabled, enabled),
@@ -158,7 +179,10 @@ class TheNewPolicyNode(Then[Any, RetentionPolicyNode]):
 
     @override
     def says(self) -> str:
-        return "생성한 정책 전체가 반환된다"
+        return Says(
+            "생성한 정책 전체가 반환됩니다",
+            english="the whole policy just created comes back",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[RetentionPolicyNode]) -> list[Verdict]:
@@ -184,7 +208,10 @@ class ThePolicyNode(Then[APolicyAndACaller, RetentionPolicyNode]):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 정책 전체가 반환된다"
+        return Says(
+            "미리 저장한 정책 전체가 반환됩니다",
+            english="the whole policy seeded in advance comes back",
+        )
 
     @override
     def look(
@@ -209,7 +236,10 @@ class TheLaidPoliciesAreLeft(Then[ManyPoliciesAndACaller, SearchRetentionPolicie
 
     @override
     def says(self) -> str:
-        return "응답에 나와야 하는 정책만 반환된다"
+        return Says(
+            "응답에 나와야 하는 정책만 반환됩니다",
+            english="only the policies that must appear in the response come back",
+        )
 
     @override
     def look(
@@ -236,7 +266,10 @@ class OnlyTheNamedPolicyIsLeft(Then[ManyPoliciesAndACaller, SearchRetentionPolic
 
     @override
     def says(self) -> str:
-        return "필터에 맞는 정책 하나만 반환된다"
+        return Says(
+            "필터에 맞는 정책 하나만 반환됩니다",
+            english="only the one policy the filter names comes back",
+        )
 
     @override
     def look(
@@ -259,14 +292,26 @@ class TheDeletedPolicyId(Then[APolicyAndACaller, Any]):
 
     @override
     def says(self) -> str:
-        return "삭제한 정책의 id가 반환된다"
+        return Says(
+            "삭제한 정책의 id 가 반환됩니다",
+            english="the id of the deleted policy comes back",
+        )
 
     @override
     def look(self, laid: APolicyAndACaller, answered: Answered[Any]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        return [Held[UUID]("id", payload.id, SameAs[UUID](laid.policy.id, "미리 만들어 둔 정책"))]
+        return [
+            Held[UUID](
+                "id",
+                payload.id,
+                SameAs[UUID](
+                    laid.policy.id,
+                    Says("미리 저장한 정책", english="the policy seeded in advance"),
+                ),
+            )
+        ]
 
 
 @dataclass(frozen=True)
@@ -277,7 +322,10 @@ class NothingIsProcessed(Then[ManyPoliciesAndACaller, PartialBulkPayload[Retenti
 
     @override
     def says(self) -> str:
-        return "처리된 정책 없이 대상이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 정책 없이 대상이 모두 실패 목록에 옵니다",
+            english="no policy is processed and every target comes back in the failed list",
+        )
 
     @override
     def look(
@@ -294,7 +342,13 @@ class NothingIsProcessed(Then[ManyPoliciesAndACaller, PartialBulkPayload[Retenti
         ]
         for i, (failure, policy) in enumerate(zip(payload.failed, laid.laid, strict=False)):
             verdicts += [
-                Held[UUID](f"failed[{i}].id", failure.id, SameAs(policy.id, "대상 정책의 id")),
+                Held[UUID](
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(
+                        policy.id, Says("대상 정책의 id", english="the id of the target policy")
+                    ),
+                ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]
         return verdicts

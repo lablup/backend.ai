@@ -41,7 +41,16 @@ class SeedRosterWrite:
     user_id: UserID
 
 
-type SeedItemWrite = SeedWrite | SeedRelationWrite | SeedRosterWrite
+@dataclass(frozen=True)
+class SeedRoleGrantWrite:
+    """A user granted the role a preset made in one scope."""
+
+    user_id: UserID
+    scope: EntityIdentifier
+    preset_name: str
+
+
+type SeedItemWrite = SeedWrite | SeedRelationWrite | SeedRosterWrite | SeedRoleGrantWrite
 
 
 @dataclass(frozen=True)

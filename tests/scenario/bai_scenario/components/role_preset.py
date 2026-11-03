@@ -33,6 +33,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
@@ -82,9 +83,16 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
 
     @override
     def describe(self) -> str:
+        role = self.role.value
         if self.scope_type == ProjectEntityType():
-            return f"이미 있는 프리셋 하나와, {self.role.value} 한 명"
-        return f"이미 있는 {self.scope_type} 스코프 프리셋 하나와, {self.role.value} 한 명"
+            return Says(
+                f"이미 있는 프리셋 하나와, {role} 한 명",
+                english=f"one preset that already exists and one {role}",
+            )
+        return Says(
+            f"이미 있는 {self.scope_type} 스코프 프리셋 하나와, {role} 한 명",
+            english=f"one preset that already exists in the {self.scope_type} scope and one {role}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> APresetAndACaller:
@@ -101,7 +109,11 @@ class AProjectAndADomainPresetAndSomeone(Given[Any, ManyPresetsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"프로젝트 스코프 프리셋과 도메인 스코프 프리셋 하나씩과, {self.role.value} 한 명"
+        role = self.role.value
+        return Says(
+            f"프로젝트 스코프 프리셋과 도메인 스코프 프리셋 하나씩과, {role} 한 명",
+            english=(f"one project-scope preset, one domain-scope preset, and one {role}"),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
@@ -122,7 +134,11 @@ class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"프리셋 {self.count}개와, {self.role.value} 한 명"
+        role = self.role.value
+        return Says(
+            f"프리셋 {self.count}개와, {role} 한 명",
+            english=f"{self.count} presets and one {role}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
@@ -141,7 +157,11 @@ class APresetWithEntriesAndSomeone(Given[Any, APresetWithEntriesAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"권한 항목 둘을 가진 프리셋 하나와, {self.role.value} 한 명"
+        role = self.role.value
+        return Says(
+            f"권한 항목 둘을 가진 프리셋 하나와, {role} 한 명",
+            english=f"one preset with two permission entries and one {role}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> APresetWithEntriesAndACaller:
@@ -181,9 +201,27 @@ class PresetLook:
         )
         return [
             *owner_assign,
-            Held[UUID](f"{at}id", node.id, SameAs(seeded.id, "미리 만든 프리셋의 id")),
             Held[UUID](
-                f"{at}entity_id", node.entity_id, SameAs(seeded.id, "미리 만든 프리셋의 id")
+                f"{at}id",
+                node.id,
+                SameAs(
+                    seeded.id,
+                    Says(
+                        "미리 저장한 프리셋의 id",
+                        english="the id of the preset seeded in advance",
+                    ),
+                ),
+            ),
+            Held[UUID](
+                f"{at}entity_id",
+                node.entity_id,
+                SameAs(
+                    seeded.id,
+                    Says(
+                        "미리 저장한 프리셋의 id",
+                        english="the id of the preset seeded in advance",
+                    ),
+                ),
             ),
             Same(f"{at}name", node.name, self.named if self.named is not None else seeded.name),
             Same(f"{at}scope_type", str(node.scope_type), str(seeded.scope_type)),
@@ -207,12 +245,24 @@ class ThePresetComesBack(Then[APresetAndACaller, RolePresetNode]):
     @override
     def says(self) -> str:
         if self.expected.named is not None:
-            return "새 이름을 실은 프리셋 전체가 온다"
+            return Says(
+                "새 이름을 담은 프리셋 전체가 응답으로 옵니다",
+                english="the whole preset carrying the new name comes back",
+            )
         if self.expected.auto_assign_to_owner:
-            return "소유자 부여가 켜진 프리셋 전체가 온다"
+            return Says(
+                "소유자 부여가 켜진 프리셋 전체가 응답으로 옵니다",
+                english="the whole preset with owner assignment turned on comes back",
+            )
         if self.expected.deleted:
-            return "삭제 표시가 켜진 프리셋 전체가 온다"
-        return "삭제 표시가 꺼진 프리셋 전체가 온다"
+            return Says(
+                "삭제로 표시된 프리셋 전체가 응답으로 옵니다",
+                english="the whole preset marked deleted comes back",
+            )
+        return Says(
+            "삭제로 표시되지 않은 프리셋 전체가 응답으로 옵니다",
+            english="the whole preset not marked deleted comes back",
+        )
 
     @override
     def look(self, laid: APresetAndACaller, answered: Answered[RolePresetNode]) -> list[Verdict]:
@@ -232,14 +282,23 @@ class EveryTargetComesBack(Then[ManyPresetsAndACaller, PartialBulkPayload[RolePr
     @override
     def says(self) -> str:
         if self.expected.auto_assign is not None:
-            done = "새 값으로"
+            done_ko, done_en = "새 값으로", "with the new value"
         elif self.expected.deleted:
-            done = "삭제 표시가 켜진 채"
+            done_ko, done_en = "삭제로 표시된 채", "marked deleted"
         else:
-            done = "삭제 표시가 꺼진 채"
+            done_ko, done_en = "삭제로 표시되지 않은 채", "not marked deleted"
         if self.missing is None:
-            return f"대상 프리셋이 모두 {done} 오고, 실패한 것은 없다"
-        return f"대상 프리셋이 모두 {done} 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+            return Says(
+                f"대상 프리셋이 모두 {done_ko} 오고, 실패한 것은 없습니다",
+                english=f"every target preset comes back {done_en}, and nothing failed",
+            )
+        return Says(
+            f"대상 프리셋이 모두 {done_ko} 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                f"every target preset comes back {done_en}, and an unknown id comes back "
+                "in the failed list because no target answers to it"
+            ),
+        )
 
     @override
     def look(
@@ -258,7 +317,14 @@ class EveryTargetComesBack(Then[ManyPresetsAndACaller, PartialBulkPayload[RolePr
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the unknown id put in the request"),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -272,7 +338,13 @@ class OnlyTheFirstPresetComesBack(Then[ManyPresetsAndACaller, PartialBulkPayload
 
     @override
     def says(self) -> str:
-        return "프로젝트 스코프 프리셋만 고쳐져 오고, 도메인 스코프 프리셋은 실패 목록에 온다"
+        return Says(
+            "프로젝트 스코프 프리셋만 수정되어 오고, 도메인 스코프 프리셋은 실패 목록에 옵니다",
+            english=(
+                "only the project-scope preset comes back edited, and the domain-scope "
+                "preset comes back in the failed list"
+            ),
+        )
 
     @override
     def look(
@@ -292,7 +364,12 @@ class OnlyTheFirstPresetComesBack(Then[ManyPresetsAndACaller, PartialBulkPayload
         for failure in payload.failed:
             verdicts.append(
                 Held[UUID](
-                    "failed[0].id", failure.id, SameAs(laid.laid[1].id, "두 번째 프리셋의 id")
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        laid.laid[1].id,
+                        Says("두 번째 프리셋의 id", english="the id of the second preset"),
+                    ),
                 )
             )
         return verdicts
@@ -306,7 +383,10 @@ class NothingIsProcessed(Then[Any, PartialBulkPayload[Any]]):
 
     @override
     def says(self) -> str:
-        return "처리된 것 없이 대상이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 것 없이 대상이 모두 실패 목록에 옵니다",
+            english="nothing is processed and every target comes back in the failed list",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[PartialBulkPayload[Any]]) -> list[Verdict]:
@@ -320,7 +400,11 @@ class NothingIsProcessed(Then[Any, PartialBulkPayload[Any]]):
         ]
         for i, (failure, target) in enumerate(zip(payload.failed, targets, strict=False)):
             verdicts += [
-                Held[UUID](f"failed[{i}].id", failure.id, SameAs(target, "대상의 id")),
+                Held[UUID](
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(target, Says("대상의 id", english="the id of the target")),
+                ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]
         return verdicts
@@ -341,7 +425,10 @@ class TheEntriesAreAdded(Then[APresetAndACaller, list[RolePermissionPresetNode]]
 
     @override
     def says(self) -> str:
-        return "넣은 두 항목이 프리셋 아래에 온다"
+        return Says(
+            "추가한 두 항목이 프리셋 아래에 옵니다",
+            english="the two entries added come back under the preset",
+        )
 
     @override
     def look(
@@ -355,12 +442,24 @@ class TheEntriesAreAdded(Then[APresetAndACaller, list[RolePermissionPresetNode]]
         verdicts: list[Verdict] = [Same("items count", len(items), len(ENTRIES))]
         for i, (node, (entity_type, permission)) in enumerate(zip(got, ENTRIES, strict=False)):
             verdicts += [
-                Skipped(f"items[{i}].id", "데이터베이스가 만든다"),
-                Skipped(f"items[{i}].field_id", "데이터베이스가 만든다"),
+                Skipped(
+                    f"items[{i}].id",
+                    Says("데이터베이스가 생성합니다", english="the database generates it"),
+                ),
+                Skipped(
+                    f"items[{i}].field_id",
+                    Says("데이터베이스가 생성합니다", english="the database generates it"),
+                ),
                 Held[UUID](
                     f"items[{i}].role_preset_id",
                     node.role_preset_id,
-                    SameAs(laid.preset.id, "미리 만든 프리셋의 id"),
+                    SameAs(
+                        laid.preset.id,
+                        Says(
+                            "미리 저장한 프리셋의 id",
+                            english="the id of the preset seeded in advance",
+                        ),
+                    ),
                 ),
                 Same(f"items[{i}].entity_type", str(node.entity_type), entity_type),
                 Same(f"items[{i}].permission", node.permission, permission),
@@ -379,7 +478,13 @@ class TheEntriesAreRemoved(
 
     @override
     def says(self) -> str:
-        return "뺀 두 항목이 처리된 목록에 오고, 없는 id 는 실패 목록에 온다"
+        return Says(
+            "제거한 두 항목이 처리된 목록에 오고, 없는 id 는 실패 목록에 옵니다",
+            english=(
+                "the two entries removed come back in the processed list, "
+                "and the unknown id comes back in the failed list"
+            ),
+        )
 
     @override
     def look(
@@ -395,16 +500,38 @@ class TheEntriesAreRemoved(
         verdicts: list[Verdict] = [Same("successes count", len(got), len(wanted))]
         for i, (node, entry) in enumerate(zip(got, wanted, strict=False)):
             verdicts += [
-                Held[UUID](f"successes[{i}].id", node.id, SameAs(entry.id, "미리 만든 항목의 id")),
+                Held[UUID](
+                    f"successes[{i}].id",
+                    node.id,
+                    SameAs(
+                        entry.id,
+                        Says(
+                            "미리 저장한 항목의 id",
+                            english="the id of the entry seeded in advance",
+                        ),
+                    ),
+                ),
                 Held[UUID](
                     f"successes[{i}].field_id",
                     node.field_id,
-                    SameAs(entry.id, "미리 만든 항목의 id"),
+                    SameAs(
+                        entry.id,
+                        Says(
+                            "미리 저장한 항목의 id",
+                            english="the id of the entry seeded in advance",
+                        ),
+                    ),
                 ),
                 Held[UUID](
                     f"successes[{i}].role_preset_id",
                     node.role_preset_id,
-                    SameAs(laid.preset.id, "미리 만든 프리셋의 id"),
+                    SameAs(
+                        laid.preset.id,
+                        Says(
+                            "미리 저장한 프리셋의 id",
+                            english="the id of the preset seeded in advance",
+                        ),
+                    ),
                 ),
                 Same(f"successes[{i}].entity_type", str(node.entity_type), str(entry.entity_type)),
                 Same(
@@ -415,13 +542,26 @@ class TheEntriesAreRemoved(
                 Held[datetime](
                     f"successes[{i}].created_at",
                     node.created_at,
-                    SameAs(entry.created_at, "미리 만든 항목의 시각"),
+                    SameAs(
+                        entry.created_at,
+                        Says(
+                            "미리 저장한 항목의 시각",
+                            english="the time of the entry seeded in advance",
+                        ),
+                    ),
                 ),
             ]
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the unknown id put in the request"),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts

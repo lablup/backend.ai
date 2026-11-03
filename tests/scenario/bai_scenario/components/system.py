@@ -18,7 +18,7 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.testutils.scenario_steps import Given
+from ai.backend.testutils.scenario_steps import Given, Language, Says, in_language
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
@@ -36,9 +36,10 @@ class Kept:
 KEPT = Kept()
 
 
-def role_named(role: UserRole) -> str:
+def role_named(role: UserRole) -> Says:
     """What the report calls a user of this role, the same way the seed does."""
-    return TestSeedUserOf(role=role).kind()
+    named = TestSeedUserOf(role=role).kind()
+    return named if isinstance(named, Says) else Says(named)
 
 
 @dataclass(frozen=True)
@@ -69,7 +70,10 @@ class SomeoneReadingInPublic(TestSeedNest[Laid[UserData]]):
 
     @override
     def kind(self) -> str:
-        return f"public 에서 {self.entity_type} 조회 권한을 받은 사용자 준비"
+        return Says(
+            f"public 에서 {self.entity_type} 조회 권한을 받은 사용자 준비",
+            english=f"Prepare a user granted read permission on {self.entity_type} in public",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[UserData]:
@@ -106,7 +110,11 @@ class SomeoneAlone(Given[Any, ACaller]):
 
     @override
     def describe(self) -> str:
-        return f"{role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"{who} 한 명",
+            english=f"one {in_language(who, Language.ENGLISH)}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ACaller:

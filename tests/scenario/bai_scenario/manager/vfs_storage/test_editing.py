@@ -16,7 +16,15 @@ from ai.backend.manager.api.adapters.vfs_storage.adapter import VFSStorageAdapte
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    Given,
+    Language,
+    Says,
+    Scenario,
+    Then,
+    When,
+    in_language,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.vfs_storage import (
     AStorageAndACaller,
@@ -44,8 +52,16 @@ class EditingTheBasePath(When[AStorageAndACaller, VFSStorageAdapter, VFSStorageN
 
     @override
     def describe(self, laid: AStorageAndACaller) -> str:
-        target = "존재하지 않는 id" if self.unknown else laid.storage.name
-        return f"{laid.caller.username}이 {target}의 기본 경로 수정"
+        target = (
+            Says("존재하지 않는 id", english="a missing id") if self.unknown else laid.storage.name
+        )
+        return Says(
+            f"{laid.caller.username}이 {target} 의 기본 경로를 수정합니다",
+            english=(
+                f"{laid.caller.username} changes the base path of "
+                f"{in_language(target, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def call(self, adapter: VFSStorageAdapter, laid: AStorageAndACaller) -> VFSStorageNode:
@@ -67,7 +83,13 @@ class TheSuperadminMovesTheBasePath(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 기본 경로만 바꾸면, 기본 경로는 새 값이 되고 나머지는 그대로 남는다"
+        return Says(
+            "superadmin 이 기본 경로만 변경하면, 기본 경로는 새 값이 되고 나머지는 그대로 남습니다",
+            english=(
+                "when the superadmin changes only the base path, the base path takes the new "
+                "value and the rest stays as it is"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AStorageAndACaller]:
@@ -92,7 +114,13 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 id 를 수정하면 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when the superadmin edits an id that does not exist, it is rejected because "
+                "the target is not found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AStorageAndACaller]:
@@ -117,9 +145,14 @@ class AUserGrantedNothingMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 VFS storage 를 수정하면 권한 부족으로 거부된다. "
-            "VFS storage 는 global 에만 속해 그 권한을 받을 방법이 없다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 VFS storage 를 수정하면 권한 부족으로 거부됩니다. "
+            "VFS storage 는 global 에만 속해 그 권한을 받을 방법이 없습니다",
+            english=(
+                "when a user granted nothing edits a VFS storage, it is rejected for lack of "
+                "permission. A VFS storage belongs only to global, so there is no way to grant "
+                "that permission"
+            ),
         )
 
     @override

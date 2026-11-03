@@ -9,6 +9,7 @@ from typing import override
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
 from ai.backend.manager.models.resource_slot.upserters import AgentResourceUpserter
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import TestSeedFieldUpserter
 
 
@@ -24,7 +25,10 @@ class TestSeedReportedSlot(TestSeedFieldUpserter[AgentUUID, AgentResourceData]):
 
     @override
     def kind(self) -> str:
-        return f"{self.slot_name} 슬롯 용량 {self.capacity} 보고, {self.used} 사용 중"
+        return Says(
+            f"{self.slot_name} 슬롯 용량 {self.capacity} 보고, {self.used} 사용 중",
+            english=f"{self.slot_name} slot capacity {self.capacity} reported, {self.used} in use",
+        )
 
     @override
     def owner_id(self, owner: AgentUUID) -> AgentUUID:

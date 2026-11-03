@@ -25,7 +25,15 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    Given,
+    Language,
+    Says,
+    Scenario,
+    Then,
+    When,
+    in_language,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config_fragment import (
     AReadingPlace,
@@ -56,7 +64,11 @@ class ReadingMineByNames(When[AReadingPlace, AppConfigFragmentAdapter, ByNames])
 
     @override
     def describe(self, laid: AReadingPlace) -> str:
-        return f"{laid.caller.username}이 {', '.join(laid.names)}의 자기 조각을 조회"
+        names = ", ".join(laid.names)
+        return Says(
+            f"{laid.caller.username} 이 {names} 의 자기 조각을 조회합니다",
+            english=f"{laid.caller.username} reads their own fragments for {names}",
+        )
 
     @override
     async def call(self, adapter: AppConfigFragmentAdapter, laid: AReadingPlace) -> ByNames:
@@ -76,7 +88,14 @@ class ReadingAtByName(When[ATargetAndACaller, AppConfigFragmentAdapter, ByNames]
 
     @override
     def describe(self, laid: ATargetAndACaller) -> str:
-        return f"{laid.caller.username}이 {SCOPE_NAMES[laid.scope_type]} 스코프를 지정해 {laid.name}의 조각을 조회"
+        scope = SCOPE_NAMES[laid.scope_type]
+        return Says(
+            f"{laid.caller.username} 이 {scope} 스코프를 지정해 {laid.name} 의 조각을 조회합니다",
+            english=(
+                f"{laid.caller.username} reads the fragment of {laid.name} in the "
+                f"{in_language(scope, Language.ENGLISH)} scope"
+            ),
+        )
 
     @override
     async def call(self, adapter: AppConfigFragmentAdapter, laid: ATargetAndACaller) -> ByNames:
@@ -100,7 +119,15 @@ class ReadingElsewhereByName(When[ATargetAndACaller, AppConfigFragmentAdapter, B
 
     @override
     def describe(self, laid: ATargetAndACaller) -> str:
-        return f"{laid.caller.username}이 어느 {SCOPE_NAMES[laid.scope_type]}도 아닌 id를 지정해 {laid.name}의 조각을 조회"
+        scope = SCOPE_NAMES[laid.scope_type]
+        return Says(
+            f"{laid.caller.username} 이 어느 {scope}도 아닌 id 를 지정해 {laid.name} 의 조각을 "
+            "조회합니다",
+            english=(
+                f"{laid.caller.username} reads the fragment of {laid.name} by naming an id that "
+                f"belongs to no {in_language(scope, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def call(self, adapter: AppConfigFragmentAdapter, laid: ATargetAndACaller) -> ByNames:
@@ -121,9 +148,14 @@ class EachNameIsAnsweredInOrder(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "사용자 스코프에 허용된 이름 셋 중 둘에 자기 조각이 있고 읽기 권한을 받은 사용자가 "
-            "셋을 조회하면, 세 항목이 요청 순서대로 반환되고 조각이 없는 항목은 비어 있다"
+            "셋을 조회하면, 세 항목이 요청 순서대로 반환되고 조각이 없는 항목은 비어 있습니다",
+            english=(
+                "when two of the three names opened to the user scope hold the user's own "
+                "fragment and a user granted read permission reads the three names, three items "
+                "come back in request order and the item without a fragment is empty"
+            ),
         )
 
     @override
@@ -149,7 +181,13 @@ class AnotherUsersFragmentStaysOut(
 
     @override
     def describe(self) -> str:
-        return "같은 이름에 다른 사용자의 조각이 있어도, 자기 조각을 조회하면 자기 것만 반환된다"
+        return Says(
+            "같은 이름에 다른 사용자의 조각이 있어도, 자기 조각을 조회하면 자기 것만 반환됩니다",
+            english=(
+                "even when another user's fragment has the same name, reading the user's own "
+                "fragments answers only their own"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AReadingPlace]:
@@ -174,9 +212,13 @@ class TheDomainsFragmentStaysOut(
 
     @override
     def describe(self) -> str:
-        return (
-            "같은 이름에 자기 도메인의 조각이 있어도, 자기 조각을 조회하면 자기 것만 반환된다. "
-            "이 조회는 사용자 스코프 하나만 본다"
+        return Says(
+            "같은 이름에 자기 도메인의 조각이 있어도, 자기 조각을 조회하면 자기 것만 반환됩니다. "
+            "이 조회는 사용자 스코프 하나만 봅니다",
+            english=(
+                "even when a fragment of the user's own domain has the same name, reading the "
+                "user's own fragments answers only their own. This read sees the user scope alone"
+            ),
         )
 
     @override
@@ -202,8 +244,13 @@ class AUserGrantedNothingMayNotReadMine(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 조각이 있어도 아무 권한도 없는 사용자가 이름으로 조회하면, 권한 부족으로 거부된다"
+        return Says(
+            "자기 조각이 있어도 아무 권한도 없는 사용자가 이름으로 조회하면, 권한 부족으로 "
+            "거부됩니다",
+            english=(
+                "even when the user has their own fragment, a user with no permission reading "
+                "by name is rejected for lack of permission"
+            ),
         )
 
     @override
@@ -229,7 +276,14 @@ class TheGrantedUserReadsTheDomains(
 
     @override
     def describe(self) -> str:
-        return "도메인 조각이 있고 그 도메인 스코프에 읽기 권한을 받은 사용자가 도메인을 지정해 조회하면, 그 조각이 반환된다"
+        return Says(
+            "도메인 조각이 있고 그 도메인 스코프에 읽기 권한을 받은 사용자가 도메인을 지정해 "
+            "조회하면, 그 조각이 반환됩니다",
+            english=(
+                "when a domain fragment exists and a user granted read permission on that "
+                "domain scope reads by naming the domain, that fragment comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ATargetAndACaller]:
@@ -256,9 +310,13 @@ class AnyoneSignedInReadsThePublic(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "공개 조각이 있고 아무 권한도 없는 사용자가 공개 스코프를 지정해 조회하면, 그 조각이 "
-            "반환된다. 공개 조각에는 보호할 스코프가 없다"
+            "반환됩니다. 공개 조각에는 보호할 스코프가 없습니다",
+            english=(
+                "when a public fragment exists and a user with no permission reads by naming the "
+                "public scope, that fragment comes back. A public fragment has no scope to protect"
+            ),
         )
 
     @override
@@ -284,7 +342,14 @@ class AnotherUsersScopeIsRefused(
 
     @override
     def describe(self) -> str:
-        return "자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 조회하면, 권한 부족으로 거부된다"
+        return Says(
+            "자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 조회하면, "
+            "권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted read permission only on their own scope reads by naming "
+                "another user, it is rejected for lack of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ATargetAndACaller]:
@@ -311,9 +376,14 @@ class AMissingDomainIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 어느 도메인도 아닌 id를 지정해 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. "
-            "권한 검사를 통과하는 사용자만 이 응답을 본다"
+        return Says(
+            "superadmin 이 어느 도메인도 아닌 id 를 지정해 조회하면, 대상을 찾을 수 없다는 이유로 "
+            "거부됩니다. 권한 검사를 통과하는 사용자만 이 응답을 봅니다",
+            english=(
+                "when the superadmin reads by naming an id that belongs to no domain, it is "
+                "rejected because no such target exists. Only a user who passes the permission "
+                "check sees this answer"
+            ),
         )
 
     @override
@@ -339,9 +409,14 @@ class AMissingDomainIsRefusedAsPermission(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 도메인에 읽기 권한을 받은 사용자가 어느 도메인도 아닌 id를 지정해 조회하면, "
-            "대상 없음이 아니라 권한 부족으로 거부된다"
+        return Says(
+            "자기 도메인에 읽기 권한을 받은 사용자가 어느 도메인도 아닌 id 를 지정해 조회하면, "
+            "대상 없음이 아니라 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted read permission on their own domain reads by naming an id "
+                "that belongs to no domain, it is rejected for lack of permission, not for a "
+                "missing target"
+            ),
         )
 
     @override

@@ -31,6 +31,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Then,
     Verdict,
 )
@@ -38,7 +39,7 @@ from bai_scenario.components.domain import Mentions, SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.artifact.artifact import TestSeedArtifact
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 
-WAS_HERE = "이미 있던 아티팩트"
+WAS_HERE = Says("이미 있던 아티팩트", english="an artifact that already existed")
 """시드가 미리 만드는 아티팩트의 설명. 시나리오가 기대값으로 다시 쓰므로 한 자리에 둔다."""
 
 
@@ -66,7 +67,10 @@ class AnArtifactAndSomeone(Given[Any, AnArtifactAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"아티팩트 하나와 {self.role.value} 한 명"
+        return Says(
+            f"아티팩트 하나와 {self.role.value} 한 명",
+            english=f"one artifact and one {self.role.value}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AnArtifactAndACaller:
@@ -85,7 +89,10 @@ class ManyArtifactsAndSomeone(Given[Any, ManyArtifactsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"아티팩트 {self.count}개와 {self.role.value} 한 명"
+        return Says(
+            f"아티팩트 {self.count}개와 {self.role.value} 한 명",
+            english=f"{self.count} artifacts and one {self.role.value}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyArtifactsAndACaller:
@@ -126,19 +133,49 @@ class ArtifactLook:
             Same(f"{prefix}readonly", node.readonly, self.readonly),
             Same(f"{prefix}extra", node.extra, None),
             Same(f"{prefix}revisions", node.revisions, []),
-            Held[UUID](f"{prefix}id", node.id, SameAs(laid.id, "미리 만든 아티팩트의 id")),
             Held[UUID](
-                f"{prefix}entity_id", node.entity_id, SameAs(laid.id, "미리 만든 아티팩트의 id")
+                f"{prefix}id",
+                node.id,
+                SameAs(
+                    laid.id,
+                    Says(
+                        "미리 저장한 아티팩트의 id",
+                        english="the id of the artifact made in advance",
+                    ),
+                ),
+            ),
+            Held[UUID](
+                f"{prefix}entity_id",
+                node.entity_id,
+                SameAs(
+                    laid.id,
+                    Says(
+                        "미리 저장한 아티팩트의 id",
+                        english="the id of the artifact made in advance",
+                    ),
+                ),
             ),
             Held[UUID](
                 f"{prefix}registry_id",
                 node.registry_id,
-                SameAs(laid.registry_id, "미리 만든 아티팩트의 레지스트리 id"),
+                SameAs(
+                    laid.registry_id,
+                    Says(
+                        "미리 저장한 아티팩트의 레지스트리 id",
+                        english="the registry id of the artifact made in advance",
+                    ),
+                ),
             ),
             Held[UUID](
                 f"{prefix}source_registry_id",
                 node.source_registry_id,
-                SameAs(laid.source_registry_id, "미리 만든 아티팩트의 레지스트리 id"),
+                SameAs(
+                    laid.source_registry_id,
+                    Says(
+                        "미리 저장한 아티팩트의 레지스트리 id",
+                        english="the registry id of the artifact made in advance",
+                    ),
+                ),
             ),
             Held(f"{prefix}scanned_at", node.scanned_at, WrittenByThisRun(started)),
             Held(f"{prefix}updated_at", node.updated_at, WrittenByThisRun(started)),
@@ -154,7 +191,10 @@ class TheArtifactNode(Then[AnArtifactAndACaller, ArtifactNode]):
 
     @override
     def says(self) -> str:
-        return "미리 만든 아티팩트 전체가 온다"
+        return Says(
+            "미리 저장한 아티팩트 전체가 반환됩니다",
+            english="the whole artifact made in advance comes back",
+        )
 
     @override
     def look(self, laid: AnArtifactAndACaller, answered: Answered[ArtifactNode]) -> list[Verdict]:
@@ -175,10 +215,17 @@ class EveryTargetComesBack(Then[ManyArtifactsAndACaller, PartialBulkPayload[Arti
     @override
     def says(self) -> str:
         if self.missing is None:
-            return "대상 아티팩트가 모두 처리된 모습으로 오고, 실패한 것은 없다"
-        return (
+            return Says(
+                "대상 아티팩트가 모두 처리된 모습으로 오고, 실패한 것은 없습니다",
+                english="every target artifact comes back processed, and none failed",
+            )
+        return Says(
             "대상 아티팩트가 모두 처리된 모습으로 오고, 없는 id 는 대상이 없다는 이유로 "
-            "실패 목록에 온다"
+            "실패 목록에 옵니다",
+            english=(
+                "every target artifact comes back processed, and the missing id comes back "
+                "in the failed list with a reason that it does not exist"
+            ),
         )
 
     @override
@@ -198,7 +245,17 @@ class EveryTargetComesBack(Then[ManyArtifactsAndACaller, PartialBulkPayload[Arti
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says(
+                            "요청에 넣은 없는 id",
+                            english="the nonexistent id sent in the request",
+                        ),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -212,7 +269,10 @@ class NothingIsProcessed(Then[ManyArtifactsAndACaller, PartialBulkPayload[Artifa
 
     @override
     def says(self) -> str:
-        return "처리된 아티팩트 없이 대상이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 아티팩트 없이 대상이 모두 실패 목록에 옵니다",
+            english="no artifact is processed and every target comes back in the failed list",
+        )
 
     @override
     def look(
@@ -230,7 +290,15 @@ class NothingIsProcessed(Then[ManyArtifactsAndACaller, PartialBulkPayload[Artifa
         for i, (failure, artifact) in enumerate(zip(payload.failed, laid.laid, strict=False)):
             verdicts += [
                 Held[UUID](
-                    f"failed[{i}].id", failure.id, SameAs(artifact.id, "대상 아티팩트의 id")
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(
+                        artifact.id,
+                        Says(
+                            "대상 아티팩트의 id",
+                            english="the id of the target artifact",
+                        ),
+                    ),
                 ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]

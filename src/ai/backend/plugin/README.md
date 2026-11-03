@@ -1,7 +1,5 @@
-Backend.AI Plugin Subsystem
-===========================
+# Backend.AI Plugin Subsystem
 
-Package Structure
------------------
+## Package Structure
 
-* `ai.backend.plugin`: Abstract types for plugins and a common base plugin set
+- `ai.backend.plugin`: abstract types for plugins and a common base plugin set

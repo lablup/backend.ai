@@ -18,7 +18,15 @@ from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import VFolderData
-from ai.backend.testutils.scenario_steps import Given, Held, Same, SameAs, Skipped, Verdict
+from ai.backend.testutils.scenario_steps import (
+    Given,
+    Held,
+    Same,
+    SameAs,
+    Says,
+    Skipped,
+    Verdict,
+)
 from bai_scenario.components.domain import WAS_HERE, GrantedUser, SomeoneOf, WrittenByThisRun
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.entity_share.share import TestSeedShareTaken, TestSeedVFolderShare
@@ -52,7 +60,13 @@ class VFolderNodeLook:
     def verdicts(self, node: VFolderNode, folder: VFolderData, at: str = "") -> list[Verdict]:
         """``at``은 답이 목록일 때 원소 자리를 앞에 붙인다."""
         return [
-            Held(f"{at}id", node.id, SameAs[UUID](folder.id, "심은 폴더")),
+            Held(
+                f"{at}id",
+                node.id,
+                SameAs[UUID](
+                    folder.id, Says("미리 저장한 vfolder", english="the vfolder seeded in advance")
+                ),
+            ),
             Same(f"{at}host", node.host, STORAGE_HOST),
             Same(f"{at}status", node.status, self.status),
             Same(
@@ -70,24 +84,56 @@ class VFolderNodeLook:
             Held(
                 f"{at}ownership.user_id",
                 node.ownership.user_id,
-                SameAs[UUID | None](folder.user, "폴더 주인"),
+                SameAs[UUID | None](
+                    folder.user, Says("vfolder 소유자", english="the vfolder owner")
+                ),
             ),
             Held(
                 f"{at}ownership.project_id",
                 node.ownership.project_id,
-                SameAs[UUID | None](folder.group, "폴더가 놓인 프로젝트"),
+                SameAs[UUID | None](
+                    folder.group,
+                    Says(
+                        "vfolder 가 놓인 프로젝트",
+                        english="the project the vfolder is placed in",
+                    ),
+                ),
             ),
             Held(
                 f"{at}ownership.creator_id",
                 node.ownership.creator_id,
-                SameAs[UUID | None](folder.creator_id, "만든 사람"),
+                SameAs[UUID | None](
+                    folder.creator_id,
+                    Says("생성한 사용자", english="the user who created the vfolder"),
+                ),
             ),
             Same(f"{at}ownership.creator_email", node.ownership.creator_email, folder.creator),
             Same(f"{at}unmanaged_path", node.unmanaged_path, None),
-            Skipped(f"{at}metadata.usage_mode", "타입이 이미 값을 못박는다"),
-            Skipped(f"{at}metadata.quota_scope_id", "주인의 id로 만들어져 실행마다 다르다"),
-            Skipped(f"{at}access_control.permission", "마운트 권한이라 이 표가 묻는 것이 아니다"),
-            Skipped(f"{at}quota", "저장소가 답하는 값이라 여기서 말할 수 없다"),
+            Skipped(
+                f"{at}metadata.usage_mode",
+                Says("타입이 이미 값을 고정합니다", english="the type already fixes the value"),
+            ),
+            Skipped(
+                f"{at}metadata.quota_scope_id",
+                Says(
+                    "소유자의 id 로 생성되어 실행마다 다릅니다",
+                    english="it is made from the owner's id, so it differs per run",
+                ),
+            ),
+            Skipped(
+                f"{at}access_control.permission",
+                Says(
+                    "마운트 권한이라 이 표가 확인하는 값이 아닙니다",
+                    english="it is a mount permission, which this table does not check",
+                ),
+            ),
+            Skipped(
+                f"{at}quota",
+                Says(
+                    "저장소가 응답하는 값이라 여기서 말할 수 없습니다",
+                    english="the storage answers it, so it cannot be stated here",
+                ),
+            ),
             Held(
                 f"{at}metadata.created_at", node.metadata.created_at, WrittenByThisRun(self.started)
             ),
@@ -105,7 +151,10 @@ class SomeoneMakingFolders(TestSeedNest[GrantedUser]):
 
     @override
     def kind(self) -> str:
-        return "폴더를 만들 수 있는 사용자 준비"
+        return Says(
+            "vfolder 를 생성할 수 있는 사용자 준비",
+            english="Prepare a user who can create vfolders",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> GrantedUser:
@@ -137,7 +186,10 @@ class SomeoneWhoMayMakeFolders(Given[Any, AFolderMakerAndTheirDomain]):
 
     @override
     def describe(self) -> str:
-        return "폴더를 놓을 수 있는 도메인과, 거기서 폴더를 만들 수 있는 사용자 한 명"
+        return Says(
+            "vfolder 를 놓을 수 있는 도메인과, 거기서 vfolder 를 생성할 수 있는 사용자 한 명",
+            english=("a domain that can hold vfolders and one user who can create a vfolder there"),
+        )
 
     @override
     async def lay(self, seeding: Any) -> AFolderMakerAndTheirDomain:
@@ -158,7 +210,10 @@ class SomeoneReadingFoldersIn[S](TestSeedNest[Laid[None]]):
 
     @override
     def kind(self) -> str:
-        return "폴더 읽기 권한 부여"
+        return Says(
+            "vfolder 읽기 권한 부여",
+            english="Grant permission to read vfolders",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[None]:
@@ -189,12 +244,20 @@ class SomeoneWithAFolderOfTheirOwn(Given[Any, AFolderAndItsReader]):
 
     @override
     def describe(self) -> str:
-        grant = (
+        grant_ko = (
             "자기 개인 프로젝트에서 폴더를 읽을 수 있는"
             if self.granted
             else "아무 권한도 받지 않은"
         )
-        return f"자기 개인 폴더 하나를 가진, {grant} 사용자 한 명"
+        grant_en = (
+            "who can read vfolders in their personal project"
+            if self.granted
+            else "holding no permission"
+        )
+        return Says(
+            f"자기 개인 vfolder 하나를 가진, {grant_ko} 사용자 한 명",
+            english=f"one user with one personal vfolder of their own, {grant_en}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AFolderAndItsReader:
@@ -217,8 +280,16 @@ class AProjectFolderAndSomeone(Given[Any, AFolderAndItsReader]):
 
     @override
     def describe(self) -> str:
-        grant = "그 프로젝트에서 폴더를 읽을 수 있는" if self.granted else "아무 권한도 받지 않은"
-        return f"폴더 하나를 가진 프로젝트와, {grant} 사용자 한 명"
+        grant_ko = (
+            "그 프로젝트에서 폴더를 읽을 수 있는" if self.granted else "아무 권한도 받지 않은"
+        )
+        grant_en = (
+            "who can read vfolders in that project" if self.granted else "holding no permission"
+        )
+        return Says(
+            f"vfolder 하나를 가진 프로젝트와, {grant_ko} 사용자 한 명",
+            english=f"a project with one vfolder and one user {grant_en}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AFolderAndItsReader:
@@ -246,10 +317,15 @@ class AFolderOfferedToSomeone(Given[Any, AFolderAndItsReader]):
 
     @override
     def describe(self) -> str:
-        answer = "받아들인" if self.accepted else "아직 답하지 않은"
-        return (
-            "남의 개인 폴더를 읽기로 공유 제안받아 "
-            f"{answer}, 자기 개인 프로젝트에서 폴더를 읽을 수 있는 사용자 한 명"
+        answer_ko = "받아들인" if self.accepted else "아직 응답하지 않은"
+        answer_en = "accepted" if self.accepted else "not yet answered"
+        return Says(
+            f"남의 개인 vfolder 를 읽기로 공유 제안받아 {answer_ko}, "
+            "자기 개인 프로젝트에서 vfolder 를 읽을 수 있는 사용자 한 명",
+            english=(
+                "one user offered another user's personal vfolder to read, "
+                f"{answer_en}, and able to read vfolders in their personal project"
+            ),
         )
 
     @override
@@ -285,9 +361,14 @@ class SomeoneWithTheirFolderAndAnothers(Given[Any, AReaderAndTwoFolders]):
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 개인 폴더 하나를 가진, 자기 개인 프로젝트에서 폴더를 읽을 수 있는 사용자 한 명과, "
-            "그 사람에게 공유되지 않은 남의 개인 폴더 하나"
+        return Says(
+            "자기 개인 vfolder 하나를 가진, 자기 개인 프로젝트에서 vfolder 를 읽을 수 있는 사용자 "
+            "한 명과, 그 사람에게 공유되지 않은 남의 개인 vfolder 하나",
+            english=(
+                "one user with one personal vfolder of their own who can read vfolders in "
+                "their personal project, and one other user's personal vfolder not shared "
+                "with them"
+            ),
         )
 
     @override
@@ -312,7 +393,10 @@ class SomeonesFolderAndTheSuperadmin(Given[Any, AFolderAndItsReader]):
 
     @override
     def describe(self) -> str:
-        return "남의 개인 폴더 하나와, 아무 역할도 받지 않은 슈퍼관리자 한 명"
+        return Says(
+            "남의 개인 vfolder 하나와, 아무 역할도 받지 않은 superadmin 한 명",
+            english="one personal vfolder of another user and one superadmin holding no role",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AFolderAndItsReader:
@@ -331,7 +415,10 @@ class SomeoneWithNoGrant(Given[Any, AFolderMakerAndTheirDomain]):
 
     @override
     def describe(self) -> str:
-        return "폴더를 놓을 수 있는 도메인과, 아무 권한도 받지 않은 사용자 한 명"
+        return Says(
+            "vfolder 를 놓을 수 있는 도메인과, 아무 권한도 받지 않은 사용자 한 명",
+            english="a domain that can hold vfolders and one user holding no permission",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AFolderMakerAndTheirDomain:
@@ -353,7 +440,7 @@ class SomeoneGrantedOnFoldersIn[S](TestSeedNest[Laid[None]]):
 
     @override
     def kind(self) -> str:
-        return "폴더 권한 부여"
+        return Says("vfolder 권한 부여", english="Grant vfolder permissions")
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[None]:
@@ -391,12 +478,18 @@ class SomeoneWithTwoFoldersAndAnothers(Given[Any, TwoOwnFoldersAndAnothers]):
     def describe(self) -> str:
         if self.permissions:
             names = ", ".join(p.name for p in self.permissions if p.name is not None)
-            grant = f"자기 개인 프로젝트에서 폴더에 {names} 권한을 받은"
+            grant_ko = f"자기 개인 프로젝트에서 폴더에 {names} 권한을 받은"
+            grant_en = f"granted the {names} permission on vfolders in their personal project"
         else:
-            grant = "아무 권한도 받지 않은"
-        return (
-            f"자기 개인 폴더 둘을 가진, {grant} 사용자 한 명과, "
-            "그 사람에게 공유되지 않은 남의 개인 폴더 하나"
+            grant_ko = "아무 권한도 받지 않은"
+            grant_en = "holding no permission"
+        return Says(
+            f"자기 개인 vfolder 둘을 가진, {grant_ko} 사용자 한 명과, "
+            "그 사람에게 공유되지 않은 남의 개인 vfolder 하나",
+            english=(
+                f"one user with two personal vfolders of their own, {grant_en}, and one "
+                "other user's personal vfolder not shared with them"
+            ),
         )
 
     @override

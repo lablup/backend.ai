@@ -13,7 +13,7 @@ from ai.backend.common.dto.manager.v2.login_client_type.response import LoginCli
 from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.login_client_type import (
     ATypeAndACaller,
@@ -41,8 +41,16 @@ class ReadingById(When[ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeN
 
     @override
     def describe(self, laid: ATypeAndACaller) -> str:
-        target = "존재하지 않는 id" if self.unknown else laid.client_type.name
-        return f"{laid.caller.username}이 {target}(으)로 조회"
+        if self.unknown:
+            target_ko = "존재하지 않는 id"
+            target_en = "an id nothing answers to"
+        else:
+            target_ko = laid.client_type.name
+            target_en = laid.client_type.name
+        return Says(
+            f"{laid.caller.username} 이 {target_ko} (으)로 조회합니다",
+            english=f"{laid.caller.username} reads a login client type by {target_en}",
+        )
 
     @override
     async def call(
@@ -64,7 +72,16 @@ class AUserGrantedNothingReadsById(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 id로 조회하면 그 종류 전체가 반환된다. 이 조회는 인증만 확인한다"
+        return Says(
+            (
+                "아무 권한도 없는 사용자가 id 로 조회하면 그 로그인 클라이언트 유형 전체가 "
+                "반환됩니다. 이 조회는 인증만 확인합니다"
+            ),
+            english=(
+                "when a user granted nothing reads a login client type by id, the whole login "
+                "client type comes back. This read checks authentication alone"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
@@ -89,7 +106,13 @@ class AnIdNothingAnswersToIsRefused(
 
     @override
     def describe(self) -> str:
-        return "존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "존재하지 않는 id 로 조회하면 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when it is read by an id nothing answers to, it is rejected because the target "
+                "cannot be found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:

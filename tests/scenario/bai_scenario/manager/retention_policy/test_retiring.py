@@ -18,7 +18,7 @@ from ai.backend.manager.api.adapters.retention_policy.adapter import RetentionPo
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.retention_policy import (
     APolicyAndACaller,
@@ -45,10 +45,19 @@ class Purging(When[APolicyAndACaller, RetentionPolicyAdapter, PurgeRetentionPoli
 
     @override
     def describe(self, laid: APolicyAndACaller) -> str:
-        target = (
+        target_ko = (
             "존재하지 않는 id" if self.unknown else f"{laid.policy.category.value} 카테고리 정책"
         )
-        return f"{laid.caller.username}이 {target} 완전 삭제"
+        target_en = (
+            "an id nothing answers to"
+            if self.unknown
+            else f"the policy of the {laid.policy.category.value} category"
+        )
+        return Says(
+            f"{laid.caller.username} 이 {target_ko}"
+            f"{' 를' if self.unknown else '을'} 영구 삭제합니다",
+            english=f"{laid.caller.username} purges {target_en}",
+        )
 
     @override
     async def call(
@@ -72,7 +81,13 @@ class TheSuperadminPurgesAPolicy(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 정책을 완전 삭제하면 삭제한 정책의 id를 담은 응답이 반환된다"
+        return Says(
+            "superadmin 이 정책을 영구 삭제하면 삭제한 정책의 id 를 담은 응답이 반환됩니다",
+            english=(
+                "when the superadmin purges a policy, the answer carries the id of the policy "
+                "that was purged"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
@@ -99,7 +114,14 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 id를 완전 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 id 를 영구 삭제하면 대상을 찾을 수 없다는 이유로 "
+            "거부됩니다",
+            english=(
+                "when the superadmin purges an id nothing answers to, the call is rejected as "
+                "not found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
@@ -126,7 +148,13 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 정책을 완전 삭제하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 정책을 영구 삭제하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing purges a policy, the call is rejected for lack of "
+                "permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APolicyAndACaller]:
@@ -154,7 +182,10 @@ class EnforcementOffLetsAnyonePurge(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 완전 삭제할 수 있다"
+        return Says(
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 영구 삭제할 수 있습니다",
+            english=("turning permission checks off lets a user granted nothing purge a policy"),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:

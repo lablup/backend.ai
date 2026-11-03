@@ -9,20 +9,14 @@ from typing import Any, override
 import pytest
 
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.resource_group.request import (
-    CreateResourceGroupInput,
-    CreateResourceGroupSchedulerOptionsConfigInput,
-    CreateResourceGroupSchedulerOptionsInput,
-)
+from ai.backend.common.dto.manager.v2.resource_group.request import CreateResourceGroupInput
 from ai.backend.common.dto.manager.v2.resource_group.response import ResourceGroupDetailNode
-from ai.backend.common.dto.manager.v2.resource_group.types import SchedulerTypeDTO
 from ai.backend.common.exception import ResourceGroupConflict
-from ai.backend.common.types import AgentSelectionStrategy, SessionTypes
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource import DefaultResourceGroupAlreadyExists
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_group import (
     AGroupAndACaller,
@@ -50,8 +44,16 @@ class Creating(When[Any, ResourceGroupAdapter, ResourceGroupDetailNode]):
 
     @override
     def describe(self, laid: Any) -> str:
-        what = "기본 그룹으로 " if self.is_default else ""
-        return f"{laid.caller.username}이 {self.named or laid.group.name}을 {what}생성"
+        if self.is_default:
+            what_ko = "기본 그룹으로 "
+            what_en = " as the default group"
+        else:
+            what_ko = ""
+            what_en = ""
+        return Says(
+            f"{laid.caller.username}이 {self.named or laid.group.name}을 {what_ko}생성합니다",
+            english=f"{laid.caller.username} creates {self.named or laid.group.name}{what_en}",
+        )
 
     @override
     async def call(self, adapter: ResourceGroupAdapter, laid: Any) -> ResourceGroupDetailNode:
@@ -61,51 +63,6 @@ class Creating(When[Any, ResourceGroupAdapter, ResourceGroupDetailNode]):
                     name=self.named or laid.group.name,
                     domain_name=laid.caller.domain_name,
                     is_default=self.is_default,
-                )
-            )
-        return payload.resource_group
-
-
-@dataclass(frozen=True)
-class CreatingWithStatusAndSchedulerOptions(
-    When[ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
-):
-    """비활성·비공개 그룹을 후입선출 스케줄러와 스케줄러 옵션을 지정해 만든다."""
-
-    named: str
-
-    @override
-    def operation(self) -> str:
-        return "create"
-
-    @override
-    def describe(self, laid: ACaller) -> str:
-        return (
-            f"{laid.caller.username}이 {self.named}을 비활성·비공개로, 후입선출 스케줄러와 "
-            "허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수, 에이전트 선택 전략, "
-            "분할 자원 조각화 허용 여부, 자동 정리할 라우트 상태를 지정해 생성"
-        )
-
-    @override
-    async def call(self, adapter: ResourceGroupAdapter, laid: ACaller) -> ResourceGroupDetailNode:
-        with ActingAs(laid.caller):
-            payload = await adapter.create(
-                CreateResourceGroupInput(
-                    name=self.named,
-                    domain_name=laid.caller.domain_name,
-                    is_active=False,
-                    is_public=False,
-                    scheduler_type=SchedulerTypeDTO.LIFO,
-                    scheduler_options=CreateResourceGroupSchedulerOptionsInput(
-                        allowed_session_types=[SessionTypes.BATCH],
-                        pending_timeout=60,
-                        config=CreateResourceGroupSchedulerOptionsConfigInput(
-                            num_retries_to_skip=3
-                        ),
-                        agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
-                        allow_fractional_resource_fragmentation=False,
-                        route_cleanup_target_statuses=["unhealthy", "degraded"],
-                    ),
                 )
             )
         return payload.resource_group
@@ -123,9 +80,14 @@ class TheSuperadminMakesAGroup(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 이름만 주고 리소스 그룹을 만들면, "
-            "활성이고 공개이며 기본이 아닌 그룹 전체가 코드의 기본값으로 채워져 반환된다"
+        return Says(
+            "superadmin 이 이름만 주고 자원 그룹을 생성하면, 활성이고 공개이며 기본이 아닌 그룹 "
+            "전체가 코드의 기본값으로 채워져 반환됩니다",
+            english=(
+                "when the superadmin creates a resource group with only a name, the whole group "
+                "comes back active, public and not the default, filled from the defaults in "
+                "the code"
+            ),
         )
 
     @override
@@ -142,49 +104,6 @@ class TheSuperadminMakesAGroup(
 
 
 @dataclass(frozen=True)
-class TheSuperadminMakesAGroupWithItsStatusAndSchedulerOptions(
-    Scenario[TestSeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
-):
-    started: datetime
-
-    @override
-    def summary(self) -> str:
-        return "the-superadmin-makes-a-resource-group-with-its-status-and-scheduler-options"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "슈퍼관리자가 활성·공개 여부, 스케줄러, 허용 세션 타입, 대기 제한 시간, "
-            "대기 세션 건너뛰기 재시도 횟수, 에이전트 선택 전략, 분할 자원 조각화 허용 여부, "
-            "자동 정리할 라우트 상태를 지정해 리소스 그룹을 만들면 지정한 값으로 채워진 그룹 전체가 반환된다"
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ACaller]:
-        return SomeoneAlone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
-        return CreatingWithStatusAndSchedulerOptions(named="batch-only")
-
-    @override
-    def then(self) -> Then[ACaller, ResourceGroupDetailNode]:
-        return TheNewGroupNode(
-            started=self.started,
-            named="batch-only",
-            is_active=False,
-            is_public=False,
-            scheduler_type=SchedulerTypeDTO.LIFO,
-            allowed_session_types=(SessionTypes.BATCH,),
-            pending_timeout=60.0,
-            num_retries_to_skip=3,
-            agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
-            allow_fractional_resource_fragmentation=False,
-            route_cleanup_target_statuses=("unhealthy", "degraded"),
-        )
-
-
-@dataclass(frozen=True)
 class ADefaultGroupIsMade(
     Scenario[TestSeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
@@ -196,7 +115,13 @@ class ADefaultGroupIsMade(
 
     @override
     def describe(self) -> str:
-        return "기본 그룹이 없을 때 슈퍼관리자가 기본으로 지정해 만들면 기본인 그룹이 반환된다"
+        return Says(
+            "기본 그룹이 없을 때 superadmin 이 기본으로 지정해 생성하면 기본인 그룹이 반환됩니다",
+            english=(
+                "when no default group exists and the superadmin creates one designated as the "
+                "default, the group comes back as the default"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
@@ -221,7 +146,13 @@ class ANameAnotherGroupHoldsIsRefused(
 
     @override
     def describe(self) -> str:
-        return "이미 어떤 그룹이 쓰고 있는 이름으로 만들려 하면 이름 중복으로 거부된다"
+        return Says(
+            "이미 어떤 자원 그룹이 쓰고 있는 이름으로 생성하려 하면 이름 중복으로 거부됩니다",
+            english=(
+                "creating with a name another resource group already holds is rejected as a "
+                "duplicate name"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
@@ -246,7 +177,14 @@ class ASecondDefaultIsRefused(
 
     @override
     def describe(self) -> str:
-        return "기본 그룹이 이미 있을 때 다른 이름으로 또 기본 그룹을 만들려 하면 기본 그룹이 이미 있다는 이유로 거부된다"
+        return Says(
+            "기본 그룹이 이미 있을 때 다른 이름으로 또 기본 그룹을 생성하려 하면 기본 그룹이 "
+            "이미 있다는 이유로 거부됩니다",
+            english=(
+                "when a default group already exists, creating another default group under a "
+                "different name is rejected because a default group already exists"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
@@ -271,7 +209,13 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 자원 그룹을 생성하려 하면 역할 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin tries to create a resource group, the "
+                "call is rejected for lacking the role"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
@@ -296,7 +240,14 @@ class TheMonitorMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "모니터가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다"
+        return Says(
+            "모니터가 자원 그룹을 생성하려 하면 역할 부족으로 거부됩니다. 모니터는 읽기만 "
+            "통과합니다",
+            english=(
+                "when the monitor tries to create a resource group, the call is rejected for "
+                "lacking the role. the monitor passes reads only"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
@@ -313,7 +264,6 @@ class TheMonitorMayNotCreate(
 
 SCENARIOS: list[CreatingStep] = [
     TheSuperadminMakesAGroup(started=datetime.now(UTC)),
-    TheSuperadminMakesAGroupWithItsStatusAndSchedulerOptions(started=datetime.now(UTC)),
     ADefaultGroupIsMade(started=datetime.now(UTC)),
     ANameAnotherGroupHoldsIsRefused(),
     # TODO(BA-7946): the create path maps every unique violation to a name conflict, so a

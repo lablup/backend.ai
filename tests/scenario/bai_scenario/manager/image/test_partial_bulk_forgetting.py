@@ -18,7 +18,7 @@ from ai.backend.common.dto.manager.v2.image.response import ImageNode
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.image import (
     NOTHING,
     EveryImageComesBack,
@@ -46,8 +46,19 @@ class ForgettingEveryTarget(When[ManyImagesAndACaller, ImageAdapter, Forgotten])
 
     @override
     def describe(self, laid: ManyImagesAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 이미지 {len(laid.laid)}개{besides}를 한 번에 소프트 삭제"
+        if self.missing is not None:
+            return Says(
+                f"{laid.caller.username}이 이미지 {len(laid.laid)}개와 없는 id 하나를 "
+                "한 번에 소프트 삭제합니다",
+                english=(
+                    f"{laid.caller.username} soft deletes {len(laid.laid)} images "
+                    "and one missing id at once"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username}이 이미지 {len(laid.laid)}개를 한 번에 소프트 삭제합니다",
+            english=f"{laid.caller.username} soft deletes {len(laid.laid)} images at once",
+        )
 
     @override
     async def call(self, adapter: ImageAdapter, laid: ManyImagesAndACaller) -> Forgotten:
@@ -68,9 +79,13 @@ class ForgettingThenRestoringEveryTarget(When[ManyImagesAndACaller, ImageAdapter
 
     @override
     def describe(self, laid: ManyImagesAndACaller) -> str:
-        return (
+        return Says(
             f"{laid.caller.username}이 이미지 {len(laid.laid)}개를 한 번에 소프트 삭제했다가 "
-            "한 번에 복원"
+            "한 번에 복원합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {len(laid.laid)} images at once "
+                "and then restores them at once"
+            ),
         )
 
     @override
@@ -91,9 +106,13 @@ class ForgettingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "살아 있는 이미지 둘과 없는 id 하나를 한 번에 소프트 삭제하면, 둘은 삭제됨 상태로 오고 "
-            "없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "살아 있는 이미지 둘과 없는 id 하나를 한 번에 소프트 삭제하면 둘은 삭제됨 상태로 "
+            "오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "soft deleting two alive images and one unknown id at once brings the two "
+                "back as deleted, and the unknown id comes back in the failed list as not found"
+            ),
         )
 
     @override
@@ -119,9 +138,13 @@ class AUserGrantedNothingForgetsNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 이미지 여럿을 한 번에 소프트 삭제하려 하면, "
-            "삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 이미지 여럿을 한 번에 소프트 삭제하려 하면 "
+            "삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to soft delete several images at once, "
+                "nothing is deleted and all come back in the failed list for lack of permission"
+            ),
         )
 
     @override
@@ -147,7 +170,10 @@ class RestoringBringsSeveralBack(
 
     @override
     def describe(self) -> str:
-        return "소프트 삭제한 이미지 여럿을 한 번에 복원하면, 모두 살아 있는 상태로 온다"
+        return Says(
+            "소프트 삭제한 이미지 여럿을 한 번에 복원하면 모두 살아 있는 상태로 옵니다",
+            english="restoring several soft-deleted images at once brings them all back alive",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyImagesAndACaller]:

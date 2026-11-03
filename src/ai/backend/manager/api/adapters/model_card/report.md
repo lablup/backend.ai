@@ -29,37 +29,37 @@ Scenario: incomplete 13 / 16
 
 | scenario | verdict |
 |---|---|
-| [모델 카드를 하나도 심지 않은 상태에서 슈퍼관리자가 전체 조회를 하면, 답은 비어 있다](#model_card-a-scenario-that-laid-no-model-card-finds-none) | answered |
-| [슈퍼관리자가 아닌 사용자가 전체 모델 카드 조회를 요청하면 역할로 막힌다](#model_card-a-user-who-is-not-the-superadmin-may-not-search-every-model-card) | rejected |
+| [with no model card seeded, a superadmin reading every card gets an empty answer](#model_card-a-scenario-that-laid-no-model-card-finds-none) | answered |
+| [when a user who is not the superadmin asks to read every model card, the role blocks it](#model_card-a-user-who-is-not-the-superadmin-may-not-search-every-model-card) | rejected |
 
 **partial_bulk_update**
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 카드 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-model-cards) | answered |
-| [프로젝트에서 모델 카드 읽기와 수정 권한을 받은 사용자가 카드 여럿의 제목을 한 번에 바꾸면, 모두 새 제목으로 오고 실패한 것은 없다](#partial_bulk_editing-a-user-granted-update-edits-several-model-cards) | answered |
+| [when a user granted nothing tries to update several cards at once, nothing is updated and all come back in the failed list for lack of permission](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-model-cards) | answered |
+| [when a user granted read and update permission on model cards in the project changes the titles of several cards at once, they all come back with the new title and nothing failed](#partial_bulk_editing-a-user-granted-update-edits-several-model-cards) | answered |
 
 **update**
 
 | scenario | verdict |
 |---|---|
-| [프로젝트에서 모델 카드 읽기와 수정 권한을 받은 사용자가 카드의 제목을 바꾸면, 제목은 새 값이 되고 나머지는 그대로 남는다](#editing-a-user-granted-update-in-the-project-edits-a-model-card) | answered |
-| [아무 권한도 받지 않은 사용자가 모델 카드를 수정하려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-model-card) | rejected |
+| [when a user granted read and update permission on model cards in the project changes the title of a card, the title takes the new value and the rest stays unchanged](#editing-a-user-granted-update-in-the-project-edits-a-model-card) | answered |
+| [when a user granted nothing tries to update a model card, the call is rejected for lack of permission](#editing-a-user-granted-nothing-may-not-edit-a-model-card) | rejected |
 
 **partial_bulk_purge**
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 카드 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-model-cards) | answered |
-| [프로젝트에서 모델 카드 purge 권한을 받은 사용자가 카드 둘을 한 번에 purge 하면, 둘 다 처리된 목록에 오고 실패한 것은 없다](#partial_bulk_purging-a-user-granted-purge-purges-several-model-cards) | answered |
-| [슈퍼관리자가 카드 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다. 권한 검사는 슈퍼관리자를 먼저 통과시키므로 없는 id 가 purge 까지 간다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | answered |
+| [when a user granted nothing tries to purge several cards at once, nothing is purged and all come back in the failed list for lack of permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-model-cards) | answered |
+| [when a user granted purge permission on model cards in the project purges two cards at once, both come back in the processed list and nothing failed](#partial_bulk_purging-a-user-granted-purge-purges-several-model-cards) | answered |
+| [when the superadmin purges two cards and one unknown id at once, the two come back in the processed list and the unknown id comes back in the failed list as not found. The permission check passes the superadmin first, so the unknown id reaches the purge](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | answered |
 
 **purge**
 
 | scenario | verdict |
 |---|---|
-| [프로젝트에서 모델 카드 purge 권한을 받은 사용자가 카드를 purge 하면, 그 카드의 id 가 온다](#purging-a-user-granted-purge-in-the-project-purges-a-model-card) | answered |
-| [아무 권한도 받지 않은 사용자가 모델 카드를 purge 하려 하면 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-purge-a-model-card) | rejected |
+| [when a user granted purge permission on model cards in the project purges a card, the id of that card comes back](#purging-a-user-granted-purge-in-the-project-purges-a-model-card) | answered |
+| [when a user granted nothing tries to purge a model card, the call is rejected for lack of permission](#purging-a-user-granted-nothing-may-not-purge-a-model-card) | rejected |
 
 ### admin_search
 
@@ -67,25 +67,25 @@ Scenario: incomplete 13 / 16
 
 #### [a-scenario-that-laid-no-model-card-finds-none](/tests/scenario/bai_scenario/manager/model_card/test_model_card.py): pass
 
-모델 카드를 하나도 심지 않은 상태에서 슈퍼관리자가 전체 조회를 하면, 답은 비어 있다
+with no model card seeded, a superadmin reading every card gets an empty answer
 
 Given
 
-- 도메인 하나와, 그 도메인에 속한 superadmin 한 명
-  - 도메인 host-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain and one superadmin in it
+  - Domain host-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ModelCardAdapter.admin_search: user-1이 필터 없이 전체 조회
+- ModelCardAdapter.admin_search: user-1 reads every card without a filter
 
 Then
 
-- 답이 비어 있다
+- the answer is empty
   - items = []
   - total_count = 0
   - has_next_page = False
@@ -95,26 +95,26 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-search-every-model-card](/tests/scenario/bai_scenario/manager/model_card/test_model_card.py): pass
 
-슈퍼관리자가 아닌 사용자가 전체 모델 카드 조회를 요청하면 역할로 막힌다
+when a user who is not the superadmin asks to read every model card, the role blocks it
 
 Given
 
-- 도메인 하나와, 그 도메인에 속한 user 한 명
-  - 도메인 host-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain and one user in it
+  - Domain host-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ModelCardAdapter.admin_search: user-1이 필터 없이 전체 조회
+- ModelCardAdapter.admin_search: user-1 reads every card without a filter
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### partial_bulk_update
 
@@ -122,86 +122,86 @@ Then
 
 #### [a-user-granted-nothing-edits-none-of-several-model-cards](/tests/scenario/bai_scenario/manager/model_card/test_partial_bulk_editing.py): pass
 
-아무 권한도 받지 않은 사용자가 카드 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user granted nothing tries to update several cards at once, nothing is updated and all come back in the failed list for lack of permission
 
 Given
 
-- 모델 카드 2개가 놓인 프로젝트와, 아무 권한도 받지 않은 user 한 명
-  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 프로젝트 model-store-1
-  - 프로젝트 폴더 folder-1: 프로젝트에 놓이고, 쓸 수 있는 상태다
-  - 모델 카드 card-1: 프로젝트에 놓이고 폴더 위에 얹힌다, 제목 '이미 있던 카드'
-  - 프로젝트 폴더 folder-2: 프로젝트에 놓이고, 쓸 수 있는 상태다
-  - 모델 카드 card-2: 프로젝트에 놓이고 폴더 위에 얹힌다, 제목 '이미 있던 카드'
+- a project holding 2 model cards and one user granted no permission
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Project model-store-1
+  - Project vfolder folder-1: is placed in the project and is ready to use
+  - Model card card-1: placed in the project and added on top of a vfolder, titled 'a card that already existed'
+  - Project vfolder folder-2: is placed in the project and is ready to use
+  - Model card card-2: placed in the project and added on top of a vfolder, titled 'a card that already existed'
 
 When
 
-- ModelCardAdapter.partial_bulk_update: user-2이 카드 2개의 제목을 한 번에 고침
+- ModelCardAdapter.partial_bulk_update: user-2 edits the titles of 2 cards at once
 
 Then
 
-- 처리된 카드 없이 대상이 모두 실패 목록에 온다
+- no card is processed and every target comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상 카드의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 카드의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the target card
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target card
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_editing-a-user-granted-update-edits-several-model-cards"></a>
 
 #### [a-user-granted-update-edits-several-model-cards](/tests/scenario/bai_scenario/manager/model_card/test_partial_bulk_editing.py): pass
 
-프로젝트에서 모델 카드 읽기와 수정 권한을 받은 사용자가 카드 여럿의 제목을 한 번에 바꾸면, 모두 새 제목으로 오고 실패한 것은 없다
+when a user granted read and update permission on model cards in the project changes the titles of several cards at once, they all come back with the new title and nothing failed
 
 Given
 
-- 모델 카드 2개가 놓인 프로젝트와, 그 프로젝트에서 모델 카드에 READ, UPDATE 권한을 받은 user 한 명
-  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 프로젝트 model-store-1
-  - 프로젝트 폴더 folder-1: 프로젝트에 놓이고, 쓸 수 있는 상태다
-  - 모델 카드 card-1: 프로젝트에 놓이고 폴더 위에 얹힌다, 제목 '이미 있던 카드'
-  - 프로젝트 폴더 folder-2: 프로젝트에 놓이고, 쓸 수 있는 상태다
-  - 모델 카드 card-2: 프로젝트에 놓이고 폴더 위에 얹힌다, 제목 '이미 있던 카드'
-  - 모델 카드 권한 부여
-    - 역할 card-handler-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 card-handler-1: model_card 전체에 READ 허용
-    - 역할 card-handler-1: model_card 전체에 UPDATE 허용
-    - 일반 사용자 user-2: 역할 card-handler-1 보유
+- a project holding 2 model cards and one user granted READ, UPDATE on model cards in that project
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Project model-store-1
+  - Project vfolder folder-1: is placed in the project and is ready to use
+  - Model card card-1: placed in the project and added on top of a vfolder, titled 'a card that already existed'
+  - Project vfolder folder-2: is placed in the project and is ready to use
+  - Model card card-2: placed in the project and added on top of a vfolder, titled 'a card that already existed'
+  - Grant model card permissions
+    - Role card-handler-1: applies only within the scope it is granted in
+    - Role card-handler-1: READ allowed on every model_card
+    - Role card-handler-1: UPDATE allowed on every model_card
+    - regular user user-2: holds Role card-handler-1
 
 When
 
-- ModelCardAdapter.partial_bulk_update: user-2이 카드 2개의 제목을 한 번에 고침
+- ModelCardAdapter.partial_bulk_update: user-2 edits the titles of 2 cards at once
 
 Then
 
-- 대상 카드가 모두 새 제목으로 오고, 실패한 것은 없다
+- every target card comes back with the new title and nothing failed
   - successes count = 2
-  - successes[0].id: 미리 만든 카드와 같다
-  - successes[0].entity_id: 미리 만든 카드와 같다
+  - successes[0].id: same as the card created in advance
+  - successes[0].entity_id: same as the card created in advance
   - successes[0].name = 'card-1'
-  - successes[0].vfolder_id: 카드가 얹힌 폴더와 같다
+  - successes[0].vfolder_id: same as the vfolder the card is placed on
   - successes[0].domain_name = 'home-1'
-  - successes[0].project_id: 카드가 놓인 프로젝트와 같다
-  - successes[0].creator_id: 카드를 만든 사람와 같다
+  - successes[0].project_id: same as the project the card is placed in
+  - successes[0].creator_id: same as the user who created the card
   - successes[0].metadata.author = None
-  - successes[0].metadata.title = '고쳐 쓴 제목'
+  - successes[0].metadata.title = 'the edited title'
   - successes[0].metadata.model_version = None
   - successes[0].metadata.description = None
   - successes[0].metadata.task = None
@@ -213,17 +213,17 @@ Then
   - successes[0].min_resource = None
   - successes[0].readme = None
   - successes[0].access_level = <ModelCardAccessLevel.INTERNAL: 'internal'>
-  - successes[0].created_at: 이 실행이 쓴 시각
-  - successes[0].updated_at: 이 실행이 쓴 시각
-  - successes[1].id: 미리 만든 카드와 같다
-  - successes[1].entity_id: 미리 만든 카드와 같다
+  - successes[0].created_at: the time this run wrote
+  - successes[0].updated_at: the time this run wrote
+  - successes[1].id: same as the card created in advance
+  - successes[1].entity_id: same as the card created in advance
   - successes[1].name = 'card-2'
-  - successes[1].vfolder_id: 카드가 얹힌 폴더와 같다
+  - successes[1].vfolder_id: same as the vfolder the card is placed on
   - successes[1].domain_name = 'home-1'
-  - successes[1].project_id: 카드가 놓인 프로젝트와 같다
-  - successes[1].creator_id: 카드를 만든 사람와 같다
+  - successes[1].project_id: same as the project the card is placed in
+  - successes[1].creator_id: same as the user who created the card
   - successes[1].metadata.author = None
-  - successes[1].metadata.title = '고쳐 쓴 제목'
+  - successes[1].metadata.title = 'the edited title'
   - successes[1].metadata.model_version = None
   - successes[1].metadata.description = None
   - successes[1].metadata.task = None
@@ -235,8 +235,8 @@ Then
   - successes[1].min_resource = None
   - successes[1].readme = None
   - successes[1].access_level = <ModelCardAccessLevel.INTERNAL: 'internal'>
-  - successes[1].created_at: 이 실행이 쓴 시각
-  - successes[1].updated_at: 이 실행이 쓴 시각
+  - successes[1].created_at: the time this run wrote
+  - successes[1].updated_at: the time this run wrote
   - failed = []
 
 ### update
@@ -245,45 +245,45 @@ Then
 
 #### [a-user-granted-update-in-the-project-edits-a-model-card](/tests/scenario/bai_scenario/manager/model_card/test_editing.py): pass
 
-프로젝트에서 모델 카드 읽기와 수정 권한을 받은 사용자가 카드의 제목을 바꾸면, 제목은 새 값이 되고 나머지는 그대로 남는다
+when a user granted read and update permission on model cards in the project changes the title of a card, the title takes the new value and the rest stays unchanged
 
 Given
 
-- 모델 카드 1개가 놓인 프로젝트와, 그 프로젝트에서 모델 카드에 READ, UPDATE 권한을 받은 user 한 명
-  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 프로젝트 model-store-1
-  - 프로젝트 폴더 folder-1: 프로젝트에 놓이고, 쓸 수 있는 상태다
-  - 모델 카드 card-1: 프로젝트에 놓이고 폴더 위에 얹힌다, 제목 '이미 있던 카드'
-  - 모델 카드 권한 부여
-    - 역할 card-handler-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 card-handler-1: model_card 전체에 READ 허용
-    - 역할 card-handler-1: model_card 전체에 UPDATE 허용
-    - 일반 사용자 user-2: 역할 card-handler-1 보유
+- a project holding 1 model cards and one user granted READ, UPDATE on model cards in that project
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Project model-store-1
+  - Project vfolder folder-1: is placed in the project and is ready to use
+  - Model card card-1: placed in the project and added on top of a vfolder, titled 'a card that already existed'
+  - Grant model card permissions
+    - Role card-handler-1: applies only within the scope it is granted in
+    - Role card-handler-1: READ allowed on every model_card
+    - Role card-handler-1: UPDATE allowed on every model_card
+    - regular user user-2: holds Role card-handler-1
 
 When
 
-- ModelCardAdapter.update: user-2이 card-1의 제목을 고침
+- ModelCardAdapter.update: user-2 edits the title of card-1
 
 Then
 
-- 제목은 새 값이 되고 나머지는 그대로인 카드 전체
-  - id: 미리 만든 카드와 같다
-  - entity_id: 미리 만든 카드와 같다
+- the whole card comes back with the title taking the new value and the rest unchanged
+  - id: same as the card created in advance
+  - entity_id: same as the card created in advance
   - name = 'card-1'
-  - vfolder_id: 카드가 얹힌 폴더와 같다
+  - vfolder_id: same as the vfolder the card is placed on
   - domain_name = 'home-1'
-  - project_id: 카드가 놓인 프로젝트와 같다
-  - creator_id: 카드를 만든 사람와 같다
+  - project_id: same as the project the card is placed in
+  - creator_id: same as the user who created the card
   - metadata.author = None
-  - metadata.title = '고쳐 쓴 제목'
+  - metadata.title = 'the edited title'
   - metadata.model_version = None
   - metadata.description = None
   - metadata.task = None
@@ -295,39 +295,39 @@ Then
   - min_resource = None
   - readme = None
   - access_level = <ModelCardAccessLevel.INTERNAL: 'internal'>
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="editing-a-user-granted-nothing-may-not-edit-a-model-card"></a>
 
 #### [a-user-granted-nothing-may-not-edit-a-model-card](/tests/scenario/bai_scenario/manager/model_card/test_editing.py): pass
 
-아무 권한도 받지 않은 사용자가 모델 카드를 수정하려 하면 권한 부족으로 거부된다
+when a user granted nothing tries to update a model card, the call is rejected for lack of permission
 
 Given
 
-- 모델 카드 1개가 놓인 프로젝트와, 아무 권한도 받지 않은 user 한 명
-  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 프로젝트 model-store-1
-  - 프로젝트 폴더 folder-1: 프로젝트에 놓이고, 쓸 수 있는 상태다
-  - 모델 카드 card-1: 프로젝트에 놓이고 폴더 위에 얹힌다, 제목 '이미 있던 카드'
+- a project holding 1 model cards and one user granted no permission
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Project model-store-1
+  - Project vfolder folder-1: is placed in the project and is ready to use
+  - Model card card-1: placed in the project and added on top of a vfolder, titled 'a card that already existed'
 
 When
 
-- ModelCardAdapter.update: user-2이 card-1의 제목을 고침
+- ModelCardAdapter.update: user-2 edits the title of card-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### partial_bulk_purge
 
@@ -335,85 +335,85 @@ Then
 
 #### [a-user-granted-nothing-purges-none-of-several-model-cards](/tests/scenario/bai_scenario/manager/model_card/test_partial_bulk_purging.py): pass
 
-아무 권한도 받지 않은 사용자가 카드 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user granted nothing tries to purge several cards at once, nothing is purged and all come back in the failed list for lack of permission
 
 Given
 
-- 모델 카드 2개가 놓인 프로젝트와, 아무 권한도 받지 않은 user 한 명
-  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 프로젝트 model-store-1
-  - 프로젝트 폴더 folder-1: 프로젝트에 놓이고, 쓸 수 있는 상태다
-  - 모델 카드 card-1: 프로젝트에 놓이고 폴더 위에 얹힌다, 제목 '이미 있던 카드'
-  - 프로젝트 폴더 folder-2: 프로젝트에 놓이고, 쓸 수 있는 상태다
-  - 모델 카드 card-2: 프로젝트에 놓이고 폴더 위에 얹힌다, 제목 '이미 있던 카드'
+- a project holding 2 model cards and one user granted no permission
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Project model-store-1
+  - Project vfolder folder-1: is placed in the project and is ready to use
+  - Model card card-1: placed in the project and added on top of a vfolder, titled 'a card that already existed'
+  - Project vfolder folder-2: is placed in the project and is ready to use
+  - Model card card-2: placed in the project and added on top of a vfolder, titled 'a card that already existed'
 
 When
 
-- ModelCardAdapter.partial_bulk_purge: user-2이 카드 2개를 한 번에 purge 함
+- ModelCardAdapter.partial_bulk_purge: user-2 purges 2 cards at once
 
 Then
 
-- 처리된 카드 없이 대상이 모두 실패 목록에 온다
+- no card is processed and every target comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상 카드의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 카드의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the target card
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target card
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_purging-a-user-granted-purge-purges-several-model-cards"></a>
 
 #### [a-user-granted-purge-purges-several-model-cards](/tests/scenario/bai_scenario/manager/model_card/test_partial_bulk_purging.py): pass
 
-프로젝트에서 모델 카드 purge 권한을 받은 사용자가 카드 둘을 한 번에 purge 하면, 둘 다 처리된 목록에 오고 실패한 것은 없다
+when a user granted purge permission on model cards in the project purges two cards at once, both come back in the processed list and nothing failed
 
 Given
 
-- 모델 카드 2개가 놓인 프로젝트와, 그 프로젝트에서 모델 카드에 HARD_DELETE 권한을 받은 user 한 명
-  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 프로젝트 model-store-1
-  - 프로젝트 폴더 folder-1: 프로젝트에 놓이고, 쓸 수 있는 상태다
-  - 모델 카드 card-1: 프로젝트에 놓이고 폴더 위에 얹힌다, 제목 '이미 있던 카드'
-  - 프로젝트 폴더 folder-2: 프로젝트에 놓이고, 쓸 수 있는 상태다
-  - 모델 카드 card-2: 프로젝트에 놓이고 폴더 위에 얹힌다, 제목 '이미 있던 카드'
-  - 모델 카드 권한 부여
-    - 역할 card-handler-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 card-handler-1: model_card 전체에 HARD_DELETE 허용
-    - 일반 사용자 user-2: 역할 card-handler-1 보유
+- a project holding 2 model cards and one user granted HARD_DELETE on model cards in that project
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Project model-store-1
+  - Project vfolder folder-1: is placed in the project and is ready to use
+  - Model card card-1: placed in the project and added on top of a vfolder, titled 'a card that already existed'
+  - Project vfolder folder-2: is placed in the project and is ready to use
+  - Model card card-2: placed in the project and added on top of a vfolder, titled 'a card that already existed'
+  - Grant model card permissions
+    - Role card-handler-1: applies only within the scope it is granted in
+    - Role card-handler-1: HARD_DELETE allowed on every model_card
+    - regular user user-2: holds Role card-handler-1
 
 When
 
-- ModelCardAdapter.partial_bulk_purge: user-2이 카드 2개를 한 번에 purge 함
+- ModelCardAdapter.partial_bulk_purge: user-2 purges 2 cards at once
 
 Then
 
-- 대상 카드가 모두 처리된 목록에 오고, 실패한 것은 없다
+- every target card comes back in the processed list and nothing failed
   - successes count = 2
-  - successes[0].id: 미리 만든 카드와 같다
-  - successes[0].entity_id: 미리 만든 카드와 같다
+  - successes[0].id: same as the card created in advance
+  - successes[0].entity_id: same as the card created in advance
   - successes[0].name = 'card-1'
-  - successes[0].vfolder_id: 카드가 얹힌 폴더와 같다
+  - successes[0].vfolder_id: same as the vfolder the card is placed on
   - successes[0].domain_name = 'home-1'
-  - successes[0].project_id: 카드가 놓인 프로젝트와 같다
-  - successes[0].creator_id: 카드를 만든 사람와 같다
+  - successes[0].project_id: same as the project the card is placed in
+  - successes[0].creator_id: same as the user who created the card
   - successes[0].metadata.author = None
-  - successes[0].metadata.title = '이미 있던 카드'
+  - successes[0].metadata.title = 'a card that already existed'
   - successes[0].metadata.model_version = None
   - successes[0].metadata.description = None
   - successes[0].metadata.task = None
@@ -425,17 +425,17 @@ Then
   - successes[0].min_resource = None
   - successes[0].readme = None
   - successes[0].access_level = <ModelCardAccessLevel.INTERNAL: 'internal'>
-  - successes[0].created_at: 이 실행이 쓴 시각
-  - successes[0].updated_at: 이 실행이 쓴 시각
-  - successes[1].id: 미리 만든 카드와 같다
-  - successes[1].entity_id: 미리 만든 카드와 같다
+  - successes[0].created_at: the time this run wrote
+  - successes[0].updated_at: the time this run wrote
+  - successes[1].id: same as the card created in advance
+  - successes[1].entity_id: same as the card created in advance
   - successes[1].name = 'card-2'
-  - successes[1].vfolder_id: 카드가 얹힌 폴더와 같다
+  - successes[1].vfolder_id: same as the vfolder the card is placed on
   - successes[1].domain_name = 'home-1'
-  - successes[1].project_id: 카드가 놓인 프로젝트와 같다
-  - successes[1].creator_id: 카드를 만든 사람와 같다
+  - successes[1].project_id: same as the project the card is placed in
+  - successes[1].creator_id: same as the user who created the card
   - successes[1].metadata.author = None
-  - successes[1].metadata.title = '이미 있던 카드'
+  - successes[1].metadata.title = 'a card that already existed'
   - successes[1].metadata.model_version = None
   - successes[1].metadata.description = None
   - successes[1].metadata.task = None
@@ -447,51 +447,51 @@ Then
   - successes[1].min_resource = None
   - successes[1].readme = None
   - successes[1].access_level = <ModelCardAccessLevel.INTERNAL: 'internal'>
-  - successes[1].created_at: 이 실행이 쓴 시각
-  - successes[1].updated_at: 이 실행이 쓴 시각
+  - successes[1].created_at: the time this run wrote
+  - successes[1].updated_at: the time this run wrote
   - failed = []
 
 <a id="partial_bulk_purging-purging-several-answers-for-the-missing-one"></a>
 
 #### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/model_card/test_partial_bulk_purging.py): pass
 
-슈퍼관리자가 카드 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다. 권한 검사는 슈퍼관리자를 먼저 통과시키므로 없는 id 가 purge 까지 간다
+when the superadmin purges two cards and one unknown id at once, the two come back in the processed list and the unknown id comes back in the failed list as not found. The permission check passes the superadmin first, so the unknown id reaches the purge
 
 Given
 
-- 모델 카드 2개가 놓인 프로젝트와, 아무 권한도 받지 않은 superadmin 한 명
-  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 프로젝트 model-store-1
-  - 프로젝트 폴더 folder-1: 프로젝트에 놓이고, 쓸 수 있는 상태다
-  - 모델 카드 card-1: 프로젝트에 놓이고 폴더 위에 얹힌다, 제목 '이미 있던 카드'
-  - 프로젝트 폴더 folder-2: 프로젝트에 놓이고, 쓸 수 있는 상태다
-  - 모델 카드 card-2: 프로젝트에 놓이고 폴더 위에 얹힌다, 제목 '이미 있던 카드'
+- a project holding 2 model cards and one superadmin granted no permission
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - superadmin user-2: has their own keypair and personal project
+  - Project model-store-1
+  - Project vfolder folder-1: is placed in the project and is ready to use
+  - Model card card-1: placed in the project and added on top of a vfolder, titled 'a card that already existed'
+  - Project vfolder folder-2: is placed in the project and is ready to use
+  - Model card card-2: placed in the project and added on top of a vfolder, titled 'a card that already existed'
 
 When
 
-- ModelCardAdapter.partial_bulk_purge: user-2이 카드 2개 와 없는 id 하나를 한 번에 purge 함
+- ModelCardAdapter.partial_bulk_purge: user-2 purges 2 cards and one missing id at once
 
 Then
 
-- 대상 카드가 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+- every target card comes back in the processed list, and the unknown id comes back in the failed list as not found
   - successes count = 2
-  - successes[0].id: 미리 만든 카드와 같다
-  - successes[0].entity_id: 미리 만든 카드와 같다
+  - successes[0].id: same as the card created in advance
+  - successes[0].entity_id: same as the card created in advance
   - successes[0].name = 'card-1'
-  - successes[0].vfolder_id: 카드가 얹힌 폴더와 같다
+  - successes[0].vfolder_id: same as the vfolder the card is placed on
   - successes[0].domain_name = 'home-1'
-  - successes[0].project_id: 카드가 놓인 프로젝트와 같다
-  - successes[0].creator_id: 카드를 만든 사람와 같다
+  - successes[0].project_id: same as the project the card is placed in
+  - successes[0].creator_id: same as the user who created the card
   - successes[0].metadata.author = None
-  - successes[0].metadata.title = '이미 있던 카드'
+  - successes[0].metadata.title = 'a card that already existed'
   - successes[0].metadata.model_version = None
   - successes[0].metadata.description = None
   - successes[0].metadata.task = None
@@ -503,17 +503,17 @@ Then
   - successes[0].min_resource = None
   - successes[0].readme = None
   - successes[0].access_level = <ModelCardAccessLevel.INTERNAL: 'internal'>
-  - successes[0].created_at: 이 실행이 쓴 시각
-  - successes[0].updated_at: 이 실행이 쓴 시각
-  - successes[1].id: 미리 만든 카드와 같다
-  - successes[1].entity_id: 미리 만든 카드와 같다
+  - successes[0].created_at: the time this run wrote
+  - successes[0].updated_at: the time this run wrote
+  - successes[1].id: same as the card created in advance
+  - successes[1].entity_id: same as the card created in advance
   - successes[1].name = 'card-2'
-  - successes[1].vfolder_id: 카드가 얹힌 폴더와 같다
+  - successes[1].vfolder_id: same as the vfolder the card is placed on
   - successes[1].domain_name = 'home-1'
-  - successes[1].project_id: 카드가 놓인 프로젝트와 같다
-  - successes[1].creator_id: 카드를 만든 사람와 같다
+  - successes[1].project_id: same as the project the card is placed in
+  - successes[1].creator_id: same as the user who created the card
   - successes[1].metadata.author = None
-  - successes[1].metadata.title = '이미 있던 카드'
+  - successes[1].metadata.title = 'a card that already existed'
   - successes[1].metadata.model_version = None
   - successes[1].metadata.description = None
   - successes[1].metadata.task = None
@@ -525,11 +525,11 @@ Then
   - successes[1].min_resource = None
   - successes[1].readme = None
   - successes[1].access_level = <ModelCardAccessLevel.INTERNAL: 'internal'>
-  - successes[1].created_at: 이 실행이 쓴 시각
-  - successes[1].updated_at: 이 실행이 쓴 시각
+  - successes[1].created_at: the time this run wrote
+  - successes[1].updated_at: the time this run wrote
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 'No such model card'를 담은 이유
+  - failed[0].id: same as the unknown id put in the request
+  - failed[0].message: a reason containing 'No such model card'
 
 ### purge
 
@@ -537,65 +537,65 @@ Then
 
 #### [a-user-granted-purge-in-the-project-purges-a-model-card](/tests/scenario/bai_scenario/manager/model_card/test_purging.py): pass
 
-프로젝트에서 모델 카드 purge 권한을 받은 사용자가 카드를 purge 하면, 그 카드의 id 가 온다
+when a user granted purge permission on model cards in the project purges a card, the id of that card comes back
 
 Given
 
-- 모델 카드 1개가 놓인 프로젝트와, 그 프로젝트에서 모델 카드에 HARD_DELETE 권한을 받은 user 한 명
-  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 프로젝트 model-store-1
-  - 프로젝트 폴더 folder-1: 프로젝트에 놓이고, 쓸 수 있는 상태다
-  - 모델 카드 card-1: 프로젝트에 놓이고 폴더 위에 얹힌다, 제목 '이미 있던 카드'
-  - 모델 카드 권한 부여
-    - 역할 card-handler-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 card-handler-1: model_card 전체에 HARD_DELETE 허용
-    - 일반 사용자 user-2: 역할 card-handler-1 보유
+- a project holding 1 model cards and one user granted HARD_DELETE on model cards in that project
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Project model-store-1
+  - Project vfolder folder-1: is placed in the project and is ready to use
+  - Model card card-1: placed in the project and added on top of a vfolder, titled 'a card that already existed'
+  - Grant model card permissions
+    - Role card-handler-1: applies only within the scope it is granted in
+    - Role card-handler-1: HARD_DELETE allowed on every model_card
+    - regular user user-2: holds Role card-handler-1
 
 When
 
-- ModelCardAdapter.purge: user-2이 card-1을 purge 함, 폴더는 그대로 둠
+- ModelCardAdapter.purge: user-2 purges card-1 and leaves the vfolder alone
 
 Then
 
-- purge 한 카드의 id
-  - id: 미리 만든 카드와 같다
+- the id of the purged card comes back
+  - id: same as the card created in advance
 
 <a id="purging-a-user-granted-nothing-may-not-purge-a-model-card"></a>
 
 #### [a-user-granted-nothing-may-not-purge-a-model-card](/tests/scenario/bai_scenario/manager/model_card/test_purging.py): pass
 
-아무 권한도 받지 않은 사용자가 모델 카드를 purge 하려 하면 권한 부족으로 거부된다
+when a user granted nothing tries to purge a model card, the call is rejected for lack of permission
 
 Given
 
-- 모델 카드 1개가 놓인 프로젝트와, 아무 권한도 받지 않은 user 한 명
-  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 프로젝트 model-store-1
-  - 프로젝트 폴더 folder-1: 프로젝트에 놓이고, 쓸 수 있는 상태다
-  - 모델 카드 card-1: 프로젝트에 놓이고 폴더 위에 얹힌다, 제목 '이미 있던 카드'
+- a project holding 1 model cards and one user granted no permission
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Project model-store-1
+  - Project vfolder folder-1: is placed in the project and is ready to use
+  - Model card card-1: placed in the project and added on top of a vfolder, titled 'a card that already existed'
 
 When
 
-- ModelCardAdapter.purge: user-2이 card-1을 purge 함, 폴더는 그대로 둠
+- ModelCardAdapter.purge: user-2 purges card-1 and leaves the vfolder alone
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 

@@ -9,6 +9,7 @@ from typing import override
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 SLOTS = ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")})
@@ -23,11 +24,14 @@ class TestSeedResourcePreset(TestSeedRow[ResourcePresetData]):
 
     @override
     def kind(self) -> str:
-        return "리소스 프리셋"
+        return Says("자원 프리셋", english="Resource preset")
 
     @override
     def detail(self) -> str:
-        return "리소스 그룹에 묶이지 않아 public 에 속한다"
+        return Says(
+            "자원 그룹에 묶이지 않아 public 에 속합니다",
+            english="belongs to public because it is bound to no resource group",
+        )
 
     @override
     def name(self, naming: Naming) -> str:

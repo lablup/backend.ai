@@ -15,7 +15,15 @@ from ai.backend.manager.api.adapters.vfs_storage.adapter import VFSStorageAdapte
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import (
+    Given,
+    Language,
+    Says,
+    Scenario,
+    Then,
+    When,
+    in_language,
+)
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.vfs_storage import (
     AStorageAndACaller,
@@ -41,8 +49,13 @@ class Purging(When[AStorageAndACaller, VFSStorageAdapter, PurgeVFSStoragePayload
 
     @override
     def describe(self, laid: AStorageAndACaller) -> str:
-        target = "존재하지 않는 id" if self.unknown else laid.storage.name
-        return f"{laid.caller.username}이 {target} purge"
+        target = (
+            Says("존재하지 않는 id", english="a missing id") if self.unknown else laid.storage.name
+        )
+        return Says(
+            f"{laid.caller.username}이 {target} 를 purge 합니다",
+            english=f"{laid.caller.username} purges {in_language(target, Language.ENGLISH)}",
+        )
 
     @override
     async def call(
@@ -63,7 +76,12 @@ class TheSuperadminPurgesAStorage(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 VFS storage 를 purge 하면 purge 한 것의 id 가 반환된다"
+        return Says(
+            "superadmin 이 VFS storage 를 purge 하면 purge 한 것의 id 가 반환됩니다",
+            english=(
+                "when the superadmin purges a VFS storage, the id of the purged one is returned"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AStorageAndACaller]:
@@ -88,7 +106,13 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 id를 purge 하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 id 를 purge 하면 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when the superadmin purges an id that does not exist, it is rejected because "
+                "the target is not found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AStorageAndACaller]:
@@ -113,7 +137,13 @@ class AUserGrantedNothingMayNotPurge(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 VFS storage 를 purge 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 VFS storage 를 purge 하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing purges a VFS storage, it is rejected for lack of "
+                "permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AStorageAndACaller]:
