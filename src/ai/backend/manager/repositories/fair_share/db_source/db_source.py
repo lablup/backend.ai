@@ -922,7 +922,7 @@ class FairShareDBSource:
             for rank in calculation_result.scheduling_ranks
         }
 
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_session_read_committed() as db_sess:
             now = sa.func.now()
 
             # Upsert domain fair shares
