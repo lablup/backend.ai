@@ -16,7 +16,12 @@ from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
+from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
+    GroupMeta,
+    ProcessorDependencies,
+)
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.api.adapters.login_history.adapter import LoginHistoryAdapter
 from ai.backend.manager.api.adapters.login_session.adapter import LoginSessionAdapter
@@ -102,6 +107,7 @@ async def adapter(
     )
     domain = DomainProcessors(
         registry.group(GroupMeta(DomainEntityType())),
+        registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
         DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
     )
     return UserAdapter(user, domain, config.config.auth, key_pool)
