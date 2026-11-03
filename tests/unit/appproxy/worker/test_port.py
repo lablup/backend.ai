@@ -130,12 +130,12 @@ async def serving_port_frontend(
         return web.Response()
 
     frontend = PortFrontend(root_context=root_context)
-    frontend.circuits = {
-        unused_tcp_port: create_circuit(unused_tcp_port).model_copy(update={"open_to_public": True})
+    circuit = create_circuit(unused_tcp_port).model_copy(update={"open_to_public": True})
+    frontend.backends = {
+        unused_tcp_port: mocker.MagicMock(proxy_http=record_request_body, circuit=circuit)
     }
-    frontend.backends = {unused_tcp_port: mocker.MagicMock(proxy_http=record_request_body)}
     root_context.ingress_state.reader.get = mocker.AsyncMock(
-        return_value=frontend.circuits[unused_tcp_port].to_ingress(_AUTHORITY)
+        return_value=circuit.to_ingress(_AUTHORITY)
     )
     await frontend.start()
     yield _ServingPortFrontend(
@@ -170,9 +170,8 @@ class TestPortFrontend:
                     side_effect=IngressNotRegisteredError("no layer holds the frontend")
                 )
         frontend = PortFrontend(root_context=root_context)
-        backend = mocker.MagicMock()
+        backend = mocker.MagicMock(circuit=circuit)
         if case.circuit_registered:
-            frontend.circuits[_PORT] = circuit
             frontend.backends[_PORT] = backend
         app = web.Application()
         app["port"] = _PORT
