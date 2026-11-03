@@ -131,6 +131,13 @@ def get(deployment_id: str) -> None:
 @click.option("--project-id", required=True, type=str, help="Project (group) UUID.")
 @click.option("--domain-name", default="default", type=str, help="Domain name.")
 @click.option("--resource-group", required=True, type=str, help="Resource group name.")
+@click.option(
+    "--designated-agent",
+    "designated_agents",
+    multiple=True,
+    type=click.UUID,
+    help="UUID of an agent of the resource group to place route sessions on. Repeatable.",
+)
 @click.option("--replicas", default=0, type=int, help="Number of replicas.")
 @click.option("--open-to-public", default=False, is_flag=True, help="Make publicly accessible.")
 @click.option(
@@ -150,6 +157,7 @@ def create(
     project_id: str,
     domain_name: str,
     resource_group: str,
+    designated_agents: tuple[UUID, ...],
     replicas: int,
     open_to_public: bool,
     strategy: str,
@@ -183,6 +191,7 @@ def create(
             project_id=project_id,
             domain_name=domain_name,
             resource_group_name=ResourceGroupName(resource_group),
+            designated_agent_ids=list(designated_agents) or None,
             name=name,
         ),
         network_access=ModelDeploymentNetworkAccessInput(
@@ -212,14 +221,33 @@ def create(
 @click.option("--replicas", default=None, type=int, help="Number of replicas.")
 @click.option("--open-to-public", default=None, type=bool, help="Network visibility.")
 @click.option("--preferred-domain-name", default=None, type=str, help="Preferred domain name.")
+@click.option(
+    "--designated-agent",
+    "designated_agents",
+    multiple=True,
+    type=click.UUID,
+    help="Replace the designated agents with these UUIDs. Repeatable.",
+)
+@click.option(
+    "--clear-designated-agents",
+    is_flag=True,
+    default=False,
+    help="Remove every designated agent.",
+)
 def update(
     deployment_id: str,
     name: str | None,
     replicas: int | None,
     open_to_public: bool | None,
     preferred_domain_name: str | None,
+    designated_agents: tuple[UUID, ...],
+    clear_designated_agents: bool,
 ) -> None:
     """Update deployment metadata."""
+    if designated_agents and clear_designated_agents:
+        raise click.BadParameter(
+            "--designated-agent and --clear-designated-agents are mutually exclusive"
+        )
 
     from ai.backend.common.dto.manager.v2.deployment.request import (
         UpdateDeploymentInput,
@@ -232,6 +260,13 @@ def update(
         open_to_public=open_to_public if open_to_public is not None else UNSET,
         preferred_domain_name=(
             preferred_domain_name if preferred_domain_name is not None else UNSET
+        ),
+        designated_agent_ids=(
+            []
+            if clear_designated_agents
+            else list(designated_agents)
+            if designated_agents
+            else UNSET
         ),
     )
 
