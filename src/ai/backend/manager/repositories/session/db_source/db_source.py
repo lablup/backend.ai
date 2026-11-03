@@ -23,6 +23,7 @@ from ai.backend.manager.data.image.types import ImageData, ImageStatus
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import (
     SessionData,
+    SessionEntityData,
     SessionRoutingInfo,
     SessionStatus,
 )
@@ -61,11 +62,12 @@ from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
 from ai.backend.manager.models.session_template.row import SessionTemplateRow
-from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
 from ai.backend.manager.utils import query_userinfo
@@ -212,45 +214,63 @@ class SessionDBSource:
         self,
         id_or_name_prefix: str,
         owner_access_key: AccessKey,
-    ) -> list[SessionRow]:
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
+    ) -> list[SessionEntityData]:
+        async with self._ops_provider.read_ops() as r:
             return await self._match_sessions(
-                db_sess, id_or_name_prefix, owner_access_key, allow_stale=True
+                r, id_or_name_prefix, owner_access_key, allow_stale=True
             )
 
     @staticmethod
     async def _match_sessions(
-        db_sess: AsyncSession,
+        r: V2ReadOps,
         id_or_name: str,
         access_key: AccessKey,
         *,
         allow_stale: bool,
-    ) -> list[SessionRow]:
+    ) -> list[SessionEntityData]:
         """The sessions of ``access_key`` whose id or name equals ``id_or_name``.
 
         An id match shuts out the name matches; up to 10 name matches come newest first.
         """
-        id_match: sa.ColumnElement[bool]
-        try:
-            id_match = SessionRow.id == uuid.UUID(id_or_name)
-        except ValueError:
-            id_match = sa.false()
-        rank = sa.case((id_match, 0), else_=1).label("rank")
-        cond = (id_match | (SessionRow.name == id_or_name)) & (SessionRow.access_key == access_key)
+        fields = SessionSearchableFields.own
+        owned = [
+            fields.access_key.filter.equals(
+                StringMatchSpec(access_key, case_insensitive=False, negated=False)
+            )
+        ]
         if not allow_stale:
-            cond = cond & ~SessionRow.status.in_(SessionStatus.terminal_statuses())
-        query = (
-            sa.select(SessionRow, rank)
-            .where(cond)
-            .order_by(rank, sa.desc(SessionRow.created_at))
-            .limit(10)
-            .execution_options(populate_existing=True)
+            owned.append(fields.status.filter.not_in(list(SessionStatus.terminal_statuses())))
+        try:
+            session_id = uuid.UUID(id_or_name)
+        except ValueError:
+            pass
+        else:
+            by_id = await r.search_in_global(
+                SessionSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        *owned,
+                        fields.id.filter.equals(
+                            UUIDEqualMatchSpec(value=session_id, negated=False)
+                        ),
+                    ],
+                )
+            )
+            if by_id.items:
+                return list(by_id.items)
+        by_name = await r.search_in_global(
+            SessionSearcher(
+                pagination=OffsetPagination(limit=10),
+                conditions=[
+                    *owned,
+                    fields.name.filter.equals(
+                        StringMatchSpec(id_or_name, case_insensitive=False, negated=False)
+                    ),
+                ],
+                orders=[fields.created_at.order.apply(ascending=False)],
+            )
         )
-        rows = (await db_sess.execute(query)).all()
-        if not rows:
-            return []
-        best_rank = rows[0].rank
-        return [row.SessionRow for row in rows if row.rank == best_rank]
+        return list(by_name.items)
 
     async def get_template_by_id(
         self,
@@ -426,10 +446,11 @@ class SessionDBSource:
             if session_row is None:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
 
+            w = V2WriteOps(db_session)
             if session_name and session_row.access_key is not None:
                 # Check the owner of the target session has any session with the same name
                 matches = await self._match_sessions(
-                    db_session,
+                    w,
                     session_name,
                     AccessKey(session_row.access_key),
                     allow_stale=False,
@@ -453,7 +474,7 @@ class SessionDBSource:
                         f"Duplicate session name. Session(id:{matches[0].id}) already has the name"
                     )
 
-            updated = await V2WriteOps(db_session).update_data(updater)
+            updated = await w.update_data(updater)
             if updated is None:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
 

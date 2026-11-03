@@ -25,6 +25,7 @@ from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import (
     SessionData,
+    SessionEntityData,
     SessionRoutingInfo,
 )
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
@@ -112,7 +113,7 @@ class SessionRepository:
         self,
         id_or_name_prefix: str,
         owner_access_key: AccessKey,
-    ) -> list[SessionRow]:
+    ) -> list[SessionEntityData]:
         return await self._db_source.match_sessions(id_or_name_prefix, owner_access_key)
 
     @session_repository_resilience.apply()
