@@ -4,10 +4,9 @@
 
 Scenario: incomplete 15 / 17
 
-- built from ops (11)
+- built from ops (10)
   - admin_search: representative success ✗ · representative rejection ✗: SCENARIO-GAP
   - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - batch_load_image_commit_registries: representative success ✓ · representative rejection ✓
   - delete: representative success ✗ · representative rejection ✗: SCENARIO-GAP
   - get: representative success ✗ · representative rejection ✗: SCENARIO-GAP
   - partial_bulk_delete: representative success ✓ · representative rejection ✗: SCENARIO-GAP
@@ -21,17 +20,10 @@ Scenario: incomplete 15 / 17
   - partial_bulk_update: success present 3 · rejection absent (partial_bulk, partial_bulk_delete_ops, partial_bulk_restore_ops): SCENARIO-GAP
   - unassign_users: success absent · rejection absent (atomic_bulk_get_ops, scope): SCENARIO-GAP
   - update: success present 2 · rejection absent (single_delete_ops, single_entity, single_restore_ops): SCENARIO-GAP
-- direct implementation (2)
+- direct implementation (3)
   - admin_create: success present 1 · rejection present 1 (scope)
   - admin_purge: success absent · rejection absent (single_entity): SCENARIO-GAP
-
-**batch_load_image_commit_registries**
-
-| scenario | verdict |
-|---|---|
-| [with read permission, the container registry for image commits comes back in request order](#image_commit_registry-read-targets-in-request-order) | answered |
-| [with read permission and no container registry for image commits configured, an empty value comes back](#image_commit_registry-read-unconfigured-targets) | answered |
-| [without read permission, reading the container registry for image commits is rejected](#image_commit_registry-target-read-requires-permission) | rejected |
+  - batch_load_registries: success present 3 · rejection present 1 (partial_bulk)
 
 **partial_bulk_delete**
 
@@ -74,93 +66,14 @@ Scenario: incomplete 15 / 17
 | [when a domain and a project policy are in place and the superadmin creates a project, a project with that name appears under the domain](#project-the-superadmin-makes-a-project-in-a-domain) | answered |
 | [project creation is guarded by permission in the domain scope rather than by a role, so a user granted nothing is rejected for lack of permission](#project-a-user-granted-nothing-may-not-make-a-project) | rejected |
 
-### batch_load_image_commit_registries
+**batch_load_registries**
 
-<a id="image_commit_registry-read-targets-in-request-order"></a>
-
-#### [read-targets-in-request-order](/tests/scenario/bai_scenario/manager/project/test_image_commit_registry.py): pass
-
-with read permission, the container registry for image commits comes back in request order
-
-Given
-
-- the container registry for image commits is configured. an ordinary user has permission to read the project.
-  - Domain domain-1
-  - Project resource policy default: the personal project created along with a user looks it up by this name
-  - Project project-1
-  - Prepare one user in the domain
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - Role role-1: applies only within the scope it is granted in
-  - Role role-1: READ allowed on every project
-  - regular user user-1: holds Role role-1
-
-When
-
-- ProjectAdapter.batch_load_image_commit_registries: requests the container registry for image commits of the same project twice
-
-Then
-
-- for each request, the container registry for image commits, an empty value, or a permission denial comes back
-  - targets = [ImageCommitRegistry(registry_name='registry.example.com', project_name='images'), ImageCommitRegistry(registry_name='registry.example.com', project_name='images')]
-
-<a id="image_commit_registry-read-unconfigured-targets"></a>
-
-#### [read-unconfigured-targets](/tests/scenario/bai_scenario/manager/project/test_image_commit_registry.py): pass
-
-with read permission and no container registry for image commits configured, an empty value comes back
-
-Given
-
-- the container registry for image commits is not configured. an ordinary user has permission to read the project.
-  - Domain domain-1
-  - Project resource policy default: the personal project created along with a user looks it up by this name
-  - Project project-1
-  - Prepare one user in the domain
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - Role role-1: applies only within the scope it is granted in
-  - Role role-1: READ allowed on every project
-  - regular user user-1: holds Role role-1
-
-When
-
-- ProjectAdapter.batch_load_image_commit_registries: requests the container registry for image commits of the same project twice
-
-Then
-
-- for each request, the container registry for image commits, an empty value, or a permission denial comes back
-  - targets = [None, None]
-
-<a id="image_commit_registry-target-read-requires-permission"></a>
-
-#### [target-read-requires-permission](/tests/scenario/bai_scenario/manager/project/test_image_commit_registry.py): pass
-
-without read permission, reading the container registry for image commits is rejected
-
-Given
-
-- the container registry for image commits is not configured. an ordinary user does not have permission to read the project.
-  - Domain domain-1
-  - Project resource policy default: the personal project created along with a user looks it up by this name
-  - Project project-1
-  - Prepare one user in the domain
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-
-When
-
-- ProjectAdapter.batch_load_image_commit_registries: requests the container registry for image commits of the same project twice
-
-Then
-
-- for each request, the container registry for image commits, an empty value, or a permission denial comes back
-  - count = 2
-  - rejected: NotEnoughPermission
-  - rejected: NotEnoughPermission
+| scenario | verdict |
+|---|---|
+| [with read permission, answers a container registry allowed but not as the default with a flag saying it is not the default](#registries-read-allowed-registry) | answered |
+| [with read permission, answers the container registry allowed as the default with a flag saying it is the default](#registries-read-default-registry) | answered |
+| [with read permission and no allowed container registry, answers an empty list](#registries-read-no-registry) | answered |
+| [without read permission, rejects the read of allowed container registries](#registries-registries-read-requires-permission) | rejected |
 
 ### partial_bulk_delete
 
@@ -620,5 +533,142 @@ When
 Then
 
 - the call is rejected
+  - rejected: NotEnoughPermission
+
+### batch_load_registries
+
+<a id="registries-read-allowed-registry"></a>
+
+#### [read-allowed-registry](/tests/scenario/bai_scenario/manager/project/test_registries.py): pass
+
+with read permission, answers a container registry allowed but not as the default with a flag saying it is not the default
+
+Given
+
+- the project is allowed on the registry but not as the default. A regular user has read permission on the project.
+  - Domain domain-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project project-1
+  - Container registry registry-1: image source, project images
+  - Project project-1 allows Container registry registry-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Role role-1: applies only within the scope it is granted in
+  - Role role-1: READ allowed on every project
+  - regular user user-1: holds Role role-1
+
+When
+
+- ProjectAdapter.batch_load_registries: asks for the allowed container registries of the same project twice
+
+Then
+
+- answers each request with the allowed container registries or a permission rejection
+  - count = 2
+  - [0] count = 1
+  - [0][0].registry: same as the registry seeded in advance
+  - [0][0].is_default = False
+  - [1] count = 1
+  - [1][0].registry: same as the registry seeded in advance
+  - [1][0].is_default = False
+
+<a id="registries-read-default-registry"></a>
+
+#### [read-default-registry](/tests/scenario/bai_scenario/manager/project/test_registries.py): pass
+
+with read permission, answers the container registry allowed as the default with a flag saying it is the default
+
+Given
+
+- the project is allowed on the registry as the default. A regular user has read permission on the project.
+  - Domain domain-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project project-1
+  - Container registry registry-1: image source, project images
+  - Project project-1 defaults to Container registry registry-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Role role-1: applies only within the scope it is granted in
+  - Role role-1: READ allowed on every project
+  - regular user user-1: holds Role role-1
+
+When
+
+- ProjectAdapter.batch_load_registries: asks for the allowed container registries of the same project twice
+
+Then
+
+- answers each request with the allowed container registries or a permission rejection
+  - count = 2
+  - [0] count = 1
+  - [0][0].registry: same as the registry seeded in advance
+  - [0][0].is_default = True
+  - [1] count = 1
+  - [1][0].registry: same as the registry seeded in advance
+  - [1][0].is_default = True
+
+<a id="registries-read-no-registry"></a>
+
+#### [read-no-registry](/tests/scenario/bai_scenario/manager/project/test_registries.py): pass
+
+with read permission and no allowed container registry, answers an empty list
+
+Given
+
+- the project has no allowed registry. A regular user has read permission on the project.
+  - Domain domain-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project project-1
+  - Container registry registry-1: image source, project images
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Role role-1: applies only within the scope it is granted in
+  - Role role-1: READ allowed on every project
+  - regular user user-1: holds Role role-1
+
+When
+
+- ProjectAdapter.batch_load_registries: asks for the allowed container registries of the same project twice
+
+Then
+
+- answers each request with the allowed container registries or a permission rejection
+  - count = 2
+  - [0] count = 0
+  - [1] count = 0
+
+<a id="registries-registries-read-requires-permission"></a>
+
+#### [registries-read-requires-permission](/tests/scenario/bai_scenario/manager/project/test_registries.py): pass
+
+without read permission, rejects the read of allowed container registries
+
+Given
+
+- the project has no allowed registry. A regular user has no read permission on the project.
+  - Domain domain-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project project-1
+  - Container registry registry-1: image source, project images
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- ProjectAdapter.batch_load_registries: asks for the allowed container registries of the same project twice
+
+Then
+
+- answers each request with the allowed container registries or a permission rejection
+  - count = 2
+  - rejected: NotEnoughPermission
   - rejected: NotEnoughPermission
 

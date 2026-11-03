@@ -47,7 +47,7 @@ Scenario: incomplete 33 / 47
   - partial_bulk_update_rules: success present 2 · rejection absent (partial_bulk_field): SCENARIO-GAP
   - purge_access_token: success absent · rejection absent (single_field): SCENARIO-GAP
   - purge_rule: success absent · rejection absent (single_entity): SCENARIO-GAP
-  - replace_options: success present 2 · rejection present 3 (single_entity)
+  - replace_options: success present 4 · rejection present 3 (single_entity)
   - search_revision_resource_slots: success present 1 · rejection present 1 (single_field)
   - sync_replicas: success present 1 · rejection present 1 (single_entity)
   - update: success present 5 · rejection present 2 (single_entity)
@@ -185,7 +185,9 @@ Scenario: incomplete 33 / 47
 | scenario | verdict |
 |---|---|
 | [when a user granted update replaces the options with the defaults and per-handler settings, what was given becomes the new options as a whole and the response carries only those options](#options-a-user-granted-update-replaces-the-options-whole) | answered |
+| [replacing the options with the selection policy STRICT keeps that policy on the new options](#options-replacing-with-a-strict-policy-keeps-it-strict) | answered |
 | [replacing the options of a deployment that holds inherited per-handler settings with only the defaults leaves none of the inherited settings](#options-replacing-with-no-handler-entry-drops-the-inherited-ones) | answered |
+| [replacing the options of a deployment whose selection policy is STRICT without a policy keeps it STRICT](#options-replacing-without-a-policy-keeps-the-stored-one) | answered |
 | [when a user granted only read replaces the options, the call is rejected for lack of permission](#options-a-user-granted-only-read-may-not-replace-the-options) | rejected |
 | [replacing the options with the same handler name twice is rejected because the input is wrong](#options-naming-a-handler-twice-is-refused) | rejected |
 | [replacing the options with an unregistered handler name is rejected because the input is wrong](#options-naming-an-unregistered-handler-is-refused) | rejected |
@@ -2413,6 +2415,43 @@ Then
   - options.handler_options.default.timeout_sec = 600
   - options.handler_options.default.max_retry_count = 3
   - options.handler_options.by_handler = [('check-replica-deployments', None, 1)]
+  - options.agent_selection_policy = <AgentSelectionPolicyEnum.PREFERRED: 'preferred'>
+
+<a id="options-replacing-with-a-strict-policy-keeps-it-strict"></a>
+
+#### [replacing-with-a-strict-policy-keeps-it-strict](/tests/scenario/bai_scenario/manager/deployment/test_options.py): pass
+
+replacing the options with the selection policy STRICT keeps that policy on the new options
+
+Given
+
+- one existing deployment and one user granted UPDATE on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+
+When
+
+- DeploymentAdapter.replace_options: user-1 replaces the options of deployment-1 with the selection policy strict and only the defaults
+
+Then
+
+- only the replaced options come back
+  - deployment_id: same as the deployment seeded in advance
+  - options.handler_options.default.timeout_sec = 600
+  - options.handler_options.default.max_retry_count = 3
+  - options.handler_options.by_handler = []
+  - options.agent_selection_policy = <AgentSelectionPolicyEnum.STRICT: 'strict'>
 
 <a id="options-replacing-with-no-handler-entry-drops-the-inherited-ones"></a>
 
@@ -2448,6 +2487,43 @@ Then
   - options.handler_options.default.timeout_sec = 600
   - options.handler_options.default.max_retry_count = 3
   - options.handler_options.by_handler = []
+  - options.agent_selection_policy = <AgentSelectionPolicyEnum.PREFERRED: 'preferred'>
+
+<a id="options-replacing-without-a-policy-keeps-the-stored-one"></a>
+
+#### [replacing-without-a-policy-keeps-the-stored-one](/tests/scenario/bai_scenario/manager/deployment/test_options.py): pass
+
+replacing the options of a deployment whose selection policy is STRICT without a policy keeps it STRICT
+
+Given
+
+- one existing deployment and one user granted UPDATE on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet, the selection policy is strict
+
+When
+
+- DeploymentAdapter.replace_options: user-1 replaces the options of deployment-1 with only the defaults
+
+Then
+
+- only the replaced options come back
+  - deployment_id: same as the deployment seeded in advance
+  - options.handler_options.default.timeout_sec = 600
+  - options.handler_options.default.max_retry_count = 3
+  - options.handler_options.by_handler = []
+  - options.agent_selection_policy = <AgentSelectionPolicyEnum.STRICT: 'strict'>
 
 <a id="options-a-user-granted-only-read-may-not-replace-the-options"></a>
 

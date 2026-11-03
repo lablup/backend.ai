@@ -75,7 +75,13 @@ class TurningOwnerAssignOnForEvery(When[ManyPresetsAndACaller, RolePresetAdapter
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return f"{laid.caller.username}이 프리셋 {len(laid.laid)}개의 소유자 부여를 한 번에 켬"
+        return Says(
+            f"{laid.caller.username} 이 프리셋 {len(laid.laid)}개의 소유자 부여를 한 번에 켭니다",
+            english=(
+                f"{laid.caller.username} turns on owner assignment of "
+                f"{len(laid.laid)} presets at once"
+            ),
+        )
 
     @override
     async def call(self, adapter: RolePresetAdapter, laid: ManyPresetsAndACaller) -> Edited:
@@ -168,9 +174,14 @@ class OnlyTheProjectPresetTakesOwnerAssign(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "프로젝트 스코프와 도메인 스코프 프리셋의 소유자 부여를 한 번에 켜면, "
-            "프로젝트 스코프 프리셋만 고쳐지고 도메인 스코프 프리셋은 실패 목록에 온다"
+            "프로젝트 스코프 프리셋만 수정되고 도메인 스코프 프리셋은 실패 목록에 옵니다",
+            english=(
+                "turning on owner assignment of project-scope and domain-scope presets at "
+                "once edits only the project-scope preset, and the domain-scope preset "
+                "comes back in the failed list"
+            ),
         )
 
     @override

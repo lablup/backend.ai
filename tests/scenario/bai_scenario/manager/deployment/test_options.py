@@ -258,7 +258,13 @@ class TheGivenPolicyBecomesThePolicy(
 
     @override
     def describe(self) -> str:
-        return "선택 정책을 STRICT로 담아 옵션을 갈아끼우면, 새 옵션의 선택 정책이 STRICT다"
+        return Says(
+            "선택 정책을 STRICT 로 담아 옵션을 교체하면, 새 옵션의 선택 정책도 STRICT 입니다",
+            english=(
+                "replacing the options with the selection policy STRICT keeps that policy "
+                "on the new options"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
@@ -290,9 +296,13 @@ class AnOmittedPolicyStays(
 
     @override
     def describe(self) -> str:
-        return (
-            "선택 정책이 STRICT인 배포에 선택 정책을 빼고 옵션을 갈아끼우면, "
-            "선택 정책은 STRICT로 남는다"
+        return Says(
+            "선택 정책이 STRICT 인 배포에서 선택 정책을 빼고 옵션을 교체하면, "
+            "선택 정책은 STRICT 로 남습니다",
+            english=(
+                "replacing the options of a deployment whose selection policy is STRICT "
+                "without a policy keeps it STRICT"
+            ),
         )
 
     @override

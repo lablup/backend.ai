@@ -109,7 +109,11 @@ class AProjectAndADomainPresetAndSomeone(Given[Any, ManyPresetsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"프로젝트 스코프 프리셋과 도메인 스코프 프리셋 하나씩과, {self.role.value} 한 명"
+        role = self.role.value
+        return Says(
+            f"프로젝트 스코프 프리셋과 도메인 스코프 프리셋 하나씩과, {role} 한 명",
+            english=(f"one project-scope preset, one domain-scope preset, and one {role}"),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
@@ -334,7 +338,13 @@ class OnlyTheFirstPresetComesBack(Then[ManyPresetsAndACaller, PartialBulkPayload
 
     @override
     def says(self) -> str:
-        return "프로젝트 스코프 프리셋만 고쳐져 오고, 도메인 스코프 프리셋은 실패 목록에 온다"
+        return Says(
+            "프로젝트 스코프 프리셋만 수정되어 오고, 도메인 스코프 프리셋은 실패 목록에 옵니다",
+            english=(
+                "only the project-scope preset comes back edited, and the domain-scope "
+                "preset comes back in the failed list"
+            ),
+        )
 
     @override
     def look(
@@ -354,7 +364,12 @@ class OnlyTheFirstPresetComesBack(Then[ManyPresetsAndACaller, PartialBulkPayload
         for failure in payload.failed:
             verdicts.append(
                 Held[UUID](
-                    "failed[0].id", failure.id, SameAs(laid.laid[1].id, "두 번째 프리셋의 id")
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        laid.laid[1].id,
+                        Says("두 번째 프리셋의 id", english="the id of the second preset"),
+                    ),
                 )
             )
         return verdicts

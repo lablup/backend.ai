@@ -67,7 +67,10 @@ class TurningOwnerAssignOn(When[APresetAndACaller, RolePresetAdapter, RolePreset
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.preset.name}의 소유자 부여를 켬"
+        return Says(
+            f"{laid.caller.username} 이 {laid.preset.name}의 소유자 부여를 켭니다",
+            english=(f"{laid.caller.username} turns on owner assignment of {laid.preset.name}"),
+        )
 
     @override
     async def call(self, adapter: RolePresetAdapter, laid: APresetAndACaller) -> RolePresetNode:
@@ -154,7 +157,13 @@ class AProjectPresetTakesOwnerAssign(
 
     @override
     def describe(self) -> str:
-        return "프로젝트 스코프 프리셋의 소유자 부여를 켜면, 켜진 프리셋 전체가 온다"
+        return Says(
+            "프로젝트 스코프 프리셋의 소유자 부여를 켜면, 켜진 프리셋 전체가 응답으로 옵니다",
+            english=(
+                "turning on owner assignment of a project-scope preset brings the whole "
+                "preset back turned on"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
@@ -179,7 +188,13 @@ class ADomainPresetRefusesOwnerAssign(
 
     @override
     def describe(self) -> str:
-        return "프로젝트 외 스코프 프리셋의 소유자 부여를 켜려 하면, 소유자가 없어 거부된다"
+        return Says(
+            "프로젝트 외 스코프 프리셋의 소유자 부여를 켜려 하면, 소유자가 없어 거부됩니다",
+            english=(
+                "turning on owner assignment of a preset in a scope other than a project "
+                "is rejected because there is no owner"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:

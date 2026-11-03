@@ -23,10 +23,10 @@ Scenario: incomplete 16 / 21
   - atomic_bulk_add_permissions: success present 1 · rejection present 1 (single_entity)
   - bulk_add_permissions: success absent · rejection absent (single_entity): SCENARIO-GAP
   - bulk_remove_permissions: success absent · rejection absent (partial_bulk_field): SCENARIO-GAP
-  - create: success absent · rejection absent (scope): SCENARIO-GAP
+  - create: success present 1 · rejection absent (scope): SCENARIO-GAP
   - partial_bulk_remove_permissions: success present 2 · rejection absent (partial_bulk_field): SCENARIO-GAP
-  - partial_bulk_update: success present 2 · rejection absent (partial_bulk): SCENARIO-GAP
-  - update: success present 1 · rejection present 1 (single_entity)
+  - partial_bulk_update: success present 3 · rejection absent (partial_bulk): SCENARIO-GAP
+  - update: success present 2 · rejection present 2 (single_entity)
 
 **delete**
 
@@ -76,6 +76,12 @@ Scenario: incomplete 16 / 21
 | [when the superadmin adds two permission entries to a preset that has none, the two entries added come back under the preset](#permission_editing-the-superadmin-adds-entries-to-a-preset) | answered |
 | [when a user granted nothing tries to add permission entries to a preset, it is rejected for lack of permission](#permission_editing-a-user-granted-nothing-may-not-add-entries) | rejected |
 
+**create**
+
+| scenario | verdict |
+|---|---|
+| [creating a project-scope preset with owner assignment on brings it back turned on](#creating-a-project-preset-is-made-with-owner-assign) | answered |
+
 **partial_bulk_remove_permissions**
 
 | scenario | verdict |
@@ -88,13 +94,16 @@ Scenario: incomplete 16 / 21
 | scenario | verdict |
 |---|---|
 | [when a user granted nothing tries to edit several presets at once, none is edited and every one comes back in the failed list for lack of permission](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | answered |
+| [turning on owner assignment of project-scope and domain-scope presets at once edits only the project-scope preset, and the domain-scope preset comes back in the failed list](#partial_bulk_editing-only-the-project-preset-takes-owner-assign) | answered |
 | [when the superadmin turns auto assign on for several presets at once, all of them come back with the new value and nothing failed](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | answered |
 
 **update**
 
 | scenario | verdict |
 |---|---|
+| [turning on owner assignment of a project-scope preset brings the whole preset back turned on](#editing-a-project-preset-takes-owner-assign) | answered |
 | [when the superadmin renames a preset, the whole preset carrying the new name comes back](#editing-the-superadmin-renames-a-preset) | answered |
+| [turning on owner assignment of a preset in a scope other than a project is rejected because there is no owner](#editing-a-domain-preset-refuses-owner-assign) | rejected |
 | [when a user granted nothing tries to rename a preset, it is rejected for lack of permission](#editing-a-user-granted-nothing-may-not-rename-a-preset) | rejected |
 
 ### delete
@@ -552,6 +561,34 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
+### create
+
+<a id="creating-a-project-preset-is-made-with-owner-assign"></a>
+
+#### [a-project-preset-is-made-with-owner-assign](/tests/scenario/bai_scenario/manager/role_preset/test_creating.py): pass
+
+creating a project-scope preset with owner assignment on brings it back turned on
+
+Given
+
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- RolePresetAdapter.create: user-1 creates a project-scope preset with owner assignment on
+
+Then
+
+- the preset with owner assignment turned on comes back
+  - name = 'made-preset'
+  - auto_assign_to_owner = True
+
 ### partial_bulk_remove_permissions
 
 <a id="permission_editing-a-user-granted-nothing-removes-none-of-the-entries"></a>
@@ -664,6 +701,44 @@ Then
   - failed[1].id: same as the id of the target
   - failed[1].message: a reason containing 'Insufficient permission'
 
+<a id="partial_bulk_editing-only-the-project-preset-takes-owner-assign"></a>
+
+#### [only-the-project-preset-takes-owner-assign](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_editing.py): pass
+
+turning on owner assignment of project-scope and domain-scope presets at once edits only the project-scope preset, and the domain-scope preset comes back in the failed list
+
+Given
+
+- one project-scope preset, one domain-scope preset, and one superadmin
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the domain scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- RolePresetAdapter.partial_bulk_update: user-1 turns on owner assignment of 2 presets at once
+
+Then
+
+- only the project-scope preset comes back edited, and the domain-scope preset comes back in the failed list
+  - successes count = 1
+  - failed count = 1
+  - successes[0].auto_assign_to_owner = True
+  - successes[0].id: same as the id of the preset seeded in advance
+  - successes[0].entity_id: same as the id of the preset seeded in advance
+  - successes[0].name = 'preset-1'
+  - successes[0].scope_type = 'project'
+  - successes[0].auto_assign = False
+  - successes[0].deleted = False
+  - successes[0].created_at: the time this run wrote
+  - successes[0].updated_at: the time this run wrote
+  - failed[0].id: same as the id of the second preset
+
 <a id="partial_bulk_editing-the-superadmin-edits-several-presets-at-once"></a>
 
 #### [the-superadmin-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_editing.py): pass
@@ -710,6 +785,40 @@ Then
 
 ### update
 
+<a id="editing-a-project-preset-takes-owner-assign"></a>
+
+#### [a-project-preset-takes-owner-assign](/tests/scenario/bai_scenario/manager/role_preset/test_editing.py): pass
+
+turning on owner assignment of a project-scope preset brings the whole preset back turned on
+
+Given
+
+- one preset that already exists and one superadmin
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- RolePresetAdapter.update: user-1 turns on owner assignment of preset-1
+
+Then
+
+- the whole preset with owner assignment turned on comes back
+  - auto_assign_to_owner = True
+  - id: same as the id of the preset seeded in advance
+  - entity_id: same as the id of the preset seeded in advance
+  - name = 'preset-1'
+  - scope_type = 'project'
+  - auto_assign = False
+  - deleted = False
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+
 <a id="editing-the-superadmin-renames-a-preset"></a>
 
 #### [the-superadmin-renames-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_editing.py): pass
@@ -742,6 +851,32 @@ Then
   - deleted = False
   - created_at: the time this run wrote
   - updated_at: the time this run wrote
+
+<a id="editing-a-domain-preset-refuses-owner-assign"></a>
+
+#### [a-domain-preset-refuses-owner-assign](/tests/scenario/bai_scenario/manager/role_preset/test_editing.py): pass
+
+turning on owner assignment of a preset in a scope other than a project is rejected because there is no owner
+
+Given
+
+- one preset that already exists in the domain scope and one superadmin
+  - Role preset preset-1: for the domain scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- RolePresetAdapter.update: user-1 turns on owner assignment of preset-1
+
+Then
+
+- the call is rejected
+  - rejected: RolePresetOwnerAssignNotAllowed
 
 <a id="editing-a-user-granted-nothing-may-not-rename-a-preset"></a>
 
