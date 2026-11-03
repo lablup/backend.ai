@@ -19,6 +19,7 @@ from ai.backend.manager.models.specs.creator import (
     EntityCreator,
     FieldCreator,
     GlobalEntityCreator,
+    GuardedEntityCreator,
     RoleManagedEntityCreator,
 )
 from ai.backend.manager.models.specs.lookup import BulkDataLookup, DataLookup
@@ -314,7 +315,7 @@ class EntityCreateOpsAction[TRow: Base, TData](OpsBackendAction):
     scope and joins its declared memberships. No roles are involved."""
 
     @abstractmethod
-    def to_creator(self) -> EntityCreator[TRow, TData]:
+    def to_creator(self) -> GuardedEntityCreator[TRow, TData]:
         """Return the insert spec this action executes."""
         raise NotImplementedError
 
