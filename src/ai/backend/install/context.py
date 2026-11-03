@@ -659,6 +659,9 @@ class Context(metaclass=ABCMeta):
         with (
             self.resource_path("ai.backend.install.seeds", "manager") as manager_seeds,
             self.resource_path("ai.backend.install.seeds", "examples/manager") as example_seeds,
+            self.resource_path(
+                "ai.backend.install.seeds", "examples/domain_admin"
+            ) as domain_admin_seeds,
         ):
             await self.run_manager_cli([
                 "mgr",
@@ -678,6 +681,8 @@ class Context(metaclass=ABCMeta):
                 "--seeds",
                 str(manager_seeds),
             ])
+            # The example domain admins are granted roles that provisioning creates.
+            await self.run_manager_cli(["mgr", "seed", "apply", str(domain_admin_seeds)])
 
     def read_seed_items(self, root: Path, kind: str) -> list[dict[str, Any]]:
         yaml = YAML(typ="safe")
