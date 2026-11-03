@@ -5218,6 +5218,15 @@ input CreateResourceGroupInput
   Added in 26.9.0. Make this the default resource group. At most one resource group may hold the flag, so this is rejected while another one holds it; clear that one first.
   """
   isDefault: Boolean! = false
+
+  """Added in 26.10.0. Whether the resource group is active."""
+  isActive: Boolean! = true
+
+  """Added in 26.10.0. Whether the resource group is public."""
+  isPublic: Boolean! = true
+
+  """Added in 26.10.0. Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE)."""
+  schedulerType: SchedulerType! = FIFO
 }
 
 """Added in 26.4.2. Payload for resource group creation."""

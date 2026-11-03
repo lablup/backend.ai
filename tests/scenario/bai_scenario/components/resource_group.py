@@ -523,6 +523,9 @@ class TheNewGroupNode(Then[Any, ResourceGroupDetailNode]):
     started: datetime
     named: str
     is_default: bool = False
+    is_active: bool = True
+    is_public: bool = True
+    scheduler_type: SchedulerTypeDTO = SchedulerTypeDTO.FIFO
 
     @override
     def says(self) -> str:
@@ -539,14 +542,14 @@ class TheNewGroupNode(Then[Any, ResourceGroupDetailNode]):
         return [
             Skipped("id", Says("데이터베이스가 생성합니다", english="the database generates it")),
             Same("name", node.name, self.named),
-            Same("status.is_active", node.status.is_active, True),
-            Same("status.is_public", node.status.is_public, True),
+            Same("status.is_active", node.status.is_active, self.is_active),
+            Same("status.is_public", node.status.is_public, self.is_public),
             Same("status.is_default", node.status.is_default, self.is_default),
             Same("metadata.description", node.metadata.description, None),
             Held("metadata.created_at", node.metadata.created_at, WrittenByThisRun(self.started)),
             Same("network.wsproxy_addr", node.network.wsproxy_addr, None),
             Same("network.use_host_network", node.network.use_host_network, False),
-            Same("scheduler.type", node.scheduler.type, SchedulerTypeDTO.FIFO),
+            Same("scheduler.type", node.scheduler.type, self.scheduler_type),
             Same("scheduler.preemption.enabled", node.scheduler.preemption.enabled, False),
             Same(
                 "scheduler.preemption.preemptible_priority",
