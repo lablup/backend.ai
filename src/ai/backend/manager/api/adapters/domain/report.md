@@ -2,7 +2,7 @@
 
 [background](/src/ai/backend/manager/api/adapters/domain/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/domain/adapter.py)
 
-Scenario: incomplete 3 / 14
+Scenario: incomplete 3 / 15
 
 - built from ops (12)
   - bulk_get_ids: representative success ✓ · representative rejection ✓
@@ -17,6 +17,8 @@ Scenario: incomplete 3 / 14
   - restore: representative success ✓ · representative rejection ✓
   - scoped_search: representative success ✓ · representative rejection ✓
   - update: representative success ✓ · representative rejection ✓
+- ops + direct implementation (1)
+  - sync_registry_relations: success present 3 · rejection present 1 (global_searcher_ops, relation, scope)
 - direct implementation (2)
   - create: success present 2 · rejection present 4 (global_scope)
   - purge: success present 1 · rejection present 4 (single_entity)
@@ -120,6 +122,15 @@ Scenario: incomplete 3 / 14
 | [an edit that turns the active flag on of a soft-deleted domain restores it, and the response carries the active state](#editing-raising-the-active-flag-restores-a-soft-deleted-domain) | answered |
 | [when a user granted nothing tries to edit a domain, the call is rejected for lack of permission](#editing-a-user-granted-nothing-may-not-edit-a-domain) | rejected |
 | [editing a name no domain answers to is rejected as not found](#editing-editing-a-name-nothing-answers-to-is-not-found) | rejected |
+
+**sync_registry_relations**
+
+| scenario | verdict |
+|---|---|
+| [syncing with a name no registry carries relates nothing and raises nothing (finding registries by name is gated by the global role, so the superadmin calls it)](#syncing_registry_relations-a-name-no-registry-carries-links-nothing) | answered |
+| [syncing with an empty list removes the relation to a registry left out (finding registries by name is gated by the global role, so the superadmin calls it)](#syncing_registry_relations-leaving-a-linked-registry-out-unlinks-it) | answered |
+| [when the superadmin syncs with the name of a registry, the domain and that registry become related (finding registries by name is gated by the global role, so the superadmin calls it)](#syncing_registry_relations-naming-a-registry-links-the-domain-to-it) | answered |
+| [a user who is not a superadmin is refused when syncing the relations; finding registries by name runs only with the superadmin role](#syncing_registry_relations-a-user-granted-nothing-may-not-sync-registry-relations) | rejected |
 
 **create**
 
@@ -1476,6 +1487,113 @@ Then
 
 - the call is rejected
   - rejected: EntityNotFoundError
+
+### sync_registry_relations
+
+<a id="syncing_registry_relations-a-name-no-registry-carries-links-nothing"></a>
+
+#### [a-name-no-registry-carries-links-nothing](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
+
+syncing with a name no registry carries relates nothing and raises nothing (finding registries by name is gated by the global role, so the superadmin calls it)
+
+Given
+
+- one domain, one registry, and one superadmin in that domain
+  - Domain allowing-1
+  - Container registry allowed-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- DomainAdapter.sync_registry_relations: user-1 syncs the relations of allowing-1 to a name no registry carries
+
+Then
+
+- the call returns nothing and raises nothing
+  - response = None
+
+<a id="syncing_registry_relations-leaving-a-linked-registry-out-unlinks-it"></a>
+
+#### [leaving-a-linked-registry-out-unlinks-it](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
+
+syncing with an empty list removes the relation to a registry left out (finding registries by name is gated by the global role, so the superadmin calls it)
+
+Given
+
+- one domain and one registry already related to each other, and one superadmin in that domain
+  - Domain allowing-1
+  - Container registry allowed-1: image source
+  - Domain allowing-1 allows Container registry allowed-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- DomainAdapter.sync_registry_relations: user-1 syncs the relations of allowing-1 to an empty list
+
+Then
+
+- the call returns nothing and raises nothing
+  - response = None
+
+<a id="syncing_registry_relations-naming-a-registry-links-the-domain-to-it"></a>
+
+#### [naming-a-registry-links-the-domain-to-it](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
+
+when the superadmin syncs with the name of a registry, the domain and that registry become related (finding registries by name is gated by the global role, so the superadmin calls it)
+
+Given
+
+- one domain, one registry, and one superadmin in that domain
+  - Domain allowing-1
+  - Container registry allowed-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- DomainAdapter.sync_registry_relations: user-1 syncs the relations of allowing-1 to the name of that registry
+
+Then
+
+- the call returns nothing and raises nothing
+  - response = None
+
+<a id="syncing_registry_relations-a-user-granted-nothing-may-not-sync-registry-relations"></a>
+
+#### [a-user-granted-nothing-may-not-sync-registry-relations](/tests/scenario/bai_scenario/manager/domain/test_syncing_registry_relations.py): pass
+
+a user who is not a superadmin is refused when syncing the relations; finding registries by name runs only with the superadmin role
+
+Given
+
+- one domain, one registry, and one user in that domain
+  - Domain allowing-1
+  - Container registry allowed-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- DomainAdapter.sync_registry_relations: user-1 syncs the relations of allowing-1 to the name of that registry
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### create
 
