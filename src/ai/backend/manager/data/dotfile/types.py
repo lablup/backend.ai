@@ -7,8 +7,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from ai.backend.common import msgpack
-from ai.backend.common.data.entity.dotfile import DotfileID
-from ai.backend.common.data.entity.types import FieldData, RuntimeEntityID
 from ai.backend.common.dotfile import DotfilePath
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
 from ai.backend.common.exception import InvalidAPIParameters
@@ -42,16 +40,6 @@ class DotfileEntry:
     path: str
     perm: str
     data: str
-
-
-@dataclass(frozen=True)
-class DotfileData(FieldData):
-    id: DotfileID
-    entity: RuntimeEntityID
-    path: str
-    perm: str
-    data: str
-    is_default: bool
 
 
 @dataclass(frozen=True)

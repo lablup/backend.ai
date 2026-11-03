@@ -90,6 +90,7 @@ def context(
                             name="preset",
                             scope_type=DomainEntityType(),
                             auto_assign=False,
+                            auto_assign_to_owner=False,
                             deleted=False,
                             created_at=now,
                             updated_at=now,

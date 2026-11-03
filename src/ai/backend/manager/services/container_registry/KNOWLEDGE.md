@@ -10,10 +10,14 @@ sources:
   - src/ai/backend/manager/api/gql_legacy/container_registry.py
   - src/ai/backend/manager/api/gql_legacy/group.py
   - src/ai/backend/manager/repositories/container_registry/repository.py
+  - src/ai/backend/manager/repositories/container_registry/db_source.py
   - src/ai/backend/manager/clients/container_registry
 generated:
   by: claude-code/opus-5
   at: 2026-09-21
+updated:
+  by: claude-code/opus-5.5
+  at: 2026-11-02
 status: stable
 ---
 
@@ -47,9 +51,10 @@ Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 ## A quota operation reaches the registry through the project
 
-- `get_project_registry` reads the registry name and project name from the project's
-  `container_registry` setting and finds the registry those two reference. If any of the
-  project, the setting or the registry is missing, it is `ContainerRegistryNotFound`.
+- `get_project_registry` reads the project's default registry: the
+  `association_container_registries_groups` row with `is_default` set. Without one it is
+  `ContainerRegistryNotFound`. Session commit finds its registry through the same lookup.
+- The `groups.container_registry` JSON column is no longer read.
 - The client pool picks a client by registry type. The only implementation is `HARBOR2`, so
   any other type is `ContainerRegistryQuotaNotSupported`.
 - A registry whose `project`, `username` or `password` is null is rejected with

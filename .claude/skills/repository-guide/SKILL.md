@@ -20,16 +20,16 @@ Guide for implementing Backend.AI repositories using base patterns and standard 
 Repositories implement 6 standard operations:
 
 1. **create** - Create new entity
-2. **get** - Retrieve single entity by ID
-3. **search** - Query with filters and pagination
+2. **get** - Get a single entity by ID
+3. **search** - Search with filters and pagination
 4. **update** - Update existing entity
-5. **delete** - Soft delete (status change)
-6. **purge** - Hard delete (permanent removal)
+5. **delete** - Mark the row as deleted while keeping it (status change)
+6. **purge** - Permanently remove the row
 
 **Target semantics:**
-- **Single** (`create`/`get`/`update`/`delete`/`purge`) — one row by PK.
-- **Batch** (`batch_*`) — many rows in one SQL statement, **atomic** (all-or-nothing); returns only the affected-row count.
-- **Bulk** (`bulk_*`) — rows processed individually, **partial failures allowed** (returns successes + errors).
+- **Single** (`create`/`get`/`update`/`delete`/`purge`): one row by primary key.
+- **Batch** (`batch_*`): many rows in one SQL statement, **atomic** (all or nothing); returns only the affected-row count.
+- **Bulk** (`bulk_*`): rows processed individually, **partial failures allowed** (returns successes and errors).
 
 **Method naming (no prefix):**
 ```python
@@ -67,10 +67,10 @@ Multi-tenant access control for queries.
 
 **Available utilities:**
 - `Creator[TRow]` - Create operations
-- `Querier[TRow]` - Single entity retrieval (get)
+- `Querier[TRow]` - Single entity get
 - `BatchQuerier[TRow]` - Search with filters and pagination
 - `Updater[TRow]` - Update with OptionalState pattern
-- `Purger[TRow]` - Hard delete operations
+- `Purger[TRow]` - Purge operations
 - `BatchUpdater[TRow]`, `BatchPurger[TRow]` - atomic multi-row (single statement)
 - `BulkCreator[TRow]`, `BulkUpserter[TRow]` - per-row with partial failures (`execute_bulk_*_partial`)
 
@@ -78,11 +78,11 @@ Multi-tenant access control for queries.
 - `repositories/base/` - Base utility source code
 - `repositories/fair_share/repository.py` - Usage examples
 
-## DB Ops Wrapper (`ops/`) — Preferred for new code
+## DB Ops Wrapper (`ops/`): Preferred for new code
 
 `ops/provider.py` wraps `ExtendedAsyncSAEngine` and exposes a spec-only operations
 surface. **Migration direction:** db_sources are moving to this wrapper. New or modified
-db_sources SHOULD use `DBOpsProvider` rather than holding the engine and calling
+db_sources should use `DBOpsProvider` rather than holding the engine and calling
 `session.execute` directly. Existing db_sources are migrated gradually when touched.
 
 ### Entry points
@@ -105,17 +105,17 @@ class FooDBSource:
             return result.row.to_data()
 ```
 
-- `read_ops()` / `write_ops()` both open a READ COMMITTED session; the raw engine/
-  session is never exposed.
-- ops methods accept only spec types — never raw `Select/Insert/Update/Delete`.
+- `read_ops()` and `write_ops()` both open a READ COMMITTED session; the raw engine and
+  session are not exposed.
+- ops methods accept only spec types; do not pass raw `Select/Insert/Update/Delete`.
 
 ### Reads with scope (RBAC)
 
 ```python
 async with self._ops.read_ops() as r:
-    # default — scoped query:
+    # default: scoped query
     result = await r.batch_query_with_scopes(sa.select(FooRow), querier, scopes)
-    # superadmin / internal only — bypasses scope filtering:
+    # superadmin / internal only: bypasses scope filtering
     result = await r.batch_query_in_global(sa.select(FooRow), querier)
 ```
 
@@ -123,10 +123,10 @@ Use `batch_query_in_global` only for superadmin-only endpoints or internal syste
 operations; it bypasses RBAC scope filtering. Empty `scopes` for the scoped variant
 raises `EmptySearchScopeError` (400).
 
-### Single-table specs + multi-table coordination
+### Single-table specs and multi-table coordination
 
-Each spec owns exactly one table — never build child-table rows inside a creator/
-updater spec. For a parent + dependent children, the repository coordinates the
+Each spec owns exactly one table. Do not build child-table rows inside a creator or
+updater spec. For a parent with dependent children, the repository coordinates the
 sequence procedurally (no tree object):
 
 ```python
@@ -137,10 +137,10 @@ async with self._ops.write_ops() as w:
 ```
 
 - `DependentCreatorSpec[TDependency, TRow].build_row(dependency)` builds one row from a
-  dependency resolved at execution time (e.g. the parent's generated id).
-- `create_dependent` (single) / `bulk_create_dependent` (multiple) execute them.
-- An update that must replace child rows = update parent + purge old children +
-  `bulk_create_dependent` new children, all inside one `write_ops()` block.
+  dependency resolved at execution time (for example the parent's generated id).
+- `create_dependent` (single) and `bulk_create_dependent` (multiple) execute them.
+- An update that must replace child rows is an update of the parent, a purge of the old
+  children, and `bulk_create_dependent` for the new children, all inside one `write_ops()` block.
 
 ## Implementation Pattern
 
@@ -159,7 +159,7 @@ async with self._ops.write_ops() as w:
 ## DB Source and Cache Source Architecture
 
 **Architecture principle:**
-- Repositories are transitioning to delegate data access to DB Source pattern
+- Repositories are transitioning to the DB Source pattern for data access
 - Repository acts as coordinator between DB Source and Cache Source (if present)
 - Actual database queries and transactions are handled by DB Source
 - Cache operations are handled by Cache Source (optional)
@@ -185,7 +185,7 @@ repositories/{domain}/
 **Responsibilities:**
 - **Repository**: Public API, coordination between sources, business logic orchestration
 - **DB Source**: Database queries, transaction management, ORM operations
-- **Cache Source**: Cache reads/writes, invalidation strategies
+- **Cache Source**: Cache reads and writes, invalidation strategies
 
 **See complete examples:**
 - `repositories/fair_share/repository.py:39` - DB Source import and usage
@@ -195,7 +195,7 @@ repositories/{domain}/
 
 **Migration status:**
 - Not all repositories have migrated to this pattern yet
-- New repositories SHOULD use this pattern
+- New repositories should use this pattern
 - Existing repositories can be migrated gradually when modified
 
 ## Implementation Steps
@@ -215,7 +215,7 @@ Define SearchScope dataclass with `to_conditions()` method.
 **File:** `repositories/{domain}/repository.py`
 
 1. Initialize base utilities in `__init__`
-2. Implement standard 6 operations
+2. Implement the 6 standard operations
 3. Add batch operations if needed
 4. Add domain-specific methods
 
@@ -273,7 +273,7 @@ Define SearchScope dataclass with `to_conditions()` method.
 
 **Pattern:**
 - Define domain exceptions inheriting from `BackendAIError`
-- Raise specific exceptions (e.g., `EntityNotFound`, `EntityAlreadyExists`)
+- Raise specific exceptions (for example `EntityNotFound`, `EntityAlreadyExists`)
 - Provide clear error messages
 
 **See examples:** `repositories/fair_share/repository.py`
@@ -285,7 +285,7 @@ Define SearchScope dataclass with `to_conditions()` method.
 - `src/ai/backend/manager/repositories/group/` - Scope usage
 - `src/ai/backend/manager/repositories/domain/` - Standard operations
 
-## Cross-References
+## Related documents
 
 - **Service Layer**: `/service-guide` - Service methods using repositories
 - **API Layer**: `/api-guide` - API handlers calling services

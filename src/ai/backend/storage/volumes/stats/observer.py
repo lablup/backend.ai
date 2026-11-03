@@ -10,6 +10,7 @@ from ai.backend.common.clients.valkey_client.valkey_volume_stats import ValkeyVo
 from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.observer.types import AbstractObserver
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.storage.errors.volume import VolumePerfMetricNotSupportedError
 from ai.backend.storage.metrics.volume_perf import VolumePerfMetricObserver
 from ai.backend.storage.metrics.volume_stats import VolumeStatsMetricObserver
 
@@ -128,6 +129,9 @@ class VolumeStatsObserver(AbstractObserver):
                 duration=duration,
             )
             log.warning("volume stats observation timed out", volume_name=volume_name)
+            return None
+        except VolumePerfMetricNotSupportedError:
+            log.debug("Volume {} does not provide performance metrics", volume_name)
             return None
         except Exception as e:
             duration = time.monotonic() - start_time

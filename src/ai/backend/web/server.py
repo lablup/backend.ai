@@ -327,12 +327,15 @@ def _bind_session_to_manager_token(session: Session, session_token: str | None) 
     session._new = True
 
 
-def build_cors_options(allowed_origins: Sequence[str]) -> dict[str, aiohttp_cors.ResourceOptions]:
+def build_cors_options(
+    allowed_origins: Sequence[str], *, allow_all_origins: bool = False
+) -> dict[str, aiohttp_cors.ResourceOptions]:
+    origins: Sequence[str] = ["*"] if allow_all_origins else allowed_origins
     return {
         origin: aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
             allow_credentials=True, allow_methods="*", expose_headers="*", allow_headers="*"
         )
-        for origin in allowed_origins
+        for origin in origins
     }
 
 
@@ -1091,8 +1094,17 @@ async def webapp_ctx(
         static_endpoint=pipeline_api_endpoint,
     )
 
+    if config.security.cors_allow_all_origins:
+        log.warning(
+            "CORS accepts all origins with credentials; development environments only, "
+            "do not enable this in production"
+        )
     cors = aiohttp_cors.setup(
-        app, defaults=build_cors_options(config.security.cors_allowed_origins)
+        app,
+        defaults=build_cors_options(
+            config.security.cors_allowed_origins,
+            allow_all_origins=config.security.cors_allow_all_origins,
+        ),
     )
     app.router.add_route("HEAD", "/func/{path:folders/_/tus/upload/.*$}", anon_web_plugin_handler)
     app.router.add_route("PATCH", "/func/{path:folders/_/tus/upload/.*$}", anon_web_plugin_handler)

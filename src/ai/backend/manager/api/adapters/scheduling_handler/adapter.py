@@ -35,7 +35,7 @@ class SchedulingHandlerAdapter:
     Unlike most domain adapters this one has no Processor dependency —
     the data is pulled from the coordinator that actually dispatches the
     handlers, so this enumeration and the validation in
-    ``deployment_options_from_input`` always agree on the same set.
+    ``deployment_handler_options_from_input`` always agree on the same set.
     """
 
     def __init__(self, deployment_coordinator: DeploymentCoordinator) -> None:

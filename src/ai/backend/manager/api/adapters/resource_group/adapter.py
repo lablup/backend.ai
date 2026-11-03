@@ -76,7 +76,7 @@ from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import PreemptionMode, PreemptionOrder, SlotQuantity
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.deployment.options import (
-    deployment_options_from_input,
+    deployment_handler_options_from_input,
     deployment_options_to_info,
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
@@ -92,6 +92,7 @@ from ai.backend.manager.data.resource_group.types import (
     ResourceGroupData,
     SchedulerType,
 )
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import (
@@ -1109,15 +1110,12 @@ class ResourceGroupAdapter(BaseAdapter):
     ) -> ReplaceResourceGroupDefaultDeploymentOptionsPayload:
         """Fully replace a resource group's ``default_deployment_options``.
 
-        Admin-only. The DTO payload is converted to the domain
-        :class:`DeploymentOptions` (duplicate or unknown handler names
-        are rejected against the coordinator's live registration), the
-        :class:`ReplaceDefaultDeploymentOptionsAction` is dispatched, and
-        only the refreshed options surface is returned (the repository
-        path uses ``UPDATE ... RETURNING`` and does not re-read the
-        surrounding scaling group node).
+        Admin-only. The handler options are converted to the domain
+        :class:`DeploymentHandlerOptions` (duplicate or unknown handler names
+        are rejected), the agent selection policy is passed apart, and only
+        the refreshed options surface is returned.
         """
-        options = deployment_options_from_input(
+        handler_options = deployment_handler_options_from_input(
             input.options,
             valid_handler_names=frozenset(
                 h.name() for h in self._deployment_coordinator.registered_handlers()
@@ -1127,7 +1125,12 @@ class ResourceGroupAdapter(BaseAdapter):
             ReplaceDefaultDeploymentOptionsAction(
                 resource_group_id=await self.lookup_name(name),
                 resource_group=name,
-                options=options,
+                handler_options=handler_options,
+                agent_selection_policy=(
+                    AgentSelectionPolicy(input.options.agent_selection_policy.value)
+                    if input.options.agent_selection_policy is not None
+                    else None
+                ),
             )
         )
         return ReplaceResourceGroupDefaultDeploymentOptionsPayload(

@@ -8,11 +8,13 @@ from typing import override
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.role_preset.request import UpdateRolePresetBody
 from ai.backend.common.dto.manager.v2.role_preset.response import RolePresetNode
 from ai.backend.manager.api.adapters.role_preset.adapter import RolePresetAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.role_preset import RolePresetOwnerAssignNotAllowed
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
@@ -49,6 +51,27 @@ class Renaming(When[APresetAndACaller, RolePresetAdapter, RolePresetNode]):
     async def call(self, adapter: RolePresetAdapter, laid: APresetAndACaller) -> RolePresetNode:
         with ActingAs(laid.caller):
             payload = await adapter.update(laid.preset.id, UpdateRolePresetBody(name=RENAMED))
+        return payload.role_preset
+
+
+@dataclass(frozen=True)
+class TurningOwnerAssignOn(When[APresetAndACaller, RolePresetAdapter, RolePresetNode]):
+    """프리셋의 소유자 부여를 켠다."""
+
+    @override
+    def operation(self) -> str:
+        return "update"
+
+    @override
+    def describe(self, laid: APresetAndACaller) -> str:
+        return f"{laid.caller.username}이 {laid.preset.name}의 소유자 부여를 켬"
+
+    @override
+    async def call(self, adapter: RolePresetAdapter, laid: APresetAndACaller) -> RolePresetNode:
+        with ActingAs(laid.caller):
+            payload = await adapter.update(
+                laid.preset.id, UpdateRolePresetBody(auto_assign_to_owner=True)
+            )
         return payload.role_preset
 
 
@@ -104,9 +127,63 @@ class AUserGrantedNothingMayNotRename(
         return TheCallIsRefused(NotEnoughPermission)
 
 
+@dataclass(frozen=True)
+class AProjectPresetTakesOwnerAssign(
+    Scenario[TestSeedingSession, APresetAndACaller, RolePresetAdapter, RolePresetNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "a-project-preset-takes-owner-assign"
+
+    @override
+    def describe(self) -> str:
+        return "프로젝트 스코프 프리셋의 소유자 부여를 켜면, 켜진 프리셋 전체가 온다"
+
+    @override
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
+        return APresetAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[APresetAndACaller, RolePresetAdapter, RolePresetNode]:
+        return TurningOwnerAssignOn()
+
+    @override
+    def then(self) -> Then[APresetAndACaller, RolePresetNode]:
+        return ThePresetComesBack(PresetLook(self.started, auto_assign_to_owner=True))
+
+
+@dataclass(frozen=True)
+class ADomainPresetRefusesOwnerAssign(
+    Scenario[TestSeedingSession, APresetAndACaller, RolePresetAdapter, RolePresetNode]
+):
+    @override
+    def summary(self) -> str:
+        return "a-domain-preset-refuses-owner-assign"
+
+    @override
+    def describe(self) -> str:
+        return "프로젝트 외 스코프 프리셋의 소유자 부여를 켜려 하면, 소유자가 없어 거부된다"
+
+    @override
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
+        return APresetAndSomeone(role=UserRole.SUPERADMIN, scope_type=DomainEntityType())
+
+    @override
+    def when(self) -> When[APresetAndACaller, RolePresetAdapter, RolePresetNode]:
+        return TurningOwnerAssignOn()
+
+    @override
+    def then(self) -> Then[APresetAndACaller, RolePresetNode]:
+        return TheCallIsRefused(RolePresetOwnerAssignNotAllowed)
+
+
 SCENARIOS: list[EditingStep] = [
     TheSuperadminRenamesIt(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotRename(),
+    AProjectPresetTakesOwnerAssign(started=datetime.now(UTC)),
+    ADomainPresetRefusesOwnerAssign(),
 ]
 
 

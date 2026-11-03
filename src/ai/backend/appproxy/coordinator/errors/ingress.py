@@ -60,11 +60,11 @@ class ApiDeliveryWorkerServerError(BackendAIError, web.HTTPBadGateway):
         )
 
 
-class ApiDeliveryWorkerPushFailedError(BackendAIError, web.HTTPBadGateway):
-    """Raised after every push has settled when any api-delivery worker push failed."""
+class IngressPushFailedError(BackendAIError, web.HTTPBadGateway):
+    """Raised after every push has settled when any push to a worker or to Traefik etcd failed."""
 
-    error_type = "https://api.backend.ai/probs/appproxy-coordinator/api-delivery-worker-push-failed"
-    error_title = "Pushes to api-delivery workers failed."
+    error_type = "https://api.backend.ai/probs/appproxy-coordinator/ingress-push-failed"
+    error_title = "Ingress pushes failed."
 
     @override
     def error_code(self) -> ErrorCode:

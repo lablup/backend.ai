@@ -10,6 +10,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentOptions
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.endpoint.creators import (
     DeploymentCreator,
@@ -34,6 +35,7 @@ class TestSeedDeployment(
     replica_count: int = 1
     open_to_public: bool = False
     tag: str | None = None
+    agent_selection_policy: AgentSelectionPolicy = AgentSelectionPolicy.PREFERRED
 
     @override
     def kind(self) -> str:
@@ -46,6 +48,8 @@ class TestSeedDeployment(
             says.append("바깥에 열려 있다")
         if self.tag is not None:
             says.append(f"{self.tag} 태그가 붙어 있다")
+        if self.agent_selection_policy != AgentSelectionPolicy.PREFERRED:
+            says.append(f"선택 정책이 {self.agent_selection_policy.value}다")
         return ", ".join(says)
 
     @override
@@ -72,5 +76,5 @@ class TestSeedDeployment(
             ),
             replica=DeploymentReplicaFields(replica_count=self.replica_count),
             network=DeploymentNetworkFields(open_to_public=self.open_to_public),
-            options=DeploymentOptions(),
+            options=DeploymentOptions(agent_selection_policy=self.agent_selection_policy),
         )

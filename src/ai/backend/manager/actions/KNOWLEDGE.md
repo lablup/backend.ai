@@ -14,22 +14,24 @@ generated:
 status: stable
 ---
 
-# Manager Actions layer — Knowledge
+# Manager Actions layer: Knowledge
 
 > Rules: `AGENTS.md` in the same directory.
+
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 ## Why this layer exists
 
 It wraps every service operation in a single uniform envelope so that
 authorization, auditing, and metrics are enforced structurally instead of being
-reimplemented per handler. An operation that bypasses it gets none of the three —
-which is why handlers call processors, not services.
+reimplemented per handler. An operation that bypasses it gets none of the three.
+So handlers call processors, not services.
 
 ## Permissions are derived, not declared by actions
 
-- The v2 bases classify actions by the shape of their target — the shapes are listed in `AGENTS.md`.
-- The required permission is derived from `operation_type()` — actions do not declare permissions, so the two cannot diverge.
-- `RESTORE` is the only deliberate split: the behavior/audit label is restore, the checked permission is soft-delete — no new permission bit.
+- The v2 bases classify actions by the shape of their target: the shapes are listed in `AGENTS.md`.
+- The required permission is derived from `operation_type()`: actions do not declare permissions, so the two cannot diverge.
+- `RESTORE` is the only deliberate split: the behavior/audit label is restore, the checked permission is soft-delete, with no new permission bit.
 
 ## An entity with no scope of its own is still designated by id
 
@@ -43,12 +45,12 @@ which is why handlers call processors, not services.
 ## Backing is orthogonal to shape
 
 - The `OpsBackendAction` mixin (`actions/v2/ops/`) is a second independent axis: "how it executes".
-- Pass-through actions carry repository specs (`to_creator()`, `to_searcher()`, ...) and run in the generic service — RBAC and auditing remain owned by the shape axis.
-- The moment an operation grows branching, promote it to a service method — the generic path has no hook to hide branching in.
+- Pass-through actions carry repository specs (`to_creator()`, `to_searcher()`, ...) and run in the generic service: RBAC and auditing remain owned by the shape axis.
+- The moment an operation grows branching, promote it to a service method: the generic path has no hook to hide branching in.
 
 ## A soft delete is an update the action reclassifies
 
-- The DB operation is an UPDATE, so ops has no delete to generalize — one update
+- The DB operation is an UPDATE, so ops has no delete to generalize: one update
   path serves both. The split lives one layer up: the action declares
   `operation_type() == DELETE`, and that is what the RBAC check and the audit
   row's `operation` column read.
@@ -66,7 +68,7 @@ which is why handlers call processors, not services.
   carries no membership of its own, so an operation naming one has to read the owning
   entity before it has anything to answer with.
 - That read runs as a lookup action. A request naming a row that is gone leaves a
-  lookup failure with the key in `lookup_kind` / `lookup_key` — the one place a field
+  lookup failure with the key in `lookup_kind` / `lookup_key`: the one place a field
   id belongs in the trail.
 - The owning entity's id is not taken from the request. Confirming that the two stand
   in that relation takes the same query anyway, and trusting it without confirming
@@ -78,17 +80,17 @@ which is why handlers call processors, not services.
 ## A relation names two scopes and no kind
 
 - The shape a link takes follows from containment. A user is inside a project, so that is
-  the scope shape as it stands — one scope, and the type it contains. A resource group is
+  the scope shape as it stands: one scope, and the type it contains. A resource group is
   a cluster resource several domains share, so neither is inside the other and both are
   named.
 - Naming both means asking both. With no entity type there is nothing to read at a scope,
   so the question degenerates to the permission on the scope itself, which is the entity
-  question the bulk validator already asks. One denied scope refuses the run: the row is
+  question the bulk validator already asks. One denied scope rejects the run: the row is
   about both, so there is no subset left to write.
 - Not the bulk shape, which runs the operation once per entity and answers per entity.
   A link runs once and answers once.
-- The audit row names no entity and no kind — what was written stands between two
-  entities and is neither. The scopes go to `audit_log_scopes`, which is why
+- The audit row names no entity and no kind: what was written stands between two
+  entities and is neither. The scopes go to `audit_log_scopes`, so
   `audit_logs.entity_type` admits NULL. The reporter still emits one message per scope,
   since every scope is an entity and each is reported as the one it is.
 - Deriving permission from a relation was rejected: the same entity reached through
@@ -113,31 +115,31 @@ which is why handlers call processors, not services.
 
 ## Many-row writes: the failure mode is named, never an argument
 
-- `atomic_*` flushes every row together and raises on the first failure — the
+- `atomic_*` flushes every row together and raises on the first failure: the
   run records one failure with no entity named, because nothing was written and
   no row can be blamed.
-- `partial_*` isolates each item in a savepoint and answers per item — the run
+- `partial_*` isolates each item in a savepoint and answers per item: the run
   itself succeeds and carries the verdicts.
 - Not selectable by a flag: the return type differs (`list` vs
   `BulkResultWithFailures`), and that type propagates through the generic
   service, the action result and the processor. A value cannot decide four
   layers of types.
-- `Bulk` names the `BaseBulkAction` shape — the caller named the entities, so
+- `Bulk` names the `BaseBulkAction` shape: the caller named the entities, so
   each is answered for. A many-row write whose target is one scope, one owner or
-  the system is not bulk-shaped, which is why the atomic creates are scope-,
+  the system is not bulk-shaped, so the atomic creates are scope-,
   single-entity- and global-shaped.
 
 ## Audit principles: writes always, reads on subscription, failures always
 
 - Write recording cannot be disabled by configuration, successful reads are recorded only when subscribed, and failures are always recorded including permission denials (`DENIED`) (`audit_policy.py`).
 - Validation runs inside the monitor lifecycle so that denials leave a row.
-- The reference structure is GCP audit configuration — admin activity always on / data access opt-in / policy denial always on.
-- Bulk records one row per target, each with its own status — single-row alternatives (JSON arrays, child tables) trade per-target lookup for volume, and volume is a retention problem, not a schema problem.
+- The reference structure is GCP audit configuration: admin activity always on / data access opt-in / policy denial always on.
+- Bulk records one row per target, each with its own status: single-row alternatives (JSON arrays, child tables) trade per-target lookup for volume, and volume is a retention problem, not a schema problem.
 
 ## Lookup must not leak existence
 
-- Lookup resolves keys before the permission check, so a distinguishable "not found" leaks existence to unauthorized callers — the reason a lookup miss and a permission denial must share the same response shape.
-- Lookup metrics are labeled only by the shape of the key — value labels are a cardinality explosion.
+- Lookup resolves keys before the permission check, so a distinguishable "not found" leaks existence to unauthorized callers: the reason a lookup miss and a permission denial must share the same response shape.
+- Lookup metrics are labeled only by the shape of the key: value labels are a cardinality explosion.
 - These metrics double as a legacy-drain indicator: a lookup whose counter stays at 0 can be deleted.
 
 ## Public means all authenticated users, not anonymous
@@ -145,7 +147,7 @@ which is why handlers call processors, not services.
 - `PublicActionProcessor` replaces the global gate with an authentication check and does nothing else.
 - It is the only processor constructed together with the action class, so it rejects write operations at wiring time, not at request time.
 - A read that runs before anyone has signed in therefore has no processor of its own: `ScopeActionProcessor` pins no gate, so `ProcessorGroup.anonymous_scope` wires one without adding a class. It takes read operations only, checked at wiring time.
-- A write that no principal can ever reach — an external system posting to a webhook, authenticated by a secret the entity stores — has nowhere else to go, so `AnonymousGlobalActionProcessor` runs it with no validator at all. Recording the wiring as an anonymous gate is what keeps that set countable.
+- A write that no principal can ever reach (an external system posting to a webhook, authenticated by a secret the entity stores) has nowhere else to go, so `AnonymousGlobalActionProcessor` runs it with no validator at all. Recording the wiring as an anonymous gate is what keeps that set countable.
 
 ## A global action is answered by the global singleton
 
@@ -157,22 +159,22 @@ which is why handlers call processors, not services.
 - A super admin, and a monitor on a read, pass straight off the user role. What worked
   without a role row keeps working, and neither costs a permission read.
 - With the enforcement switch (`manager.rbac.enforcement_enabled`) off, those two bypasses
-  are all that remain and everything else is refused. Nothing guarantees the permission rows
-  are maintained while it is off, so the fall-back is the earlier behavior — super admin
-  only — rather than letting callers through.
+  are all that remain and everything else is rejected. Nothing guarantees the permission rows
+  are maintained while it is off, so the fall-back is the earlier behavior: super admin
+  only: rather than letting callers through.
 - The list a role editor offers (`role_grantable_wirings`) leaves the global wirings out,
   because `role_scope_types` does not name `global` and the matrix has no axis for it. The
   gate works, but a role to delegate through cannot yet be made from that list.
 
 ## The registry is the catalog
 
-- `ProcessorRegistry.wired_actions()` accumulates every wired action class — the
+- `ProcessorRegistry.wired_actions()` accumulates every wired action class: the
   authoritative catalog of what is actually in use.
-- A sweep test compares the v2 bases' `__subclasses__()` against the wiring — an action
+- A sweep test compares the v2 bases' `__subclasses__()` against the wiring: an action
   that exists but is unwired is a test failure, not dead code.
 - The same sweep asserts that `action_name()` is unique. An entity type is no longer
-  readable off a class — a single-entity action derives it from the id, and a field
-  action has none until its owner is read — so the name alone has to tell two runs
+  readable off a class: a single-entity action derives it from the id, and a field
+  action has none until its owner is read: so the name alone has to tell two runs
   apart.
 
 ## The command that reads the catalog out

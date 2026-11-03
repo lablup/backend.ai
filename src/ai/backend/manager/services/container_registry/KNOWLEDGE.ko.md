@@ -25,9 +25,10 @@ registry 를 참조하는 프로젝트를 받아 거기서 registry 를 찾는�
 
 ## quota 연산은 프로젝트를 거쳐 registry 에 접근한다
 
-- `get_project_registry` 는 프로젝트의 `container_registry` 설정에서 registry 이름과 프로젝트명을
-  읽고, 그 둘이 참조하는 registry 를 찾는다. 프로젝트, 설정, registry 중 하나라도 없으면
-  `ContainerRegistryNotFound` 다.
+- `get_project_registry` 는 프로젝트의 기본 registry 를 읽는다. `is_default` 가 설정된
+  `association_container_registries_groups` 행을 본다. 없으면 `ContainerRegistryNotFound` 다.
+  세션 commit 도 같은 lookup 으로 registry 를 찾는다.
+- `groups.container_registry` JSON column 은 더 이상 읽지 않는다.
 - 클라이언트 pool 은 registry 타입으로 클라이언트를 고른다. 구현은 `HARBOR2` 뿐이라 다른 타입은
   `ContainerRegistryQuotaNotSupported` 다.
 - `project`, `username`, `password` 중 하나라도 null 인 registry 는 Harbor 를 호출하기 전에

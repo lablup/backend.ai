@@ -1,11 +1,11 @@
 # Manager GraphQL API (Strawberry)
 
-← [Back to Manager API](../README.md)
+[Back to Manager API](../README.md)
 
 ## Overview
 
-Manager GraphQL API is a GraphQL interface built using the Strawberry framework,
-with all types backed by Pydantic v2 DTOs from `common/dto/manager/v2/`.
+The manager GraphQL API is built on the Strawberry framework.
+Every type is backed by a pydantic v2 DTO from `common/dto/manager/v2/`.
 
 ## Architecture
 
@@ -25,7 +25,7 @@ Services Layer
 
 ## Module Organization Pattern
 
-The GraphQL module follows a consistent pattern for organizing code. Choose between file-based or package-based structure based on complexity.
+The GraphQL module organizes code in one consistent pattern. Choose a file-based or package-based structure by complexity.
 
 ### Decision Tree
 
@@ -53,16 +53,16 @@ domain_v2/
 
 ### Layer Responsibilities
 
-- **types/**: GQL type definitions — Node, Connection, Filter, Input, Payload, Enum
-- **fetcher/**: Data loading — pagination, DataLoader usage, Adapter calls, DTO conversion
-- **resolver/**: GraphQL operations — thin wrappers calling fetchers
+- **types/**: GQL type definitions (Node, Connection, Filter, Input, Payload, Enum)
+- **fetcher/**: Data loading - pagination, DataLoader use, adapter calls, DTO conversion
+- **resolver/**: GraphQL operations - thin wrappers that call a fetcher
 
 ## Type Definition Conventions
 
 ### Decorator Rules
 
-All GQL types MUST use custom decorators from `decorators.py`.
-Never use `@strawberry.type`, `@strawberry.input`, `@strawberry.field`, `@strawberry.enum`,
+Every GQL type must use the custom decorators from `decorators.py`.
+Do not use `@strawberry.type`, `@strawberry.input`, `@strawberry.field`, `@strawberry.enum`,
 `@strawberry.mutation`, `@strawberry.subscription`, or `@strawberry.federation.type` directly.
 
 ```python
@@ -84,7 +84,7 @@ from ai.backend.manager.api.gql.decorators import (
 
 ### Node Types (Relay)
 
-Node types represent GraphQL entities with unique IDs. Inherit `PydanticNodeMixin[DTO]`.
+A Node type represents a GraphQL entity with a unique ID. It inherits `PydanticNodeMixin[DTO]`.
 
 ```python
 from ai.backend.common.dto.manager.v2.domain.response import DomainNode
@@ -102,11 +102,11 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
         return await info.context.data_loaders.project_loader.load(self.domain_name)
 ```
 
-Conversion from DTO: `DomainV2GQL.from_pydantic(dto)`.
+Conversion from a DTO: `DomainV2GQL.from_pydantic(dto)`.
 
 ### Nested Output Types
 
-Nested sub-models use `@gql_pydantic_type(model=DTO)`. Strawberry auto-generates `from_pydantic()`.
+A nested sub-model uses `@gql_pydantic_type(model=DTO)`. Strawberry generates `from_pydantic()` automatically.
 
 ```python
 from ai.backend.common.dto.manager.v2.domain.response import DomainBasicInfo
@@ -122,7 +122,7 @@ class DomainBasicInfoGQL:
 
 ### Filter / OrderBy Types (Input)
 
-Filter and OrderBy types inherit `PydanticInputMixin[DTO]`. `to_pydantic()` converts to DTO.
+Filter and OrderBy types inherit `PydanticInputMixin[DTO]`. `to_pydantic()` converts the value to a DTO.
 
 ```python
 from ai.backend.common.dto.manager.v2.domain.request import DomainFilter
@@ -138,11 +138,11 @@ class DomainV2FilterGQL(PydanticInputMixin[DomainFilter]):
     NOT: strawberry.UNSET | DomainV2FilterGQL = strawberry.UNSET
 ```
 
-Conversion to DTO: `filter_gql.to_pydantic()`.
+Conversion to a DTO: `filter_gql.to_pydantic()`.
 
 ### Payload Types
 
-Mutation payloads use `@gql_pydantic_type(model=DTO)`.
+A mutation payload uses `@gql_pydantic_type(model=DTO)`.
 
 ```python
 from ai.backend.common.dto.manager.v2.domain.response import AdminSearchDomainsPayload
@@ -158,8 +158,8 @@ class AdminSearchDomainsPayloadGQL:
 
 ### Enum Values
 
-- Use `gql_enum` (decorator or function call) — never `@strawberry.enum` directly.
-- GQL enum values MUST match DTO enum values exactly (conversion is by `.value`).
+- Use `gql_enum` as a decorator or a function call. Do not use `@strawberry.enum` directly.
+- GQL enum values must match DTO enum values exactly (conversion is by `.value`).
 
 ```python
 # As decorator
@@ -178,20 +178,20 @@ DomainStatusGQL = gql_enum(
 
 ### Nullable Return Types
 
-Any field that runs through a **resolver** MUST be declared nullable (`T | None`). This
-covers root `Query` / `Mutation` fields and any computed nested field on a Node /
-Connection / Payload type — anything decorated with `@gql_root_field`, `@gql_mutation`,
-`@gql_field`, or `@gql_added_field`. This follows GraphQL's nullable-by-default best
+Every field that runs through a **resolver** must be declared nullable (`T | None`). This
+covers root `Query` / `Mutation` fields and any computed nested field on a Node,
+Connection, or Payload type: anything decorated with `@gql_root_field`, `@gql_mutation`,
+`@gql_field`, or `@gql_added_field`. It follows the GraphQL nullable-by-default best
 practice.
 
 **Why**
 
 - **Partial failure isolation.** When a resolver raises, GraphQL propagates `null` up to
   the nearest nullable ancestor. A non-null computed field turns a single nested
-  resolver failure into a whole-parent failure, wiping sibling fields the client could
+  resolver failure into a whole-parent failure and wipes sibling fields the client could
   otherwise have used.
-- **Permission / scope denial.** Fields that are visible only to some users naturally
-  express "denied" as `null` instead of an error that aborts the query.
+- **Permission / scope denial.** A field visible only to some users expresses "denied" as
+  `null` instead of an error that aborts the query.
 - **Forward compatibility.** `nullable → non-null` is a breaking change; `non-null →
   nullable` is not. Starting nullable is the safe default.
 
@@ -225,25 +225,25 @@ class FooConnection(Connection[Foo]):
 async def scheduling_handlers(...) -> list[SchedulingHandlerNodeGQL] | None: ...
 ```
 
-This emits the return type without `!` in the SDL — e.g. `AdminSearchDomainsPayload`,
-`AuditLogV2Connection`, `[SchedulingHandlerNode!]`, `ProjectV2Connection`.
+This emits the return type without `!` in the SDL, for example `AdminSearchDomainsPayload`,
+`AuditLogV2Connection`, `[SchedulingHandlerNode!]`, and `ProjectV2Connection`.
 
 **Resolver implementation note**
 
-Returning `None` is allowed and recommended for "not found" / "denied" cases. Do NOT
-catch domain exceptions inside fetchers just to swallow them as `None` — let
-`BackendAIError` propagate so the failure surfaces in the GraphQL `errors` array.
+Returning `None` is allowed and recommended for a not-found or denied case. Do not
+catch a domain exception inside a fetcher to turn it into `None`. Let
+`BackendAIError` propagate so the failure appears in the GraphQL `errors` array.
 
 **Exceptions**
 
-- **Statically projected DTO fields** — class-level attributes that map directly from
-  the backing Pydantic DTO (e.g. `name: str`) may stay non-null.
-- **Trivially derived scalars** — resolver-decorated fields whose value is computed
-  synchronously from non-null parent state with no I/O, permission check, or external
-  call. Example: a Connection `count` returning `len(self.edges)` stays non-null.
-- **Apollo Federation entry points** — `_service` and `_entities` are mandated by the
-  spec and remain non-null.
-- **Subscriptions** — streaming-event return types are governed separately.
+- **Statically projected DTO fields**: class-level attributes that map directly from
+  the backing pydantic DTO (for example `name: str`) may stay non-null.
+- **Trivially derived scalars**: resolver-decorated fields whose value is computed
+  synchronously from non-null parent state, with no I/O, permission check, or external
+  call. For example, a Connection `count` that returns `len(self.edges)` stays non-null.
+- **Apollo Federation entry points**: the GraphQL specification mandates `_service` and
+  `_entities`, and they remain non-null.
+- **Subscriptions**: streaming-event return types follow separate rules.
 
 ## Fetcher Pattern
 
@@ -319,18 +319,18 @@ async def projects(
     return ProjectV2GQL.from_pydantic(data) if data else None
 ```
 
-`| None` must be **outside** `Annotated[]`.
+`| None` goes **outside** `Annotated[]`.
 
 ## Key Principles
 
-- All GQL types are Pydantic-backed via custom decorators.
-- Resolvers call Adapters — shared with REST v2 — not Processors directly.
+- Every GQL type is backed by pydantic through the custom decorators.
+- Resolvers call adapters shared with REST v2, not processors directly.
 - DataLoaders prevent N+1 queries for cross-entity references.
-- Raise `BackendAIError` for all domain exceptions.
+- Raise `BackendAIError` for every domain exception.
 
-## Related Documentation
+## Related documents
 
 - [Manager API Overview](../README.md)
 - [REST v2 API](../rest/v2/AGENTS.md)
 - [Repositories Layer](../../repositories/README.md)
-- [Legacy GraphQL (Graphene)](../gql_legacy/README.md) — DEPRECATED
+- [Legacy GraphQL (Graphene)](../gql_legacy/README.md) - deprecated

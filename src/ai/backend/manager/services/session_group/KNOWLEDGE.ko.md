@@ -18,10 +18,12 @@
 | `global_search` | 제외되지 않는다. superadmin 은 모든 그룹을 본다 |
 | `update` | `SessionGroupUpdater` 가 그 조건을 `GuardCheck` 로 담는다. replica group 이 가진 그룹은 사용 중으로 거부된다. 상태 코드는 409 다 |
 | `purge` | purger 의 guard 가 DELETE 에 함께 적용된다. replica group 이 가진 그룹은 사용 중으로 거부된다. 상태 코드는 409 다 |
+| session `enqueue` | `EnqueueSessionAction.to_held_session_group_searcher` 가 조건을 담는다. 소유자의 replica group 이 가진 그룹은 사용 중으로 거부되고, 다른 그룹은 찾을 수 없음으로 반환된다 |
 
 - 조건은 `SessionGroupSearchableFields.linked.replica_groups.not_exists()` 이고, 모든 경로가 이 선언 하나를 읽는다.
 - 조회는 replica group 이 가진 그룹을 거부가 아니라 찾을 수 없음으로 반환한다. 호출자가 프로젝트를 통해 그 그룹에 READ 를 가질 수 있으므로 권한이 그 그룹을 제외하는 이유가 아니다.
 - update 와 purge 는 replica group 이 가진 그룹을 사용 중으로 거부한다. 그 그룹에 UPDATE 나 PURGE 를 가진 호출자만 guard 에 도달하고, 참조하는 deployment 가 그 그룹을 관리한다.
+- enqueue 는 그룹이 사용 중이라는 응답을 소유자에게만 준다. 다른 호출자에게는 그룹이 찾을 수 없음으로 반환된다. enqueue 는 그룹에 대한 권한을 검사하지 않는다.
 
 ## id 로 하는 조회는 service 를 둔다
 

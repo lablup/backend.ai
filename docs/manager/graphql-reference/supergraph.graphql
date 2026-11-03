@@ -5422,6 +5422,11 @@ input CreateRolePresetInput
   """
   autoAssign: Boolean! = false
 
+  """
+  Added in 26.10.0. Whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.
+  """
+  autoAssignToOwner: Boolean! = false
+
   """Permission entries carried by the preset."""
   permissions: [RolePermissionPresetEntryInput!]!
 }
@@ -6984,6 +6989,9 @@ type DeploymentOptionsInfo
 {
   """Handler-keyed scheduler policy (timeout + retry)."""
   handlerOptions: DeploymentHandlerOptionsInfo!
+
+  """Added in 26.10.0. How the designated agents are enforced."""
+  agentSelectionPolicy: SessionAgentSelectionPolicy!
 }
 
 """Added in 26.4.4. Deployment options payload input."""
@@ -6991,6 +6999,11 @@ input DeploymentOptionsInput
   @join__type(graph: STRAWBERRY)
 {
   handlerOptions: DeploymentHandlerOptionsInput!
+
+  """
+  Added in 26.10.0. How the designated agents are enforced. null keeps the stored policy.
+  """
+  agentSelectionPolicy: SessionAgentSelectionPolicy = null
 }
 
 """Added in 25.19.0. """
@@ -8429,6 +8442,11 @@ input EnqueueSessionInput
 
   """Network UUID to attach."""
   attachNetwork: ID = null
+
+  """
+  Added in 26.10.0. Session group UUID the session joins. The group must belong to the session's owner and project.
+  """
+  sessionGroupId: ID = null
 
   """User-defined tag."""
   tag: String = null
@@ -14301,9 +14319,9 @@ type Mutation
     """Agent ID to rescan GPU alloc map"""
     agent_id: String!
   ): RescanGPUAllocMaps @join__field(graph: GRAPHENE)
-  create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair @join__field(graph: GRAPHENE)
-  modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair @join__field(graph: GRAPHENE)
-  delete_keypair(access_key: String!): DeleteKeyPair @join__field(graph: GRAPHENE)
+  create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair @join__field(graph: GRAPHENE) @deprecated(reason: "Deprecated since 26.10.0. Use `adminCreateKeypairV2` instead.")
+  modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair @join__field(graph: GRAPHENE) @deprecated(reason: "Deprecated since 26.10.0. Use `adminUpdateKeypairV2` instead.")
+  delete_keypair(access_key: String!): DeleteKeyPair @join__field(graph: GRAPHENE) @deprecated(reason: "Deprecated since 26.10.0. Use `adminDeleteKeypairV2` instead.")
   rescan_images(
     """Added in 25.1.0."""
     project: String
@@ -14810,6 +14828,11 @@ type Mutation
 
   """Added in 25.16.0. Delete model deployment."""
   deleteModelDeployment(input: DeleteDeploymentInput!): DeleteDeploymentPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Fully replace the ``options`` surface of a deployment. Replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
+  """
+  replaceDeploymentOptions(input: ReplaceDeploymentOptionsInput!): ReplaceDeploymentOptionsPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.16.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers.
@@ -22648,6 +22671,29 @@ input RejectRoleInvitationInput
 }
 
 """
+Added in 26.10.0. Input for the replaceDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
+"""
+input ReplaceDeploymentOptionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  deploymentId: UUID!
+  options: DeploymentOptionsInput!
+}
+
+"""
+Added in 26.10.0. Payload returned after replacing a deployment's options. Only the refreshed options surface is returned.
+"""
+type ReplaceDeploymentOptionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the deployment whose ``options`` were replaced."""
+  deploymentId: ID!
+
+  """The newly persisted ``options`` surface."""
+  options: DeploymentOptionsInfo!
+}
+
+"""
 Added in 26.4.4. Input for the replaceResourceGroupDefaultDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value.
 """
 input ReplaceResourceGroupDefaultDeploymentOptionsInput
@@ -24746,6 +24792,11 @@ type RolePreset implements Node
   autoAssign: Boolean!
 
   """
+  Added in 26.10.0. Whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.
+  """
+  autoAssignToOwner: Boolean!
+
+  """
   Soft-delete flag. Set by the delete mutation and cleared by the restore mutation; archived rows are excluded from default searches.
   """
   deleted: Boolean! @deprecated(reason: "Deprecated since 26.10.0. Use `deletedAt`.")
@@ -24808,6 +24859,9 @@ input RolePresetFilter
 
   """Filter by auto-assign flag."""
   autoAssign: Boolean = null
+
+  """Added in 26.10.0. Filter by the assign-to-owner flag."""
+  autoAssignToOwner: Boolean = null
 
   """
   Filter by soft-delete flag. Searches exclude soft-deleted rows by default; set this explicitly to `true` to inspect archived presets.
@@ -26967,6 +27021,9 @@ input SessionUses
 
   """Resource groups the session runs in."""
   resourceGroup: [UUID!] = null
+
+  """Added in 26.10.0. Vfolders the session's kernel groups mount."""
+  vfolder: [UUID!] = null
 }
 
 """Added in 26.3.0. Represents a compute session in Backend.AI."""
@@ -29691,6 +29748,11 @@ input UpdateRolePresetBodyInput
   Updated default value for the `auto_assign` flag of instantiated roles.
   """
   autoAssign: Boolean
+
+  """
+  Added in 26.10.0. Updated value for whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.
+  """
+  autoAssignToOwner: Boolean
 }
 
 """
@@ -29709,6 +29771,11 @@ input UpdateRolePresetInput
   Updated default value for the `auto_assign` flag of instantiated roles.
   """
   autoAssign: Boolean
+
+  """
+  Added in 26.10.0. Updated value for whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.
+  """
+  autoAssignToOwner: Boolean
 }
 
 """Added in 26.4.4. Payload returned after updating a role preset."""
@@ -32227,6 +32294,9 @@ input VFolderUsedBy
 
   """Model cards built on the vfolder."""
   modelCard: [UUID!] = null
+
+  """Added in 26.10.0. Sessions whose kernel groups mount the vfolder."""
+  session: [UUID!] = null
 }
 
 """Added in 25.16.0. VFS Storage configuration."""

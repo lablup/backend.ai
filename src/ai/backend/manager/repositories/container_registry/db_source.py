@@ -8,11 +8,13 @@ from ai.backend.common.data.entity.container_registry import (
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
+from ai.backend.manager.models.association_container_registries_groups.lookups import (
+    ProjectDefaultRegistriesLookup,
+)
 from ai.backend.manager.models.container_registry.lookups import (
     ContainerRegistryByNameAndRegistryProjectLookup,
 )
 from ai.backend.manager.models.container_registry.queriers import ContainerRegistryQuerier
-from ai.backend.manager.models.project.queriers import ProjectQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 
@@ -48,24 +50,12 @@ class ContainerRegistryDBSource:
 
     async def lookup_image_commit_registry_id(self, project_id: ProjectID) -> ContainerRegistryID:
         async with self._ops_provider.read_ops() as ops:
-            project = await ops.query_data(ProjectQuerier(project_id=project_id))
-            if project is None or project.container_registry is None:
-                raise ContainerRegistryNotFound(
-                    f"Container registry info does not exist or is invalid in the project. (project: {project_id})"
-                )
-            target = project.container_registry
-            registry_id = await ops.lookup_entity_id(
-                ContainerRegistryByNameAndRegistryProjectLookup(
-                    registry_name=ContainerRegistryName(target.registry_name),
-                    registry_project_name=(
-                        ContainerRegistryProjectName(target.project_name)
-                        if target.project_name is not None
-                        else None
-                    ),
-                )
+            registry_ids = await ops.lookup_entity_ids(
+                ProjectDefaultRegistriesLookup(), [project_id]
             )
-            if registry_id is None:
-                raise ContainerRegistryNotFound(
-                    f"Container registry row not found. (registry: {target.registry_name}, project: {target.project_name})"
-                )
-            return registry_id
+        registry_id = registry_ids.get(project_id)
+        if registry_id is None:
+            raise ContainerRegistryNotFound(
+                f"The project has no default container registry. (project: {project_id})"
+            )
+        return registry_id

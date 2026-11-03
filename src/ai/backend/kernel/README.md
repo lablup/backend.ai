@@ -1,1 +1,1 @@
-# Backend.AI Kernel Runner
+# Backend.AI kernel runner

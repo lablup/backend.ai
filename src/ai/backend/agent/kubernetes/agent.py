@@ -35,6 +35,7 @@ from ai.backend.agent.agent import (
     ScanImagesResult,
 )
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ScratchType
+from ai.backend.agent.defs import SESSION_NAME_CONFIG_FILENAME
 from ai.backend.agent.dotfile import DotfileTargetResolver
 from ai.backend.agent.errors import K8sError, UnsupportedResource
 from ai.backend.agent.etcd import AgentEtcdClientView
@@ -588,6 +589,13 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     None,
                     functools.partial(_write_config, "environ.txt", buf.getvalue()),
                 )
+
+            await run_in_executor_with_context(
+                None,
+                functools.partial(
+                    _write_config, SESSION_NAME_CONFIG_FILENAME, self.kernel_config["session_name"]
+                ),
+            )
 
             with StringIO() as buf:
                 resource_spec.write_to_file(buf)

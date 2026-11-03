@@ -20,10 +20,12 @@ from ai.backend.manager.api.adapters.role_preset.adapter import RolePresetAdapte
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.role_preset import (
+    AProjectAndADomainPresetAndSomeone,
     EveryTargetComesBack,
     ManyPresetsAndACaller,
     ManyPresetsAndSomeone,
     NothingIsProcessed,
+    OnlyTheFirstPresetComesBack,
     PresetLook,
 )
 from bai_scenario.runner.acting import ActingAs
@@ -51,6 +53,30 @@ class TurningAutoAssignOnForEvery(When[ManyPresetsAndACaller, RolePresetAdapter,
         items = [
             PartialBulkUpdateRolePresetItemInput(
                 id=preset.id, input=UpdateRolePresetBody(auto_assign=True)
+            )
+            for preset in laid.laid
+        ]
+        with ActingAs(laid.caller):
+            return await adapter.partial_bulk_update(PartialBulkUpdateRolePresetsInput(items=items))
+
+
+@dataclass(frozen=True)
+class TurningOwnerAssignOnForEvery(When[ManyPresetsAndACaller, RolePresetAdapter, Edited]):
+    """대상 프리셋 모두의 소유자 부여를 한 번에 켠다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_update"
+
+    @override
+    def describe(self, laid: ManyPresetsAndACaller) -> str:
+        return f"{laid.caller.username}이 프리셋 {len(laid.laid)}개의 소유자 부여를 한 번에 켬"
+
+    @override
+    async def call(self, adapter: RolePresetAdapter, laid: ManyPresetsAndACaller) -> Edited:
+        items = [
+            PartialBulkUpdateRolePresetItemInput(
+                id=preset.id, input=UpdateRolePresetBody(auto_assign_to_owner=True)
             )
             for preset in laid.laid
         ]
@@ -113,9 +139,40 @@ class AUserGrantedNothingEditsNone(
         return NothingIsProcessed(reason="Insufficient permission")
 
 
+@dataclass(frozen=True)
+class OnlyTheProjectPresetTakesOwnerAssign(
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, RolePresetAdapter, Edited]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "only-the-project-preset-takes-owner-assign"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "프로젝트 스코프와 도메인 스코프 프리셋의 소유자 부여를 한 번에 켜면, "
+            "프로젝트 스코프 프리셋만 고쳐지고 도메인 스코프 프리셋은 실패 목록에 온다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
+        return AProjectAndADomainPresetAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ManyPresetsAndACaller, RolePresetAdapter, Edited]:
+        return TurningOwnerAssignOnForEvery()
+
+    @override
+    def then(self) -> Then[ManyPresetsAndACaller, Edited]:
+        return OnlyTheFirstPresetComesBack(PresetLook(self.started, auto_assign_to_owner=True))
+
+
 SCENARIOS: list[EditingStep] = [
     TheSuperadminEditsSeveral(started=datetime.now(UTC)),
     AUserGrantedNothingEditsNone(),
+    OnlyTheProjectPresetTakesOwnerAssign(started=datetime.now(UTC)),
 ]
 
 

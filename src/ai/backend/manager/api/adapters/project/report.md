@@ -4,10 +4,9 @@
 
 Scenario: incomplete 15 / 17
 
-- built from ops (11)
+- built from ops (10)
   - admin_search: representative success ✗ · representative rejection ✗: SCENARIO-GAP
   - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - batch_load_image_commit_registries: representative success ✓ · representative rejection ✓
   - delete: representative success ✗ · representative rejection ✗: SCENARIO-GAP
   - get: representative success ✗ · representative rejection ✗: SCENARIO-GAP
   - partial_bulk_delete: representative success ✓ · representative rejection ✗: SCENARIO-GAP
@@ -21,17 +20,10 @@ Scenario: incomplete 15 / 17
   - partial_bulk_update: success present 3 · rejection absent (partial_bulk, partial_bulk_delete_ops, partial_bulk_restore_ops): SCENARIO-GAP
   - unassign_users: success absent · rejection absent (atomic_bulk_get_ops, scope): SCENARIO-GAP
   - update: success present 2 · rejection absent (single_delete_ops, single_entity, single_restore_ops): SCENARIO-GAP
-- direct implementation (2)
+- direct implementation (3)
   - admin_create: success present 1 · rejection present 1 (scope)
   - admin_purge: success absent · rejection absent (single_entity): SCENARIO-GAP
-
-**batch_load_image_commit_registries**
-
-| scenario | verdict |
-|---|---|
-| [읽기 권한이 있으면 요청 순서대로 image commit을 위한 Container Registry를 응답한다](#image_commit_registry-read-targets-in-request-order) | answered |
-| [읽기 권한이 있고 image commit을 위한 Container Registry가 설정되지 않았으면 빈 값을 응답한다](#image_commit_registry-read-unconfigured-targets) | answered |
-| [읽기 권한이 없으면 image commit을 위한 Container Registry 조회를 거부한다](#image_commit_registry-target-read-requires-permission) | rejected |
+  - batch_load_registries: success present 3 · rejection present 1 (partial_bulk)
 
 **partial_bulk_delete**
 
@@ -74,93 +66,14 @@ Scenario: incomplete 15 / 17
 | [도메인과 프로젝트 정책이 있을 때 슈퍼관리자가 프로젝트를 만들면, 그 이름의 프로젝트가 그 도메인 아래에 생긴다](#project-the-superadmin-makes-a-project-in-a-domain) | answered |
 | [프로젝트 생성은 역할이 아니라 도메인 스코프의 권한이 지키므로, 아무 권한도 받지 않은 사용자는 권한 부족으로 거부된다](#project-a-user-granted-nothing-may-not-make-a-project) | rejected |
 
-### batch_load_image_commit_registries
+**batch_load_registries**
 
-<a id="image_commit_registry-read-targets-in-request-order"></a>
-
-#### [read-targets-in-request-order](/tests/scenario/bai_scenario/manager/project/test_image_commit_registry.py): pass
-
-읽기 권한이 있으면 요청 순서대로 image commit을 위한 Container Registry를 응답한다
-
-Given
-
-- image commit을 위한 Container Registry가 설정되어 있다. 일반 사용자는 프로젝트 읽기 권한이 있다.
-  - 도메인 domain-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 project-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 역할 role-1: 이 역할이 앉은 스코프 안에서만 통한다
-  - 역할 role-1: project 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 role-1 보유
-
-When
-
-- ProjectAdapter.batch_load_image_commit_registries: 같은 프로젝트의 image commit을 위한 Container Registry를 두 번 요청한다
-
-Then
-
-- 요청마다 image commit을 위한 Container Registry나 빈 값 또는 권한 거부를 응답한다
-  - targets = [ImageCommitRegistry(registry_name='registry.example.com', project_name='images'), ImageCommitRegistry(registry_name='registry.example.com', project_name='images')]
-
-<a id="image_commit_registry-read-unconfigured-targets"></a>
-
-#### [read-unconfigured-targets](/tests/scenario/bai_scenario/manager/project/test_image_commit_registry.py): pass
-
-읽기 권한이 있고 image commit을 위한 Container Registry가 설정되지 않았으면 빈 값을 응답한다
-
-Given
-
-- image commit을 위한 Container Registry가 설정되어 있지 않다. 일반 사용자는 프로젝트 읽기 권한이 있다.
-  - 도메인 domain-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 project-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 역할 role-1: 이 역할이 앉은 스코프 안에서만 통한다
-  - 역할 role-1: project 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 role-1 보유
-
-When
-
-- ProjectAdapter.batch_load_image_commit_registries: 같은 프로젝트의 image commit을 위한 Container Registry를 두 번 요청한다
-
-Then
-
-- 요청마다 image commit을 위한 Container Registry나 빈 값 또는 권한 거부를 응답한다
-  - targets = [None, None]
-
-<a id="image_commit_registry-target-read-requires-permission"></a>
-
-#### [target-read-requires-permission](/tests/scenario/bai_scenario/manager/project/test_image_commit_registry.py): pass
-
-읽기 권한이 없으면 image commit을 위한 Container Registry 조회를 거부한다
-
-Given
-
-- image commit을 위한 Container Registry가 설정되어 있지 않다. 일반 사용자는 프로젝트 읽기 권한이 없다.
-  - 도메인 domain-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 project-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ProjectAdapter.batch_load_image_commit_registries: 같은 프로젝트의 image commit을 위한 Container Registry를 두 번 요청한다
-
-Then
-
-- 요청마다 image commit을 위한 Container Registry나 빈 값 또는 권한 거부를 응답한다
-  - count = 2
-  - 거부: NotEnoughPermission
-  - 거부: NotEnoughPermission
+| scenario | verdict |
+|---|---|
+| [읽기 권한이 있으면 default가 아닌 허용된 Container Registry도 default가 아니라는 표시와 함께 응답한다](#registries-read-allowed-registry) | answered |
+| [읽기 권한이 있으면 default로 허용된 Container Registry를 default라는 표시와 함께 응답한다](#registries-read-default-registry) | answered |
+| [읽기 권한이 있고 허용된 Container Registry가 없으면 빈 목록을 응답한다](#registries-read-no-registry) | answered |
+| [읽기 권한이 없으면 허용된 Container Registry 조회를 거부한다](#registries-registries-read-requires-permission) | rejected |
 
 ### partial_bulk_delete
 
@@ -620,5 +533,142 @@ When
 Then
 
 - 거부된다
+  - 거부: NotEnoughPermission
+
+### batch_load_registries
+
+<a id="registries-read-allowed-registry"></a>
+
+#### [read-allowed-registry](/tests/scenario/bai_scenario/manager/project/test_registries.py): pass
+
+읽기 권한이 있으면 default가 아닌 허용된 Container Registry도 default가 아니라는 표시와 함께 응답한다
+
+Given
+
+- 프로젝트가 레지스트리에 허용돼 있지만 default는 아니다. 일반 사용자는 프로젝트 읽기 권한이 있다.
+  - 도메인 domain-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳, 프로젝트는 images
+  - 프로젝트 project-1 을 허용한 컨테이너 레지스트리 registry-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 역할 role-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 역할 role-1: project 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 role-1 보유
+
+When
+
+- ProjectAdapter.batch_load_registries: 같은 프로젝트가 허용된 Container Registry를 두 번 요청한다
+
+Then
+
+- 요청마다 허용된 Container Registry 목록이나 권한 거부를 응답한다
+  - count = 2
+  - [0] count = 1
+  - [0][0].registry: 심은 레지스트리와 같다
+  - [0][0].is_default = False
+  - [1] count = 1
+  - [1][0].registry: 심은 레지스트리와 같다
+  - [1][0].is_default = False
+
+<a id="registries-read-default-registry"></a>
+
+#### [read-default-registry](/tests/scenario/bai_scenario/manager/project/test_registries.py): pass
+
+읽기 권한이 있으면 default로 허용된 Container Registry를 default라는 표시와 함께 응답한다
+
+Given
+
+- 프로젝트가 레지스트리에 default로 허용돼 있다. 일반 사용자는 프로젝트 읽기 권한이 있다.
+  - 도메인 domain-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳, 프로젝트는 images
+  - 프로젝트 project-1 을 default 레지스트리로 허용한 컨테이너 레지스트리 registry-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 역할 role-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 역할 role-1: project 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 role-1 보유
+
+When
+
+- ProjectAdapter.batch_load_registries: 같은 프로젝트가 허용된 Container Registry를 두 번 요청한다
+
+Then
+
+- 요청마다 허용된 Container Registry 목록이나 권한 거부를 응답한다
+  - count = 2
+  - [0] count = 1
+  - [0][0].registry: 심은 레지스트리와 같다
+  - [0][0].is_default = True
+  - [1] count = 1
+  - [1][0].registry: 심은 레지스트리와 같다
+  - [1][0].is_default = True
+
+<a id="registries-read-no-registry"></a>
+
+#### [read-no-registry](/tests/scenario/bai_scenario/manager/project/test_registries.py): pass
+
+읽기 권한이 있고 허용된 Container Registry가 없으면 빈 목록을 응답한다
+
+Given
+
+- 프로젝트가 허용된 레지스트리가 없다. 일반 사용자는 프로젝트 읽기 권한이 있다.
+  - 도메인 domain-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳, 프로젝트는 images
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 역할 role-1: 이 역할이 앉은 스코프 안에서만 통한다
+  - 역할 role-1: project 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 role-1 보유
+
+When
+
+- ProjectAdapter.batch_load_registries: 같은 프로젝트가 허용된 Container Registry를 두 번 요청한다
+
+Then
+
+- 요청마다 허용된 Container Registry 목록이나 권한 거부를 응답한다
+  - count = 2
+  - [0] count = 0
+  - [1] count = 0
+
+<a id="registries-registries-read-requires-permission"></a>
+
+#### [registries-read-requires-permission](/tests/scenario/bai_scenario/manager/project/test_registries.py): pass
+
+읽기 권한이 없으면 허용된 Container Registry 조회를 거부한다
+
+Given
+
+- 프로젝트가 허용된 레지스트리가 없다. 일반 사용자는 프로젝트 읽기 권한이 없다.
+  - 도메인 domain-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳, 프로젝트는 images
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ProjectAdapter.batch_load_registries: 같은 프로젝트가 허용된 Container Registry를 두 번 요청한다
+
+Then
+
+- 요청마다 허용된 Container Registry 목록이나 권한 거부를 응답한다
+  - count = 2
+  - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
 

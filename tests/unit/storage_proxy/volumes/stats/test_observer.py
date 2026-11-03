@@ -71,6 +71,20 @@ class TestVolumeStatsObserver:
             options=default_options,
         )
 
+    @pytest.fixture
+    def observer_without_perf_metric(
+        self,
+        mock_volume_pool_without_perf_metric: MagicMock,
+        mock_valkey_client: AsyncMock,
+        default_options: VolumeStatsObserverOptions,
+    ) -> VolumeStatsObserver:
+        """Observer configured with a volume that has no performance metric."""
+        return VolumeStatsObserver(
+            volume_pool=mock_volume_pool_without_perf_metric,
+            valkey_client=mock_valkey_client,
+            options=default_options,
+        )
+
     def test_name_property(
         self,
         observer_with_single_volume: VolumeStatsObserver,
@@ -166,6 +180,29 @@ class TestVolumeStatsObserver:
         mock_stats_observer.observe.assert_called_once()
         call_kwargs = mock_stats_observer.observe.call_args.kwargs
         assert call_kwargs["status"] == "failure"
+
+    @patch("ai.backend.storage.volumes.stats.observer.VolumeStatsMetricObserver")
+    @patch("ai.backend.storage.volumes.stats.observer.VolumePerfMetricObserver")
+    async def test_observe_skips_volume_without_perf_metric(
+        self,
+        mock_perf_observer_cls: MagicMock,
+        mock_stats_observer_cls: MagicMock,
+        observer_without_perf_metric: VolumeStatsObserver,
+        mock_valkey_client: AsyncMock,
+    ) -> None:
+        mock_stats_observer = MagicMock()
+        mock_stats_observer_cls.instance.return_value = mock_stats_observer
+        mock_perf_observer = MagicMock()
+        mock_perf_observer_cls.instance.return_value = mock_perf_observer
+
+        observer_without_perf_metric._metric_observer = mock_stats_observer
+        observer_without_perf_metric._perf_metric_observer = mock_perf_observer
+
+        await observer_without_perf_metric.observe()
+
+        mock_valkey_client.set_volume_stats.assert_not_called()
+        mock_stats_observer.observe.assert_not_called()
+        mock_perf_observer.update.assert_not_called()
 
     async def test_cleanup_does_nothing(
         self,
