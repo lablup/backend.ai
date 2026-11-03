@@ -576,42 +576,41 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
                 await run_in_executor_with_context(None, _write_user_bootstrap_script)
 
-            def _write_config(file_name: str, content: str) -> None:
-                file_path = self.config_dir / file_name
-                file_path.write_text(content)
-                if KernelFeatures.UID_MATCH in self.kernel_features:
-                    uid = self.local_config.container.kernel_uid
-                    gid = self.local_config.container.kernel_gid
-                    if os.geteuid() == 0:
-                        os.chown(str(file_path), uid, gid)
+            uid: int | None = None
+            gid: int | None = None
+            if KernelFeatures.UID_MATCH in self.kernel_features:
+                uid = self.local_config.container.kernel_uid
+                gid = self.local_config.container.kernel_gid
 
             config_files: list[BaseKernelConfigFile] = [
-                EnvironFile(path=self.config_dir / "environ.txt", environ=environ),
+                EnvironFile(
+                    path=self.config_dir / "environ.txt", environ=environ, uid=uid, gid=gid
+                ),
                 SessionNameFile(
                     path=self.config_dir / SESSION_NAME_CONFIG_FILENAME,
                     session_name=self.kernel_config["session_name"],
+                    uid=uid,
+                    gid=gid,
                 ),
                 ResourceFile(
                     path=self.config_dir / "resource.txt",
                     resource_spec=resource_spec,
                     computers=self.computers,
+                    uid=uid,
+                    gid=gid,
                 ),
             ]
             for config_file in config_files:
-                content = await config_file.render()
-                await run_in_executor_with_context(
-                    None, functools.partial(_write_config, config_file.path.name, content)
-                )
+                await config_file.write()
 
             docker_creds = self.internal_data.get("docker_credentials")
             if docker_creds:
-                creds_file = DockerCredsFile(
-                    path=self.config_dir / "docker-creds.json", docker_creds=docker_creds
-                )
-                content = await creds_file.render()
-                await run_in_executor_with_context(
-                    None, functools.partial(_write_config, creds_file.path.name, content)
-                )
+                await DockerCredsFile(
+                    path=self.config_dir / "docker-creds.json",
+                    docker_creds=docker_creds,
+                    uid=uid,
+                    gid=gid,
+                ).write()
 
         if keypair := self.internal_data.get("ssh_keypair"):
             for mount in resource_spec.mounts:

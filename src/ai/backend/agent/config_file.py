@@ -1,4 +1,4 @@
-import functools
+import os
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -17,6 +17,8 @@ class BaseKernelConfigFile(ABC):
 
     path: Path
     encoding: str | None = field(default=None, kw_only=True)
+    uid: int | None = field(default=None, kw_only=True)  # chown target when running as root
+    gid: int | None = field(default=None, kw_only=True)
 
     @abstractmethod
     async def render(self) -> str:
@@ -24,9 +26,12 @@ class BaseKernelConfigFile(ABC):
 
     async def write(self) -> None:
         content = await self.render()
-        await run_in_executor_with_context(
-            None, functools.partial(self.path.write_text, content, encoding=self.encoding)
-        )
+        await run_in_executor_with_context(None, self._write_sync, content)
+
+    def _write_sync(self, content: str) -> None:
+        self.path.write_text(content, encoding=self.encoding)
+        if self.uid is not None and self.gid is not None and os.geteuid() == 0:
+            os.chown(self.path, self.uid, self.gid)
 
 
 @dataclass(frozen=True)
