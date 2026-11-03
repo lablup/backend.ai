@@ -41,7 +41,7 @@ Central manager that manages all background tasks.
 
 **Key Features:**
 - Task startup and execution management
-- Store task metadata in Redis for recovery after server restart/failure
+- Store task metadata in Valkey for recovery after server restart or failure
 - Publish task success/failure events to support monitoring by other components and users
 - Task status tracking via heartbeat
 - Retry failed tasks
@@ -56,7 +56,7 @@ Planned for deprecation.
 Single task that can be retried on failure.
 
 **Characteristics:**
-- Store metadata in Redis
+- Store metadata in Valkey
 - Retriable (`retriable() = True`)
 - Progress tracking available
 
@@ -75,16 +75,16 @@ Executes multiple tasks in parallel.
 - Independent progress tracking for each subtask
 
 **Usage Examples:**
-- Simultaneously check status of multiple agents
-- Split and execute large-scale session cleanup tasks in batches
+- Check the status of multiple agents simultaneously
+- Split large-scale session cleanup tasks into batches and execute them
 
 ### 3. Task Hooks
 
 Hooks executed before and after task execution handle additional features such as:
 
-- Task execution metric collection (start/completion time, success/failure count, etc.)
+- Task execution metric collection (start and completion time, success and failure count, and so on)
 - Publish task state change events
-- Clean up Redis metadata on task completion
+- Clean up Valkey metadata on task completion
 
 ### 4. Task Registry
 
@@ -114,7 +114,7 @@ Tasks are created in `ONGOING` state immediately upon registration. There is no 
 
 **Retry Mechanism**:
 - `FAILURE` state is the final failure state with no retries
-- Retries only apply to tasks that remain in `ONGOING` state but are no longer managed due to server restarts, etc.
+- Retries only apply to tasks that remain in `ONGOING` state but are no longer managed due to server restarts and so on
 
 ## State Management
 
@@ -127,11 +127,11 @@ Tasks are created in `ONGOING` state immediately upon registration. There is no 
 
 ### Heartbeat
 
-BackgroundTaskManager periodically sends heartbeats for running tasks. If a heartbeat is not updated for a certain period, the task can be retried by another server capable of performing it.
+The BackgroundTaskManager sends heartbeats for running tasks periodically. If a heartbeat is not updated for a certain period, the task can be retried by another server capable of performing it.
 
-## Redis Metadata Storage
+## Valkey Metadata Storage
 
-Task metadata is stored in Redis and used for recovery and monitoring upon server restart.
+Task metadata is stored in Valkey and used for recovery and monitoring upon server restart.
 
 ## Event Publishing
 
@@ -155,21 +155,21 @@ Published when task is cancelled.
 
 ### Batch Processing
 
-When processing large volumes of items, divide into batches for processing.
+When processing a large number of items, divide them into batches.
 
-## Related Documentation
+## Related documents
 
 - [Event Dispatcher System](../events/README.md) - Event publishing and subscription
-- [Manager Services](../../manager/services/README.md) - Using Background Tasks in Services
-- [Storage Background Tasks](../../storage/bgtask/) - Storage Proxy background tasks
+- [Manager services](../../manager/services/README.md) - Using background tasks in services
+- [Storage proxy background tasks](../../storage/bgtask/) - Storage proxy background tasks
 
-## Reference Materials
+## Reference materials
 
 ### Task Type Selection Guide
 
 | Requirement | Recommended Task Type | Reason |
 |------------|----------------------|--------|
 | Retry needed | SingleBgtask | Can retry on failure |
-| Parallel processing needed | ParallelBgtask | Execute multiple tasks simultaneously |
+| Parallel processing needed | ParallelBgtask | Execute multiple tasks at the same time |
 | Progress tracking needed | SingleBgtask/ParallelBgtask | Progress tracking available |
 | Long-running tasks | SingleBgtask/ParallelBgtask | Status tracking via heartbeat |

@@ -1,6 +1,6 @@
 # Notification CLI Guide
 
-This guide covers the Backend.AI notification system CLI commands for managing notification channels and rules.
+This guide covers the Backend.AI notification system CLI commands for managing notification channels and notification rules.
 
 ## Overview
 
@@ -10,8 +10,8 @@ The notification system allows you to configure webhooks that trigger when speci
 - Custom events
 
 The system consists of two main components:
-- **Channels**: Webhook endpoints where notifications are sent
-- **Rules**: Event-to-channel mappings with customizable message templates
+- **Notification channels**: Webhook endpoints where notifications are sent
+- **Notification rules**: Event-to-channel mappings with customizable message templates
 
 ## Quick Start
 
@@ -333,7 +333,7 @@ EOF
 
 ### session.started
 
-Triggered when a compute session transitions to RUNNING state.
+Triggered when a session transitions to RUNNING state.
 
 **Available fields:**
 - `session_id` (required): Session UUID
@@ -351,7 +351,7 @@ Triggered when a compute session transitions to RUNNING state.
 
 ### session.terminated
 
-Triggered when a compute session transitions to TERMINATED state.
+Triggered when a session transitions to TERMINATED state.
 
 **Available fields:**
 - `session_id` (required): Session UUID
@@ -424,7 +424,7 @@ Templates use Jinja2 syntax for variable interpolation and logic.
 ## Tips
 
 1. **Test before deploying**: Always validate rules with test data before enabling them in production
-2. **Use meaningful names**: Give channels and rules descriptive names for easy management
+2. **Use meaningful names**: Give notification channels and notification rules descriptive names for easy management
 3. **Template files for complex messages**: Use `--template-file` for multi-line or complex JSON structures
 4. **Disable instead of delete**: Temporarily disable rules instead of deleting them if you might need them later
 5. **Check schemas**: Use `./backend.ai notification rule types` to see exactly what fields are available for each event type
@@ -442,7 +442,7 @@ Templates use Jinja2 syntax for variable interpolation and logic.
 - Ensure required fields are provided
 
 **Notifications not received:**
-- Verify both channel and rule are enabled
+- Verify that both the notification channel and the notification rule are enabled
 - Check channel URL is correct
 - Test the channel with `./backend.ai notification channel validate`
 - Check Backend.AI manager logs for errors
