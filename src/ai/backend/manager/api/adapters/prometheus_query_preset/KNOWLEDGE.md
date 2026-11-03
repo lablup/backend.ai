@@ -12,118 +12,76 @@ updated:
   at: 2026-10-16
 status: draft
 ---
-# prometheus_query_preset 어댑터 — 시나리오
+# prometheus_query_preset adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 어긋나면 문장 쪽을 먼저
-의심한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-`prometheus_query_preset`(이하 프리셋)은 지표를 읽는 질의 템플릿을 저장한 것이다. 행은 global 과
-public 양쪽에 소속된다. 저장된 프리셋을 조회하고 검색하는 것은 public 에서 READ 를 검사한다 —
-모든 계정이 public 소속 역할을 자동으로 받으므로 로그인한 사용자는 모두 볼 수 있다. 생성과 미리
-보기는 슈퍼관리자인지 검사한다. 수정·삭제에 필요한 권한은 global 에서만 나오므로 슈퍼관리자만
-통과한다. 실행은 조회와 같은 권한을 묻는다. 저장된 프리셋을 보는 경로와 그 프리셋으로
-Prometheus에 질의하는 경로가 다르다는 것이 이 어댑터의 요지다. 프리셋을 스코프에 공유하는 시나리오는 이 문서에 없다.
-공유 어댑터 문서에 둔다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-실행과 미리 보기는 응답을 Prometheus에서 받아 온다. 실행과 미리 보기 절의 시나리오는 모의
-Prometheus를 띄워 두고 실행한다. 모의 서버는 모든 질의에 샘플 하나를 응답하고, 그 샘플 값에 받은
-질의를 그대로 넣는다. 시나리오는 그 값에서 `time_window` 값이 질의에 어떻게 반영됐는지 확인한다.
-range query에는 range query의 응답 형식으로, instant query에는 instant query의 응답
-형식으로 응답하고, 빈 질의는 실제 Prometheus처럼 거부한다. 생성·조회·검색·여러 id
-조회·수정·삭제·여럿 수정·여럿 삭제는 데이터베이스만으로 실행된다.
+A `prometheus_query_preset` (preset below) stores a query template that reads metrics. A row belongs to both global and public. Getting and searching a stored preset checks READ in public: every account automatically receives the public membership role, so every signed-in user can see it. Create and preview check whether the caller is superadmin. The permission that update and delete need comes from global only, so only superadmin passes. Execute asks for the same permission as get. The point of this adapter is that the path that reads a stored preset differs from the path that queries Prometheus with that preset. A scenario that shares a preset into a scope is not in this document. It belongs to the sharing adapter document.
 
-컨테이너 지표 자체를 읽는 경로인 전체 지표 검색, 지표 이름 목록, 한 사용자의 지표 조회는 어댑터가
-없고 legacy GraphQL이 프로세서를 직접 호출하므로 이 문서에 없다.
+Execute and preview receive their response from Prometheus. The scenarios in the execute and preview sections run with a mock Prometheus. The mock server responds to every query with one sample and puts the received query into that sample value as it is. A scenario uses that value to check how the `time_window` value was reflected into the query. It responds to a range query in the range query response format and an instant query in the instant query response format, and rejects an empty query as the real Prometheus does. Create, get, search, several id get, update, delete, bulk update and bulk delete run with the database alone.
 
-## 생성
+The whole metric search, the metric name list and the metric get of one user, which are the paths that read container metrics themselves, have no adapter and the legacy GraphQL calls the processor directly, so they are not in this document.
 
-저장하기 전에 렌더러가 템플릿을 검사하고, 거부되면 행은 생기지 않는다. 그 검사는 시나리오로 두지
-않는다. 어댑터와 데이터베이스가 결과를 바꾸지 않고, 렌더러의 단위 테스트가 거부하는 경우마다,
-서비스의 단위 테스트가 거부되면 저장하지 않는다는 것을 검사한다. 수정과 미리 보기의 템플릿 검사도
-같다.
+## Create
 
-프리셋의 이름에는 유일 제약이 없다. "같은 이름으로 다시 생성한다"가 그것을 확인한다. 카테고리의 이름과
-반대다.
+The renderer checks the template before storing, and a rejected template creates no row. That check is not a scenario. The adapter and the database do not change the result; the unit tests of the renderer cover each rejection case, and the unit tests of the service check that a rejected template is not stored. The template check of update and preview is the same.
 
-존재하지 않는 카테고리는 저장소의 참조 제약이 거부하는 것이고, 도메인 오류로 변환되지 않는다.
-수정의 같은 시나리오도 마찬가지다.
+The preset name has no unique constraint. "create again with the same name" checks it. The category name is the opposite.
 
-이름이 공백뿐인 요청, `rank` 값이 음수인 요청, `time_window` 값의 형식이 잘못된 요청은 시나리오로
-두지 않는다. 요청 타입이 이미 거부하므로 어댑터가 보장하는 것이 아니다.
+A non-existent category is rejected by the reference constraint of the repository and is not converted to a domain error. The same scenario of update is the same.
 
-"모니터 역할이 생성한다"는 슈퍼관리자 검사가 읽기에만 모니터를 허용한다는 것을 확인한다. 미리
-보기 절의 "모니터 역할이 미리 본다"와 결과가 반대다.
+A request whose name is only whitespace, a request with a negative `rank` value and a request with a malformed `time_window` value are not scenarios. The request type already rejects them, so the adapter does not guarantee them.
 
-## 조회
+"a monitor role user creates" checks that the superadmin check allows a monitor for reads only. Its result is the opposite of "a monitor role user previews" in the preview section.
 
-조회는 public 에서 READ 를 검사한다. "public 에서 읽는 사용자가 조회한다"의 행위자가 그 권한만
-받은 사용자인 이유다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없으므로, 존재하지 않는
-id와 닿을 수 없는 id는 같은 이유로 거부된다.
+## Get
 
-## 검색
+Get checks READ in public. So the requester of "a user who reads in public gets" is a user who received only that permission. The permission check runs first and a missing row has no granted permission either, so a non-existent id and an unreachable id are rejected for the same reason.
 
-## 여러 id로 조회
+## Search
 
-검색을 id 조건으로 호출하는 것이라 권한 경로가 검색과 같다. 스코프가 답한 행만 돌아오므로 없는
-id는 빈 항목이 된다.
+## Getting by several ids
 
-## 수정
+This is the search called with an id condition, so its permission path is the same as the search. Only the rows the scope responds with come back, so a missing id becomes an empty entry.
 
-`filter_labels` 값과 `group_labels` 값은 `options` 컬럼 하나에 같이 저장된다. 하나만 수정해도 다른
-하나가 지워지지 않는다는 것을 시나리오로 둔다.
+## Update
 
-템플릿 검증은 요청이 템플릿을 지정했을 때만 하고 저장된 템플릿은 다시 검사하지 않는다. 이것도
-서비스의 단위 테스트가 검사한다.
+The `filter_labels` and `group_labels` values are stored together in the one `options` column. A scenario checks that changing one does not delete the other.
 
-## 실행
+The template is checked only when the request specifies a template, and a stored template is not validated again. The service unit tests check this too.
 
-실행은 조회와 같은 권한을 묻는다. 그래서 public 에서 읽을 수 있는 사용자는 실행도 할 수 있고,
-아무 권한도 없는 사용자만 거부된다. "아무 권한도 없는 사용자가 실행한다"의 행위자는 그 권한을
-받지 않은 사용자다.
+## Execute
 
-`time_window` 값과 `time_range` 값은 다른 것이다. `time_window` 값은 템플릿의 플레이스홀더에
-들어가는 문자열이고, `time_range` 값은 instant query냐 range query냐를 결정한다. 둘을 함께 지정할 수
-있고 어느 쪽도 다른 쪽을 덮어쓰지 않는다.
+Execute asks for the same permission as get. A user who can read in public can therefore execute too, and only a user without any permission is rejected. The requester of "a user without any permission executes" is a user who did not receive that permission.
 
-`time_window` 값을 요청, 프리셋, 서버 기본값 중 어느 것에서 가져오는지와 `options` 컬럼의 라벨 허용
-목록 검사는 시나리오로 두지 않는다. 어느 쪽도 어댑터와 데이터베이스가 결과를 바꾸지 않고, 서비스의
-단위 테스트가 검사한다. 생성 절의 템플릿 검사와 같은 이유다.
+The `time_window` value and the `time_range` value are different. The `time_window` value is a string that goes into a placeholder of the template, and the `time_range` value decides whether the query is an instant query or a range query. Both can be specified together and neither overrides the other.
 
-Prometheus가 거부하는 시나리오는 빈 질의로 구성한다. 라벨 플레이스홀더만 있는 템플릿은
-렌더러를 통과하지만 라벨 없이 렌더하면 빈 질의가 되고, Prometheus는 빈 질의를 문법 오류로
-거부한다.
+Whether the `time_window` value comes from the request, the preset or the server default, and the check of the label allowance list of the `options` column, are not scenarios. Neither changes the result in the adapter or the database, and the service unit tests check them. The reason is the same as the template check in the create section.
 
-존재하지 않는 id는 슈퍼관리자와 그 밖의 사용자에게 서로 다른 이유로 거부된다. 권한 검사가 먼저
-실행되는데 없는 행에는 부여된 권한도 없으므로, 그 검사를 통과하는 슈퍼관리자만 "대상 없음"을
-본다. 실행의 "대상 없음"은 서비스가 프리셋을 직접 읽어서 내는 것이라, 수정과 삭제의 "대상
-없음"과 같은 종류가 아니다.
+The scenario where Prometheus rejects uses an empty query. A template with only label placeholders passes the renderer, but rendering it without labels makes an empty query, and Prometheus rejects an empty query as a syntax error.
 
-Prometheus의 오류를 실행은 그대로 전파하고, 미리 보기는 평가 실패로 바꿔 전파한다. 실행과 미리
-보기 절의 "Prometheus가 질의를 거부한다"가 서로 다른 오류로 거부되는 이유다.
+A non-existent id is rejected for different reasons for superadmin and for other users. The permission check runs first and a missing row has no granted permission either, so only superadmin, who passes that check, sees "missing target". The "missing target" of execute comes from the service reading the preset directly and is not the same kind as the "missing target" of update and delete.
 
-## 미리 보기
+Execute propagates the Prometheus error as it is, and preview converts it to an evaluation failure before propagating. So "Prometheus rejects the query" in the execute and preview sections is rejected with different errors.
 
-미리 보기는 요청에서 템플릿만 읽는다. 라벨도 `time_window` 값도 받지 않으므로 모의 서버가 받는
-질의는 늘 빈 라벨과 서버 기본 `time_window` 값이다. 행이 생기지 않는다는 것은 시나리오가 확인하지
-않는다. 미리 보기는 저장소의 쓰기 경로를 거치지 않는다.
+## Preview
 
-미리 보기는 이 어댑터에서 유일하게 슈퍼관리자인지 검사하는 읽기라, 모니터 역할이 성공하는
-시나리오가 여기에만 있다.
+Preview reads only the template from the request. It accepts neither labels nor a `time_window` value, so the query the mock server receives always has empty labels and the server default `time_window` value. The scenario does not check that no row is created. Preview does not pass through the write path of the repository.
 
-## 삭제
+Preview is the only read in this adapter that checks whether the caller is superadmin, so the scenario where a monitor role user succeeds is here only.
 
-이 어댑터에는 soft delete가 없다. 삭제하면 행이 사라지고 되살리는 호출도 없다.
-삭제는 purge 다. 옛 GQL mutation 과 REST 경로는 deprecated 이고 같은 호출로 잇는다.
+## Delete
 
-deployment의 자동 확장 규칙이 프리셋을 참조할 수 있다. 프리셋을 삭제하면 그 규칙은 남고
-`prometheus_query_preset_id`가 NULL이 된다. 규칙을 미리 만들어 두려면 deployment까지 만들어야
-하므로, 그 시나리오는 `../deployment/KNOWLEDGE.md`에 자동 확장 규칙 절이 생길 때 그쪽에 둔다.
+This adapter has no delete that keeps the row. Deleting makes the row disappear, and there is no call that brings it back. The delete call runs purge. The old GraphQL mutation and REST path are deprecated and lead to the same call.
 
-## 여럿 수정하기
+The auto-scaling rule of a deployment may reference a preset. Deleting the preset keeps that rule with `prometheus_query_preset_id` set to NULL. Preparing the rule requires creating the deployment too, so that scenario belongs in `../deployment/KNOWLEDGE.md` when the auto-scaling rules section appears there.
 
-템플릿 검사는 항목마다 한다. 검사에 걸린 항목만 실패 목록에 오고 나머지는 수정된다.
+## Bulk update
 
-## 여럿 삭제
+The template check runs per entry. Only the entries caught by the check enter the failure list and the rest are updated.
 
-여럿 연산은 호출 전체를 거부하지 않는다. 처리한 프리셋은 처리된 목록에, 처리하지 못한 것은 id 와
-이유를 실패 목록에 싣는다.
+## Bulk delete
+
+A bulk operation does not reject the whole call. Processed presets go into the processed list, and failures are recorded in the failure list with the id and the reason.

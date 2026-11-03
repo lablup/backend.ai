@@ -9,28 +9,24 @@ generated:
   at: 2026-10-16
 status: draft
 ---
-# rbac 어댑터 — 시나리오
+# rbac adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 것과 실행 결과가 어긋나면 문장을 먼저
-의심한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-지금은 역할 쓰기만 적는다. 역할은 한 스코프에 속하고, 역할을 고치는 문은 그 스코프의 권한
-그래프가 지킨다. 대상 역할은 부르는 사람이 속하지 않은 도메인에 둔다. 슈퍼관리자가 아닌 사람이
-부르는 행은 아무 권한도 받지 않은 사용자다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-## 수정
+This document covers role writes only for now. A role belongs to one scope, and the permission graph of that scope checks the calls that update a role. The target role is placed in a domain the caller does not belong to. A call made by a user who is not superadmin runs as a user without any permission.
 
-deprecated `status` 는 수정 뒤에 처리한다. DELETED 는 soft delete 로, 삭제된 역할에 ACTIVE 는
-restore 로 보낸다. 이미 그 상태면 아무것도 하지 않고, INACTIVE 는 반영하지 않는다.
+## Update
 
-## soft delete, restore, purge
+The deprecated `status` is handled after the update. The adapter sends DELETED to delete the role and ACTIVE to a deleted role to restore it. When the role is already in that state, the adapter does nothing and does not apply INACTIVE.
 
-## 여럿 수정하기
+## Delete, restore, purge
 
-deprecated `status` 는 역할마다 단건과 같은 기준으로 처리한다. soft delete · restore 에서 실패한
-역할은 그 이유로 실패 목록에 온다.
+## Bulk update
 
-## 여럿 soft delete, restore, purge
+The deprecated `status` is handled per role by the same rule as the single update. A role that fails in delete or restore goes into the failure list with that reason.
 
-여럿 연산은 호출 전체를 거부하지 않는다. 처리한 역할은 처리된 목록에, 처리하지 못한 것은 id 와
-이유를 실패 목록에 싣는다.
+## Bulk delete, restore, purge
+
+A bulk operation does not reject the whole call. Processed roles go into the processed list, and failed items go into the failure list with the id and the reason.
