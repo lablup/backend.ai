@@ -339,7 +339,7 @@ class PrometheusMetrics:
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class RootContext:
     pidx: int
-    proxy_frontend: BaseFrontend[Any, Any]
+    proxy_frontend: BaseFrontend[Any]
     event_dispatcher: EventDispatcher
     event_producer: EventProducer
     sentinel_monitors: SentinelMonitorSet

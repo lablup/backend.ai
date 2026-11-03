@@ -5,23 +5,22 @@ import logging
 import time
 import uuid
 from collections.abc import Mapping
-from typing import Any, Final, override
+from typing import Final, override
 
 from aiohttp import web
 
 from ai.backend.appproxy.common.config import ContentEncodingConfig, get_default_redis_key_ttl
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
-from ai.backend.appproxy.common.types import RouteInfo
-from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError, MissingTraefikConfigError
+from ai.backend.appproxy.worker.errors import MissingTraefikConfigError
+from ai.backend.appproxy.worker.proxy.backend.base import BaseBackendArgs
 from ai.backend.appproxy.worker.proxy.backend.traefik import TraefikBackend
 from ai.backend.appproxy.worker.types import (
     LAST_USED_MARKER_SOCKET_NAME,
     Circuit,
-    PortFrontendInfo,
     RootContext,
-    SubdomainFrontendInfo,
 )
 from ai.backend.common.cron import LocalCron, PeriodicTask
+from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress
 from ai.backend.logging.structured import StructuredLogger
 
 from .base import BaseFrontend
@@ -37,9 +36,9 @@ _ACTIVE_CIRCUIT_WRITER_INTERVAL: Final[float] = 5.0
 class _LastUsedTimeMarkerWriterTask(PeriodicTask):
     """Periodically flush accumulated last-used-time markers to Valkey."""
 
-    _frontend: Final[AbstractTraefikFrontend[Any]]
+    _frontend: Final[AbstractTraefikFrontend]
 
-    def __init__(self, frontend: AbstractTraefikFrontend[Any]) -> None:
+    def __init__(self, frontend: AbstractTraefikFrontend) -> None:
         self._frontend = frontend
 
     @property
@@ -65,9 +64,9 @@ class _LastUsedTimeMarkerWriterTask(PeriodicTask):
 class _ActiveCircuitWriterTask(PeriodicTask):
     """Periodically refresh last-access timestamps for active circuits."""
 
-    _frontend: Final[AbstractTraefikFrontend[Any]]
+    _frontend: Final[AbstractTraefikFrontend]
 
-    def __init__(self, frontend: AbstractTraefikFrontend[Any]) -> None:
+    def __init__(self, frontend: AbstractTraefikFrontend) -> None:
         self._frontend = frontend
 
     @property
@@ -90,14 +89,12 @@ class _ActiveCircuitWriterTask(PeriodicTask):
         await self._frontend.active_circuit_writer()
 
 
-class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
-    BaseFrontend[TraefikBackend, TCircuitKeyType]
-):
+class AbstractTraefikFrontend(BaseFrontend[TraefikBackend]):
     runner: web.AppRunner
-    _local_cron: LocalCron
     redis_keys: dict[str, float]
     redis_keys_lock: asyncio.Lock
     active_circuits: set[uuid.UUID]
+    _local_cron: LocalCron
 
     def __init__(self, root_context: RootContext) -> None:
         super().__init__(root_context)
@@ -197,51 +194,28 @@ class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
                 self.redis_keys.update(keys)
 
     @override
-    async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> TraefikBackend:
-        return TraefikBackend(self.root_context, circuit, routes)
-
-    @override
-    async def update_backend(
-        self, backend: TraefikBackend, routes: list[RouteInfo]
-    ) -> TraefikBackend:
-        backend.routes = routes
-        return backend
+    async def initialize_backend(self, ingress: Ingress, circuit: Circuit) -> TraefikBackend:
+        return TraefikBackend(
+            BaseBackendArgs(
+                last_used_time_marker_redis_queue=self.root_context.last_used_time_marker_redis_queue,
+                request_counter_redis_queue=self.root_context.request_counter_redis_queue,
+                ingress=ingress,
+                circuit=circuit,
+            )
+        )
 
     @override
     async def terminate_backend(self, backend: TraefikBackend) -> None:
         pass
 
-    @override
-    async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
-        # FIXME: implement
-        return []
+
+class TraefikPortFrontend(AbstractTraefikFrontend):
+    pass
 
 
-class TraefikPortFrontend(AbstractTraefikFrontend[int]):
-    @override
-    def get_circuit_key(self, circuit: Circuit) -> int:
-        if not isinstance(circuit.frontend, PortFrontendInfo):
-            raise InvalidFrontendTypeError(
-                f"Expected PortFrontendInfo, got {type(circuit.frontend).__name__}"
-            )
-        return circuit.frontend.port
+class TraefikSubdomainFrontend(AbstractTraefikFrontend):
+    pass
 
 
-class TraefikSubdomainFrontend(AbstractTraefikFrontend[str]):
-    @override
-    def get_circuit_key(self, circuit: Circuit) -> str:
-        if not isinstance(circuit.frontend, SubdomainFrontendInfo):
-            raise InvalidFrontendTypeError(
-                f"Expected SubdomainFrontendInfo, got {type(circuit.frontend).__name__}"
-            )
-        return circuit.frontend.subdomain
-
-
-class TraefikTCPFrontend(AbstractTraefikFrontend[int]):
-    @override
-    def get_circuit_key(self, circuit: Circuit) -> int:
-        if not isinstance(circuit.frontend, PortFrontendInfo):
-            raise InvalidFrontendTypeError(
-                f"Expected PortFrontendInfo, got {type(circuit.frontend).__name__}"
-            )
-        return circuit.frontend.port
+class TraefikTCPFrontend(AbstractTraefikFrontend):
+    pass

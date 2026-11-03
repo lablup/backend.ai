@@ -10,9 +10,13 @@ from aiohttp.typedefs import Handler
 
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.worker.config import WildcardDomainConfig
-from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
 from ai.backend.appproxy.worker.errors.ingress import IngressFrontendNotRegisteredError
-from ai.backend.appproxy.worker.types import Circuit, SubdomainFrontendInfo
+from ai.backend.common.dto.appproxy.v2.ingress.types import (
+    IngressFrontend,
+    IngressFrontendKind,
+    IngressProtocol,
+    WildcardFrontend,
+)
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .base import BaseHTTPFrontend
@@ -20,7 +24,7 @@ from .base import BaseHTTPFrontend
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-class SubdomainFrontend(BaseHTTPFrontend[str]):
+class SubdomainFrontend(BaseHTTPFrontend):
     site: web.TCPSite | None
     wildcard_config: WildcardDomainConfig
 
@@ -90,8 +94,8 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
     def parse_slot(self, request: web.Request) -> str:
         # exclude port number when evaluating the subdomain
         subdomain = request.host.partition(":")[0].replace(self.wildcard_config.domain, "").lower()
-        if subdomain not in self.backends:
-            raise IngressFrontendNotRegisteredError(f"E20009: Subdomain {subdomain} not registered")
+        if not subdomain:
+            raise IngressFrontendNotRegisteredError("E20009: No subdomain in the request host")
         return subdomain
 
     @web.middleware
@@ -99,11 +103,21 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
         self, request: web.Request, handler: Handler
     ) -> web.StreamResponse:
         async def _exception_safe_handler(request: web.Request) -> web.StreamResponse:
-            slot = self.parse_slot(request)
-            backend = self.backends[slot]
+            subdomain = self.parse_slot(request)
+            frontend_key = IngressFrontend(
+                kind=IngressFrontendKind.WILDCARD,
+                protocol=IngressProtocol.HTTP,
+                wildcard=WildcardFrontend(subdomain=subdomain),
+            ).key()
+            backend = self.backends.get(frontend_key)
+            if backend is None:
+                raise IngressFrontendNotRegisteredError(
+                    f"E20009: Subdomain {subdomain} not registered"
+                )
             circuit = backend.circuit
+            # TODO: Use the ingress id once ingresses are stored as their own entity.
             with with_log_context(circuit_id=circuit.id):
-                ingress = await self._read_registered_ingress(circuit.to_ingress_frontend().key())
+                ingress = await self._read_registered_ingress(frontend_key)
                 self.ensure_allowed_ip(request, ingress.access)
                 # TODO: Check the credential against ingress.access once an ingress carries the id
                 # its tokens name.
@@ -113,11 +127,3 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
                 return await handler(request)
 
         return await self.exception_safe_handler_wrapper(request, _exception_safe_handler)
-
-    @override
-    def get_circuit_key(self, circuit: Circuit) -> str:
-        if not isinstance(circuit.frontend, SubdomainFrontendInfo):
-            raise InvalidFrontendTypeError(
-                f"Expected SubdomainFrontendInfo, got {type(circuit.frontend).__name__}"
-            )
-        return circuit.frontend.subdomain.lower()

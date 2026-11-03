@@ -21,18 +21,19 @@ from ai.backend.appproxy.common.types import (
     ProxyProtocol,
     RouteInfo,
 )
-from ai.backend.appproxy.worker.proxy.backend.http import HTTPBackend
-from ai.backend.appproxy.worker.proxy.backend.tcp import TCPBackend
+from ai.backend.appproxy.worker.proxy.backend.http import HTTPBackend, HTTPBackendArgs
+from ai.backend.appproxy.worker.proxy.backend.tcp import TCPBackend, TCPBackendArgs
 from ai.backend.appproxy.worker.proxy.frontend.http.port import PortFrontend
 from ai.backend.appproxy.worker.proxy.frontend.tcp import TCPFrontend
 from ai.backend.appproxy.worker.types import Circuit, InteractiveAppInfo, PortFrontendInfo
-from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAuthority
+from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAuthority, IngressFrontendKey
 
 WORKER_LOGGER_NAME = "ai.backend.appproxy.worker"
 TRACE_LEVEL = 5
 PORT = 10200
 CIRCUIT_ID = UUID("d0e6f60c-f375-4454-b4d3-e8ee202fa372")
 AUTHORITY = IngressAuthority("worker-1")
+FRONTEND_KEY = IngressFrontendKey(f"port-{PORT}")
 
 
 def _closed_port() -> int:
@@ -109,11 +110,20 @@ class TestHTTPProxyLogging:
         root_context.local_config.proxy_worker.trusted_proxies = []
         frontend = PortFrontend(root_context)
         circuit = _create_circuit(ProxyProtocol.HTTP, kernel_port=_closed_port())
-        backend = HTTPBackend(circuit.route_info, root_context, circuit)
+        backend = HTTPBackend(
+            HTTPBackendArgs(
+                last_used_time_marker_redis_queue=root_context.last_used_time_marker_redis_queue,
+                request_counter_redis_queue=root_context.request_counter_redis_queue,
+                worker_config=root_context.local_config.proxy_worker,
+                metrics=root_context.metrics,
+                ingress=circuit.to_ingress(AUTHORITY),
+                circuit=circuit,
+            )
+        )
         root_context.ingress_state.reader.get = AsyncMock(
             return_value=circuit.to_ingress(AUTHORITY)
         )
-        frontend.backends[PORT] = backend
+        frontend.backends[FRONTEND_KEY] = backend
         try:
             yield frontend
         finally:
@@ -131,7 +141,7 @@ class TestHTTPProxyLogging:
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         mocker.patch.object(
-            http_frontend.backends[PORT], "request_http", side_effect=RuntimeError("boom")
+            http_frontend.backends[FRONTEND_KEY], "request_http", side_effect=RuntimeError("boom")
         )
 
         with caplog.at_level(TRACE_LEVEL, logger=WORKER_LOGGER_NAME):
@@ -150,7 +160,7 @@ class TestHTTPProxyLogging:
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         mocker.patch.object(
-            http_frontend.backends[PORT],
+            http_frontend.backends[FRONTEND_KEY],
             "request_http",
             side_effect=aiohttp.ClientOSError(111, "Connection refused"),
         )
@@ -178,11 +188,19 @@ class TestTCPProxyLogging:
     ) -> AsyncIterator[TCPFrontend]:
         frontend = TCPFrontend(root_context)
         circuit = _create_circuit(ProxyProtocol.TCP, kernel_port=_closed_port())
-        backend = TCPBackend(circuit.route_info, root_context, circuit)
+        backend = TCPBackend(
+            TCPBackendArgs(
+                last_used_time_marker_redis_queue=root_context.last_used_time_marker_redis_queue,
+                request_counter_redis_queue=root_context.request_counter_redis_queue,
+                metrics=root_context.metrics,
+                ingress=circuit.to_ingress(AUTHORITY),
+                circuit=circuit,
+            )
+        )
         root_context.ingress_state.reader.get = AsyncMock(
             return_value=circuit.to_ingress(AUTHORITY)
         )
-        frontend.backends[PORT] = backend
+        frontend.backends[FRONTEND_KEY] = backend
         try:
             yield frontend
         finally:
@@ -214,7 +232,9 @@ class TestTCPProxyLogging:
         tcp_frontend: TCPFrontend,
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        mocker.patch.object(tcp_frontend.backends[PORT], "bind", side_effect=RuntimeError("boom"))
+        mocker.patch.object(
+            tcp_frontend.backends[FRONTEND_KEY], "bind", side_effect=RuntimeError("boom")
+        )
 
         with caplog.at_level(TRACE_LEVEL, logger=WORKER_LOGGER_NAME):
             await tcp_frontend.pipe(PORT, mocker.MagicMock(), self._writer())

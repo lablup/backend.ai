@@ -7,13 +7,12 @@ from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.worker.proxy.backend.h2 import H2Backend
 from ai.backend.appproxy.worker.proxy.frontend.base import BaseFrontend
-from ai.backend.appproxy.worker.types import Circuit
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-class H2Frontend[TCircuitKeyType: (int, str)](BaseFrontend[H2Backend, TCircuitKeyType]):
+class H2Frontend(BaseFrontend[H2Backend]):
     api_port_pool: set[int]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -23,11 +22,6 @@ class H2Frontend[TCircuitKeyType: (int, str)](BaseFrontend[H2Backend, TCircuitKe
             raise ServerMisconfiguredError("worker:proxy-worker.http2")
 
         self.api_port_pool = set(range(h2_config.api_port_pool[0], h2_config.api_port_pool[1] + 1))
-
-    @override
-    async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
-        # We can't measure activeness of HTTP/2 circuits
-        return []
 
     @override
     def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:

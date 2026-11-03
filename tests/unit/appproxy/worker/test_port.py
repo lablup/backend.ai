@@ -89,7 +89,7 @@ class _IngressPresence(StrEnum):
 @dataclass(frozen=True)
 class _PortSlotCase:
     name: str
-    circuit_registered: bool = True
+    backend_registered: bool = True
     ingress_presence: _IngressPresence = _IngressPresence.HELD
     allowed_client_ips: list[str] = field(default_factory=list)
     client_ip: str = "10.0.0.1"
@@ -102,6 +102,7 @@ class _PortSlotSituation:
     handler: AsyncMock
     circuit: Circuit
     backend: MagicMock
+    read_ingress: AsyncMock
     ensure_credential: MagicMock
 
 
@@ -132,7 +133,9 @@ async def serving_port_frontend(
     frontend = PortFrontend(root_context=root_context)
     circuit = create_circuit(unused_tcp_port).model_copy(update={"open_to_public": True})
     frontend.backends = {
-        unused_tcp_port: mocker.MagicMock(proxy_http=record_request_body, circuit=circuit)
+        circuit.to_ingress_frontend().key(): mocker.MagicMock(
+            proxy_http=record_request_body, circuit=circuit
+        )
     }
     root_context.ingress_state.reader.get = mocker.AsyncMock(
         return_value=circuit.to_ingress(_AUTHORITY)
@@ -151,18 +154,18 @@ class TestPortFrontend:
         self, mocker: pytest_mock.MockerFixture, case: _PortSlotCase
     ) -> _PortSlotSituation:
         circuit = create_circuit(_PORT)
-        access = IngressAccess(
-            mode=IngressAccessMode.PUBLIC,
-            allowed_client_ips=[ip_network(cidr) for cidr in case.allowed_client_ips],
+        held_ingress = circuit.to_ingress(_AUTHORITY).model_copy(
+            update={
+                "access": IngressAccess(
+                    mode=IngressAccessMode.PUBLIC,
+                    allowed_client_ips=[ip_network(cidr) for cidr in case.allowed_client_ips],
+                )
+            }
         )
         root_context = mocker.MagicMock()
         match case.ingress_presence:
             case _IngressPresence.HELD:
-                root_context.ingress_state.reader.get = mocker.AsyncMock(
-                    return_value=circuit.to_ingress(_AUTHORITY).model_copy(
-                        update={"access": access}
-                    )
-                )
+                root_context.ingress_state.reader.get = mocker.AsyncMock(return_value=held_ingress)
             case _IngressPresence.REMOVED:
                 root_context.ingress_state.reader.get = mocker.AsyncMock(return_value=None)
             case _IngressPresence.NEVER_HELD:
@@ -171,8 +174,8 @@ class TestPortFrontend:
                 )
         frontend = PortFrontend(root_context=root_context)
         backend = mocker.MagicMock(circuit=circuit)
-        if case.circuit_registered:
-            frontend.backends[_PORT] = backend
+        if case.backend_registered:
+            frontend.backends[circuit.to_ingress_frontend().key()] = backend
         app = web.Application()
         app["port"] = _PORT
         return _PortSlotSituation(
@@ -183,13 +186,14 @@ class TestPortFrontend:
             handler=mocker.AsyncMock(return_value=web.Response(text="success")),
             circuit=circuit,
             backend=backend,
+            read_ingress=root_context.ingress_state.reader.get,
             ensure_credential=mocker.patch.object(frontend, "ensure_credential"),
         )
 
     @pytest.mark.parametrize(
         "case",
         [
-            _PortSlotCase(name="no-circuit", circuit_registered=False),
+            _PortSlotCase(name="no-backend", backend_registered=False),
             _PortSlotCase(name="ingress-never-held", ingress_presence=_IngressPresence.NEVER_HELD),
             _PortSlotCase(name="ingress-removed", ingress_presence=_IngressPresence.REMOVED),
         ],
@@ -226,6 +230,9 @@ class TestPortFrontend:
         assert response.text == "success"
         assert situation.request["circuit"] is situation.circuit
         assert situation.request["backend"] is situation.backend
+        situation.read_ingress.assert_awaited_once_with(
+            situation.circuit.to_ingress_frontend().key()
+        )
         situation.ensure_credential.assert_called_once_with(situation.request, situation.circuit)
 
     @pytest.mark.parametrize(

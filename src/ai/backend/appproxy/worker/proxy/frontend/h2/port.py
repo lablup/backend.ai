@@ -6,10 +6,10 @@ from typing import Any, override
 from yarl import URL
 
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
-from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError, SubprocessPipeError
-from ai.backend.appproxy.worker.proxy.backend.h2 import BackendConfig, H2Backend
-from ai.backend.appproxy.worker.types import Circuit, PortFrontendInfo
+from ai.backend.appproxy.worker.proxy.backend.h2 import H2Backend, H2BackendArgs
+from ai.backend.appproxy.worker.types import Circuit
+from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress
 from ai.backend.logging.structured import StructuredLogger
 
 from .base import H2Frontend
@@ -17,7 +17,7 @@ from .base import H2Frontend
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-class PortFrontend(H2Frontend[int]):
+class PortFrontend(H2Frontend):
     processes: list[subprocess.Process]
     healthy: bool
     proc_monitor_tasks: list[asyncio.Task[Any]] = []
@@ -94,25 +94,22 @@ class PortFrontend(H2Frontend[int]):
             self.api_ports = {}
 
     @override
-    async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> H2Backend:
-        api_port = self.api_ports[self.get_circuit_key(circuit)]
-        backend = H2Backend(URL(f"http://localhost:{api_port}"), self.root_context, circuit)
-        return await self.update_backend(backend, routes)
-
-    @override
-    async def update_backend(self, backend: H2Backend, routes: list[RouteInfo]) -> H2Backend:
-        backend_configs = [BackendConfig(r.current_kernel_host, r.kernel_port) for r in routes]
-        await backend.update_config(backend_configs)
+    async def initialize_backend(self, ingress: Ingress, circuit: Circuit) -> H2Backend:
+        if ingress.frontend.port is None:
+            raise InvalidFrontendTypeError(f"Expected a port frontend, got {ingress.frontend.kind}")
+        api_port = self.api_ports[ingress.frontend.port.number]
+        backend = H2Backend(
+            H2BackendArgs(
+                last_used_time_marker_redis_queue=self.root_context.last_used_time_marker_redis_queue,
+                request_counter_redis_queue=self.root_context.request_counter_redis_queue,
+                ingress=ingress,
+                circuit=circuit,
+                api_endpoint=URL(f"http://localhost:{api_port}"),
+            )
+        )
+        await backend.update_ingress(ingress)
         return backend
 
     @override
     async def terminate_backend(self, backend: H2Backend) -> None:
         await backend.update_config([])
-
-    @override
-    def get_circuit_key(self, circuit: Circuit) -> int:
-        if not isinstance(circuit.frontend, PortFrontendInfo):
-            raise InvalidFrontendTypeError(
-                f"Expected PortFrontendInfo, got {type(circuit.frontend).__name__}"
-            )
-        return circuit.frontend.port

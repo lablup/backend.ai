@@ -9,9 +9,13 @@ from aiohttp import web
 from aiohttp.typedefs import Handler
 
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
-from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
 from ai.backend.appproxy.worker.errors.ingress import IngressFrontendNotRegisteredError
-from ai.backend.appproxy.worker.types import Circuit, PortFrontendInfo
+from ai.backend.common.dto.appproxy.v2.ingress.types import (
+    IngressFrontend,
+    IngressFrontendKind,
+    IngressProtocol,
+)
+from ai.backend.common.dto.appproxy.v2.ingress.types import PortFrontend as IngressPortFrontend
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .base import BaseHTTPFrontend
@@ -19,7 +23,7 @@ from .base import BaseHTTPFrontend
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-class PortFrontend(BaseHTTPFrontend[int]):
+class PortFrontend(BaseHTTPFrontend):
     sites: list[web.TCPSite]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -103,12 +107,18 @@ class PortFrontend(BaseHTTPFrontend[int]):
         self, request: web.Request, handler: Handler
     ) -> web.StreamResponse:
         port: int = request.app["port"]
-        backend = self.backends.get(port)
+        frontend_key = IngressFrontend(
+            kind=IngressFrontendKind.PORT,
+            protocol=IngressProtocol.HTTP,
+            port=IngressPortFrontend(number=port),
+        ).key()
+        backend = self.backends.get(frontend_key)
         if backend is None:
             raise IngressFrontendNotRegisteredError(f"Unregistered slot {port}")
         circuit = backend.circuit
+        # TODO: Use the ingress id once ingresses are stored as their own entity.
         with with_log_context(circuit_id=circuit.id):
-            ingress = await self._read_registered_ingress(circuit.to_ingress_frontend().key())
+            ingress = await self._read_registered_ingress(frontend_key)
             self.ensure_allowed_ip(request, ingress.access)
             # TODO: Check the credential against ingress.access once an ingress carries the id
             # its tokens name.
@@ -116,11 +126,3 @@ class PortFrontend(BaseHTTPFrontend[int]):
             request["circuit"] = circuit
             request["backend"] = backend
             return await handler(request)
-
-    @override
-    def get_circuit_key(self, circuit: Circuit) -> int:
-        if not isinstance(circuit.frontend, PortFrontendInfo):
-            raise InvalidFrontendTypeError(
-                f"Expected PortFrontendInfo, got {type(circuit.frontend).__name__}"
-            )
-        return circuit.frontend.port
