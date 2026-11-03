@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Literal, NewType, Self, override
+from typing import Annotated, Literal, NewType, Self, override
 from uuid import UUID
 
 from pydantic import ConfigDict, Field, IPvAnyNetwork, model_validator
@@ -140,10 +140,13 @@ class SessionIngressTarget(IngressTarget):
         return IngressTargetID(str(self.session_id))
 
 
+AnyIngressTarget = Annotated[SessionIngressTarget, Field(discriminator="kind")]
+
+
 class IngressTargetGroup(BaseFieldModel):
     id: IngressTargetGroupID
     weight: int = Field(ge=0)
-    targets: list[SessionIngressTarget]
+    targets: list[AnyIngressTarget]
 
 
 class IngressBackend(BaseFieldModel):
