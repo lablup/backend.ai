@@ -25,10 +25,10 @@ def upgrade() -> None:
     op.create_table(
         "domain_container_registry_relations",
         sa.Column("domain_id", GUID(), nullable=False),
-        sa.Column("registry_id", GUID(), nullable=False),
+        sa.Column("container_registry_id", GUID(), nullable=False),
         sa.PrimaryKeyConstraint(
             "domain_id",
-            "registry_id",
+            "container_registry_id",
             name=op.f("pk_domain_container_registry_relations"),
         ),
         sa.ForeignKeyConstraint(
@@ -38,22 +38,22 @@ def upgrade() -> None:
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
-            ["registry_id"],
+            ["container_registry_id"],
             ["container_registries.id"],
-            name="fk_domain_container_registry_relations_registry_id",
+            name="fk_domain_container_registry_relations_container_registry_id",
             ondelete="CASCADE",
         ),
     )
     op.create_index(
-        op.f("ix_domain_container_registry_relations_registry_id"),
+        op.f("ix_domain_container_registry_relations_container_registry_id"),
         "domain_container_registry_relations",
-        ["registry_id"],
+        ["container_registry_id"],
     )
 
 
 def downgrade() -> None:
     op.drop_index(
-        op.f("ix_domain_container_registry_relations_registry_id"),
+        op.f("ix_domain_container_registry_relations_container_registry_id"),
         table_name="domain_container_registry_relations",
     )
     op.drop_table("domain_container_registry_relations")

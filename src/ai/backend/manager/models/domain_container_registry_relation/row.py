@@ -23,12 +23,12 @@ class DomainContainerRegistryRelationRow(Base):
         sa.ForeignKey("domains.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    registry_id: Mapped[ContainerRegistryID] = mapped_column(
-        "registry_id",
+    container_registry_id: Mapped[ContainerRegistryID] = mapped_column(
+        "container_registry_id",
         GUID(ContainerRegistryID),
         sa.ForeignKey(
             "container_registries.id",
-            name="fk_domain_container_registry_relations_registry_id",
+            name="fk_domain_container_registry_relations_container_registry_id",
             ondelete="CASCADE",
         ),
         primary_key=True,
