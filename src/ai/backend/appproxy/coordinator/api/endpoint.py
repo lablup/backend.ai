@@ -117,8 +117,8 @@ def _request_model_to_item(
         version=params.version,
         service_name=params.service_name,
         tags=TagsModel(
-            session=SessionTagsModel.model_validate(params.tags.session.model_dump()),
-            endpoint=EndpointTagsModel.model_validate(params.tags.endpoint.model_dump()),
+            session=SessionTagsModel.model_validate(params.tags.session.model_dump(mode="json")),
+            endpoint=EndpointTagsModel.model_validate(params.tags.endpoint.model_dump(mode="json")),
         ),
         open_to_public=params.open_to_public,
         health_check=params.health_check,
