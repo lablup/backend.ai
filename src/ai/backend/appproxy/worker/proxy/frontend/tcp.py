@@ -107,11 +107,11 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
 
     @override
     async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> TCPBackend:
-        return TCPBackend(circuit.to_ingress_backend(), self.root_context, circuit)
+        return TCPBackend(routes, self.root_context, circuit)
 
     @override
     async def update_backend(self, backend: TCPBackend, routes: list[RouteInfo]) -> TCPBackend:
-        await backend.update_ingress_backend(backend.circuit.to_ingress_backend())
+        await backend.update_routes(routes)
         return backend
 
     @override

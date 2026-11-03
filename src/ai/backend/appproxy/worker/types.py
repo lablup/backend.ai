@@ -485,7 +485,11 @@ class Circuit(SerializableCircuit):
         )
 
     def to_ingress_backend(self) -> IngressBackend:
-        target_groups = [self._target_group_of_route(route) for route in self.route_info]
+        return self.ingress_backend_of_routes(self.route_info)
+
+    @classmethod
+    def ingress_backend_of_routes(cls, routes: list[RouteInfo]) -> IngressBackend:
+        target_groups = [cls._target_group_of_route(route) for route in routes]
         if not target_groups:
             # An Ingress backend holds at least one group, even for a circuit with no route yet.
             target_groups = [
@@ -497,7 +501,8 @@ class Circuit(SerializableCircuit):
             target_groups=target_groups,
         )
 
-    def _target_group_of_route(self, route: RouteInfo) -> IngressTargetGroup:
+    @classmethod
+    def _target_group_of_route(cls, route: RouteInfo) -> IngressTargetGroup:
         # TODO: Use the replica groups once the manager sends target groups; until then each
         # route is a group of its own whose weight carries the route's traffic ratio.
         return IngressTargetGroup(
@@ -505,7 +510,7 @@ class Circuit(SerializableCircuit):
             weight=round(route.traffic_ratio * _TRAFFIC_RATIO_WEIGHT_SCALE),
             targets=[
                 IngressTarget(
-                    id=self._target_id_of_route(route),
+                    id=cls._target_id_of_route(route),
                     host=route.current_kernel_host,
                     port=route.kernel_port,
                     session_id=SessionId(route.session_id),

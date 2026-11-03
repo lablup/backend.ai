@@ -93,11 +93,11 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
 
     @override
     async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> HTTPBackend:
-        return HTTPBackend(circuit.to_ingress_backend(), self.root_context, circuit)
+        return HTTPBackend(routes, self.root_context, circuit)
 
     @override
     async def update_backend(self, backend: HTTPBackend, routes: list[RouteInfo]) -> HTTPBackend:
-        await backend.update_ingress_backend(backend.circuit.to_ingress_backend())
+        await backend.update_routes(routes)
         return backend
 
     @override

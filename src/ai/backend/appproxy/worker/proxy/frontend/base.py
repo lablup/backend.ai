@@ -50,9 +50,8 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
         if backend is None:
             log.debug("skipped a route update for an inactive slot {}", key)
             return
-        # Stored first, so a backend built from the circuit's Ingress backend reads the new routes.
-        backend.circuit.route_info = new_routes
         await self.update_backend(backend, new_routes)
+        backend.circuit.route_info = new_routes
 
     async def break_circuit(self, circuit: Circuit) -> None:
         metrics = self.root_context.metrics

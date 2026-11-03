@@ -14,13 +14,15 @@ from multidict import CIMultiDict
 from yarl import URL
 
 from ai.backend.appproxy.common.errors import ContainerConnectionRefused
+from ai.backend.appproxy.common.types import RouteInfo
+from ai.backend.appproxy.worker.types import Circuit
 from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
     ClientPool,
     tcp_client_session_factory,
 )
 from ai.backend.common.cron import LocalCron
-from ai.backend.common.dto.appproxy.v2.ingress.types import IngressBackend, IngressTarget
+from ai.backend.common.dto.appproxy.v2.ingress.types import IngressTarget
 from ai.backend.logging.structured import StructuredLogger
 
 from .base import BaseBackend, HttpRequest
@@ -53,9 +55,9 @@ class HTTPBackend(BaseBackend):
 
     _pool: RoutePool
 
-    def __init__(self, ingress_backend: IngressBackend, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, routes: list[RouteInfo], *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self._pool = RoutePool(ingress_backend)
+        self._pool = RoutePool(Circuit.ingress_backend_of_routes(routes))
         client_timeout = aiohttp.ClientTimeout(
             total=None,
             connect=10.0,
@@ -73,8 +75,9 @@ class HTTPBackend(BaseBackend):
             keep_inflight_sessions=worker_config.client_pool_keep_inflight_sessions,
         )
 
-    async def update_ingress_backend(self, ingress_backend: IngressBackend) -> None:
-        await self._pool.update(ingress_backend)
+    @override
+    async def update_routes(self, routes: list[RouteInfo]) -> None:
+        await self._pool.update(Circuit.ingress_backend_of_routes(routes))
 
     @override
     async def close(self) -> None:
