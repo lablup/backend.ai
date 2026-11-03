@@ -336,6 +336,12 @@ class PrometheusMetrics:
     memory_used_vms: prometheus_client.Gauge
 
 
+@dataclass(frozen=True)
+class LastUsedTimeMark:
+    valkey_keys: list[str]
+    used_at: float
+
+
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class RootContext:
     pidx: int
@@ -348,7 +354,7 @@ class RootContext:
     http_client_pool: ClientPool
     worker_id: UUID
     local_config: ServerConfig
-    last_used_time_marker_redis_queue: asyncio.Queue[tuple[list[str], float]]
+    last_used_time_marker_redis_queue: asyncio.Queue[LastUsedTimeMark]
     request_counter_redis_queue: asyncio.Queue[str]
     cors_options: dict[str, aiohttp_cors.ResourceOptions]
     metrics: WorkerMetricRegistry

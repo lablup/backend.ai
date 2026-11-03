@@ -10,7 +10,7 @@ from aiohttp.streams import AsyncStreamIterator
 from multidict import CIMultiDict
 from yarl import URL
 
-from ai.backend.appproxy.worker.types import Circuit
+from ai.backend.appproxy.worker.types import Circuit, LastUsedTimeMark
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
     Ingress,
     IngressTarget,
@@ -33,7 +33,7 @@ class HttpRequest:
 class BaseBackendArgs:
     ingress: Ingress
     circuit: Circuit
-    last_used_time_marker_redis_queue: asyncio.Queue[tuple[list[str], float]]
+    last_used_time_marker_redis_queue: asyncio.Queue[LastUsedTimeMark]
     request_counter_redis_queue: asyncio.Queue[str]
 
 
@@ -41,7 +41,7 @@ class BaseBackend:
     _ingress: Ingress
     # TODO: Drop the circuit once an ingress carries what is read from it.
     _circuit: Circuit
-    _last_used_time_marker_redis_queue: asyncio.Queue[tuple[list[str], float]]
+    _last_used_time_marker_redis_queue: asyncio.Queue[LastUsedTimeMark]
     _request_counter_redis_queue: asyncio.Queue[str]
 
     def __init__(self, args: BaseBackendArgs) -> None:
@@ -72,10 +72,9 @@ class BaseBackend:
         match target:
             case SessionIngressTarget():
                 last_access_keys.append(f"session.{target.session_id}.last_access")
-        await self._last_used_time_marker_redis_queue.put((
-            last_access_keys,
-            time.time(),
-        ))
+        await self._last_used_time_marker_redis_queue.put(
+            LastUsedTimeMark(valkey_keys=last_access_keys, used_at=time.time())
+        )
 
     @final
     async def increase_request_counter(self) -> None:

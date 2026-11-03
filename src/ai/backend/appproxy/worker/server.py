@@ -285,20 +285,26 @@ async def last_used_time_marker(root_ctx: RootContext) -> None:
     """Last used time marker function using the valkey client."""
     failure_count = 0
     while True:
-        keys, last_used = await root_ctx.last_used_time_marker_redis_queue.get()
+        last_used_time_mark = await root_ctx.last_used_time_marker_redis_queue.get()
         try:
-            data = {key: str(last_used) for key in keys}
+            data = {
+                key: str(last_used_time_mark.used_at) for key in last_used_time_mark.valkey_keys
+            }
             ttl = get_default_redis_key_ttl()
             await root_ctx.valkey_live.store_multiple_live_data(data, ex=ttl)
         except Exception as e:
             # Warn once per streak of failures and keep going on.
             failure_count += 1
             if failure_count == 1:
-                log.warning("last-used time store failed", exc_info=e, key_count=len(keys))
+                log.warning(
+                    "last-used time store failed",
+                    exc_info=e,
+                    key_count=len(last_used_time_mark.valkey_keys),
+                )
             else:
                 log.debug(
                     "last-used time store failed",
-                    key_count=len(keys),
+                    key_count=len(last_used_time_mark.valkey_keys),
                     failure_count=failure_count,
                 )
             continue
