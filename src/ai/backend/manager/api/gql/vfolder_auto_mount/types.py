@@ -337,8 +337,8 @@ class VFolderAutoMountOrderByGQL(PydanticInputMixin[VFolderAutoMountOrderDTO]):
         added_version=NEXT_RELEASE_VERSION,
         description=(
             "Scope for the scoped vfolder auto-mount query. The items are OR'd, and every "
-            "scope named is authorized before the read runs. At least one of `project` and "
-            "`user` must be non-empty."
+            "scope named is authorized before the read runs. At least one of `project`, `user` "
+            "and `vfolder` must be non-empty."
         ),
     ),
     name="VFolderAutoMountScope",
@@ -352,6 +352,10 @@ class VFolderAutoMountScopeGQL(PydanticInputMixin[VFolderAutoMountScopeDTO]):
         description=(
             "Users whose own auto-mounts are being read; those of a personal project are not."
         ),
+        default=None,
+    )
+    vfolder: list[UUIDScopeGQL] | None = gql_field(
+        description="VFolders whose auto-mounts are being read, in every scope they are set on.",
         default=None,
     )
 

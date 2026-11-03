@@ -49,6 +49,7 @@ from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
 from ai.backend.manager.models.vfolder_auto_mount.scopes import (
     ProjectVFolderAutoMountTarget,
     UserVFolderAutoMountTarget,
+    VFolderVFolderAutoMountTarget,
 )
 from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
     VFolderAutoMountSearchableFields,
@@ -109,7 +110,7 @@ class VFolderAutoMountAdapter(BaseAdapter):
     async def scoped_search(
         self, input: ScopedSearchVFolderAutoMountsInput
     ) -> SearchVFolderAutoMountsPayload:
-        """Search the auto-mounts of the named projects and users, combined with OR."""
+        """Search the auto-mounts of the named projects, users and vfolders, combined with OR."""
         scopes: list[ScopeTarget] = [
             ProjectVFolderAutoMountTarget(project_id=ProjectID(entry.value))
             for entry in input.scope.project or []
@@ -117,6 +118,10 @@ class VFolderAutoMountAdapter(BaseAdapter):
         scopes.extend(
             UserVFolderAutoMountTarget(user_id=UserID(entry.value))
             for entry in input.scope.user or []
+        )
+        scopes.extend(
+            VFolderVFolderAutoMountTarget(vfolder_id=VFolderUUID(entry.value))
+            for entry in input.scope.vfolder or []
         )
         searcher = self._build_searcher(
             VFolderAutoMountSearcher,

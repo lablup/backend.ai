@@ -51,9 +51,15 @@ class VFolderAutoMountScope(BaseRequestModel):
             "Users whose own auto-mounts are being read; those of a personal project are not."
         ),
     )
+    vfolder: list[UUIDScope] | None = Field(
+        default=None,
+        description="VFolders whose auto-mounts are being read, in every scope they are set on.",
+    )
 
     @model_validator(mode="after")
     def _require_a_scope(self) -> Self:
-        if not self.project and not self.user:
-            raise ValueError("VFolderAutoMountScope requires a non-empty 'project' or 'user'")
+        if not self.project and not self.user and not self.vfolder:
+            raise ValueError(
+                "VFolderAutoMountScope requires a non-empty 'project', 'user' or 'vfolder'"
+            )
         return self

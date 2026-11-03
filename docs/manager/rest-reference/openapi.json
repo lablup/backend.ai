@@ -41303,6 +41303,22 @@
             "default": null,
             "description": "Users whose own auto-mounts are being read; those of a personal project are not.",
             "title": "User"
+          },
+          "vfolder": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VFolders whose auto-mounts are being read, in every scope they are set on.",
+            "title": "Vfolder"
           }
         },
         "title": "VFolderAutoMountScope",
