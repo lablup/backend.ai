@@ -22,9 +22,8 @@ class ProbeCheckRunner[TID: Hashable]:
     """
     Runs every check it is given on the check's own interval, each in a loop of its own.
 
-    It keeps no status: a check records what it found and whoever reports it reads that
-    off the check. A loop awaits its check, so a check that has not finished is not
-    started again.
+    An update stops and closes the checks no longer given and starts the ones given anew.
+    A loop awaits its check, so a check that has not finished is not started again.
     """
 
     _checks: dict[TID, AbstractProbeCheck[TID]]
@@ -46,26 +45,31 @@ class ProbeCheckRunner[TID: Hashable]:
         log.debug("probe check runner started", check_count=len(self._tasks))
 
     async def stop(self) -> None:
+        """Stops every loop and closes every check."""
         self._running = False
         for task in self._tasks.values():
             await cancel_and_wait(task)
         self._tasks.clear()
+        for check in self._checks.values():
+            check.close()
         log.debug("probe check runner stopped")
 
-    def add(self, check: AbstractProbeCheck[TID]) -> None:
-        """Adds the check and runs it if the runner runs; a check whose id is held is skipped."""
-        if check.id() in self._checks:
+    def update(self, checks: Sequence[AbstractProbeCheck[TID]]) -> None:
+        """Replaces the checks: a check no longer given is stopped and closed, and a given
+        check without a loop is started."""
+        updated_checks = {check.id(): check for check in checks}
+        for check_id, check in self._checks.items():
+            if updated_checks.get(check_id) is not check:
+                task = self._tasks.pop(check_id, None)
+                if task is not None:
+                    task.cancel()
+                check.close()
+        self._checks = updated_checks
+        if not self._running:
             return
-        self._checks[check.id()] = check
-        if self._running:
-            self._start_check(check)
-
-    async def remove(self, check_id: TID) -> None:
-        """Stops and drops the check with the id, if there is one."""
-        self._checks.pop(check_id, None)
-        task = self._tasks.pop(check_id, None)
-        if task is not None:
-            await cancel_and_wait(task)
+        for check in updated_checks.values():
+            if check.id() not in self._tasks:
+                self._start_check(check)
 
     def _start_check(self, check: AbstractProbeCheck[TID]) -> None:
         task = asyncio.create_task(self._run_check(check))

@@ -24,12 +24,9 @@ class VolumeStatusCheckRegistry:
     def __init__(self, checks: Sequence[AbstractVolumeStatusCheck]) -> None:
         self._checks = {check.id(): check for check in checks}
 
-    def add(self, check: AbstractVolumeStatusCheck) -> None:
-        """Adds the check; a check whose volume name is held is skipped."""
-        self._checks.setdefault(check.id(), check)
-
-    def remove(self, volume_name: StorageVolumeName) -> None:
-        self._checks.pop(volume_name, None)
+    def update(self, checks: Sequence[AbstractVolumeStatusCheck]) -> None:
+        """Replaces the checks with the given ones."""
+        self._checks = {check.id(): check for check in checks}
 
     def snapshot(self) -> Mapping[StorageVolumeName, VolumeStatusSnapshot]:
         """The last observation of every check."""

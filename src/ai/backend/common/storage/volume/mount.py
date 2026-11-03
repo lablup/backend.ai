@@ -131,6 +131,7 @@ class VolumeMountStatusCheck(AbstractVolumeStatusCheck):
     def latest(self) -> StorageStatusResultData:
         return self._latest
 
+    @override
     def close(self) -> None:
         """Shuts down the executor without waiting, as a read hung on the mount never returns."""
         self._executor.shutdown(wait=False, cancel_futures=True)
