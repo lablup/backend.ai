@@ -10,7 +10,7 @@ migration stop, and the operator fixes the row before running it again — the r
 names does not work in that state either way.
 
 Revision ID: 4c91b7d3e5f2
-Revises: a31e8d4c9b72
+Revises: b3e53701440e
 Create Date: 2026-10-01
 
 """
@@ -23,7 +23,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "4c91b7d3e5f2"  # Part of: NEXT_RELEASE_VERSION
-down_revision = "a31e8d4c9b72"
+down_revision = "b3e53701440e"
 branch_labels = None
 depends_on = None
 
