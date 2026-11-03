@@ -84,7 +84,7 @@ if TYPE_CHECKING:
     from .config import ServerConfig
     from .proxy.frontend.base import BaseFrontend
 
-_TRAFFIC_RATIO_WEIGHT_SCALE: Final[int] = 100
+_TRAFFIC_RATIO_WEIGHT_SCALE: Final[int] = 10_000
 
 
 class ProxyMetricObserver:
@@ -507,7 +507,12 @@ class Circuit(SerializableCircuit):
         # route is a group of its own whose weight carries the route's traffic ratio.
         return IngressTargetGroup(
             id=IngressTargetGroupID(str(UUID(int=0))),
-            weight=round(route.traffic_ratio * _TRAFFIC_RATIO_WEIGHT_SCALE),
+            # A positive ratio keeps at least weight 1, so the route still receives traffic.
+            weight=(
+                max(1, round(route.traffic_ratio * _TRAFFIC_RATIO_WEIGHT_SCALE))
+                if route.traffic_ratio > 0
+                else 0
+            ),
             targets=[
                 IngressTarget(
                     id=cls._target_id_of_route(route),
