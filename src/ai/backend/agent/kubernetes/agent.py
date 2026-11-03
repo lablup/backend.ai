@@ -36,6 +36,7 @@ from ai.backend.agent.agent import (
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ScratchType
 from ai.backend.agent.config_file import (
     BaseKernelConfigFile,
+    DockerCredsFile,
     EnvironFile,
     ResourceFile,
     SessionNameFile,
@@ -604,9 +605,12 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
             docker_creds = self.internal_data.get("docker_credentials")
             if docker_creds:
+                creds_file = DockerCredsFile(
+                    path=self.config_dir / "docker-creds.json", docker_creds=docker_creds
+                )
+                content = await creds_file.render()
                 await run_in_executor_with_context(
-                    None,
-                    functools.partial(_write_config, "docker-creds.json", docker_creds),
+                    None, functools.partial(_write_config, creds_file.path.name, content)
                 )
 
         if keypair := self.internal_data.get("ssh_keypair"):
