@@ -68,7 +68,7 @@ from ai.backend.manager.models.user.searchable_fields import UserSearchableField
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
-from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
+from ai.backend.manager.repositories.ops.v2.session.provider import SessionOpsProvider
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
 from ai.backend.manager.utils import query_userinfo
 
@@ -76,10 +76,12 @@ from ai.backend.manager.utils import query_userinfo
 class SessionDBSource:
     _db: ExtendedAsyncSAEngine
     _ops_provider: V2DBOpsProvider
+    _session_ops_provider: SessionOpsProvider
 
     def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: V2DBOpsProvider) -> None:
         self._db = db
         self._ops_provider = ops_provider
+        self._session_ops_provider = SessionOpsProvider(db)
 
     async def resolve_session_id(
         self,
@@ -440,13 +442,11 @@ class SessionDBSource:
     ) -> SessionRow | None:
         session_id = updater.session_id
 
-        async with self._db.begin_session() as db_session:
-            query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
-            session_row = await db_session.scalar(query_stmt)
+        async with self._session_ops_provider.write_ops() as w:
+            session_row = await w.session_row(session_id)
             if session_row is None:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
 
-            w = V2WriteOps(db_session)
             if session_name and session_row.access_key is not None:
                 # Check the owner of the target session has any session with the same name
                 matches = await self._match_sessions(
@@ -479,20 +479,9 @@ class SessionDBSource:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
 
             if session_name:
-                await db_session.execute(
-                    sa.update(KernelRow)
-                    .values(session_name=session_name)
-                    .where(KernelRow.session_id == session_id)
-                )
+                await w.rename_kernels(session_id, session_name)
 
-            # Re-fetch with kernels loaded for the return value
-            select_stmt = (
-                sa.select(SessionRow)
-                .options(selectinload(SessionRow.kernels))
-                .execution_options(populate_existing=True)
-                .where(SessionRow.id == session_id)
-            )
-            return cast(SessionRow | None, await db_session.scalar(select_stmt))
+            return await w.session_row_with_kernels(session_id)
 
     async def query_userinfo(
         self,
