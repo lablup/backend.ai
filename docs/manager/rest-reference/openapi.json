@@ -25210,6 +25210,16 @@
         "title": "CreateResourceGroupInput",
         "type": "object"
       },
+      "AgentSelectionStrategy": {
+        "enum": [
+          "dispersed",
+          "concentrated",
+          "roundrobin",
+          "legacy"
+        ],
+        "title": "AgentSelectionStrategy",
+        "type": "string"
+      },
       "NonEmptyList_PartialBulkUpdateResourceGroupItemInput_": {
         "items": {
           "$ref": "#/components/schemas/PartialBulkUpdateResourceGroupItemInput"
@@ -25475,9 +25485,140 @@
             ],
             "description": "Preemption configuration. Omit to leave unchanged.",
             "title": "Preemption"
+          },
+          "scheduler_options": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdateResourceGroupSchedulerOptionsInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Scheduler options. Omit to leave unchanged; omitted keys are kept.",
+            "title": "Scheduler Options"
           }
         },
         "title": "UpdateResourceGroupInput",
+        "type": "object"
+      },
+      "UpdateResourceGroupSchedulerOptionsConfigInput": {
+        "description": "Input for updating the ``config`` section of a resource group's scheduler options.",
+        "properties": {
+          "num_retries_to_skip": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Number of scheduling retries before a pending session is skipped. Omit to leave unchanged; null clears.",
+            "title": "Num Retries To Skip"
+          }
+        },
+        "title": "UpdateResourceGroupSchedulerOptionsConfigInput",
+        "type": "object"
+      },
+      "UpdateResourceGroupSchedulerOptionsInput": {
+        "description": "Input for updating a resource group's scheduler options. Omitted keys are kept.",
+        "properties": {
+          "allowed_session_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionTypes"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Session types that may be created in the resource group. Omit to leave unchanged.",
+            "title": "Allowed Session Types"
+          },
+          "pending_timeout": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Seconds a session may stay pending before it is cancelled (0 = no timeout). Omit to leave unchanged.",
+            "title": "Pending Timeout"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdateResourceGroupSchedulerOptionsConfigInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ``config`` section of the scheduler options. Omit to leave unchanged.",
+            "title": "Config"
+          },
+          "agent_selection_strategy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSelectionStrategy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How agents are chosen for a session's kernels. Omit to leave unchanged.",
+            "title": "Agent Selection Strategy"
+          },
+          "agent_selector_config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Options of the agent selector. Omit to leave unchanged.",
+            "title": "Agent Selector Config"
+          },
+          "allow_fractional_resource_fragmentation": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether an agent may start a kernel that fragments a fractional resource request. Omit to leave unchanged.",
+            "title": "Allow Fractional Resource Fragmentation"
+          },
+          "route_cleanup_target_statuses": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Route health statuses (healthy/unhealthy/degraded) whose routes are cleaned up automatically. Omit to leave unchanged.",
+            "title": "Route Cleanup Target Statuses"
+          }
+        },
+        "title": "UpdateResourceGroupSchedulerOptionsInput",
         "type": "object"
       },
       "PartialBulkUpdateResourceGroupsInput": {
@@ -25737,6 +25878,18 @@
             ],
             "description": "Preemption configuration. Omit to leave unchanged.",
             "title": "Preemption"
+          },
+          "scheduler_options": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdateResourceGroupSchedulerOptionsInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Scheduler options. Omit to leave unchanged; omitted keys are kept.",
+            "title": "Scheduler Options"
           }
         },
         "required": [

@@ -20,6 +20,10 @@ from ai.backend.manager.models.resource_group.creators import (
     ResourceGroupForKeypairRelationCreator,
     ResourceGroupForProjectRelationCreator,
 )
+from ai.backend.manager.models.resource_group.types import (
+    NUM_RETRIES_TO_SKIP_CONFIG_KEY,
+    ResourceGroupOpts,
+)
 from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import Naming, TestSeedLink, TestSeedRow, joined
 
@@ -33,6 +37,7 @@ class TestSeedResourceGroup(TestSeedRow[ResourceGroupData]):
     description: str | None = None
     is_active: bool = True
     is_default: bool = False
+    num_retries_to_skip: int | None = None
 
     @override
     def kind(self) -> str:
@@ -50,6 +55,13 @@ class TestSeedResourceGroup(TestSeedRow[ResourceGroupData]):
             parts.append(Says("비활성", english="inactive"))
         if self.is_default:
             parts.append(Says("기본 그룹", english="default group"))
+        if self.num_retries_to_skip is not None:
+            parts.append(
+                Says(
+                    f"대기 세션 건너뛰기 재시도 횟수 {self.num_retries_to_skip}",
+                    english=f"skips a pending session after {self.num_retries_to_skip} retries",
+                )
+            )
         return joined(parts)
 
     @override
@@ -65,6 +77,13 @@ class TestSeedResourceGroup(TestSeedRow[ResourceGroupData]):
             description=self.description,
             is_active=self.is_active,
             is_default=self.is_default,
+            scheduler_opts=(
+                None
+                if self.num_retries_to_skip is None
+                else ResourceGroupOpts(
+                    config={NUM_RETRIES_TO_SKIP_CONFIG_KEY: self.num_retries_to_skip}
+                )
+            ),
         )
 
 

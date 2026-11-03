@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import Any, override
 
 import sqlalchemy as sa
@@ -13,6 +14,7 @@ from sqlalchemy.dialects.postgresql import array as pg_array
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.types import AgentSelectionStrategy, SessionTypes
 from ai.backend.manager.data.resource_group.types import (
     FairShareResourceGroupSpec,
     ResourceGroupData,
@@ -24,7 +26,10 @@ from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_group.searchable_fields import (
     ResourceGroupSearchableFields,
 )
-from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_group.types import (
+    NUM_RETRIES_TO_SKIP_CONFIG_KEY,
+    ResourceGroupOpts,
+)
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -55,6 +60,23 @@ class ResourceGroupUpdater(DataUpdater[ResourceGroupRow, ResourceGroupData]):
     )
     preemption_config: OptionalState[DataPreemptionConfig] = field(
         default_factory=OptionalState[DataPreemptionConfig].nop
+    )
+    allowed_session_types: OptionalState[list[SessionTypes]] = field(
+        default_factory=OptionalState[list[SessionTypes]].nop
+    )
+    pending_timeout: OptionalState[timedelta] = field(default_factory=OptionalState[timedelta].nop)
+    num_retries_to_skip: TriState[int] = field(default_factory=TriState[int].nop)
+    agent_selection_strategy: OptionalState[AgentSelectionStrategy] = field(
+        default_factory=OptionalState[AgentSelectionStrategy].nop
+    )
+    agent_selector_config: OptionalState[Mapping[str, Any]] = field(
+        default_factory=OptionalState[Mapping[str, Any]].nop
+    )
+    allow_fractional_resource_fragmentation: OptionalState[bool] = field(
+        default_factory=OptionalState[bool].nop
+    )
+    route_cleanup_target_statuses: OptionalState[list[str]] = field(
+        default_factory=OptionalState[list[str]].nop
     )
     fair_share_spec: TriState[FairShareResourceGroupSpec] = field(
         default_factory=TriState[FairShareResourceGroupSpec].nop
@@ -102,8 +124,15 @@ class ResourceGroupUpdater(DataUpdater[ResourceGroupRow, ResourceGroupData]):
         self.scheduler.update_dict(to_update, "scheduler")
         if (scheduler_opts := self.scheduler_opts.optional_value()) is not None:
             to_update["scheduler_opts"] = scheduler_opts
+        if (patched_scheduler_opts := self._build_scheduler_opts_patch_expression()) is not None:
+            to_update["scheduler_opts"] = patched_scheduler_opts
+        self.fair_share_spec.update_dict(to_update, "fair_share_spec")
+        return to_update
+
+    def _build_scheduler_opts_patch_expression(self) -> sa.ColumnElement[Any] | None:
+        values_by_scheduler_opts_key: dict[str, Any] = {}
         if (preemption := self.preemption_config.optional_value()) is not None:
-            preemption_dict = {
+            values_by_scheduler_opts_key["preemption"] = {
                 "enabled": preemption.enabled,
                 "preemptible_priority": preemption.preemptible_priority,
                 "order": preemption.order.value,
@@ -111,13 +140,53 @@ class ResourceGroupUpdater(DataUpdater[ResourceGroupRow, ResourceGroupData]):
                 "preemption_min_runtime": preemption.preemption_min_runtime.total_seconds(),
                 "victim_scope": preemption.victim_scope.value,
             }
-            to_update["scheduler_opts"] = func.jsonb_set(
-                sa.literal_column("scheduler_opts"),
-                pg_array(["preemption"]),
-                cast(preemption_dict, JSONB),
+        self.allowed_session_types.map(
+            lambda session_types: [session_type.value for session_type in session_types]
+        ).update_dict(values_by_scheduler_opts_key, "allowed_session_types")
+        self.pending_timeout.map(lambda timeout: timeout.total_seconds()).update_dict(
+            values_by_scheduler_opts_key, "pending_timeout"
+        )
+        self.agent_selection_strategy.map(lambda strategy: strategy.value).update_dict(
+            values_by_scheduler_opts_key, "agent_selection_strategy"
+        )
+        self.agent_selector_config.map(dict).update_dict(
+            values_by_scheduler_opts_key, "agent_selector_config"
+        )
+        self.allow_fractional_resource_fragmentation.update_dict(
+            values_by_scheduler_opts_key, "allow_fractional_resource_fragmentation"
+        )
+        self.route_cleanup_target_statuses.update_dict(
+            values_by_scheduler_opts_key, "route_cleanup_target_statuses"
+        )
+
+        stored_scheduler_opts = sa.literal_column("scheduler_opts", type_=JSONB)
+        patched_scheduler_opts: sa.ColumnElement[Any] = stored_scheduler_opts
+        for key, value in values_by_scheduler_opts_key.items():
+            patched_scheduler_opts = func.jsonb_set(
+                patched_scheduler_opts, pg_array([key]), cast(value, JSONB)
             )
-        self.fair_share_spec.update_dict(to_update, "fair_share_spec")
-        return to_update
+        stored_scheduler_opts_config = func.coalesce(
+            stored_scheduler_opts["config"], cast({}, JSONB)
+        )
+        if self.num_retries_to_skip.is_update():
+            patched_scheduler_opts = func.jsonb_set(
+                patched_scheduler_opts,
+                pg_array(["config"]),
+                stored_scheduler_opts_config.op("||")(
+                    cast({NUM_RETRIES_TO_SKIP_CONFIG_KEY: self.num_retries_to_skip.value()}, JSONB)
+                ),
+            )
+        elif self.num_retries_to_skip.is_nullify():
+            patched_scheduler_opts = func.jsonb_set(
+                patched_scheduler_opts,
+                pg_array(["config"]),
+                stored_scheduler_opts_config.op("-")(
+                    sa.literal(NUM_RETRIES_TO_SKIP_CONFIG_KEY, sa.Text)
+                ),
+            )
+        if patched_scheduler_opts is stored_scheduler_opts:
+            return None
+        return patched_scheduler_opts
 
     @override
     def to_data(self, row: ResourceGroupRow) -> ResourceGroupData:
