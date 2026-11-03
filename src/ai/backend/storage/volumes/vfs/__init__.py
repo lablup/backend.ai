@@ -31,6 +31,7 @@ from ai.backend.storage.errors import (
     QuotaScopeCreationFailedError,
     QuotaScopeNotFoundError,
 )
+from ai.backend.storage.errors.volume import VolumePerfMetricNotSupportedError
 from ai.backend.storage.subproc import run
 from ai.backend.storage.types import (
     SENTINEL,
@@ -545,7 +546,7 @@ class BaseVolume(AbstractVolume):
 
     @override
     async def get_performance_metric(self) -> FSPerfMetric:
-        raise NotImplementedError
+        raise VolumePerfMetricNotSupportedError
 
     @override
     async def get_fs_usage(self) -> CapacityUsage:
