@@ -12,6 +12,8 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.errors.container_registry import InvalidContainerRegistryProject
+from ai.backend.manager.errors.repository import CheckConstraintViolationError
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.container_registry.searchable_fields import (
     ContainerRegistrySearchableFields,
@@ -58,7 +60,16 @@ class ContainerRegistryUpdater(DataUpdater[ContainerRegistryRow, ContainerRegist
     @property
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
+        return (
+            IntegrityErrorCheck(
+                violation_type=CheckConstraintViolationError,
+                constraint_name="ck_container_registries_harbor_project",
+                error=InvalidContainerRegistryProject(
+                    "A Harbor registry needs a project name Harbor accepts:"
+                    " lowercase letters and digits, joined by one of . _ -"
+                ),
+            ),
+        )
 
     @override
     def build_values(self) -> dict[str, Any]:

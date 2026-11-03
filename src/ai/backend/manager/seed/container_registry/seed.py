@@ -8,13 +8,13 @@ from pydantic import Field, model_validator
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.exception import BackendAIError
-from ai.backend.manager.models.container_registry.row import (
-    ContainerRegistryValidator,
-    ContainerRegistryValidatorArgs,
-)
 from ai.backend.manager.models.container_registry.upserters import ContainerRegistryUpserter
 from ai.backend.manager.repositories.ops.v2.seed.types import SeedWrite
 from ai.backend.manager.seed.base import SeedItem, SeedItems, SeedRejection
+from ai.backend.manager.services.container_registry.validator import (
+    ContainerRegistryValidator,
+    ContainerRegistryValidatorArgs,
+)
 
 
 class ContainerRegistrySeed(SeedItem):

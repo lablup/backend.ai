@@ -1,7 +1,7 @@
 ---
 name: container-registry-adapter-scenarios
 type: reference
-description: container registry adapter guarantees; superadmin-gated management calls, per-id batch load, missing scoped search, RBAC project relations, linking a project as its default, legacy is_global image visibility, update-only URL validation
+description: container registry adapter guarantees; superadmin-gated management calls, per-id batch load, missing scoped search, RBAC project relations, linking a project as its default, legacy is_global image visibility, URL validated by the request DTO and the Harbor project rule by a column constraint
 scope: src/ai/backend/manager/api/adapters/container_registry
 keywords: [container registry, scenario, adapter, superadmin, scoped_search, operation scope, RBAC, allowed groups, is_global, image visibility]
 sources:
@@ -71,12 +71,14 @@ Filter combination (`AND`/`OR`/`NOT`), sort and cursor or offset pagination are 
 - The permission check runs before the existence check, so a user without permission is rejected for insufficient permission even for a non-existent ID. Whether the target exists is not revealed.
 - The per-ID permission check does not pass superadmin first. Superadmin is also judged by the permission graph, so an ID whose node is missing is rejected for insufficient permission, not returned as an empty value. The permission check of the single get passes superadmin first, so the two checks differ in result, and which one to follow is not decided yet.
 
-## Update validates the `url` and `type` values of the registry
+## The request read validates the `url` value, and the database validates the `project` value
 
-- The `url` validation checks only that a host is present and does not restrict the scheme.
+- The request DTO validates the `url` value. It checks only that a host is present and does not restrict the scheme.
 - A `url` value that does not start with `http` or `https` is parsed after `http://` is prepended. So `ftp://reg.example` and a string containing whitespace pass too, and only a `url` value with an empty host is rejected.
 - Whether to tighten this validation is not decided yet.
-- The validation targets the final value after the update. Even when the request omits the `url` or `project` value, the update is rejected when the stored value violates the rule.
+- A `CHECK` constraint on the `container_registries` table validates the `project` value. A Harbor row must hold a `project` value in the format Harbor accepts, and other types ignore this value.
+- The constraint reads the row after the write. Changing only one of the `type` and `project` values is rejected when the row to store violates the rule, and the database rejects it, not the request read.
+- v1 GraphQL does not go through the request DTO yet, so a Python validator handles the same check (`services/container_registry/validator.py`).
 
 ## Changing the allowed projects checks permission on both the registry and the project scope
 
