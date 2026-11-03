@@ -124,7 +124,6 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 __all__ = (
     "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",
     "ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE",
-    "DEAD_SESSION_STATUSES",
     "TERMINAL_SESSION_STATUSES",
     "PRIVATE_SESSION_TYPES",
     "KernelLoadingStrategy",
@@ -135,11 +134,6 @@ __all__ = (
 
 log = StructuredLogger(logging.getLogger("ai.backend.manager.models.session"))
 
-
-DEAD_SESSION_STATUSES = frozenset([
-    SessionStatus.CANCELLED,
-    SessionStatus.TERMINATED,
-])
 
 # Statuses treated as terminal for session-name reuse. Mirrors the
 # `ix_sessions_unique_name_per_user_nonterminal` partial unique index predicate
@@ -229,7 +223,7 @@ def _build_session_fetch_query(
     if access_key:
         cond = cond & (SessionRow.access_key == access_key)
     if not allow_stale:
-        cond = cond & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
+        cond = cond & (~SessionRow.status.in_(SessionStatus.terminal_statuses()))
     query = (
         sa.select(SessionRow)
         .where(cond)
@@ -1073,15 +1067,6 @@ def by_status(statuses: Iterable[SessionStatus]) -> QueryCondition:
         return query_stmt.where(SessionRow.status.in_(statuses))
 
     return _by_status
-
-
-def by_user_id(user_id: UUID) -> QueryCondition:
-    def _by_user_id(
-        query_stmt: sa.sql.Select[Any],
-    ) -> sa.sql.Select[Any]:
-        return query_stmt.where(SessionRow.user_uuid == user_id)
-
-    return _by_user_id
 
 
 def by_domain_name(domain_name: str) -> QueryCondition:

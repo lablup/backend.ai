@@ -22,6 +22,7 @@ from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -33,6 +34,7 @@ from ai.backend.manager.data.keypair.types import (
     KeyPairData,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
+from ai.backend.manager.data.session.types import SessionEntityData, SessionStatus
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
     BulkUserUpdateResultData,
@@ -97,14 +99,12 @@ from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.session.row import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
-    DEAD_SESSION_STATUSES,
     SessionRow,
-    by_status,
-    by_user_id,
 )
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.session_group.row import SessionGroupRow
-from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.types import QueryCondition, QueryOption, join_by_related_field
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.purgers import (
     UserErrorLogPurger,
@@ -525,20 +525,22 @@ class UserDBSource:
                 conn, deleted_user_uuid, target_user_uuid, target_user_email
             )
 
-    async def retrieve_active_sessions(self, user_uuid: UUID) -> list[SessionRow]:
+    async def retrieve_active_sessions(self, user_uuid: UUID) -> list[SessionEntityData]:
         """Retrieve active sessions for a user."""
-        query_conditions: list[QueryCondition] = [
-            by_user_id(user_uuid),
-            by_status(AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES),
-        ]
-
-        query_options: list[QueryOption] = [
-            join_by_related_field(SessionRow.user),
-        ]
-
-        return await SessionRow.list_session_by_condition(
-            query_conditions, query_options, db=self._db
-        )
+        fields = SessionSearchableFields.own
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(
+                SessionSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        fields.user_uuid.filter.equals(
+                            UUIDEqualMatchSpec(value=user_uuid, negated=False)
+                        ),
+                        fields.status.filter.in_(AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES),
+                    ],
+                )
+            )
+        return result.items
 
     async def delegate_endpoint_ownership(
         self,
@@ -598,7 +600,7 @@ class UserDBSource:
             SessionRow.id.in_(
                 sa.select(RoutingRow.session).where(RoutingRow.endpoint.in_(endpoint_ids))
             )
-            & SessionRow.status.not_in(DEAD_SESSION_STATUSES)
+            & SessionRow.status.not_in(SessionStatus.terminal_statuses())
         )
         await session.execute(
             sa.update(KernelRow)

@@ -5,7 +5,7 @@ import logging
 import secrets
 import uuid
 from collections.abc import Mapping, MutableMapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from typing import Any, cast
 from urllib.parse import urlparse
@@ -78,7 +78,7 @@ from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
 )
-from ai.backend.manager.data.session.types import SessionTerminationStatus
+from ai.backend.manager.data.session.types import SessionStatus, SessionTerminationStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.agent import AgentNotAllocated
 from ai.backend.manager.errors.common import (
@@ -106,7 +106,6 @@ from ai.backend.manager.errors.session_group import (
 from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.session.row import (
-    DEAD_SESSION_STATUSES,
     PRIVATE_SESSION_TYPES,
     KernelLoadingStrategy,
 )
@@ -1051,7 +1050,7 @@ class SessionService:
             ),
         )
 
-        if compute_session.status in DEAD_SESSION_STATUSES:
+        if compute_session.status in SessionStatus.terminal_statuses():
             if kernel_id is None:
                 # Get logs from the main kernel
                 kernel_id = compute_session.main_kernel.id
@@ -1434,13 +1433,11 @@ class SessionService:
         session_id = action.session_id
         session_name = action.updater.name.optional_value()
 
-        session_row = await self._session_repository.update_session(action.updater, session_name)
-        if session_row is None:
-            raise ValueError(f"Session not found (id:{session_id})")
+        session_data = await self._session_repository.update_session(action.updater, session_name)
         session_owner_data = await self._session_repository.get_session_owner(str(session_id))
 
         return UpdateSessionActionResult(
-            session_data=session_row.to_dataclass(owner=session_owner_data)
+            session_data=replace(session_data, owner=session_owner_data)
         )
 
     async def bulk_get_session_designated_agent_ids(
