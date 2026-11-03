@@ -6,12 +6,13 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any, override
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
 from ai.backend.common.config import ModelConfig, ModelDefinition, ModelServiceConfig
 from ai.backend.common.contexts.user import with_user_context
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
@@ -19,6 +20,7 @@ from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.vfolder import VFolderUUID
@@ -26,7 +28,12 @@ from ai.backend.common.data.model_deployment.types import DeploymentStrategy, Mo
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AdminSearchDeploymentsInput,
+    CreateDeploymentInput,
+    DeploymentStrategyInput,
+    ModelDeploymentMetadataInput,
+    ModelDeploymentNetworkAccessInput,
     ScopedSearchDeploymentsInput,
+    UpdateDeploymentInput,
 )
 from ai.backend.common.dto.manager.v2.deployment.types import DeploymentScope
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
@@ -75,6 +82,8 @@ from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
+from ai.backend.manager.services.deployment.actions.update_deployment import UpdateDeploymentAction
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 
 DENIED_TOKEN = DeploymentTokenID(uuid4())
@@ -475,3 +484,100 @@ class TestFieldBatchLoads:
         assert none is None
         action = processors.deployment.bulk_get_deployment_policies.run.await_args.args[0]
         assert list(action.owner_ids()) == [deployment_id, DeploymentID(without_policy)]
+
+
+class _Reached(Exception):
+    """Stops a call at the processor so the action it was given can be read."""
+
+
+class TestDesignatedAgentInputs:
+    """The create and update inputs reach their actions as a set of agent UUIDs."""
+
+    @pytest.fixture
+    def processors(self) -> MagicMock:
+        processors = MagicMock()
+        processors.deployment.create_deployment.run = AsyncMock(side_effect=_Reached)
+        processors.deployment.update_deployment.run = AsyncMock(side_effect=_Reached)
+        return processors
+
+    @pytest.fixture
+    def adapter(self, processors: MagicMock) -> DeploymentAdapter:
+        return DeploymentAdapter(processors.deployment, MagicMock())
+
+    def _creating(self, designated_agent_ids: list[UUID] | None) -> CreateDeploymentInput:
+        return CreateDeploymentInput(
+            metadata=ModelDeploymentMetadataInput(
+                project_id=uuid4(),
+                domain_name="default",
+                resource_group_name=ResourceGroupName("default"),
+                designated_agent_ids=designated_agent_ids,
+            ),
+            network_access=ModelDeploymentNetworkAccessInput(),
+            default_deployment_strategy=DeploymentStrategyInput(type=DeploymentStrategy.ROLLING),
+            replica_count=1,
+        )
+
+    async def _created_with(
+        self, adapter: DeploymentAdapter, processors: MagicMock, input: CreateDeploymentInput
+    ) -> frozenset[AgentUUID]:
+        with pytest.raises(_Reached):
+            await adapter.create(input, uuid4())
+        action: CreateDeploymentAction = (
+            processors.deployment.create_deployment.run.await_args.args[0]
+        )
+        return action.creator.designated_agents
+
+    async def _updated_with(
+        self, adapter: DeploymentAdapter, processors: MagicMock, input: UpdateDeploymentInput
+    ) -> frozenset[AgentUUID] | None:
+        with pytest.raises(_Reached):
+            await adapter.update(input, DeploymentID(uuid4()))
+        action: UpdateDeploymentAction = (
+            processors.deployment.update_deployment.run.await_args.args[0]
+        )
+        return action.designated_agents
+
+    async def test_create_takes_each_agent_once(
+        self, adapter: DeploymentAdapter, processors: MagicMock
+    ) -> None:
+        first, second = uuid4(), uuid4()
+
+        designated = await self._created_with(
+            adapter, processors, self._creating([first, second, first])
+        )
+
+        assert designated == frozenset({AgentUUID(first), AgentUUID(second)})
+
+    async def test_create_without_agents_designates_none(
+        self, adapter: DeploymentAdapter, processors: MagicMock
+    ) -> None:
+        assert await self._created_with(adapter, processors, self._creating(None)) == frozenset()
+
+    async def test_update_omitting_the_agents_leaves_them(
+        self, adapter: DeploymentAdapter, processors: MagicMock
+    ) -> None:
+        assert await self._updated_with(adapter, processors, UpdateDeploymentInput()) is None
+
+    async def test_update_with_null_leaves_them(
+        self, adapter: DeploymentAdapter, processors: MagicMock
+    ) -> None:
+        updating = UpdateDeploymentInput(designated_agent_ids=None)
+
+        assert await self._updated_with(adapter, processors, updating) is None
+
+    async def test_update_with_an_empty_list_clears_them(
+        self, adapter: DeploymentAdapter, processors: MagicMock
+    ) -> None:
+        updating = UpdateDeploymentInput(designated_agent_ids=[])
+
+        assert await self._updated_with(adapter, processors, updating) == frozenset()
+
+    async def test_update_with_agents_replaces_them(
+        self, adapter: DeploymentAdapter, processors: MagicMock
+    ) -> None:
+        agent = uuid4()
+        updating = UpdateDeploymentInput(designated_agent_ids=[agent])
+
+        assert await self._updated_with(adapter, processors, updating) == frozenset({
+            AgentUUID(agent)
+        })
