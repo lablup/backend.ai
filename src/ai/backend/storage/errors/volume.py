@@ -4,6 +4,8 @@ Volume-related exceptions.
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -54,4 +56,19 @@ class MetadataTooLargeError(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.STORAGE,
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class VolumePerfMetricNotSupportedError(BackendAIError, web.HTTPBadRequest):
+    """Raised when a volume backend does not provide performance metrics."""
+
+    error_type = "https://api.backend.ai/probs/storage/volume/perf-metric-not-supported"
+    error_title = "Volume Performance Metric Not Supported"
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
         )
