@@ -87,7 +87,9 @@ class SubdomainFrontend(H2Frontend):
                 self.api_port_pool.add(self.api_port)
 
     @override
-    async def initialize_backend(self, ingress: Ingress, circuit: Circuit) -> H2Backend:
+    async def initialize_backend(
+        self, ingress: Ingress, circuit: Circuit | None = None
+    ) -> H2Backend:
         backend = H2Backend(
             H2BackendArgs(
                 last_used_time_mark_queue=self.root_context.last_used_time_mark_queue,

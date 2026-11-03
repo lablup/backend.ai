@@ -54,7 +54,7 @@ class SubdomainFrontend(BaseHTTPFrontend):
         if self._xff_strict is not None:
             app.middlewares.append(self._xff_strict.middleware)
         app.middlewares.extend([
-            self.ensure_slot_middleware,
+            self.ensure_ingress_middleware,
             self.metric_collector_middleware,
             self.exception_middleware,
         ])
@@ -91,7 +91,7 @@ class SubdomainFrontend(BaseHTTPFrontend):
         if self.site:
             await self.site.stop()
 
-    def parse_slot(self, request: web.Request) -> str:
+    def parse_subdomain(self, request: web.Request) -> str:
         # exclude port number when evaluating the subdomain
         subdomain = request.host.partition(":")[0].replace(self.wildcard_config.domain, "").lower()
         if not subdomain:
@@ -99,11 +99,11 @@ class SubdomainFrontend(BaseHTTPFrontend):
         return subdomain
 
     @web.middleware
-    async def ensure_slot_middleware(
+    async def ensure_ingress_middleware(
         self, request: web.Request, handler: Handler
     ) -> web.StreamResponse:
         async def _exception_safe_handler(request: web.Request) -> web.StreamResponse:
-            subdomain = self.parse_slot(request)
+            subdomain = self.parse_subdomain(request)
             frontend_key = IngressFrontend(
                 kind=IngressFrontendKind.WILDCARD,
                 protocol=IngressProtocol.HTTP,
@@ -114,15 +114,11 @@ class SubdomainFrontend(BaseHTTPFrontend):
                 raise IngressFrontendNotRegisteredError(
                     f"E20009: Subdomain {subdomain} not registered"
                 )
-            circuit = backend.circuit
             # TODO: Use the ingress id once ingresses are stored as their own entity.
-            with with_log_context(circuit_id=circuit.id):
+            with with_log_context(circuit_id=backend.circuit_id):
                 ingress = await self._read_registered_ingress(frontend_key)
                 self.ensure_allowed_ip(request, ingress.access)
-                # TODO: Check the credential against ingress.access once an ingress carries the id
-                # its tokens name.
-                self.ensure_credential(request, circuit)
-                request["circuit"] = circuit
+                self.ensure_credential(request, backend.circuit)
                 request["backend"] = backend
                 return await handler(request)
 

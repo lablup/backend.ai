@@ -102,7 +102,9 @@ class TCPFrontend(BaseFrontend[TCPBackend]):
         return True
 
     @override
-    async def initialize_backend(self, ingress: Ingress, circuit: Circuit) -> TCPBackend:
+    async def initialize_backend(
+        self, ingress: Ingress, circuit: Circuit | None = None
+    ) -> TCPBackend:
         return TCPBackend(
             TCPBackendArgs(
                 last_used_time_mark_queue=self.root_context.last_used_time_mark_queue,
@@ -136,7 +138,7 @@ class TCPFrontend(BaseFrontend[TCPBackend]):
             return
 
         # TODO: Use the ingress id once ingresses are stored as their own entity.
-        with with_log_context(circuit_id=backend.circuit.id):
+        with with_log_context(circuit_id=backend.circuit_id):
             try:
                 ingress = await self._read_registered_ingress(frontend_key)
             except IngressFrontendNotRegisteredError:

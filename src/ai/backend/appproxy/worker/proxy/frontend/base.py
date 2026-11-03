@@ -32,12 +32,13 @@ class BaseFrontend[TBackend: BaseBackend](metaclass=ABCMeta):
         self.backends = {}
 
     # TODO: Drop the circuit once an ingress carries the values the backends read from it.
-    async def register_ingress(self, ingress: Ingress, circuit: Circuit) -> None:
+    async def register_ingress(self, ingress: Ingress, circuit: Circuit | None = None) -> None:
         metrics = self.root_context.metrics
         frontend_key = ingress.frontend.key()
+        backend = await self.initialize_backend(ingress, circuit)
+        self.backends[frontend_key] = backend
         # TODO: Use the ingress id once ingresses are stored as their own entity.
-        with with_log_context(circuit_id=circuit.id):
-            self.backends[frontend_key] = await self.initialize_backend(ingress, circuit)
+        with with_log_context(circuit_id=backend.circuit_id):
             log.debug("registered the ingress of frontend {}", frontend_key)
         metrics.circuit.observe_circuit_creation(protocol=ingress.frontend.protocol.name)
 
@@ -60,7 +61,7 @@ class BaseFrontend[TBackend: BaseBackend](metaclass=ABCMeta):
             await self.terminate_backend(backend)
         except Exception:
             # TODO: Use the ingress id once ingresses are stored as their own entity.
-            log.exception("failed to terminate the backend", circuit_id=backend.circuit.id)
+            log.exception("failed to terminate the backend", circuit_id=backend.circuit_id)
         finally:
             del self.backends[frontend_key]
             metrics.circuit.observe_circuit_removal(protocol=frontend.protocol.name)
@@ -102,7 +103,9 @@ class BaseFrontend[TBackend: BaseBackend](metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def initialize_backend(self, ingress: Ingress, circuit: Circuit) -> TBackend:
+    async def initialize_backend(
+        self, ingress: Ingress, circuit: Circuit | None = None
+    ) -> TBackend:
         raise NotImplementedError
 
     @abstractmethod

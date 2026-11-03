@@ -194,7 +194,9 @@ class TraefikFrontend(BaseFrontend[TraefikBackend]):
                 self._redis_keys.update(keys)
 
     @override
-    async def initialize_backend(self, ingress: Ingress, circuit: Circuit) -> TraefikBackend:
+    async def initialize_backend(
+        self, ingress: Ingress, circuit: Circuit | None = None
+    ) -> TraefikBackend:
         return TraefikBackend(
             BaseBackendArgs(
                 last_used_time_mark_queue=self.root_context.last_used_time_mark_queue,

@@ -94,7 +94,9 @@ class PortFrontend(H2Frontend):
             self.api_ports = {}
 
     @override
-    async def initialize_backend(self, ingress: Ingress, circuit: Circuit) -> H2Backend:
+    async def initialize_backend(
+        self, ingress: Ingress, circuit: Circuit | None = None
+    ) -> H2Backend:
         if ingress.frontend.port is None:
             raise InvalidFrontendTypeError(f"Expected a port frontend, got {ingress.frontend.kind}")
         api_port = self.api_ports[ingress.frontend.port.number]

@@ -49,9 +49,8 @@ class PortFrontend(BaseHTTPFrontend):
             app = web.Application()
             app["port"] = port
             app.on_response_prepare.append(self.append_cors_headers)
-            # ensure_slot middleware should be placed before exception_middleware and metric_collector_middleware
-            # so that metric_collector_middleware can properly assess circuit variable
-            # Keep in mind that implementation of ensure_slot_middleware should manually handle exception and respond with
+            # ensure_ingress_middleware should be placed before exception_middleware and metric_collector_middleware
+            # Keep in mind that implementation of ensure_ingress_middleware should manually handle exception and respond with
             # appropriate HTTP response, which usually is automatically covered by exception_middleware
             # That can be achieved by wraping whole execution block with AbstractHTTPFrontend.exception_safe_handler_wrapper()
             # Resolve the real client IP from X-Forwarded-For first (only when
@@ -60,7 +59,7 @@ class PortFrontend(BaseHTTPFrontend):
             if self._xff_strict is not None:
                 app.middlewares.append(self._xff_strict.middleware)
             app.middlewares.extend([
-                self.ensure_slot_middleware,
+                self.ensure_ingress_middleware,
                 self.metric_collector_middleware,
                 self.exception_middleware,
             ])
@@ -103,7 +102,7 @@ class PortFrontend(BaseHTTPFrontend):
             await site.stop()
 
     @web.middleware
-    async def ensure_slot_middleware(
+    async def ensure_ingress_middleware(
         self, request: web.Request, handler: Handler
     ) -> web.StreamResponse:
         port: int = request.app["port"]
@@ -115,14 +114,10 @@ class PortFrontend(BaseHTTPFrontend):
         backend = self.backends.get(frontend_key)
         if backend is None:
             raise IngressFrontendNotRegisteredError(f"Unregistered slot {port}")
-        circuit = backend.circuit
         # TODO: Use the ingress id once ingresses are stored as their own entity.
-        with with_log_context(circuit_id=circuit.id):
+        with with_log_context(circuit_id=backend.circuit_id):
             ingress = await self._read_registered_ingress(frontend_key)
             self.ensure_allowed_ip(request, ingress.access)
-            # TODO: Check the credential against ingress.access once an ingress carries the id
-            # its tokens name.
-            self.ensure_credential(request, circuit)
-            request["circuit"] = circuit
+            self.ensure_credential(request, backend.circuit)
             request["backend"] = backend
             return await handler(request)

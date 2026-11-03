@@ -166,16 +166,16 @@ class HTTPBackend(BaseBackend):
         for key, value in frontend_request.headers.items():
             if key not in HOP_ONLY_HEADERS:
                 backend_rqst_hdrs.add(key, value)
+        # TODO: Read the app from the ingress once an ingress carries it.
+        serves_rstudio = self._circuit is not None and self._circuit.app == "rstudio"
         # overwrite proxy-related headers
         backend_rqst_hdrs["x-forwarded-proto"] = protocol
-        # TODO: Read the app from the ingress once an ingress carries it.
-        if self._circuit.app == "rstudio":
+        if serves_rstudio:
             backend_rqst_hdrs["x-rstudio-proto"] = protocol
         if host:
             backend_rqst_hdrs["forwarded"] = f"host={host};proto={protocol}"
             backend_rqst_hdrs["x-forwarded-host"] = host
-            # TODO: Read the app from the ingress once an ingress carries it.
-            if self._circuit.app == "rstudio":
+            if serves_rstudio:
                 backend_rqst_hdrs["x-rstudio-request"] = (
                     f"{protocol}://{host}{frontend_request.path or ''}"
                 )

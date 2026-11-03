@@ -204,7 +204,7 @@ class TestPortFrontend:
     ) -> None:
         situation = port_slot_situation
         with pytest.raises(IngressFrontendNotRegisteredError):
-            await situation.frontend.ensure_slot_middleware(situation.request, situation.handler)
+            await situation.frontend.ensure_ingress_middleware(situation.request, situation.handler)
         situation.handler.assert_not_awaited()
 
     @pytest.mark.parametrize(
@@ -223,12 +223,11 @@ class TestPortFrontend:
         self, case: _PortSlotCase, port_slot_situation: _PortSlotSituation
     ) -> None:
         situation = port_slot_situation
-        response = await situation.frontend.ensure_slot_middleware(
+        response = await situation.frontend.ensure_ingress_middleware(
             situation.request, situation.handler
         )
         assert isinstance(response, web.Response)
         assert response.text == "success"
-        assert situation.request["circuit"] is situation.circuit
         assert situation.request["backend"] is situation.backend
         situation.read_ingress.assert_awaited_once_with(
             situation.circuit.to_ingress_frontend().key()
@@ -256,7 +255,7 @@ class TestPortFrontend:
     ) -> None:
         situation = port_slot_situation
         with pytest.raises(ClientIPNotAllowed):
-            await situation.frontend.ensure_slot_middleware(situation.request, situation.handler)
+            await situation.frontend.ensure_ingress_middleware(situation.request, situation.handler)
         situation.handler.assert_not_awaited()
 
     async def test_proxy_passes_compressed_request_body_as_received(

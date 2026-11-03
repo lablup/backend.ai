@@ -146,7 +146,7 @@ class TestHTTPProxyLogging:
 
         with caplog.at_level(TRACE_LEVEL, logger=WORKER_LOGGER_NAME):
             with pytest.raises(RuntimeError):
-                await http_frontend.ensure_slot_middleware(self._request(), http_frontend.proxy)
+                await http_frontend.ensure_ingress_middleware(self._request(), http_frontend.proxy)
 
         errors = _worker_records(caplog, logging.ERROR)
         assert len(errors) == 1
@@ -167,7 +167,7 @@ class TestHTTPProxyLogging:
 
         with caplog.at_level(TRACE_LEVEL, logger=WORKER_LOGGER_NAME):
             with pytest.raises(ContainerConnectionRefused):
-                await http_frontend.ensure_slot_middleware(self._request(), http_frontend.proxy)
+                await http_frontend.ensure_ingress_middleware(self._request(), http_frontend.proxy)
 
         assert _worker_records(caplog, logging.INFO) == []
         traces = [
