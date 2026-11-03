@@ -14,9 +14,9 @@ from ai.backend.agent.kernel import KernelRegistry
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from ai.backend.agent.resources import ComputerContext, ResourceAllocator
 from ai.backend.agent.tasks import CollectNodeStatTask, UpdateSlotsTask
-from ai.backend.agent.tasks.refresh_volume_status_checks import (
-    RefreshVolumeStatusChecksTask,
-    RefreshVolumeStatusChecksTaskArgs,
+from ai.backend.agent.tasks.read_volume_declarations import (
+    ReadVolumeDeclarationsTask,
+    ReadVolumeDeclarationsTaskArgs,
 )
 from ai.backend.agent.types import AgentBackend, get_agent_discovery
 from ai.backend.common.auth import PublicKey
@@ -56,7 +56,6 @@ class AgentRuntime:
     _volume_status_check_registry: VolumeStatusCheckRegistry
     _probe_check_runner: ProbeCheckRunner[StorageVolumeName]
     _valkey_storage_volume_client: ValkeyStorageVolumeClient | None
-    _refresh_volume_status_checks_task: RefreshVolumeStatusChecksTask | None
     _local_cron: LocalCron
 
     @classmethod
@@ -227,18 +226,18 @@ class AgentRuntime:
             UpdateSlotsTask(self),
             CollectNodeStatTask(self, local_config),
         ]
-        self._refresh_volume_status_checks_task = None
         if valkey_storage_volume_client is not None:
-            self._refresh_volume_status_checks_task = RefreshVolumeStatusChecksTask(
-                RefreshVolumeStatusChecksTaskArgs(
-                    valkey_storage_volume_client=valkey_storage_volume_client,
-                    agent_ids=list(agents.keys()),
-                    registry=self._volume_status_check_registry,
-                    runner=self._probe_check_runner,
-                    local_config=local_config,
+            periodic_tasks.append(
+                ReadVolumeDeclarationsTask(
+                    ReadVolumeDeclarationsTaskArgs(
+                        valkey_storage_volume_client=valkey_storage_volume_client,
+                        agent_ids=list(agents.keys()),
+                        registry=self._volume_status_check_registry,
+                        runner=self._probe_check_runner,
+                        local_config=local_config,
+                    )
                 )
             )
-            periodic_tasks.append(self._refresh_volume_status_checks_task)
         sd_config = local_config.service_discovery
         # The manager tells reports apart by these ids, so without both there is nothing to report.
         if sd_config.instance_id and sd_config.service_group:
@@ -264,8 +263,6 @@ class AgentRuntime:
     async def __aexit__(self, *exc_info: Any) -> None:
         await self._local_cron.stop()
         await self._probe_check_runner.stop()
-        if self._refresh_volume_status_checks_task is not None:
-            await self._refresh_volume_status_checks_task.close()
         if self._valkey_storage_volume_client is not None:
             await self._valkey_storage_volume_client.close()
         for agent in self._agents.values():
