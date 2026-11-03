@@ -1,10 +1,20 @@
 from collections.abc import Awaitable, Callable
 from typing import override
 
+<<<<<<< HEAD
 from ai.backend.common.types import KernelId
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+=======
+from ai.backend.common.types import KernelId, SessionId
+from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.global_scope.processor import AnonymousGlobalActionProcessor
+from ai.backend.manager.actions.v2.single_entity.processor import (
+    SingleEntityActionProcessor,
+)
+from ai.backend.manager.data.session.types import SessionData
+>>>>>>> 1b302e102 (fix(BA-8870): run stream connection GC without the global RBAC gate (#16386))
 from ai.backend.manager.services.stream.actions.execute_in_stream import (
     ExecuteInStreamAction,
     ExecuteInStreamActionResult,
@@ -46,6 +56,7 @@ class StreamProcessors(AbstractProcessorPackage):
     get_streaming_session: ActionProcessor[
         GetStreamingSessionAction, GetStreamingSessionActionResult
     ]
+<<<<<<< HEAD
     track_connection: ActionProcessor[TrackConnectionAction, TrackConnectionActionResult]
     untrack_connection: ActionProcessor[UntrackConnectionAction, UntrackConnectionActionResult]
     gc_stale_connections: ActionProcessor[GCStaleConnectionsAction, GCStaleConnectionsActionResult]
@@ -53,11 +64,33 @@ class StreamProcessors(AbstractProcessorPackage):
     restart_in_stream: ActionProcessor[RestartInStreamAction, RestartInStreamActionResult]
     interrupt_in_stream: ActionProcessor[InterruptInStreamAction, InterruptInStreamActionResult]
     start_service_in_stream: ActionProcessor[
+=======
+    track_connection: SingleEntityActionProcessor[
+        TrackConnectionAction, TrackConnectionActionResult
+    ]
+    untrack_connection: SingleEntityActionProcessor[
+        UntrackConnectionAction, UntrackConnectionActionResult
+    ]
+    gc_stale_connections: AnonymousGlobalActionProcessor[
+        GCStaleConnectionsAction, GCStaleConnectionsActionResult
+    ]
+    execute_in_stream: SingleEntityActionProcessor[
+        ExecuteInStreamAction, ExecuteInStreamActionResult
+    ]
+    restart_in_stream: SingleEntityActionProcessor[
+        RestartInStreamAction, RestartInStreamActionResult
+    ]
+    interrupt_in_stream: SingleEntityActionProcessor[
+        InterruptInStreamAction, InterruptInStreamActionResult
+    ]
+    start_service_in_stream: SingleEntityActionProcessor[
+>>>>>>> 1b302e102 (fix(BA-8870): run stream connection GC without the global RBAC gate (#16386))
         StartServiceInStreamAction, StartServiceInStreamActionResult
     ]
 
     def __init__(self, service: StreamService, action_monitors: list[ActionMonitor]) -> None:
         self._service = service
+<<<<<<< HEAD
         self.get_streaming_session = ActionProcessor(service.get_streaming_session, action_monitors)
         self.track_connection = ActionProcessor(service.track_connection, action_monitors)
         self.untrack_connection = ActionProcessor(service.untrack_connection, action_monitors)
@@ -67,6 +100,29 @@ class StreamProcessors(AbstractProcessorPackage):
         self.interrupt_in_stream = ActionProcessor(service.interrupt_in_stream, action_monitors)
         self.start_service_in_stream = ActionProcessor(
             service.start_service_in_stream, action_monitors
+=======
+        self.get_streaming_session = group.single_entity(
+            GetStreamingSessionAction, service.get_streaming_session
+        )
+        self.track_connection = group.single_entity(TrackConnectionAction, service.track_connection)
+        self.untrack_connection = group.single_entity(
+            UntrackConnectionAction, service.untrack_connection
+        )
+        self.gc_stale_connections = group.anonymous_global(
+            GCStaleConnectionsAction, service.gc_stale_connections
+        )
+        self.execute_in_stream = group.single_entity(
+            ExecuteInStreamAction, service.execute_in_stream
+        )
+        self.restart_in_stream = group.single_entity(
+            RestartInStreamAction, service.restart_in_stream
+        )
+        self.interrupt_in_stream = group.single_entity(
+            InterruptInStreamAction, service.interrupt_in_stream
+        )
+        self.start_service_in_stream = group.single_entity(
+            StartServiceInStreamAction, service.start_service_in_stream
+>>>>>>> 1b302e102 (fix(BA-8870): run stream connection GC without the global RBAC gate (#16386))
         )
 
     def create_connection_refresh_callback(
