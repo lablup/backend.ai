@@ -11,6 +11,8 @@ from pydantic import ConfigDict, Field, IPvAnyNetwork, model_validator
 
 from ai.backend.common.api_handlers import BaseFieldModel
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.types import SessionId
 
 IngressID = NewType("IngressID", str)
 IngressAuthority = NewType("IngressAuthority", str)
@@ -117,6 +119,13 @@ class IngressTarget(BaseFieldModel):
     id: IngressTargetID
     host: str
     port: int = Field(ge=1, le=65535)
+    session_id: SessionId | None = Field(
+        default=None,
+        description=(
+            "Session the target runs in, whose last access a worker records. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
 
 
 class IngressTargetGroup(BaseFieldModel):

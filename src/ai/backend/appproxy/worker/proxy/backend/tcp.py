@@ -3,9 +3,9 @@ import logging
 import socket
 from typing import Any, Final, override
 
-from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cron import LocalCron
+from ai.backend.common.dto.appproxy.v2.ingress.types import IngressBackend
 from ai.backend.logging.structured import StructuredLogger
 
 from .base import BaseBackend
@@ -18,23 +18,18 @@ MAX_BUFFER_SIZE: Final[int] = 1 * 1024 * 1024
 
 
 class TCPBackend(BaseBackend):
-    """TCP proxy backend that keeps routes in a health-checked pool.
-
-    Route selection defers to the pool so that upstreams with repeated
-    connect failures are excluded from traffic. The pool also tracks
-    route identity by ``(host, port)`` and treats ``route_id`` changes on
-    the same endpoint as kernel swaps (fresh health state).
+    """TCP proxy backend that keeps the targets of its Ingress backend in a health-checked pool,
+    so that targets with repeated connect failures are excluded from traffic.
     """
 
     _pool: RoutePool
 
-    def __init__(self, routes: list[RouteInfo], *args: Any, **kwargs: Any) -> None:
+    def __init__(self, ingress_backend: IngressBackend, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self._pool = RoutePool(initial_routes=routes)
+        self._pool = RoutePool(ingress_backend)
 
-    @override
-    async def update_routes(self, routes: list[RouteInfo]) -> None:
-        await self._pool.update(routes)
+    async def update_ingress_backend(self, ingress_backend: IngressBackend) -> None:
+        await self._pool.update(ingress_backend)
 
     @override
     async def close(self) -> None:
@@ -68,15 +63,15 @@ class TCPBackend(BaseBackend):
             finally:
                 stop_event.set()
 
-        route = await self._pool.select()
+        target = await self._pool.select()
         log.trace(
             "proxying TCP connection to {}:{}",
-            route.current_kernel_host,
-            route.kernel_port,
-            route_id=route.route_id,
+            target.host,
+            target.port,
+            target_id=target.id,
         )
 
-        marker_cron = LocalCron([LastAccessMarkerTask(self, route)])
+        marker_cron = LocalCron([LastAccessMarkerTask(self, target)])
         await marker_cron.start()
         await self.increase_request_counter()
 
@@ -85,17 +80,15 @@ class TCPBackend(BaseBackend):
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
             # unlike .frontend.tcp this has a chance of being a blocking call since kernel host can be a domain
             try:
-                await run_in_executor_with_context(
-                    None, sock.connect, (route.current_kernel_host, route.kernel_port)
-                )
+                await run_in_executor_with_context(None, sock.connect, (target.host, target.port))
             except OSError as e:
-                self._pool.record_failure(route)
-                log.trace("app refused the connection: {!r}", e, route_id=route.route_id)
+                self._pool.record_failure(target)
+                log.trace("app refused the connection: {!r}", e, target_id=target.id)
                 sock.close()
                 return
 
             up_reader, up_writer = await asyncio.open_connection(sock=sock)
-            self._pool.record_success(route)
+            self._pool.record_success(target)
             async with asyncio.TaskGroup() as group:
                 group.create_task(_pipe(up_reader, down_writer, tag="up->down"))
                 group.create_task(_pipe(down_reader, up_writer, tag="down->up"))

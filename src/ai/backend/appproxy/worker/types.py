@@ -26,6 +26,7 @@ from ai.backend.appproxy.common.types import (
     AppMode,
     FrontendMode,
     ProxyProtocol,
+    RouteInfo,
     SerializableCircuit,
 )
 from ai.backend.common.clients.http_client.client_pool import ClientPool
@@ -72,6 +73,7 @@ from ai.backend.common.types import (
     MetricValue,
     MovingStatValue,
     RuntimeVariant,
+    SessionId,
 )
 
 from .errors import InvalidCircuitDataError, InvalidFrontendTypeError
@@ -81,6 +83,8 @@ if TYPE_CHECKING:
 
     from .config import ServerConfig
     from .proxy.frontend.base import BaseFrontend
+
+_TRAFFIC_RATIO_WEIGHT_SCALE: Final[int] = 100
 
 
 class ProxyMetricObserver:
@@ -469,22 +473,6 @@ class Circuit(SerializableCircuit):
                     )
                 case _:
                     raise UnreachableError("a circuit holds only interactive or inference app info")
-        # Circuits have no target groups, so every route is a target of a single group.
-        target_group = IngressTargetGroup(
-            # TODO: Use the target group id once target groups are stored as their own entity.
-            id=IngressTargetGroupID(str(UUID(int=0))),
-            # TODO: Use the target group weight once target groups are stored as their own entity.
-            weight=1,
-            targets=[
-                IngressTarget(
-                    # TODO: Use the target id once targets are stored as their own entity.
-                    id=IngressTargetID(str(UUID(int=0))),
-                    host=route.current_kernel_host,
-                    port=route.kernel_port,
-                )
-                for route in self.route_info
-            ],
-        )
         return Ingress(
             # TODO: Use the ingress id once ingresses are stored as their own entity.
             id=IngressID(str(UUID(int=0))),
@@ -493,12 +481,45 @@ class Circuit(SerializableCircuit):
             revision=0,
             frontend=frontend,
             access=access,
-            backend=IngressBackend(
-                # TODO: Use the backend id once ingresses are stored as their own entity.
-                id=IngressBackendID(str(UUID(int=0))),
-                target_groups=[target_group],
-            ),
+            backend=self.to_ingress_backend(),
         )
+
+    def to_ingress_backend(self) -> IngressBackend:
+        target_groups = [self._target_group_of_route(route) for route in self.route_info]
+        if not target_groups:
+            # An Ingress backend holds at least one group, even for a circuit with no route yet.
+            target_groups = [
+                IngressTargetGroup(id=IngressTargetGroupID(str(UUID(int=0))), weight=0, targets=[])
+            ]
+        return IngressBackend(
+            # TODO: Use the backend id once ingresses are stored as their own entity.
+            id=IngressBackendID(str(UUID(int=0))),
+            target_groups=target_groups,
+        )
+
+    def _target_group_of_route(self, route: RouteInfo) -> IngressTargetGroup:
+        # TODO: Use the replica groups once the manager sends target groups; until then each
+        # route is a group of its own whose weight carries the route's traffic ratio.
+        return IngressTargetGroup(
+            id=IngressTargetGroupID(str(UUID(int=0))),
+            weight=round(route.traffic_ratio * _TRAFFIC_RATIO_WEIGHT_SCALE),
+            targets=[
+                IngressTarget(
+                    id=self._target_id_of_route(route),
+                    host=route.current_kernel_host,
+                    port=route.kernel_port,
+                    session_id=SessionId(route.session_id),
+                )
+            ],
+        )
+
+    @staticmethod
+    def _target_id_of_route(route: RouteInfo) -> IngressTargetID:
+        # Until the manager manages targets, a route id names a model service target and a
+        # session id an interactive app target.
+        if route.route_id is not None:
+            return IngressTargetID(str(route.route_id))
+        return IngressTargetID(str(route.session_id))
 
     def to_ingress_key(self, authority: IngressAuthority) -> IngressKey:
         return IngressKey(authority=authority, frontend_key=self.to_ingress_frontend().key())

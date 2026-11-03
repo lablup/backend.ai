@@ -27,6 +27,7 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
     IngressTargetGroupID,
     IngressTargetID,
 )
+from ai.backend.common.types import SessionId
 
 AUTHORITY = IngressAuthority("worker-1")
 CIRCUIT_ID = UUID("11111111-1111-1111-1111-111111111111")
@@ -44,6 +45,15 @@ class _AccessCase:
     protocol: ProxyProtocol
     open_to_public: bool
     access_mode: IngressAccessMode
+
+
+@dataclass(frozen=True)
+class _RouteTargetCase:
+    name: str
+    route_id: UUID | None
+    traffic_ratio: float
+    expected_target_id: IngressTargetID
+    expected_weight: int
 
 
 @dataclass(frozen=True)
@@ -229,15 +239,68 @@ class TestCircuit:
             ip_network("192.168.0.1/32"),
         ]
 
-    def test_to_ingress_carries_every_route_as_a_target_of_one_group(
-        self, circuit: Circuit
+    @pytest.fixture
+    def route_target_case_circuit(
+        self, route_target_case: _RouteTargetCase, serialized_circuit: SerializableCircuit
+    ) -> Circuit:
+        route = serialized_circuit.route_info[0].model_copy(
+            update={
+                "route_id": route_target_case.route_id,
+                "traffic_ratio": route_target_case.traffic_ratio,
+            }
+        )
+        return Circuit.from_serialized_circuit(
+            serialized_circuit.model_copy(update={"route_info": [route]})
+        )
+
+    @pytest.mark.parametrize(
+        "route_target_case",
+        [
+            _RouteTargetCase(
+                name="model-service-route",
+                route_id=ROUTE_ID,
+                traffic_ratio=1.0,
+                expected_target_id=IngressTargetID(str(ROUTE_ID)),
+                expected_weight=100,
+            ),
+            _RouteTargetCase(
+                name="interactive-app-route",
+                route_id=None,
+                traffic_ratio=1.0,
+                expected_target_id=IngressTargetID(str(SESSION_ID)),
+                expected_weight=100,
+            ),
+            _RouteTargetCase(
+                name="half-traffic-route",
+                route_id=ROUTE_ID,
+                traffic_ratio=0.5,
+                expected_target_id=IngressTargetID(str(ROUTE_ID)),
+                expected_weight=50,
+            ),
+            _RouteTargetCase(
+                name="no-traffic-route",
+                route_id=ROUTE_ID,
+                traffic_ratio=0.0,
+                expected_target_id=IngressTargetID(str(ROUTE_ID)),
+                expected_weight=0,
+            ),
+        ],
+        ids=lambda case: case.name,
+    )
+    def test_to_ingress_backend_makes_each_route_a_group_weighted_by_its_traffic_ratio(
+        self, route_target_case: _RouteTargetCase, route_target_case_circuit: Circuit
     ) -> None:
-        assert circuit.to_ingress(AUTHORITY).backend.target_groups == [
+        assert route_target_case_circuit.to_ingress_backend().target_groups == [
             IngressTargetGroup(
                 id=IngressTargetGroupID(str(UUID(int=0))),
-                weight=1,
+                weight=route_target_case.expected_weight,
                 targets=[
-                    IngressTarget(id=IngressTargetID(str(UUID(int=0))), host="10.0.0.5", port=8000)
+                    IngressTarget(
+                        id=route_target_case.expected_target_id,
+                        host="10.0.0.5",
+                        port=8000,
+                        session_id=SessionId(SESSION_ID),
+                    )
                 ],
             )
         ]
