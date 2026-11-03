@@ -35,7 +35,10 @@ USER_ID = UUID("33333333-3333-3333-3333-333333333333")
 ENDPOINT_ID = UUID("44444444-4444-4444-4444-444444444444")
 ROUTE_ID = UUID("55555555-5555-5555-5555-555555555555")
 SESSION_ID = UUID("66666666-6666-6666-6666-666666666666")
+OTHER_ROUTE_ID = UUID("77777777-7777-7777-7777-777777777777")
+OTHER_SESSION_ID = UUID("88888888-8888-8888-8888-888888888888")
 CREATED_AT = datetime(2026, 1, 1, tzinfo=UTC)
+ROUTE_TARGET = SessionIngressTarget(host="10.0.0.5", port=8000, session_id=SessionId(SESSION_ID))
 
 
 @dataclass(frozen=True)
@@ -51,7 +54,7 @@ class _RouteTargetCase:
     name: str
     route_id: UUID | None
     traffic_ratio: float
-    expected_weight: int
+    expected_targets: list[SessionIngressTarget]
 
 
 @dataclass(frozen=True)
@@ -104,6 +107,25 @@ def serialized_circuit(route: RouteInfo) -> SerializableCircuit:
 @pytest.fixture
 def circuit(serialized_circuit: SerializableCircuit) -> Circuit:
     return Circuit.from_serialized_circuit(serialized_circuit)
+
+
+@pytest.fixture
+def circuit_with_two_routes(serialized_circuit: SerializableCircuit, route: RouteInfo) -> Circuit:
+    other_route = route.model_copy(
+        update={
+            "route_id": OTHER_ROUTE_ID,
+            "session_id": OTHER_SESSION_ID,
+            "kernel_host": "10.0.0.6",
+        }
+    )
+    return Circuit.from_serialized_circuit(
+        serialized_circuit.model_copy(
+            update={
+                "route_info": [route, other_route],
+                "session_ids": [SESSION_ID, OTHER_SESSION_ID],
+            }
+        )
+    )
 
 
 @pytest.fixture
@@ -258,48 +280,52 @@ class TestCircuit:
                 name="model-service-route",
                 route_id=ROUTE_ID,
                 traffic_ratio=1.0,
-                expected_weight=10_000,
+                expected_targets=[ROUTE_TARGET],
             ),
             _RouteTargetCase(
                 name="interactive-app-route",
                 route_id=None,
                 traffic_ratio=1.0,
-                expected_weight=10_000,
+                expected_targets=[ROUTE_TARGET],
             ),
             _RouteTargetCase(
                 name="half-traffic-route",
                 route_id=ROUTE_ID,
                 traffic_ratio=0.5,
-                expected_weight=5_000,
-            ),
-            _RouteTargetCase(
-                name="traffic-below-the-weight-scale-route",
-                route_id=ROUTE_ID,
-                traffic_ratio=0.00001,
-                expected_weight=1,
+                expected_targets=[ROUTE_TARGET],
             ),
             _RouteTargetCase(
                 name="no-traffic-route",
                 route_id=ROUTE_ID,
                 traffic_ratio=0.0,
-                expected_weight=0,
+                expected_targets=[],
             ),
         ],
         ids=lambda case: case.name,
     )
-    def test_to_ingress_backend_makes_each_route_a_session_target_group_weighted_by_its_traffic_ratio(
+    def test_to_ingress_backend_makes_a_route_with_traffic_a_session_target_of_one_group(
         self, route_target_case: _RouteTargetCase, route_target_case_circuit: Circuit
     ) -> None:
         assert route_target_case_circuit.to_ingress_backend().target_groups == [
             IngressTargetGroup(
                 id=IngressTargetGroupID(str(UUID(int=0))),
-                weight=route_target_case.expected_weight,
+                weight=1,
+                targets=route_target_case.expected_targets,
+            )
+        ]
+
+    def test_to_ingress_backend_puts_every_route_in_one_group(
+        self, circuit_with_two_routes: Circuit
+    ) -> None:
+        assert circuit_with_two_routes.to_ingress_backend().target_groups == [
+            IngressTargetGroup(
+                id=IngressTargetGroupID(str(UUID(int=0))),
+                weight=1,
                 targets=[
+                    ROUTE_TARGET,
                     SessionIngressTarget(
-                        host="10.0.0.5",
-                        port=8000,
-                        session_id=SessionId(SESSION_ID),
-                    )
+                        host="10.0.0.6", port=8000, session_id=SessionId(OTHER_SESSION_ID)
+                    ),
                 ],
             )
         ]

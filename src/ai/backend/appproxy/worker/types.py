@@ -83,8 +83,6 @@ if TYPE_CHECKING:
     from .config import ServerConfig
     from .proxy.frontend.base import BaseFrontend
 
-_TRAFFIC_RATIO_WEIGHT_SCALE: Final[int] = 10_000
-
 
 class ProxyMetricObserver:
     _instance: Self | None = None
@@ -486,37 +484,26 @@ class Circuit(SerializableCircuit):
     def to_ingress_backend(self) -> IngressBackend:
         return self.ingress_backend_of_routes(self.route_info)
 
-    @classmethod
-    def ingress_backend_of_routes(cls, routes: list[RouteInfo]) -> IngressBackend:
-        target_groups = [cls._target_group_of_route(route) for route in routes]
-        if not target_groups:
-            # An Ingress backend holds at least one group, even for a circuit with no route yet.
-            target_groups = [
-                IngressTargetGroup(id=IngressTargetGroupID(str(UUID(int=0))), weight=0, targets=[])
-            ]
+    @staticmethod
+    def ingress_backend_of_routes(routes: list[RouteInfo]) -> IngressBackend:
         return IngressBackend(
             # TODO: Use the backend id once ingresses are stored as their own entity.
             id=IngressBackendID(str(UUID(int=0))),
-            target_groups=target_groups,
-        )
-
-    @staticmethod
-    def _target_group_of_route(route: RouteInfo) -> IngressTargetGroup:
-        # TODO: Use the replica groups once the manager sends target groups; until then each
-        # route is a group of its own whose weight carries the route's traffic ratio.
-        return IngressTargetGroup(
-            id=IngressTargetGroupID(str(UUID(int=0))),
-            # A positive ratio keeps at least weight 1, so the route still receives traffic.
-            weight=(
-                max(1, round(route.traffic_ratio * _TRAFFIC_RATIO_WEIGHT_SCALE))
-                if route.traffic_ratio > 0
-                else 0
-            ),
-            targets=[
-                SessionIngressTarget(
-                    host=route.current_kernel_host,
-                    port=route.kernel_port,
-                    session_id=SessionId(route.session_id),
+            # TODO: Use the replica groups once the manager sends target groups; until then the
+            # routes are the targets of one group, which spreads traffic over them evenly.
+            target_groups=[
+                IngressTargetGroup(
+                    id=IngressTargetGroupID(str(UUID(int=0))),
+                    weight=1,
+                    targets=[
+                        SessionIngressTarget(
+                            host=route.current_kernel_host,
+                            port=route.kernel_port,
+                            session_id=SessionId(route.session_id),
+                        )
+                        for route in routes
+                        if route.traffic_ratio > 0
+                    ],
                 )
             ],
         )
