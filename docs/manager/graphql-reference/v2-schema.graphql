@@ -22787,16 +22787,18 @@ input UpdateResourceGroupV2Input {
   preemption: PreemptionConfigInput
 
   """
-  Session types that may be created in the resource group. Omit to leave unchanged.
+  Added in 26.10.0. Session types that may be created in the resource group. Omit to leave unchanged.
   """
   allowedSessionTypes: [SessionTypes!]
 
   """
-  Seconds a session may stay pending before it is cancelled (0 = no timeout). Omit to leave unchanged.
+  Added in 26.10.0. Seconds a session may stay pending before it is cancelled (0 = no timeout). Omit to leave unchanged.
   """
   pendingTimeout: Float
 
-  """The config section of the scheduler options. Omit to leave unchanged."""
+  """
+  Added in 26.10.0. The config section of the scheduler options. Omit to leave unchanged.
+  """
   schedulerConfig: UpdateResourceGroupSchedulerOptionsConfigInput
 }
 

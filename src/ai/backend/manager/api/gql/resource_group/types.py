@@ -1074,21 +1074,30 @@ class UpdateResourceGroupV2InputGQL(PydanticInputMixin[UpdateResourceGroupInputD
         ),
         default=UNSET,
     )
-    allowed_session_types: list[SessionTypes] | None = gql_field(
-        description=(
-            "Session types that may be created in the resource group. Omit to leave unchanged."
+    allowed_session_types: list[SessionTypes] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Session types that may be created in the resource group. Omit to leave unchanged."
+            ),
         ),
         default=UNSET,
     )
-    pending_timeout: float | None = gql_field(
-        description=(
-            "Seconds a session may stay pending before it is cancelled (0 = no timeout)."
-            " Omit to leave unchanged."
+    pending_timeout: float | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Seconds a session may stay pending before it is cancelled (0 = no timeout)."
+                " Omit to leave unchanged."
+            ),
         ),
         default=UNSET,
     )
-    scheduler_config: UpdateResourceGroupSchedulerOptionsConfigInputGQL | None = gql_field(
-        description="The config section of the scheduler options. Omit to leave unchanged.",
+    scheduler_config: UpdateResourceGroupSchedulerOptionsConfigInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The config section of the scheduler options. Omit to leave unchanged.",
+        ),
         default=UNSET,
     )
 
