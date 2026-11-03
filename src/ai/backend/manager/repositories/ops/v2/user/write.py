@@ -86,6 +86,18 @@ class V2UserWriteOps(V2RosterWriteOps, V2ResourcePolicyWriteOps):
             )
         ) or False
 
+    async def lock_user_node(self, user_id: UserID) -> None:
+        """Hold the user's node until the transaction ends. A row created under the user
+        checks its foreign key against the node, so it waits and is then purged or refused."""
+        await self._sess.execute(
+            sa.select(VirtualEntityRow.id)
+            .where(
+                VirtualEntityRow.entity_type == user_id.entity_type(),
+                VirtualEntityRow.entity_id == user_id,
+            )
+            .with_for_update()
+        )
+
     async def create_user(self, creation: FullUserCreator) -> FullUserCreatorResult:
         """Provision a user: the row, its virtual entity, the domain that owns and
         governs it, the roles its scope's, its domain's and the public scope's presets
