@@ -69,7 +69,6 @@ from ai.backend.appproxy.common.events import (
 from ai.backend.appproxy.common.types import (
     AppCreator,
     EventLoopType,
-    FrontendMode,
     FrontendServerMode,
     ProxyProtocol,
     WebMiddleware,
@@ -159,9 +158,7 @@ from .proxy.frontend import (
     HTTPPortFrontend,
     HTTPSubdomainFrontend,
     TCPFrontend,
-    TraefikPortFrontend,
-    TraefikSubdomainFrontend,
-    TraefikTCPFrontend,
+    TraefikFrontend,
 )
 from .tasks import WorkerHeartbeatTask
 from .types import Circuit, CleanupContext, RootContext, WorkerMetricRegistry
@@ -469,11 +466,7 @@ async def proxy_frontend_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 raise MissingTraefikConfigError(
                     "Traefik configuration is required for TRAEFIK mode"
                 )
-            match root_ctx.local_config.proxy_worker.traefik.frontend_mode:
-                case FrontendMode.PORT:
-                    root_ctx.proxy_frontend = TraefikPortFrontend(root_ctx)
-                case FrontendMode.WILDCARD_DOMAIN:
-                    root_ctx.proxy_frontend = TraefikSubdomainFrontend(root_ctx)
+            root_ctx.proxy_frontend = TraefikFrontend(root_ctx)
         case (ProxyProtocol.TCP, FrontendServerMode.TRAEFIK):
             if not (
                 root_ctx.local_config.proxy_worker.traefik
@@ -482,7 +475,7 @@ async def proxy_frontend_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 raise MissingPortProxyConfigError(
                     "Traefik and port proxy configuration are required for TCP TRAEFIK mode"
                 )
-            root_ctx.proxy_frontend = TraefikTCPFrontend(root_ctx)
+            root_ctx.proxy_frontend = TraefikFrontend(root_ctx)
         case (ProxyProtocol.HTTP, FrontendServerMode.PORT):
             root_ctx.proxy_frontend = HTTPPortFrontend(root_ctx)
         case (ProxyProtocol.HTTP, FrontendServerMode.WILDCARD_DOMAIN):

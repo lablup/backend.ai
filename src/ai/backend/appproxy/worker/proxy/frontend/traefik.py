@@ -36,9 +36,9 @@ _ACTIVE_CIRCUIT_WRITER_INTERVAL: Final[float] = 5.0
 class _LastUsedTimeMarkerWriterTask(PeriodicTask):
     """Periodically flush accumulated last-used-time markers to Valkey."""
 
-    _frontend: Final[AbstractTraefikFrontend]
+    _frontend: Final[TraefikFrontend]
 
-    def __init__(self, frontend: AbstractTraefikFrontend) -> None:
+    def __init__(self, frontend: TraefikFrontend) -> None:
         self._frontend = frontend
 
     @property
@@ -64,9 +64,9 @@ class _LastUsedTimeMarkerWriterTask(PeriodicTask):
 class _ActiveCircuitWriterTask(PeriodicTask):
     """Periodically refresh last-access timestamps for active circuits."""
 
-    _frontend: Final[AbstractTraefikFrontend]
+    _frontend: Final[TraefikFrontend]
 
-    def __init__(self, frontend: AbstractTraefikFrontend) -> None:
+    def __init__(self, frontend: TraefikFrontend) -> None:
         self._frontend = frontend
 
     @property
@@ -89,7 +89,7 @@ class _ActiveCircuitWriterTask(PeriodicTask):
         await self._frontend.active_circuit_writer()
 
 
-class AbstractTraefikFrontend(BaseFrontend[TraefikBackend]):
+class TraefikFrontend(BaseFrontend[TraefikBackend]):
     runner: web.AppRunner
     redis_keys: dict[str, float]
     redis_keys_lock: asyncio.Lock
@@ -207,15 +207,3 @@ class AbstractTraefikFrontend(BaseFrontend[TraefikBackend]):
     @override
     async def terminate_backend(self, backend: TraefikBackend) -> None:
         pass
-
-
-class TraefikPortFrontend(AbstractTraefikFrontend):
-    pass
-
-
-class TraefikSubdomainFrontend(AbstractTraefikFrontend):
-    pass
-
-
-class TraefikTCPFrontend(AbstractTraefikFrontend):
-    pass
