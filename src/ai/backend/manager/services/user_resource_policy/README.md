@@ -6,19 +6,19 @@ The User Resource Policy Service manages resource policies that apply to users i
 
 ## Key Features and Capabilities
 
-- **Create User Resource Policies**: Define new resource policies with specific limits for user resources
-- **Modify User Resource Policies**: Update existing policies with new resource limits
-- **Delete User Resource Policies**: Remove policies that are no longer needed
+- **Create User Resource Policies**: Create new resource policies with specific limits for user resources
+- **Update User Resource Policies**: Update existing policies with new resource limits
+- **Delete User Resource Policies**: Delete policies that are no longer needed
 - **Repository Pattern**: Uses a clean architecture with repository pattern for data access
 
 ### Resource Limits Supported
 
-- `max_vfolder_count`: Maximum number of virtual folders a user can create
+- `max_vfolder_count`: Maximum number of vfolders a user can create
 - `max_quota_scope_size`: Maximum total size quota for all user resources
 - `max_session_count_per_model_session`: Maximum number of sessions per model session
 - `max_customized_image_count`: Maximum number of custom images a user can create
 
-Note: `max_vfolder_size` field is deprecated and not used in the current implementation.
+Note: the `max_vfolder_size` field is deprecated and is not used in the current implementation.
 
 ## Operation Scenarios
 
@@ -31,7 +31,7 @@ When an administrator needs to define a new resource policy for users:
 3. The service creates the policy in the database via the repository
 4. Returns `CreateUserResourcePolicyActionResult` with the created policy data
 
-### Modifying a User Resource Policy
+### Updating a User Resource Policy
 
 When resource limits need to be adjusted:
 
@@ -71,7 +71,7 @@ action = CreateUserResourcePolicyAction(creator=creator)
 result = await user_resource_policy_service.create_user_resource_policy(action)
 ```
 
-### Modify User Resource Policy
+### Update User Resource Policy
 
 ```python
 from ai.backend.manager.services.user_resource_policy.actions.update_user_resource_policy import (
@@ -113,7 +113,7 @@ The service integrates with `UserResourcePolicyRepository` for all data operatio
 
 - `create()`: Creates new policies
 - `update()`: Updates existing policies
-- `delete()`: Removes policies
+- `delete()`: Deletes policies
 
 ### Action Processing
 
@@ -138,7 +138,7 @@ Test files are located in `tests/services/user_resource_policy/`. Key test scena
    - Minimal data creation
    - Duplicate name handling
 
-2. **Modify Policy Tests**:
+2. **Update Policy Tests**:
    - Updating specific fields
    - Unsetting fields
    - Non-existing policy handling
@@ -166,6 +166,6 @@ pytest tests/services/user_resource_policy/test_user_resource_policy.py::test_cr
 
 The service properly handles:
 
-- `ObjectNotFound`: When trying to modify/delete non-existing policies
+- `ObjectNotFound`: When trying to modify or delete a non-existing policy
 - `IntegrityError`: When creating policies with duplicate names
 - Repository-level exceptions are propagated to callers

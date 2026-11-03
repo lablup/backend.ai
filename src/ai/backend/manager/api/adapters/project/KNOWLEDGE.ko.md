@@ -25,3 +25,7 @@
 ## image commit 을 위한 Container Registry 조회
 
 일반 프로젝트 조회에는 image commit 을 위한 Container Registry 조회가 포함되지 않는다. GraphQL 에서 해당 필드를 요청하면 별도로 일괄 조회한다.
+
+- 프로젝트의 기본 레지스트리를 읽는다. `is_default` 가 설정된 `association_container_registries_groups` 행을
+  본다. `groups.container_registry` JSON 은 읽지 않는다.
+- 읽기 권한은 프로젝트마다 확인한다. 기본 레지스트리가 없는 프로젝트는 빈 결과를 답한다.

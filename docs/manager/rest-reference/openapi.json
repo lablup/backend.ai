@@ -874,7 +874,7 @@
           },
           "force": {
             "default": false,
-            "description": "When false, the change is rejected with a conflict error if the agent still has active sessions. When true, the group is changed anyway and the conflicting sessions are cleaned up per the policy.",
+            "description": "When false, the change is rejected with a conflict error if the agent still has active sessions or unterminated sessions or deployments of other resource groups designate it. When true, the group is changed anyway, the active sessions are cleaned up per the policy, and those designations are removed.",
             "title": "Force",
             "type": "boolean"
           }
@@ -6764,6 +6764,15 @@
         "title": "DeleteDeploymentInput",
         "type": "object"
       },
+      "AgentSelectionPolicyEnum": {
+        "description": "Scheduling constraint applied to ``SchedulingTargetInput.designated_agents``.",
+        "enum": [
+          "strict",
+          "preferred"
+        ],
+        "title": "AgentSelectionPolicyEnum",
+        "type": "string"
+      },
       "DeploymentHandlerOptionsInput": {
         "description": "Handler-keyed scheduler policy for deployments.\n\n``default`` is the fallback applied to any handler not listed in\n``by_handler``; field-level ``null`` within either layer means\n\"fall back to global defaults\" (unbounded timeout, global retry\nfallback).",
         "properties": {
@@ -6789,6 +6798,18 @@
           "handler_options": {
             "$ref": "#/components/schemas/DeploymentHandlerOptionsInput",
             "description": "Handler-keyed scheduler policy (timeout + retry)."
+          },
+          "agent_selection_policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSelectionPolicyEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "How the designated agents are enforced. `null` keeps the stored policy."
           }
         },
         "required": [
@@ -20546,6 +20567,12 @@
             "title": "Auto Assign",
             "type": "boolean"
           },
+          "auto_assign_to_owner": {
+            "default": false,
+            "description": "Added in 26.10.0. Whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.",
+            "title": "Auto Assign To Owner",
+            "type": "boolean"
+          },
           "permissions": {
             "description": "Permission entries carried by the preset.",
             "items": {
@@ -20804,6 +20831,19 @@
             "default": null,
             "description": "Filter by auto-assign flag.",
             "title": "Auto Assign"
+          },
+          "auto_assign_to_owner": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by the assign-to-owner flag.",
+            "title": "Auto Assign To Owner"
           },
           "deleted": {
             "anyOf": [
@@ -21219,6 +21259,19 @@
             "default": null,
             "description": "Updated default value for the `auto_assign` flag of instantiated roles.",
             "title": "Auto Assign"
+          },
+          "auto_assign_to_owner": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Updated value for whether a personal project's owner is mapped to the role made from this preset. Allowed only on a project preset.",
+            "title": "Auto Assign To Owner"
           }
         },
         "title": "UpdateRolePresetBody",
@@ -25705,15 +25758,6 @@
         ],
         "title": "ReplaceResourceGroupDefaultDeploymentOptionsInput",
         "type": "object"
-      },
-      "AgentSelectionPolicyEnum": {
-        "description": "Scheduling constraint applied to ``SchedulingTargetInput.designated_agents``.",
-        "enum": [
-          "strict",
-          "preferred"
-        ],
-        "title": "AgentSelectionPolicyEnum",
-        "type": "string"
       },
       "BinarySizeInput": {
         "description": "Binary size input accepting bytes integer or human-readable string.\n\nExamples: '536870912', '512m', '1g', '2048k'",
@@ -34804,6 +34848,20 @@
             "description": "Persistent network UUID to attach.",
             "title": "Attach Network"
           },
+          "session_group_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Session group UUID the session joins. The group must belong to the session's owner and project.",
+            "title": "Session Group Id"
+          },
           "tag": {
             "anyOf": [
               {
@@ -36157,6 +36215,23 @@
             "default": null,
             "description": "Resource groups the session runs in",
             "title": "Resource Group"
+          },
+          "vfolder": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Vfolders the session's kernel groups mount",
+            "title": "Vfolder"
           }
         },
         "title": "SessionUses",
@@ -39892,6 +39967,23 @@
             "default": null,
             "description": "Model cards built on the vfolder",
             "title": "Model Card"
+          },
+          "session": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Sessions whose kernel groups mount the vfolder",
+            "title": "Session"
           }
         },
         "title": "VFolderUsedBy",

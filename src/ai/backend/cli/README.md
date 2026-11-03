@@ -5,7 +5,7 @@ Unified command-line interface for Backend.AI
 
 ## How to adopt in CLI-enabled Backend.AI packages
 
-An example `setup.cfg` in Backend.AI Manager:
+An example `setup.cfg` in the Backend.AI manager:
 ```
 [options.entry_points]
 backendai_cli_v10 =
@@ -13,8 +13,8 @@ backendai_cli_v10 =
     mgr.start-server = ai.backend.gateway.server:main
 ```
 
-Define your package entry points that returns a Click command group using a
-prefix, and add additional entry points that returns a Click command using a
+Define your package entry points that return a Click command group using a
+prefix, and add additional entry points that return a Click command using a
 prefix followed by a dot and sub-command name for shortcut access, under the
 `backendai_cli_v10` entry point group.
 
@@ -41,7 +41,7 @@ backend.ai completion --shell fish  # Install to fish completions
 
 ### Manual Setup
 
-If you prefer manual setup, you can add completion to your shell configuration:
+If you prefer manual setup, add completion to your shell configuration:
 
 **Bash** (`~/.bashrc`):
 ```bash
@@ -61,10 +61,10 @@ backend.ai completion --shell fish | source
 ### Features
 
 Tab completion supports:
-- **Commands**: All available commands and subcommands
-- **Options**: Short and long flags with descriptions
-- **Arguments**: Context-aware argument completion where applicable
-- **Help**: Descriptions for commands and options
+- **Commands**: all available commands and subcommands
+- **Options**: short and long flags with descriptions
+- **Arguments**: context-aware argument completion where applicable
+- **Help**: descriptions for commands and options
 
 ### Examples
 

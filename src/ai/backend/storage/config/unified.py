@@ -20,6 +20,7 @@ from ai.backend.common.configs import (
     PyroscopeConfig,
     ServiceDiscoveryConfig,
 )
+from ai.backend.common.configs.storage_status_report import StorageStatusReportConfig
 from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.entity.storage_volume import StorageVolumeName
@@ -1718,6 +1719,19 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "Essential for multi-node deployments and automatic failover."
             ),
             added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    storage_status_report: Annotated[
+        StorageStatusReportConfig,
+        Field(
+            default_factory=StorageStatusReportConfig,
+            validation_alias=AliasChoices("storage-status-report", "storage_status_report"),
+            serialization_alias="storage-status-report",
+        ),
+        BackendAIConfigMeta(
+            description="Configuration for the periodic storage status report to the manager.",
+            added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
     ]

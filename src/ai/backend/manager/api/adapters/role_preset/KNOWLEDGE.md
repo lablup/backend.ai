@@ -1,7 +1,7 @@
 ---
 name: role-preset-adapter-scenarios
 type: reference
-description: what the role preset adapter guarantees for its writes; the permission graph guarding each write, bulk operations answering per id, and permission entries added all-or-nothing and removed one by one
+description: what the role preset adapter guarantees for its writes; the permission graph guarding each write, bulk operations answering per id, and role permission presets added all-or-nothing and removed one by one
 scope: src/ai/backend/manager/api/adapters/role_preset
 keywords: [role preset, scenario, adapter, partial bulk, soft delete, restore, purge, permission entry]
 generated:
@@ -9,29 +9,26 @@ generated:
   at: 2026-10-15
 status: draft
 ---
-# role_preset 어댑터 — 시나리오
+# role_preset adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 것과 실행 결과가 어긋나면 문장을 먼저
-의심한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-역할 프리셋(이하 프리셋)은 global 스코프에 만들어진다. 수정, soft delete, restore, purge, 권한
-항목 넣기·빼기는 프리셋에 대한 권한 그래프가 지킨다. 아무 역할도 받지 않은 사용자는 global 에서
-나오는 권한이 없으므로 거부된다. 이 문서는 쓰기 연산만 적는다. 만들기와 읽기는 아직 적지 않았다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-공통 계약(대상 존재, 일괄 구성)은 프레임워크 계약 테스트가 확인한다. 여기에는 연산마다 대표
-성공과 대표 실패만 적는다.
+A role preset (preset below) is created in the global scope. The permission graph on the preset checks update, delete, restore, purge, and the addition and removal of permission entries. A user who received no role has no permission from the global scope and so is rejected. This document covers only the write operations. Create and read are not covered yet.
 
-## 수정하기
+Framework contract tests check the common contract (target existence, bulk composition). This document records only the representative success and representative failure of each operation.
 
-## soft delete, restore, purge
+## Update
 
-## 여럿 수정하기
+## Delete, restore and purge
 
-## 여럿 soft delete, restore, purge
+## Bulk update
 
-여럿 연산은 호출 전체를 거부하지 않는다. 처리한 프리셋은 처리된 목록에, 처리하지 못한 것은 id 와
-이유를 실패 목록에 싣는다.
+## Bulk delete, restore and purge
 
-## 권한 항목 넣기, 빼기
+A bulk operation does not reject the whole call. Processed presets go into the processed list, and failures are recorded in the failure list with the id and the reason.
 
-항목 넣기는 전부 넣거나 하나도 넣지 않는다. 항목 빼기는 항목마다 답한다.
+## Adding and removing role permission presets
+
+Adding is all or nothing. Removing responds per entry.

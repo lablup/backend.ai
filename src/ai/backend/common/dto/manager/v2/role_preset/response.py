@@ -57,6 +57,12 @@ class RolePresetNode(BaseResponseModel):
             "from this preset."
         ),
     )
+    auto_assign_to_owner: bool = Field(
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Whether a personal project's owner is mapped to "
+            "the role made from this preset. Allowed only on a project preset."
+        ),
+    )
     deleted: bool = Field(
         description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deleted_at`.",
         deprecated=True,

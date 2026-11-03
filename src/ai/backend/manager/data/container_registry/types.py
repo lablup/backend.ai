@@ -54,3 +54,11 @@ class AssociationContainerRegistriesGroupsData:
     project_id: ProjectID
     registry_id: ContainerRegistryID
     is_default: bool
+
+
+@dataclass(frozen=True)
+class ProjectAllowedRegistryData:
+    """A registry a project is allowed on, and whether it is the project's default."""
+
+    registry: ContainerRegistryData
+    is_default: bool

@@ -33,8 +33,8 @@ Guide for implementing Backend.AI client SDK and CLI with session management, AP
 
 **When to use:**
 - SDK: Building integrations, automation scripts, web dashboards
-- CLI: Interactive administration, shell scripts, CI/CD pipelines
-- Direct API: Only when SDK doesn't support the operation yet
+- CLI: Interactive administration, shell scripts, continuous integration (CI) and continuous delivery (CD) pipelines
+- Direct API: Only when SDK does not support the operation yet
 
 ## Architecture Overview
 
@@ -48,7 +48,7 @@ Guide for implementing Backend.AI client SDK and CLI with session management, AP
 - `CLIContext` - Shared state (config, output mode)
 - `@pass_ctx_obj` - CLIContext injection decorator
 - `FieldSpec` - Output field definitions
-- `BaseOutputHandler` - Console/JSON formatters
+- `BaseOutputHandler` - Console and JSON formatters
 
 **SDK Layer:**
 - `BaseFunction` - Metaclass for API function classes
@@ -58,7 +58,7 @@ Guide for implementing Backend.AI client SDK and CLI with session management, AP
 - `api_session` - ContextVar for session context
 
 **Data Layer:**
-- **Pydantic models** - Request/Response DTOs (future standard)
+- **Pydantic models** - Request and response DTOs (future standard)
 - **attrs classes** - Legacy DTOs (current usage in `client/cli/types.py`)
 - New code should use Pydantic (`common/dto/`)
 
@@ -90,7 +90,7 @@ Guide for implementing Backend.AI client SDK and CLI with session management, AP
 **@api_function decorator:**
 - Wraps instance methods as API functions
 - Retrieves session from `api_session` ContextVar
-- Handles async/sync execution
+- Handles async and sync execution
 - Provides consistent error handling
 
 **BaseFunction metaclass:**
@@ -118,7 +118,7 @@ Guide for implementing Backend.AI client SDK and CLI with session management, AP
 
 **Why Pydantic:**
 - Runtime type validation
-- Automatic JSON serialization/deserialization
+- Automatic JSON serialization and deserialization
 - IDE autocomplete and type checking
 - Better error messages
 
@@ -134,7 +134,7 @@ Guide for implementing Backend.AI client SDK and CLI with session management, AP
 ### SDK Implementation Flow
 
 **Standard pattern:**
-1. Define request/response Pydantic models
+1. Define request and response Pydantic models
 2. Create method with @api_function decorator
 3. Build Request object with endpoint and data
 4. Fetch JSON response from session
@@ -176,7 +176,7 @@ Guide for implementing Backend.AI client SDK and CLI with session management, AP
 - `client/output/fields.py` - Field utilities
 - `client/cli/fair_share/commands.py` - FieldSpec definitions and usage
 
-### CLI + SDK Integration
+### CLI and SDK Integration
 
 **Pattern:**
 - Click command → Session context → SDK function → REST API
@@ -202,7 +202,7 @@ Guide for implementing Backend.AI client SDK and CLI with session management, AP
 | **Request** | `Request("POST", "/endpoint", json={...})` | SDK handles internally |
 | **Response** | `Response.model_validate(data)` | SDK returns parsed model |
 | **Output** | Return Pydantic model | `ctx.output.print_item()` or `print_list()` |
-| **Error** | Raise `BackendAIError` subclass | `print_error()` + `sys.exit(ExitCode)` |
+| **Error** | Raise `BackendAIError` subclass | `print_error()` and `sys.exit(ExitCode)` |
 | **Config** | `APIConfig()` reads environment | Passed via `CLIContext` |
 | **Async** | Always async (`async def`, `await`) | Sync wrapper handles internally |
 
@@ -210,35 +210,35 @@ Guide for implementing Backend.AI client SDK and CLI with session management, AP
 
 When implementing new CLI/SDK feature:
 
-1. ✅ **Implement REST API** (`/api-guide`)
+1. **Implement REST API** (`/api-guide`)
    - Handler with standard operations
    - Proper error responses
 
-2. ✅ **Define Pydantic models**
+2. **Define Pydantic models**
    - Request DTOs in `common/dto/`
    - Response DTOs shared with API layer
 
-3. ✅ **Implement SDK function**
+3. **Implement SDK function**
    - Add method to appropriate function group
    - Use `@api_function` decorator
    - Handle all operations (create, get, search, update, delete)
 
-4. ✅ **Define FieldSpec**
+4. **Define FieldSpec**
    - List displayable fields
    - Add formatters for complex types
    - Consider both console and JSON output
 
-5. ✅ **Implement CLI commands**
+5. **Implement CLI commands**
    - Add Click command group
-   - Map options/arguments to SDK calls
+   - Map options and arguments to SDK calls
    - Handle errors with proper exit codes
 
-6. ✅ **Write tests** (`/test-guide`)
+6. **Write tests** (`/test-guide`)
    - SDK: Mock HTTP responses (pytest-aiohttp)
    - CLI: Use CliRunner, mock SDK functions (not HTTP)
-   - Verify request/response serialization
+   - Verify request and response serialization
 
-7. ✅ **Update documentation**
+7. **Update documentation**
    - Add usage examples to README
    - Document new CLI commands
 
@@ -276,7 +276,7 @@ When implementing new CLI/SDK feature:
 
 ## V2 SDK/CLI (New Pattern)
 
-**All new SDK/CLI work MUST use the v2 pattern.**
+**All new SDK/CLI work must use the v2 pattern.**
 
 ### V2 SDK Client (`client/v2/domains_v2/`)
 
@@ -292,21 +292,21 @@ When implementing new CLI/SDK feature:
 - `admin_` SDK methods → commands under `./bai admin {entity} ...`
 - Non-admin methods → `./bai {entity} ...`
 - Entity names are **singular** (domain, user, agent)
-- Each entity has its own directory with `__init__.py` + `commands.py`
+- Each entity has its own directory with `__init__.py` and `commands.py`
 - Admin commands in `admin/{entity}.py`
-- Sub-entities as separate Click sub-groups (e.g., revision, channel, role)
-- Construct Pydantic DTOs with **explicit field arguments** (never kwargs unpacking)
-- Filter options are domain-specific CLI args (`--name-contains`, `--status`, etc.)
+- Sub-entities as separate Click sub-groups (for example revision, channel, role)
+- Construct Pydantic DTOs with **explicit field arguments** (do not unpack kwargs)
+- Filter options are domain-specific CLI args (`--name-contains`, `--status` and so on)
 - `--order-by field:direction` supports multiple values
 - Config from `~/.backend.ai/` via `load_v2_config()` → `V2ConnectionConfig` dataclass
 
 ### V2 Config (`~/.backend.ai/`)
 
-- `config.toml` — endpoint, endpoint_type, api_version
-- `credentials.toml` — access_key, secret_key
-- `session/cookie.dat` — webserver session cookie (login/logout)
+- `config.toml` - endpoint, endpoint_type, api_version
+- `credentials.toml` - access_key, secret_key
+- `session/cookie.dat` - webserver session cookie (login/logout)
 
-**Related skills:**
+**Related documents:**
 - `/api-guide` - REST API implementation (prerequisite)
 - `/test-guide` - Testing workflow
 - `/local-dev` - Service management and CLI testing

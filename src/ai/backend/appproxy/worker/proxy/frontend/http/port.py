@@ -8,8 +8,9 @@ import jinja2
 from aiohttp import web
 from aiohttp.typedefs import Handler
 
-from ai.backend.appproxy.common.errors import GenericBadRequest, ServerMisconfiguredError
+from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
+from ai.backend.appproxy.worker.errors.ingress import IngressFrontendNotRegisteredError
 from ai.backend.appproxy.worker.types import Circuit, PortFrontendInfo
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
@@ -102,13 +103,16 @@ class PortFrontend(BaseHTTPFrontend[int]):
         self, request: web.Request, handler: Handler
     ) -> web.StreamResponse:
         port: int = request.app["port"]
-        circuit = self.circuits.get(port, None)
-        if circuit is None:
-            raise GenericBadRequest(f"Unregistered slot {port}")
+        backend = self.backends.get(port)
+        if backend is None:
+            raise IngressFrontendNotRegisteredError(f"Unregistered slot {port}")
+        circuit = backend.circuit
         with with_log_context(circuit_id=circuit.id):
-            self.ensure_allowed_ip(request, circuit)
+            ingress = await self._read_registered_ingress(circuit.to_ingress_frontend().key())
+            self.ensure_allowed_ip(request, ingress.access)
+            # TODO: Check the credential against ingress.access once an ingress carries the id
+            # its tokens name.
             self.ensure_credential(request, circuit)
-            backend = self.backends[port]
             request["circuit"] = circuit
             request["backend"] = backend
             return await handler(request)

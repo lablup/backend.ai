@@ -32,6 +32,7 @@ from ai.backend.common.exception import (
     ErrorCode,
     PermissionDeniedError,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -387,9 +388,15 @@ class Mutation(graphene.ObjectType):  # type: ignore[misc]
     rescan_gpu_alloc_maps = RescanGPUAllocMaps.Field(description="Added in 25.4.0.")
 
     # admin only
-    create_keypair = CreateKeyPair.Field()
-    modify_keypair = ModifyKeyPair.Field()
-    delete_keypair = DeleteKeyPair.Field()
+    create_keypair = CreateKeyPair.Field(
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `adminCreateKeypairV2` instead."
+    )
+    modify_keypair = ModifyKeyPair.Field(
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `adminUpdateKeypairV2` instead."
+    )
+    delete_keypair = DeleteKeyPair.Field(
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `adminDeleteKeypairV2` instead."
+    )
 
     # admin only
     rescan_images = RescanImages.Field()

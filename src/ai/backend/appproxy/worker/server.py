@@ -46,8 +46,11 @@ from ai.backend.appproxy.common.defs import (
     MEDIA_TYPE_HTML,
     MEDIA_TYPE_JSON,
     WORKER_AUTHORITY_LABEL,
+    WORKER_HOSTNAME_LABEL,
     WORKER_INGRESS_DELIVERY_MODE_LABEL,
     WORKER_SERVICE_GROUP,
+    WORKER_TLS_LISTEN_LABEL,
+    WORKER_WILDCARD_DOMAIN_LABEL,
 )
 from ai.backend.appproxy.common.errors import (
     CoordinatorConnectionError,
@@ -596,6 +599,18 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     announce_addr = root_ctx.local_config.proxy_worker.announce_addr
     if announce_addr is None:
         raise MissingAnnounceAddressError("Announce address is not configured")
+    proxy_worker_config = root_ctx.local_config.proxy_worker
+    service_discovery_labels = {
+        WORKER_AUTHORITY_LABEL: proxy_worker_config.authority,
+        WORKER_INGRESS_DELIVERY_MODE_LABEL: proxy_worker_config.ingress.delivery_mode,
+        WORKER_HOSTNAME_LABEL: (
+            proxy_worker_config.api_advertised_addr or proxy_worker_config.api_bind_addr
+        ).host,
+        WORKER_TLS_LISTEN_LABEL: str(proxy_worker_config.tls_listen).lower(),
+    }
+    served_wildcard_domain = proxy_worker_config.served_wildcard_domain()
+    if served_wildcard_domain is not None:
+        service_discovery_labels[WORKER_WILDCARD_DOMAIN_LABEL] = served_wildcard_domain
     sd_loop = ServiceDiscoveryLoop(
         sd_type,
         service_discovery,
@@ -610,10 +625,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 # It can be separated into an internal-purpose port later.
                 prometheus_address=str(announce_addr),
             ),
-            labels={
-                WORKER_AUTHORITY_LABEL: root_ctx.local_config.proxy_worker.authority,
-                WORKER_INGRESS_DELIVERY_MODE_LABEL: root_ctx.local_config.proxy_worker.ingress.delivery_mode,
-            },
+            labels=service_discovery_labels,
         ),
     )
 
@@ -764,12 +776,13 @@ async def handle_proxy_route_event(
             log.debug("circuit routes updated: {}", event.circuit.id)
             updated_circuit = Circuit.from_serialized_circuit(event.circuit)
             await context.proxy_frontend.update_circuit_route_info(updated_circuit, event.routes)
-            # The frontend stores the new routes on the circuit it holds and skips one it does not.
-            held_circuit = context.proxy_frontend.circuits.get(
+            # The frontend stores the new routes on the circuit of the backend it holds and skips a
+            # circuit it holds no backend of.
+            held_backend = context.proxy_frontend.backends.get(
                 context.proxy_frontend.get_circuit_key(updated_circuit)
             )
-            if ingress_writer is not None and held_circuit is not None:
-                await ingress_writer.apply([held_circuit.to_ingress(ingress_authority)])
+            if ingress_writer is not None and held_backend is not None:
+                await ingress_writer.apply([held_backend.circuit.to_ingress(ingress_authority)])
         case AppProxyCircuitRemovedEvent():
             log.debug("circuits removed: {}", [str(c.id) for c in event.circuits])
             removed_circuits = [Circuit.from_serialized_circuit(c) for c in event.circuits]

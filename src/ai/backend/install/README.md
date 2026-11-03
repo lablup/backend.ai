@@ -1,13 +1,10 @@
-Backend.AI Installer
-====================
+# Backend.AI Installer
 
-Package Structure
------------------
+## Package Structure
 
 * `ai.backend.install`: The installer package
 
-Development
------------
+## Development
 
 ### Using the textual debug mode
 

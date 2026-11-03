@@ -1,6 +1,6 @@
 # Backend.AI Test Suite
 
-This directory contains the comprehensive test suite for Backend.AI, organized into three categories based on testing scope and isolation level.
+This directory holds the test suite for Backend.AI, in three categories by testing scope and isolation level.
 
 ## Directory Structure
 
@@ -15,52 +15,52 @@ tests/
 
 ### [Unit Tests](unit/README.md) (`tests/unit/`)
 
-Tests individual parts (functions, classes, modules) within a Backend.AI component.
+Tests a single part of a Backend.AI component, such as a function, a class or a module.
 
 - **Scope**: Specific parts of a Backend.AI component
-- **Backend.AI Components**: Parts of one component (e.g., a repository class, a service method)
-- **Infrastructure**: May use real PostgreSQL, Redis, etc.
+- **Backend.AI components**: Parts of one component, such as a repository class or a service method
+- **Infrastructure**: May use real PostgreSQL, Valkey, etc.
 - **Speed**: Fast (milliseconds to seconds)
 - **When to use**: Testing internal logic, data access layers, utilities
 
-**Examples**: Repository methods, service business logic, utility functions, dataloaders
+**Examples**: Repository methods, service business logic, utility functions, DataLoaders
 
 ### [Component Tests](component/README.md) (`tests/component/`)
 
-Tests one complete Backend.AI component (manager, agent, storage-proxy, etc.) from external perspective.
+Tests one complete Backend.AI component, such as the manager, the agent or the storage proxy, from the outside.
 
 - **Scope**: One complete Backend.AI component
-- **Backend.AI Components**: Entire component running (manager, agent, etc.)
-- **Infrastructure**: May use real PostgreSQL, Redis, etc.
+- **Backend.AI components**: Entire component running (manager, agent, etc.)
+- **Infrastructure**: May use real PostgreSQL, Valkey, etc.
 - **Speed**: Moderate (seconds)
-- **When to use**: Testing component APIs, endpoints, complete workflows within one component
+- **When to use**: Testing component APIs, routes, complete workflows within one component
 
-**Examples**: HTTP API endpoints, GraphQL queries, component external behavior
+**Examples**: HTTP API routes, GraphQL queries, external behavior of a component
 
 ### [Integration Tests](integration/README.md) (`tests/integration/`)
 
 Tests **multiple Backend.AI components** working together as a complete system.
 
 - **Scope**: Multiple Backend.AI components
-- **Backend.AI Components**: Multiple components running simultaneously (manager + agent + storage-proxy)
-- **Infrastructure**: Real PostgreSQL, Redis, etcd, storage systems
+- **Backend.AI components**: Multiple components running simultaneously (manager, agent and storage proxy)
+- **Infrastructure**: Real PostgreSQL, Valkey, etcd and storage systems
 - **Speed**: Slow (seconds to minutes)
-- **When to use**: Testing inter-component communication, end-to-end workflows
+- **When to use**: Testing communication between components, end-to-end workflows
 
-**Examples**: Manager scheduling sessions on agent, storage operations across components, complete user workflows
+**Examples**: Manager scheduling sessions on an agent, storage operations across components, complete user workflows
 
 ## Comparison Table
 
 | Aspect | Unit Tests | Component Tests | Integration Tests |
 |--------|-----------|-----------------|-------------------|
-| **Backend.AI Components** | Test parts of one component | Test one complete component | Test multiple components together |
-| **Scope** | Individual function/class/module | Complete component (manager, agent, etc.) | Multiple components (manager + agent + storage-proxy) |
+| **Backend.AI components** | Test parts of one component | Test one complete component | Test multiple components together |
+| **Scope** | Individual function, class or module | Complete component (manager, agent, etc.) | Multiple components (manager, agent and storage proxy) |
 | **Internal Parts** | Test specific parts | Test all parts of one component | Test components working together |
-| **Infrastructure** | May use real PostgreSQL, Redis, etc. | May use real PostgreSQL, Redis, etc. | Use real PostgreSQL, Redis, etc. |
+| **Infrastructure** | May use real PostgreSQL, Valkey, etc. | May use real PostgreSQL, Valkey, etc. | Use real PostgreSQL, Valkey, etc. |
 | **Environment** | In-process or single process | Single component process | Multi-component cluster |
-| **Speed** | Fast (ms to seconds) | Moderate (seconds) | Slow (seconds to minutes) |
+| **Speed** | Fast (milliseconds to seconds) | Moderate (seconds) | Slow (seconds to minutes) |
 | **Focus** | How specific parts work | What one component does | How components interact |
-| **Example** | Testing a repository class | Testing an API endpoint | Testing manager scheduling a session on agent |
+| **Example** | Testing a repository class | Testing an API route | Testing the manager scheduling a session on an agent |
 
 ## Quick Start
 
@@ -83,12 +83,12 @@ pants test --changed-since=HEAD~1
 
 ## Test containers
 
-`etcd_container`, `redis_container` and `postgres_container`
-(`src/ai/backend/testutils/bootstrap.py`) take their containers from a pool with one
+The `etcd_container`, `redis_container` and `postgres_container` fixtures in
+`src/ai/backend/testutils/bootstrap.py` take their containers from a pool with one
 container per (role, Pants execution slot). Pants runs one pytest process per slot at a
-time, so a process reuses the containers the previous process in its slot left running
-instead of starting new ones. The pool is keyed by checkout path, so worktrees do not
-share it.
+time, so a process reuses the containers that the previous process in its slot left
+running instead of starting new ones. The pool is keyed by checkout path, so worktrees do
+not share it.
 
 | Step | Who |
 |---|---|
@@ -109,7 +109,7 @@ test must clean up what its fixtures wrote.
 | Rule | |
 |---|---|
 | A tag names an infrastructure set | `component` = postgres + etcd + redis; `component-agent` = pulled docker images |
-| Set it once, in the subtree's top `__defaults__` | Never on an individual `python_tests` target |
+| Set it once, in the subtree's top `__defaults__` | Do not set it on an individual `python_tests` target |
 | A new tag needs a different infrastructure set | Write the reason in that BUILD file |
 | State leaking between files is a fixture bug | Fix the fixture; do not split the tag or pull the file out of the batch |
 
@@ -117,25 +117,25 @@ test must clean up what its fixtures wrote.
 
 **When writing a new test, ask yourself:**
 
-1. **Am I testing a specific part of a Backend.AI component?** → Unit test
-   - Testing a function, class, or module in isolation
-   - May use real infrastructure (PostgreSQL, Redis)
-   - Don't need to run the entire component
+1. **Testing a specific part of a Backend.AI component** → Unit test
+   - Testing a function, class or module in isolation
+   - May use real infrastructure, such as PostgreSQL and Valkey
+   - Do not need to run the entire component
    - Example: Testing a repository class, a service method
 
-2. **Am I testing one complete Backend.AI component?** → Component test
+2. **Testing one complete Backend.AI component** → Component test
    - Testing the entire component (manager, agent, etc.)
-   - Testing from external perspective via APIs
-   - Don't need other Backend.AI components running
-   - Example: Testing manager's HTTP API endpoints
+   - Testing from the outside through APIs
+   - Do not need other Backend.AI components running
+   - Example: Testing the manager's HTTP API routes
 
-3. **Am I testing multiple Backend.AI components together?** → Integration test
-   - Testing manager, agent, storage-proxy, etc. working together
-   - Testing inter-component communication
+3. **Testing multiple Backend.AI components together** → Integration test
+   - Testing the manager, agent and storage proxy working together
+   - Testing communication between components
    - Testing complete end-to-end workflows
-   - Example: Testing manager scheduling a session that runs on agent
+   - Example: Testing the manager scheduling a session that runs on an agent
 
-## Documentation
+## Related documents
 
 For detailed guidelines on each test category, see:
 - [Unit Tests Guide](unit/README.md)
@@ -144,7 +144,7 @@ For detailed guidelines on each test category, see:
 
 ## Build System
 
-This project uses **Pantsbuild** for test execution and dependency management.
+This project uses **Pants** for test execution and dependency management.
 
 Each test directory requires a `BUILD` file:
 
@@ -165,7 +165,7 @@ python_tests(
 
 When adding new tests:
 
-1. Choose the appropriate category (unit/component/integration)
+1. Choose the appropriate category (unit, component or integration)
 2. Follow existing patterns in that category
 3. Ensure BUILD files are properly configured
 4. Run tests locally before committing
