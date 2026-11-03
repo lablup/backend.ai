@@ -53,7 +53,11 @@ def domain_processors(
     service = DomainService(
         repository=DomainRepository(database_engine, DomainOpsProvider(database_engine))
     )
-    return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
+    return DomainProcessors(
+        processor_registry.group(GroupMeta(DomainEntityType())),
+        processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        service,
+    )
 
 
 @pytest.fixture()

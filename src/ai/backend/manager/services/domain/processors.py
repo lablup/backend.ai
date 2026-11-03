@@ -1,5 +1,6 @@
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.registry.relation import RelationGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
@@ -12,6 +13,7 @@ from ai.backend.manager.actions.v2.ops.result import (
     LookupOpsResult,
     ScopedBatchOpsResult,
 )
+from ai.backend.manager.actions.v2.relation.processor import RelationActionProcessor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import (
     SingleEntityActionProcessor,
@@ -19,6 +21,10 @@ from ai.backend.manager.actions.v2.single_entity.processor import (
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.services.domain.actions.bulk_get import BulkGetDomainsAction
 from ai.backend.manager.services.domain.actions.bulk_lookup import BulkLookupDomainsAction
+from ai.backend.manager.services.domain.actions.create_container_registry_relations import (
+    CreateDomainContainerRegistryRelationsAction,
+    CreateDomainContainerRegistryRelationsActionResult,
+)
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.create_domain_dotfile import (
     CreateDomainDotfileAction,
@@ -40,12 +46,20 @@ from ai.backend.manager.services.domain.actions.partial_bulk_restore_domains imp
 from ai.backend.manager.services.domain.actions.partial_bulk_update_domains import (
     PartialBulkUpdateDomainsAction,
 )
+from ai.backend.manager.services.domain.actions.purge_container_registry_relations import (
+    PurgeDomainContainerRegistryRelationsAction,
+    PurgeDomainContainerRegistryRelationsActionResult,
+)
 from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainAction,
     PurgeDomainActionResult,
 )
 from ai.backend.manager.services.domain.actions.restore_domain import RestoreDomainAction
 from ai.backend.manager.services.domain.actions.scoped_search import ScopedSearchDomainsAction
+from ai.backend.manager.services.domain.actions.search_container_registry_relations import (
+    SearchDomainContainerRegistryRelationsAction,
+    SearchDomainContainerRegistryRelationsActionResult,
+)
 from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
 from ai.backend.manager.services.domain.actions.update_domain import UpdateDomainAction
 from ai.backend.manager.services.domain.actions.update_domain_dotfile import (
@@ -73,6 +87,18 @@ class DomainProcessors:
     partial_bulk_update: PartialBulkActionProcessor[PartialBulkUpdateDomainsAction, DomainData]
     partial_bulk_delete: PartialBulkActionProcessor[PartialBulkDeleteDomainsAction, DomainData]
     partial_bulk_restore: PartialBulkActionProcessor[PartialBulkRestoreDomainsAction, DomainData]
+    create_container_registry_relations: RelationActionProcessor[
+        CreateDomainContainerRegistryRelationsAction,
+        CreateDomainContainerRegistryRelationsActionResult,
+    ]
+    purge_container_registry_relations: RelationActionProcessor[
+        PurgeDomainContainerRegistryRelationsAction,
+        PurgeDomainContainerRegistryRelationsActionResult,
+    ]
+    search_container_registry_relations: ScopeActionProcessor[
+        SearchDomainContainerRegistryRelationsAction,
+        SearchDomainContainerRegistryRelationsActionResult,
+    ]
     create_dotfile: SingleEntityActionProcessor[
         CreateDomainDotfileAction, CreateDomainDotfileActionResult
     ]
@@ -86,8 +112,20 @@ class DomainProcessors:
     def __init__(
         self,
         group: ProcessorGroup[DomainData],
+        relation_group: RelationGroup,
         service: DomainService,
     ) -> None:
+        self.create_container_registry_relations = relation_group.relation(
+            CreateDomainContainerRegistryRelationsAction,
+            service.create_container_registry_relations,
+        )
+        self.purge_container_registry_relations = relation_group.relation(
+            PurgeDomainContainerRegistryRelationsAction, service.purge_container_registry_relations
+        )
+        self.search_container_registry_relations = group.scope(
+            SearchDomainContainerRegistryRelationsAction,
+            service.search_container_registry_relations,
+        )
         self.get = group.single_get_ops(GetDomainAction)
         self.lookup_name = group.public_lookup_ops(LookupDomainAction)
         self.bulk_lookup_names = group.public_bulk_lookup_ops(BulkLookupDomainsAction)

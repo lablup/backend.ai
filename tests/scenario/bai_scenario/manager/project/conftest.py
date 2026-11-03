@@ -111,6 +111,7 @@ async def adapter(
     )
     domain = DomainProcessors(
         registry.group(GroupMeta(DomainEntityType())),
+        registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
         DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
     )
     user = UserProcessors(
