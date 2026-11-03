@@ -29,6 +29,8 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     AdminSearchResourceGroupsInput,
     CreateResourceGroupInput,
+    CreateResourceGroupSchedulerOptionsConfigInput,
+    CreateResourceGroupSchedulerOptionsInput,
     PartialBulkPurgeResourceGroupsInput,
     PartialBulkUpdateResourceGroupsInput,
     ReplaceResourceGroupDefaultDeploymentOptionsInput,
@@ -57,6 +59,8 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ResourceGroupMetadataInfo,
     ResourceGroupNetworkConfigInfo,
     ResourceGroupSchedulerConfigInfo,
+    ResourceGroupSchedulerOptionsConfigInfo,
+    ResourceGroupSchedulerOptionsInfo,
     ResourceGroupStatusInfo,
     ResourceInfoNode,
     UpdateResourceGroupConfigPayloadNode,
@@ -120,6 +124,10 @@ from ai.backend.manager.models.resource_group.searchable_fields import (
     ResourceGroupSearchableFields,
 )
 from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
+from ai.backend.manager.models.resource_group.types import (
+    NUM_RETRIES_TO_SKIP_CONFIG_KEY,
+    ResourceGroupOpts,
+)
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.search.usage import UsedBy
@@ -496,6 +504,16 @@ class ResourceGroupAdapter(BaseAdapter):
         Returns:
             Pydantic payload containing the created resource group node.
         """
+        scheduler_options = (
+            input.scheduler_options
+            if input.scheduler_options is not None
+            else CreateResourceGroupSchedulerOptionsInput()
+        )
+        scheduler_options_config = (
+            scheduler_options.config
+            if scheduler_options.config is not None
+            else CreateResourceGroupSchedulerOptionsConfigInput()
+        )
         creator = ResourceGroupCreator(
             name=input.name,
             # ResourceGroupCreator requires driver and scheduler fields
@@ -506,6 +524,23 @@ class ResourceGroupAdapter(BaseAdapter):
             description=input.description,
             is_active=True,
             is_default=input.is_default,
+            scheduler_opts=ResourceGroupOpts(
+                allowed_session_types=scheduler_options.allowed_session_types,
+                pending_timeout=timedelta(seconds=scheduler_options.pending_timeout),
+                config=(
+                    {}
+                    if scheduler_options_config.num_retries_to_skip is None
+                    else {
+                        NUM_RETRIES_TO_SKIP_CONFIG_KEY: scheduler_options_config.num_retries_to_skip
+                    }
+                ),
+                agent_selection_strategy=scheduler_options.agent_selection_strategy,
+                agent_selector_config=scheduler_options.agent_selector_config,
+                allow_fractional_resource_fragmentation=(
+                    scheduler_options.allow_fractional_resource_fragmentation
+                ),
+                route_cleanup_target_statuses=scheduler_options.route_cleanup_target_statuses,
+            ),
         )
         action_result = await self._resource_group.create_resource_group.run(
             CreateResourceGroupAction(creator=creator)
@@ -1097,6 +1132,23 @@ class ResourceGroupAdapter(BaseAdapter):
                     mode=PreemptionModeDTO(data.scheduler.options.preemption.mode.value),
                     preemption_min_runtime=data.scheduler.options.preemption.preemption_min_runtime.total_seconds(),
                     victim_scope=data.scheduler.options.preemption.victim_scope,
+                ),
+                options=ResourceGroupSchedulerOptionsInfo(
+                    allowed_session_types=data.scheduler.options.allowed_session_types,
+                    pending_timeout=data.scheduler.options.pending_timeout.total_seconds(),
+                    config=ResourceGroupSchedulerOptionsConfigInfo(
+                        num_retries_to_skip=data.scheduler.options.config.get(
+                            NUM_RETRIES_TO_SKIP_CONFIG_KEY
+                        ),
+                    ),
+                    agent_selection_strategy=data.scheduler.options.agent_selection_strategy,
+                    agent_selector_config=dict(data.scheduler.options.agent_selector_config),
+                    allow_fractional_resource_fragmentation=(
+                        data.scheduler.options.allow_fractional_resource_fragmentation
+                    ),
+                    route_cleanup_target_statuses=(
+                        data.scheduler.options.route_cleanup_target_statuses
+                    ),
                 ),
             ),
             default_deployment_options=deployment_options_to_info(data.default_deployment_options),
