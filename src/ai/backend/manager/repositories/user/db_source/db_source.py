@@ -495,7 +495,8 @@ class UserDBSource:
         """
         user_id = UserID(user_uuid)
         await self._revoke_shared_vfolders(user_uuid)
-        async with self._v2_ops.write_ops() as w:
+        async with self._user_ops_provider.write_ops() as w:
+            await w.lock_user_node(user_id)
             await w.batch_purge_field_entities(user_id, UserErrorLogPurger())
             await w.batch_purge_field_entities(user_id, UserKeyPairPurger())
             await w.batch_purge_field_entities(user_id, BootstrapScriptPurger())
