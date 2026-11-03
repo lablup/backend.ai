@@ -42,12 +42,13 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import SessionId, VFolderID
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.kernel.row import DEAD_KERNEL_STATUSES, KernelRow
 from ai.backend.manager.models.kernel_group_vfolder_mount.row import KernelGroupVFolderMountRow
-from ai.backend.manager.models.session.row import DEAD_SESSION_STATUSES, SessionRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.vfolder.row import VFolderRow
 
@@ -94,9 +95,9 @@ class VFolderReferenceHit:
 
 
 def _sessions_mounting(vfolder_id: VFolderID) -> sa.ColumnElement[bool]:
-    return SessionRow.status.not_in(DEAD_SESSION_STATUSES) & SessionRow.vfolder_mounts.contains([
-        {"vfid": str(vfolder_id)}
-    ])
+    return SessionRow.status.not_in(
+        SessionStatus.terminal_statuses()
+    ) & SessionRow.vfolder_mounts.contains([{"vfid": str(vfolder_id)}])
 
 
 def _kernels_mounting(vfolder_id: VFolderID) -> sa.ColumnElement[bool]:

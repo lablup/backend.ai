@@ -51,7 +51,6 @@ from ai.backend.manager.models.project.row import groups
 from ai.backend.manager.models.resource_group.row import resource_groups
 from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
 from ai.backend.manager.models.session.row import (
-    DEAD_SESSION_STATUSES,
     TERMINAL_SESSION_STATUSES,
     KernelLoadingStrategy,
     SessionDependencyRow,
@@ -197,7 +196,7 @@ class SessionDBSource:
             ])
         cond = SessionRow.id == session_id
         if not allow_stale:
-            cond = cond & ~SessionRow.status.in_(DEAD_SESSION_STATUSES)
+            cond = cond & ~SessionRow.status.in_(SessionStatus.terminal_statuses())
         query = (
             sa.select(SessionRow)
             .where(cond)
@@ -239,7 +238,7 @@ class SessionDBSource:
         rank = sa.case((id_match, 0), else_=1).label("rank")
         cond = (id_match | (SessionRow.name == id_or_name)) & (SessionRow.access_key == access_key)
         if not allow_stale:
-            cond = cond & ~SessionRow.status.in_(DEAD_SESSION_STATUSES)
+            cond = cond & ~SessionRow.status.in_(SessionStatus.terminal_statuses())
         query = (
             sa.select(SessionRow, rank)
             .where(cond)
@@ -602,7 +601,7 @@ class SessionDBSource:
         """Resolve a live session by ``session_id`` into its routing info.
 
         This is a pure lookup; session access authorization is the caller's
-        responsibility. Dead (terminated/cancelled) sessions are excluded. The main
+        responsibility. Errored, terminated and cancelled sessions are excluded. The main
         kernel's routing fields are read separately: a searcher answers with one
         entity's own columns.
         """
@@ -617,7 +616,9 @@ class SessionDBSource:
                             session_fields.id.filter.equals(
                                 UUIDEqualMatchSpec(value=session_id, negated=False)
                             ),
-                            session_fields.status.filter.not_in(list(DEAD_SESSION_STATUSES)),
+                            session_fields.status.filter.not_in(
+                                list(SessionStatus.terminal_statuses())
+                            ),
                         ],
                     )
                 )

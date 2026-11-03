@@ -78,7 +78,7 @@ from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
 )
-from ai.backend.manager.data.session.types import SessionTerminationStatus
+from ai.backend.manager.data.session.types import SessionStatus, SessionTerminationStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.agent import AgentNotAllocated
 from ai.backend.manager.errors.common import (
@@ -102,7 +102,6 @@ from ai.backend.manager.errors.resource import (
 from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.session.row import (
-    DEAD_SESSION_STATUSES,
     PRIVATE_SESSION_TYPES,
     KernelLoadingStrategy,
 )
@@ -1047,7 +1046,7 @@ class SessionService:
             ),
         )
 
-        if compute_session.status in DEAD_SESSION_STATUSES:
+        if compute_session.status in SessionStatus.terminal_statuses():
             if kernel_id is None:
                 # Get logs from the main kernel
                 kernel_id = compute_session.main_kernel.id

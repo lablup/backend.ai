@@ -34,7 +34,7 @@ from ai.backend.manager.data.keypair.types import (
     KeyPairData,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
-from ai.backend.manager.data.session.types import SessionEntityData
+from ai.backend.manager.data.session.types import SessionEntityData, SessionStatus
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
     BulkUserUpdateResultData,
@@ -99,7 +99,6 @@ from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.session.row import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
-    DEAD_SESSION_STATUSES,
     SessionRow,
 )
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
@@ -601,7 +600,7 @@ class UserDBSource:
             SessionRow.id.in_(
                 sa.select(RoutingRow.session).where(RoutingRow.endpoint.in_(endpoint_ids))
             )
-            & SessionRow.status.not_in(DEAD_SESSION_STATUSES)
+            & SessionRow.status.not_in(SessionStatus.terminal_statuses())
         )
         await session.execute(
             sa.update(KernelRow)
