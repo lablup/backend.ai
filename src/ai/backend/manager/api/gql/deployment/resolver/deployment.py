@@ -348,7 +348,8 @@ async def delete_model_deployment(
         added_version="26.4.4",
         description=(
             "Fully replace the ``options`` surface of a deployment. "
-            "Replace semantics — the supplied payload is the complete new value."
+            "Replace semantics — the supplied payload is the complete new value, "
+            "except an omitted agent selection policy, which keeps the stored one."
         ),
     )
 )
@@ -359,9 +360,7 @@ async def replace_deployment_options(
 
     GQL input carries the target ``deployment_id`` and the full ``options``
     payload together; REST equivalent carries the id in the path. Only the
-    refreshed options surface is returned (the server path uses
-    ``UPDATE ... RETURNING`` and does not re-read the surrounding
-    deployment node).
+    refreshed options surface is returned.
     """
     gql_pydantic = input.to_pydantic()
     rest_body = ReplaceDeploymentOptionsInput(options=gql_pydantic.options)

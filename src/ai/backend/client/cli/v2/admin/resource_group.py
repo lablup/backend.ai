@@ -509,11 +509,18 @@ def _parse_timeout_value(raw: str) -> int | None:
         "(e.g., --config @options.json). Overrides --default-timeout / --handler."
     ),
 )
+@click.option(
+    "--agent-selection-policy",
+    type=click.Choice(["strict", "preferred"]),
+    default=None,
+    help="How designated agents are enforced. Omit to keep the stored policy.",
+)
 def default_options_replace(
     name: str,
     default_timeout: str | None,
     handlers: tuple[str, ...],
     config_path: str | None,
+    agent_selection_policy: str | None,
 ) -> None:
     """Fully replace a resource group's ``default_deployment_options`` (superadmin only)."""
     import json
@@ -530,6 +537,7 @@ def default_options_replace(
         HandlerOptionsEntryInput,
         HandlerOptionsInput,
     )
+    from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 
     if config_path is not None:
         if not config_path.startswith("@"):
@@ -564,6 +572,11 @@ def default_options_replace(
                 handler_options=DeploymentHandlerOptionsInput(
                     default=HandlerOptionsInput(timeout_sec=default_value),
                     by_handler=entries,
+                ),
+                agent_selection_policy=(
+                    AgentSelectionPolicyEnum(agent_selection_policy)
+                    if agent_selection_policy is not None
+                    else None
                 ),
             ),
         )

@@ -1122,7 +1122,8 @@ class AdminRefreshDeploymentRevisionsPayload:
         added_version="26.4.4",
         description=(
             "Input for the replaceDeploymentOptions mutation. Full-replace"
-            " semantics — the supplied payload is the complete new value."
+            " semantics — the supplied payload is the complete new value,"
+            " except an omitted agent selection policy, which keeps the stored one."
         ),
     ),
     name="ReplaceDeploymentOptionsInput",
@@ -1137,9 +1138,7 @@ class ReplaceDeploymentOptionsInputGQL(PydanticInputMixin[ReplaceDeploymentOptio
         added_version="26.4.4",
         description=(
             "Payload returned after replacing a deployment's options. Only"
-            " the refreshed options surface is returned; the server path uses"
-            " ``UPDATE ... RETURNING`` and does not re-read the surrounding"
-            " deployment node."
+            " the refreshed options surface is returned."
         ),
     ),
     model=ReplaceDeploymentOptionsPayloadDTO,

@@ -87,7 +87,7 @@ class ReplacingDeploymentOptions(When[AGroupAndACaller, ResourceGroupAdapter, De
     @override
     def describe(self, laid: AGroupAndACaller) -> str:
         handler = UNREGISTERED if self.unregistered else DEPLOYMENT_HANDLER
-        return f"{laid.caller.username}이 {laid.group.name}의 기본 배포 옵션을 처리기 {handler}의 설정을 담아 갈아끼움"
+        return f"{laid.caller.username}이 {laid.group.name}의 기본 배포 옵션을 선택 정책 STRICT와 처리기 {handler}의 설정을 담아 갈아끼움"
 
     @override
     async def call(self, adapter: ResourceGroupAdapter, laid: AGroupAndACaller) -> Deployed:
@@ -101,7 +101,8 @@ class ReplacingDeploymentOptions(When[AGroupAndACaller, ResourceGroupAdapter, De
                             timeout_sec=HANDLER_WAITS,
                         )
                     ],
-                )
+                ),
+                agent_selection_policy=AgentSelectionPolicyEnum.STRICT,
             )
         )
         with ActingAs(laid.caller):
@@ -177,6 +178,11 @@ class TheDeploymentOptionsAreReplaced(Then[AGroupAndACaller, Deployed]):
                 "default_deployment_options.handler_options.by_handler",
                 [(e.handler_name, e.timeout_sec, e.max_retry_count) for e in handler.by_handler],
                 [(DEPLOYMENT_HANDLER, HANDLER_WAITS, None)],
+            ),
+            Same(
+                "default_deployment_options.agent_selection_policy",
+                payload.default_deployment_options.agent_selection_policy,
+                AgentSelectionPolicyEnum.STRICT,
             ),
         ]
 
