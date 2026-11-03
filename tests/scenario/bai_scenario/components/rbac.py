@@ -28,6 +28,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
@@ -39,7 +40,7 @@ from bai_scenario.seeds.rbac.role import TestSeedRole
 
 @dataclass(frozen=True)
 class RolesAndACaller:
-    """역할 여럿과, 그것을 부를 사람. 역할은 부르는 사람이 속하지 않은 도메인에 있다."""
+    """역할 여럿과, 그것을 부를 사람. 역할은 호출자가 속하지 않은 도메인에 있다."""
 
     roles: tuple[RoleData, ...]
     domain: DomainData
@@ -60,7 +61,14 @@ class RolesAndSomeone(Given[Any, RolesAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"한 도메인에 둔 커스텀 역할 {self.count}개와, 다른 도메인에 사는 {self.role.value} 한 명"
+        return Says(
+            f"한 도메인에 둔 커스텀 역할 {self.count}개와, 다른 도메인에 사는 "
+            f"{self.role.value} 한 명",
+            english=(
+                f"{self.count} custom roles in one domain and one {self.role.value} "
+                "in another domain"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> RolesAndACaller:
@@ -103,12 +111,28 @@ class RoleLook:
             Same(f"{prefix}auto_assign", node.auto_assign, False),
             Same(f"{prefix}scope_type", node.scope_type, DomainEntityType()),
             Held[UUID](
-                f"{prefix}scope_id", node.scope_id, SameAs(domain.id, "역할을 둔 도메인의 id")
+                f"{prefix}scope_id",
+                node.scope_id,
+                SameAs(
+                    domain.id,
+                    Says(
+                        "역할을 둔 도메인의 id",
+                        english="the id of the domain the role sits in",
+                    ),
+                ),
             ),
             Same(f"{prefix}role_preset_id", node.role_preset_id, None),
-            Skipped(f"{prefix}id", "데이터베이스가 만든다"),
+            Skipped(
+                f"{prefix}id",
+                Says("데이터베이스가 생성합니다", english="the database generates it"),
+            ),
             Held[UUID](
-                f"{prefix}entity_id", node.entity_id, SameAs(laid.id, "미리 만든 역할의 id")
+                f"{prefix}entity_id",
+                node.entity_id,
+                SameAs(
+                    laid.id,
+                    Says("미리 저장한 역할의 id", english="the id of the role seeded in advance"),
+                ),
             ),
             Held(f"{prefix}created_at", node.created_at, written),
             Held(f"{prefix}updated_at", node.updated_at, written),
@@ -124,7 +148,10 @@ class NothingIsProcessed(Then[RolesAndACaller, PartialBulkPayload[RoleNode]]):
 
     @override
     def says(self) -> str:
-        return "처리된 역할 없이 대상이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 역할 없이 대상이 모두 실패 목록에 옵니다",
+            english="no role is processed and every target comes back in the failed list",
+        )
 
     @override
     def look(
@@ -141,7 +168,11 @@ class NothingIsProcessed(Then[RolesAndACaller, PartialBulkPayload[RoleNode]]):
         ]
         for i, (failure, role) in enumerate(zip(payload.failed, laid.roles, strict=False)):
             verdicts += [
-                Held[UUID](f"failed[{i}].id", failure.id, SameAs(role.id, "대상 역할의 id")),
+                Held[UUID](
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(role.id, Says("대상 역할의 id", english="the id of the target role")),
+                ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]
         return verdicts

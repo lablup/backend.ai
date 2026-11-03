@@ -13,6 +13,7 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
 from ai.backend.manager.models.entity_share.updaters import EntityShareAcceptUpdater
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import Naming, TestSeedRowFromThree, TestSeedShareAcceptance
 
 
@@ -25,11 +26,14 @@ class TestSeedVFolderShare(TestSeedRowFromThree[UserData, VFolderData, UserData,
 
     @override
     def kind(self) -> str:
-        return "폴더 공유 제안"
+        return Says("vfolder 공유 제안", english="vfolder share offer")
 
     @override
     def detail(self) -> str:
-        return f"{self.cap.name} 권한으로 제안되고, 아직 답하지 않았다"
+        return Says(
+            f"{self.cap.name} 권한으로 제안되었고, 아직 응답하지 않았습니다",
+            english=f"offered under the {self.cap.name} permission, not answered yet",
+        )
 
     @override
     def name(self, naming: Naming) -> str:
@@ -53,7 +57,7 @@ class TestSeedShareTaken(TestSeedShareAcceptance[EntityShareData]):
 
     @override
     def kind(self) -> str:
-        return "받는 사람이 받아들임"
+        return Says("받는 사람이 받아들임", english="the recipient accepts it")
 
     @override
     def seed(self, offer: EntityShareData) -> EntityShareAcceptUpdater:

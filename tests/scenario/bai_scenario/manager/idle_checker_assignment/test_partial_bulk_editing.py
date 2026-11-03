@@ -17,7 +17,7 @@ from ai.backend.manager.api.adapters.idle_checker_assignment.adapter import (
     IdleCheckerAssignmentAdapter,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.idle_checker import (
     AssignmentsAndACaller,
     AssignmentsAnswered,
@@ -44,7 +44,10 @@ class DisablingEveryAssignment(When[AssignmentsAndACaller, Adapter, AssignmentsA
 
     @override
     def describe(self, laid: AssignmentsAndACaller) -> str:
-        return f"{laid.caller.username}이 할당 {len(laid.domains)}개를 한 번에 끔"
+        return Says(
+            f"{laid.caller.username}이 할당 {len(laid.domains)}개를 한 번에 비활성화합니다",
+            english=f"{laid.caller.username} disables {len(laid.domains)} assignments in one call",
+        )
 
     @override
     async def call(self, adapter: Adapter, laid: AssignmentsAndACaller) -> AssignmentsAnswered:
@@ -73,7 +76,14 @@ class TheSuperadminDisablesSeveral(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 할당 여럿을 한 번에 끄면, 모두 꺼진 할당으로 오고 실패한 것은 없다"
+        return Says(
+            "superadmin 이 할당 여럿을 한 번에 비활성화하면, 모두 비활성 할당으로 오고 실패한 "
+            "것은 없습니다",
+            english=(
+                "when the superadmin disables several assignments in one call, all come back as "
+                "disabled assignments and nothing failed"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AssignmentsAndACaller]:
@@ -98,9 +108,14 @@ class AUserGrantedNothingDisablesNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 할당 여럿을 한 번에 끄려 하면, 끈 것 없이 모두 "
-            "찾을 수 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 할당 여럿을 한 번에 비활성화하려 하면, 비활성화한 "
+            "것 없이 모두 찾을 수 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to disable several assignments in one call, "
+                "none is disabled and all come back in the failed list because they cannot be "
+                "found"
+            ),
         )
 
     @override

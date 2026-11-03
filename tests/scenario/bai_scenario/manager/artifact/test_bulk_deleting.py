@@ -21,6 +21,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Refused,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -50,7 +51,12 @@ class SoftDeletingByIds(When[ManyArtifactsAndACaller, ArtifactAdapter, Deleted])
 
     @override
     def describe(self, laid: ManyArtifactsAndACaller) -> str:
-        return f"{laid.caller.username}이 아티팩트 {len(laid.laid)}개를 id 목록으로 soft delete 함"
+        return Says(
+            f"{laid.caller.username}이 아티팩트 {len(laid.laid)}개를 id 목록으로 soft delete 합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {len(laid.laid)} artifacts by an id list"
+            ),
+        )
 
     @override
     async def call(self, adapter: ArtifactAdapter, laid: ManyArtifactsAndACaller) -> Deleted:
@@ -71,9 +77,13 @@ class SoftDeletingThenRestoringByIds(When[ManyArtifactsAndACaller, ArtifactAdapt
 
     @override
     def describe(self, laid: ManyArtifactsAndACaller) -> str:
-        return (
+        return Says(
             f"{laid.caller.username}이 아티팩트 {len(laid.laid)}개를 id 목록으로 soft delete "
-            "했다가 restore 함"
+            "했다가 restore 합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {len(laid.laid)} artifacts by an id list "
+                "and then restores them"
+            ),
         )
 
     @override
@@ -93,7 +103,10 @@ class EveryTargetIsAnswered(Then[ManyArtifactsAndACaller, Deleted]):
 
     @override
     def says(self) -> str:
-        return "대상 아티팩트가 모두 처리된 모습으로 온다"
+        return Says(
+            "대상 아티팩트가 모두 처리된 모습으로 옵니다",
+            english="every target artifact comes back in the processed state",
+        )
 
     @override
     def look(self, laid: ManyArtifactsAndACaller, answered: Answered[Deleted]) -> list[Verdict]:
@@ -121,7 +134,13 @@ class TheSuperadminSoftDeletesByIds(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아티팩트 여럿을 id 목록으로 soft delete 하면, 모두 삭제됨 상태로 온다"
+        return Says(
+            "superadmin 이 아티팩트 여럿을 id 목록으로 soft delete 하면, 모두 삭제됨 상태로 옵니다",
+            english=(
+                "when the superadmin soft deletes several artifacts by an id list, all come "
+                "back in the deleted state"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyArtifactsAndACaller]:
@@ -149,9 +168,13 @@ class AUserWhoIsNotSuperadminMayNotSoftDeleteByIds(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 아닌 사용자는 아티팩트 여럿을 id 목록으로 soft delete 할 수 없고, "
-            "역할로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자는 아티팩트 여럿을 id 목록으로 soft delete 할 수 없고, "
+            "역할로 거부됩니다",
+            english=(
+                "a user who is not the superadmin cannot soft delete several artifacts by an "
+                "id list, and the role rejects it"
+            ),
         )
 
     @override
@@ -179,9 +202,13 @@ class TheSuperadminRestoresByIds(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 soft delete 된 아티팩트 여럿을 id 목록으로 restore 하면, 모두 살아 있는 "
-            "상태로 온다"
+        return Says(
+            "superadmin 이 soft delete 된 아티팩트 여럿을 id 목록으로 restore 하면, 모두 살아 "
+            "있는 상태로 옵니다",
+            english=(
+                "when the superadmin restores several soft-deleted artifacts by an id list, "
+                "all come back in the live state"
+            ),
         )
 
     @override

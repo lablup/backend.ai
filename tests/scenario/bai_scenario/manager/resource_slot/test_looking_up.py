@@ -17,6 +17,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Held,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -47,7 +48,13 @@ class LookingUpByName(When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlo
 
     @override
     def describe(self, laid: ASlotTypeAndACaller) -> str:
-        return f"{laid.caller.username}이 {self.named or laid.slot_type.slot_name} 이름으로 id 찾기"
+        return Says(
+            f"{laid.caller.username} 이 {self.named or laid.slot_type.slot_name} 이름으로 id 를 찾습니다",
+            english=(
+                f"{laid.caller.username} looks up the id under the name "
+                f"{self.named or laid.slot_type.slot_name}"
+            ),
+        )
 
     @override
     async def call(
@@ -63,7 +70,10 @@ class TheSlotTypeId(Then[ASlotTypeAndACaller, ResourceSlotTypeUUID]):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 슬롯 종류의 id가 반환된다"
+        return Says(
+            "미리 저장한 자원 슬롯 유형의 id 가 반환됩니다",
+            english="the id of the slot type stored in advance comes back",
+        )
 
     @override
     def look(
@@ -74,7 +84,15 @@ class TheSlotTypeId(Then[ASlotTypeAndACaller, ResourceSlotTypeUUID]):
             return [MissingResponse(answered.raised)]
         return [
             Held[UUID](
-                "id", found, SameAs(laid.slot_type.entity_id(), "미리 만들어 둔 슬롯 종류의 id")
+                "id",
+                found,
+                SameAs(
+                    laid.slot_type.entity_id(),
+                    Says(
+                        "미리 저장한 자원 슬롯 유형의 id",
+                        english="the id of the slot type stored in advance",
+                    ),
+                ),
             )
         ]
 
@@ -89,7 +107,13 @@ class AUserGrantedNothingLooksUpByName(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 이름으로 id를 찾으면 그 슬롯 종류의 id가 반환된다"
+        return Says(
+            "아무 권한도 없는 사용자가 이름으로 id 를 찾으면 그 자원 슬롯 유형의 id 가 반환됩니다",
+            english=(
+                "when a user granted nothing looks up an id by name, the id of that slot type "
+                "comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
@@ -114,7 +138,12 @@ class ANameNothingAnswersToIsRefused(
 
     @override
     def describe(self) -> str:
-        return "존재하지 않는 이름으로 id를 찾으면 잘못된 요청으로 거부된다"
+        return Says(
+            "존재하지 않는 이름으로 id 를 찾으면 잘못된 요청으로 거부됩니다",
+            english=(
+                "looking up an id under a name nothing answers to is rejected as a bad request"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:

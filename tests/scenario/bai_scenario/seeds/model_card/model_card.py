@@ -14,6 +14,7 @@ from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.model_card.creators import ModelCardCreator
+from ai.backend.testutils.scenario_steps import Language, Says, in_language
 from bai_scenario.seeds.seeder import Naming, TestSeedRowFromThree
 
 
@@ -26,11 +27,17 @@ class TestSeedModelCard(TestSeedRowFromThree[ProjectData, VFolderData, UserData,
 
     @override
     def kind(self) -> str:
-        return "모델 카드"
+        return Says("모델 카드", english="Model card")
 
     @override
     def detail(self) -> str:
-        return f"프로젝트에 놓이고 폴더 위에 얹힌다, 제목 '{self.title}'"
+        return Says(
+            f"프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '{self.title}'입니다",
+            english=(
+                f"placed in the project and added on top of a vfolder, "
+                f"titled '{in_language(self.title, Language.ENGLISH)}'"
+            ),
+        )
 
     @override
     def name(self, naming: Naming) -> str:

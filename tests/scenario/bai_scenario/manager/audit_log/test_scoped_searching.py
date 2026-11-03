@@ -32,6 +32,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Configured,
     Given,
+    Says,
     Scenario,
     Then,
     When,
@@ -69,7 +70,10 @@ class ScopedSearchingEntities(When[ScopedEntities, AuditLogAdapter, Searched]):
 
     @override
     def describe(self, laid: ScopedEntities) -> str:
-        return f"{laid.caller.username}이 엔티티를 지정해 검색"
+        return Says(
+            f"{laid.caller.username}이 엔티티를 지정해 검색합니다",
+            english=f"{laid.caller.username} searches naming an entity",
+        )
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: ScopedEntities) -> Searched:
@@ -96,7 +100,12 @@ class ScopedSearchingEntitiesBySuccess(When[ScopedEntities, AuditLogAdapter, Sea
 
     @override
     def describe(self, laid: ScopedEntities) -> str:
-        return f"{laid.caller.username}이 엔티티를 지정하고 성공 상태 필터로 검색"
+        return Says(
+            f"{laid.caller.username}이 엔티티를 지정하고 성공 상태 필터로 검색합니다",
+            english=(
+                f"{laid.caller.username} searches naming an entity with a success status filter"
+            ),
+        )
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: ScopedEntities) -> Searched:
@@ -126,7 +135,10 @@ class ScopedSearchingEntitiesByRun(When[ScopedEntities, AuditLogAdapter, Searche
 
     @override
     def describe(self, laid: ScopedEntities) -> str:
-        return f"{laid.caller.username}이 엔티티를 지정하고 실행 필터로 검색"
+        return Says(
+            f"{laid.caller.username}이 엔티티를 지정하고 실행 필터로 검색합니다",
+            english=(f"{laid.caller.username} searches naming an entity with a run filter"),
+        )
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: ScopedEntities) -> Searched:
@@ -154,7 +166,10 @@ class ScopedSearchingBadId(When[ScopedEntities, AuditLogAdapter, Searched]):
 
     @override
     def describe(self, laid: ScopedEntities) -> str:
-        return f"{laid.caller.username}이 id 형식이 아닌 값을 지정해 검색"
+        return Says(
+            f"{laid.caller.username}이 id 형식이 아닌 값을 지정해 검색합니다",
+            english=f"{laid.caller.username} searches naming a value that is not an id",
+        )
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: ScopedEntities) -> Searched:
@@ -180,7 +195,10 @@ class ScopedSearchingActors(When[ScopedActors, AuditLogAdapter, Searched]):
 
     @override
     def describe(self, laid: ScopedActors) -> str:
-        return f"{laid.caller.username}이 실행한 사용자를 지정해 검색"
+        return Says(
+            f"{laid.caller.username}이 실행한 사용자를 지정해 검색합니다",
+            english=f"{laid.caller.username} searches naming the user who triggered records",
+        )
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: ScopedActors) -> Searched:
@@ -202,9 +220,14 @@ class TheGrantedUserReadsAnEntity(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "두 엔티티에 기록이 하나씩 있고 한쪽에만 읽기 권한을 받은 사용자가 그 엔티티를 "
-            "지정해 검색하면, 그 엔티티의 기록만 반환된다"
+            "지정해 검색하면, 그 엔티티의 기록만 반환됩니다",
+            english=(
+                "when each of two entities has one record and a user granted read on only "
+                "one of them searches naming that entity, only the records of that entity "
+                "come back"
+            ),
         )
 
     @override
@@ -230,9 +253,13 @@ class NamingSeveralEntitiesMerges(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "두 엔티티에 모두 읽기 권한을 받은 사용자가 둘을 함께 지정해 검색하면, 두 기록이 "
-            "다 반환되고 최근 것이 먼저다"
+            "다 반환되고 최근 것이 먼저입니다",
+            english=(
+                "when a user granted read on both of two entities searches naming both, both "
+                "records come back with the newest first"
+            ),
         )
 
     @override
@@ -258,9 +285,13 @@ class AStatusFilterNarrowsWithinScope(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "한 엔티티에 성공 기록과 거부 기록이 있을 때 그것을 지정하고 성공 상태 필터로 "
-            "검색하면, 성공한 기록만 반환된다"
+            "검색하면, 성공한 기록만 반환됩니다",
+            english=(
+                "when one entity holds a success record and a rejected record and it is "
+                "searched with a success status filter, only the successful record comes back"
+            ),
         )
 
     @override
@@ -286,9 +317,13 @@ class ARunFilterNarrowsWithinScope(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "한 엔티티에 두 실행이 남긴 기록이 있을 때 그것을 지정하고 한 실행 필터로 검색하면, "
-            "그 실행이 남긴 기록만 모두 반환된다"
+            "그 실행이 남긴 기록만 모두 반환됩니다",
+            english=(
+                "when one entity holds records left by two runs and it is searched with one "
+                "run filter, every record that run left comes back"
+            ),
         )
 
     @override
@@ -314,7 +349,14 @@ class OmittingThePageSizeCapsThePage(
 
     @override
     def describe(self) -> str:
-        return "지정한 엔티티에 기록이 많고 페이지 크기를 지정하지 않으면, 10건까지 반환되고 다음 페이지가 있다고 응답한다"
+        return Says(
+            "지정한 엔티티에 기록이 많고 페이지 크기를 지정하지 않으면, 10건까지 반환되고 다음 "
+            "페이지가 있다고 응답합니다",
+            english=(
+                "when the named entity holds many records and no page size is given, ten "
+                "items come back and it answers that there is a next page"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ScopedEntities]:
@@ -339,9 +381,14 @@ class AnUnreadableEntityRefusesTheWhole(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "한쪽에만 읽기 권한을 받은 사용자가 두 엔티티를 함께 지정해 검색하면, 볼 수 있는 "
-            "것만 주는 대신 요청 전체가 권한 부족으로 거부된다"
+            "것만 주는 대신 요청 전체가 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted read on only one of two entities searches naming both, "
+                "the whole request is rejected for lack of permission instead of giving only "
+                "what is readable"
+            ),
         )
 
     @override
@@ -367,7 +414,13 @@ class AUserGrantedNothingMayNotScopeSearch(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 엔티티를 지정해 검색하면, 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 엔티티를 지정해 검색하면, 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing searches naming an entity, it is rejected for "
+                "lack of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ScopedEntities]:
@@ -392,9 +445,14 @@ class TheMonitorRoleGetsNoScopeForFree(
 
     @override
     def describe(self) -> str:
-        return (
-            "모니터 역할 사용자라도 권한 없이 엔티티를 지정해 검색하면, 권한 부족으로 거부된다. "
-            "모니터가 통과하는 것은 슈퍼관리자 검사뿐이고 이 검색은 권한 그래프로 보호된다"
+        return Says(
+            "모니터 역할 사용자라도 권한 없이 엔티티를 지정해 검색하면, 권한 부족으로 거부됩니다. "
+            "모니터가 통과하는 것은 superadmin 검사뿐이고 이 검색은 권한 그래프로 보호됩니다",
+            english=(
+                "even a monitor-role user is rejected for lack of permission when searching "
+                "naming an entity without a grant. The monitor passes only the superadmin "
+                "check, and this search is protected by the permission graph"
+            ),
         )
 
     @override
@@ -420,9 +478,14 @@ class NamingAnUnknownEntityIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "다른 엔티티에 읽기 권한을 받은 사용자가 어느 엔티티도 아닌 id를 지정해 검색하면, 그 id에 "
-            "부여된 권한이 없어 권한 부족으로 거부된다"
+        return Says(
+            "다른 엔티티에 읽기 권한을 받은 사용자가 어느 엔티티도 아닌 id 를 지정해 검색하면, 그 "
+            "id 에 부여된 권한이 없어 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted read on another entity searches naming an id that is no "
+                "entity, it is rejected for lack of permission because no permission is "
+                "granted on that id"
+            ),
         )
 
     @override
@@ -448,9 +511,13 @@ class TheSuperadminNamingAnUnknownEntityFindsNothing(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 어느 엔티티도 아닌 id를 지정해 검색하면, 권한 검사를 지나가므로 거부되지 "
-            "않고 빈 페이지가 온다"
+        return Says(
+            "superadmin 이 어느 엔티티도 아닌 id 를 지정해 검색하면, 권한 검사를 지나가므로 "
+            "거부되지 않고 빈 페이지가 옵니다",
+            english=(
+                "when the superadmin searches naming an id that is no entity, it passes the "
+                "permission check and an empty page comes back instead of a rejection"
+            ),
         )
 
     @override
@@ -476,7 +543,14 @@ class EnforcementOffReadsWithoutAGrant(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 끄면 아무 권한도 없는 사용자도 엔티티를 지정해 그 기록을 검색할 수 있다"
+        return Says(
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 엔티티를 지정해 그 기록을 검색할 수 "
+            "있습니다",
+            english=(
+                "turning the permission check off lets even a user granted nothing search the "
+                "records of a named entity"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:
@@ -505,7 +579,10 @@ class ANonEntityIdIsRefused(
 
     @override
     def describe(self) -> str:
-        return "지정한 id가 id 형식이 아니면, 잘못된 입력으로 거부된다"
+        return Says(
+            "지정한 id 가 id 형식이 아니면, 잘못된 입력으로 거부됩니다",
+            english=("when the named id is not in id form, it is rejected as invalid input"),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ScopedEntities]:
@@ -530,9 +607,14 @@ class TheGrantedReaderReadsByActor(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "두 사용자가 각각 기록을 남겼고 한 사용자에 읽기 권한을 받은 사용자가 그 사용자를 "
-            "실행한 사용자로 지정해 검색하면, 그 사용자가 실행한 기록만 반환된다"
+            "실행한 사용자로 지정해 검색하면, 그 사용자가 실행한 기록만 반환됩니다",
+            english=(
+                "when two users each left a record and a user granted read on one of them "
+                "searches naming that user as the one who triggered records, only the records "
+                "that user triggered come back"
+            ),
         )
 
     @override
@@ -558,9 +640,14 @@ class ReadingOnesOwnActorRecordsNeedsAGrant(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "자기 자신에 읽기 권한을 받지 않은 사용자가 자기를 실행한 사용자로 지정해 검색하면, "
-            "권한 부족으로 거부된다. 자기 기록을 조회하는 호출이 따로 없기 때문이다"
+            "권한 부족으로 거부됩니다. 자기 기록을 조회하는 호출이 따로 없기 때문입니다",
+            english=(
+                "when a user granted no read on themselves searches naming themselves as the "
+                "one who triggered records, it is rejected for lack of permission, because "
+                "there is no separate call that reads one's own records"
+            ),
         )
 
     @override
@@ -586,9 +673,14 @@ class ARecordIsFoundByItsScopeTag(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "다른 엔티티에 대한 기록이 한 프로젝트를 스코프로 달고 있을 때 그 프로젝트를 지정해 "
-            "검색하면, 대상 엔티티가 그 프로젝트가 아니어도 그 기록이 반환된다"
+            "검색하면, 대상 엔티티가 그 프로젝트가 아니어도 그 기록이 반환됩니다",
+            english=(
+                "when a record about another entity carries a project as its scope and that "
+                "project is named in a search, the record comes back even though its target "
+                "entity is not that project"
+            ),
         )
 
     @override

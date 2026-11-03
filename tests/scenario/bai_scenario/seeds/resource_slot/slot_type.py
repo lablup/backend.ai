@@ -9,7 +9,8 @@ from ai.backend.common.types import IntrinsicSlotNames, SlotTypes
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.models.resource_slot.creators import ResourceSlotTypeCreator
 from ai.backend.manager.models.resource_slot.types import NumberFormat
-from bai_scenario.seeds.seeder import Naming, TestSeedRow
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import Naming, TestSeedRow, joined
 
 
 @dataclass(frozen=True)
@@ -25,13 +26,16 @@ class TestSeedSlotType(TestSeedRow[ResourceSlotTypeData]):
 
     @override
     def kind(self) -> str:
-        return "자원 슬롯 타입"
+        return Says("자원 슬롯 유형", english="Resource slot type")
 
     @override
     def detail(self) -> str:
         if self.required:
-            return "모든 리비전이 반드시 채워야 한다"
-        return "리비전이 채우지 않아도 된다"
+            return Says(
+                "모든 리비전이 반드시 채워야 합니다",
+                english="every revision must fill it",
+            )
+        return Says("리비전이 채우지 않아도 됩니다", english="a revision may leave it unfilled")
 
     @override
     def name(self, naming: Naming) -> str:
@@ -61,8 +65,8 @@ class TestSeedResourceSlotType(TestSeedRow[ResourceSlotTypeData]):
     slot_type: SlotTypes = SlotTypes.COUNT
     required: bool = False
     enabled: bool = True
-    display_name: str = "미리 만들어 둔 슬롯"
-    description: str = "미리 만들어 둔 슬롯 종류"
+    display_name: str = Says("미리 저장한 슬롯", english="a slot prepared in advance")
+    description: str = Says("미리 저장한 슬롯 종류", english="a slot type prepared in advance")
     display_unit: str = ""
     display_icon: str = ""
     number_format: NumberFormat = NumberFormat()
@@ -70,14 +74,14 @@ class TestSeedResourceSlotType(TestSeedRow[ResourceSlotTypeData]):
 
     @override
     def kind(self) -> str:
-        return "자원 슬롯 종류"
+        return Says("자원 슬롯 유형", english="Resource slot type")
 
     @override
     def detail(self) -> str:
-        parts = [f"{self.slot_type.value} 종류"]
+        parts = [Says(f"{self.slot_type.value} 유형", english=f"{self.slot_type.value} type")]
         if not self.enabled:
-            parts.append("사용하지 않음")
-        return ", ".join(parts)
+            parts.append(Says("사용하지 않음", english="unused"))
+        return joined(parts)
 
     @override
     def name(self, naming: Naming) -> str:

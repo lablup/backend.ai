@@ -23,6 +23,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Refused,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -57,7 +58,13 @@ class EditingEveryPolicy(When[ManyPoliciesAndACaller, RetentionPolicyAdapter, Ed
 
     @override
     def describe(self, laid: ManyPoliciesAndACaller) -> str:
-        return f"{laid.caller.username}이 정책 {len(laid.laid)}개의 보존 일수를 한 번에 수정"
+        return Says(
+            f"{laid.caller.username} 이 정책 {len(laid.laid)}개의 보존 일수를 한 번에 수정합니다",
+            english=(
+                f"{laid.caller.username} edits the retention days of {len(laid.laid)} policies "
+                "at once"
+            ),
+        )
 
     @override
     async def call(self, adapter: RetentionPolicyAdapter, laid: ManyPoliciesAndACaller) -> Edited:
@@ -80,7 +87,12 @@ class EveryPolicyIsEdited(Then[ManyPoliciesAndACaller, Edited]):
 
     @override
     def says(self) -> str:
-        return "대상 정책이 모두 새 보존 일수로 오고, 실패한 것은 없다"
+        return Says(
+            "대상 정책이 모두 새 보존 일수로 오고, 실패한 것은 없습니다",
+            english=(
+                "every target policy comes back with the new retention days and nothing failed"
+            ),
+        )
 
     @override
     def look(self, laid: ManyPoliciesAndACaller, answered: Answered[Edited]) -> list[Verdict]:
@@ -114,7 +126,14 @@ class TheSuperadminEditsSeveralPolicies(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 정책 여럿의 보존 일수를 한 번에 바꾸면, 모두 새 일수로 오고 실패한 것은 없다"
+        return Says(
+            "superadmin 이 정책 여럿의 보존 일수를 한 번에 바꾸면, 모두 새 일수로 오고 실패한 "
+            "것은 없습니다",
+            english=(
+                "when the superadmin changes the retention days of several policies at once, "
+                "all of them come back with the new days and nothing failed"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyPoliciesAndACaller]:
@@ -139,9 +158,14 @@ class AUserGrantedNothingEditsNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 없는 사용자가 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 "
+            "권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to edit several policies at once, none is "
+                "edited and every one comes back in the failed list because the user has no "
+                "permission"
+            ),
         )
 
     @override

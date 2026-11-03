@@ -13,7 +13,8 @@ from ai.backend.common.types import ClusterMode
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.models.deployment_revision_preset.creators import DeploymentPresetCreator
-from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom, joined
 
 
 @dataclass(frozen=True)
@@ -26,16 +27,23 @@ class TestSeedDeploymentRevisionPreset(
     """
 
     name_hint: str = "preset"
-    description: str | None = "미리 만들어 둔 프리셋"
+    description: str | None = Says("미리 저장한 프리셋", english="a preset created in advance")
     image_id: UUID = UUID(int=7)
 
     @override
     def kind(self) -> str:
-        return "배포 리비전 프리셋"
+        return Says("배포 리비전 프리셋", english="Deployment revision preset")
 
     @override
     def detail(self) -> str:
-        return "단일 노드, 레플리카 하나, 롤링 업데이트"
+        return joined(
+            [
+                Says("단일 노드", english="single node"),
+                Says("복제본 하나", english="one replica"),
+                Says("롤링 업데이트", english="rolling update"),
+            ],
+            ", ",
+        )
 
     @override
     def name(self, naming: Naming) -> str:

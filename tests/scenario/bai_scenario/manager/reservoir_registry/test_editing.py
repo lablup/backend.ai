@@ -19,7 +19,7 @@ from ai.backend.manager.api.adapters.reservoir_registry.adapter import (
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.reservoir_registry import (
     EDITED_ENDPOINT,
@@ -47,7 +47,10 @@ class Editing(When[ARegistryAndACaller, ReservoirRegistryAdapter, Edited]):
 
     @override
     def describe(self, laid: ARegistryAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.registry.name}의 엔드포인트를 바꿈"
+        return Says(
+            f"{laid.caller.username}이 {laid.registry.name}의 엔드포인트를 변경합니다",
+            english=f"{laid.caller.username} changes the endpoint of {laid.registry.name}",
+        )
 
     @override
     async def call(self, adapter: ReservoirRegistryAdapter, laid: ARegistryAndACaller) -> Edited:
@@ -68,7 +71,14 @@ class AUserGrantedUpdateEdits(
 
     @override
     def describe(self) -> str:
-        return "레지스트리 수정 권한을 받은 사용자가 엔드포인트를 바꾸면, 그 레지스트리가 새 엔드포인트로 온다"
+        return Says(
+            "Reservoir 레지스트리 수정 권한을 받은 사용자가 엔드포인트를 변경하면, 그 Reservoir "
+            "레지스트리가 새 엔드포인트로 옵니다",
+            english=(
+                "when a user granted permission to edit Reservoir registries changes the "
+                "endpoint, the Reservoir registry comes back with the new endpoint"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
@@ -93,7 +103,13 @@ class AUserGrantedNothingMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 엔드포인트를 바꾸려 하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 엔드포인트를 변경하려 하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing tries to change the endpoint, it is rejected for "
+                "lack of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:

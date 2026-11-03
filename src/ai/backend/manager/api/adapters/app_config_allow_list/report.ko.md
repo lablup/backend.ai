@@ -2,89 +2,89 @@
 
 [배경](/src/ai/backend/manager/api/adapters/app_config_allow_list/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/app_config_allow_list/adapter.py)
 
-시나리오: 미완 2 / 8
+시나리오: 미완성 2 / 8
 
-- ops 로 구성 (6)
-  - admin_create: 대표 성공 ✓ · 대표 실패 ✓
-  - admin_get: 대표 성공 ✓ · 대표 실패 ✓
-  - admin_search: 대표 성공 ✓ · 대표 실패 ✓
-  - batch_load_by_ids: 대표 성공 ✓ · 대표 실패 ✓
-  - partial_bulk_update: 대표 성공 ✓ · 대표 실패 ✗: SCENARIO-GAP
-  - update: 대표 성공 ✓ · 대표 실패 ✓
+- ops 구성 (6)
+  - admin_create: 대표 성공 ✓ · 대표 거부 ✓
+  - admin_get: 대표 성공 ✓ · 대표 거부 ✓
+  - admin_search: 대표 성공 ✓ · 대표 거부 ✓
+  - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
+  - partial_bulk_update: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - update: 대표 성공 ✓ · 대표 거부 ✓
 - 직접 구현 (2)
-  - partial_bulk_purge: 성공 있음 2 · 실패 없음 (partial_bulk): SCENARIO-GAP
-  - purge: 성공 있음 2 · 실패 있음 2 (single_entity)
+  - partial_bulk_purge: 성공 있음 2 · 거부 없음 (partial_bulk): SCENARIO-GAP
+  - purge: 성공 있음 2 · 거부 있음 2 (single_entity)
 
 **admin_create**
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 순위를 지정해 allow_list를 생성하면, 지정한 값이 그대로 저장된다](#creating-a-rank-given-in-the-request-is-kept-as-is) | 성공 |
-| [슈퍼관리자가 순위를 생략하고 도메인 스코프 유형의 allow_list를 생성하면, 순위 200이 적용된다](#creating-leaving-the-rank-out-opens-the-domain-kind-at-its-default-rank) | 성공 |
-| [슈퍼관리자가 순위를 생략하고 공개 스코프 유형의 allow_list를 생성하면, 순위 100이 적용된다](#creating-leaving-the-rank-out-opens-the-public-kind-at-its-default-rank) | 성공 |
-| [슈퍼관리자가 순위를 생략하고 사용자 스코프 유형의 allow_list를 생성하면, 순위 300이 적용된다](#creating-leaving-the-rank-out-opens-the-user-kind-at-its-default-rank) | 성공 |
-| [슈퍼관리자가 등록되지 않은 설정 이름으로 allow_list를 생성하면, 정의 없음 오류가 반환된다](#creating-a-name-nothing-registers-cannot-be-opened) | 거부 |
-| [일반 사용자가 allow_list를 생성하면, 슈퍼관리자 권한이 없어 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-open-a-name) | 거부 |
-| [슈퍼관리자가 같은 설정 이름과 스코프 유형으로 allow_list를 다시 생성하면, 데이터베이스의 고유 제약 오류가 반환된다](#creating-opening-the-same-name-to-the-same-kind-twice-is-refused-as-a-constraint-violation) | 거부 |
-| [RBAC 강제를 꺼도 일반 사용자의 allow_list 생성은 거부된다](#creating-turning-enforcement-off-still-does-not-let-a-user-open-a-name) | 거부 |
+| [superadmin 이 순위를 지정해 allow_list 를 생성하면, 지정한 값이 그대로 저장됩니다](#creating-a-rank-given-in-the-request-is-kept-as-is) | 성공 |
+| [superadmin 이 순위를 생략하고 도메인 스코프 유형의 allow_list 를 생성하면, 순위 200이 적용됩니다](#creating-leaving-the-rank-out-opens-the-domain-kind-at-its-default-rank) | 성공 |
+| [superadmin 이 순위를 생략하고 공개 스코프 유형의 allow_list 를 생성하면, 순위 100이 적용됩니다](#creating-leaving-the-rank-out-opens-the-public-kind-at-its-default-rank) | 성공 |
+| [superadmin 이 순위를 생략하고 사용자 스코프 유형의 allow_list 를 생성하면, 순위 300이 적용됩니다](#creating-leaving-the-rank-out-opens-the-user-kind-at-its-default-rank) | 성공 |
+| [superadmin 이 등록되지 않은 설정 이름으로 allow_list 를 생성하면, 정의 없음 오류가 반환됩니다](#creating-a-name-nothing-registers-cannot-be-opened) | 거부 |
+| [일반 사용자가 allow_list 를 생성하면, superadmin 권한이 없어 거부됩니다](#creating-a-user-who-is-not-the-superadmin-may-not-open-a-name) | 거부 |
+| [superadmin 이 같은 설정 이름과 스코프 유형으로 allow_list 를 다시 생성하면, 데이터베이스의 고유 제약 오류가 반환됩니다](#creating-opening-the-same-name-to-the-same-kind-twice-is-refused-as-a-constraint-violation) | 거부 |
+| [RBAC 강제를 비활성화해도 일반 사용자의 allow_list 생성은 거부됩니다](#creating-turning-enforcement-off-still-does-not-let-a-user-open-a-name) | 거부 |
 
 **admin_get**
 
 | 시나리오 | 판정 |
 |---|---|
-| [allow_list 하나가 있고 슈퍼관리자가 ID로 조회하면, 그 allow_list의 모든 필드가 반환된다](#reading-the-superadmin-reads-an-entry-by-id) | 성공 |
-| [RBAC 강제를 끄면 권한이 없는 일반 사용자도 allow_list를 조회할 수 있다](#reading-turning-enforcement-off-lets-a-plain-user-read) | 성공 |
-| [같은 allow_list를 권한이 없는 일반 사용자가 조회하면, 엔티티 읽기 권한이 없어 거부된다](#reading-a-user-who-is-not-the-superadmin-may-not-read-an-entry) | 거부 |
-| [슈퍼관리자가 존재하지 않는 ID로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다](#reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
+| [allow_list 하나가 있고 superadmin 이 ID 로 조회하면, 그 allow_list 의 모든 필드가 반환됩니다](#reading-the-superadmin-reads-an-entry-by-id) | 성공 |
+| [RBAC 강제를 비활성화하면 권한이 없는 일반 사용자도 allow_list 를 조회할 수 있습니다](#reading-turning-enforcement-off-lets-a-plain-user-read) | 성공 |
+| [같은 allow_list 를 권한이 없는 일반 사용자가 조회하면, 엔티티 읽기 권한이 없어 거부됩니다](#reading-a-user-who-is-not-the-superadmin-may-not-read-an-entry) | 거부 |
+| [superadmin 이 존재하지 않는 ID 로 조회하면, 대상을 찾을 수 없다는 이유로 거부됩니다. 권한 검사를 통과하는 사용자만 이 응답을 봅니다](#reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
 
 **admin_search**
 
 | 시나리오 | 판정 |
 |---|---|
-| [생성 시각이 모두 같은 allow_list 넷이 있고 슈퍼관리자가 기본 순서 첫 항목의 커서 뒤로 한 건을 검색하면, 바로 다음 allow_list 하나와 앞뒤 페이지가 모두 있다고 응답한다](#searching-a-forward-cursor-answers-the-one-right-after-it) | 성공 |
-| [설정 이름 둘에 allow_list 넷이 있고 슈퍼관리자가 필터 없이 검색하면, 네 allow_list가 모두 반환된다](#searching-the-superadmin-counts-every-entry) | 성공 |
-| [일반 사용자가 allow_list를 검색하면, 슈퍼관리자 권한이 없어 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-entries) | 거부 |
+| [생성 시각이 모두 같은 allow_list 넷이 있고 superadmin 이 기본 순서 첫 항목의 커서 뒤로 한 건을 검색하면, 바로 다음 allow_list 하나와 앞뒤 페이지가 모두 있다고 응답합니다](#searching-a-forward-cursor-answers-the-one-right-after-it) | 성공 |
+| [설정 이름 둘에 allow_list 넷이 있고 superadmin 이 필터 없이 검색하면, 네 allow_list 가 모두 반환됩니다](#searching-the-superadmin-counts-every-entry) | 성공 |
+| [일반 사용자가 allow_list 를 검색하면, superadmin 권한이 없어 거부됩니다](#searching-a-user-who-is-not-the-superadmin-may-not-search-entries) | 거부 |
 
 **batch_load_by_ids**
 
 | 시나리오 | 판정 |
 |---|---|
-| [빈 ID 목록으로 조회하면 빈 목록이 반환된다](#reading_many-an-empty-id-list-answers-empty) | 성공 |
-| [슈퍼관리자가 같은 allow_list의 ID를 두 번 조회하면, 같은 노드가 두 위치에 반환된다](#reading_many-duplicate-ids-keep-their-input-positions) | 성공 |
-| [슈퍼관리자가 allow_list 둘과 없는 ID 하나를 함께 조회하면, 입력 순서대로 노드 둘과 None이 반환된다](#reading_many-the-superadmin-reads-both-and-a-missing-id-comes-back-empty) | 성공 |
-| [권한이 없는 일반 사용자가 allow_list 둘과 없는 ID 하나를 함께 조회하면, 각 입력 위치에 엔티티 읽기 권한 오류가 반환된다](#reading_many-a-user-who-is-not-the-superadmin-is-refused-per-id) | 거부 |
+| [빈 ID 목록으로 조회하면 빈 목록이 반환됩니다](#reading_many-an-empty-id-list-answers-empty) | 성공 |
+| [superadmin 이 같은 allow_list 의 ID 를 두 번 조회하면, 같은 노드가 두 위치에 반환됩니다](#reading_many-duplicate-ids-keep-their-input-positions) | 성공 |
+| [superadmin 이 allow_list 둘과 없는 ID 하나를 함께 조회하면, 입력 순서대로 노드 둘과 None 이 반환됩니다](#reading_many-the-superadmin-reads-both-and-a-missing-id-comes-back-empty) | 성공 |
+| [권한이 없는 일반 사용자가 allow_list 둘과 없는 ID 하나를 함께 조회하면, 각 입력 위치에 엔티티 읽기 권한 오류가 반환됩니다](#reading_many-a-user-who-is-not-the-superadmin-is-refused-per-id) | 거부 |
 
 **partial_bulk_update**
 
 | 시나리오 | 판정 |
 |---|---|
-| [권한이 없는 일반 사용자가 allow_list 둘의 순위를 한 번에 바꾸려 하면, 바뀐 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-reranks-none-of-several-entries) | 성공 |
-| [슈퍼관리자가 allow_list 둘의 순위를 한 번에 바꾸면, 둘 다 새 순위로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-reranks-several-entries-at-once) | 성공 |
+| [권한이 없는 일반 사용자가 allow_list 둘의 순위를 한 번에 변경하려 하면, 변경된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_editing-a-user-granted-nothing-reranks-none-of-several-entries) | 성공 |
+| [superadmin 이 allow_list 둘의 순위를 한 번에 변경하면, 둘 다 새 순위로 오고 실패한 것은 없습니다](#partial_bulk_editing-the-superadmin-reranks-several-entries-at-once) | 성공 |
 
 **update**
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 아무 값도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-an-edit-carrying-no-value-changes-nothing) | 성공 |
-| [allow_list 하나가 있고 슈퍼관리자가 순위를 바꾸면, 순위만 변경되고 설정 이름과 스코프 유형은 그대로다](#editing-the-superadmin-changes-an-entrys-rank) | 성공 |
-| [같은 allow_list를 권한이 없는 일반 사용자가 수정하면, 엔티티 수정 권한이 없어 거부된다](#editing-a-user-who-is-not-the-superadmin-may-not-change-a-rank) | 거부 |
-| [슈퍼관리자가 존재하지 않는 ID의 순위를 수정하면, 대상을 찾을 수 없다는 이유로 거부된다](#editing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
+| [superadmin 이 아무 값도 지정하지 않고 수정하면, 아무것도 변경되지 않은 노드가 반환됩니다](#editing-an-edit-carrying-no-value-changes-nothing) | 성공 |
+| [allow_list 하나가 있고 superadmin 이 순위를 변경하면, 순위만 변경되고 설정 이름과 스코프 유형은 그대로입니다](#editing-the-superadmin-changes-an-entrys-rank) | 성공 |
+| [같은 allow_list 를 권한이 없는 일반 사용자가 수정하면, 엔티티 수정 권한이 없어 거부됩니다](#editing-a-user-who-is-not-the-superadmin-may-not-change-a-rank) | 거부 |
+| [superadmin 이 존재하지 않는 ID 의 순위를 수정하면, 대상을 찾을 수 없다는 이유로 거부됩니다](#editing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
 
 **partial_bulk_purge**
 
 | 시나리오 | 판정 |
 |---|---|
-| [권한이 없는 일반 사용자가 allow_list 둘을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-entries) | 성공 |
-| [슈퍼관리자가 allow_list 둘과 존재하지 않는 ID를 한 번에 영구 삭제하면, 둘은 처리된 목록에 오고 없는 ID는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | 성공 |
+| [권한이 없는 일반 사용자가 allow_list 둘을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-entries) | 성공 |
+| [superadmin 이 allow_list 둘과 존재하지 않는 ID 를 한 번에 영구 삭제하면, 둘은 처리된 목록에 오고 없는 ID 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | 성공 |
 
 **purge**
 
 | 시나리오 | 판정 |
 |---|---|
-| [설정 조각이 있는 allow_list를 슈퍼관리자가 영구 삭제하면, 설정 조각이 막지 않고 allow_list의 ID가 반환된다](#purging-an-entry-holding-a-fragment-is-still-purged) | 성공 |
-| [설정 조각이 없는 allow_list를 슈퍼관리자가 영구 삭제하면, 삭제한 allow_list의 ID가 반환된다](#purging-the-superadmin-purges-an-entry) | 성공 |
-| [같은 allow_list를 권한이 없는 일반 사용자가 영구 삭제하면, 엔티티 삭제 권한이 없어 거부된다](#purging-a-user-who-is-not-the-superadmin-may-not-purge-an-entry) | 거부 |
-| [슈퍼관리자가 존재하지 않는 ID를 영구 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다](#purging-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
+| [설정 조각이 있는 allow_list 를 superadmin 이 영구 삭제하면, 설정 조각이 차단하지 않고 allow_list 의 ID 가 반환됩니다](#purging-an-entry-holding-a-fragment-is-still-purged) | 성공 |
+| [설정 조각이 없는 allow_list 를 superadmin 이 영구 삭제하면, 삭제한 allow_list 의 ID 가 반환됩니다](#purging-the-superadmin-purges-an-entry) | 성공 |
+| [같은 allow_list 를 권한이 없는 일반 사용자가 영구 삭제하면, 엔티티 삭제 권한이 없어 거부됩니다](#purging-a-user-who-is-not-the-superadmin-may-not-purge-an-entry) | 거부 |
+| [superadmin 이 존재하지 않는 ID 를 영구 삭제하면, 대상을 찾을 수 없다는 이유로 거부됩니다](#purging-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
 
 ### admin_create
 
@@ -92,27 +92,27 @@
 
 #### [a-rank-given-in-the-request-is-kept-as-is](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py): pass
 
-슈퍼관리자가 순위를 지정해 allow_list를 생성하면, 지정한 값이 그대로 저장된다
+superadmin 이 순위를 지정해 allow_list 를 생성하면, 지정한 값이 그대로 저장됩니다
 
 Given
 
-- allow_list가 없는 설정 정의 하나와 슈퍼관리자 한 명
+- allow_list 가 없는 설정 정의 하나와 superadmin 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
 
 When
 
-- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 도메인 allow_list 생성 (순위 250)
+- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 도메인 allow_list 를 생성합니다 (순위 250)
 
 Then
 
-- 생성한 allow_list의 모든 필드가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- 생성한 allow_list 의 모든 필드가 반환됩니다
+  - id: 건너뜀: 데이터베이스가 생성합니다
   - config_name = 'config-1'
   - scope_type = <AppConfigScopeType.DOMAIN: 'domain'>
   - rank = 250
@@ -123,27 +123,27 @@ Then
 
 #### [leaving-the-rank-out-opens-the-domain-kind-at-its-default-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py): pass
 
-슈퍼관리자가 순위를 생략하고 도메인 스코프 유형의 allow_list를 생성하면, 순위 200이 적용된다
+superadmin 이 순위를 생략하고 도메인 스코프 유형의 allow_list 를 생성하면, 순위 200이 적용됩니다
 
 Given
 
-- allow_list가 없는 설정 정의 하나와 슈퍼관리자 한 명
+- allow_list 가 없는 설정 정의 하나와 superadmin 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
 
 When
 
-- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 도메인 allow_list 생성 (순위 생략)
+- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 도메인 allow_list 를 생성합니다 (순위 생략)
 
 Then
 
-- 생성한 allow_list의 모든 필드가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- 생성한 allow_list 의 모든 필드가 반환됩니다
+  - id: 건너뜀: 데이터베이스가 생성합니다
   - config_name = 'config-1'
   - scope_type = <AppConfigScopeType.DOMAIN: 'domain'>
   - rank = 200
@@ -154,27 +154,27 @@ Then
 
 #### [leaving-the-rank-out-opens-the-public-kind-at-its-default-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py): pass
 
-슈퍼관리자가 순위를 생략하고 공개 스코프 유형의 allow_list를 생성하면, 순위 100이 적용된다
+superadmin 이 순위를 생략하고 공개 스코프 유형의 allow_list 를 생성하면, 순위 100이 적용됩니다
 
 Given
 
-- allow_list가 없는 설정 정의 하나와 슈퍼관리자 한 명
+- allow_list 가 없는 설정 정의 하나와 superadmin 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
 
 When
 
-- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 공개 allow_list 생성 (순위 생략)
+- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 공개 allow_list 를 생성합니다 (순위 생략)
 
 Then
 
-- 생성한 allow_list의 모든 필드가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- 생성한 allow_list 의 모든 필드가 반환됩니다
+  - id: 건너뜀: 데이터베이스가 생성합니다
   - config_name = 'config-1'
   - scope_type = <AppConfigScopeType.PUBLIC: 'public'>
   - rank = 100
@@ -185,27 +185,27 @@ Then
 
 #### [leaving-the-rank-out-opens-the-user-kind-at-its-default-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py): pass
 
-슈퍼관리자가 순위를 생략하고 사용자 스코프 유형의 allow_list를 생성하면, 순위 300이 적용된다
+superadmin 이 순위를 생략하고 사용자 스코프 유형의 allow_list 를 생성하면, 순위 300이 적용됩니다
 
 Given
 
-- allow_list가 없는 설정 정의 하나와 슈퍼관리자 한 명
+- allow_list 가 없는 설정 정의 하나와 superadmin 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
 
 When
 
-- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 사용자 allow_list 생성 (순위 생략)
+- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 사용자 allow_list 를 생성합니다 (순위 생략)
 
 Then
 
-- 생성한 allow_list의 모든 필드가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- 생성한 allow_list 의 모든 필드가 반환됩니다
+  - id: 건너뜀: 데이터베이스가 생성합니다
   - config_name = 'config-1'
   - scope_type = <AppConfigScopeType.USER: 'user'>
   - rank = 300
@@ -216,104 +216,104 @@ Then
 
 #### [a-name-nothing-registers-cannot-be-opened](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py): pass
 
-슈퍼관리자가 등록되지 않은 설정 이름으로 allow_list를 생성하면, 정의 없음 오류가 반환된다
+superadmin 이 등록되지 않은 설정 이름으로 allow_list 를 생성하면, 정의 없음 오류가 반환됩니다
 
 Given
 
-- 등록되지 않은 설정 이름과 슈퍼관리자 한 명
+- 등록되지 않은 설정 이름과 superadmin 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
 
 When
 
-- AppConfigAllowListAdapter.admin_create: user-1이 unregistered의 공개 allow_list 생성 (순위 생략)
+- AppConfigAllowListAdapter.admin_create: user-1이 unregistered 의 공개 allow_list 를 생성합니다 (순위 생략)
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: AppConfigDefinitionNotFound
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-open-a-name"></a>
 
 #### [a-user-who-is-not-the-superadmin-may-not-open-a-name](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py): pass
 
-일반 사용자가 allow_list를 생성하면, 슈퍼관리자 권한이 없어 거부된다
+일반 사용자가 allow_list 를 생성하면, superadmin 권한이 없어 거부됩니다
 
 Given
 
-- allow_list가 없는 설정 정의 하나와 권한이 없는 일반 사용자 한 명
+- allow_list 가 없는 설정 정의 하나와 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
 
 When
 
-- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 공개 allow_list 생성 (순위 생략)
+- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 공개 allow_list 를 생성합니다 (순위 생략)
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: InsufficientPrivilege
 
 <a id="creating-opening-the-same-name-to-the-same-kind-twice-is-refused-as-a-constraint-violation"></a>
 
 #### [opening-the-same-name-to-the-same-kind-twice-is-refused-as-a-constraint-violation](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py): pass
 
-슈퍼관리자가 같은 설정 이름과 스코프 유형으로 allow_list를 다시 생성하면, 데이터베이스의 고유 제약 오류가 반환된다
+superadmin 이 같은 설정 이름과 스코프 유형으로 allow_list 를 다시 생성하면, 데이터베이스의 고유 제약 오류가 반환됩니다
 
 Given
 
-- 공개 스코프 유형의 allow_list 하나와 슈퍼관리자 한 명
+- 공개 스코프 유형의 allow_list 하나와 superadmin 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
 
 When
 
-- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 공개 allow_list 생성 (순위 생략)
+- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 공개 allow_list 를 생성합니다 (순위 생략)
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: UniqueConstraintViolationError
 
 <a id="creating-turning-enforcement-off-still-does-not-let-a-user-open-a-name"></a>
 
 #### [turning-enforcement-off-still-does-not-let-a-user-open-a-name](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py): pass
 
-RBAC 강제를 꺼도 일반 사용자의 allow_list 생성은 거부된다
+RBAC 강제를 비활성화해도 일반 사용자의 allow_list 생성은 거부됩니다
 
 Given
 
-- allow_list가 없는 설정 정의 하나와 권한이 없는 일반 사용자 한 명
+- allow_list 가 없는 설정 정의 하나와 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
 
 When
 
-- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 공개 allow_list 생성 (순위 생략)
+- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 공개 allow_list 를 생성합니다 (순위 생략)
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: InsufficientPrivilege
 
 ### admin_get
@@ -322,28 +322,28 @@ Then
 
 #### [the-superadmin-reads-an-entry-by-id](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py): pass
 
-allow_list 하나가 있고 슈퍼관리자가 ID로 조회하면, 그 allow_list의 모든 필드가 반환된다
+allow_list 하나가 있고 superadmin 이 ID 로 조회하면, 그 allow_list 의 모든 필드가 반환됩니다
 
 Given
 
-- 사용자 스코프 유형의 allow_list 하나와 슈퍼관리자 한 명
+- 사용자 스코프 유형의 allow_list 하나와 superadmin 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
 
 When
 
-- AppConfigAllowListAdapter.admin_get: user-1이 config-1의 allow_list 조회
+- AppConfigAllowListAdapter.admin_get: user-1이 config-1의 allow_list 조회합니다
 
 Then
 
-- 준비한 allow_list의 모든 필드가 반환된다
-  - id: 준비한 ID와 같다
+- 준비한 allow_list 의 모든 필드가 반환됩니다
+  - id: 준비한 ID 와 같다
   - config_name = 'config-1'
   - scope_type = <AppConfigScopeType.USER: 'user'>
   - rank = 300
@@ -354,28 +354,28 @@ Then
 
 #### [turning-enforcement-off-lets-a-plain-user-read](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py): pass
 
-RBAC 강제를 끄면 권한이 없는 일반 사용자도 allow_list를 조회할 수 있다
+RBAC 강제를 비활성화하면 권한이 없는 일반 사용자도 allow_list 를 조회할 수 있습니다
 
 Given
 
 - 사용자 스코프 유형의 allow_list 하나와 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
 
 When
 
-- AppConfigAllowListAdapter.admin_get: user-1이 config-1의 allow_list 조회
+- AppConfigAllowListAdapter.admin_get: user-1이 config-1의 allow_list 조회합니다
 
 Then
 
-- 준비한 allow_list의 모든 필드가 반환된다
-  - id: 준비한 ID와 같다
+- 준비한 allow_list 의 모든 필드가 반환됩니다
+  - id: 준비한 ID 와 같다
   - config_name = 'config-1'
   - scope_type = <AppConfigScopeType.USER: 'user'>
   - rank = 300
@@ -386,54 +386,54 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-read-an-entry](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py): pass
 
-같은 allow_list를 권한이 없는 일반 사용자가 조회하면, 엔티티 읽기 권한이 없어 거부된다
+같은 allow_list 를 권한이 없는 일반 사용자가 조회하면, 엔티티 읽기 권한이 없어 거부됩니다
 
 Given
 
 - 사용자 스코프 유형의 allow_list 하나와 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
 
 When
 
-- AppConfigAllowListAdapter.admin_get: user-1이 config-1의 allow_list 조회
+- AppConfigAllowListAdapter.admin_get: user-1이 config-1의 allow_list 조회합니다
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: NotEnoughPermission
 
 <a id="reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
 #### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py): pass
 
-슈퍼관리자가 존재하지 않는 ID로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다
+superadmin 이 존재하지 않는 ID 로 조회하면, 대상을 찾을 수 없다는 이유로 거부됩니다. 권한 검사를 통과하는 사용자만 이 응답을 봅니다
 
 Given
 
-- 공개 스코프 유형의 allow_list 하나와 슈퍼관리자 한 명
+- 공개 스코프 유형의 allow_list 하나와 superadmin 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
 
 When
 
-- AppConfigAllowListAdapter.admin_get: user-1이 존재하지 않는 ID 조회
+- AppConfigAllowListAdapter.admin_get: user-1이 존재하지 않는 ID 조회합니다
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: EntityNotFoundError
 
 ### admin_search
@@ -442,33 +442,33 @@ Then
 
 #### [a-forward-cursor-answers-the-one-right-after-it](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_searching.py): pass
 
-생성 시각이 모두 같은 allow_list 넷이 있고 슈퍼관리자가 기본 순서 첫 항목의 커서 뒤로 한 건을 검색하면, 바로 다음 allow_list 하나와 앞뒤 페이지가 모두 있다고 응답한다
+생성 시각이 모두 같은 allow_list 넷이 있고 superadmin 이 기본 순서 첫 항목의 커서 뒤로 한 건을 검색하면, 바로 다음 allow_list 하나와 앞뒤 페이지가 모두 있다고 응답합니다
 
 Given
 
-- 설정 이름 4개에 각각 공개 스코프 유형의 allow_list와 슈퍼관리자 한 명
+- 설정 이름 4개에 각각 공개 스코프 유형의 allow_list 와 superadmin 한 명
   - 도메인 home-1
-  - 설정 정의 definition-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 설정 정의 definition-2: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-2: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 설정 정의 definition-3: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-3: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 설정 정의 definition-4: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-4: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 설정 정의 definition-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 설정 정의 definition-2: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-2: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 설정 정의 definition-3: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-3: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 설정 정의 definition-4: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-4: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
 
 When
 
-- AppConfigAllowListAdapter.admin_search: user-1이 기본 순서 첫 항목의 커서 뒤로 한 건 검색
+- AppConfigAllowListAdapter.admin_search: user-1이 기본 순서 첫 항목의 커서 뒤로 한 건 검색합니다
 
 Then
 
-- 커서 다음 allow_list 하나가 오고 앞뒤 페이지가 모두 있다고 응답한다
+- 커서 다음 allow_list 하나가 오고 앞뒤 페이지가 모두 있다고 응답합니다
   - items: 커서 다음 allow_list 하나와 같다
   - total_count = 4
   - has_next_page = True
@@ -478,31 +478,31 @@ Then
 
 #### [the-superadmin-counts-every-entry](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_searching.py): pass
 
-설정 이름 둘에 allow_list 넷이 있고 슈퍼관리자가 필터 없이 검색하면, 네 allow_list가 모두 반환된다
+설정 이름 둘에 allow_list 넷이 있고 superadmin 이 필터 없이 검색하면, 네 allow_list 가 모두 반환됩니다
 
 Given
 
-- 설정 이름 2개에 각각 공개·사용자 스코프 유형의 allow_list와 슈퍼관리자 한 명
+- 설정 이름 2개에 각각 공개, 사용자 스코프 유형의 allow_list 와 superadmin 한 명
   - 도메인 home-1
-  - 설정 정의 definition-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 허용 목록 항목 entry-2: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 설정 정의 definition-2: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-3: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 허용 목록 항목 entry-4: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 설정 정의 definition-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 허용 목록 항목 entry-2: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 설정 정의 definition-2: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-3: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 허용 목록 항목 entry-4: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
 
 When
 
-- AppConfigAllowListAdapter.admin_search: user-1이 필터 없이 검색
+- AppConfigAllowListAdapter.admin_search: user-1이 필터 없이 검색합니다
 
 Then
 
-- 준비한 allow_list만 모두 반환된다
+- 준비한 allow_list 만 모두 반환됩니다
   - items = [('definition-1', <AppConfigScopeType.PUBLIC: 'public'>), ('definition-1', <AppConfigScopeType.USER: 'user'>), ('definition-2', <AppConfigScopeType.PUBLIC: 'public'>), ('definition-2', <AppConfigScopeType.USER: 'user'>)]
   - total_count = 4
   - has_next_page = False
@@ -512,29 +512,29 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-search-entries](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_searching.py): pass
 
-일반 사용자가 allow_list를 검색하면, 슈퍼관리자 권한이 없어 거부된다
+일반 사용자가 allow_list 를 검색하면, superadmin 권한이 없어 거부됩니다
 
 Given
 
-- 설정 이름 2개에 각각 공개 스코프 유형의 allow_list와 권한이 없는 일반 사용자 한 명
+- 설정 이름 2개에 각각 공개 스코프 유형의 allow_list 와 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
-  - 설정 정의 definition-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 설정 정의 definition-2: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-2: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 설정 정의 definition-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 설정 정의 definition-2: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-2: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
 
 When
 
-- AppConfigAllowListAdapter.admin_search: user-1이 필터 없이 검색
+- AppConfigAllowListAdapter.admin_search: user-1이 필터 없이 검색합니다
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: InsufficientPrivilege
 
 ### batch_load_by_ids
@@ -543,117 +543,117 @@ Then
 
 #### [an-empty-id-list-answers-empty](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading_many.py): pass
 
-빈 ID 목록으로 조회하면 빈 목록이 반환된다
+빈 ID 목록으로 조회하면 빈 목록이 반환됩니다
 
 Given
 
-- 한 설정 이름의 PUBLIC·USER allow_list와 권한이 없는 일반 사용자 한 명
+- 한 설정 이름의 PUBLIC, USER allow_list 와 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
 
 When
 
-- AppConfigAllowListAdapter.batch_load_by_ids: user-1이 빈 ID 목록으로 조회
+- AppConfigAllowListAdapter.batch_load_by_ids: user-1이 빈 ID 목록으로 조회합니다
 
 Then
 
-- 빈 응답이 반환된다
+- 빈 응답이 반환됩니다
   - items = []
 
 <a id="reading_many-duplicate-ids-keep-their-input-positions"></a>
 
 #### [duplicate-ids-keep-their-input-positions](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading_many.py): pass
 
-슈퍼관리자가 같은 allow_list의 ID를 두 번 조회하면, 같은 노드가 두 위치에 반환된다
+superadmin 이 같은 allow_list 의 ID 를 두 번 조회하면, 같은 노드가 두 위치에 반환됩니다
 
 Given
 
-- 한 설정 이름의 PUBLIC·USER allow_list와 슈퍼관리자 한 명
+- 한 설정 이름의 PUBLIC, USER allow_list 와 superadmin 한 명
   - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
 
 When
 
-- AppConfigAllowListAdapter.batch_load_by_ids: user-1이 첫 번째 allow_list의 ID를 두 번 조회
+- AppConfigAllowListAdapter.batch_load_by_ids: user-1이 첫 번째 allow_list 의 ID 를 두 번 조회합니다
 
 Then
 
-- 중복 ID의 두 위치에 같은 allow_list가 반환된다
+- 중복 ID 의 두 위치에 같은 allow_list 가 반환됩니다
   - items = 2
-  - items[0].id: 준비한 첫 번째 ID와 같다
-  - items[1].id: 준비한 첫 번째 ID와 같다
+  - items[0].id: 준비한 첫 번째 ID 와 같다
+  - items[1].id: 준비한 첫 번째 ID 와 같다
 
 <a id="reading_many-the-superadmin-reads-both-and-a-missing-id-comes-back-empty"></a>
 
 #### [the-superadmin-reads-both-and-a-missing-id-comes-back-empty](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading_many.py): pass
 
-슈퍼관리자가 allow_list 둘과 없는 ID 하나를 함께 조회하면, 입력 순서대로 노드 둘과 None이 반환된다
+superadmin 이 allow_list 둘과 없는 ID 하나를 함께 조회하면, 입력 순서대로 노드 둘과 None 이 반환됩니다
 
 Given
 
-- 한 설정 이름의 PUBLIC·USER allow_list와 슈퍼관리자 한 명
+- 한 설정 이름의 PUBLIC, USER allow_list 와 superadmin 한 명
   - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
 
 When
 
-- AppConfigAllowListAdapter.batch_load_by_ids: user-1이 allow_list 둘과 존재하지 않는 ID를 한 번에 조회
+- AppConfigAllowListAdapter.batch_load_by_ids: user-1이 allow_list 둘과 존재하지 않는 ID 를 한 번에 조회합니다
 
 Then
 
-- 있는 ID 둘은 노드로, 없는 ID는 None으로 반환된다
+- 있는 ID 둘은 노드로, 없는 ID 는 None 으로 반환됩니다
   - items = 3
-  - items[0].id: 준비한 첫 번째 ID와 같다
-  - items[1].id: 준비한 두 번째 ID와 같다
+  - items[0].id: 준비한 첫 번째 ID 와 같다
+  - items[1].id: 준비한 두 번째 ID 와 같다
   - items[2] = None
 
 <a id="reading_many-a-user-who-is-not-the-superadmin-is-refused-per-id"></a>
 
 #### [a-user-who-is-not-the-superadmin-is-refused-per-id](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading_many.py): pass
 
-권한이 없는 일반 사용자가 allow_list 둘과 없는 ID 하나를 함께 조회하면, 각 입력 위치에 엔티티 읽기 권한 오류가 반환된다
+권한이 없는 일반 사용자가 allow_list 둘과 없는 ID 하나를 함께 조회하면, 각 입력 위치에 엔티티 읽기 권한 오류가 반환됩니다
 
 Given
 
-- 한 설정 이름의 PUBLIC·USER allow_list와 권한이 없는 일반 사용자 한 명
+- 한 설정 이름의 PUBLIC, USER allow_list 와 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
 
 When
 
-- AppConfigAllowListAdapter.batch_load_by_ids: user-1이 allow_list 둘과 존재하지 않는 ID를 한 번에 조회
+- AppConfigAllowListAdapter.batch_load_by_ids: user-1이 allow_list 둘과 존재하지 않는 ID 를 한 번에 조회합니다
 
 Then
 
-- 있는 ID 둘과 없는 ID 모두 각 위치에 권한 오류가 반환된다
+- 있는 ID 둘과 없는 ID 모두 각 위치에 권한 오류가 반환됩니다
   - items = 3
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
@@ -665,69 +665,69 @@ Then
 
 #### [a-user-granted-nothing-reranks-none-of-several-entries](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_editing.py): pass
 
-권한이 없는 일반 사용자가 allow_list 둘의 순위를 한 번에 바꾸려 하면, 바뀐 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다
+권한이 없는 일반 사용자가 allow_list 둘의 순위를 한 번에 변경하려 하면, 변경된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 옵니다
 
 Given
 
-- 한 설정 이름의 PUBLIC·USER allow_list와 권한이 없는 일반 사용자 한 명
+- 한 설정 이름의 PUBLIC, USER allow_list 와 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
 
 When
 
-- AppConfigAllowListAdapter.partial_bulk_update: user-1이 allow_list 둘의 순위를 한 번에 150(으)로 변경
+- AppConfigAllowListAdapter.partial_bulk_update: user-1이 allow_list 둘의 순위를 한 번에 150(으)로 변경합니다
 
 Then
 
-- 처리된 allow_list 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다
+- 처리된 allow_list 없이 둘 다 권한이 없다는 이유로 실패 목록에 옵니다
   - successes = []
   - failed count = 2
-  - failed[0].id: 준비한 ID와 같다
+  - failed[0].id: 준비한 ID 와 같다
   - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 준비한 ID와 같다
+  - failed[1].id: 준비한 ID 와 같다
   - failed[1].message: 'Insufficient permission'를 담은 이유
 
 <a id="partial_bulk_editing-the-superadmin-reranks-several-entries-at-once"></a>
 
 #### [the-superadmin-reranks-several-entries-at-once](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_editing.py): pass
 
-슈퍼관리자가 allow_list 둘의 순위를 한 번에 바꾸면, 둘 다 새 순위로 오고 실패한 것은 없다
+superadmin 이 allow_list 둘의 순위를 한 번에 변경하면, 둘 다 새 순위로 오고 실패한 것은 없습니다
 
 Given
 
-- 한 설정 이름의 PUBLIC·USER allow_list와 슈퍼관리자 한 명
+- 한 설정 이름의 PUBLIC, USER allow_list 와 superadmin 한 명
   - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
 
 When
 
-- AppConfigAllowListAdapter.partial_bulk_update: user-1이 allow_list 둘의 순위를 한 번에 150(으)로 변경
+- AppConfigAllowListAdapter.partial_bulk_update: user-1이 allow_list 둘의 순위를 한 번에 150(으)로 변경합니다
 
 Then
 
-- allow_list 둘이 모두 새 순위로 오고, 실패한 것은 없다
+- allow_list 둘이 모두 새 순위로 오고, 실패한 것은 없습니다
   - successes count = 2
   - failed = []
-  - successes[0].id: 준비한 ID와 같다
+  - successes[0].id: 준비한 ID 와 같다
   - successes[0].config_name = 'config-1'
   - successes[0].scope_type = <AppConfigScopeType.PUBLIC: 'public'>
   - successes[0].rank = 150
   - successes[0].updated_at: 이 실행이 쓴 시각
-  - successes[1].id: 준비한 ID와 같다
+  - successes[1].id: 준비한 ID 와 같다
   - successes[1].config_name = 'config-1'
   - successes[1].scope_type = <AppConfigScopeType.USER: 'user'>
   - successes[1].rank = 150
@@ -739,28 +739,28 @@ Then
 
 #### [an-edit-carrying-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py): pass
 
-슈퍼관리자가 아무 값도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환된다
+superadmin 이 아무 값도 지정하지 않고 수정하면, 아무것도 변경되지 않은 노드가 반환됩니다
 
 Given
 
-- 사용자 스코프 유형의 allow_list 하나와 슈퍼관리자 한 명
+- 사용자 스코프 유형의 allow_list 하나와 superadmin 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
 
 When
 
-- AppConfigAllowListAdapter.update: user-1이 config-1의 allow_list 수정 (빈 요청)
+- AppConfigAllowListAdapter.update: user-1이 config-1의 allow_list 수정합니다 (빈 요청)
 
 Then
 
-- 준비한 allow_list의 모든 필드가 반환된다
-  - id: 준비한 ID와 같다
+- 준비한 allow_list 의 모든 필드가 반환됩니다
+  - id: 준비한 ID 와 같다
   - config_name = 'config-1'
   - scope_type = <AppConfigScopeType.USER: 'user'>
   - rank = 300
@@ -771,28 +771,28 @@ Then
 
 #### [the-superadmin-changes-an-entrys-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py): pass
 
-allow_list 하나가 있고 슈퍼관리자가 순위를 바꾸면, 순위만 변경되고 설정 이름과 스코프 유형은 그대로다
+allow_list 하나가 있고 superadmin 이 순위를 변경하면, 순위만 변경되고 설정 이름과 스코프 유형은 그대로입니다
 
 Given
 
-- 사용자 스코프 유형의 allow_list 하나와 슈퍼관리자 한 명
+- 사용자 스코프 유형의 allow_list 하나와 superadmin 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
 
 When
 
-- AppConfigAllowListAdapter.update: user-1이 config-1의 allow_list 수정 (순위 150(으)로 변경)
+- AppConfigAllowListAdapter.update: user-1이 config-1의 allow_list 수정합니다 (순위 150(으)로 변경)
 
 Then
 
-- 준비한 allow_list의 모든 필드가 반환된다
-  - id: 준비한 ID와 같다
+- 준비한 allow_list 의 모든 필드가 반환됩니다
+  - id: 준비한 ID 와 같다
   - config_name = 'config-1'
   - scope_type = <AppConfigScopeType.USER: 'user'>
   - rank = 150
@@ -803,54 +803,54 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-change-a-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py): pass
 
-같은 allow_list를 권한이 없는 일반 사용자가 수정하면, 엔티티 수정 권한이 없어 거부된다
+같은 allow_list 를 권한이 없는 일반 사용자가 수정하면, 엔티티 수정 권한이 없어 거부됩니다
 
 Given
 
 - 사용자 스코프 유형의 allow_list 하나와 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
 
 When
 
-- AppConfigAllowListAdapter.update: user-1이 config-1의 allow_list 수정 (순위 150(으)로 변경)
+- AppConfigAllowListAdapter.update: user-1이 config-1의 allow_list 수정합니다 (순위 150(으)로 변경)
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: NotEnoughPermission
 
 <a id="editing-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
 #### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py): pass
 
-슈퍼관리자가 존재하지 않는 ID의 순위를 수정하면, 대상을 찾을 수 없다는 이유로 거부된다
+superadmin 이 존재하지 않는 ID 의 순위를 수정하면, 대상을 찾을 수 없다는 이유로 거부됩니다
 
 Given
 
-- 공개 스코프 유형의 allow_list 하나와 슈퍼관리자 한 명
+- 공개 스코프 유형의 allow_list 하나와 superadmin 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
 
 When
 
-- AppConfigAllowListAdapter.update: user-1이 존재하지 않는 ID 수정 (순위 150(으)로 변경)
+- AppConfigAllowListAdapter.update: user-1이 존재하지 않는 ID 수정합니다 (순위 150(으)로 변경)
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: EntityNotFoundError
 
 ### partial_bulk_purge
@@ -859,64 +859,64 @@ Then
 
 #### [a-user-granted-nothing-purges-none-of-several-entries](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_purging.py): pass
 
-권한이 없는 일반 사용자가 allow_list 둘을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다
+권한이 없는 일반 사용자가 allow_list 둘을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 옵니다
 
 Given
 
-- 한 설정 이름의 PUBLIC·USER allow_list와 권한이 없는 일반 사용자 한 명
+- 한 설정 이름의 PUBLIC, USER allow_list 와 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
 
 When
 
-- AppConfigAllowListAdapter.partial_bulk_purge: user-1이 allow_list 둘를 한 번에 영구 삭제
+- AppConfigAllowListAdapter.partial_bulk_purge: user-1이 allow_list 둘를 한 번에 영구 삭제합니다
 
 Then
 
-- 처리된 allow_list 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다
+- 처리된 allow_list 없이 둘 다 권한이 없다는 이유로 실패 목록에 옵니다
   - successes = []
   - failed count = 2
-  - failed[0].id: 준비한 ID와 같다
+  - failed[0].id: 준비한 ID 와 같다
   - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 준비한 ID와 같다
+  - failed[1].id: 준비한 ID 와 같다
   - failed[1].message: 'Insufficient permission'를 담은 이유
 
 <a id="partial_bulk_purging-purging-several-answers-for-the-missing-one"></a>
 
 #### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_purging.py): pass
 
-슈퍼관리자가 allow_list 둘과 존재하지 않는 ID를 한 번에 영구 삭제하면, 둘은 처리된 목록에 오고 없는 ID는 대상이 없다는 이유로 실패 목록에 온다
+superadmin 이 allow_list 둘과 존재하지 않는 ID 를 한 번에 영구 삭제하면, 둘은 처리된 목록에 오고 없는 ID 는 대상이 없다는 이유로 실패 목록에 옵니다
 
 Given
 
-- 한 설정 이름의 PUBLIC·USER allow_list와 슈퍼관리자 한 명
+- 한 설정 이름의 PUBLIC, USER allow_list 와 superadmin 한 명
   - 도메인 home-1
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
 
 When
 
-- AppConfigAllowListAdapter.partial_bulk_purge: user-1이 allow_list 둘와 존재하지 않는 ID를 한 번에 영구 삭제
+- AppConfigAllowListAdapter.partial_bulk_purge: user-1이 allow_list 둘와 존재하지 않는 ID 를 한 번에 영구 삭제합니다
 
 Then
 
-- allow_list 둘은 처리된 목록에, 없는 ID는 대상이 없다는 이유로 실패 목록에 온다
+- allow_list 둘은 처리된 목록에, 없는 ID 는 대상이 없다는 이유로 실패 목록에 옵니다
   - successes: 준비한 ID 둘와 같다
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 ID와 같다
+  - failed[0].id: 요청에 넣은 없는 ID 와 같다
   - failed[0].message: 'not found'를 담은 이유
 
 ### purge
@@ -925,108 +925,108 @@ Then
 
 #### [an-entry-holding-a-fragment-is-still-purged](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_purging.py): pass
 
-설정 조각이 있는 allow_list를 슈퍼관리자가 영구 삭제하면, 설정 조각이 막지 않고 allow_list의 ID가 반환된다
+설정 조각이 있는 allow_list 를 superadmin 이 영구 삭제하면, 설정 조각이 차단하지 않고 allow_list 의 ID 가 반환됩니다
 
 Given
 
-- 설정 조각이 있는 공개 스코프 유형의 allow_list 하나와 슈퍼관리자 한 명
+- 설정 조각이 있는 공개 스코프 유형의 allow_list 하나와 superadmin 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
-  - 공개 설정 조각 public-fragment-1: 값 {'theme': 'light'}
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 공개 스코프별 앱 설정 public-fragment-1: 값 {'theme': 'light'}
 
 When
 
-- AppConfigAllowListAdapter.purge: user-1이 config-1의 allow_list 영구 삭제
+- AppConfigAllowListAdapter.purge: user-1이 config-1의 allow_list 영구 삭제합니다
 
 Then
 
-- 영구 삭제한 allow_list의 ID가 반환된다
-  - id: 준비한 ID와 같다
+- 영구 삭제한 allow_list 의 ID 가 반환됩니다
+  - id: 준비한 ID 와 같다
 
 <a id="purging-the-superadmin-purges-an-entry"></a>
 
 #### [the-superadmin-purges-an-entry](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_purging.py): pass
 
-설정 조각이 없는 allow_list를 슈퍼관리자가 영구 삭제하면, 삭제한 allow_list의 ID가 반환된다
+설정 조각이 없는 allow_list 를 superadmin 이 영구 삭제하면, 삭제한 allow_list 의 ID 가 반환됩니다
 
 Given
 
-- 사용자 스코프 유형의 allow_list 하나와 슈퍼관리자 한 명
+- 사용자 스코프 유형의 allow_list 하나와 superadmin 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
 
 When
 
-- AppConfigAllowListAdapter.purge: user-1이 config-1의 allow_list 영구 삭제
+- AppConfigAllowListAdapter.purge: user-1이 config-1의 allow_list 영구 삭제합니다
 
 Then
 
-- 영구 삭제한 allow_list의 ID가 반환된다
-  - id: 준비한 ID와 같다
+- 영구 삭제한 allow_list 의 ID 가 반환됩니다
+  - id: 준비한 ID 와 같다
 
 <a id="purging-a-user-who-is-not-the-superadmin-may-not-purge-an-entry"></a>
 
 #### [a-user-who-is-not-the-superadmin-may-not-purge-an-entry](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_purging.py): pass
 
-같은 allow_list를 권한이 없는 일반 사용자가 영구 삭제하면, 엔티티 삭제 권한이 없어 거부된다
+같은 allow_list 를 권한이 없는 일반 사용자가 영구 삭제하면, 엔티티 삭제 권한이 없어 거부됩니다
 
 Given
 
 - 사용자 스코프 유형의 allow_list 하나와 권한이 없는 일반 사용자 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
 
 When
 
-- AppConfigAllowListAdapter.purge: user-1이 config-1의 allow_list 영구 삭제
+- AppConfigAllowListAdapter.purge: user-1이 config-1의 allow_list 영구 삭제합니다
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: NotEnoughPermission
 
 <a id="purging-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
 #### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_purging.py): pass
 
-슈퍼관리자가 존재하지 않는 ID를 영구 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다
+superadmin 이 존재하지 않는 ID 를 영구 삭제하면, 대상을 찾을 수 없다는 이유로 거부됩니다
 
 Given
 
-- 공개 스코프 유형의 allow_list 하나와 슈퍼관리자 한 명
+- 공개 스코프 유형의 allow_list 하나와 superadmin 한 명
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 설정 정의 config-1: 이 이름의 설정이 등록돼 있다
-  - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있다, 순위는 그 스코프 종류의 기본값
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 entry-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
 
 When
 
-- AppConfigAllowListAdapter.purge: user-1이 존재하지 않는 ID 영구 삭제
+- AppConfigAllowListAdapter.purge: user-1이 존재하지 않는 ID 영구 삭제합니다
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: EntityNotFoundError
 

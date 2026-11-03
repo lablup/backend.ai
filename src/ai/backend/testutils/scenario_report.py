@@ -12,6 +12,7 @@ import ast
 import enum
 import json
 import pathlib
+import re
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
@@ -20,6 +21,11 @@ from typing import Any, ClassVar, override
 from ai.backend.testutils.scenario_steps import Language, Refused, Says
 
 MARKS = {"passed": "pass", "failed": "FAIL", "skipped": "skip"}
+HANGUL = re.compile("[ᄀ-ᇿ㄰-㆏가-힣]")
+PARTICLE = re.compile(
+    r"([A-Za-z])(입니다|이며|이고|이란|이라는|에서는|에게는|으로는|으로|에서|에게|"
+    r"부터|까지|에는|에도|이|가|은|는|을|를|와|과|로|만|도|의|에|인|나|며|라)"
+)
 
 
 class OperationWords:
@@ -29,11 +35,11 @@ class OperationWords:
     """붙은 연산은 기본 시나리오 행이 모자라다. 이 말로 검색한다."""
     STATUS: ClassVar[Says] = Says("시나리오", english="Scenario")
     COMPLETE: ClassVar[Says] = Says("완성", english="complete")
-    INCOMPLETE: ClassVar[Says] = Says("미완", english="incomplete")
+    INCOMPLETE: ClassVar[Says] = Says("미완성", english="incomplete")
     REPRESENTATIVE_SUCCESS: ClassVar[Says] = Says("대표 성공", english="representative success")
-    REPRESENTATIVE_REFUSAL: ClassVar[Says] = Says("대표 실패", english="representative rejection")
+    REPRESENTATIVE_REFUSAL: ClassVar[Says] = Says("대표 거부", english="representative rejection")
     SUCCESS: ClassVar[Says] = Says("성공", english="success")
-    REFUSAL: ClassVar[Says] = Says("실패", english="rejection")
+    REFUSAL: ClassVar[Says] = Says("거부", english="rejection")
     SCENARIO: ClassVar[Says] = Says("시나리오", english="scenario")
     VERDICT: ClassVar[Says] = Says("판정", english="verdict")
     ANSWERED: ClassVar[Says] = Says("성공", english="answered")
@@ -140,7 +146,7 @@ class ScenarioRecord:
                 fields[name] = tuple(
                     Line(
                         says=Says.from_data(one["says"]),
-                        nest=tuple(one["nest"]),
+                        nest=tuple(Says.from_data(nest) for nest in one["nest"]),
                     )
                     for one in fields[name]
                 )
@@ -158,7 +164,7 @@ class BehaviourReport:
 class Composition(enum.StrEnum):
     """How an adapter operation is built, in the order a report lists them."""
 
-    OPS = "ops 로 구성"
+    OPS = "ops 구성"
     MIXED = "ops + 직접 구현"
     CUSTOM = "직접 구현"
     NO_ACTION = "Action 없음"
@@ -583,7 +589,16 @@ class MarkdownFormat(ReportFormat):
 
     @override
     def render_one(self, component: ComponentReport) -> str:
-        return "\n".join(self._component(component))
+        text = "\n".join(self._component(component))
+        if self._language is Language.KOREAN:
+            text = PARTICLE.sub(r"\1 \2", text)
+        if self._language is Language.ENGLISH and HANGUL.search(text):
+            lines = [line for line in text.splitlines() if HANGUL.search(line)]
+            raise ValueError(
+                f"{component.component}: the English report still says {len(lines)} Korean "
+                f"line(s):\n" + "\n".join(lines)
+            )
+        return text
 
     @override
     def render(self, report: Report) -> str:

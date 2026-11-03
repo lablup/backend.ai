@@ -15,7 +15,8 @@ from ai.backend.common.data.notification.types import (
 from ai.backend.manager.data.notification.types import NotificationChannelData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.notification.creators import NotificationChannelCreator
-from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom, joined
 
 WEBHOOK_URL = "https://hooks.example.test/notify"
 SMTP_HOST = "smtp.example.test"
@@ -36,14 +37,16 @@ class TestSeedWebhookChannel(TestSeedRowFrom[UserData, NotificationChannelData])
 
     @override
     def kind(self) -> str:
-        return "webhook 채널"
+        return Says("webhook 채널", english="Webhook channel")
 
     @override
     def detail(self) -> str:
-        parts = [f"{WEBHOOK_URL}로 보낸다"]
+        parts: list[str] = [
+            Says(f"{WEBHOOK_URL} 주소로 보냅니다", english=f"sends to {WEBHOOK_URL}")
+        ]
         if not self.enabled:
-            parts.append("비활성")
-        return ", ".join(parts)
+            parts.append(Says("비활성", english="inactive"))
+        return joined(parts, ", ")
 
     @override
     def name(self, naming: Naming) -> str:
@@ -70,14 +73,19 @@ class TestSeedEmailChannel(TestSeedRowFrom[UserData, NotificationChannelData]):
 
     @override
     def kind(self) -> str:
-        return "email 채널"
+        return Says("email 채널", english="Email channel")
 
     @override
     def detail(self) -> str:
-        parts = [f"{SMTP_HOST}를 거쳐 {TO_EMAIL}에게 보낸다"]
+        parts: list[str] = [
+            Says(
+                f"{SMTP_HOST}를 거쳐 {TO_EMAIL} 주소로 보냅니다",
+                english=f"sends to {TO_EMAIL} through {SMTP_HOST}",
+            )
+        ]
         if not self.enabled:
-            parts.append("비활성")
-        return ", ".join(parts)
+            parts.append(Says("비활성", english="inactive"))
+        return joined(parts, ", ")
 
     @override
     def name(self, naming: Naming) -> str:

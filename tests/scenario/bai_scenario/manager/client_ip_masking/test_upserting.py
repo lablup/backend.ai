@@ -27,7 +27,7 @@ from ai.backend.manager.api.adapters.client_ip_masking.adapter import ClientIPMa
 from ai.backend.manager.data.client_ip.masking import ClientIPMaskingMode, ClientIPMaskingTarget
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.client_ip_masking import (
     IPV4,
@@ -60,8 +60,19 @@ class Upserting(When[ACaller, ClientIPMaskingAdapter, ClientIPMaskingPolicyNode]
 
     @override
     def describe(self, laid: ACaller) -> str:
-        prefixes = "" if self.ipv4 is None and self.ipv6 is None else " 접두 길이와 함께"
-        return f"{laid.caller.username}이 default 대상에 truncate 모드 정책을{prefixes} 등록"
+        no_prefixes = self.ipv4 is None and self.ipv6 is None
+        prefixes_ko = "" if no_prefixes else " 접두 길이와 함께"
+        prefixes_en = "" if no_prefixes else " with prefix lengths"
+        return Says(
+            (
+                f"{laid.caller.username} 이 default 대상에 truncate 모드 정책을{prefixes_ko} "
+                "등록합니다"
+            ),
+            english=(
+                f"{laid.caller.username} registers a truncate mode policy on the default target"
+                f"{prefixes_en}"
+            ),
+        )
 
     @override
     async def call(
@@ -95,10 +106,18 @@ class UpsertingTheLaidTargetAgain(
 
     @override
     def describe(self, laid: AMaskingPolicyAndACaller) -> str:
-        prefixes = "" if self.ipv4 is None and self.ipv6 is None else " 접두 길이와 함께"
-        return (
-            f"{laid.caller.username}이 {laid.policy.target_type.value} 대상에 "
-            f"{self.mode.value} 모드 정책을{prefixes} 다시 등록"
+        no_prefixes = self.ipv4 is None and self.ipv6 is None
+        prefixes_ko = "" if no_prefixes else " 접두 길이와 함께"
+        prefixes_en = "" if no_prefixes else " with prefix lengths"
+        return Says(
+            (
+                f"{laid.caller.username} 이 {laid.policy.target_type.value} 대상에 "
+                f"{self.mode.value} 모드 정책을{prefixes_ko} 다시 등록합니다"
+            ),
+            english=(
+                f"{laid.caller.username} registers a {self.mode.value} mode policy on the "
+                f"{laid.policy.target_type.value} target again{prefixes_en}"
+            ),
         )
 
     @override
@@ -129,7 +148,16 @@ class TheSuperadminPutsAPolicyOnATarget(
 
     @override
     def describe(self) -> str:
-        return "정책이 없을 때 슈퍼관리자가 대상·모드·두 접두 길이를 지정해 등록하면 지정한 값이 그대로 담긴 노드가 반환된다"
+        return Says(
+            (
+                "정책이 없을 때 superadmin 이 대상, 모드, 두 접두 길이를 지정해 등록하면 지정한 값이 "
+                "그대로 담긴 노드가 반환됩니다"
+            ),
+            english=(
+                "when no policy exists and the superadmin registers one with a target, a mode and "
+                "two prefix lengths, the node comes back carrying the given values"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
@@ -162,7 +190,13 @@ class OmittedPrefixesStayEmpty(
 
     @override
     def describe(self) -> str:
-        return "대상과 모드만 지정해 등록하면 두 접두 길이가 비어 있는 노드가 반환된다"
+        return Says(
+            "대상과 모드만 지정해 등록하면 두 접두 길이가 비어 있는 노드가 반환됩니다",
+            english=(
+                "when it is registered with only a target and a mode, the node comes back with "
+                "both prefix lengths empty"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
@@ -200,7 +234,17 @@ class PuttingOnATakenTargetRewritesTheRow(
 
     @override
     def describe(self) -> str:
-        return "이미 정책이 있는 대상에 다른 모드로 등록하면, 새 행이 아니라 같은 id의 행이 새 모드로 바뀐 노드가 반환된다"
+        return Says(
+            (
+                "이미 정책이 있는 대상에 다른 모드로 등록하면 새 row 가 아니라 같은 id 의 row 가 새 "
+                "모드로 변경된 노드가 반환됩니다"
+            ),
+            english=(
+                "when a policy is registered on a target that already has one in a different mode, "
+                "the node comes back with the row of the same id changed to the new mode rather "
+                "than a new row"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AMaskingPolicyAndACaller]:
@@ -234,9 +278,16 @@ class PuttingAgainWithoutPrefixesClearsThem(
 
     @override
     def describe(self) -> str:
-        return (
-            "접두 길이가 있는 정책의 대상에 대상과 모드만 지정해 다시 등록하면 접두 길이가 비워진다. "
-            "등록은 기존 값과 병합하지 않고 행을 통째로 바꾼다"
+        return Says(
+            (
+                "접두 길이가 있는 정책의 대상에 대상과 모드만 지정해 다시 등록하면 접두 길이가 "
+                "비워집니다. 등록은 기존 값과 병합하지 않고 row 전체를 변경합니다"
+            ),
+            english=(
+                "when a policy with prefix lengths is registered again on its target with only a "
+                "target and a mode, the prefix lengths are cleared. Registration does not merge "
+                "with the existing values but changes the row as a whole"
+            ),
         )
 
     @override
@@ -264,7 +315,13 @@ class AUserWhoIsNotTheSuperadminMayNotPut(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 정책을 등록하면 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 정책을 등록하면 역할 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin registers a policy, it is rejected because "
+                "the role is insufficient"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
@@ -289,7 +346,16 @@ class TheMonitorMayNotPut(
 
     @override
     def describe(self) -> str:
-        return "모니터 역할이 정책을 등록하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다"
+        return Says(
+            (
+                "모니터 역할이 정책을 등록하면 역할 부족으로 거부됩니다. 모니터는 superadmin 검사에서 "
+                "읽기만 통과합니다"
+            ),
+            english=(
+                "when the monitor role registers a policy, it is rejected because the role is "
+                "insufficient. The monitor passes only reads in the superadmin check"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
@@ -315,7 +381,13 @@ class EnforcementOffStillNeedsTheSuperadmin(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 꺼도 슈퍼관리자가 아니면 정책을 등록하지 못한다"
+        return Says(
+            "권한 검사를 꺼도 superadmin 이 아니면 정책을 등록하지 못합니다",
+            english=(
+                "turning permission enforcement off still does not let a user who is not the "
+                "superadmin register a policy"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:

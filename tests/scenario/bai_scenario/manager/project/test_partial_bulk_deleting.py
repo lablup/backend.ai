@@ -23,13 +23,16 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
     When,
+    in_language,
 )
 from bai_scenario.components.domain import Mentions
 from bai_scenario.components.project import (
@@ -58,8 +61,19 @@ class SoftDeletingEveryTarget(When[ManyProjectsAndACaller, ProjectAdapter, Delet
 
     @override
     def describe(self, laid: ManyProjectsAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 프로젝트 {len(laid.targets)}개{besides}를 한 번에 soft delete 함"
+        besides = (
+            Says(" 와 없는 id 하나", english=" and a missing id")
+            if self.missing is not None
+            else ""
+        )
+        return Says(
+            f"{laid.caller.username}이 프로젝트 {len(laid.targets)}개{besides}를 한 번에 "
+            "soft delete 합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {len(laid.targets)} projects"
+                f"{in_language(besides, Language.ENGLISH)} in one call"
+            ),
+        )
 
     @override
     async def call(self, adapter: ProjectAdapter, laid: ManyProjectsAndACaller) -> Deleted:
@@ -80,9 +94,13 @@ class SoftDeletingThenRestoringEveryTarget(When[ManyProjectsAndACaller, ProjectA
 
     @override
     def describe(self, laid: ManyProjectsAndACaller) -> str:
-        return (
+        return Says(
             f"{laid.caller.username}이 프로젝트 {len(laid.targets)}개를 한 번에 soft delete "
-            "했다가 한 번에 restore 함"
+            "했다가 한 번에 restore 합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {len(laid.targets)} projects in one call "
+                "and then restores them in one call"
+            ),
         )
 
     @override
@@ -104,9 +122,20 @@ class EveryTargetComesBack(Then[ManyProjectsAndACaller, Deleted]):
     @override
     def says(self) -> str:
         state = "활성" if self.active else "비활성"
+        state_en = "active" if self.active else "inactive"
         if self.missing is None:
-            return f"대상 프로젝트가 모두 {state}으로 오고, 실패한 것은 없다"
-        return f"대상 프로젝트가 모두 {state}으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+            return Says(
+                f"대상 프로젝트가 모두 {state}으로 오고, 실패한 것은 없습니다",
+                english=f"every target project comes back {state_en} and nothing failed",
+            )
+        return Says(
+            f"대상 프로젝트가 모두 {state}으로 오고, 없는 id 는 대상이 없다는 이유로 실패 "
+            "목록에 옵니다",
+            english=(
+                f"every target project comes back {state_en} and the missing id comes back in "
+                "the failed list because no target answers to it"
+            ),
+        )
 
     @override
     def look(self, laid: ManyProjectsAndACaller, answered: Answered[Deleted]) -> list[Verdict]:
@@ -124,7 +153,14 @@ class EveryTargetComesBack(Then[ManyProjectsAndACaller, Deleted]):
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the missing id given in the request"),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -143,9 +179,14 @@ class SoftDeletingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "활성 프로젝트 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 비활성으로 오고 "
-            "없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+            "없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when two active projects and a missing id are soft deleted in one call, the "
+                "two come back inactive and the missing id comes back in the failed list "
+                "because no target answers to it"
+            ),
         )
 
     @override
@@ -171,9 +212,13 @@ class AUserGrantedNothingSoftDeletesNone(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "아무 권한도 받지 않은 사용자가 프로젝트 여럿을 한 번에 soft delete 하려 하면, "
-            "soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+            "soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to soft delete several projects in one call, "
+                "none is soft deleted and all come back in the failed list for lack of permission"
+            ),
         )
 
     @override
@@ -201,7 +246,12 @@ class RestoringBringsSeveralBack(
 
     @override
     def describe(self) -> str:
-        return "soft delete 된 프로젝트 여럿을 한 번에 restore 하면, 모두 활성으로 온다"
+        return Says(
+            "soft delete 된 프로젝트 여럿을 한 번에 restore 하면, 모두 활성으로 옵니다",
+            english=(
+                "when several soft-deleted projects are restored in one call, all come back active"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyProjectsAndACaller]:

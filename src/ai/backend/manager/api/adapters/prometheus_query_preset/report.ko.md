@@ -2,117 +2,117 @@
 
 [배경](/src/ai/backend/manager/api/adapters/prometheus_query_preset/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/prometheus_query_preset/adapter.py)
 
-시나리오: 미완 3 / 10
+시나리오: 미완성 3 / 10
 
-- ops 로 구성 (5)
-  - batch_load_by_ids: 대표 성공 ✓ · 대표 실패 ✗: SCENARIO-GAP
-  - get: 대표 성공 ✓ · 대표 실패 ✓
-  - partial_bulk_purge: 대표 성공 ✓ · 대표 실패 ✗: SCENARIO-GAP
-  - purge: 대표 성공 ✓ · 대표 실패 ✓
-  - search: 대표 성공 ✓ · 대표 실패 ✓
+- ops 구성 (5)
+  - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - get: 대표 성공 ✓ · 대표 거부 ✓
+  - partial_bulk_purge: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - purge: 대표 성공 ✓ · 대표 거부 ✓
+  - search: 대표 성공 ✓ · 대표 거부 ✓
 - 직접 구현 (5)
-  - admin_preview: 성공 있음 2 · 실패 있음 2 (global_scope)
-  - create: 성공 있음 4 · 실패 있음 4 (global_scope)
-  - execute_preset: 성공 있음 3 · 실패 있음 4 (single_entity)
-  - partial_bulk_update: 성공 있음 3 · 실패 없음 (partial_bulk): SCENARIO-GAP
-  - update: 성공 있음 6 · 실패 있음 3 (single_entity)
+  - admin_preview: 성공 있음 2 · 거부 있음 2 (global_scope)
+  - create: 성공 있음 4 · 거부 있음 4 (global_scope)
+  - execute_preset: 성공 있음 3 · 거부 있음 4 (single_entity)
+  - partial_bulk_update: 성공 있음 3 · 거부 없음 (partial_bulk): SCENARIO-GAP
+  - update: 성공 있음 6 · 거부 있음 3 (single_entity)
 
 **batch_load_by_ids**
 
 | 시나리오 | 판정 |
 |---|---|
-| [프리셋이 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환된다](#loading-loading-an-empty-id-list-answers-an-empty-list) | 성공 |
-| [프리셋 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 빈 항목으로 반환되고 순서가 요청한 순서와 같다](#loading-loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-gap) | 성공 |
+| [프리셋이 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환됩니다](#loading-loading-an-empty-id-list-answers-an-empty-list) | 성공 |
+| [프리셋 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 빈 항목으로 반환되고 순서가 요청한 순서와 같습니다](#loading-loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-gap) | 성공 |
 
 **get**
 
 | 시나리오 | 판정 |
 |---|---|
-| [프리셋 하나가 있고 아무 권한도 없는 사용자가 id로 조회하면, 그 프리셋 전체가 반환된다](#reading-a-user-granted-nothing-reads-a-preset-by-id) | 성공 |
-| [프리셋 하나가 있고 사용자 컨텍스트 없이 id로 조회하면, 호출자를 알 수 없어 거부된다](#reading-a-call-carrying-no-user-may-not-read-a-preset) | 거부 |
-| [public 에서 읽을 수 있는 사용자가 존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다](#reading-an-id-nothing-answers-to-is-refused) | 거부 |
+| [프리셋 하나가 있고 아무 권한도 없는 사용자가 id 로 조회하면, 그 프리셋 전체가 반환됩니다](#reading-a-user-granted-nothing-reads-a-preset-by-id) | 성공 |
+| [프리셋 하나가 있고 사용자 컨텍스트 없이 id 로 조회하면, 호출자를 알 수 없어 거부됩니다](#reading-a-call-carrying-no-user-may-not-read-a-preset) | 거부 |
+| [public 에서 읽을 수 있는 사용자가 존재하지 않는 id 로 조회하면 거부됩니다. 권한을 요구할 대상이 없으므로, 없는 것인지 접근하지 못하는 것인지는 응답으로 드러나지 않습니다](#reading-an-id-nothing-answers-to-is-refused) | 거부 |
 
 **partial_bulk_purge**
 
 | 시나리오 | 판정 |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets) | 성공 |
-| [슈퍼관리자가 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-presets-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets) | 성공 |
+| [superadmin 이 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 삭제되기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-purging-several-presets-answers-for-the-missing-one) | 성공 |
 
 **purge**
 
 | 시나리오 | 판정 |
 |---|---|
-| [프리셋 하나가 있고 슈퍼관리자가 삭제하면, 삭제한 id를 담은 응답이 반환된다](#purging-the-superadmin-removes-a-preset) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다](#purging-turning-enforcement-off-lets-a-user-remove-a-preset) | 성공 |
-| [같은 프리셋이 있고 아무 권한도 없는 사용자가 삭제하면, 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-remove-a-preset) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다](#purging-removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
+| [프리셋 하나가 있고 superadmin 이 삭제하면, 삭제한 id 를 담은 응답이 반환됩니다](#purging-the-superadmin-removes-a-preset) | 성공 |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있습니다](#purging-turning-enforcement-off-lets-a-user-remove-a-preset) | 성공 |
+| [같은 프리셋이 있고 아무 권한도 없는 사용자가 삭제하면, 권한 부족으로 거부됩니다](#purging-a-user-granted-nothing-may-not-remove-a-preset) | 거부 |
+| [superadmin 이 존재하지 않는 id 를 삭제하면, 대상을 찾을 수 없다는 이유로 거부됩니다](#purging-removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
 
 **search**
 
 | 시나리오 | 판정 |
 |---|---|
-| [프리셋 둘이 있고 아무 권한도 없는 사용자가 필터 없이 검색하면, 둘 다 집계된다](#searching-a-user-granted-nothing-counts-every-preset) | 성공 |
-| [두 카테고리에 프리셋이 나뉘어 있을 때 한 카테고리 필터로 검색하면, 그 카테고리의 프리셋만 반환된다](#searching-filtering-by-category-keeps-only-the-presets-filed-under-it) | 성공 |
-| [이름이 다른 프리셋 셋이 있을 때 이름 필터로 검색하면, 그 이름의 프리셋만 반환된다](#searching-filtering-by-name-keeps-only-the-preset-of-that-name) | 성공 |
-| [프리셋 11개가 있을 때 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching-omitting-the-page-size-answers-ten-and-says-there-is-a-next-page) | 성공 |
-| [프리셋 하나가 있고 사용자 컨텍스트 없이 검색하면, 호출자를 알 수 없어 거부된다](#searching-a-call-carrying-no-user-may-not-search-presets) | 거부 |
+| [프리셋 둘이 있고 아무 권한도 없는 사용자가 필터 없이 검색하면, 둘 다 집계됩니다](#searching-a-user-granted-nothing-counts-every-preset) | 성공 |
+| [두 카테고리에 프리셋이 나뉘어 있을 때 한 카테고리 필터로 검색하면, 그 카테고리의 프리셋만 반환됩니다](#searching-filtering-by-category-keeps-only-the-presets-filed-under-it) | 성공 |
+| [이름이 다른 프리셋 셋이 있을 때 이름 필터로 검색하면, 그 이름의 프리셋만 반환됩니다](#searching-filtering-by-name-keeps-only-the-preset-of-that-name) | 성공 |
+| [프리셋 11개가 있을 때 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답합니다](#searching-omitting-the-page-size-answers-ten-and-says-there-is-a-next-page) | 성공 |
+| [프리셋 하나가 있고 사용자 컨텍스트 없이 검색하면, 호출자를 알 수 없어 거부됩니다](#searching-a-call-carrying-no-user-may-not-search-presets) | 거부 |
 
 **admin_preview**
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 템플릿만 지정해 미리 보면, 순간 질의로 응답하고 모의 서버가 받은 질의의 시간 창은 서버 설정의 기본 시간 창이며 라벨은 비어 있다](#previewing-previewing-a-template-is-an-instant-query-with-the-server-window-and-no-label) | 성공 |
-| [모니터 역할이 템플릿을 미리 보면, 모의 서버가 응답한 결과가 반환된다. 슈퍼관리자 검사는 읽기에 한해 모니터를 허용한다](#previewing-the-monitor-role-previews-a-template) | 성공 |
-| [슈퍼관리자가 빈 질의로 렌더되는 템플릿을 미리 보면, Prometheus가 그 질의를 거부하고 그 거부가 평가 실패로 바뀌어 전파된다. 실행의 같은 시나리오와 다른 오류로 거부된다](#previewing-a-query-prometheus-refuses-is-refused-as-an-evaluation-failure) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 미리 보려 하면, 역할 부족으로 거부된다](#previewing-a-user-who-is-not-the-superadmin-may-not-preview-a-template) | 거부 |
+| [superadmin 이 템플릿만 지정해 미리 보면, 순간 질의로 응답하고 모의 서버가 받은 질의의 시간 창은 서버 설정의 기본 시간 창이며 라벨은 비어 있습니다](#previewing-previewing-a-template-is-an-instant-query-with-the-server-window-and-no-label) | 성공 |
+| [모니터 역할이 템플릿을 미리 보면, 모의 서버가 응답한 결과가 반환됩니다. superadmin 검사는 읽기에 대해서만 모니터를 허용합니다](#previewing-the-monitor-role-previews-a-template) | 성공 |
+| [superadmin 이 빈 질의로 렌더되는 템플릿을 미리 보면, Prometheus 가 그 질의를 거부하고 그 거부가 평가 실패로 변경되어 전파됩니다. 실행의 같은 시나리오와 다른 오류로 거부됩니다](#previewing-a-query-prometheus-refuses-is-refused-as-an-evaluation-failure) | 거부 |
+| [superadmin 이 아닌 사용자가 미리 보려 하면, 역할 부족으로 거부됩니다](#previewing-a-user-who-is-not-the-superadmin-may-not-preview-a-template) | 거부 |
 
 **create**
 
 | 시나리오 | 판정 |
 |---|---|
-| [이미 다른 프리셋이 사용 중인 이름으로 슈퍼관리자가 다시 생성하면, 생성된다. 프리셋의 이름에는 유일 제약이 없다](#creating-a-name-another-preset-already-holds-is-allowed) | 성공 |
-| [카테고리 하나가 있고 슈퍼관리자가 그 카테고리를 지정해 생성하면, 응답의 카테고리가 그것을 가리킨다](#creating-creating-a-preset-under-a-category-points-the-node-at-that-category) | 성공 |
-| [슈퍼관리자가 시간 창을 함께 지정해 생성하면, 노드에 그 시간 창이 담긴다](#creating-creating-a-preset-with-a-window-carries-that-window-on-the-node) | 성공 |
-| [슈퍼관리자가 이름, 지표 이름, 템플릿, 허용 라벨 목록만 지정해 생성하면, 순위는 0이고 카테고리·설명·시간 창은 비어 있는 노드 전체가 반환된다](#creating-creating-a-preset-with-the-required-values-answers-with-the-whole-node) | 성공 |
-| [슈퍼관리자가 존재하지 않는 카테고리 id를 지정해 생성하면, 카테고리가 없다는 이유로 거부된다. 저장소의 참조 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다](#creating-a-category-id-nothing-answers-to-is-refused) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 프리셋을 생성하려 하면, 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-preset) | 거부 |
-| [모니터 역할이 프리셋을 생성하려 하면, 역할 부족으로 거부된다. 슈퍼관리자 검사는 읽기에만 모니터를 허용한다](#creating-the-monitor-role-may-not-create-a-preset) | 거부 |
-| [권한 검사를 꺼도 프리셋 생성은 여전히 거부된다](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-preset) | 거부 |
+| [이미 다른 프리셋이 사용 중인 이름으로 superadmin 이 다시 생성하면, 생성됩니다. 프리셋의 이름에는 유일 제약이 없습니다](#creating-a-name-another-preset-already-holds-is-allowed) | 성공 |
+| [카테고리 하나가 있고 superadmin 이 그 카테고리를 지정해 생성하면, 응답의 카테고리가 그것을 참조합니다](#creating-creating-a-preset-under-a-category-points-the-node-at-that-category) | 성공 |
+| [superadmin 이 시간 창을 함께 지정해 생성하면, 노드에 그 시간 창이 담깁니다](#creating-creating-a-preset-with-a-window-carries-that-window-on-the-node) | 성공 |
+| [superadmin 이 이름, 지표 이름, 템플릿, 허용 라벨 목록만 지정해 생성하면, 순위는 0이고 카테고리, 설명, 시간 창은 비어 있는 노드 전체가 반환됩니다](#creating-creating-a-preset-with-the-required-values-answers-with-the-whole-node) | 성공 |
+| [superadmin 이 존재하지 않는 카테고리 id 를 지정해 생성하면, 카테고리가 없다는 이유로 거부됩니다. 저장소의 참조 제약이 차단하며 도메인 오류로 옮기지 않았습니다](#creating-a-category-id-nothing-answers-to-is-refused) | 거부 |
+| [superadmin 이 아닌 사용자가 프리셋을 생성하려 하면, 역할 부족으로 거부됩니다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-preset) | 거부 |
+| [모니터 역할이 프리셋을 생성하려 하면, 역할 부족으로 거부됩니다. superadmin 검사는 읽기에만 모니터를 허용합니다](#creating-the-monitor-role-may-not-create-a-preset) | 거부 |
+| [권한 검사를 꺼도 프리셋 생성은 여전히 거부됩니다](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-preset) | 거부 |
 
 **execute_preset**
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 시작·끝·간격을 지정해 실행하면, 모의 서버가 범위 질의로 응답한다](#executing-running-a-preset-over-a-range-is-a-range-query) | 성공 |
-| [시간 창이 없는 프리셋을 슈퍼관리자가 시간 창을 지정하고 조회 구간 없이 실행하면, 순간 질의로 응답하고 모의 서버가 받은 질의에 요청의 시간 창이 들어 있다](#executing-running-a-preset-without-a-range-is-an-instant-query-carrying-the-asked-window) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 실행할 수 있다](#executing-turning-enforcement-off-lets-a-user-run-a-preset) | 성공 |
-| [라벨 없이는 빈 질의로 렌더되는 프리셋을 슈퍼관리자가 라벨 없이 실행하면, Prometheus가 그 질의를 거부하고 그 거부가 지표를 얻지 못했다는 이유로 그대로 전파된다](#executing-a-query-prometheus-refuses-is-refused-as-a-failed-metric-read) | 거부 |
-| [아무 권한도 없는 사용자가 프리셋을 실행하면 권한 부족으로 거부된다. 실행은 조회와 같은 권한을 묻는다](#executing-a-user-granted-nothing-may-not-run-a-preset) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id로 실행하면, 대상을 찾을 수 없다는 이유로 거부된다. 실행은 서비스가 프리셋을 직접 읽어서 내는 오류라 수정과 삭제의 대상 없음과 종류가 다르다](#executing-running-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
-| [아무 권한도 없는 사용자가 존재하지 않는 id로 실행하면, 대상 없음이 아니라 권한 부족으로 거부된다. 없는 행에는 부여된 권한도 없기 때문이다](#executing-running-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | 거부 |
+| [superadmin 이 시작, 끝, 간격을 지정해 실행하면, 모의 서버가 범위 질의로 응답합니다](#executing-running-a-preset-over-a-range-is-a-range-query) | 성공 |
+| [시간 창이 없는 프리셋을 superadmin 이 시간 창을 지정하고 조회 구간 없이 실행하면, 순간 질의로 응답하고 모의 서버가 받은 질의에 요청의 시간 창이 들어 있습니다](#executing-running-a-preset-without-a-range-is-an-instant-query-carrying-the-asked-window) | 성공 |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 실행할 수 있습니다](#executing-turning-enforcement-off-lets-a-user-run-a-preset) | 성공 |
+| [라벨 없이는 빈 질의로 렌더되는 프리셋을 superadmin 이 라벨 없이 실행하면, Prometheus 가 그 질의를 거부하고 그 거부가 지표를 얻지 못했다는 이유로 그대로 전파됩니다](#executing-a-query-prometheus-refuses-is-refused-as-a-failed-metric-read) | 거부 |
+| [아무 권한도 없는 사용자가 프리셋을 실행하면 권한 부족으로 거부됩니다. 실행은 조회와 같은 권한을 요구합니다](#executing-a-user-granted-nothing-may-not-run-a-preset) | 거부 |
+| [superadmin 이 존재하지 않는 id 로 실행하면, 대상을 찾을 수 없다는 이유로 거부됩니다. 실행은 서비스가 프리셋을 직접 읽어서 발생시키는 오류라 수정과 삭제의 대상 없음과 종류가 다릅니다](#executing-running-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
+| [아무 권한도 없는 사용자가 존재하지 않는 id 로 실행하면, 대상 없음이 아니라 권한 부족으로 거부됩니다. 없는 행에는 부여된 권한도 없기 때문입니다](#executing-running-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | 거부 |
 
 **partial_bulk_update**
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 프리셋 여럿을 한 번에 고치며 하나에 잘못된 템플릿을 주면, 그 하나만 템플릿 검사의 이유로 실패 목록에 오고 나머지는 고쳐진다](#partial_bulk_editing-a-broken-template-fails-only-the-preset-it-was-meant-for) | 성공 |
-| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | 성공 |
-| [슈퍼관리자가 프리셋 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | 성공 |
+| [superadmin 이 프리셋 여럿을 한 번에 수정하며 하나에 잘못된 템플릿을 주면, 그 하나만 템플릿 검사의 이유로 실패 목록에 오고 나머지는 수정됩니다](#partial_bulk_editing-a-broken-template-fails-only-the-preset-it-was-meant-for) | 성공 |
+| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | 성공 |
+| [superadmin 이 프리셋 여럿의 설명을 한 번에 변경하면, 모두 새 설명으로 오고 실패한 것은 없습니다](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | 성공 |
 
 **update**
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 값을 하나도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-an-update-giving-no-value-answers-the-node-unchanged) | 성공 |
-| [필터 라벨과 그룹 라벨이 모두 있는 프리셋을 슈퍼관리자가 필터 라벨만 수정하면, 필터 라벨은 새 값이고 그룹 라벨은 그대로다](#editing-changing-only-the-filter-labels-keeps-the-group-labels) | 성공 |
-| [설명이 있는 프리셋을 슈퍼관리자가 설명을 비우도록 수정하면, 설명이 없어진다](#editing-clearing-the-description-leaves-it-empty) | 성공 |
-| [카테고리 둘 중 한쪽에 속한 프리셋을 슈퍼관리자가 다른 카테고리로 옮기면, 응답의 카테고리가 그것을 가리킨다](#editing-moving-a-preset-to-another-category-points-the-node-at-that-one) | 성공 |
-| [프리셋 하나가 있고 슈퍼관리자가 템플릿만 수정하면, 템플릿은 새 값이고 나머지는 그대로다](#editing-the-superadmin-changes-the-template-and-the-rest-stays) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있다](#editing-turning-enforcement-off-lets-a-user-edit-a-preset) | 성공 |
-| [같은 프리셋이 있고 아무 권한도 없는 사용자가 이름을 수정하면, 권한 부족으로 거부된다. 이 엔티티는 어느 스코프에도 속하지 않아 권한을 받을 방법이 없다](#editing-a-user-granted-nothing-may-not-edit-a-preset) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id의 이름을 수정하면, 대상을 찾을 수 없다는 이유로 거부된다](#editing-editing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
-| [슈퍼관리자가 존재하지 않는 카테고리 id로 수정하면, 카테고리가 없다는 이유로 거부된다. 저장소의 참조 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다](#editing-moving-a-preset-to-a-category-id-nothing-answers-to-is-refused) | 거부 |
+| [superadmin 이 값을 하나도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환됩니다](#editing-an-update-giving-no-value-answers-the-node-unchanged) | 성공 |
+| [필터 라벨과 그룹 라벨이 모두 있는 프리셋을 superadmin 이 필터 라벨만 수정하면, 필터 라벨은 새 값이고 그룹 라벨은 그대로입니다](#editing-changing-only-the-filter-labels-keeps-the-group-labels) | 성공 |
+| [설명이 있는 프리셋을 superadmin 이 설명을 비우도록 수정하면, 설명이 없어집니다](#editing-clearing-the-description-leaves-it-empty) | 성공 |
+| [카테고리 둘 중 한쪽에 속한 프리셋을 superadmin 이 다른 카테고리로 옮기면, 응답의 카테고리가 그것을 참조합니다](#editing-moving-a-preset-to-another-category-points-the-node-at-that-one) | 성공 |
+| [프리셋 하나가 있고 superadmin 이 템플릿만 수정하면, 템플릿은 새 값이고 나머지는 그대로입니다](#editing-the-superadmin-changes-the-template-and-the-rest-stays) | 성공 |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있습니다](#editing-turning-enforcement-off-lets-a-user-edit-a-preset) | 성공 |
+| [같은 프리셋이 있고 아무 권한도 없는 사용자가 이름을 수정하면, 권한 부족으로 거부됩니다. 이 엔티티는 어느 스코프에도 속하지 않아 권한을 받을 방법이 없습니다](#editing-a-user-granted-nothing-may-not-edit-a-preset) | 거부 |
+| [superadmin 이 존재하지 않는 id 의 이름을 수정하면, 대상을 찾을 수 없다는 이유로 거부됩니다](#editing-editing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
+| [superadmin 이 존재하지 않는 카테고리 id 로 수정하면, 카테고리가 없다는 이유로 거부됩니다. 저장소의 참조 제약이 차단하며 도메인 오류로 옮기지 않았습니다](#editing-moving-a-preset-to-a-category-id-nothing-answers-to-is-refused) | 거부 |
 
 ### batch_load_by_ids
 
@@ -120,7 +120,7 @@
 
 #### [loading-an-empty-id-list-answers-an-empty-list](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_loading.py): pass
 
-프리셋이 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환된다
+프리셋이 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환됩니다
 
 Given
 
@@ -129,28 +129,28 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.batch_load_by_ids: user-1이 빈 id 목록으로 조회
+- PrometheusQueryPresetAdapter.batch_load_by_ids: user-1이 빈 id 목록으로 조회합니다
 
 Then
 
-- 빈 응답이 반환된다
+- 빈 응답이 반환됩니다
   - answer = []
 
 <a id="loading-loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-gap"></a>
 
 #### [loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-gap](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_loading.py): pass
 
-프리셋 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 빈 항목으로 반환되고 순서가 요청한 순서와 같다
+프리셋 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 빈 항목으로 반환되고 순서가 요청한 순서와 같습니다
 
 Given
 
@@ -160,24 +160,24 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.batch_load_by_ids: user-1이 미리 만들어 둔 프리셋 2개의 id와 없는 id 하나를 한 번에 조회
+- PrometheusQueryPresetAdapter.batch_load_by_ids: user-1이 미리 저장한 프리셋 2개의 id 와 없는 id 하나를 한 번에 조회합니다
 
 Then
 
-- 요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 비어 있다
+- 요청한 순서대로 반환되고, 없는 id 에 해당하는 항목은 비어 있습니다
   - len = 3
-  - [0]: 1번째로 요청한 id의 프리셋 전체와 같다
-  - [1]: 2번째로 요청한 id의 프리셋 전체와 같다
+  - [0]: 1번째로 요청한 id 의 프리셋 전체와 같다
+  - [1]: 2번째로 요청한 id 의 프리셋 전체와 같다
   - [2] = None
 
 ### get
@@ -186,7 +186,7 @@ Then
 
 #### [a-user-granted-nothing-reads-a-preset-by-id](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_reading.py): pass
 
-프리셋 하나가 있고 아무 권한도 없는 사용자가 id로 조회하면, 그 프리셋 전체가 반환된다
+프리셋 하나가 있고 아무 권한도 없는 사용자가 id 로 조회하면, 그 프리셋 전체가 반환됩니다
 
 Given
 
@@ -195,24 +195,24 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.get: user-1이 preset-1(으)로 조회
+- PrometheusQueryPresetAdapter.get: user-1이 preset-1(으)로 조회합니다
 
 Then
 
-- 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 미리 만들어 둔 프리셋와 같다
+- 미리 저장한 프리셋 전체가 반환됩니다
+  - id: 미리 저장한 프리셋와 같다
   - name = 'preset-1'
-  - description = '미리 만들어 둔 질의 프리셋'
+  - description = '미리 생성한 질의 프리셋'
   - rank = 0
   - category_id = None
   - metric_name = 'container_cpu_seconds_total'
@@ -227,7 +227,7 @@ Then
 
 #### [a-call-carrying-no-user-may-not-read-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_reading.py): pass
 
-프리셋 하나가 있고 사용자 컨텍스트 없이 id로 조회하면, 호출자를 알 수 없어 거부된다
+프리셋 하나가 있고 사용자 컨텍스트 없이 id 로 조회하면, 호출자를 알 수 없어 거부됩니다
 
 Given
 
@@ -236,18 +236,18 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.get: 사용자 컨텍스트 없이 preset-1 조회
+- PrometheusQueryPresetAdapter.get: 사용자 컨텍스트 없이 preset-1 조회합니다
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: UnreachableError
 
 <a id="reading-an-id-nothing-answers-to-is-refused"></a>
 
 #### [an-id-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_reading.py): pass
 
-public 에서 읽을 수 있는 사용자가 존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다
+public 에서 읽을 수 있는 사용자가 존재하지 않는 id 로 조회하면 거부됩니다. 권한을 요구할 대상이 없으므로, 없는 것인지 접근하지 못하는 것인지는 응답으로 드러나지 않습니다
 
 Given
 
@@ -256,21 +256,21 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.get: user-1이 존재하지 않는 id(으)로 조회
+- PrometheusQueryPresetAdapter.get: user-1이 존재하지 않는 id(으)로 조회합니다
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: NotEnoughPermission
 
 ### partial_bulk_purge
@@ -279,7 +279,7 @@ Then
 
 #### [a-user-granted-nothing-purges-none-of-several-presets](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_purging.py): pass
 
-아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다
 
 Given
 
@@ -289,33 +289,33 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.partial_bulk_purge: user-1이 프리셋 2개를 한 번에 purge 함
+- PrometheusQueryPresetAdapter.partial_bulk_purge: user-1이 프리셋 2개를 한 번에 purge 합니다
 
 Then
 
-- 처리된 프리셋 없이 대상이 모두 실패 목록에 온다
+- 처리된 프리셋 없이 대상이 모두 실패 목록에 옵니다
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상 프리셋의 id와 같다
+  - failed[0].id: 대상 프리셋의 id 와 같다
   - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 프리셋의 id와 같다
+  - failed[1].id: 대상 프리셋의 id 와 같다
   - failed[1].message: 'Insufficient permission'를 담은 이유
 
 <a id="partial_bulk_purging-purging-several-presets-answers-for-the-missing-one"></a>
 
 #### [purging-several-presets-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_purging.py): pass
 
-슈퍼관리자가 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+superadmin 이 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 삭제되기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
 
 Given
 
@@ -325,26 +325,26 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.partial_bulk_purge: user-1이 프리셋 2개 와 없는 id 하나를 한 번에 purge 함
+- PrometheusQueryPresetAdapter.partial_bulk_purge: user-1이 프리셋 2개 와 없는 id 하나를 한 번에 purge 합니다
 
 Then
 
-- 대상 프리셋이 모두 지워지기 전 모습으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+- 대상 프리셋이 모두 삭제되기 전 모습으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
   - successes count = 2
   - failed count = 1
   - successes[0]: 대상 프리셋 전체와 같다
   - successes[1]: 대상 프리셋 전체와 같다
-  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].id: 요청에 넣은 없는 id 와 같다
   - failed[0].message: 'not found'를 담은 이유
 
 ### purge
@@ -353,7 +353,7 @@ Then
 
 #### [the-superadmin-removes-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_purging.py): pass
 
-프리셋 하나가 있고 슈퍼관리자가 삭제하면, 삭제한 id를 담은 응답이 반환된다
+프리셋 하나가 있고 superadmin 이 삭제하면, 삭제한 id 를 담은 응답이 반환됩니다
 
 Given
 
@@ -362,28 +362,28 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.purge: user-1이 preset-1 삭제
+- PrometheusQueryPresetAdapter.purge: user-1이 preset-1 삭제합니다
 
 Then
 
-- 삭제한 프리셋을 응답한다
-  - id: 미리 만들어 둔 프리셋와 같다
+- 삭제한 프리셋을 응답합니다
+  - id: 미리 저장한 프리셋와 같다
 
 <a id="purging-turning-enforcement-off-lets-a-user-remove-a-preset"></a>
 
 #### [turning-enforcement-off-lets-a-user-remove-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_purging.py): pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다
+권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있습니다
 
 Given
 
@@ -392,28 +392,28 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.purge: user-1이 preset-1 삭제
+- PrometheusQueryPresetAdapter.purge: user-1이 preset-1 삭제합니다
 
 Then
 
-- 삭제한 프리셋을 응답한다
-  - id: 미리 만들어 둔 프리셋와 같다
+- 삭제한 프리셋을 응답합니다
+  - id: 미리 저장한 프리셋와 같다
 
 <a id="purging-a-user-granted-nothing-may-not-remove-a-preset"></a>
 
 #### [a-user-granted-nothing-may-not-remove-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_purging.py): pass
 
-같은 프리셋이 있고 아무 권한도 없는 사용자가 삭제하면, 권한 부족으로 거부된다
+같은 프리셋이 있고 아무 권한도 없는 사용자가 삭제하면, 권한 부족으로 거부됩니다
 
 Given
 
@@ -422,28 +422,28 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.purge: user-1이 preset-1 삭제
+- PrometheusQueryPresetAdapter.purge: user-1이 preset-1 삭제합니다
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: NotEnoughPermission
 
 <a id="purging-removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
 #### [removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_purging.py): pass
 
-슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다
+superadmin 이 존재하지 않는 id 를 삭제하면, 대상을 찾을 수 없다는 이유로 거부됩니다
 
 Given
 
@@ -452,21 +452,21 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.purge: user-1이 존재하지 않는 id 삭제
+- PrometheusQueryPresetAdapter.purge: user-1이 존재하지 않는 id 삭제합니다
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: EntityNotFoundError
 
 ### search
@@ -475,7 +475,7 @@ Then
 
 #### [a-user-granted-nothing-counts-every-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_searching.py): pass
 
-프리셋 둘이 있고 아무 권한도 없는 사용자가 필터 없이 검색하면, 둘 다 집계된다
+프리셋 둘이 있고 아무 권한도 없는 사용자가 필터 없이 검색하면, 둘 다 집계됩니다
 
 Given
 
@@ -485,21 +485,21 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.search: user-1이 필터 없이 전체 조회
+- PrometheusQueryPresetAdapter.search: user-1이 필터 없이 전체 조회합니다
 
 Then
 
-- 미리 만들어 둔 프리셋이 모두, 그리고 그것만 집계된다
+- 미리 저장한 프리셋이 모두, 그리고 그것만 집계됩니다
   - items = ['other-1', 'wanted-1']
   - total_count = 2
   - has_next_page = False
@@ -509,34 +509,34 @@ Then
 
 #### [filtering-by-category-keeps-only-the-presets-filed-under-it](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_searching.py): pass
 
-두 카테고리에 프리셋이 나뉘어 있을 때 한 카테고리 필터로 검색하면, 그 카테고리의 프리셋만 반환된다
+두 카테고리에 프리셋이 나뉘어 있을 때 한 카테고리 필터로 검색하면, 그 카테고리의 프리셋만 반환됩니다
 
 Given
 
 - 두 카테고리에 나뉜 프리셋 셋과, user 한 명
   - 카테고리 wanted-1
   - 카테고리 other-1
-  - 질의 프리셋 wanted-2: 카테고리에 속한다
-  - 질의 프리셋 beside-1: 카테고리에 속한다
-  - 질의 프리셋 elsewhere-1: 카테고리에 속한다
+  - 질의 프리셋 wanted-2: 카테고리에 속합니다
+  - 질의 프리셋 beside-1: 카테고리에 속합니다
+  - 질의 프리셋 elsewhere-1: 카테고리에 속합니다
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.search: user-1이 카테고리 필터로 조회
+- PrometheusQueryPresetAdapter.search: user-1이 카테고리 필터로 조회합니다
 
 Then
 
-- 미리 만들어 둔 프리셋이 모두, 그리고 그것만 집계된다
+- 미리 저장한 프리셋이 모두, 그리고 그것만 집계됩니다
   - items = ['beside-1', 'wanted-2']
   - total_count = 2
   - has_next_page = False
@@ -546,7 +546,7 @@ Then
 
 #### [filtering-by-name-keeps-only-the-preset-of-that-name](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_searching.py): pass
 
-이름이 다른 프리셋 셋이 있을 때 이름 필터로 검색하면, 그 이름의 프리셋만 반환된다
+이름이 다른 프리셋 셋이 있을 때 이름 필터로 검색하면, 그 이름의 프리셋만 반환됩니다
 
 Given
 
@@ -557,21 +557,21 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.search: user-1이 wanted-1 이름 필터로 조회
+- PrometheusQueryPresetAdapter.search: user-1이 wanted-1 이름 필터로 조회합니다
 
 Then
 
-- 이름 필터에 맞는 하나만 집계된다
+- 이름 필터에 맞는 하나만 집계됩니다
   - items = ['wanted-1']
   - total_count = 1
   - has_next_page = False
@@ -581,7 +581,7 @@ Then
 
 #### [omitting-the-page-size-answers-ten-and-says-there-is-a-next-page](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_searching.py): pass
 
-프리셋 11개가 있을 때 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다
+프리셋 11개가 있을 때 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답합니다
 
 Given
 
@@ -600,21 +600,21 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.search: user-1이 필터 없이 전체 조회
+- PrometheusQueryPresetAdapter.search: user-1이 필터 없이 전체 조회합니다
 
 Then
 
-- 한 페이지만 반환되고 다음 페이지가 있다고 응답한다
+- 한 페이지만 반환되고 다음 페이지가 있다고 응답합니다
   - items = 10
   - total_count = 11
   - has_next_page = True
@@ -624,7 +624,7 @@ Then
 
 #### [a-call-carrying-no-user-may-not-search-presets](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_searching.py): pass
 
-프리셋 하나가 있고 사용자 컨텍스트 없이 검색하면, 호출자를 알 수 없어 거부된다
+프리셋 하나가 있고 사용자 컨텍스트 없이 검색하면, 호출자를 알 수 없어 거부됩니다
 
 Given
 
@@ -633,11 +633,11 @@ Given
 
 When
 
-- PrometheusQueryPresetAdapter.search: 사용자 컨텍스트 없이 전체 조회
+- PrometheusQueryPresetAdapter.search: 사용자 컨텍스트 없이 전체 조회합니다
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: UnreachableError
 
 ### admin_preview
@@ -646,7 +646,7 @@ Then
 
 #### [previewing-a-template-is-an-instant-query-with-the-server-window-and-no-label](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_previewing.py): pass
 
-슈퍼관리자가 템플릿만 지정해 미리 보면, 순간 질의로 응답하고 모의 서버가 받은 질의의 시간 창은 서버 설정의 기본 시간 창이며 라벨은 비어 있다
+superadmin 이 템플릿만 지정해 미리 보면, 순간 질의로 응답하고 모의 서버가 받은 질의의 시간 창은 서버 설정의 기본 시간 창이며 라벨은 비어 있습니다
 
 Given
 
@@ -654,21 +654,21 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.admin_preview: user-1이 템플릿 미리 보기
+- PrometheusQueryPresetAdapter.admin_preview: user-1이 템플릿 미리 봅니다
 
 Then
 
-- 모의 서버가 받은 질의를 담은 결과가 반환된다
+- 모의 서버가 받은 질의를 담은 결과가 반환됩니다
   - status = 'success'
   - result_type = 'vector'
   - result = [([], [(1000.0, 'avg by () (rate(container_cpu_seconds_total{}[2m]))')])]
@@ -677,7 +677,7 @@ Then
 
 #### [the-monitor-role-previews-a-template](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_previewing.py): pass
 
-모니터 역할이 템플릿을 미리 보면, 모의 서버가 응답한 결과가 반환된다. 슈퍼관리자 검사는 읽기에 한해 모니터를 허용한다
+모니터 역할이 템플릿을 미리 보면, 모의 서버가 응답한 결과가 반환됩니다. superadmin 검사는 읽기에 대해서만 모니터를 허용합니다
 
 Given
 
@@ -685,21 +685,21 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 모니터 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 모니터 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 모니터 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.admin_preview: user-1이 템플릿 미리 보기
+- PrometheusQueryPresetAdapter.admin_preview: user-1이 템플릿 미리 봅니다
 
 Then
 
-- 모의 서버가 받은 질의를 담은 결과가 반환된다
+- 모의 서버가 받은 질의를 담은 결과가 반환됩니다
   - status = 'success'
   - result_type = 'vector'
   - result = [([], [(1000.0, 'avg by () (rate(container_cpu_seconds_total{}[2m]))')])]
@@ -708,7 +708,7 @@ Then
 
 #### [a-query-prometheus-refuses-is-refused-as-an-evaluation-failure](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_previewing.py): pass
 
-슈퍼관리자가 빈 질의로 렌더되는 템플릿을 미리 보면, Prometheus가 그 질의를 거부하고 그 거부가 평가 실패로 바뀌어 전파된다. 실행의 같은 시나리오와 다른 오류로 거부된다
+superadmin 이 빈 질의로 렌더되는 템플릿을 미리 보면, Prometheus 가 그 질의를 거부하고 그 거부가 평가 실패로 변경되어 전파됩니다. 실행의 같은 시나리오와 다른 오류로 거부됩니다
 
 Given
 
@@ -716,28 +716,28 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.admin_preview: user-1이 빈 질의로 렌더되는 템플릿 미리 보기
+- PrometheusQueryPresetAdapter.admin_preview: user-1이 빈 질의로 렌더되는 템플릿 미리 봅니다
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: PrometheusQueryEvaluationFailed
 
 <a id="previewing-a-user-who-is-not-the-superadmin-may-not-preview-a-template"></a>
 
 #### [a-user-who-is-not-the-superadmin-may-not-preview-a-template](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_previewing.py): pass
 
-슈퍼관리자가 아닌 사용자가 미리 보려 하면, 역할 부족으로 거부된다
+superadmin 이 아닌 사용자가 미리 보려 하면, 역할 부족으로 거부됩니다
 
 Given
 
@@ -745,21 +745,21 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.admin_preview: user-1이 템플릿 미리 보기
+- PrometheusQueryPresetAdapter.admin_preview: user-1이 템플릿 미리 봅니다
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: InsufficientPrivilege
 
 ### create
@@ -768,7 +768,7 @@ Then
 
 #### [a-name-another-preset-already-holds-is-allowed](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_creating.py): pass
 
-이미 다른 프리셋이 사용 중인 이름으로 슈퍼관리자가 다시 생성하면, 생성된다. 프리셋의 이름에는 유일 제약이 없다
+이미 다른 프리셋이 사용 중인 이름으로 superadmin 이 다시 생성하면, 생성됩니다. 프리셋의 이름에는 유일 제약이 없습니다
 
 Given
 
@@ -777,22 +777,22 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.create: user-1이 이미 있는 이름 preset-1(으)로 다시 생성
+- PrometheusQueryPresetAdapter.create: user-1이 이미 있는 이름 preset-1(으)로 다시 생성합니다
 
 Then
 
-- 생성한 프리셋 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- 생성한 프리셋 전체가 반환됩니다
+  - id: 건너뜀: 데이터베이스가 생성합니다
   - name = 'preset-1'
   - description = None
   - rank = 0
@@ -809,7 +809,7 @@ Then
 
 #### [creating-a-preset-under-a-category-points-the-node-at-that-category](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_creating.py): pass
 
-카테고리 하나가 있고 슈퍼관리자가 그 카테고리를 지정해 생성하면, 응답의 카테고리가 그것을 가리킨다
+카테고리 하나가 있고 superadmin 이 그 카테고리를 지정해 생성하면, 응답의 카테고리가 그것을 참조합니다
 
 Given
 
@@ -818,26 +818,26 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.create: user-1이 미리 만들어 둔 카테고리 아래에 이름 cpu-by-kernel(으)로 생성
+- PrometheusQueryPresetAdapter.create: user-1이 미리 저장한 카테고리 아래에 이름 cpu-by-kernel(으)로 생성합니다
 
 Then
 
-- 생성한 프리셋 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- 생성한 프리셋 전체가 반환됩니다
+  - id: 건너뜀: 데이터베이스가 생성합니다
   - name = 'cpu-by-kernel'
   - description = None
   - rank = 0
-  - category_id: 미리 만들어 둔 카테고리와 같다
+  - category_id: 미리 저장한 카테고리와 같다
   - metric_name = 'container_cpu_seconds_total'
   - query_template = 'avg by (${{group_by}}) (rate(container_cpu_seconds_total{${{labels}}}[${{window}}]))'
   - time_window = None
@@ -850,7 +850,7 @@ Then
 
 #### [creating-a-preset-with-a-window-carries-that-window-on-the-node](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_creating.py): pass
 
-슈퍼관리자가 시간 창을 함께 지정해 생성하면, 노드에 그 시간 창이 담긴다
+superadmin 이 시간 창을 함께 지정해 생성하면, 노드에 그 시간 창이 담깁니다
 
 Given
 
@@ -858,22 +858,22 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.create: user-1이 이름 cpu-by-kernel(으)로 생성
+- PrometheusQueryPresetAdapter.create: user-1이 이름 cpu-by-kernel(으)로 생성합니다
 
 Then
 
-- 생성한 프리셋 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- 생성한 프리셋 전체가 반환됩니다
+  - id: 건너뜀: 데이터베이스가 생성합니다
   - name = 'cpu-by-kernel'
   - description = None
   - rank = 0
@@ -890,7 +890,7 @@ Then
 
 #### [creating-a-preset-with-the-required-values-answers-with-the-whole-node](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_creating.py): pass
 
-슈퍼관리자가 이름, 지표 이름, 템플릿, 허용 라벨 목록만 지정해 생성하면, 순위는 0이고 카테고리·설명·시간 창은 비어 있는 노드 전체가 반환된다
+superadmin 이 이름, 지표 이름, 템플릿, 허용 라벨 목록만 지정해 생성하면, 순위는 0이고 카테고리, 설명, 시간 창은 비어 있는 노드 전체가 반환됩니다
 
 Given
 
@@ -898,22 +898,22 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.create: user-1이 이름 cpu-by-kernel(으)로 생성
+- PrometheusQueryPresetAdapter.create: user-1이 이름 cpu-by-kernel(으)로 생성합니다
 
 Then
 
-- 생성한 프리셋 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- 생성한 프리셋 전체가 반환됩니다
+  - id: 건너뜀: 데이터베이스가 생성합니다
   - name = 'cpu-by-kernel'
   - description = None
   - rank = 0
@@ -930,7 +930,7 @@ Then
 
 #### [a-category-id-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_creating.py): pass
 
-슈퍼관리자가 존재하지 않는 카테고리 id를 지정해 생성하면, 카테고리가 없다는 이유로 거부된다. 저장소의 참조 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다
+superadmin 이 존재하지 않는 카테고리 id 를 지정해 생성하면, 카테고리가 없다는 이유로 거부됩니다. 저장소의 참조 제약이 차단하며 도메인 오류로 옮기지 않았습니다
 
 Given
 
@@ -938,28 +938,28 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.create: user-1이 존재하지 않는 카테고리 id 아래에 이름 cpu-by-kernel(으)로 생성
+- PrometheusQueryPresetAdapter.create: user-1이 존재하지 않는 카테고리 id 아래에 이름 cpu-by-kernel(으)로 생성합니다
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: ForeignKeyViolationError
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-create-a-preset"></a>
 
 #### [a-user-who-is-not-the-superadmin-may-not-create-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_creating.py): pass
 
-슈퍼관리자가 아닌 사용자가 프리셋을 생성하려 하면, 역할 부족으로 거부된다
+superadmin 이 아닌 사용자가 프리셋을 생성하려 하면, 역할 부족으로 거부됩니다
 
 Given
 
@@ -967,28 +967,28 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.create: user-1이 이름 cpu-by-kernel(으)로 생성
+- PrometheusQueryPresetAdapter.create: user-1이 이름 cpu-by-kernel(으)로 생성합니다
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: InsufficientPrivilege
 
 <a id="creating-the-monitor-role-may-not-create-a-preset"></a>
 
 #### [the-monitor-role-may-not-create-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_creating.py): pass
 
-모니터 역할이 프리셋을 생성하려 하면, 역할 부족으로 거부된다. 슈퍼관리자 검사는 읽기에만 모니터를 허용한다
+모니터 역할이 프리셋을 생성하려 하면, 역할 부족으로 거부됩니다. superadmin 검사는 읽기에만 모니터를 허용합니다
 
 Given
 
@@ -996,28 +996,28 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 모니터 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 모니터 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 모니터 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.create: user-1이 이름 cpu-by-kernel(으)로 생성
+- PrometheusQueryPresetAdapter.create: user-1이 이름 cpu-by-kernel(으)로 생성합니다
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: InsufficientPrivilege
 
 <a id="creating-turning-enforcement-off-still-does-not-let-a-user-create-a-preset"></a>
 
 #### [turning-enforcement-off-still-does-not-let-a-user-create-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_creating.py): pass
 
-권한 검사를 꺼도 프리셋 생성은 여전히 거부된다
+권한 검사를 꺼도 프리셋 생성은 여전히 거부됩니다
 
 Given
 
@@ -1025,21 +1025,21 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.create: user-1이 이름 cpu-by-kernel(으)로 생성
+- PrometheusQueryPresetAdapter.create: user-1이 이름 cpu-by-kernel(으)로 생성합니다
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: InsufficientPrivilege
 
 ### execute_preset
@@ -1048,30 +1048,30 @@ Then
 
 #### [running-a-preset-over-a-range-is-a-range-query](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py): pass
 
-슈퍼관리자가 시작·끝·간격을 지정해 실행하면, 모의 서버가 범위 질의로 응답한다
+superadmin 이 시작, 끝, 간격을 지정해 실행하면, 모의 서버가 범위 질의로 응답합니다
 
 Given
 
 - 이미 있는 프리셋 하나와, 프리셋을 읽을 수 있는 superadmin 한 명
-  - 질의 프리셋 preset-1: 시간 창이 1h(으)로 설정돼 있다
+  - 질의 프리셋 preset-1: 시간 창을 1h 값으로 설정합니다
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset: user-1이 preset-1 실행 (조회 구간 지정)
+- PrometheusQueryPresetAdapter.execute_preset: user-1이 preset-1 실행합니다 (조회 구간 지정)
 
 Then
 
-- 모의 서버가 받은 질의를 담은 결과가 반환된다
+- 모의 서버가 받은 질의를 담은 결과가 반환됩니다
   - status = 'success'
   - result_type = 'matrix'
   - result = [([], [(1000.0, 'avg by () (rate(container_cpu_seconds_total{}[1h]))')])]
@@ -1080,7 +1080,7 @@ Then
 
 #### [running-a-preset-without-a-range-is-an-instant-query-carrying-the-asked-window](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py): pass
 
-시간 창이 없는 프리셋을 슈퍼관리자가 시간 창을 지정하고 조회 구간 없이 실행하면, 순간 질의로 응답하고 모의 서버가 받은 질의에 요청의 시간 창이 들어 있다
+시간 창이 없는 프리셋을 superadmin 이 시간 창을 지정하고 조회 구간 없이 실행하면, 순간 질의로 응답하고 모의 서버가 받은 질의에 요청의 시간 창이 들어 있습니다
 
 Given
 
@@ -1089,21 +1089,21 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset: user-1이 preset-1 실행 (시간 창 30s)
+- PrometheusQueryPresetAdapter.execute_preset: user-1이 preset-1 실행합니다 (시간 창 30s)
 
 Then
 
-- 모의 서버가 받은 질의를 담은 결과가 반환된다
+- 모의 서버가 받은 질의를 담은 결과가 반환됩니다
   - status = 'success'
   - result_type = 'vector'
   - result = [([], [(1000.0, 'avg by () (rate(container_cpu_seconds_total{}[30s]))')])]
@@ -1112,30 +1112,30 @@ Then
 
 #### [turning-enforcement-off-lets-a-user-run-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py): pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 실행할 수 있다
+권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 실행할 수 있습니다
 
 Given
 
 - 이미 있는 프리셋 하나와, 프리셋을 읽을 수 있는 user 한 명
-  - 질의 프리셋 preset-1: 시간 창이 1h(으)로 설정돼 있다
+  - 질의 프리셋 preset-1: 시간 창을 1h 값으로 설정합니다
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset: user-1이 preset-1 실행 (아무것도 지정하지 않음)
+- PrometheusQueryPresetAdapter.execute_preset: user-1이 preset-1 실행합니다 (아무것도 지정하지 않음)
 
 Then
 
-- 모의 서버가 받은 질의를 담은 결과가 반환된다
+- 모의 서버가 받은 질의를 담은 결과가 반환됩니다
   - status = 'success'
   - result_type = 'vector'
   - result = [([], [(1000.0, 'avg by () (rate(container_cpu_seconds_total{}[1h]))')])]
@@ -1144,37 +1144,37 @@ Then
 
 #### [a-query-prometheus-refuses-is-refused-as-a-failed-metric-read](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py): pass
 
-라벨 없이는 빈 질의로 렌더되는 프리셋을 슈퍼관리자가 라벨 없이 실행하면, Prometheus가 그 질의를 거부하고 그 거부가 지표를 얻지 못했다는 이유로 그대로 전파된다
+라벨 없이는 빈 질의로 렌더되는 프리셋을 superadmin 이 라벨 없이 실행하면, Prometheus 가 그 질의를 거부하고 그 거부가 지표를 얻지 못했다는 이유로 그대로 전파됩니다
 
 Given
 
 - 이미 있는 프리셋 하나와, 프리셋을 읽을 수 있는 superadmin 한 명
-  - 질의 프리셋 preset-1: 라벨 없이는 빈 질의로 렌더되는 템플릿을 갖는다
+  - 질의 프리셋 preset-1: 라벨이 없으면 빈 질의로 렌더되는 템플릿을 가집니다
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset: user-1이 preset-1 실행 (아무것도 지정하지 않음)
+- PrometheusQueryPresetAdapter.execute_preset: user-1이 preset-1 실행합니다 (아무것도 지정하지 않음)
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: FailedToGetMetric
 
 <a id="executing-a-user-granted-nothing-may-not-run-a-preset"></a>
 
 #### [a-user-granted-nothing-may-not-run-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py): pass
 
-아무 권한도 없는 사용자가 프리셋을 실행하면 권한 부족으로 거부된다. 실행은 조회와 같은 권한을 묻는다
+아무 권한도 없는 사용자가 프리셋을 실행하면 권한 부족으로 거부됩니다. 실행은 조회와 같은 권한을 요구합니다
 
 Given
 
@@ -1182,25 +1182,25 @@ Given
   - 질의 프리셋 preset-1
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset: user-1이 preset-1 실행 (아무것도 지정하지 않음)
+- PrometheusQueryPresetAdapter.execute_preset: user-1이 preset-1 실행합니다 (아무것도 지정하지 않음)
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: NotEnoughPermission
 
 <a id="executing-running-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
 #### [running-an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py): pass
 
-슈퍼관리자가 존재하지 않는 id로 실행하면, 대상을 찾을 수 없다는 이유로 거부된다. 실행은 서비스가 프리셋을 직접 읽어서 내는 오류라 수정과 삭제의 대상 없음과 종류가 다르다
+superadmin 이 존재하지 않는 id 로 실행하면, 대상을 찾을 수 없다는 이유로 거부됩니다. 실행은 서비스가 프리셋을 직접 읽어서 발생시키는 오류라 수정과 삭제의 대상 없음과 종류가 다릅니다
 
 Given
 
@@ -1209,28 +1209,28 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset: user-1이 존재하지 않는 id 실행 (아무것도 지정하지 않음)
+- PrometheusQueryPresetAdapter.execute_preset: user-1이 존재하지 않는 id 실행합니다 (아무것도 지정하지 않음)
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: PrometheusQueryPresetNotFound
 
 <a id="executing-running-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user"></a>
 
 #### [running-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_executing.py): pass
 
-아무 권한도 없는 사용자가 존재하지 않는 id로 실행하면, 대상 없음이 아니라 권한 부족으로 거부된다. 없는 행에는 부여된 권한도 없기 때문이다
+아무 권한도 없는 사용자가 존재하지 않는 id 로 실행하면, 대상 없음이 아니라 권한 부족으로 거부됩니다. 없는 행에는 부여된 권한도 없기 때문입니다
 
 Given
 
@@ -1239,21 +1239,21 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.execute_preset: user-1이 존재하지 않는 id 실행 (아무것도 지정하지 않음)
+- PrometheusQueryPresetAdapter.execute_preset: user-1이 존재하지 않는 id 실행합니다 (아무것도 지정하지 않음)
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: NotEnoughPermission
 
 ### partial_bulk_update
@@ -1262,7 +1262,7 @@ Then
 
 #### [a-broken-template-fails-only-the-preset-it-was-meant-for](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_editing.py): pass
 
-슈퍼관리자가 프리셋 여럿을 한 번에 고치며 하나에 잘못된 템플릿을 주면, 그 하나만 템플릿 검사의 이유로 실패 목록에 오고 나머지는 고쳐진다
+superadmin 이 프리셋 여럿을 한 번에 수정하며 하나에 잘못된 템플릿을 주면, 그 하나만 템플릿 검사의 이유로 실패 목록에 오고 나머지는 수정됩니다
 
 Given
 
@@ -1272,33 +1272,33 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 설명을 한 번에 고침, 첫째는 템플릿도 잘못된 값으로
+- PrometheusQueryPresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 설명을 한 번에 수정합니다, 첫째는 템플릿도 잘못된 값으로
 
 Then
 
-- 템플릿이 잘못된 첫째는 그 이유로 실패 목록에 오고, 나머지는 새 설명으로 처리된 목록에 온다
+- 템플릿이 잘못된 첫째는 그 이유로 실패 목록에 오고, 나머지는 새 설명으로 처리된 목록에 옵니다
   - successes count = 1
   - successes[0]: 새 설명을 실은 대상 프리셋 전체와 같다
   - successes[0].updated_at: 이 실행이 쓴 시각
   - failed count = 1
-  - failed[0].id: 첫째 프리셋의 id와 같다
+  - failed[0].id: 첫째 프리셋의 id 와 같다
   - failed[0].message: 'Unsupported template variable'를 담은 이유
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets"></a>
 
 #### [a-user-granted-nothing-edits-none-of-several-presets](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_editing.py): pass
 
-아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다
 
 Given
 
@@ -1308,33 +1308,33 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 설명을 한 번에 고침
+- PrometheusQueryPresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 설명을 한 번에 수정합니다
 
 Then
 
-- 처리된 프리셋 없이 대상이 모두 실패 목록에 온다
+- 처리된 프리셋 없이 대상이 모두 실패 목록에 옵니다
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상 프리셋의 id와 같다
+  - failed[0].id: 대상 프리셋의 id 와 같다
   - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 프리셋의 id와 같다
+  - failed[1].id: 대상 프리셋의 id 와 같다
   - failed[1].message: 'Insufficient permission'를 담은 이유
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-presets-at-once"></a>
 
 #### [the-superadmin-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_editing.py): pass
 
-슈퍼관리자가 프리셋 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다
+superadmin 이 프리셋 여럿의 설명을 한 번에 변경하면, 모두 새 설명으로 오고 실패한 것은 없습니다
 
 Given
 
@@ -1344,21 +1344,21 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 설명을 한 번에 고침
+- PrometheusQueryPresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 설명을 한 번에 수정합니다
 
 Then
 
-- 대상 프리셋이 모두 새 설명으로 오고, 실패한 것은 없다
+- 대상 프리셋이 모두 새 설명으로 오고, 실패한 것은 없습니다
   - successes count = 2
   - successes[0]: 새 설명을 실은 대상 프리셋 전체와 같다
   - successes[0].updated_at: 이 실행이 쓴 시각
@@ -1372,7 +1372,7 @@ Then
 
 #### [an-update-giving-no-value-answers-the-node-unchanged](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_editing.py): pass
 
-슈퍼관리자가 값을 하나도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환된다
+superadmin 이 값을 하나도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환됩니다
 
 Given
 
@@ -1381,24 +1381,24 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.update: user-1이 preset-1 수정 (빈 요청)
+- PrometheusQueryPresetAdapter.update: user-1이 preset-1 을 수정합니다 (빈 요청)
 
 Then
 
-- 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 미리 만들어 둔 프리셋와 같다
+- 미리 저장한 프리셋 전체가 반환됩니다
+  - id: 미리 저장한 프리셋와 같다
   - name = 'preset-1'
-  - description = '미리 만들어 둔 질의 프리셋'
+  - description = '미리 생성한 질의 프리셋'
   - rank = 0
   - category_id = None
   - metric_name = 'container_cpu_seconds_total'
@@ -1413,33 +1413,33 @@ Then
 
 #### [changing-only-the-filter-labels-keeps-the-group-labels](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_editing.py): pass
 
-필터 라벨과 그룹 라벨이 모두 있는 프리셋을 슈퍼관리자가 필터 라벨만 수정하면, 필터 라벨은 새 값이고 그룹 라벨은 그대로다
+필터 라벨과 그룹 라벨이 모두 있는 프리셋을 superadmin 이 필터 라벨만 수정하면, 필터 라벨은 새 값이고 그룹 라벨은 그대로입니다
 
 Given
 
 - 이미 있는 프리셋 하나와, 프리셋을 읽을 수 있는 superadmin 한 명
-  - 질의 프리셋 preset-1: 필터 라벨을 kernel_id(으)로 제한한다, 그룹 라벨을 agent_id(으)로 제한한다
+  - 질의 프리셋 preset-1: 필터 라벨을 kernel_id 값으로 제한합니다, 그룹 라벨을 agent_id 값으로 제한합니다
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.update: user-1이 preset-1 수정 (필터 라벨 변경)
+- PrometheusQueryPresetAdapter.update: user-1이 preset-1 을 수정합니다 (필터 라벨 변경)
 
 Then
 
-- 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 미리 만들어 둔 프리셋와 같다
+- 미리 저장한 프리셋 전체가 반환됩니다
+  - id: 미리 저장한 프리셋와 같다
   - name = 'preset-1'
-  - description = '미리 만들어 둔 질의 프리셋'
+  - description = '미리 생성한 질의 프리셋'
   - rank = 0
   - category_id = None
   - metric_name = 'container_cpu_seconds_total'
@@ -1454,7 +1454,7 @@ Then
 
 #### [clearing-the-description-leaves-it-empty](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_editing.py): pass
 
-설명이 있는 프리셋을 슈퍼관리자가 설명을 비우도록 수정하면, 설명이 없어진다
+설명이 있는 프리셋을 superadmin 이 설명을 비우도록 수정하면, 설명이 없어집니다
 
 Given
 
@@ -1463,22 +1463,22 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.update: user-1이 preset-1 수정 (설명 비우기)
+- PrometheusQueryPresetAdapter.update: user-1이 preset-1 을 수정합니다 (설명 비우기)
 
 Then
 
-- 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 미리 만들어 둔 프리셋와 같다
+- 미리 저장한 프리셋 전체가 반환됩니다
+  - id: 미리 저장한 프리셋와 같다
   - name = 'preset-1'
   - description = None
   - rank = 0
@@ -1495,35 +1495,35 @@ Then
 
 #### [moving-a-preset-to-another-category-points-the-node-at-that-one](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_editing.py): pass
 
-카테고리 둘 중 한쪽에 속한 프리셋을 슈퍼관리자가 다른 카테고리로 옮기면, 응답의 카테고리가 그것을 가리킨다
+카테고리 둘 중 한쪽에 속한 프리셋을 superadmin 이 다른 카테고리로 옮기면, 응답의 카테고리가 그것을 참조합니다
 
 Given
 
 - 카테고리 둘과 한쪽에 속한 프리셋 하나, superadmin 한 명
   - 카테고리 home-1
   - 카테고리 elsewhere-1
-  - 질의 프리셋 preset-1: 카테고리에 속한다
+  - 질의 프리셋 preset-1: 카테고리에 속합니다
   - 도메인 home-2
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.update: user-1이 preset-1 수정 (다른 카테고리로 이동)
+- PrometheusQueryPresetAdapter.update: user-1이 preset-1 을 수정합니다 (다른 카테고리로 이동)
 
 Then
 
-- 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 미리 만들어 둔 프리셋와 같다
+- 미리 저장한 프리셋 전체가 반환됩니다
+  - id: 미리 저장한 프리셋와 같다
   - name = 'preset-1'
-  - description = '미리 만들어 둔 질의 프리셋'
+  - description = '미리 생성한 질의 프리셋'
   - rank = 0
   - category_id: 다른 카테고리와 같다
   - metric_name = 'container_cpu_seconds_total'
@@ -1538,7 +1538,7 @@ Then
 
 #### [the-superadmin-changes-the-template-and-the-rest-stays](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_editing.py): pass
 
-프리셋 하나가 있고 슈퍼관리자가 템플릿만 수정하면, 템플릿은 새 값이고 나머지는 그대로다
+프리셋 하나가 있고 superadmin 이 템플릿만 수정하면, 템플릿은 새 값이고 나머지는 그대로입니다
 
 Given
 
@@ -1547,24 +1547,24 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.update: user-1이 preset-1 수정 (템플릿 변경)
+- PrometheusQueryPresetAdapter.update: user-1이 preset-1 을 수정합니다 (템플릿 변경)
 
 Then
 
-- 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 미리 만들어 둔 프리셋와 같다
+- 미리 저장한 프리셋 전체가 반환됩니다
+  - id: 미리 저장한 프리셋와 같다
   - name = 'preset-1'
-  - description = '미리 만들어 둔 질의 프리셋'
+  - description = '미리 생성한 질의 프리셋'
   - rank = 0
   - category_id = None
   - metric_name = 'container_cpu_seconds_total'
@@ -1579,7 +1579,7 @@ Then
 
 #### [turning-enforcement-off-lets-a-user-edit-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_editing.py): pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있다
+권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있습니다
 
 Given
 
@@ -1588,24 +1588,24 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.update: user-1이 preset-1 수정 (이름 변경)
+- PrometheusQueryPresetAdapter.update: user-1이 preset-1 을 수정합니다 (이름 변경)
 
 Then
 
-- 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 미리 만들어 둔 프리셋와 같다
+- 미리 저장한 프리셋 전체가 반환됩니다
+  - id: 미리 저장한 프리셋와 같다
   - name = 'cpu-by-session'
-  - description = '미리 만들어 둔 질의 프리셋'
+  - description = '미리 생성한 질의 프리셋'
   - rank = 0
   - category_id = None
   - metric_name = 'container_cpu_seconds_total'
@@ -1620,7 +1620,7 @@ Then
 
 #### [a-user-granted-nothing-may-not-edit-a-preset](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_editing.py): pass
 
-같은 프리셋이 있고 아무 권한도 없는 사용자가 이름을 수정하면, 권한 부족으로 거부된다. 이 엔티티는 어느 스코프에도 속하지 않아 권한을 받을 방법이 없다
+같은 프리셋이 있고 아무 권한도 없는 사용자가 이름을 수정하면, 권한 부족으로 거부됩니다. 이 엔티티는 어느 스코프에도 속하지 않아 권한을 받을 방법이 없습니다
 
 Given
 
@@ -1629,28 +1629,28 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
     - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.update: user-1이 preset-1 수정 (이름 변경)
+- PrometheusQueryPresetAdapter.update: user-1이 preset-1 을 수정합니다 (이름 변경)
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: NotEnoughPermission
 
 <a id="editing-editing-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
 #### [editing-an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_editing.py): pass
 
-슈퍼관리자가 존재하지 않는 id의 이름을 수정하면, 대상을 찾을 수 없다는 이유로 거부된다
+superadmin 이 존재하지 않는 id 의 이름을 수정하면, 대상을 찾을 수 없다는 이유로 거부됩니다
 
 Given
 
@@ -1659,28 +1659,28 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.update: user-1이 존재하지 않는 id 수정 (이름 변경)
+- PrometheusQueryPresetAdapter.update: user-1이 존재하지 않는 id 을 수정합니다 (이름 변경)
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: EntityNotFoundError
 
 <a id="editing-moving-a-preset-to-a-category-id-nothing-answers-to-is-refused"></a>
 
 #### [moving-a-preset-to-a-category-id-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_editing.py): pass
 
-슈퍼관리자가 존재하지 않는 카테고리 id로 수정하면, 카테고리가 없다는 이유로 거부된다. 저장소의 참조 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다
+superadmin 이 존재하지 않는 카테고리 id 로 수정하면, 카테고리가 없다는 이유로 거부됩니다. 저장소의 참조 제약이 차단하며 도메인 오류로 옮기지 않았습니다
 
 Given
 
@@ -1689,20 +1689,20 @@ Given
   - 도메인 home-1
   - public 에서 prometheus_query_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 public-reader-1: prometheus_query_preset 전체에 READ 허용
-    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+    - superadmin user-1: 역할 public-reader-1 보유
 
 When
 
-- PrometheusQueryPresetAdapter.update: user-1이 preset-1 수정 (존재하지 않는 카테고리 id로 이동)
+- PrometheusQueryPresetAdapter.update: user-1이 preset-1 을 수정합니다 (존재하지 않는 카테고리 id 로 이동)
 
 Then
 
-- 거부된다
+- 거부됩니다
   - 거부: ForeignKeyViolationError
 

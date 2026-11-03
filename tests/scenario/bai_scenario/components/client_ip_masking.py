@@ -26,12 +26,15 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
@@ -68,7 +71,11 @@ class AMaskingPolicyAndSomeone(Given[Any, AMaskingPolicyAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"클라이언트 IP 마스킹 정책 하나와, {role_named(self.role)} 한 명"
+        role = role_named(self.role)
+        return Says(
+            f"클라이언트 IP 마스킹 정책 하나와, {role} 한 명",
+            english=(f"one client IP masking policy and one {in_language(role, Language.ENGLISH)}"),
+        )
 
     @override
     async def lay(self, seeding: Any) -> AMaskingPolicyAndACaller:
@@ -89,7 +96,14 @@ class TwoMaskingPoliciesAndSomeone(Given[Any, ManyMaskingPoliciesAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"대상이 다른 클라이언트 IP 마스킹 정책 둘과, {role_named(self.role)} 한 명"
+        role = role_named(self.role)
+        return Says(
+            f"대상이 다른 클라이언트 IP 마스킹 정책 둘과, {role} 한 명",
+            english=(
+                "two client IP masking policies of different targets and one "
+                f"{in_language(role, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyMaskingPoliciesAndACaller:
@@ -141,7 +155,10 @@ class TheNewMaskingPolicyNode(Then[Any, ClientIPMaskingPolicyNode]):
 
     @override
     def says(self) -> str:
-        return "등록한 정책 전체가 반환된다"
+        return Says(
+            "등록한 정책 전체가 반환됩니다",
+            english="the whole registered policy comes back",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[ClientIPMaskingPolicyNode]) -> list[Verdict]:
@@ -150,7 +167,10 @@ class TheNewMaskingPolicyNode(Then[Any, ClientIPMaskingPolicyNode]):
             return [Refused(EntityNotFoundError, answered.raised)]
         return masking_verdicts(
             node,
-            identity=Skipped("id", "데이터베이스가 만든다"),
+            identity=Skipped(
+                "id",
+                Says("데이터베이스가 생성합니다", english="the database generates it"),
+            ),
             target=self.target,
             mode=self.mode,
             ipv4=self.ipv4,
@@ -170,7 +190,10 @@ class TheSameRowRewritten(Then[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNo
 
     @override
     def says(self) -> str:
-        return "같은 id의 행이 지정한 값으로 바뀌어 반환된다"
+        return Says(
+            "같은 id 의 행이 지정한 값으로 변경되어 반환됩니다",
+            english="the row with the same id comes back changed to the given values",
+        )
 
     @override
     def look(
@@ -182,7 +205,14 @@ class TheSameRowRewritten(Then[AMaskingPolicyAndACaller, ClientIPMaskingPolicyNo
         seed = laid.policy
         return masking_verdicts(
             node,
-            identity=Held[UUID]("id", node.id, SameAs[UUID](seed.id, "미리 만들어 둔 정책")),
+            identity=Held[UUID](
+                "id",
+                node.id,
+                SameAs[UUID](
+                    seed.id,
+                    Says("미리 저장한 정책", english="the policy made in advance"),
+                ),
+            ),
             target=seed.target_type,
             mode=seed.mode if isinstance(self.mode, Kept) else self.mode,
             ipv4=seed.ipv4_prefix if isinstance(self.ipv4, Kept) else self.ipv4,
@@ -199,7 +229,10 @@ class TheLaidMaskingPoliciesAreLeft(
 
     @override
     def says(self) -> str:
-        return "응답에 나와야 하는 정책만 반환된다"
+        return Says(
+            "응답에 나와야 하는 정책만 반환됩니다",
+            english="only the policies that must appear in the answer come back",
+        )
 
     @override
     def look(
@@ -230,7 +263,10 @@ class TheDeletedMaskingPolicy(Then[AMaskingPolicyAndACaller, ClientIPMaskingPoli
 
     @override
     def says(self) -> str:
-        return "삭제한 정책 전체가 반환된다"
+        return Says(
+            "삭제한 정책 전체가 반환됩니다",
+            english="the whole deleted policy comes back",
+        )
 
     @override
     def look(
@@ -242,7 +278,14 @@ class TheDeletedMaskingPolicy(Then[AMaskingPolicyAndACaller, ClientIPMaskingPoli
         seed = laid.policy
         return masking_verdicts(
             node,
-            identity=Held[UUID]("id", node.id, SameAs[UUID](seed.id, "미리 만들어 둔 정책")),
+            identity=Held[UUID](
+                "id",
+                node.id,
+                SameAs[UUID](
+                    seed.id,
+                    Says("미리 저장한 정책", english="the policy made in advance"),
+                ),
+            ),
             target=seed.target_type,
             mode=seed.mode,
             ipv4=seed.ipv4_prefix,
@@ -261,7 +304,10 @@ class NoMaskingPolicyIsProcessed(
 
     @override
     def says(self) -> str:
-        return "처리된 정책 없이 대상이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 정책 없이 대상이 모두 실패 목록에 옵니다",
+            english="no policy is processed and every target comes back in the failed list",
+        )
 
     @override
     def look(
@@ -279,7 +325,12 @@ class NoMaskingPolicyIsProcessed(
         for i, (failure, policy) in enumerate(zip(payload.failed, laid.laid, strict=False)):
             verdicts += [
                 Held[UUID](
-                    f"failed[{i}].id", failure.id, SameAs[UUID](policy.id, "대상 정책의 id")
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs[UUID](
+                        policy.id,
+                        Says("대상 정책의 id", english="the id of the target policy"),
+                    ),
                 ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]

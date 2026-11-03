@@ -17,7 +17,7 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config_fragment import (
     AFragmentAndACaller,
@@ -46,10 +46,15 @@ class ReadingById(When[AFragmentAndACaller, AppConfigFragmentAdapter, AppConfigF
 
     @override
     def describe(self, laid: AFragmentAndACaller) -> str:
-        called = (
-            "존재하지 않는 id" if self.other is not None else f"{laid.fragment.config_name}의 조각"
+        if self.other is not None:
+            return Says(
+                f"{laid.caller.username} 이 존재하지 않는 id 로 조회합니다",
+                english=f"{laid.caller.username} reads by a missing id",
+            )
+        return Says(
+            f"{laid.caller.username} 이 {laid.fragment.config_name} 의 조각을 조회합니다",
+            english=f"{laid.caller.username} reads the fragment of {laid.fragment.config_name}",
         )
-        return f"{laid.caller.username}이 {called} 조회"
 
     @override
     async def call(
@@ -74,7 +79,14 @@ class TheGrantedUserReadsTheirOwn(
 
     @override
     def describe(self) -> str:
-        return "자기 조각 하나가 있고 자기 스코프에 읽기 권한을 받은 사용자가 id로 조회하면, 그 조각 전체가 반환된다"
+        return Says(
+            "자기 조각 하나가 있고 자기 스코프에 읽기 권한을 받은 사용자가 id 로 조회하면, "
+            "그 조각 전체가 반환됩니다",
+            english=(
+                "when a user with one own fragment and read permission on their own scope reads "
+                "by id, the whole fragment comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AFragmentAndACaller]:
@@ -101,7 +113,14 @@ class AnotherUsersFragmentIsRefused(
 
     @override
     def describe(self) -> str:
-        return "다른 사용자의 조각을 자기 스코프에만 읽기 권한을 받은 사용자가 id로 조회하면, 권한 부족으로 거부된다"
+        return Says(
+            "다른 사용자의 조각을 자기 스코프에만 읽기 권한을 받은 사용자가 id 로 조회하면, "
+            "권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted read permission only on their own scope reads another "
+                "user's fragment by id, it is rejected for lack of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AFragmentAndACaller]:
@@ -130,7 +149,14 @@ class APublicFragmentIsReadByIdByAnyone(
 
     @override
     def describe(self) -> str:
-        return "공개 조각을 아무 권한도 없는 사용자가 id로 조회하면, 스코프로 조회할 때와 같이 그 조각 전체가 반환된다"
+        return Says(
+            "공개 조각을 아무 권한도 없는 사용자가 id 로 조회하면, 스코프로 조회할 때와 같이 "
+            "그 조각 전체가 반환됩니다",
+            english=(
+                "when a user with no permission reads a public fragment by id, the whole "
+                "fragment comes back as it does in a scoped read"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AFragmentAndACaller]:
@@ -157,9 +183,14 @@ class AnUnknownIdIsRefusedAsPermission(
 
     @override
     def describe(self) -> str:
-        return (
-            "자기 스코프에 읽기 권한을 받은 사용자가 존재하지 않는 id로 조회하면, 대상 없음이 "
-            "아니라 권한 부족으로 거부된다. 없는 행에는 부여된 권한도 없기 때문이다"
+        return Says(
+            "자기 스코프에 읽기 권한을 받은 사용자가 존재하지 않는 id 로 조회하면, 대상 없음이 "
+            "아니라 권한 부족으로 거부됩니다. 없는 행에는 부여된 권한도 없기 때문입니다",
+            english=(
+                "when a user granted read permission on their own scope reads a missing id, it "
+                "is rejected for lack of permission, not for a missing target, because a row "
+                "that does not exist holds no permission either"
+            ),
         )
 
     @override
@@ -187,9 +218,13 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 존재하지 않는 id로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. "
-            "권한 검사를 통과하는 사용자만 이 응답을 본다"
+        return Says(
+            "superadmin 이 존재하지 않는 id 로 조회하면, 대상을 찾을 수 없다는 이유로 거부됩니다. "
+            "권한 검사를 통과하는 사용자만 이 응답을 봅니다",
+            english=(
+                "when the superadmin reads by a missing id, it is rejected because no such "
+                "target exists. Only a user who passes the permission check sees this answer"
+            ),
         )
 
     @override

@@ -18,7 +18,7 @@ from ai.backend.manager.api.adapters.secret.adapter import SecretAdapter
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.secret import (
     CONFIG_KEYS,
@@ -47,7 +47,10 @@ class ReadingTheStatus(When[AKeyringAndACaller, SecretAdapter, AdminSecretStatus
 
     @override
     def describe(self, laid: AKeyringAndACaller) -> str:
-        return f"{laid.caller.username}이 비밀 상태를 조회"
+        return Says(
+            f"{laid.caller.username} 이 비밀 상태를 조회합니다",
+            english=f"{laid.caller.username} reads the secret status",
+        )
 
     @override
     async def call(
@@ -67,9 +70,14 @@ class TheSuperadminCountsPlaintextSecrets(
 
     @override
     def describe(self) -> str:
-        return (
-            "쓰기 제공자가 평문일 때 슈퍼관리자가 상태를 조회하면, 쓰기 제공자는 평문이고 집계는 "
-            "호출자까지 포함해 평문 비밀 키를 가진 수 한 항목이다"
+        return Says(
+            "쓰기 provider 가 평문일 때 superadmin 이 상태를 조회하면, 쓰기 provider 는 평문이고 "
+            "집계는 호출자까지 포함해 평문 비밀 키를 가진 수 한 항목입니다",
+            english=(
+                "when the write provider is plaintext and the superadmin reads the status, "
+                "the write provider is plaintext and the count is one entry for the secrets "
+                "held in plaintext, including the caller's"
+            ),
         )
 
     @override
@@ -96,9 +104,14 @@ class MixedKeysAreCountedApart(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "설정 키로 암호화된 비밀 키와 평문 비밀 키가 섞여 있을 때 상태를 조회하면, "
-            "그 키로 암호화된 수와 평문인 수가 두 항목으로 따로 반환된다"
+            "그 키로 암호화된 수와 평문인 수가 두 항목으로 따로 반환됩니다",
+            english=(
+                "when secrets encrypted with the config key and plaintext secrets are mixed, "
+                "reading the status returns the encrypted count and the plaintext count "
+                "as two separate entries"
+            ),
         )
 
     @override
@@ -130,7 +143,14 @@ class TheMonitorReadsTheStatusLikeTheSuperadmin(
 
     @override
     def describe(self) -> str:
-        return "모니터 역할이 상태를 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다"
+        return Says(
+            "모니터 역할이 상태를 조회하면 superadmin 과 같은 응답이 반환됩니다. "
+            "superadmin 검사는 모니터의 읽기를 허용합니다",
+            english=(
+                "when the monitor role reads the status, the same response as the superadmin's "
+                "comes back, because the superadmin check allows the monitor to read"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyringAndACaller]:
@@ -155,7 +175,11 @@ class AUserWhoIsNotTheSuperadminMayNotReadTheStatus(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 상태를 조회하면 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 상태를 조회하면 역할 부족으로 거부됩니다",
+            english="when a user who is not the superadmin reads the status, it is rejected "
+            "for lack of the role",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AKeyringAndACaller]:

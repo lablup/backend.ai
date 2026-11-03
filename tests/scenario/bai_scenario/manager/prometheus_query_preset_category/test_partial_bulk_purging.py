@@ -28,6 +28,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -61,8 +62,15 @@ class PurgingEveryCategory(When[ManyCategoriesAndACaller, Adapter, Purged]):
 
     @override
     def describe(self, laid: ManyCategoriesAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 카테고리 {len(laid.laid)}개{besides}를 한 번에 purge 함"
+        besides_ko = " 와 없는 id 하나" if self.missing is not None else ""
+        besides_en = " and one missing id" if self.missing is not None else ""
+        return Says(
+            f"{laid.caller.username}이 카테고리 {len(laid.laid)}개{besides_ko}를 한 번에 "
+            "purge 합니다",
+            english=(
+                f"{laid.caller.username} purges {len(laid.laid)} categories{besides_en} in one call"
+            ),
+        )
 
     @override
     async def call(self, adapter: Adapter, laid: ManyCategoriesAndACaller) -> Purged:
@@ -83,9 +91,13 @@ class EveryCategoryIsPurged(Then[ManyCategoriesAndACaller, Purged]):
 
     @override
     def says(self) -> str:
-        return (
-            "대상 카테고리가 모두 지워지기 전 모습으로 오고, 없는 id 는 대상이 없다는 이유로 "
-            "실패 목록에 온다"
+        return Says(
+            "대상 카테고리가 모두 삭제되기 전 모습으로 오고, 없는 id 는 대상이 없다는 이유로 "
+            "실패 목록에 옵니다",
+            english=(
+                "every target category comes back as it was before deletion, and the missing "
+                "id comes back in the failed list because there is no such target"
+            ),
         )
 
     @override
@@ -100,12 +112,24 @@ class EveryCategoryIsPurged(Then[ManyCategoriesAndACaller, Purged]):
         for i, (node, category) in enumerate(zip(payload.successes, laid.laid, strict=False)):
             verdicts.append(
                 Held[CategoryNode](
-                    f"successes[{i}]", node, SameAs(node_of(category), "대상 카테고리 전체")
+                    f"successes[{i}]",
+                    node,
+                    SameAs(
+                        node_of(category),
+                        Says("대상 카테고리 전체", english="the whole target category"),
+                    ),
                 )
             )
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the missing id in the request"),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -123,9 +147,14 @@ class PurgingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 카테고리 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워지기 전 모습으로 "
-            "오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "superadmin 이 카테고리 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 삭제되기 전 "
+            "모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when the superadmin purges two categories and one missing id in one call, "
+                "the two come back as they were before deletion and the missing id comes back "
+                "in the failed list because there is no such target"
+            ),
         )
 
     @override
@@ -151,9 +180,14 @@ class AUserGrantedNothingPurgesNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 카테고리 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 카테고리 여럿을 한 번에 purge 하려 하면, 삭제된 것 "
+            "없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to purge several categories in one call, "
+                "none is deleted and every one comes back in the failed list for lack of "
+                "permission"
+            ),
         )
 
     @override

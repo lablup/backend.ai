@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.v2.notification.request import (
 from ai.backend.common.dto.manager.v2.notification.response import NotificationRuleNode
 from ai.backend.manager.api.adapters.notification.adapter import NotificationAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.notification import (
     ManyRulesAndACaller,
     NothingIsProcessed,
@@ -31,7 +31,7 @@ from bai_scenario.runner.steps import run_scenario
 type Edited = PartialBulkPayload[NotificationRuleNode]
 type EditingStep = Scenario[TestSeedingSession, ManyRulesAndACaller, NotificationAdapter, Edited]
 
-NEW_DESCRIPTION = "한 번에 바꾼 설명"
+NEW_DESCRIPTION = Says("한 번에 변경한 설명", english="the description changed all at once")
 
 
 @dataclass(frozen=True)
@@ -44,7 +44,12 @@ class DescribingEveryOne(When[ManyRulesAndACaller, NotificationAdapter, Edited])
 
     @override
     def describe(self, laid: ManyRulesAndACaller) -> str:
-        return f"{laid.caller.username}이 규칙 {len(laid.laid)}개의 설명을 한 번에 수정"
+        return Says(
+            f"{laid.caller.username}이 규칙 {len(laid.laid)}개의 설명을 한 번에 수정합니다",
+            english=(
+                f"{laid.caller.username} edits the description of {len(laid.laid)} rules at once"
+            ),
+        )
 
     @override
     async def call(self, adapter: NotificationAdapter, laid: ManyRulesAndACaller) -> Edited:
@@ -70,8 +75,13 @@ class TheSuperadminDescribesSeveral(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 규칙 둘의 설명을 한 번에 바꾸면, 둘 다 새 설명으로 오고 실패한 것은 없다"
+        return Says(
+            "superadmin 이 규칙 둘의 설명을 한 번에 변경하면, 둘 다 새 설명으로 오고 "
+            "실패한 것은 없습니다",
+            english=(
+                "when the superadmin changes the description of two rules at once, "
+                "both come back with the new description and nothing failed"
+            ),
         )
 
     @override
@@ -97,9 +107,14 @@ class AUserGrantedNothingEditsNone(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "아무 권한도 없는 사용자가 규칙 여럿을 한 번에 수정하려 하면, 수정된 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+            "모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing edits several rules at once, nothing "
+                "is edited and every one comes back in the failed list because "
+                "permission is not enough"
+            ),
         )
 
     @override

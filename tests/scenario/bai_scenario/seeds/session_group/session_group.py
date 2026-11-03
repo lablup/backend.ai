@@ -20,6 +20,7 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.deployment_policy.creators import DeploymentPolicyCreator
 from ai.backend.manager.models.replica_group.creators import ReplicaGroupCreator
 from ai.backend.manager.models.session_group.creators import SessionGroupCreator
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import (
     Naming,
     TestSeedFieldCreator,
@@ -37,11 +38,14 @@ class TestSeedSessionGroup(TestSeedRowFromTwo[ProjectData, UserData, SessionGrou
 
     @override
     def kind(self) -> str:
-        return "사용자가 만든 세션 그룹"
+        return Says("사용자가 만든 세션 그룹", english="Session group a user made")
 
     @override
     def detail(self) -> str:
-        return "멤버를 한 에이전트에 모으고, 반드시 지킨다"
+        return Says(
+            "멤버를 한 에이전트에 모으고, 반드시 지킵니다",
+            english="packs its members onto one agent and enforces it strictly",
+        )
 
     @override
     def name(self, naming: Naming) -> str:
@@ -66,11 +70,14 @@ class TestSeedDeploymentSessionGroup(TestSeedRowFrom[DeploymentInfo, SessionGrou
 
     @override
     def kind(self) -> str:
-        return "배포의 세션 그룹"
+        return Says("배포의 세션 그룹", english="Session group of a deployment")
 
     @override
     def detail(self) -> str:
-        return "배포가 replica group과 함께 만드는 세션 그룹이다"
+        return Says(
+            "배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다",
+            english="the session group a deployment creates with its replica group",
+        )
 
     @override
     def name(self, naming: Naming) -> str:
@@ -95,7 +102,10 @@ class TestSeedPrimaryReplicaGroupOf(TestSeedFieldCreator[DeploymentInfo, Replica
 
     @override
     def kind(self) -> str:
-        return "세션 그룹을 가진 replica group 하나를 갖는다"
+        return Says(
+            "세션 그룹을 가진 복제본 그룹 하나를 갖습니다",
+            english="has one replica group holding the session group",
+        )
 
     @override
     def owner_id(self, owner: DeploymentInfo) -> DeploymentID:

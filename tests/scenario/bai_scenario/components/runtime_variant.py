@@ -31,12 +31,15 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.components.system import (
@@ -47,7 +50,7 @@ from bai_scenario.components.system import (
 )
 from bai_scenario.seeds.runtime_variant.runtime_variant import TestSeedRuntimeVariant
 
-DESCRIBED = "미리 만들어 둔 런타임 변형"
+DESCRIBED = Says("미리 저장한 인퍼런스 런타임 종류", english="a runtime variant seeded in advance")
 """시드가 미리 만들어 두는 변형의 설명. 시나리오가 기대값으로 다시 쓰므로 한 곳에 둔다."""
 
 FIXED_MODEL_DEFINITION = RuntimeVariantModelDefinitionInfo.model_validate(
@@ -82,7 +85,11 @@ class AVariantAndSomeone(Given[Any, AVariantAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"런타임 변형 하나와, {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"인퍼런스 런타임 종류 하나와, {who} 한 명",
+            english=f"one runtime variant and one {in_language(who, Language.ENGLISH)}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AVariantAndACaller:
@@ -102,7 +109,13 @@ class ManyVariantsAndSomeone(Given[Any, ManyVariantsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"런타임 변형 {self.besides + 1}개와, {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"인퍼런스 런타임 종류 {self.besides + 1}개와, {who} 한 명",
+            english=(
+                f"{self.besides + 1} runtime variants and one {in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyVariantsAndACaller:
@@ -131,7 +144,7 @@ def variant_verdicts(
 ) -> list[Verdict]:
     """Every place of one variant node, prefixed for a node inside a list."""
     return [
-        Skipped(f"{at}id", "데이터베이스가 만든다"),
+        Skipped(f"{at}id", Says("데이터베이스가 생성합니다", english="the database generates it")),
         Same(f"{at}name", node.name, named),
         Same(f"{at}description", node.description, described),
         Same(f"{at}reads_vfolder_config_files", node.reads_vfolder_config_files, False),
@@ -153,7 +166,10 @@ class TheNewVariantNode(Then[Any, RuntimeVariantNode]):
 
     @override
     def says(self) -> str:
-        return "생성한 변형 전체가 반환된다"
+        return Says(
+            "생성한 변형 전체가 반환됩니다",
+            english="the whole variant just created comes back",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[RuntimeVariantNode]) -> list[Verdict]:
@@ -179,7 +195,10 @@ class TheVariantNode(Then[AVariantAndACaller, RuntimeVariantNode]):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 변형 전체가 반환된다"
+        return Says(
+            "미리 저장한 변형 전체가 반환됩니다",
+            english="the whole variant seeded in advance comes back",
+        )
 
     @override
     def look(
@@ -201,7 +220,10 @@ class EveryLaidVariantIsCounted(Then[ManyVariantsAndACaller, SearchRuntimeVarian
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 변형이 모두 집계된다"
+        return Says(
+            "미리 저장한 변형이 모두 집계됩니다",
+            english="every variant seeded in advance is counted",
+        )
 
     @override
     def look(
@@ -228,7 +250,10 @@ class OnlyTheNamedVariantIsLeft(Then[ManyVariantsAndACaller, SearchRuntimeVarian
 
     @override
     def says(self) -> str:
-        return "필터에 맞는 변형 하나만 반환된다"
+        return Says(
+            "필터에 맞는 변형 하나만 반환됩니다",
+            english="only the one variant matching the filter comes back",
+        )
 
     @override
     def look(
@@ -253,7 +278,10 @@ class TheFirstPageOfVariants(Then[ManyVariantsAndACaller, SearchRuntimeVariantsP
 
     @override
     def says(self) -> str:
-        return "기본 크기의 첫 페이지가 반환된다"
+        return Says(
+            "기본 크기의 첫 페이지가 반환됩니다",
+            english="the first page of the default size comes back",
+        )
 
     @override
     def look(
@@ -280,7 +308,13 @@ class TheVariantsInTheOrderAsked(
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 거부가 담긴다"
+        return Says(
+            "요청한 순서대로 반환되고, 없는 id 에 해당하는 항목은 거부가 담깁니다",
+            english=(
+                "items come back in the order asked, and the item for an unknown id "
+                "carries a rejection"
+            ),
+        )
 
     @override
     def look(
@@ -297,7 +331,7 @@ class TheVariantsInTheOrderAsked(
         for i, expected in enumerate(laid.laid):
             got = items[i] if i < len(items) else None
             if not isinstance(got, RuntimeVariantNode):
-                seen.append(Same(f"items[{i}]", got, "노드"))
+                seen.append(Same(f"items[{i}]", got, Says("노드", english="a node")))
                 continue
             seen.extend(
                 variant_verdicts(
@@ -319,7 +353,10 @@ class TheDeletedVariantId(Then[AVariantAndACaller, DeleteRuntimeVariantPayload])
 
     @override
     def says(self) -> str:
-        return "삭제한 변형의 id가 반환된다"
+        return Says(
+            "삭제한 변형의 id 가 반환됩니다",
+            english="the id of the variant deleted comes back",
+        )
 
     @override
     def look(
@@ -328,10 +365,22 @@ class TheDeletedVariantId(Then[AVariantAndACaller, DeleteRuntimeVariantPayload])
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        return [Held[UUID]("id", payload.id, SameAs[UUID](laid.variant.id, "미리 만들어 둔 변형"))]
+        return [
+            Held[UUID](
+                "id",
+                payload.id,
+                SameAs[UUID](
+                    laid.variant.id,
+                    Says("미리 저장한 변형", english="the variant seeded in advance"),
+                ),
+            )
+        ]
 
 
-MESSAGE_IS_FREE_TEXT = "이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다"
+MESSAGE_IS_FREE_TEXT = Says(
+    "이유는 문자열로 오고, 문자열은 변경되어도 되는 값입니다",
+    english="the reason comes as a string, and the string is a value that may change",
+)
 
 
 @dataclass(frozen=True)
@@ -340,7 +389,13 @@ class EveryLaidVariantIsDeleted(Then[ManyVariantsAndACaller, DeleteRuntimeVarian
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 변형 전부가 삭제된 목록에 반환되고, 실패 목록은 비어 있다"
+        return Says(
+            "미리 저장한 변형 전부가 삭제된 목록에 반환되고, 실패 목록은 비어 있습니다",
+            english=(
+                "every variant seeded in advance comes back in the deleted list, "
+                "and the failed list is empty"
+            ),
+        )
 
     @override
     def look(
@@ -353,7 +408,10 @@ class EveryLaidVariantIsDeleted(Then[ManyVariantsAndACaller, DeleteRuntimeVarian
             Held[list[UUID]](
                 "items",
                 list(payload.items),
-                SameAs[list[UUID]]([one.id for one in laid.laid], "미리 만들어 둔 변형들"),
+                SameAs[list[UUID]](
+                    [one.id for one in laid.laid],
+                    Says("미리 저장한 변형들", english="the variants seeded in advance"),
+                ),
             ),
             Same("failed", list(payload.failed), []),
             Same("deleted_count", payload.deleted_count, len(laid.laid)),
@@ -366,7 +424,13 @@ class TheLaidOneIsDeletedTheUnknownFails(Then[AVariantAndACaller, DeleteRuntimeV
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 변형은 삭제된 목록에, 없는 id는 실패 목록에 반환된다"
+        return Says(
+            "미리 저장한 변형은 삭제된 목록에, 없는 id 는 실패 목록에 반환됩니다",
+            english=(
+                "the variant seeded in advance comes back in the deleted list, "
+                "and an unknown id comes back in the failed list"
+            ),
+        )
 
     @override
     def look(
@@ -379,10 +443,19 @@ class TheLaidOneIsDeletedTheUnknownFails(Then[AVariantAndACaller, DeleteRuntimeV
             Held[list[UUID]](
                 "items",
                 list(payload.items),
-                SameAs[list[UUID]]([laid.variant.id], "미리 만들어 둔 변형"),
+                SameAs[list[UUID]](
+                    [laid.variant.id],
+                    Says("미리 저장한 변형", english="the variant seeded in advance"),
+                ),
             ),
             Same("len(failed)", len(payload.failed), 1),
-            Skipped("failed[0].id", "호출이 만든 없는 id라 미리 알 수 없다"),
+            Skipped(
+                "failed[0].id",
+                Says(
+                    "호출이 생성한 없는 id 라 미리 알 수 없습니다",
+                    english="the call made an unknown id, so it cannot be known in advance",
+                ),
+            ),
             Skipped("failed[0].message", MESSAGE_IS_FREE_TEXT),
             Same("deleted_count", payload.deleted_count, 1),
         ]
@@ -394,7 +467,13 @@ class EveryLaidVariantIsRefused(Then[ManyVariantsAndACaller, DeleteRuntimeVarian
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 변형 전부가 실패 목록에 반환되고, 삭제된 목록은 비어 있다"
+        return Says(
+            "미리 저장한 변형 전부가 실패 목록에 반환되고, 삭제된 목록은 비어 있습니다",
+            english=(
+                "every variant seeded in advance comes back in the failed list, "
+                "and the deleted list is empty"
+            ),
+        )
 
     @override
     def look(
@@ -408,7 +487,10 @@ class EveryLaidVariantIsRefused(Then[ManyVariantsAndACaller, DeleteRuntimeVarian
             Held[list[UUID]](
                 "failed[*].id",
                 [one.id for one in payload.failed],
-                SameAs[list[UUID]]([one.id for one in laid.laid], "미리 만들어 둔 변형들"),
+                SameAs[list[UUID]](
+                    [one.id for one in laid.laid],
+                    Says("미리 저장한 변형들", english="the variants seeded in advance"),
+                ),
             ),
             Skipped("failed[*].message", MESSAGE_IS_FREE_TEXT),
             Same("deleted_count", payload.deleted_count, 0),
@@ -428,8 +510,20 @@ class EveryLaidVariantComesBack(
     @override
     def says(self) -> str:
         if self.missing is None:
-            return "미리 만들어 둔 변형이 모두 처리된 목록에 오고, 실패한 것은 없다"
-        return "미리 만들어 둔 변형이 모두 처리된 목록에 오고, 없는 id 는 실패 목록에 온다"
+            return Says(
+                "미리 저장한 변형이 모두 처리된 목록에 오고, 실패한 것은 없습니다",
+                english=(
+                    "every variant seeded in advance comes back in the processed list, "
+                    "and nothing failed"
+                ),
+            )
+        return Says(
+            "미리 저장한 변형이 모두 처리된 목록에 오고, 없는 id 는 실패 목록에 옵니다",
+            english=(
+                "every variant seeded in advance comes back in the processed list, "
+                "and an unknown id comes back in the failed list"
+            ),
+        )
 
     @override
     def look(
@@ -451,7 +545,14 @@ class EveryLaidVariantComesBack(
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the unknown id put in the request"),
+                    ),
+                ),
                 Skipped("failed[0].message", MESSAGE_IS_FREE_TEXT),
             ]
         return verdicts
@@ -467,7 +568,13 @@ class NoLaidVariantIsProcessed(
 
     @override
     def says(self) -> str:
-        return "처리된 변형 없이 미리 만들어 둔 변형이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 변형 없이 미리 저장한 변형이 모두 실패 목록에 옵니다",
+            english=(
+                "no variant is processed and every variant seeded in advance comes back "
+                "in the failed list"
+            ),
+        )
 
     @override
     def look(
@@ -485,7 +592,15 @@ class NoLaidVariantIsProcessed(
         for i, (failure, one) in enumerate(zip(payload.failed, laid.laid, strict=False)):
             verdicts += [
                 Held[UUID](
-                    f"failed[{i}].id", failure.id, SameAs(one.id, "미리 만들어 둔 변형의 id")
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(
+                        one.id,
+                        Says(
+                            "미리 저장한 변형의 id",
+                            english="the id of the variant seeded in advance",
+                        ),
+                    ),
                 ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]

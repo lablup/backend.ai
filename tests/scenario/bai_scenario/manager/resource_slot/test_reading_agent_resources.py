@@ -18,7 +18,7 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource_slot import AgentResourceNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.agent_resource import (
     AgentsReportingSlots,
     AnAgentAndACaller,
@@ -56,9 +56,10 @@ class ReadingAnAgentSlot(When[AnAgentAndACaller, ResourceSlotAdapter, AgentResou
 
     @override
     def describe(self, laid: AnAgentAndACaller) -> str:
-        return (
-            f"{laid.caller.username}이 {self.agent or laid.agent.agent_id} 에이전트의 "
-            f"{UNREPORTED_SLOT} 슬롯 조회"
+        agent = self.agent or laid.agent.agent_id
+        return Says(
+            f"{laid.caller.username} 이 {agent} 에이전트의 {UNREPORTED_SLOT} 슬롯을 조회합니다",
+            english=(f"{laid.caller.username} reads the {UNREPORTED_SLOT} slot of agent {agent}"),
         )
 
     @override
@@ -83,9 +84,11 @@ class ReadingAReportedSlot(When[ReportedSlotsAndACaller, ResourceSlotAdapter, Ag
 
     @override
     def describe(self, laid: ReportedSlotsAndACaller) -> str:
-        return (
-            f"{laid.caller.username}이 {laid.agents[self.row.agent].agent_id} 에이전트의 "
-            f"{laid.slots[self.row.slot].name} 슬롯 조회"
+        agent = laid.agents[self.row.agent].agent_id
+        slot = laid.slots[self.row.slot].name
+        return Says(
+            f"{laid.caller.username} 이 {agent} 에이전트의 {slot} 슬롯을 조회합니다",
+            english=f"{laid.caller.username} reads the {slot} slot of agent {agent}",
         )
 
     @override
@@ -108,7 +111,14 @@ class TheSuperadminReadsAReportedSlot(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 에이전트가 보고한 슬롯을 조회하면 그 슬롯에 보고된 용량과 사용량이 반환된다"
+        return Says(
+            "superadmin 이 에이전트가 보고한 슬롯을 조회하면 그 슬롯에 보고된 용량과 사용량이 "
+            "반환됩니다",
+            english=(
+                "when the superadmin reads a slot the agent reports, the capacity and usage "
+                "reported for that slot come back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ReportedSlotsAndACaller]:
@@ -133,9 +143,13 @@ class AUserReadingAgentsInTheGroupReadsAReportedSlot(
 
     @override
     def describe(self) -> str:
-        return (
-            "리소스 그룹의 에이전트를 읽을 수 있는 사용자가 에이전트가 보고한 슬롯을 조회하면 "
-            "그 슬롯에 보고된 용량과 사용량이 반환된다"
+        return Says(
+            "resource group 의 에이전트를 읽을 수 있는 사용자가 에이전트가 보고한 슬롯을 "
+            "조회하면 그 슬롯에 보고된 용량과 사용량이 반환됩니다",
+            english=(
+                "when a user who can read the agents of the resource group reads a slot the "
+                "agent reports, the capacity and usage reported for that slot come back"
+            ),
         )
 
     @override
@@ -161,7 +175,14 @@ class ASlotTheAgentDoesNotReportIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 에이전트가 보고하지 않는 슬롯을 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 에이전트가 보고하지 않는 슬롯을 조회하면 대상을 찾을 수 없다는 이유로 "
+            "거부됩니다",
+            english=(
+                "when the superadmin reads a slot the agent does not report, the call is "
+                "rejected as not found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnAgentAndACaller]:
@@ -186,9 +207,14 @@ class AUserReadingAgentsInTheGroupPassesTheGate(
 
     @override
     def describe(self) -> str:
-        return (
-            "리소스 그룹의 에이전트를 읽을 수 있는 사용자가 에이전트가 보고하지 않는 슬롯을 조회하면 "
-            "권한 검사를 통과한 뒤 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "resource group 의 에이전트를 읽을 수 있는 사용자가 에이전트가 보고하지 않는 슬롯을 "
+            "조회하면 권한 검사를 통과한 뒤 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "when a user who can read the agents of the resource group reads a slot the "
+                "agent does not report, the call passes the permission check and is then "
+                "rejected as not found"
+            ),
         )
 
     @override
@@ -214,7 +240,14 @@ class AUserGrantedNothingMayNotReadAnAgentSlot(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다. 에이전트에 대한 권한을 슬롯을 찾기 전에 검사한다"
+        return Says(
+            "아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부됩니다. 에이전트에 대한 권한을 "
+            "슬롯을 찾기 전에 검사합니다",
+            english=(
+                "when a user granted nothing reads, the call is rejected for lack of permission. "
+                "The permission on the agent is checked before the slot is found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnAgentAndACaller]:
@@ -239,7 +272,14 @@ class AnAgentNameNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 에이전트 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 에이전트 이름으로 조회하면 대상을 찾을 수 없다는 이유로 "
+            "거부됩니다",
+            english=(
+                "when the superadmin reads under an agent name nothing answers to, the call is "
+                "rejected as not found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnAgentAndACaller]:
@@ -264,9 +304,15 @@ class AUserGrantedNothingReadingAnUnknownAgentIsNotFound(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 존재하지 않는 에이전트 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다. "
-            "이름을 풀어내는 단계는 인증만 확인하고, 권한은 풀어낸 에이전트에 대해 검사한다"
+        return Says(
+            "아무 권한도 없는 사용자가 존재하지 않는 에이전트 이름으로 조회하면 대상을 찾을 수 "
+            "없다는 이유로 거부됩니다. 이름을 풀어내는 단계는 인증만 확인하고, 권한은 풀어낸 "
+            "에이전트에 대해 검사합니다",
+            english=(
+                "when a user granted nothing reads under an agent name nothing answers to, the "
+                "call is rejected as not found. The name resolution step checks authentication "
+                "only, and the permission is checked on the resolved agent"
+            ),
         )
 
     @override
@@ -293,9 +339,14 @@ class EnforcementOffLetsAnyonePassTheGateToAnAgentSlot(
 
     @override
     def describe(self) -> str:
-        return (
-            "권한 검사를 끄면 아무 권한도 없는 사용자도 권한 검사를 통과하고, "
-            "에이전트가 보고하지 않는 슬롯이므로 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 권한 검사를 통과하고, 에이전트가 보고하지 "
+            "않는 슬롯이므로 대상을 찾을 수 없다는 이유로 거부됩니다",
+            english=(
+                "turning permission checks off lets a user granted nothing pass the permission "
+                "check, and the call is rejected as not found because the agent does not report "
+                "the slot"
+            ),
         )
 
     @override

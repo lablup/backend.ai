@@ -19,6 +19,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Held,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -44,7 +45,14 @@ class LookingUp(When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, Conta
 
     @override
     def describe(self, laid: ARegistryToAllowAndACaller) -> str:
-        return "일반 사용자가 이름과 registry 내부 프로젝트명으로 레지스트리 식별자를 조회"
+        return Says(
+            "일반 사용자가 이름과 컨테이너 레지스트리 내부 프로젝트명으로 컨테이너 레지스트리 "
+            "식별자를 조회합니다",
+            english=(
+                "a plain user looks up the container registry identifier by name and the "
+                "project name inside the container registry"
+            ),
+        )
 
     @override
     async def call(
@@ -64,7 +72,10 @@ class LookingUp(When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, Conta
 class TheRegistryIsResolved(Then[ARegistryToAllowAndACaller, ContainerRegistryID]):
     @override
     def says(self) -> str:
-        return "준비한 레지스트리의 식별자가 반환된다"
+        return Says(
+            "준비한 컨테이너 레지스트리의 식별자가 반환됩니다",
+            english="the identifier of the container registry prepared comes back",
+        )
 
     @override
     def look(
@@ -76,7 +87,13 @@ class TheRegistryIsResolved(Then[ARegistryToAllowAndACaller, ContainerRegistryID
             Held(
                 "registry",
                 answered.response,
-                SameAs(ContainerRegistryID(laid.registry.id), "준비한 레지스트리"),
+                SameAs(
+                    ContainerRegistryID(laid.registry.id),
+                    Says(
+                        "준비한 컨테이너 레지스트리",
+                        english="the container registry prepared",
+                    ),
+                ),
             )
         ]
 
@@ -106,10 +123,29 @@ class LookupRegistry(
     @override
     def describe(self) -> str:
         if self.missing:
-            return "존재하지 않는 이름은 읽기 권한이 없는 경우와 같은 오류로 거부된다"
+            return Says(
+                "존재하지 않는 이름은 읽기 권한이 없을 때와 같은 에러로 거부됩니다",
+                english=(
+                    "a name that does not exist is rejected with the same error as when the "
+                    "caller lacks read permission"
+                ),
+            )
         if self.readable:
-            return "읽기 권한이 있는 사용자는 registry 내부 프로젝트명이 없는 레지스트리의 이름을 식별자로 변환할 수 있다"
-        return "읽기 권한이 없는 사용자의 이름 조회는 대상의 존재 여부를 드러내지 않고 거부된다"
+            return Says(
+                "읽기 권한이 있는 사용자는 컨테이너 레지스트리 내부 프로젝트명이 없는 컨테이너 "
+                "레지스트리의 이름을 식별자로 변환할 수 있습니다",
+                english=(
+                    "a user with read permission can turn the name of a container registry "
+                    "that has no inner project name into its identifier"
+                ),
+            )
+        return Says(
+            "읽기 권한이 없는 사용자의 이름 조회는 대상의 존재 여부를 드러내지 않고 거부됩니다",
+            english=(
+                "a name lookup by a user without read permission is rejected without "
+                "revealing whether the target exists"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ARegistryToAllowAndACaller]:

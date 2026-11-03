@@ -18,7 +18,8 @@ from ai.backend.manager.models.endpoint.creators import (
     DeploymentNetworkFields,
     DeploymentReplicaFields,
 )
-from bai_scenario.seeds.seeder import Naming, TestSeedRowFromThree
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFromThree, joined
 
 
 @dataclass(frozen=True)
@@ -39,18 +40,29 @@ class TestSeedDeployment(
 
     @override
     def kind(self) -> str:
-        return "배포"
+        return Says("배포", english="Deployment")
 
     @override
     def detail(self) -> str:
-        says = [f"복제를 {self.replica_count}개 두려 한다", "아직 리비전이 없다"]
+        says = [
+            Says(
+                f"복제본 {self.replica_count}개를 두려 한다",
+                english=f"replica count {self.replica_count}",
+            ),
+            Says("아직 리비전이 없다", english="has no revision yet"),
+        ]
         if self.open_to_public:
-            says.append("바깥에 열려 있다")
+            says.append(Says("외부에 열려 있다", english="open to the public"))
         if self.tag is not None:
-            says.append(f"{self.tag} 태그가 붙어 있다")
+            says.append(Says(f"{self.tag} 태그가 붙어 있다", english=f"tagged {self.tag}"))
         if self.agent_selection_policy != AgentSelectionPolicy.PREFERRED:
-            says.append(f"선택 정책이 {self.agent_selection_policy.value}다")
-        return ", ".join(says)
+            says.append(
+                Says(
+                    f"선택 정책은 {self.agent_selection_policy.value} 입니다",
+                    english=f"the selection policy is {self.agent_selection_policy.value}",
+                )
+            )
+        return joined(says, ", ")
 
     @override
     def name(self, naming: Naming) -> str:

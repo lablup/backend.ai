@@ -19,31 +19,31 @@ Scenario: incomplete 7 / 9
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 VFS storage 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-vfs-storages) | answered |
-| [슈퍼관리자가 VFS storage 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-the-superadmin-purges-several-vfs-storages-and-a-missing-id) | answered |
+| [when a user granted nothing tries to purge several VFS storages in one call, none is purged and all come back in the failed list for lack of permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-vfs-storages) | answered |
+| [when the superadmin purges two VFS storages and a missing id in one call, the two come back in the purged list and the missing id comes back in the failed list because no target answers to it](#partial_bulk_purging-the-superadmin-purges-several-vfs-storages-and-a-missing-id) | answered |
 
 **partial_bulk_update**
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 VFS storage 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-vfs-storages) | answered |
-| [슈퍼관리자가 VFS storage 여럿의 기본 경로를 한 번에 바꾸면, 모두 새 기본 경로로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-vfs-storages-at-once) | answered |
+| [when a user granted nothing tries to edit several VFS storages in one call, none is edited and all come back in the failed list for lack of permission](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-vfs-storages) | answered |
+| [when the superadmin changes the base path of several VFS storages in one call, all come back with the new base path and nothing failed](#partial_bulk_editing-the-superadmin-edits-several-vfs-storages-at-once) | answered |
 
 **purge**
 
 | scenario | verdict |
 |---|---|
-| [슈퍼관리자가 VFS storage 를 purge 하면 purge 한 것의 id 가 반환된다](#purging-the-superadmin-purges-a-vfs-storage) | answered |
-| [아무 권한도 받지 않은 사용자가 VFS storage 를 purge 하면 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-purge-a-vfs-storage) | rejected |
-| [슈퍼관리자가 존재하지 않는 id를 purge 하면 대상을 찾을 수 없다는 이유로 거부된다](#purging-purging-a-vfs-storage-id-nothing-answers-to-is-not-found) | rejected |
+| [when the superadmin purges a VFS storage, the id of the purged one is returned](#purging-the-superadmin-purges-a-vfs-storage) | answered |
+| [when a user granted nothing purges a VFS storage, it is rejected for lack of permission](#purging-a-user-granted-nothing-may-not-purge-a-vfs-storage) | rejected |
+| [when the superadmin purges an id that does not exist, it is rejected because the target is not found](#purging-purging-a-vfs-storage-id-nothing-answers-to-is-not-found) | rejected |
 
 **update**
 
 | scenario | verdict |
 |---|---|
-| [슈퍼관리자가 기본 경로만 바꾸면, 기본 경로는 새 값이 되고 나머지는 그대로 남는다](#editing-the-superadmin-changes-the-base-path-of-a-vfs-storage) | answered |
-| [아무 권한도 받지 않은 사용자가 VFS storage 를 수정하면 권한 부족으로 거부된다. VFS storage 는 global 에만 속해 그 권한을 받을 방법이 없다](#editing-a-user-granted-nothing-may-not-edit-a-vfs-storage) | rejected |
-| [슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-a-vfs-storage-id-nothing-answers-to-is-not-found) | rejected |
+| [when the superadmin changes only the base path, the base path takes the new value and the rest stays as it is](#editing-the-superadmin-changes-the-base-path-of-a-vfs-storage) | answered |
+| [when a user granted nothing edits a VFS storage, it is rejected for lack of permission. A VFS storage belongs only to global, so there is no way to grant that permission](#editing-a-user-granted-nothing-may-not-edit-a-vfs-storage) | rejected |
+| [when the superadmin edits an id that does not exist, it is rejected because the target is not found](#editing-the-superadmin-editing-a-vfs-storage-id-nothing-answers-to-is-not-found) | rejected |
 
 ### partial_bulk_purge
 
@@ -51,73 +51,73 @@ Scenario: incomplete 7 / 9
 
 #### [a-user-granted-nothing-purges-none-of-several-vfs-storages](/tests/scenario/bai_scenario/manager/vfs_storage/test_partial_bulk_purging.py): pass
 
-아무 권한도 받지 않은 사용자가 VFS storage 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user granted nothing tries to purge several VFS storages in one call, none is purged and all come back in the failed list for lack of permission
 
 Given
 
-- VFS storage 2개와, 일반 사용자 한 명
-  - VFS storage vfs-storage-1: 기본 경로가 /seeded/vfs-storage 이다
-  - VFS storage vfs-storage-2: 기본 경로가 /seeded/vfs-storage 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 VFS storages and one regular user
+  - VFS storage vfs-storage-1: its base path is /seeded/vfs-storage
+  - VFS storage vfs-storage-2: its base path is /seeded/vfs-storage
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- VFSStorageAdapter.partial_bulk_purge: user-1이 VFS storage 2개를 한 번에 purge
+- VFSStorageAdapter.partial_bulk_purge: user-1 purges 2 VFS storages in one call
 
 Then
 
-- 처리된 VFS storage 없이 대상이 모두 실패 목록에 온다
+- no VFS storage is processed and every target comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상 VFS storage 의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 VFS storage 의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the target VFS storage
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target VFS storage
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_purging-the-superadmin-purges-several-vfs-storages-and-a-missing-id"></a>
 
 #### [the-superadmin-purges-several-vfs-storages-and-a-missing-id](/tests/scenario/bai_scenario/manager/vfs_storage/test_partial_bulk_purging.py): pass
 
-슈퍼관리자가 VFS storage 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+when the superadmin purges two VFS storages and a missing id in one call, the two come back in the purged list and the missing id comes back in the failed list because no target answers to it
 
 Given
 
-- VFS storage 2개와, 슈퍼관리자 한 명
-  - VFS storage vfs-storage-1: 기본 경로가 /seeded/vfs-storage 이다
-  - VFS storage vfs-storage-2: 기본 경로가 /seeded/vfs-storage 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 VFS storages and one superadmin
+  - VFS storage vfs-storage-1: its base path is /seeded/vfs-storage
+  - VFS storage vfs-storage-2: its base path is /seeded/vfs-storage
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- VFSStorageAdapter.partial_bulk_purge: user-1이 VFS storage 2개 와 없는 id 하나를 한 번에 purge
+- VFSStorageAdapter.partial_bulk_purge: user-1 purges 2 VFS storages and a missing id in one call
 
 Then
 
-- 대상 VFS storage 가 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+- every target VFS storage comes back in the processed list, and an unknown id comes back in the failed list because no target answers to it
   - successes count = 2
-  - successes[0].id: 미리 만들어 둔 VFS storage와 같다
-  - successes[0].entity_id: 미리 만들어 둔 VFS storage와 같다
+  - successes[0].id: same as the VFS storage seeded in advance
+  - successes[0].entity_id: same as the VFS storage seeded in advance
   - successes[0].name = 'vfs-storage-1'
   - successes[0].host = 'seeded-host'
   - successes[0].base_path = '/seeded/vfs-storage'
-  - successes[1].id: 미리 만들어 둔 VFS storage와 같다
-  - successes[1].entity_id: 미리 만들어 둔 VFS storage와 같다
+  - successes[1].id: same as the VFS storage seeded in advance
+  - successes[1].entity_id: same as the VFS storage seeded in advance
   - successes[1].name = 'vfs-storage-2'
   - successes[1].host = 'seeded-host'
   - successes[1].base_path = '/seeded/vfs-storage'
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 'not found'를 담은 이유
+  - failed[0].id: same as the unknown id put in the request
+  - failed[0].message: a reason containing 'not found'
 
 ### partial_bulk_update
 
@@ -125,67 +125,67 @@ Then
 
 #### [a-user-granted-nothing-edits-none-of-several-vfs-storages](/tests/scenario/bai_scenario/manager/vfs_storage/test_partial_bulk_editing.py): pass
 
-아무 권한도 받지 않은 사용자가 VFS storage 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user granted nothing tries to edit several VFS storages in one call, none is edited and all come back in the failed list for lack of permission
 
 Given
 
-- VFS storage 2개와, 일반 사용자 한 명
-  - VFS storage vfs-storage-1: 기본 경로가 /seeded/vfs-storage 이다
-  - VFS storage vfs-storage-2: 기본 경로가 /seeded/vfs-storage 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 VFS storages and one regular user
+  - VFS storage vfs-storage-1: its base path is /seeded/vfs-storage
+  - VFS storage vfs-storage-2: its base path is /seeded/vfs-storage
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- VFSStorageAdapter.partial_bulk_update: user-1이 VFS storage 2개의 기본 경로를 한 번에 수정
+- VFSStorageAdapter.partial_bulk_update: user-1 changes the base path of 2 VFS storages in one call
 
 Then
 
-- 처리된 VFS storage 없이 대상이 모두 실패 목록에 온다
+- no VFS storage is processed and every target comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상 VFS storage 의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 VFS storage 의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the target VFS storage
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target VFS storage
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-vfs-storages-at-once"></a>
 
 #### [the-superadmin-edits-several-vfs-storages-at-once](/tests/scenario/bai_scenario/manager/vfs_storage/test_partial_bulk_editing.py): pass
 
-슈퍼관리자가 VFS storage 여럿의 기본 경로를 한 번에 바꾸면, 모두 새 기본 경로로 오고 실패한 것은 없다
+when the superadmin changes the base path of several VFS storages in one call, all come back with the new base path and nothing failed
 
 Given
 
-- VFS storage 2개와, 슈퍼관리자 한 명
-  - VFS storage vfs-storage-1: 기본 경로가 /seeded/vfs-storage 이다
-  - VFS storage vfs-storage-2: 기본 경로가 /seeded/vfs-storage 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 VFS storages and one superadmin
+  - VFS storage vfs-storage-1: its base path is /seeded/vfs-storage
+  - VFS storage vfs-storage-2: its base path is /seeded/vfs-storage
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- VFSStorageAdapter.partial_bulk_update: user-1이 VFS storage 2개의 기본 경로를 한 번에 수정
+- VFSStorageAdapter.partial_bulk_update: user-1 changes the base path of 2 VFS storages in one call
 
 Then
 
-- 대상 VFS storage 가 모두 처리된 목록에 오고, 실패한 것은 없다
+- every target VFS storage comes back in the processed list, and nothing failed
   - successes count = 2
-  - successes[0].id: 미리 만들어 둔 VFS storage와 같다
-  - successes[0].entity_id: 미리 만들어 둔 VFS storage와 같다
+  - successes[0].id: same as the VFS storage seeded in advance
+  - successes[0].entity_id: same as the VFS storage seeded in advance
   - successes[0].name = 'vfs-storage-1'
   - successes[0].host = 'seeded-host'
   - successes[0].base_path = '/moved/vfs-storage'
-  - successes[1].id: 미리 만들어 둔 VFS storage와 같다
-  - successes[1].entity_id: 미리 만들어 둔 VFS storage와 같다
+  - successes[1].id: same as the VFS storage seeded in advance
+  - successes[1].entity_id: same as the VFS storage seeded in advance
   - successes[1].name = 'vfs-storage-2'
   - successes[1].host = 'seeded-host'
   - successes[1].base_path = '/moved/vfs-storage'
@@ -197,79 +197,79 @@ Then
 
 #### [the-superadmin-purges-a-vfs-storage](/tests/scenario/bai_scenario/manager/vfs_storage/test_purging.py): pass
 
-슈퍼관리자가 VFS storage 를 purge 하면 purge 한 것의 id 가 반환된다
+when the superadmin purges a VFS storage, the id of the purged one is returned
 
 Given
 
-- VFS storage 하나와, 슈퍼관리자 한 명
-  - VFS storage vfs-storage-1: 기본 경로가 /seeded/vfs-storage 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one VFS storage and one superadmin
+  - VFS storage vfs-storage-1: its base path is /seeded/vfs-storage
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- VFSStorageAdapter.purge: user-1이 vfs-storage-1 purge
+- VFSStorageAdapter.purge: user-1 purges vfs-storage-1
 
 Then
 
-- purge 한 VFS storage 의 id 가 반환된다
-  - id: 미리 만들어 둔 VFS storage와 같다
+- the id of the purged VFS storage comes back
+  - id: same as the VFS storage seeded in advance
 
 <a id="purging-a-user-granted-nothing-may-not-purge-a-vfs-storage"></a>
 
 #### [a-user-granted-nothing-may-not-purge-a-vfs-storage](/tests/scenario/bai_scenario/manager/vfs_storage/test_purging.py): pass
 
-아무 권한도 받지 않은 사용자가 VFS storage 를 purge 하면 권한 부족으로 거부된다
+when a user granted nothing purges a VFS storage, it is rejected for lack of permission
 
 Given
 
-- VFS storage 하나와, 일반 사용자 한 명
-  - VFS storage vfs-storage-1: 기본 경로가 /seeded/vfs-storage 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one VFS storage and one regular user
+  - VFS storage vfs-storage-1: its base path is /seeded/vfs-storage
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- VFSStorageAdapter.purge: user-1이 vfs-storage-1 purge
+- VFSStorageAdapter.purge: user-1 purges vfs-storage-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="purging-purging-a-vfs-storage-id-nothing-answers-to-is-not-found"></a>
 
 #### [purging-a-vfs-storage-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/vfs_storage/test_purging.py): pass
 
-슈퍼관리자가 존재하지 않는 id를 purge 하면 대상을 찾을 수 없다는 이유로 거부된다
+when the superadmin purges an id that does not exist, it is rejected because the target is not found
 
 Given
 
-- VFS storage 하나와, 슈퍼관리자 한 명
-  - VFS storage vfs-storage-1: 기본 경로가 /seeded/vfs-storage 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one VFS storage and one superadmin
+  - VFS storage vfs-storage-1: its base path is /seeded/vfs-storage
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- VFSStorageAdapter.purge: user-1이 존재하지 않는 id purge
+- VFSStorageAdapter.purge: user-1 purges a missing id
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 ### update
 
@@ -277,28 +277,28 @@ Then
 
 #### [the-superadmin-changes-the-base-path-of-a-vfs-storage](/tests/scenario/bai_scenario/manager/vfs_storage/test_editing.py): pass
 
-슈퍼관리자가 기본 경로만 바꾸면, 기본 경로는 새 값이 되고 나머지는 그대로 남는다
+when the superadmin changes only the base path, the base path takes the new value and the rest stays as it is
 
 Given
 
-- VFS storage 하나와, 슈퍼관리자 한 명
-  - VFS storage vfs-storage-1: 기본 경로가 /seeded/vfs-storage 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one VFS storage and one superadmin
+  - VFS storage vfs-storage-1: its base path is /seeded/vfs-storage
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- VFSStorageAdapter.update: user-1이 vfs-storage-1의 기본 경로 수정
+- VFSStorageAdapter.update: user-1 changes the base path of vfs-storage-1
 
 Then
 
-- 미리 만들어 둔 VFS storage 전체가 반환된다
-  - id: 미리 만들어 둔 VFS storage와 같다
-  - entity_id: 미리 만들어 둔 VFS storage와 같다
+- the whole VFS storage seeded in advance comes back
+  - id: same as the VFS storage seeded in advance
+  - entity_id: same as the VFS storage seeded in advance
   - name = 'vfs-storage-1'
   - host = 'seeded-host'
   - base_path = '/moved/vfs-storage'
@@ -307,51 +307,51 @@ Then
 
 #### [a-user-granted-nothing-may-not-edit-a-vfs-storage](/tests/scenario/bai_scenario/manager/vfs_storage/test_editing.py): pass
 
-아무 권한도 받지 않은 사용자가 VFS storage 를 수정하면 권한 부족으로 거부된다. VFS storage 는 global 에만 속해 그 권한을 받을 방법이 없다
+when a user granted nothing edits a VFS storage, it is rejected for lack of permission. A VFS storage belongs only to global, so there is no way to grant that permission
 
 Given
 
-- VFS storage 하나와, 일반 사용자 한 명
-  - VFS storage vfs-storage-1: 기본 경로가 /seeded/vfs-storage 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one VFS storage and one regular user
+  - VFS storage vfs-storage-1: its base path is /seeded/vfs-storage
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- VFSStorageAdapter.update: user-1이 vfs-storage-1의 기본 경로 수정
+- VFSStorageAdapter.update: user-1 changes the base path of vfs-storage-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="editing-the-superadmin-editing-a-vfs-storage-id-nothing-answers-to-is-not-found"></a>
 
 #### [the-superadmin-editing-a-vfs-storage-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/vfs_storage/test_editing.py): pass
 
-슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다
+when the superadmin edits an id that does not exist, it is rejected because the target is not found
 
 Given
 
-- VFS storage 하나와, 슈퍼관리자 한 명
-  - VFS storage vfs-storage-1: 기본 경로가 /seeded/vfs-storage 이다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one VFS storage and one superadmin
+  - VFS storage vfs-storage-1: its base path is /seeded/vfs-storage
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- VFSStorageAdapter.update: user-1이 존재하지 않는 id의 기본 경로 수정
+- VFSStorageAdapter.update: user-1 changes the base path of a missing id
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 

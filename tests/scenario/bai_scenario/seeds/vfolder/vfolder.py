@@ -19,7 +19,8 @@ from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     ProjectVFolderCreator,
 )
-from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom, TestSeedRowFromTwo
+from ai.backend.testutils.scenario_steps import Says
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom, TestSeedRowFromTwo, joined
 
 
 @dataclass(frozen=True)
@@ -32,16 +33,25 @@ class TestSeedPersonalVFolder(TestSeedRowFrom[UserData, VFolderData]):
 
     @override
     def kind(self) -> str:
-        return "개인 폴더"
+        return Says("개인 vfolder", english="Personal vfolder")
 
     @override
     def detail(self) -> str:
-        mount = (
-            f", 남에게는 {self.default_mount_permission.value}로 마운트된다"
-            if self.default_mount_permission is not None
-            else ""
-        )
-        return f"그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다{mount}"
+        parts: list[str] = [
+            Says(
+                "그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다",
+                english="is placed in that person's personal project and is ready to use",
+            )
+        ]
+        if self.default_mount_permission is not None:
+            permission = self.default_mount_permission.value
+            parts.append(
+                Says(
+                    f"남에게는 {permission}로 마운트됩니다",
+                    english=f"is mounted for others as {permission}",
+                )
+            )
+        return joined(parts)
 
     @override
     def name(self, naming: Naming) -> str:
@@ -70,11 +80,14 @@ class TestSeedProjectVFolder(TestSeedRowFromTwo[ProjectData, UserData, VFolderDa
 
     @override
     def kind(self) -> str:
-        return "프로젝트 폴더"
+        return Says("프로젝트 vfolder", english="Project vfolder")
 
     @override
     def detail(self) -> str:
-        return "프로젝트에 놓이고, 쓸 수 있는 상태다"
+        return Says(
+            "프로젝트에 놓이고, 사용할 수 있는 상태입니다",
+            english="is placed in the project and is ready to use",
+        )
 
     @override
     def name(self, naming: Naming) -> str:

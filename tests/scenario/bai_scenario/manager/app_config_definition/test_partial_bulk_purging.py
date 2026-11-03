@@ -28,6 +28,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -62,8 +63,17 @@ class PurgingBoth(When[TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Pur
 
     @override
     def describe(self, laid: TwoDefinitionsAndACaller) -> str:
-        besides = "와 존재하지 않는 ID" if self.missing else ""
-        return f"{laid.caller.username}이 설정 정의 둘{besides}를 한 번에 영구 삭제"
+        if self.missing:
+            return Says(
+                f"{laid.caller.username} 이 설정 정의 둘과 존재하지 않는 ID 를 한 번에 영구 삭제합니다",
+                english=(
+                    f"{laid.caller.username} purges two config definitions and a missing id at once"
+                ),
+            )
+        return Says(
+            f"{laid.caller.username} 이 설정 정의 둘을 한 번에 영구 삭제합니다",
+            english=f"{laid.caller.username} purges two config definitions at once",
+        )
 
     @override
     async def call(
@@ -82,7 +92,13 @@ class BothArePurgedTheMissingFails(Then[TwoDefinitionsAndACaller, Purged]):
 
     @override
     def says(self) -> str:
-        return "설정 정의 둘은 처리된 목록에, 없는 ID는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "설정 정의 둘은 처리된 목록에 오고, 없는 ID 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "both config definitions come back in the succeeded list, and the missing id "
+                "comes back in the failed list because no such target exists"
+            ),
+        )
 
     @override
     def look(self, laid: TwoDefinitionsAndACaller, answered: Answered[Purged]) -> list[Verdict]:
@@ -93,13 +109,23 @@ class BothArePurgedTheMissingFails(Then[TwoDefinitionsAndACaller, Purged]):
             Held[list[UUID]](
                 "successes",
                 [node.id for node in payload.successes],
-                SameAs[list[UUID]]([laid.first.id, laid.second.id], "준비한 ID 둘"),
+                SameAs[list[UUID]](
+                    [laid.first.id, laid.second.id],
+                    Says("준비한 ID 둘", english="the two ids prepared"),
+                ),
             ),
             Same("failed count", len(payload.failed), 1),
         ]
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(MISSING, "요청에 넣은 없는 ID")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        MISSING,
+                        Says("요청에 넣은 없는 ID", english="the missing id put in the request"),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -111,7 +137,13 @@ class NeitherIsPurged(Then[TwoDefinitionsAndACaller, Purged]):
 
     @override
     def says(self) -> str:
-        return "처리된 설정 정의 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "처리된 설정 정의 없이 둘 다 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "no config definition is processed and both come back in the failed list "
+                "for lack of permission"
+            ),
+        )
 
     @override
     def look(self, laid: TwoDefinitionsAndACaller, answered: Answered[Purged]) -> list[Verdict]:
@@ -125,7 +157,11 @@ class NeitherIsPurged(Then[TwoDefinitionsAndACaller, Purged]):
         ]
         for i, (failure, definition) in enumerate(zip(payload.failed, targets, strict=False)):
             verdicts += [
-                Held[UUID](f"failed[{i}].id", failure.id, SameAs(definition.id, "준비한 ID")),
+                Held[UUID](
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(definition.id, Says("준비한 ID", english="the id prepared")),
+                ),
                 Held(f"failed[{i}].message", failure.message, Mentions("Insufficient permission")),
             ]
         return verdicts
@@ -141,9 +177,14 @@ class TheSuperadminPurgesBothAndIsToldOfTheMissing(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 설정 정의 둘과 존재하지 않는 ID를 한 번에 영구 삭제하면, 둘은 처리된 "
-            "목록에 오고 없는 ID는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "superadmin 이 설정 정의 둘과 존재하지 않는 ID 를 한 번에 영구 삭제하면, 둘은 처리된 "
+            "목록에 오고 없는 ID 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when the superadmin purges two config definitions and a missing id at once, "
+                "both come back in the succeeded list and the missing id comes back in the "
+                "failed list because no such target exists"
+            ),
         )
 
     @override
@@ -169,9 +210,14 @@ class AUserGrantedNothingPurgesNone(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "권한이 없는 일반 사용자가 설정 정의 둘을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 "
-            "둘 다 권한이 없다는 이유로 실패 목록에 온다"
+            "둘 다 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a regular user with no permission tries to purge two config definitions "
+                "at once, nothing is purged and both come back in the failed list for lack of "
+                "permission"
+            ),
         )
 
     @override

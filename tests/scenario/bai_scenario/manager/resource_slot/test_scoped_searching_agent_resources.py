@@ -20,7 +20,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.agent_resource import (
     AgentsReportingSlots,
     AnAgentAndACaller,
@@ -57,7 +57,10 @@ class SearchingTheAgent(When[AnAgentAndACaller, ResourceSlotAdapter, Searched]):
 
     @override
     def describe(self, laid: AnAgentAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.agent.agent_id} 에이전트를 지정해 조회"
+        return Says(
+            f"{laid.caller.username} 이 {laid.agent.agent_id} 에이전트를 지정해 조회합니다",
+            english=(f"{laid.caller.username} reads the agent {laid.agent.agent_id} by naming it"),
+        )
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: AnAgentAndACaller) -> Searched:
@@ -79,9 +82,13 @@ class SearchingBothAgents(When[TwoAgentsAndACaller, ResourceSlotAdapter, Searche
 
     @override
     def describe(self, laid: TwoAgentsAndACaller) -> str:
-        return (
-            f"{laid.caller.username}이 {laid.readable.agent_id}와 {laid.other.agent_id} "
-            "에이전트를 함께 지정해 조회"
+        return Says(
+            f"{laid.caller.username} 이 {laid.readable.agent_id}와 {laid.other.agent_id} "
+            "에이전트를 함께 지정해 조회합니다",
+            english=(
+                f"{laid.caller.username} reads the agents {laid.readable.agent_id} and "
+                f"{laid.other.agent_id} by naming both"
+            ),
         )
 
     @override
@@ -109,7 +116,12 @@ class SearchingTheReportingAgent(When[ReportedSlotsAndACaller, ResourceSlotAdapt
 
     @override
     def describe(self, laid: ReportedSlotsAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.agents[0].agent_id} 에이전트를 지정해 조회"
+        return Says(
+            f"{laid.caller.username} 이 {laid.agents[0].agent_id} 에이전트를 지정해 조회합니다",
+            english=(
+                f"{laid.caller.username} reads the agent {laid.agents[0].agent_id} by naming it"
+            ),
+        )
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: ReportedSlotsAndACaller) -> Searched:
@@ -131,9 +143,13 @@ class AUserReadingAgentsInTheGroupFindsEverySlot(
 
     @override
     def describe(self) -> str:
-        return (
-            "리소스 그룹의 에이전트를 읽을 수 있는 사용자가 슬롯 둘을 보고한 에이전트를 지정해 "
-            "조회하면 그 에이전트가 보고한 슬롯이 모두 반환된다"
+        return Says(
+            "resource group 의 에이전트를 읽을 수 있는 사용자가 슬롯 둘을 보고한 에이전트를 "
+            "지정해 조회하면 그 에이전트가 보고한 슬롯이 모두 반환됩니다",
+            english=(
+                "when a user who can read the agents of the resource group reads an agent that "
+                "reports two slots by naming it, every slot the agent reports comes back"
+            ),
         )
 
     @override
@@ -161,9 +177,13 @@ class AUserReadingAgentsInTheGroupSearchesTheAgent(
 
     @override
     def describe(self) -> str:
-        return (
-            "리소스 그룹의 에이전트를 읽을 수 있는 사용자가 아직 슬롯을 보고하지 않은 그 에이전트를 "
-            "지정해 조회하면 응답이 비어 있다"
+        return Says(
+            "resource group 의 에이전트를 읽을 수 있는 사용자가 아직 슬롯을 보고하지 않은 그 "
+            "에이전트를 지정해 조회하면 응답이 비어 있습니다",
+            english=(
+                "when a user who can read the agents of the resource group reads that agent by "
+                "naming it before it reports any slot, the answer is empty"
+            ),
         )
 
     @override
@@ -189,7 +209,14 @@ class TheSuperadminSearchesTheAgent(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아직 슬롯을 보고하지 않은 에이전트를 지정해 조회하면 응답이 비어 있다"
+        return Says(
+            "superadmin 이 아직 슬롯을 보고하지 않은 에이전트를 지정해 조회하면 응답이 비어 "
+            "있습니다",
+            english=(
+                "when the superadmin reads an agent that does not report any slot yet by naming "
+                "it, the answer is empty"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnAgentAndACaller]:
@@ -214,7 +241,13 @@ class AUserGrantedNothingMayNotSearchTheAgent(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 에이전트를 지정해 조회하면 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 에이전트를 지정해 조회하면 권한 부족으로 거부됩니다",
+            english=(
+                "when a user granted nothing reads an agent by naming it, the call is rejected "
+                "for lack of permission"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnAgentAndACaller]:
@@ -239,9 +272,13 @@ class OneAgentTheCallerMayNotReadRefusesTheWholeSearch(
 
     @override
     def describe(self) -> str:
-        return (
-            "둘 중 한 에이전트만 읽을 수 있는 사용자가 둘을 함께 지정해 조회하면 전체가 권한 부족으로 거부된다. "
-            "읽을 수 있는 쪽만 골라 답하지 않는다"
+        return Says(
+            "둘 중 한 에이전트만 읽을 수 있는 사용자가 둘을 함께 지정해 조회하면 전체가 권한 "
+            "부족으로 거부됩니다. 읽을 수 있는 쪽만 골라 응답하지 않습니다",
+            english=(
+                "when a user who can read only one of two agents names both, the whole call is "
+                "rejected for lack of permission. It does not answer with only the readable one"
+            ),
         )
 
     @override
@@ -267,7 +304,13 @@ class EnforcementOffLetsAnyoneSearchTheAgent(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 끄면 아무 권한도 없는 사용자도 에이전트를 지정해 조회할 수 있다"
+        return Says(
+            "권한 검사를 끄면 아무 권한도 없는 사용자도 에이전트를 지정해 조회할 수 있습니다",
+            english=(
+                "turning permission checks off lets a user granted nothing read an agent by "
+                "naming it"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:

@@ -19,6 +19,7 @@ from ai.backend.testutils.scenario_steps import (
     Held,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -50,7 +51,10 @@ class TerminatingTheSession(When[APendingSessionAndACaller, SessionAdapter, Term
 
     @override
     def describe(self, laid: APendingSessionAndACaller) -> str:
-        return f"{laid.caller.username}이 대기 세션을 종료함"
+        return Says(
+            f"{laid.caller.username}이 대기 세션을 종료합니다",
+            english=f"{laid.caller.username} terminates a pending session",
+        )
 
     @override
     async def call(self, adapter: SessionAdapter, laid: APendingSessionAndACaller) -> Terminated:
@@ -62,7 +66,12 @@ class TerminatingTheSession(When[APendingSessionAndACaller, SessionAdapter, Term
 class TheSessionIsCancelled(Then[APendingSessionAndACaller, Terminated]):
     @override
     def says(self) -> str:
-        return "대기 세션이 취소된 목록에 오고, 나머지 목록은 비어 있다"
+        return Says(
+            "대기 세션이 취소된 목록에 오고, 나머지 목록은 비어 있습니다",
+            english=(
+                "the pending session comes back in the cancelled list and the other lists are empty"
+            ),
+        )
 
     @override
     def look(
@@ -79,7 +88,14 @@ class TheSessionIsCancelled(Then[APendingSessionAndACaller, Terminated]):
         ]
         for session_id in payload.cancelled:
             verdicts.append(
-                Held[UUID]("cancelled[0]", session_id, SameAs(laid.session.id, "대기 세션의 id"))
+                Held[UUID](
+                    "cancelled[0]",
+                    session_id,
+                    SameAs(
+                        laid.session.id,
+                        Says("대기 세션의 id", english="the id of the pending session"),
+                    ),
+                )
             )
         return verdicts
 
@@ -94,7 +110,13 @@ class ASuperadminTerminates(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 대기 세션을 종료하면, 취소된 목록에 온다"
+        return Says(
+            "superadmin 이 대기 세션을 종료하면, 취소된 목록에 옵니다",
+            english=(
+                "when the superadmin terminates a pending session, it comes back in the "
+                "cancelled list"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APendingSessionAndACaller]:
@@ -119,7 +141,13 @@ class AUserGrantedNothingIsRefused(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자가 대기 세션을 종료하려 하면, 호출 전체가 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 대기 세션을 종료하려 하면, 호출 전체가 거부됩니다",
+            english=(
+                "when a user granted nothing tries to terminate a pending session, the whole "
+                "call is rejected"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APendingSessionAndACaller]:

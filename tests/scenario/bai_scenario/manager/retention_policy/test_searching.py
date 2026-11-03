@@ -22,7 +22,7 @@ from ai.backend.common.dto.manager.v2.retention_policy.response import (
 from ai.backend.manager.api.adapters.retention_policy.adapter import RetentionPolicyAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.retention_policy import (
     AnActiveAndAnInactivePolicy,
@@ -51,7 +51,10 @@ class SearchingEveryPolicy(When[ManyPoliciesAndACaller, RetentionPolicyAdapter, 
 
     @override
     def describe(self, laid: ManyPoliciesAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체 조회"
+        return Says(
+            f"{laid.caller.username} 이 필터 없이 전체를 조회합니다",
+            english=f"{laid.caller.username} reads everything without a filter",
+        )
 
     @override
     async def call(self, adapter: RetentionPolicyAdapter, laid: ManyPoliciesAndACaller) -> Searched:
@@ -69,7 +72,12 @@ class SearchingByCategory(When[ManyPoliciesAndACaller, RetentionPolicyAdapter, S
 
     @override
     def describe(self, laid: ManyPoliciesAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.named.category.value} 카테고리 필터로 조회"
+        return Says(
+            f"{laid.caller.username} 이 {laid.named.category.value} 카테고리 필터로 조회합니다",
+            english=(
+                f"{laid.caller.username} reads with the {laid.named.category.value} category filter"
+            ),
+        )
 
     @override
     async def call(self, adapter: RetentionPolicyAdapter, laid: ManyPoliciesAndACaller) -> Searched:
@@ -91,7 +99,10 @@ class SearchingTheActiveOnes(When[ManyPoliciesAndACaller, RetentionPolicyAdapter
 
     @override
     def describe(self, laid: ManyPoliciesAndACaller) -> str:
-        return f"{laid.caller.username}이 활성 필터로 조회"
+        return Says(
+            f"{laid.caller.username} 이 활성 필터로 조회합니다",
+            english=f"{laid.caller.username} reads with the enabled filter",
+        )
 
     @override
     async def call(self, adapter: RetentionPolicyAdapter, laid: ManyPoliciesAndACaller) -> Searched:
@@ -111,7 +122,13 @@ class TheSuperadminCountsEveryPolicy(
 
     @override
     def describe(self) -> str:
-        return "카테고리가 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 집계된다"
+        return Says(
+            "카테고리가 다른 정책 둘이 있을 때 superadmin 이 필터 없이 조회하면 둘 다 집계됩니다",
+            english=(
+                "when two policies of different categories exist and the superadmin reads "
+                "without a filter, both are counted"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyPoliciesAndACaller]:
@@ -136,7 +153,14 @@ class ACategoryFilterNarrows(
 
     @override
     def describe(self) -> str:
-        return "카테고리가 다른 정책 여럿 중 하나의 카테고리를 필터로 조회하면 그 카테고리의 정책 하나만 반환된다"
+        return Says(
+            "카테고리가 다른 정책 여럿 중 하나의 카테고리를 필터로 조회하면 그 카테고리의 정책 "
+            "하나만 반환됩니다",
+            english=(
+                "when the call reads with the category of one of several policies of different "
+                "categories as a filter, only the one policy of that category comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyPoliciesAndACaller]:
@@ -161,7 +185,13 @@ class AnEnabledFilterKeepsTheActive(
 
     @override
     def describe(self) -> str:
-        return "활성과 비활성이 섞여 있을 때 활성 필터로 조회하면 활성인 정책만 반환된다"
+        return Says(
+            "활성과 비활성이 섞여 있을 때 활성 필터로 조회하면 활성인 정책만 반환됩니다",
+            english=(
+                "when active and inactive policies are mixed and the call reads with the "
+                "enabled filter, only the active policies come back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyPoliciesAndACaller]:
@@ -186,7 +216,14 @@ class TheMonitorSearchesLikeTheSuperadmin(
 
     @override
     def describe(self) -> str:
-        return "모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다"
+        return Says(
+            "모니터 역할이 필터 없이 조회하면 superadmin 과 같은 응답이 반환됩니다. superadmin "
+            "검사는 모니터의 읽기를 허용합니다",
+            english=(
+                "when a monitor role reads without a filter, the same answer as for the "
+                "superadmin comes back. The superadmin check allows reads for a monitor"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyPoliciesAndACaller]:
@@ -211,7 +248,13 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin asks to read everything, the call is "
+                "rejected for lack of role"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyPoliciesAndACaller]:
