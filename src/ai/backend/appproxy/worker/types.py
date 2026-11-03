@@ -495,6 +495,8 @@ class Circuit(SerializableCircuit):
             # TODO: Use the backend id once ingresses are stored as their own entity.
             id=IngressBackendID(str(UUID(int=0))),
             target_groups=target_groups,
+            # TODO: Use the deployment's health check once the manager sends ingresses.
+            health_check=None,
         )
 
     def _target_group_of_route(self, route: RouteInfo) -> IngressTargetGroup:
