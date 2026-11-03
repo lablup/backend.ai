@@ -303,10 +303,10 @@ class TestCircuit:
         ],
         ids=lambda case: case.name,
     )
-    def test_to_ingress_backend_makes_a_route_with_traffic_a_session_target_of_one_group(
+    def test_to_ingress_makes_a_route_with_traffic_a_session_target_of_one_group(
         self, route_target_case: _RouteTargetCase, route_target_case_circuit: Circuit
     ) -> None:
-        assert route_target_case_circuit.to_ingress_backend().target_groups == [
+        assert route_target_case_circuit.to_ingress(AUTHORITY).backend.target_groups == [
             IngressTargetGroup(
                 id=IngressTargetGroupID(str(UUID(int=0))),
                 weight=1,
@@ -314,10 +314,10 @@ class TestCircuit:
             )
         ]
 
-    def test_to_ingress_backend_puts_every_route_in_one_group(
+    def test_to_ingress_puts_every_route_in_one_group(
         self, circuit_with_two_routes: Circuit
     ) -> None:
-        assert circuit_with_two_routes.to_ingress_backend().target_groups == [
+        assert circuit_with_two_routes.to_ingress(AUTHORITY).backend.target_groups == [
             IngressTargetGroup(
                 id=IngressTargetGroupID(str(UUID(int=0))),
                 weight=1,

@@ -478,11 +478,8 @@ class Circuit(SerializableCircuit):
             revision=0,
             frontend=frontend,
             access=access,
-            backend=self.to_ingress_backend(),
+            backend=self.ingress_backend_of_routes(self.route_info),
         )
-
-    def to_ingress_backend(self) -> IngressBackend:
-        return self.ingress_backend_of_routes(self.route_info)
 
     @staticmethod
     def ingress_backend_of_routes(routes: list[RouteInfo]) -> IngressBackend:
