@@ -64,6 +64,7 @@ opentelemetry-instrumentation-logging~=0.66b1
 pexpect~=4.8
 prometheus-client~=0.21.1
 psutil~=7.0
+pyasn1>=0.6.5
 pycares~=4.11.0
 pycryptodome>=3.20.0
 habana-pyhlml~=1.22.1.6
