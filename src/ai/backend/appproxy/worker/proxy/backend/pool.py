@@ -53,7 +53,6 @@ class RoutePool:
     """
 
     _ingress_backend: IngressBackend
-    _target_by_id: dict[IngressTargetID, IngressTarget]
     _health_by_target_id: dict[IngressTargetID, _TargetHealth]
     _lock: asyncio.Lock
     _health_check_task: asyncio.Task[None] | None
@@ -67,8 +66,9 @@ class RoutePool:
         spec: RoutePoolSpec | None = None,
     ) -> None:
         self._ingress_backend = ingress_backend
-        self._target_by_id = {target.id: target for target in self._targets_of(ingress_backend)}
-        self._health_by_target_id = {target_id: _TargetHealth() for target_id in self._target_by_id}
+        self._health_by_target_id = {
+            target.id: _TargetHealth() for target in self._targets_of(ingress_backend)
+        }
         self._lock = asyncio.Lock()
         self._spec = spec or RoutePoolSpec()
         self._no_healthy_target = False
@@ -87,15 +87,16 @@ class RoutePool:
 
     async def update(self, ingress_backend: IngressBackend) -> None:
         async with self._lock:
-            target_by_id = {target.id: target for target in self._targets_of(ingress_backend)}
+            known_target_by_id = {
+                target.id: target for target in self._targets_of(self._ingress_backend)
+            }
             health_by_target_id: dict[IngressTargetID, _TargetHealth] = {}
-            for target_id, target in target_by_id.items():
-                health = self._health_by_target_id.get(target_id)
-                if health is None or self._target_by_id.get(target_id) != target:
+            for target in self._targets_of(ingress_backend):
+                health = self._health_by_target_id.get(target.id)
+                if health is None or known_target_by_id.get(target.id) != target:
                     health = _TargetHealth()
-                health_by_target_id[target_id] = health
+                health_by_target_id[target.id] = health
             self._ingress_backend = ingress_backend
-            self._target_by_id = target_by_id
             self._health_by_target_id = health_by_target_id
 
     async def select(self) -> IngressTarget:
@@ -156,7 +157,7 @@ class RoutePool:
         health.unhealthy_since = None
 
     def _health_of(self, target: IngressTarget) -> _TargetHealth | None:
-        if self._target_by_id.get(target.id) != target:
+        if not any(target in group.targets for group in self._ingress_backend.target_groups):
             return None
         return self._health_by_target_id.get(target.id)
 
