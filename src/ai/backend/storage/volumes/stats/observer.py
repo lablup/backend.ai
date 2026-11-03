@@ -8,7 +8,12 @@ from typing import TYPE_CHECKING, override
 
 from ai.backend.common.clients.valkey_client.valkey_volume_stats import ValkeyVolumeStatsClient
 from ai.backend.common.observer.types import AbstractObserver
+<<<<<<< HEAD
 from ai.backend.logging import BraceStyleAdapter
+=======
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.storage.errors.volume import VolumePerfMetricNotSupportedError
+>>>>>>> 30a8f0190 (fix(BA-8834): skip volumes without performance metrics in the volume stats observer (#16339))
 from ai.backend.storage.metrics.volume_perf import VolumePerfMetricObserver
 from ai.backend.storage.metrics.volume_stats import VolumeStatsMetricObserver
 
@@ -125,6 +130,9 @@ class VolumeStatsObserver(AbstractObserver):
                 duration=duration,
             )
             log.warning("Timeout observing volume stats for {}", volume_name)
+            return None
+        except VolumePerfMetricNotSupportedError:
+            log.debug("Volume {} does not provide performance metrics", volume_name)
             return None
         except Exception as e:
             duration = time.monotonic() - start_time

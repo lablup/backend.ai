@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.storage.errors.volume import VolumePerfMetricNotSupportedError
 from ai.backend.storage.types import FSPerfMetric
 from ai.backend.storage.volumes.stats.types import (
     CachedFSPerfMetricData,
@@ -138,5 +139,18 @@ def mock_volume_pool_with_error() -> MagicMock:
     pool = MagicMock()
     pool.list_volumes = MagicMock(return_value={"error-volume": MagicMock()})
     pool.get_volume_by_name = get_volume_by_name
+
+    return pool
+
+
+@pytest.fixture
+def mock_volume_pool_without_perf_metric() -> MagicMock:
+    """Mock VolumePool where the volume backend has no performance metric."""
+    mock_volume = AsyncMock()
+    mock_volume.get_performance_metric = AsyncMock(side_effect=VolumePerfMetricNotSupportedError)
+
+    pool = MagicMock()
+    pool.list_volumes = MagicMock(return_value={"vfs-volume": MagicMock()})
+    pool.get_volume_by_name = MagicMock(return_value=mock_volume)
 
     return pool

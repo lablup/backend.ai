@@ -30,6 +30,7 @@ from ai.backend.storage.errors import (
     QuotaScopeCreationFailedError,
     QuotaScopeNotFoundError,
 )
+from ai.backend.storage.errors.volume import VolumePerfMetricNotSupportedError
 from ai.backend.storage.subproc import run
 from ai.backend.storage.types import (
     SENTINEL,
@@ -512,7 +513,7 @@ class BaseVolume(AbstractVolume):
         # Other IO errors should be bubbled up.
 
     async def get_performance_metric(self) -> FSPerfMetric:
-        raise NotImplementedError
+        raise VolumePerfMetricNotSupportedError
 
     async def get_fs_usage(self) -> CapacityUsage:
         loop = asyncio.get_running_loop()
