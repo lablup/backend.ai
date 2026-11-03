@@ -17,22 +17,26 @@ generated:
 status: draft
 ---
 
-# Artifact registry 서비스
+# Artifact registry service: Knowledge
 
-registry 하나는 두 행이다. 연결 설정을 싣는 종류별 행(huggingface, reservoir)과 이름과 종류를 싣는
-`artifact_registries` 행. 쓰기는 두 행을 `ArtifactRegistryWriteOps` 의 한 연산으로 같이 쓴다.
+A registry is two rows: a per-kind row holding the connection settings (huggingface,
+reservoir) and an `artifact_registries` row holding the name and kind. A write handles both
+rows in one operation of `ArtifactRegistryWriteOps`.
 
-## 쓰기가 서비스 메서드를 두는 이유
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-| 동작 | 모양 | 이유 |
+## Why the writes keep service methods
+
+| Operation | Shape | Reason |
 |---|---|---|
-| 수정 | `single_entity` + 서비스 | 두 행을 함께 고친다. 일반 ops 수정은 한 행만 쓴다 |
-| purge | `single_entity` + 서비스 | 두 행과 그래프 노드를 함께 지운다 |
-| 여럿 수정 | `partial_bulk` + 서비스 | 같은 이유. 항목마다 savepoint 하나 |
-| 여럿 purge | `partial_bulk` + 서비스 | 같은 이유. 항목마다 savepoint 하나 |
+| update | `single_entity` + service | It updates both rows together. A generic ops update writes one row |
+| purge | `single_entity` + service | It deletes both rows and the graph node together |
+| bulk update | `partial_bulk` + service | Same reason. One savepoint per item |
+| bulk purge | `partial_bulk` + service | Same reason. One savepoint per item |
 
-- 여럿 연산은 registry 마다 권한을 따로 본다. 권한이 없는 registry 와 없는 id 는 실패 항목이 되고
-  나머지는 처리된다.
-- 여럿 purge 의 성공 항목은 지운 registry 의 id 만 싣는다. 이름은 함께 지운 행에 있었다.
-- 단건 purge 의 action 은 옛 이름(`delete_*`)을 그대로 쓰고 `PURGE` 연산 종류를 쓴다. 옛 delete 별칭도 같은
-  action 을 부른다.
+- A bulk operation checks each registry's permission separately. A registry without
+  permission and an absent id become failed items, and the rest are processed.
+- The succeeded items of a bulk purge hold only the ids of the deleted registries. The
+  names were in the rows deleted with them.
+- The single purge action keeps the old name (`delete_*`) and uses the `PURGE` operation
+  type. The old delete alias calls the same action.
