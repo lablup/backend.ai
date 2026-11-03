@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import NewType, Self
+from typing import Literal, NewType, Self, override
 from uuid import UUID
 
 from pydantic import ConfigDict, Field, IPvAnyNetwork, model_validator
 
 from ai.backend.common.api_handlers import BaseFieldModel
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 
 IngressID = NewType("IngressID", str)
@@ -37,6 +37,10 @@ class IngressAccessMode(StrEnum):
     PUBLIC = "public"
     USER = "user"
     TOKEN = "token"
+
+
+class IngressTargetKind(StrEnum):
+    SESSION = "session"
 
 
 class PortFrontend(BaseFieldModel):
@@ -115,23 +119,31 @@ class IngressAccess(BaseFieldModel):
         return self
 
 
-class IngressTarget(BaseFieldModel):
-    id: IngressTargetID
+class IngressTarget(BaseFieldModel, ABC):
+    kind: IngressTargetKind
     host: str
     port: int = Field(ge=1, le=65535)
-    session_id: SessionId | None = Field(
-        default=None,
-        description=(
-            "Session the target runs in, whose last access a worker records. "
-            f"Added in {NEXT_RELEASE_VERSION}."
-        ),
-    )
+
+    @property
+    @abstractmethod
+    def id(self) -> IngressTargetID:
+        raise NotImplementedError
+
+
+class SessionIngressTarget(IngressTarget):
+    kind: Literal[IngressTargetKind.SESSION] = IngressTargetKind.SESSION
+    session_id: SessionId
+
+    @property
+    @override
+    def id(self) -> IngressTargetID:
+        return IngressTargetID(str(self.session_id))
 
 
 class IngressTargetGroup(BaseFieldModel):
     id: IngressTargetGroupID
     weight: int = Field(ge=0)
-    targets: list[IngressTarget]
+    targets: list[SessionIngressTarget]
 
 
 class IngressBackend(BaseFieldModel):

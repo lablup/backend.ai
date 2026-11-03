@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from uuid import UUID
 
 import pytest
 
@@ -9,19 +10,23 @@ from ai.backend.appproxy.worker.proxy.backend.pool import RoutePool, RoutePoolSp
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
     IngressBackend,
     IngressBackendID,
-    IngressTarget,
     IngressTargetGroup,
     IngressTargetGroupID,
-    IngressTargetID,
+    SessionIngressTarget,
 )
+from ai.backend.common.types import SessionId
 
 _GROUP_ID = IngressTargetGroupID("00000000-0000-0000-0000-000000000000")
 _BACKEND_ID = IngressBackendID("00000000-0000-0000-0000-000000000000")
-_TARGET_A = IngressTarget(
-    id=IngressTargetID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), host="10.0.0.1", port=8000
+_TARGET_A = SessionIngressTarget(
+    host="10.0.0.1",
+    port=8000,
+    session_id=SessionId(UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
 )
-_TARGET_B = IngressTarget(
-    id=IngressTargetID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"), host="10.0.0.2", port=8000
+_TARGET_B = SessionIngressTarget(
+    host="10.0.0.2",
+    port=8000,
+    session_id=SessionId(UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")),
 )
 _TARGET_A_MOVED = _TARGET_A.model_copy(update={"host": "10.0.0.9"})
 _SPEC = RoutePoolSpec(failure_threshold=1, health_check_interval=3600.0)

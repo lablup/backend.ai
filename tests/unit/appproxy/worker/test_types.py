@@ -22,10 +22,9 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
     IngressFrontendKey,
     IngressFrontendKind,
     IngressKey,
-    IngressTarget,
     IngressTargetGroup,
     IngressTargetGroupID,
-    IngressTargetID,
+    SessionIngressTarget,
 )
 from ai.backend.common.types import SessionId
 
@@ -52,7 +51,6 @@ class _RouteTargetCase:
     name: str
     route_id: UUID | None
     traffic_ratio: float
-    expected_target_id: IngressTargetID
     expected_weight: int
 
 
@@ -260,41 +258,36 @@ class TestCircuit:
                 name="model-service-route",
                 route_id=ROUTE_ID,
                 traffic_ratio=1.0,
-                expected_target_id=IngressTargetID(str(ROUTE_ID)),
                 expected_weight=10_000,
             ),
             _RouteTargetCase(
                 name="interactive-app-route",
                 route_id=None,
                 traffic_ratio=1.0,
-                expected_target_id=IngressTargetID(str(SESSION_ID)),
                 expected_weight=10_000,
             ),
             _RouteTargetCase(
                 name="half-traffic-route",
                 route_id=ROUTE_ID,
                 traffic_ratio=0.5,
-                expected_target_id=IngressTargetID(str(ROUTE_ID)),
                 expected_weight=5_000,
             ),
             _RouteTargetCase(
                 name="traffic-below-the-weight-scale-route",
                 route_id=ROUTE_ID,
                 traffic_ratio=0.00001,
-                expected_target_id=IngressTargetID(str(ROUTE_ID)),
                 expected_weight=1,
             ),
             _RouteTargetCase(
                 name="no-traffic-route",
                 route_id=ROUTE_ID,
                 traffic_ratio=0.0,
-                expected_target_id=IngressTargetID(str(ROUTE_ID)),
                 expected_weight=0,
             ),
         ],
         ids=lambda case: case.name,
     )
-    def test_to_ingress_backend_makes_each_route_a_group_weighted_by_its_traffic_ratio(
+    def test_to_ingress_backend_makes_each_route_a_session_target_group_weighted_by_its_traffic_ratio(
         self, route_target_case: _RouteTargetCase, route_target_case_circuit: Circuit
     ) -> None:
         assert route_target_case_circuit.to_ingress_backend().target_groups == [
@@ -302,8 +295,7 @@ class TestCircuit:
                 id=IngressTargetGroupID(str(UUID(int=0))),
                 weight=route_target_case.expected_weight,
                 targets=[
-                    IngressTarget(
-                        id=route_target_case.expected_target_id,
+                    SessionIngressTarget(
                         host="10.0.0.5",
                         port=8000,
                         session_id=SessionId(SESSION_ID),

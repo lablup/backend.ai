@@ -11,7 +11,7 @@ from yarl import URL
 
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.types import Circuit, RootContext
-from ai.backend.common.dto.appproxy.v2.ingress.types import IngressTarget
+from ai.backend.common.dto.appproxy.v2.ingress.types import IngressTarget, SessionIngressTarget
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -44,8 +44,9 @@ class BaseBackend:
     @final
     async def mark_last_used_time(self, target: IngressTarget) -> None:
         last_access_keys = [f"circuit.{self.circuit.id}.last_access"]
-        if target.session_id is not None:
-            last_access_keys.append(f"session.{target.session_id}.last_access")
+        match target:
+            case SessionIngressTarget():
+                last_access_keys.append(f"session.{target.session_id}.last_access")
         await self.root_context.last_used_time_marker_redis_queue.put((
             last_access_keys,
             time.time(),

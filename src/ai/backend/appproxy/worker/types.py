@@ -45,13 +45,12 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
     IngressID,
     IngressKey,
     IngressProtocol,
-    IngressTarget,
     IngressTargetGroup,
     IngressTargetGroupID,
-    IngressTargetID,
     IngressTokenAccess,
     IngressUserAccess,
     PortFrontend,
+    SessionIngressTarget,
     WildcardFrontend,
 )
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
@@ -501,8 +500,8 @@ class Circuit(SerializableCircuit):
             target_groups=target_groups,
         )
 
-    @classmethod
-    def _target_group_of_route(cls, route: RouteInfo) -> IngressTargetGroup:
+    @staticmethod
+    def _target_group_of_route(route: RouteInfo) -> IngressTargetGroup:
         # TODO: Use the replica groups once the manager sends target groups; until then each
         # route is a group of its own whose weight carries the route's traffic ratio.
         return IngressTargetGroup(
@@ -514,22 +513,13 @@ class Circuit(SerializableCircuit):
                 else 0
             ),
             targets=[
-                IngressTarget(
-                    id=cls._target_id_of_route(route),
+                SessionIngressTarget(
                     host=route.current_kernel_host,
                     port=route.kernel_port,
                     session_id=SessionId(route.session_id),
                 )
             ],
         )
-
-    @staticmethod
-    def _target_id_of_route(route: RouteInfo) -> IngressTargetID:
-        # Until the manager manages targets, a route id names a model service target and a
-        # session id an interactive app target.
-        if route.route_id is not None:
-            return IngressTargetID(str(route.route_id))
-        return IngressTargetID(str(route.session_id))
 
     def to_ingress_key(self, authority: IngressAuthority) -> IngressKey:
         return IngressKey(authority=authority, frontend_key=self.to_ingress_frontend().key())

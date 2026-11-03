@@ -47,9 +47,9 @@ class RoutePool:
 
     :meth:`update` applies a new Ingress backend:
 
-    - a target with a new id, or a known id at a new address or session → a fresh health state
+    - a target with a new id, or a known id at a new address → a fresh health state
     - a target missing from the update → dropped
-    - a known id at the same address and session → keeps its health state
+    - a known id at the same address → keeps its health state
     """
 
     _ingress_backend: IngressBackend
@@ -105,7 +105,7 @@ class RoutePool:
             for target_group in self._ingress_backend.target_groups:
                 if target_group.weight <= 0:
                     continue
-                healthy_targets = [
+                healthy_targets: list[IngressTarget] = [
                     target
                     for target in target_group.targets
                     if (health := self._health_by_target_id.get(target.id)) is not None
