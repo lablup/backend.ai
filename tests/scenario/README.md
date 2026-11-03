@@ -50,7 +50,7 @@ class TheDomainNode(Then[ADomainAndACaller, DomainNode]):
 | `bai_scenario/fakes/` | Mocks for external services |
 | `bai_scenario/{db,schema,config,valkey,monitors}.py` | What one run needs |
 
-Add a package only for what will grow. Keep what fits in one file flat, like the modules above.
+Add a package only for content that will grow. Keep flat what fits in one file, as the modules above do.
 
 ## How to run
 
