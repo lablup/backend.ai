@@ -43,6 +43,7 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     UpdateResourceGroupConfigInput,
     UpdateResourceGroupFairShareSpecInput,
     UpdateResourceGroupInput,
+    UpdateResourceGroupSchedulerOptionsConfigInput,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     AllowedDomainsPayload,
@@ -57,6 +58,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ResourceGroupMetadataInfo,
     ResourceGroupNetworkConfigInfo,
     ResourceGroupSchedulerConfigInfo,
+    ResourceGroupSchedulerOptionsConfigInfo,
     ResourceGroupStatusInfo,
     ResourceInfoNode,
     UpdateResourceGroupConfigPayloadNode,
@@ -120,6 +122,10 @@ from ai.backend.manager.models.resource_group.searchable_fields import (
     ResourceGroupSearchableFields,
 )
 from ai.backend.manager.models.resource_group.searchers import ResourceGroupSearcher
+from ai.backend.manager.models.resource_group.types import (
+    NUM_RETRIES_TO_SKIP_CONFIG_KEY,
+    ResourceGroupOpts,
+)
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.search.usage import UsedBy
@@ -496,16 +502,30 @@ class ResourceGroupAdapter(BaseAdapter):
         Returns:
             Pydantic payload containing the created resource group node.
         """
+        num_retries_to_skip = (
+            input.scheduler_config.num_retries_to_skip
+            if input.scheduler_config is not None
+            else None
+        )
         creator = ResourceGroupCreator(
             name=input.name,
-            # ResourceGroupCreator requires driver and scheduler fields
-            # which are not exposed in CreateResourceGroupInput.
-            # Default to "static" driver and "fifo" scheduler as reasonable defaults.
+            # ResourceGroupCreator requires a driver field which is not exposed in
+            # CreateResourceGroupInput. Default to the "static" driver.
             driver="static",
-            scheduler="fifo",
+            scheduler=SchedulerType(input.scheduler_type).value,
             description=input.description,
-            is_active=True,
+            is_active=input.is_active,
+            is_public=input.is_public,
             is_default=input.is_default,
+            scheduler_opts=ResourceGroupOpts(
+                allowed_session_types=input.allowed_session_types,
+                pending_timeout=timedelta(seconds=input.pending_timeout),
+                config=(
+                    {}
+                    if num_retries_to_skip is None
+                    else {NUM_RETRIES_TO_SKIP_CONFIG_KEY: num_retries_to_skip}
+                ),
+            ),
         )
         action_result = await self._resource_group.create_resource_group.run(
             CreateResourceGroupAction(creator=creator)
@@ -586,6 +606,13 @@ class ResourceGroupAdapter(BaseAdapter):
             use_host_network=OptionalState.from_unset(input.use_host_network),
             scheduler=scheduler,
             preemption_config=preemption_config,
+            allowed_session_types=OptionalState.from_unset(input.allowed_session_types),
+            pending_timeout=OptionalState.from_unset(input.pending_timeout).map(
+                lambda seconds: timedelta(seconds=seconds)
+            ),
+            num_retries_to_skip=OptionalState[UpdateResourceGroupSchedulerOptionsConfigInput]
+            .from_unset(input.scheduler_config)
+            .and_tri(lambda scheduler_config: scheduler_config.num_retries_to_skip),
         )
 
     def _to_partial_bulk_payload(
@@ -735,6 +762,9 @@ class ResourceGroupAdapter(BaseAdapter):
                 use_host_network=input.use_host_network,
                 scheduler_type=input.scheduler_type,
                 preemption=input.preemption,
+                allowed_session_types=input.allowed_session_types,
+                pending_timeout=input.pending_timeout,
+                scheduler_config=input.scheduler_config,
             ),
         )
         return UpdateResourceGroupConfigPayloadNode(resource_group=payload.resource_group)
@@ -1097,6 +1127,13 @@ class ResourceGroupAdapter(BaseAdapter):
                     mode=PreemptionModeDTO(data.scheduler.options.preemption.mode.value),
                     preemption_min_runtime=data.scheduler.options.preemption.preemption_min_runtime.total_seconds(),
                     victim_scope=data.scheduler.options.preemption.victim_scope,
+                ),
+                allowed_session_types=data.scheduler.options.allowed_session_types,
+                pending_timeout=data.scheduler.options.pending_timeout.total_seconds(),
+                config=ResourceGroupSchedulerOptionsConfigInfo(
+                    num_retries_to_skip=data.scheduler.options.config.get(
+                        NUM_RETRIES_TO_SKIP_CONFIG_KEY
+                    ),
                 ),
             ),
             default_deployment_options=deployment_options_to_info(data.default_deployment_options),

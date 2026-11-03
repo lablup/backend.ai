@@ -5218,6 +5218,28 @@ input CreateResourceGroupInput
   Added in 26.9.0. Make this the default resource group. At most one resource group may hold the flag, so this is rejected while another one holds it; clear that one first.
   """
   isDefault: Boolean! = false
+
+  """Added in 26.10.0. Whether the resource group is active."""
+  isActive: Boolean! = true
+
+  """Added in 26.10.0. Whether the resource group is public."""
+  isPublic: Boolean! = true
+
+  """Added in 26.10.0. Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE)."""
+  schedulerType: SchedulerType! = FIFO
+
+  """
+  Added in 26.10.0. Session types that may be created in the resource group.
+  """
+  allowedSessionTypes: [SessionTypes!]! = [INTERACTIVE, BATCH, INFERENCE]
+
+  """
+  Added in 26.10.0. Seconds a session may stay pending before it is cancelled (0 = no timeout).
+  """
+  pendingTimeout: Float! = 0
+
+  """Added in 26.10.0. The config section of the scheduler options."""
+  schedulerConfig: CreateResourceGroupSchedulerOptionsConfigInput = null
 }
 
 """Added in 26.4.2. Payload for resource group creation."""
@@ -5226,6 +5248,16 @@ type CreateResourceGroupPayload
 {
   """The created resource group."""
   resourceGroup: ResourceGroup!
+}
+
+"""
+Added in 26.10.0. Input for the config section of a new resource group's scheduler options.
+"""
+input CreateResourceGroupSchedulerOptionsConfigInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Number of scheduling retries before a pending session is skipped."""
+  numRetriesToSkip: Int = null
 }
 
 type CreateResourcePreset
@@ -23370,6 +23402,29 @@ type ResourceGroupSchedulerConfig
 
   """Added in 26.3.0. Preemption configuration for this resource group."""
   preemption: PreemptionConfig!
+
+  """
+  Added in 26.10.0. Session types that may be created in the resource group.
+  """
+  allowedSessionTypes: [SessionTypes!]!
+
+  """
+  Added in 26.10.0. Seconds a session may stay pending before it is cancelled (0 = no timeout).
+  """
+  pendingTimeout: Float!
+
+  """Added in 26.10.0. The config section of the scheduler options."""
+  config: ResourceGroupSchedulerOptionsConfig!
+}
+
+"""
+Added in 26.10.0. The config section of a resource group's scheduler options.
+"""
+type ResourceGroupSchedulerOptionsConfig
+  @join__type(graph: STRAWBERRY)
+{
+  """Number of scheduling retries before a pending session is skipped."""
+  numRetriesToSkip: Int
 }
 
 """
@@ -29570,6 +29625,21 @@ input UpdateResourceGroupInput
   Added in 26.3.0. Preemption configuration. When provided, replaces the entire preemption config. Omit to leave unchanged.
   """
   preemption: PreemptionConfigInput
+
+  """
+  Added in 26.10.0. Session types that may be created in the resource group. Omit to leave unchanged.
+  """
+  allowedSessionTypes: [SessionTypes!]
+
+  """
+  Added in 26.10.0. Seconds a session may stay pending before it is cancelled (0 = no timeout). Omit to leave unchanged.
+  """
+  pendingTimeout: Float
+
+  """
+  Added in 26.10.0. The config section of the scheduler options. Omit to leave unchanged.
+  """
+  schedulerConfig: UpdateResourceGroupSchedulerOptionsConfigInput
 }
 
 """Added in 26.2.0. Payload for resource group update mutation."""
@@ -29578,6 +29648,18 @@ type UpdateResourceGroupPayload
 {
   """The updated resource group with new configuration."""
   resourceGroup: ResourceGroup!
+}
+
+"""
+Added in 26.10.0. Input for updating the config section of a resource group's scheduler options.
+"""
+input UpdateResourceGroupSchedulerOptionsConfigInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Number of scheduling retries before a pending session is skipped. Omit to leave unchanged; null clears.
+  """
+  numRetriesToSkip: Int
 }
 
 """
@@ -29616,6 +29698,19 @@ input UpdateResourceGroupV2Input
   Preemption configuration. When provided, replaces the entire preemption config. Omit to leave unchanged.
   """
   preemption: PreemptionConfigInput
+
+  """
+  Session types that may be created in the resource group. Omit to leave unchanged.
+  """
+  allowedSessionTypes: [SessionTypes!]
+
+  """
+  Seconds a session may stay pending before it is cancelled (0 = no timeout). Omit to leave unchanged.
+  """
+  pendingTimeout: Float
+
+  """The config section of the scheduler options. Omit to leave unchanged."""
+  schedulerConfig: UpdateResourceGroupSchedulerOptionsConfigInput
 }
 
 """Added in 26.4.2. Payload for resource preset update."""

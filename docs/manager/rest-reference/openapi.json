@@ -25114,6 +25114,38 @@
         "title": "AdminSearchResourceGroupsInput",
         "type": "object"
       },
+      "CreateResourceGroupSchedulerOptionsConfigInput": {
+        "description": "Input for the ``config`` section of a new resource group's scheduler options.",
+        "properties": {
+          "num_retries_to_skip": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Number of scheduling retries before a pending session is skipped.",
+            "title": "Num Retries To Skip"
+          }
+        },
+        "title": "CreateResourceGroupSchedulerOptionsConfigInput",
+        "type": "object"
+      },
+      "SchedulerTypeDTO": {
+        "description": "Scheduler type for resource group.",
+        "enum": [
+          "fifo",
+          "lifo",
+          "drf",
+          "fair-share"
+        ],
+        "title": "SchedulerTypeDTO",
+        "type": "string"
+      },
       "CreateResourceGroupInput": {
         "description": "Input for creating a new resource group.",
         "properties": {
@@ -25201,6 +25233,50 @@
             "description": "Make this the default resource group. At most one resource group may hold the flag, so this is rejected while another one holds it; clear that one first.",
             "title": "Is Default",
             "type": "boolean"
+          },
+          "is_active": {
+            "default": true,
+            "description": "Whether the resource group is active.",
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "is_public": {
+            "default": true,
+            "description": "Whether the resource group is public.",
+            "title": "Is Public",
+            "type": "boolean"
+          },
+          "scheduler_type": {
+            "$ref": "#/components/schemas/SchedulerTypeDTO",
+            "default": "fifo",
+            "description": "Scheduler type value (fifo/lifo/drf/fair-share)."
+          },
+          "allowed_session_types": {
+            "description": "Session types that may be created in the resource group.",
+            "items": {
+              "$ref": "#/components/schemas/SessionTypes"
+            },
+            "title": "Allowed Session Types",
+            "type": "array"
+          },
+          "pending_timeout": {
+            "default": 0.0,
+            "description": "Seconds a session may stay pending before it is cancelled (0 = no timeout).",
+            "minimum": 0.0,
+            "title": "Pending Timeout",
+            "type": "number"
+          },
+          "scheduler_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CreateResourceGroupSchedulerOptionsConfigInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The ``config`` section of the scheduler options."
           }
         },
         "required": [
@@ -25290,17 +25366,6 @@
           "resource-group"
         ],
         "title": "PreemptionVictimScope",
-        "type": "string"
-      },
-      "SchedulerTypeDTO": {
-        "description": "Scheduler type for resource group.",
-        "enum": [
-          "fifo",
-          "lifo",
-          "drf",
-          "fair-share"
-        ],
-        "title": "SchedulerTypeDTO",
         "type": "string"
       },
       "UpdateResourceGroupInput": {
@@ -25475,9 +25540,69 @@
             ],
             "description": "Preemption configuration. Omit to leave unchanged.",
             "title": "Preemption"
+          },
+          "allowed_session_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionTypes"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Session types that may be created in the resource group. Omit to leave unchanged.",
+            "title": "Allowed Session Types"
+          },
+          "pending_timeout": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Seconds a session may stay pending before it is cancelled (0 = no timeout). Omit to leave unchanged.",
+            "title": "Pending Timeout"
+          },
+          "scheduler_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdateResourceGroupSchedulerOptionsConfigInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ``config`` section of the scheduler options. Omit to leave unchanged.",
+            "title": "Scheduler Config"
           }
         },
         "title": "UpdateResourceGroupInput",
+        "type": "object"
+      },
+      "UpdateResourceGroupSchedulerOptionsConfigInput": {
+        "description": "Input for updating the ``config`` section of a resource group's scheduler options.",
+        "properties": {
+          "num_retries_to_skip": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Number of scheduling retries before a pending session is skipped. Omit to leave unchanged; null clears.",
+            "title": "Num Retries To Skip"
+          }
+        },
+        "title": "UpdateResourceGroupSchedulerOptionsConfigInput",
         "type": "object"
       },
       "PartialBulkUpdateResourceGroupsInput": {
@@ -25737,6 +25862,46 @@
             ],
             "description": "Preemption configuration. Omit to leave unchanged.",
             "title": "Preemption"
+          },
+          "allowed_session_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionTypes"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Session types that may be created in the resource group. Omit to leave unchanged.",
+            "title": "Allowed Session Types"
+          },
+          "pending_timeout": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Seconds a session may stay pending before it is cancelled (0 = no timeout). Omit to leave unchanged.",
+            "title": "Pending Timeout"
+          },
+          "scheduler_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UpdateResourceGroupSchedulerOptionsConfigInput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ``config`` section of the scheduler options. Omit to leave unchanged.",
+            "title": "Scheduler Config"
           }
         },
         "required": [

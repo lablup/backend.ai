@@ -14,13 +14,14 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     PreemptionConfigInputDTO,
     UpdateResourceGroupConfigInput,
     UpdateResourceGroupInput,
+    UpdateResourceGroupSchedulerOptionsConfigInput,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import ResourceGroupDetailNode
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     PreemptionModeDTO,
     SchedulerTypeDTO,
 )
-from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
+from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope, SessionTypes
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -134,6 +135,72 @@ class EditingTheConfig(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGrou
             )
         with ActingAs(laid.caller):
             payload = await adapter.update_config(asked)
+        return payload.resource_group
+
+
+@dataclass(frozen=True)
+class EditingTheSchedulerOptions(
+    When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    """id로 선점 설정과 함께 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수를 바꾼다."""
+
+    @override
+    def operation(self) -> str:
+        return "update"
+
+    @override
+    def describe(self, laid: AGroupAndACaller) -> str:
+        return (
+            f"{laid.caller.username}이 {laid.group.name}의 선점 설정, 허용 세션 타입, "
+            "대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수를 함께 수정"
+        )
+
+    @override
+    async def call(
+        self, adapter: ResourceGroupAdapter, laid: AGroupAndACaller
+    ) -> ResourceGroupDetailNode:
+        with ActingAs(laid.caller):
+            payload = await adapter.update(
+                await adapter.lookup_name(laid.group.name),
+                UpdateResourceGroupInput(
+                    preemption=PreemptionConfigInputDTO(enabled=True),
+                    allowed_session_types=[SessionTypes.INTERACTIVE],
+                    pending_timeout=60,
+                    scheduler_config=UpdateResourceGroupSchedulerOptionsConfigInput(
+                        num_retries_to_skip=3
+                    ),
+                ),
+            )
+        return payload.resource_group
+
+
+@dataclass(frozen=True)
+class ClearingTheRetriesToSkip(
+    When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    """이름으로 대기 세션 건너뛰기 재시도 횟수를 비운다."""
+
+    @override
+    def operation(self) -> str:
+        return "update_config"
+
+    @override
+    def describe(self, laid: AGroupAndACaller) -> str:
+        return f"{laid.caller.username}이 {laid.group.name}의 대기 세션 건너뛰기 재시도 횟수를 비우도록 수정"
+
+    @override
+    async def call(
+        self, adapter: ResourceGroupAdapter, laid: AGroupAndACaller
+    ) -> ResourceGroupDetailNode:
+        with ActingAs(laid.caller):
+            payload = await adapter.update_config(
+                UpdateResourceGroupConfigInput(
+                    resource_group_name=laid.group.name,
+                    scheduler_config=UpdateResourceGroupSchedulerOptionsConfigInput(
+                        num_retries_to_skip=None
+                    ),
+                )
+            )
         return payload.resource_group
 
 
@@ -423,6 +490,74 @@ class TheSuperadminChangesThePreemptionConfig(
 
 
 @dataclass(frozen=True)
+class TheSuperadminChangesTheSchedulerOptions(
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-changes-the-scheduler-options-with-the-preemption-config"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "슈퍼관리자가 선점 설정과 함께 허용 세션 타입, 대기 제한 시간, "
+            "대기 세션 건너뛰기 재시도 횟수를 바꾸면 그 값들이 모두 새 값인 그룹 전체가 반환된다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
+        return AGroupAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return EditingTheSchedulerOptions()
+
+    @override
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+        return TheGroupNode(
+            GroupLook(
+                started=self.started,
+                preemption_enabled=True,
+                allowed_session_types=[SessionTypes.INTERACTIVE],
+                pending_timeout=60.0,
+                num_retries_to_skip=3,
+            )
+        )
+
+
+@dataclass(frozen=True)
+class TheSuperadminClearsTheRetriesToSkip(
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-clears-the-retries-to-skip"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "대기 세션 건너뛰기 재시도 횟수가 있는 그룹에서 슈퍼관리자가 그 값을 비우면 "
+            "재시도 횟수가 없고 나머지는 그대로인 그룹 전체가 반환된다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
+        return AGroupAndSomeone(role=UserRole.SUPERADMIN, num_retries_to_skip=3)
+
+    @override
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return ClearingTheRetriesToSkip()
+
+    @override
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+        return TheGroupNode(GroupLook(started=self.started, num_retries_to_skip=None))
+
+
+@dataclass(frozen=True)
 class AUserGrantedNothingMayNotEditTheConfig(
     Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
@@ -458,6 +593,8 @@ SCENARIOS: list[EditingStep] = [
     TheSuperadminEditingAnUnknownNameIsNotFound(),
     TheSuperadminChangesTheConfig(started=datetime.now(UTC)),
     TheSuperadminChangesThePreemptionConfig(started=datetime.now(UTC)),
+    TheSuperadminChangesTheSchedulerOptions(started=datetime.now(UTC)),
+    TheSuperadminClearsTheRetriesToSkip(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotEditTheConfig(),
 ]
 

@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ResourceGroupNetworkConfigInfo,
     ResourceGroupNode,
     ResourceGroupSchedulerConfigInfo,
+    ResourceGroupSchedulerOptionsConfigInfo,
     ResourceGroupStatusInfo,
     UpdateResourceGroupPayload,
 )
@@ -39,7 +40,7 @@ from ai.backend.common.dto.manager.v2.session_options.types import (
     AgentSelectionPolicyEnum,
     FailurePolicyEnum,
 )
-from ai.backend.common.types import PreemptionOrder
+from ai.backend.common.types import PreemptionOrder, SessionTypes
 
 
 def _make_resource_group_node(name: str = "test-group") -> ResourceGroupNode:
@@ -81,6 +82,9 @@ def _make_resource_group_detail_node(name: str = "test-group") -> ResourceGroupD
                 mode=PreemptionModeDTO.TERMINATE,
                 preemption_min_runtime=0.0,
             ),
+            allowed_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
+            pending_timeout=0.0,
+            config=ResourceGroupSchedulerOptionsConfigInfo(num_retries_to_skip=None),
         ),
         default_deployment_options=DeploymentOptionsInfo(
             handler_options=DeploymentHandlerOptionsInfo(

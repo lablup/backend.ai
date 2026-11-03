@@ -9,9 +9,14 @@ from typing import Any, override
 import pytest
 
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.resource_group.request import CreateResourceGroupInput
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    CreateResourceGroupInput,
+    CreateResourceGroupSchedulerOptionsConfigInput,
+)
 from ai.backend.common.dto.manager.v2.resource_group.response import ResourceGroupDetailNode
+from ai.backend.common.dto.manager.v2.resource_group.types import SchedulerTypeDTO
 from ai.backend.common.exception import ResourceGroupConflict
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource import DefaultResourceGroupAlreadyExists
@@ -61,6 +66,45 @@ class Creating(When[Any, ResourceGroupAdapter, ResourceGroupDetailNode]):
 
 
 @dataclass(frozen=True)
+class CreatingWithStatusAndSchedulerOptions(
+    When[ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    """비활성·비공개 그룹을 후입선출 스케줄러와 스케줄러 옵션을 지정해 만든다."""
+
+    named: str
+
+    @override
+    def operation(self) -> str:
+        return "create"
+
+    @override
+    def describe(self, laid: ACaller) -> str:
+        return (
+            f"{laid.caller.username}이 {self.named}을 비활성·비공개로, 후입선출 스케줄러와 "
+            "허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수를 지정해 생성"
+        )
+
+    @override
+    async def call(self, adapter: ResourceGroupAdapter, laid: ACaller) -> ResourceGroupDetailNode:
+        with ActingAs(laid.caller):
+            payload = await adapter.create(
+                CreateResourceGroupInput(
+                    name=self.named,
+                    domain_name=laid.caller.domain_name,
+                    is_active=False,
+                    is_public=False,
+                    scheduler_type=SchedulerTypeDTO.LIFO,
+                    allowed_session_types=[SessionTypes.BATCH],
+                    pending_timeout=60,
+                    scheduler_config=CreateResourceGroupSchedulerOptionsConfigInput(
+                        num_retries_to_skip=3
+                    ),
+                )
+            )
+        return payload.resource_group
+
+
+@dataclass(frozen=True)
 class TheSuperadminMakesAGroup(
     Scenario[TestSeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
@@ -88,6 +132,45 @@ class TheSuperadminMakesAGroup(
     @override
     def then(self) -> Then[ACaller, ResourceGroupDetailNode]:
         return TheNewGroupNode(started=self.started, named="compute")
+
+
+@dataclass(frozen=True)
+class TheSuperadminMakesAGroupWithItsStatusAndSchedulerOptions(
+    Scenario[TestSeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-makes-a-resource-group-with-its-status-and-scheduler-options"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "슈퍼관리자가 활성·공개 여부, 스케줄러, 허용 세션 타입, 대기 제한 시간, "
+            "대기 세션 건너뛰기 재시도 횟수를 지정해 리소스 그룹을 만들면 지정한 값으로 채워진 그룹 전체가 반환된다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ACaller]:
+        return SomeoneAlone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return CreatingWithStatusAndSchedulerOptions(named="batch-only")
+
+    @override
+    def then(self) -> Then[ACaller, ResourceGroupDetailNode]:
+        return TheNewGroupNode(
+            started=self.started,
+            named="batch-only",
+            is_active=False,
+            is_public=False,
+            scheduler_type=SchedulerTypeDTO.LIFO,
+            allowed_session_types=(SessionTypes.BATCH,),
+            pending_timeout=60.0,
+            num_retries_to_skip=3,
+        )
 
 
 @dataclass(frozen=True)
@@ -219,6 +302,7 @@ class TheMonitorMayNotCreate(
 
 SCENARIOS: list[CreatingStep] = [
     TheSuperadminMakesAGroup(started=datetime.now(UTC)),
+    TheSuperadminMakesAGroupWithItsStatusAndSchedulerOptions(started=datetime.now(UTC)),
     ADefaultGroupIsMade(started=datetime.now(UTC)),
     ANameAnotherGroupHoldsIsRefused(),
     # TODO(BA-7946): the create path maps every unique violation to a name conflict, so a

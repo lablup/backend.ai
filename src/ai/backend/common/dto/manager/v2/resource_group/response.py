@@ -23,7 +23,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     SchedulerTypeDTO,
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInfo
-from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
+from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope, SessionTypes
 
 __all__ = (
     "AdminSearchResourceGroupsPayload",
@@ -41,6 +41,7 @@ __all__ = (
     "ResourceGroupNetworkConfigInfo",
     "ResourceGroupNode",
     "ResourceGroupSchedulerConfigInfo",
+    "ResourceGroupSchedulerOptionsConfigInfo",
     "ResourceGroupStatusInfo",
     "ResourceInfoNode",
     "UpdateResourceGroupConfigPayloadNode",
@@ -181,6 +182,15 @@ class ResourceGroupNetworkConfigInfo(BaseResponseModel):
     )
 
 
+class ResourceGroupSchedulerOptionsConfigInfo(BaseResponseModel):
+    """The ``config`` section of a resource group's scheduler options."""
+
+    num_retries_to_skip: int | None = Field(
+        default=None,
+        description="Number of scheduling retries before a pending session is skipped.",
+    )
+
+
 class ResourceGroupSchedulerConfigInfo(BaseResponseModel):
     """Scheduler configuration DTO for a resource group."""
 
@@ -189,6 +199,15 @@ class ResourceGroupSchedulerConfigInfo(BaseResponseModel):
     )
     preemption: PreemptionConfigInfo = Field(
         description="Preemption configuration for this resource group."
+    )
+    allowed_session_types: list[SessionTypes] = Field(
+        description="Session types that may be created in the resource group."
+    )
+    pending_timeout: float = Field(
+        description="Seconds a session may stay pending before it is cancelled (0 = no timeout)."
+    )
+    config: ResourceGroupSchedulerOptionsConfigInfo = Field(
+        description="The ``config`` section of the scheduler options."
     )
 
 

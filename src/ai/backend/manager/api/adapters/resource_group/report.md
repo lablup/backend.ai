@@ -20,17 +20,17 @@ Scenario: incomplete 4 / 25
 - direct implementation (14)
   - admin_replace_default_deployment_options: success present 2 · rejection present 2 (single_entity)
   - admin_replace_default_session_options: success present 1 · rejection present 2 (single_entity)
-  - create: success present 2 · rejection present 3 (global_scope)
+  - create: success present 3 · rejection present 3 (global_scope)
   - get_allowed_domains_for_resource_group: success present 2 · rejection present 1 (single_entity)
   - get_allowed_projects_for_resource_group: success present 1 · rejection present 1 (single_entity)
   - get_resource_info: success present 2 · rejection present 2 (single_entity)
   - purge: success present 2 · rejection present 2 (single_entity)
-  - update: success present 5 · rejection present 3 (single_entity)
+  - update: success present 6 · rejection present 3 (single_entity)
   - update_allowed_domains_for_resource_group: success present 1 · rejection present 3 (relation, single_entity)
   - update_allowed_projects_for_resource_group: success present 1 · rejection present 1 (relation, single_entity)
   - update_allowed_resource_groups_for_domain: success present 3 · rejection present 2 (global_scope, relation, single_entity)
   - update_allowed_resource_groups_for_project: success present 1 · rejection present 1 (global_scope, relation, single_entity)
-  - update_config: success present 2 · rejection present 1 (single_entity)
+  - update_config: success present 3 · rejection present 1 (single_entity)
   - update_fair_share_spec: success present 2 · rejection present 2 (single_entity)
 
 **batch_load_by_ids**
@@ -148,6 +148,7 @@ Scenario: incomplete 4 / 25
 |---|---|
 | [기본 그룹이 없을 때 슈퍼관리자가 기본으로 지정해 만들면 기본인 그룹이 반환된다](#creating-a-resource-group-made-as-the-default-answers-default) | answered |
 | [슈퍼관리자가 이름만 주고 리소스 그룹을 만들면, 활성이고 공개이며 기본이 아닌 그룹 전체가 코드의 기본값으로 채워져 반환된다](#creating-the-superadmin-makes-a-resource-group) | answered |
+| [슈퍼관리자가 활성·공개 여부, 스케줄러, 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수를 지정해 리소스 그룹을 만들면 지정한 값으로 채워진 그룹 전체가 반환된다](#creating-the-superadmin-makes-a-resource-group-with-its-status-and-scheduler-options) | answered |
 | [이미 어떤 그룹이 쓰고 있는 이름으로 만들려 하면 이름 중복으로 거부된다](#creating-a-name-another-resource-group-already-holds-is-refused) | rejected |
 | [슈퍼관리자가 아닌 사용자가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-make-a-resource-group) | rejected |
 | [모니터가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다](#creating-the-monitor-may-not-make-a-resource-group) | rejected |
@@ -193,6 +194,7 @@ Scenario: incomplete 4 / 25
 | [아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 그룹이 반환된다](#editing-an-edit-naming-no-field-changes-nothing) | answered |
 | [활성 그룹을 비활성으로 바꾸면 비활성인 그룹이 반환된다](#editing-deactivating-a-resource-group-answers-it-inactive) | answered |
 | [기본 그룹이 없을 때 그룹을 기본으로 바꾸면 기본인 그룹이 반환된다](#editing-making-a-resource-group-the-default-answers-it-default) | answered |
+| [슈퍼관리자가 선점 설정과 함께 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수를 바꾸면 그 값들이 모두 새 값인 그룹 전체가 반환된다](#editing-the-superadmin-changes-the-scheduler-options-with-the-preemption-config) | answered |
 | [슈퍼관리자가 설명만 바꾸면 설명은 새 값이고 나머지는 그대로인 그룹 전체가 반환된다](#editing-the-superadmin-changing-the-description-leaves-the-rest) | answered |
 | [아무 권한도 없는 사용자가 설명을 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-resource-group) | rejected |
 | [기본 그룹이 따로 있을 때 다른 그룹을 기본으로 바꾸려 하면 기본 그룹이 이미 있다는 이유로 거부된다](#editing-making-a-second-resource-group-the-default-is-refused) | rejected |
@@ -237,6 +239,7 @@ Scenario: incomplete 4 / 25
 |---|---|
 | [슈퍼관리자가 선점 설정을 바꾸면 선점 설정이 새 값인 그룹 전체가 반환된다](#editing-the-superadmin-changes-the-preemption-config) | answered |
 | [슈퍼관리자가 스케줄러를 후입선출로, 비공개로, 호스트 네트워크로, 프록시 주소를 지정해 설정을 바꾸면 그 값들이 새 값인 그룹 전체가 반환된다](#editing-the-superadmin-changes-the-scheduler-visibility-and-network-config) | answered |
+| [대기 세션 건너뛰기 재시도 횟수가 있는 그룹에서 슈퍼관리자가 그 값을 비우면 재시도 횟수가 없고 나머지는 그대로인 그룹 전체가 반환된다](#editing-the-superadmin-clears-the-retries-to-skip) | answered |
 | [아무 권한도 없는 사용자가 설정을 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-the-config) | rejected |
 
 **update_fair_share_spec**
@@ -348,6 +351,9 @@ Then
   - items[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[0].scheduler.preemption.preemption_min_runtime = 0.0
   - items[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - items[0].scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - items[0].scheduler.pending_timeout = 0.0
+  - items[0].scheduler.config.num_retries_to_skip = None
   - items[0].default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - items[0].default_session_options: 무시함: 설치본이 정한 기본값이다
   - items[1].id: 무시함: 데이터베이스가 만든다
@@ -366,6 +372,9 @@ Then
   - items[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[1].scheduler.preemption.preemption_min_runtime = 0.0
   - items[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - items[1].scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - items[1].scheduler.pending_timeout = 0.0
+  - items[1].scheduler.config.num_retries_to_skip = None
   - items[1].default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - items[1].default_session_options: 무시함: 설치본이 정한 기본값이다
   - items[2] = None
@@ -470,6 +479,9 @@ Then
   - items[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[0].scheduler.preemption.preemption_min_runtime = 0.0
   - items[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - items[0].scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - items[0].scheduler.pending_timeout = 0.0
+  - items[0].scheduler.config.num_retries_to_skip = None
   - items[0].default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - items[0].default_session_options: 무시함: 설치본이 정한 기본값이다
   - items[1].id: 무시함: 데이터베이스가 만든다
@@ -488,6 +500,9 @@ Then
   - items[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[1].scheduler.preemption.preemption_min_runtime = 0.0
   - items[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - items[1].scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - items[1].scheduler.pending_timeout = 0.0
+  - items[1].scheduler.config.num_retries_to_skip = None
   - items[1].default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - items[1].default_session_options: 무시함: 설치본이 정한 기본값이다
   - items[2] = None
@@ -538,6 +553,9 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.pending_timeout = 0.0
+  - scheduler.config.num_retries_to_skip = None
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -581,6 +599,9 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.pending_timeout = 0.0
+  - scheduler.config.num_retries_to_skip = None
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -994,6 +1015,9 @@ Then
   - successes[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[0].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - successes[0].scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - successes[0].scheduler.pending_timeout = 0.0
+  - successes[0].scheduler.config.num_retries_to_skip = None
   - successes[0].default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - successes[0].default_session_options: 무시함: 설치본이 정한 기본값이다
   - successes[1].id: 무시함: 데이터베이스가 만든다
@@ -1012,6 +1036,9 @@ Then
   - successes[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[1].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - successes[1].scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - successes[1].scheduler.pending_timeout = 0.0
+  - successes[1].scheduler.config.num_retries_to_skip = None
   - successes[1].default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - successes[1].default_session_options: 무시함: 설치본이 정한 기본값이다
   - failed count = 1
@@ -1094,6 +1121,9 @@ Then
   - successes[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[0].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - successes[0].scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - successes[0].scheduler.pending_timeout = 0.0
+  - successes[0].scheduler.config.num_retries_to_skip = None
   - successes[0].default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - successes[0].default_session_options: 무시함: 설치본이 정한 기본값이다
   - successes[1].id: 무시함: 데이터베이스가 만든다
@@ -1112,6 +1142,9 @@ Then
   - successes[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[1].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - successes[1].scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - successes[1].scheduler.pending_timeout = 0.0
+  - successes[1].scheduler.config.num_retries_to_skip = None
   - successes[1].default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - successes[1].default_session_options: 무시함: 설치본이 정한 기본값이다
   - failed = []
@@ -1757,6 +1790,9 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.pending_timeout = 0.0
+  - scheduler.config.num_retries_to_skip = None
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -1799,6 +1835,54 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.pending_timeout = 0.0
+  - scheduler.config.num_retries_to_skip = None
+  - default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - default_session_options: 무시함: 설치본이 정한 기본값이다
+
+<a id="creating-the-superadmin-makes-a-resource-group-with-its-status-and-scheduler-options"></a>
+
+#### [the-superadmin-makes-a-resource-group-with-its-status-and-scheduler-options](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py): pass
+
+슈퍼관리자가 활성·공개 여부, 스케줄러, 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수를 지정해 리소스 그룹을 만들면 지정한 값으로 채워진 그룹 전체가 반환된다
+
+Given
+
+- 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceGroupAdapter.create: user-1이 batch-only을 비활성·비공개로, 후입선출 스케줄러와 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수를 지정해 생성
+
+Then
+
+- 만든 리소스 그룹 전체가 반환된다
+  - id: 무시함: 데이터베이스가 만든다
+  - name = 'batch-only'
+  - status.is_active = False
+  - status.is_public = False
+  - status.is_default = False
+  - metadata.description = None
+  - metadata.created_at: 이 실행이 쓴 시각
+  - network.wsproxy_addr = None
+  - network.use_host_network = False
+  - scheduler.type = <SchedulerTypeDTO.LIFO: 'lifo'>
+  - scheduler.preemption.enabled = False
+  - scheduler.preemption.preemptible_priority = 5
+  - scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
+  - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
+  - scheduler.preemption.preemption_min_runtime = 0.0
+  - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.allowed_session_types = [<SessionTypes.BATCH: 'batch'>]
+  - scheduler.pending_timeout = 60.0
+  - scheduler.config.num_retries_to_skip = 3
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -2182,6 +2266,9 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.pending_timeout = 0.0
+  - scheduler.config.num_retries_to_skip = None
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -2225,6 +2312,9 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.pending_timeout = 0.0
+  - scheduler.config.num_retries_to_skip = None
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -2326,6 +2416,9 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.pending_timeout = 0.0
+  - scheduler.config.num_retries_to_skip = None
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -2369,6 +2462,9 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.pending_timeout = 0.0
+  - scheduler.config.num_retries_to_skip = None
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -2412,6 +2508,9 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.pending_timeout = 0.0
+  - scheduler.config.num_retries_to_skip = None
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -2455,6 +2554,55 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.pending_timeout = 0.0
+  - scheduler.config.num_retries_to_skip = None
+  - default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - default_session_options: 무시함: 설치본이 정한 기본값이다
+
+<a id="editing-the-superadmin-changes-the-scheduler-options-with-the-preemption-config"></a>
+
+#### [the-superadmin-changes-the-scheduler-options-with-the-preemption-config](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
+
+슈퍼관리자가 선점 설정과 함께 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수를 바꾸면 그 값들이 모두 새 값인 그룹 전체가 반환된다
+
+Given
+
+- 리소스 그룹 하나와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceGroupAdapter.update: user-1이 resource-group-1의 선점 설정, 허용 세션 타입, 대기 제한 시간, 대기 세션 건너뛰기 재시도 횟수를 함께 수정
+
+Then
+
+- 미리 만들어 둔 리소스 그룹 전체가 반환된다
+  - id: 무시함: 데이터베이스가 만든다
+  - name = 'resource-group-1'
+  - status.is_active = True
+  - status.is_public = True
+  - status.is_default = False
+  - metadata.description = None
+  - metadata.created_at: 이 실행이 쓴 시각
+  - network.wsproxy_addr = None
+  - network.use_host_network = False
+  - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
+  - scheduler.preemption.enabled = True
+  - scheduler.preemption.preemptible_priority = 5
+  - scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
+  - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
+  - scheduler.preemption.preemption_min_runtime = 0.0
+  - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>]
+  - scheduler.pending_timeout = 60.0
+  - scheduler.config.num_retries_to_skip = 3
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -2498,6 +2646,9 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.pending_timeout = 0.0
+  - scheduler.config.num_retries_to_skip = None
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -2982,6 +3133,9 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.RESCHEDULE: 'reschedule'>
   - scheduler.preemption.preemption_min_runtime = 60.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.PROJECT: 'project'>
+  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.pending_timeout = 0.0
+  - scheduler.config.num_retries_to_skip = None
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -3025,6 +3179,55 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.pending_timeout = 0.0
+  - scheduler.config.num_retries_to_skip = None
+  - default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - default_session_options: 무시함: 설치본이 정한 기본값이다
+
+<a id="editing-the-superadmin-clears-the-retries-to-skip"></a>
+
+#### [the-superadmin-clears-the-retries-to-skip](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
+
+대기 세션 건너뛰기 재시도 횟수가 있는 그룹에서 슈퍼관리자가 그 값을 비우면 재시도 횟수가 없고 나머지는 그대로인 그룹 전체가 반환된다
+
+Given
+
+- 리소스 그룹 하나와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다, 대기 세션 건너뛰기 재시도 횟수가 3
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceGroupAdapter.update_config: user-1이 resource-group-1의 대기 세션 건너뛰기 재시도 횟수를 비우도록 수정
+
+Then
+
+- 미리 만들어 둔 리소스 그룹 전체가 반환된다
+  - id: 무시함: 데이터베이스가 만든다
+  - name = 'resource-group-1'
+  - status.is_active = True
+  - status.is_public = True
+  - status.is_default = False
+  - metadata.description = None
+  - metadata.created_at: 이 실행이 쓴 시각
+  - network.wsproxy_addr = None
+  - network.use_host_network = False
+  - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
+  - scheduler.preemption.enabled = False
+  - scheduler.preemption.preemptible_priority = 5
+  - scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
+  - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
+  - scheduler.preemption.preemption_min_runtime = 0.0
+  - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.pending_timeout = 0.0
+  - scheduler.config.num_retries_to_skip = None
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -3100,6 +3303,9 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.pending_timeout = 0.0
+  - scheduler.config.num_retries_to_skip = None
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 
@@ -3143,6 +3349,9 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - scheduler.allowed_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>, <SessionTypes.BATCH: 'batch'>, <SessionTypes.INFERENCE: 'inference'>]
+  - scheduler.pending_timeout = 0.0
+  - scheduler.config.num_retries_to_skip = None
   - default_deployment_options: 무시함: 설치본이 정한 기본값이다
   - default_session_options: 무시함: 설치본이 정한 기본값이다
 

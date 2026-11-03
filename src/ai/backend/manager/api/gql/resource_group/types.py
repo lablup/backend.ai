@@ -19,6 +19,9 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     CreateResourceGroupInput as CreateResourceGroupInputDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_group.request import (
+    CreateResourceGroupSchedulerOptionsConfigInput as CreateResourceGroupSchedulerOptionsConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
     PartialBulkPurgeResourceGroupsInput as PartialBulkPurgeResourceGroupsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_group.request import (
@@ -63,6 +66,9 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     UpdateResourceGroupInput as UpdateResourceGroupInputDTO,
 )
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    UpdateResourceGroupSchedulerOptionsConfigInput as UpdateResourceGroupSchedulerOptionsConfigInputDTO,
+)
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     AllowedDomainsPayload as AllowedDomainsPayloadDTO,
 )
@@ -85,6 +91,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ResourceGroupMetadataInfo,
     ResourceGroupNetworkConfigInfo,
     ResourceGroupSchedulerConfigInfo,
+    ResourceGroupSchedulerOptionsConfigInfo,
     ResourceGroupStatusInfo,
     ResourceInfoNode,
     UpdateResourceGroupConfigPayloadNode,
@@ -97,7 +104,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ReplaceResourceGroupDefaultSessionOptionsPayload as ReplaceResourceGroupDefaultSessionOptionsPayloadDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
+from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
@@ -135,6 +142,7 @@ from ai.backend.manager.api.gql.session_options.types import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
+    "CreateResourceGroupSchedulerOptionsConfigInputGQL",
     "FairShareResourceGroupSpecGQL",
     "PreemptionConfigGQL",
     "PreemptionConfigInput",
@@ -148,6 +156,7 @@ __all__ = (
     "ResourceGroupOrderByGQL",
     "ResourceGroupOrderFieldGQL",
     "ResourceGroupSchedulerConfigGQL",
+    "ResourceGroupSchedulerOptionsConfigGQL",
     "ResourceGroupStatusGQL",
     "ResourceInfoGQL",
     "SchedulerTypeGQL",
@@ -155,6 +164,7 @@ __all__ = (
     "UpdateResourceGroupFairShareSpecPayload",
     "UpdateResourceGroupInput",
     "UpdateResourceGroupPayload",
+    "UpdateResourceGroupSchedulerOptionsConfigInputGQL",
 )
 
 
@@ -310,6 +320,22 @@ class ResourceGroupNetworkConfigGQL(PydanticOutputMixin[ResourceGroupNetworkConf
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="The config section of a resource group's scheduler options.",
+    ),
+    model=ResourceGroupSchedulerOptionsConfigInfo,
+    name="ResourceGroupSchedulerOptionsConfig",
+)
+class ResourceGroupSchedulerOptionsConfigGQL(
+    PydanticOutputMixin[ResourceGroupSchedulerOptionsConfigInfo]
+):
+    num_retries_to_skip: int | None = gql_field(
+        description="Number of scheduling retries before a pending session is skipped."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
         added_version="26.2.0", description="Scheduler configuration for a resource group."
     ),
     model=ResourceGroupSchedulerConfigInfo,
@@ -324,6 +350,26 @@ class ResourceGroupSchedulerConfigGQL(PydanticOutputMixin[ResourceGroupScheduler
     preemption: PreemptionConfigGQL = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.3.0", description="Preemption configuration for this resource group."
+        )
+    )
+    allowed_session_types: list[SessionTypes] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Session types that may be created in the resource group.",
+        )
+    )
+    pending_timeout: float = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Seconds a session may stay pending before it is cancelled (0 = no timeout)."
+            ),
+        )
+    )
+    config: ResourceGroupSchedulerOptionsConfigGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The config section of the scheduler options.",
         )
     )
 
@@ -799,6 +845,25 @@ class PreemptionConfigInput(PydanticInputMixin[PreemptionConfigInputDTO]):
     )
 
 
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating the config section of a resource group's scheduler options.",
+    ),
+    name="UpdateResourceGroupSchedulerOptionsConfigInput",
+)
+class UpdateResourceGroupSchedulerOptionsConfigInputGQL(
+    PydanticInputMixin[UpdateResourceGroupSchedulerOptionsConfigInputDTO]
+):
+    num_retries_to_skip: int | None = gql_field(
+        description=(
+            "Number of scheduling retries before a pending session is skipped."
+            " Omit to leave unchanged; null clears."
+        ),
+        default=UNSET,
+    )
+
+
 # Mutation Input/Payload types
 
 
@@ -917,6 +982,32 @@ class UpdateResourceGroupInput(PydanticInputMixin[UpdateResourceGroupConfigInput
         ),
         default=UNSET,
     )
+    allowed_session_types: list[SessionTypes] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Session types that may be created in the resource group. Omit to leave unchanged."
+            ),
+        ),
+        default=UNSET,
+    )
+    pending_timeout: float | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Seconds a session may stay pending before it is cancelled (0 = no timeout)."
+                " Omit to leave unchanged."
+            ),
+        ),
+        default=UNSET,
+    )
+    scheduler_config: UpdateResourceGroupSchedulerOptionsConfigInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The config section of the scheduler options. Omit to leave unchanged.",
+        ),
+        default=UNSET,
+    )
 
 
 @gql_pydantic_type(
@@ -981,6 +1072,23 @@ class UpdateResourceGroupV2InputGQL(PydanticInputMixin[UpdateResourceGroupInputD
             "Preemption configuration. When provided, replaces the entire preemption config."
             " Omit to leave unchanged."
         ),
+        default=UNSET,
+    )
+    allowed_session_types: list[SessionTypes] | None = gql_field(
+        description=(
+            "Session types that may be created in the resource group. Omit to leave unchanged."
+        ),
+        default=UNSET,
+    )
+    pending_timeout: float | None = gql_field(
+        description=(
+            "Seconds a session may stay pending before it is cancelled (0 = no timeout)."
+            " Omit to leave unchanged."
+        ),
+        default=UNSET,
+    )
+    scheduler_config: UpdateResourceGroupSchedulerOptionsConfigInputGQL | None = gql_field(
+        description="The config section of the scheduler options. Omit to leave unchanged.",
         default=UNSET,
     )
 
@@ -1058,6 +1166,22 @@ class PartialBulkResourceGroupsPayloadGQL(
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for the config section of a new resource group's scheduler options.",
+    ),
+    name="CreateResourceGroupSchedulerOptionsConfigInput",
+)
+class CreateResourceGroupSchedulerOptionsConfigInputGQL(
+    PydanticInputMixin[CreateResourceGroupSchedulerOptionsConfigInputDTO]
+):
+    num_retries_to_skip: int | None = gql_field(
+        description="Number of scheduling retries before a pending session is skipped.",
+        default=None,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
         description="Input for creating a new resource group.",
         added_version="26.4.2",
     ),
@@ -1076,6 +1200,54 @@ class CreateResourceGroupInputGQL(PydanticInputMixin[CreateResourceGroupInputDTO
             ),
         ),
         default=False,
+    )
+    is_active: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether the resource group is active.",
+        ),
+        default=True,
+    )
+    is_public: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether the resource group is public.",
+        ),
+        default=True,
+    )
+    scheduler_type: SchedulerTypeGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE).",
+        ),
+        default=SchedulerTypeGQL.FIFO,
+    )
+    allowed_session_types: list[SessionTypes] = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Session types that may be created in the resource group.",
+        ),
+        default_factory=lambda: [
+            SessionTypes.INTERACTIVE,
+            SessionTypes.BATCH,
+            SessionTypes.INFERENCE,
+        ],
+    )
+    pending_timeout: float = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Seconds a session may stay pending before it is cancelled (0 = no timeout)."
+            ),
+        ),
+        default=0.0,
+    )
+    scheduler_config: CreateResourceGroupSchedulerOptionsConfigInputGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The config section of the scheduler options.",
+        ),
+        default=None,
     )
 
 

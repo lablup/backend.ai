@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ResourceGroupMetadataInfo,
     ResourceGroupNetworkConfigInfo,
     ResourceGroupSchedulerConfigInfo,
+    ResourceGroupSchedulerOptionsConfigInfo,
     ResourceGroupStatusInfo,
     ResourceInfoNode,
 )
@@ -25,7 +26,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     PreemptionModeDTO,
     SchedulerTypeDTO,
 )
-from ai.backend.common.types import PreemptionOrder, SlotQuantity
+from ai.backend.common.types import PreemptionOrder, SessionTypes, SlotQuantity
 from ai.backend.manager.api.adapters.resource_group.adapter import (
     _normalize_quantity,
     _slot_quantities_to_resource_slot_info,
@@ -266,6 +267,9 @@ class TestResourceGroupGQLResourceInfoResolver:
                         mode=PreemptionModeDTO.TERMINATE,
                         preemption_min_runtime=0.0,
                     ),
+                    allowed_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
+                    pending_timeout=0.0,
+                    config=ResourceGroupSchedulerOptionsConfigInfo(num_retries_to_skip=None),
                 )
             ),
         )

@@ -16,6 +16,8 @@ from ai.backend.client.cli.v2.helpers import (
     parse_order_options,
     print_result,
 )
+from ai.backend.common.dto.manager.v2.resource_group.types import SchedulerTypeDTO
+from ai.backend.common.types import SessionTypes
 
 
 @click.group(name="resource-group")
@@ -127,9 +129,66 @@ def get(name: str) -> None:
     default=False,
     help="Make this the default resource group. Clear the current default first.",
 )
-def create(name: str, domain_name: str, description: str | None, is_default: bool) -> None:
+@click.option(
+    "--set-active/--unset-active",
+    "is_active",
+    default=True,
+    help="Whether the resource group accepts new sessions.",
+)
+@click.option(
+    "--set-public/--unset-public",
+    "is_public",
+    default=True,
+    help="Whether the resource group is visible to all users.",
+)
+@click.option(
+    "--scheduler-type",
+    type=click.Choice([scheduler_type.value for scheduler_type in SchedulerTypeDTO]),
+    default=SchedulerTypeDTO.FIFO.value,
+    help="Scheduler type.",
+)
+@click.option(
+    "--allowed-session-type",
+    "allowed_session_types",
+    multiple=True,
+    type=click.Choice([session_type.value for session_type in SessionTypes]),
+    default=(
+        SessionTypes.INTERACTIVE.value,
+        SessionTypes.BATCH.value,
+        SessionTypes.INFERENCE.value,
+    ),
+    show_default=True,
+    help="Session type that may be created in the resource group (repeatable).",
+)
+@click.option(
+    "--pending-timeout",
+    type=click.FloatRange(min=0),
+    default=0.0,
+    help="Seconds a session may stay pending before it is cancelled (0 = no timeout).",
+)
+@click.option(
+    "--num-retries-to-skip",
+    type=click.IntRange(min=0),
+    default=None,
+    help="Number of scheduling retries before a pending session is skipped.",
+)
+def create(
+    name: str,
+    domain_name: str,
+    description: str | None,
+    is_default: bool,
+    is_active: bool,
+    is_public: bool,
+    scheduler_type: str,
+    allowed_session_types: tuple[str, ...],
+    pending_timeout: float,
+    num_retries_to_skip: int | None,
+) -> None:
     """Create a new resource group (superadmin only)."""
-    from ai.backend.common.dto.manager.v2.resource_group.request import CreateResourceGroupInput
+    from ai.backend.common.dto.manager.v2.resource_group.request import (
+        CreateResourceGroupInput,
+        CreateResourceGroupSchedulerOptionsConfigInput,
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -140,6 +199,16 @@ def create(name: str, domain_name: str, description: str | None, is_default: boo
                     domain_name=domain_name,
                     description=description,
                     is_default=is_default,
+                    is_active=is_active,
+                    is_public=is_public,
+                    scheduler_type=SchedulerTypeDTO(scheduler_type),
+                    allowed_session_types=[
+                        SessionTypes(session_type) for session_type in allowed_session_types
+                    ],
+                    pending_timeout=pending_timeout,
+                    scheduler_config=CreateResourceGroupSchedulerOptionsConfigInput(
+                        num_retries_to_skip=num_retries_to_skip,
+                    ),
                 ),
             )
             print_result(result)
@@ -176,6 +245,31 @@ def create(name: str, domain_name: str, description: str | None, is_default: boo
     default=None,
     help="Make this the default resource group. Clear the current default first.",
 )
+@click.option(
+    "--allowed-session-type",
+    "allowed_session_types",
+    multiple=True,
+    type=click.Choice([session_type.value for session_type in SessionTypes]),
+    help="Replacement session type that may be created in the resource group (repeatable).",
+)
+@click.option(
+    "--pending-timeout",
+    type=click.FloatRange(min=0),
+    default=None,
+    help="Seconds a session may stay pending before it is cancelled (0 = no timeout).",
+)
+@click.option(
+    "--num-retries-to-skip",
+    type=click.IntRange(min=0),
+    default=None,
+    help="Number of scheduling retries before a pending session is skipped.",
+)
+@click.option(
+    "--set-null-num-retries-to-skip",
+    is_flag=True,
+    default=False,
+    help="Clear the number of retries. Mutually exclusive with --num-retries-to-skip.",
+)
 def update(
     name: str,
     description: str | None,
@@ -183,13 +277,22 @@ def update(
     is_active: bool | None,
     is_public: bool | None,
     is_default: bool | None,
+    allowed_session_types: tuple[str, ...],
+    pending_timeout: float | None,
+    num_retries_to_skip: int | None,
+    set_null_num_retries_to_skip: bool,
 ) -> None:
     """Update a resource group (superadmin only). Omitted options keep their current value."""
     from ai.backend.common.dto.manager.v2.resource_group.request import (
         UpdateResourceGroupConfigInput,
+        UpdateResourceGroupSchedulerOptionsConfigInput,
     )
+    from ai.backend.common.tristate.unset import UNSET
 
     description_value = nullable_option(description, set_null_description, option="description")
+    num_retries_to_skip_value = nullable_option(
+        num_retries_to_skip, set_null_num_retries_to_skip, option="num-retries-to-skip"
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -202,6 +305,15 @@ def update(
                     is_active=is_active,
                     is_public=is_public,
                     is_default=is_default,
+                    allowed_session_types=(
+                        [SessionTypes(session_type) for session_type in allowed_session_types]
+                        if allowed_session_types
+                        else UNSET
+                    ),
+                    pending_timeout=pending_timeout,
+                    scheduler_config=UpdateResourceGroupSchedulerOptionsConfigInput(
+                        num_retries_to_skip=num_retries_to_skip_value,
+                    ),
                 ),
             )
             print_result(result)

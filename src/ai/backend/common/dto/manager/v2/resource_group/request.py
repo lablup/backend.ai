@@ -5,7 +5,7 @@ Request DTOs for resource group DTO v2.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
 from pydantic import Field, field_validator
@@ -26,11 +26,12 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInput
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
-from ai.backend.common.types import PreemptionVictimScope
+from ai.backend.common.types import PreemptionVictimScope, SessionTypes
 
 __all__ = (
     "AdminSearchResourceGroupsInput",
     "CreateResourceGroupInput",
+    "CreateResourceGroupSchedulerOptionsConfigInput",
     "DeleteResourceGroupInput",
     "PartialBulkPurgeResourceGroupsInput",
     "PartialBulkUpdateResourceGroupItemInput",
@@ -51,7 +52,18 @@ __all__ = (
     "UpdateResourceGroupConfigInput",
     "UpdateResourceGroupFairShareSpecInput",
     "UpdateResourceGroupInput",
+    "UpdateResourceGroupSchedulerOptionsConfigInput",
 )
+
+
+class CreateResourceGroupSchedulerOptionsConfigInput(BaseRequestModel):
+    """Input for the ``config`` section of a new resource group's scheduler options."""
+
+    num_retries_to_skip: int | None = Field(
+        default=None,
+        ge=0,
+        description="Number of scheduling retries before a pending session is skipped.",
+    )
 
 
 class CreateResourceGroupInput(BaseRequestModel):
@@ -91,6 +103,35 @@ class CreateResourceGroupInput(BaseRequestModel):
             "Make this the default resource group. At most one resource group may hold the"
             " flag, so this is rejected while another one holds it; clear that one first."
         ),
+    )
+    is_active: bool = Field(
+        default=True,
+        description="Whether the resource group is active.",
+    )
+    is_public: bool = Field(
+        default=True,
+        description="Whether the resource group is public.",
+    )
+    scheduler_type: SchedulerTypeDTO = Field(
+        default=SchedulerTypeDTO.FIFO,
+        description="Scheduler type value (fifo/lifo/drf/fair-share).",
+    )
+    allowed_session_types: list[SessionTypes] = Field(
+        default_factory=lambda: [
+            SessionTypes.INTERACTIVE,
+            SessionTypes.BATCH,
+            SessionTypes.INFERENCE,
+        ],
+        description="Session types that may be created in the resource group.",
+    )
+    pending_timeout: float = Field(
+        default=0.0,
+        ge=0.0,
+        description=("Seconds a session may stay pending before it is cancelled (0 = no timeout)."),
+    )
+    scheduler_config: CreateResourceGroupSchedulerOptionsConfigInput | None = Field(
+        default=None,
+        description="The ``config`` section of the scheduler options.",
     )
 
     @field_validator("name", mode="before")
@@ -134,6 +175,18 @@ class PreemptionConfigInputDTO(BaseRequestModel):
         description=(
             "Scope preemption victims are drawn from (user/project/domain/resource-group). "
             "Default is user."
+        ),
+    )
+
+
+class UpdateResourceGroupSchedulerOptionsConfigInput(BaseRequestModel):
+    """Input for updating the ``config`` section of a resource group's scheduler options."""
+
+    num_retries_to_skip: Annotated[int, Field(ge=0)] | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Number of scheduling retries before a pending session is skipped."
+            " Omit to leave unchanged; null clears."
         ),
     )
 
@@ -202,6 +255,23 @@ class UpdateResourceGroupInput(BaseRequestModel):
     preemption: PreemptionConfigInputDTO | None | Unset = Field(
         default=UNSET,
         description="Preemption configuration. Omit to leave unchanged.",
+    )
+    allowed_session_types: list[SessionTypes] | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Session types that may be created in the resource group. Omit to leave unchanged."
+        ),
+    )
+    pending_timeout: Annotated[float, Field(ge=0.0)] | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Seconds a session may stay pending before it is cancelled (0 = no timeout)."
+            " Omit to leave unchanged."
+        ),
+    )
+    scheduler_config: UpdateResourceGroupSchedulerOptionsConfigInput | None | Unset = Field(
+        default=UNSET,
+        description="The ``config`` section of the scheduler options. Omit to leave unchanged.",
     )
 
 
@@ -392,6 +462,23 @@ class UpdateResourceGroupConfigInput(BaseRequestModel):
     preemption: PreemptionConfigInputDTO | None | Unset = Field(
         default=UNSET,
         description="Preemption configuration. Omit to leave unchanged.",
+    )
+    allowed_session_types: list[SessionTypes] | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Session types that may be created in the resource group. Omit to leave unchanged."
+        ),
+    )
+    pending_timeout: Annotated[float, Field(ge=0.0)] | None | Unset = Field(
+        default=UNSET,
+        description=(
+            "Seconds a session may stay pending before it is cancelled (0 = no timeout)."
+            " Omit to leave unchanged."
+        ),
+    )
+    scheduler_config: UpdateResourceGroupSchedulerOptionsConfigInput | None | Unset = Field(
+        default=UNSET,
+        description="The ``config`` section of the scheduler options. Omit to leave unchanged.",
     )
 
 
