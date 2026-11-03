@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import ConfigDict, Field, IPvAnyNetwork, model_validator
 
 from ai.backend.common.api_handlers import BaseFieldModel
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import SessionId
 
@@ -152,6 +153,11 @@ class IngressTargetGroup(BaseFieldModel):
 class IngressBackend(BaseFieldModel):
     id: IngressBackendID
     target_groups: list[IngressTargetGroup] = Field(min_length=1)
+    health_check: ModelHealthCheck | None = Field(
+        default=None,
+        description="Probe of the targets. Without one, or with it disabled, a worker probes "
+        "the TCP port of each target.",
+    )
 
 
 class IngressKey(BaseFieldModel):

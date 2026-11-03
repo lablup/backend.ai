@@ -503,6 +503,8 @@ class Circuit(SerializableCircuit):
                     ],
                 )
             ],
+            # TODO: Use the deployment's health check once the manager sends ingresses.
+            health_check=None,
         )
 
     def to_ingress_key(self, authority: IngressAuthority) -> IngressKey:

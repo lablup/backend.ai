@@ -50,7 +50,7 @@ class HTTPBackend(BaseBackend):
     connect failures are excluded from traffic. Connection-level errors
     observed while proxying real requests feed back into the pool via
     ``record_failure`` so that hot-path failures count toward the
-    failure threshold (the background TCP probe complements this).
+    failure threshold (the background probe complements this).
     """
 
     _pool: RoutePool

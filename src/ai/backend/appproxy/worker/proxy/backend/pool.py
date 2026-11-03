@@ -7,7 +7,10 @@ import random
 import time
 from dataclasses import dataclass
 
+import aiohttp
+
 from ai.backend.appproxy.common.errors import WorkerNotAvailable
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
     IngressBackend,
     IngressTarget,
@@ -24,6 +27,7 @@ class _TargetHealth:
 
     is_healthy: bool = True
     failure_count: int = 0
+    consecutive_http_probe_failures: int = 0
     unhealthy_since: float | None = None
 
 
@@ -41,9 +45,9 @@ class RoutePool:
     """Health-checked targets of an Ingress backend.
 
     Selection picks a target group by weight among the groups with a healthy target, then a
-    healthy target of that group evenly. TCP connect probes run in the background and flip
-    targets between healthy and unhealthy; a target that stays unreachable for
-    ``recovery_timeout`` is evicted.
+    healthy target of that group evenly. Probes run in the background and flip targets between
+    healthy and unhealthy: an HTTP GET by the Ingress backend's health check when it is enabled,
+    a TCP connect otherwise. A target that stays unhealthy for ``recovery_timeout`` is evicted.
 
     :meth:`update` applies a new Ingress backend:
 
@@ -172,13 +176,25 @@ class RoutePool:
     async def _health_check_loop(self) -> None:
         try:
             while True:
-                await asyncio.sleep(self._spec.health_check_interval)
+                await asyncio.sleep(self._probe_interval())
                 try:
                     await self._probe_all_targets()
                 except Exception:
                     log.exception("target health check failed")
         except asyncio.CancelledError:
             raise
+
+    def _enabled_http_health_check(self) -> ModelHealthCheck | None:
+        health_check = self._ingress_backend.health_check
+        if health_check is None or not health_check.enable:
+            return None
+        return health_check
+
+    def _probe_interval(self) -> float:
+        http_health_check = self._enabled_http_health_check()
+        if http_health_check is None:
+            return self._spec.health_check_interval
+        return http_health_check.interval
 
     async def _probe_all_targets(self) -> None:
         async with self._lock:
@@ -187,22 +203,55 @@ class RoutePool:
                 for target in self._targets_of(self._ingress_backend)
                 if (health := self._health_by_target_id.get(target.id)) is not None
             ]
+            http_health_check = self._enabled_http_health_check()
         if not targets_with_health:
             return
         await asyncio.gather(
-            *(self._probe_target(target, health) for target, health in targets_with_health),
+            *(
+                self._probe_target(target, health, http_health_check)
+                for target, health in targets_with_health
+            ),
             return_exceptions=True,
         )
 
-    async def _probe_target(self, target: IngressTarget, health: _TargetHealth) -> None:
-        ok = await self._tcp_probe(target.host, target.port)
-        if ok:
-            if not health.is_healthy:
-                log.debug("target recovered", target_id=target.id)
-            health.is_healthy = True
-            health.failure_count = 0
-            health.unhealthy_since = None
-            return
+    async def _probe_target(
+        self,
+        target: IngressTarget,
+        health: _TargetHealth,
+        http_health_check: ModelHealthCheck | None,
+    ) -> None:
+        if http_health_check is None:
+            await self._probe_by_tcp_connect(target, health)
+        else:
+            await self._probe_by_http_get(target, health, http_health_check)
+
+    async def _probe_by_tcp_connect(self, target: IngressTarget, health: _TargetHealth) -> None:
+        if await self._tcp_connect_succeeds(target.host, target.port):
+            self._mark_healthy_by_probe(target, health)
+        else:
+            await self._mark_unhealthy_by_probe_or_evict(target, health)
+
+    async def _probe_by_http_get(
+        self, target: IngressTarget, health: _TargetHealth, health_check: ModelHealthCheck
+    ) -> None:
+        if await self._http_get_returns_expected_status(target, health_check):
+            self._mark_healthy_by_probe(target, health)
+        else:
+            health.consecutive_http_probe_failures += 1
+            if health_check.is_retry_exhausted(health.consecutive_http_probe_failures):
+                await self._mark_unhealthy_by_probe_or_evict(target, health)
+
+    def _mark_healthy_by_probe(self, target: IngressTarget, health: _TargetHealth) -> None:
+        if not health.is_healthy:
+            log.debug("target recovered", target_id=target.id)
+        health.is_healthy = True
+        health.failure_count = 0
+        health.consecutive_http_probe_failures = 0
+        health.unhealthy_since = None
+
+    async def _mark_unhealthy_by_probe_or_evict(
+        self, target: IngressTarget, health: _TargetHealth
+    ) -> None:
         if health.is_healthy:
             log.warning("target marked unhealthy by the health check", target_id=target.id)
         health.is_healthy = False
@@ -216,12 +265,26 @@ class RoutePool:
                 if self._health_by_target_id.get(target.id) is health:
                     del self._health_by_target_id[target.id]
                     log.warning(
-                        "unreachable target evicted",
+                        "unhealthy target evicted",
                         target_id=target.id,
                         recovery_timeout_sec=self._spec.recovery_timeout,
                     )
 
-    async def _tcp_probe(self, host: str, port: int) -> bool:
+    @staticmethod
+    async def _http_get_returns_expected_status(
+        target: IngressTarget, health_check: ModelHealthCheck
+    ) -> bool:
+        url = f"http://{target.host}:{target.port}{health_check.path}"
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    url, timeout=aiohttp.ClientTimeout(total=health_check.max_wait_time)
+                ) as response:
+                    return response.status == health_check.expected_status_code
+        except (aiohttp.ClientError, TimeoutError):
+            return False
+
+    async def _tcp_connect_succeeds(self, host: str, port: int) -> bool:
         try:
             _reader, writer = await asyncio.wait_for(
                 asyncio.open_connection(host=host, port=port),
