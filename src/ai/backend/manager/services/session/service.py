@@ -5,7 +5,7 @@ import logging
 import secrets
 import uuid
 from collections.abc import Mapping, MutableMapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from typing import Any, cast
 from urllib.parse import urlparse
@@ -1429,13 +1429,11 @@ class SessionService:
         session_id = action.session_id
         session_name = action.updater.name.optional_value()
 
-        session_row = await self._session_repository.update_session(action.updater, session_name)
-        if session_row is None:
-            raise ValueError(f"Session not found (id:{session_id})")
+        session_data = await self._session_repository.update_session(action.updater, session_name)
         session_owner_data = await self._session_repository.get_session_owner(str(session_id))
 
         return UpdateSessionActionResult(
-            session_data=session_row.to_dataclass(owner=session_owner_data)
+            session_data=replace(session_data, owner=session_owner_data)
         )
 
     async def bulk_get_session_designated_agent_ids(

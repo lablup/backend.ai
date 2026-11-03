@@ -219,7 +219,7 @@ class SessionRepository:
         self,
         updater: SessionUpdater,
         session_name: str | None = None,
-    ) -> SessionRow | None:
+    ) -> SessionData:
         return await self._db_source.update_session(updater, session_name)
 
     @session_repository_resilience.apply()

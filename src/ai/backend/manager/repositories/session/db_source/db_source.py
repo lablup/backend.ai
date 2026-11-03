@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import datetime
 from typing import Any, cast
 
@@ -48,6 +49,7 @@ from ai.backend.manager.models.image.searchers import (
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
+from ai.backend.manager.models.kernel.updaters import KernelSessionNameBatchUpdater
 from ai.backend.manager.models.project.row import groups
 from ai.backend.manager.models.resource_group.row import resource_groups
 from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
@@ -68,7 +70,6 @@ from ai.backend.manager.models.user.searchable_fields import UserSearchableField
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
-from ai.backend.manager.repositories.ops.v2.session.provider import SessionOpsProvider
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
 from ai.backend.manager.utils import query_userinfo
 
@@ -76,12 +77,10 @@ from ai.backend.manager.utils import query_userinfo
 class SessionDBSource:
     _db: ExtendedAsyncSAEngine
     _ops_provider: V2DBOpsProvider
-    _session_ops_provider: SessionOpsProvider
 
     def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: V2DBOpsProvider) -> None:
         self._db = db
         self._ops_provider = ops_provider
-        self._session_ops_provider = SessionOpsProvider(db)
 
     async def resolve_session_id(
         self,
@@ -439,20 +438,31 @@ class SessionDBSource:
         self,
         updater: SessionUpdater,
         session_name: str | None = None,
-    ) -> SessionRow | None:
+    ) -> SessionData:
         session_id = updater.session_id
-
-        async with self._session_ops_provider.write_ops() as w:
-            session_row = await w.session_row(session_id)
-            if session_row is None:
+        session_fields = SessionSearchableFields.own
+        kernel_fields = KernelSearchableFields.own
+        async with self._ops_provider.write_ops() as w:
+            found = await w.search_in_global(
+                SessionSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        session_fields.id.filter.equals(
+                            UUIDEqualMatchSpec(value=session_id, negated=False)
+                        )
+                    ],
+                )
+            )
+            if not found.items:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
+            access_key = found.items[0].access_key
 
-            if session_name and session_row.access_key is not None:
+            if session_name and access_key is not None:
                 # Check the owner of the target session has any session with the same name
                 matches = await self._match_sessions(
                     w,
                     session_name,
-                    AccessKey(session_row.access_key),
+                    access_key,
                     allow_stale=False,
                 )
                 if len(matches) > 1:
@@ -479,9 +489,30 @@ class SessionDBSource:
                 raise SessionNotFound(f"Session not found (id:{session_id})")
 
             if session_name:
-                await w.rename_kernels(session_id, session_name)
+                await w.batch_update_in_global(
+                    KernelSessionNameBatchUpdater(session_id=session_id, session_name=session_name)
+                )
 
-            return await w.session_row_with_kernels(session_id)
+            main_kernels = (
+                await w.search_in_global(
+                    KernelSearcher(
+                        pagination=NoPagination(),
+                        conditions=[
+                            kernel_fields.session_id.filter.equals(
+                                UUIDEqualMatchSpec(value=session_id, negated=False)
+                            ),
+                            kernel_fields.cluster_role.filter.equals(
+                                StringMatchSpec(DEFAULT_ROLE, case_insensitive=False, negated=False)
+                            ),
+                        ],
+                    )
+                )
+            ).items
+        service_ports = main_kernels[0].network.service_ports if main_kernels else None
+        return replace(
+            updated.to_session_data(),
+            service_ports=str(service_ports) if service_ports else None,
+        )
 
     async def query_userinfo(
         self,
