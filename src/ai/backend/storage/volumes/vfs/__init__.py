@@ -23,6 +23,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.errors import (
     InvalidAPIParameters,
     InvalidQuotaScopeError,
+    InvalidSubpathError,
     MetadataTooLargeError,
     ProcessExecutionError,
     QuotaDirectoryNotEmptyError,
@@ -46,7 +47,11 @@ from ai.backend.storage.types import (
     VFolderID,
     VolumeInfo,
 )
-from ai.backend.storage.utils import fstime2datetime
+from ai.backend.storage.utils import (
+    NOFOLLOW_REFUSED_ERRNOS,
+    fstime2datetime,
+    open_dir_nofollow,
+)
 from ai.backend.storage.volumes.abc import (
     _CURRENT_DIR,
     CAP_VFOLDER,
@@ -634,9 +639,24 @@ class BaseVolume(AbstractVolume):
 
         def _create_target() -> None:
             upload_base_path = vfpath / ".upload"
-            upload_base_path.mkdir(exist_ok=True)
-            upload_target_path = upload_base_path / session_id
-            upload_target_path.touch()
+            try:
+                upload_base_path.mkdir()
+            except FileExistsError:
+                pass
+            try:
+                with open_dir_nofollow(upload_base_path) as dir_fd:
+                    os.close(
+                        os.open(
+                            session_id,
+                            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                            0o666,
+                            dir_fd=dir_fd,
+                        )
+                    )
+            except OSError as e:
+                if e.errno in NOFOLLOW_REFUSED_ERRNOS:
+                    raise InvalidSubpathError(vfid, PurePosixPath(".upload")) from e
+                raise
 
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, _create_target)

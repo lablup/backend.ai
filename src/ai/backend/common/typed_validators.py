@@ -4,7 +4,7 @@ import os
 import pwd
 from collections.abc import Mapping, Sequence
 from datetime import tzinfo
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Annotated, Any, ClassVar, Final, TypeVar
 
 import jwt
@@ -206,6 +206,23 @@ def _vfolder_name_validator(name: str) -> str:
 
 
 VFolderName = Annotated[str, AfterValidator(_vfolder_name_validator)]
+
+
+def _vfolder_relative_path_validator(path: str) -> str:
+    pure_path = PurePosixPath(path)
+    if pure_path.is_absolute():
+        raise AssertionError(f"The path must be relative to the VFolder: {path}")
+    depth = 0
+    for part in pure_path.parts:
+        depth += -1 if part == ".." else 1
+        if depth < 0:
+            raise AssertionError(f"The path must stay inside the VFolder: {path}")
+    if depth == 0:
+        raise AssertionError(f"The path must point to an entry inside the VFolder: {path}")
+    return path
+
+
+VFolderRelativePath = Annotated[str, AfterValidator(_vfolder_relative_path_validator)]
 
 
 class HostPortPair(BackendAISchema):

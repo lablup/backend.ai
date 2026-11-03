@@ -4,6 +4,8 @@ Configuration-related exceptions for the coordinator.
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
