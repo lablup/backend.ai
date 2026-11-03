@@ -222,6 +222,47 @@ class TestDeploymentDesignatedAgents:
                 DeploymentID(uuid.uuid4()), set(agent_uuids[:agent_count])
             )
 
+    async def test_only_the_agents_of_the_resource_group_are_found(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        repository: DeploymentRepository,
+        resource_group: ResourceGroupRow,
+        agent_uuids: list[AgentUUID],
+    ) -> None:
+        other_group = ResourceGroupRow(
+            id=ResourceGroupID(uuid.uuid4()),
+            name=f"rg-{uuid.uuid4().hex[:8]}",
+            driver="static",
+            scheduler="fifo",
+            scheduler_opts=ResourceGroupOpts(),
+        )
+        outside = AgentUUID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(other_group)
+            await db_sess.flush()
+            db_sess.add(
+                AgentRow(
+                    id=AgentId(f"i-{outside.hex[:12]}"),
+                    uuid=outside,
+                    status=AgentStatus.ALIVE,
+                    status_changed=datetime.now(UTC),
+                    region="local",
+                    scaling_group=other_group.name,
+                    resource_group_id=other_group.id,
+                    schedulable=True,
+                    addr="127.0.0.1:2001",
+                    architecture="x86_64",
+                    version="26.10.0",
+                )
+            )
+        unknown = AgentUUID(uuid.uuid4())
+
+        found = await repository.fetch_agents_in_resource_group(
+            resource_group.name, {agent_uuids[0], outside, unknown}
+        )
+
+        assert found == {agent_uuids[0]}
+
     async def test_fetching_many_groups_by_deployment_with_an_empty_list_for_none(
         self,
         repository: DeploymentRepository,

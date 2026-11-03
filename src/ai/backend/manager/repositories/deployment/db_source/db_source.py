@@ -32,7 +32,11 @@ from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import (
+    StringMatchSpec,
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
@@ -125,6 +129,8 @@ from ai.backend.manager.errors.service import (
 )
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
+from ai.backend.manager.models.agent.searchers import AgentSearcher
 from ai.backend.manager.models.deployment_designated_agent.row import (
     DeploymentDesignatedAgentRow,
 )
@@ -2816,6 +2822,32 @@ class DeploymentDBSource:
                         for agent_uuid in agent_uuids
                     ],
                 )
+
+    async def fetch_agents_in_resource_group(
+        self,
+        resource_group: str,
+        agent_uuids: Collection[AgentUUID],
+    ) -> set[AgentUUID]:
+        """Return those of ``agent_uuids`` that belong to ``resource_group``."""
+        if not agent_uuids:
+            return set()
+        async with self._reconcile_ops.read_ops() as r:
+            agents = await r.search_in_global(
+                AgentSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        AgentSearchableFields.own.uuid.filter.in_(
+                            UUIDInMatchSpec(values=list(agent_uuids), negated=False)
+                        ),
+                        AgentSearchableFields.own.resource_group.filter.equals(
+                            StringMatchSpec(
+                                value=resource_group, case_insensitive=False, negated=False
+                            )
+                        ),
+                    ],
+                )
+            )
+        return {agent.uuid for agent in agents.items}
 
     async def fetch_designated_agents_by_deployment_ids(
         self,
