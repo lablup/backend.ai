@@ -56,13 +56,35 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
     )
     name: str = gql_field(description="Role preset name.")
     scope_type: str = gql_field(
-        description="Scope type this preset targets (e.g., domain, project)."
+        description=(
+            "Scope type this preset targets (e.g., domain, project). A preset of the "
+            "`global` type reads as the global entity its role is created in: `global` or "
+            "`public`."
+        )
+    )
+    role_name_template: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Jinja template rendering the name of each role instantiated from this preset."
+            ),
+        ),
+        default=None,
     )
     auto_assign: bool = gql_field(
         description=(
             "Default value for the `auto_assign` flag copied onto roles instantiated "
             "from this preset."
         )
+    )
+    auto_assign_to_owner: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Whether a personal project's owner is mapped to the role made from this preset. "
+                "Allowed only on a project preset."
+            ),
+        ),
     )
     deleted: bool = gql_field(
         description=(

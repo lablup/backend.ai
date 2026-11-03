@@ -36,7 +36,7 @@ class TheDomainNode(Then[ADomainAndACaller, DomainNode]):
 2. `given` writes its rows in one transaction and returns the written values. That write closes before `when`
    starts, because the adapter reads over its own connection.
 3. `when` calls with only that value and the adapter.
-4. `then` takes what was seeded and the response or exception, and returns what it saw for each place.
+4. `then` takes what was seeded and the response or exception, and returns what it saw for each field.
 
 ## Where things are
 
@@ -47,10 +47,10 @@ class TheDomainNode(Then[ADomainAndACaller, DomainNode]):
 | `bai_scenario/components/` | Vocabulary the tables use: scenario types, common groups |
 | `bai_scenario/runner/` | Scenario execution and checks, seeding with fixtures |
 | `bai_scenario/setup/` | Tests that check what the shared setup creates |
-| `bai_scenario/fakes/` | Stand-ins for external services |
+| `bai_scenario/fakes/` | Mocks for external services |
 | `bai_scenario/{db,schema,config,valkey,monitors}.py` | What one run needs |
 
-Add a package only for what will grow. Keep what fits in one file flat, like the modules above.
+Add a package only for content that will grow. Keep flat what fits in one file, as the modules above do.
 
 ## How to run
 
@@ -67,8 +67,8 @@ BACKEND_SCENARIO_LOG=dist/scenarios.jsonl pants test tests/scenario::
 python scripts/scenario-report.py dist/scenarios.jsonl -o dist/scenarios.md
 ```
 
-`--split` writes a `report.md` per entity package. `--verify` reports only whether that file disagrees with the
-run and does not overwrite it.
+`--split` writes `report.md` (English) and `report.ko.md` (Korean) per entity package. `--verify` reports
+only whether either file disagrees with the run, without overwriting them.
 
 ```bash
 python scripts/scenario-report.py dist/scenarios.jsonl --split src/ai/backend/manager/api/adapters
@@ -84,8 +84,8 @@ There are three formats.
 | `summary` | Counts only. One line of build log |
 
 A row looks like this. Only the first sentence is written by a person, and the three parts below it come from the
-run. Rows seeded in a group are indented under that group. Report text is still Korean; this example shows it in
-English.
+run. Rows seeded within another seed are indented under it. Report sentences are still Korean; this example
+shows them in English.
 
 ```markdown
 #### a-user-granted-folder-create-makes-one-of-their-own — pass
@@ -100,7 +100,7 @@ Given
     - Project policy default, the personal project created with the user finds it by this name
     - User policy user-policy-1, up to 10 vfolders per user
     - Keypair policy keypair-policy-1, up to 5 concurrent sessions, vfolders can be placed on local:volume1
-    - Regular user user-1, in domain home-1, with their own key and personal project  ← actor
+    - Regular user user-1, in domain home-1, with their own key and personal project  ← requesting user
   - Role folder-owner-1, valid only within the scope of regular user user-1
   - Role folder-owner-1: CREATE allowed on all vfolders
   - Regular user user-1: holds role folder-owner-1
@@ -117,4 +117,5 @@ Then
 
 The report also lists the calls an adapter provides that no scenario calls.
 
-The `describe` sentences are Korean drafts. They move to English after they pass review.
+The `describe` sentences are Korean drafts. They move to English once they pass review; the English report
+keeps the Korean sentences until then.

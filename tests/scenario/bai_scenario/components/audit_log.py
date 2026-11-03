@@ -831,7 +831,7 @@ type Loaded = list[AuditLogNode | Exception | None]
 
 @dataclass(frozen=True)
 class TheSlotsInOrder(Then[RecordsToLoad, Loaded]):
-    """Each id is answered in the order named: its node whole, a refusal, or a gap for an
+    """Each id is answered in the order named: its node whole, a rejection, or a gap for an
     id nothing answers to. A slot names which — ``first``, ``second``, ``refused``, ``gap``."""
 
     slots: tuple[str, ...]

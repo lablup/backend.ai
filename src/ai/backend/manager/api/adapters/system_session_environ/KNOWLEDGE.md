@@ -1,7 +1,7 @@
 ---
 name: system-session-environ-adapter-scenarios
 type: reference
-description: what the system session environ adapter guarantees, as scenarios; superadmin search of every row at every scope with filters, the default order and pages, the monitor role passing the search, the search within named public, domain and project scopes, the value source list any logged-in user reads and a call without login is refused, the create at a scope by its admins and its refusals, the update of the key by the scope's admins and its refusal on a deleted row, the soft delete, the restore and the purge by the scope's admins, the read by ids checked per row against the domain and project admin grants, the domain and project members refused
+description: what the system session environ adapter guarantees; rows are created in a public, domain or project scope, the global search is protected by the superadmin role check and lets the monitor role read, the value source list any logged-in user reads, the update and delete rules, and the per-row permission checks when reading several rows by id with different responses for unknown ids
 scope: src/ai/backend/manager/api/adapters/system_session_environ
 keywords: [system session environ, scenario, adapter, superadmin, monitor, global_search, scoped_search, public_list_value_sources, create, update, delete, restore, purge, bulk_get_ids, partial bulk]
 generated:
@@ -12,151 +12,44 @@ updated:
   at: 2026-10-30
 status: draft
 ---
-# 시스템 세션 환경변수 어댑터 — 시나리오
+# System session environ adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 것과 실행 결과가 어긋나면 문장을 먼저
-의심한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-시스템 세션 환경변수 행은 public 스코프, 도메인 스코프, 프로젝트 스코프 중 하나에 만들어진다.
-이 어댑터는 모든 행을 검색하는 호출, 지정한 스코프 안에서 검색하는 호출, 값 출처 목록을 읽는 호출,
-행을 만드는 호출, 행의 키를 바꾸는 호출, 행을 삭제하고 복원하는 호출, 행을 영구 삭제하는 호출,
-id로 여러 행을 읽는 호출을 제공한다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-검색은 전역 superadmin 역할 검사로 보호된다. 세션에 실제로 주입되는 행을 고르지 않고, 스코프와
-삭제 여부에 상관없이 조건에 맞는 행을 모두 반환한다.
+A system session environ row is created in one of the public, domain, or project scopes. This adapter provides the call that searches every row, the call that searches within a specified scope, the call that reads the value source list, the call that creates a row, the call that changes the key of a row, the calls that delete and restore a row, the call that purges a row, and the call that reads several rows by id.
 
-id로 여러 행을 읽을 때는 행마다 권한을 검사한다. 모든 사용자는 public 스코프의 행을 읽을 수 있고,
-도메인과 프로젝트의 관리자는 그 도메인과 프로젝트의 행을 읽을 수 있다. 관리자가 아닌 구성원은 도메인과
-프로젝트의 행을 읽을 수 없다.
+The search is protected by the global superadmin role check. It does not select the rows actually injected into a session and returns every row that matches the condition, regardless of scope and deletion.
 
-## 전체 검색
+Reading several rows by id checks permission per row. Every user can read the rows of the public scope, and the administrators of a domain and of a project can read the rows of that domain and project. A member who is not an administrator cannot read the rows of the domain and project.
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| superadmin이 모든 행을 검색한다 | public 스코프, 한 도메인, 한 프로젝트에 같은 키의 행을 하나씩 미리 만들어 둠. 프로젝트의 행은 삭제되어 있음. superadmin | 조건 없이 검색 | public 스코프, 도메인, 프로젝트의 행이 모두 반환된다. 삭제된 프로젝트의 행도 반환된다 |
-| 모니터 역할이 검색한다 | "superadmin이 모든 행을 검색한다"와 같은 행, 모니터 역할 | 조건 없이 검색 | superadmin과 같은 응답 |
-| superadmin이 아닌 사용자가 검색한다 | "superadmin이 모든 행을 검색한다"와 같은 행, 그 프로젝트의 구성원 | 조건 없이 검색 | 역할 부족으로 거부 |
-| 스코프 종류와 스코프 id로 검색한다 | "superadmin이 모든 행을 검색한다"와 같은 행, superadmin | 도메인 스코프와 그 도메인의 id를 지정해 검색 | 그 도메인의 행만 반환된다 |
-| 삭제된 행만 검색한다 | "superadmin이 모든 행을 검색한다"와 같은 행, superadmin | 삭제된 행으로 지정해 검색 | 프로젝트의 행만 반환된다 |
-| 키의 일부로 검색한다 | 키가 서로 다른 행 여럿, superadmin | 키에 포함된 문자열을 지정해 검색 | 그 문자열을 키에 포함한 행만 반환된다 |
-| 값 출처로 검색한다 | 값 출처가 서로 다른 행 여럿, superadmin | 값 출처 하나를 지정해 검색 | 그 값 출처의 행만 반환된다 |
-| 없는 값 출처로 검색한다 | superadmin | 매니저가 제공하지 않는 값 출처 이름을 지정해 검색 | 알 수 없는 값 출처로 거부 |
-| 정렬을 지정하지 않는다 | 키가 서로 다른 행 여럿, superadmin | 조건 없이 검색 | 키의 오름차순으로 반환된다 |
-| 개수를 지정해 나누어 검색한다 | 행 3개, superadmin | 2개씩 검색한 뒤 다음 페이지를 검색 | 첫 페이지에 2개와 다음 페이지가 있다는 표시, 다음 페이지에 나머지 1개. 전체 개수는 첫 페이지와 다음 페이지 모두 3 |
+## Unscoped search
 
-모니터 역할은 전역 superadmin 역할 검사에서 읽기만 통과한다. REST handler와 GQL resolver는
-어댑터를 부르기 전에 superadmin만 통과시키므로, 모니터 역할의 검색은 어댑터를 직접 부를 때만
-통과한다.
+The monitor role passes the global superadmin role check for reads only. The REST handler and GQL resolver pass only superadmin before calling the adapter, so the search of the monitor role passes only when the adapter is called directly.
 
-## 스코프 안에서 검색
+## Search within a scope
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 프로젝트 관리자가 자기 프로젝트의 행을 검색한다 | public 스코프, 한 도메인, 그 도메인의 한 프로젝트에 행을 하나씩 미리 만들어 둠. 프로젝트의 행은 삭제되어 있음. 그 프로젝트의 관리자 | 그 프로젝트를 스코프로 지정해 검색 | 프로젝트의 행만 반환된다. 삭제된 행도 반환된다 |
-| 프로젝트 구성원이 자기 프로젝트의 행을 검색한다 | "프로젝트 관리자가 자기 프로젝트의 행을 검색한다"와 같은 행, 관리자가 아닌 그 프로젝트의 구성원 | 그 프로젝트를 스코프로 지정해 검색 | 권한 부족으로 거부 |
-| 프로젝트 관리자가 다른 프로젝트의 행을 검색한다 | 두 프로젝트에 행을 하나씩 미리 만들어 둠, 한 프로젝트의 관리자 | 다른 프로젝트를 스코프로 지정해 검색 | 권한 부족으로 거부 |
-| 도메인 관리자가 자기 도메인의 행을 검색한다 | "프로젝트 관리자가 자기 프로젝트의 행을 검색한다"와 같은 행, 그 도메인의 관리자 | 그 도메인을 스코프로 지정해 검색 | 도메인의 행만 반환된다. 그 도메인에 속한 프로젝트의 행은 반환되지 않는다 |
-| 도메인 구성원이 자기 도메인의 행을 검색한다 | "프로젝트 관리자가 자기 프로젝트의 행을 검색한다"와 같은 행, 관리자가 아닌 그 도메인의 구성원 | 그 도메인을 스코프로 지정해 검색 | 권한 부족으로 거부 |
-| 도메인 구성원이 구성원이 아닌 프로젝트의 행을 검색한다 | "프로젝트 관리자가 자기 프로젝트의 행을 검색한다"와 같은 행, 관리자가 아니고 그 프로젝트의 구성원도 아닌 그 도메인의 구성원 | 그 프로젝트를 스코프로 지정해 검색 | 권한 부족으로 거부 |
-| 도메인 관리자가 다른 도메인의 행을 검색한다 | 두 도메인에 행을 하나씩 미리 만들어 둠, 한 도메인의 관리자 | 다른 도메인을 스코프로 지정해 검색 | 권한 부족으로 거부 |
-| 도메인과 프로젝트의 권한이 없는 사용자가 public 스코프의 행을 검색한다 | "프로젝트 관리자가 자기 프로젝트의 행을 검색한다"와 같은 행, 어느 도메인과 프로젝트의 읽기 권한도 받지 않은 사용자 | public 스코프를 지정해 검색 | public 스코프의 행만 반환된다 |
-| 여러 스코프를 함께 지정한다 | "프로젝트 관리자가 자기 프로젝트의 행을 검색한다"와 같은 행, 그 프로젝트의 관리자 | public 스코프와 그 프로젝트를 함께 지정해 검색 | public 스코프의 행과 프로젝트의 행이 반환된다 |
-| 읽을 수 없는 스코프를 하나 섞어 지정한다 | 두 프로젝트에 행을 하나씩 미리 만들어 둠, 한 프로젝트의 관리자 | 자기 프로젝트와 다른 프로젝트를 함께 지정해 검색 | 호출 전체가 권한 부족으로 거부 |
-| 스코프를 하나도 지정하지 않는다 | superadmin | 스코프 없이 검색 | 입력 검증에서 거부 |
+## Value source list
 
-## 값 출처 목록
+A value source is a list the manager provides, not a row, so the call checks only whether the caller is signed in and returns the list. The value source of a row is returned as a name in this list, and a search condition uses this name too.
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 일반 사용자가 값 출처 목록을 읽는다 | 어느 도메인과 프로젝트의 권한도 받지 않은 사용자 | 값 출처 목록을 조회 | 매니저가 제공하는 값 출처의 이름이 모두 반환된다 |
-| 로그인하지 않은 호출이 값 출처 목록을 읽는다 | 로그인한 사용자 없음 | 값 출처 목록을 조회 | 로그인하지 않은 호출로 거부 |
+## Create
 
-값 출처는 행이 아니라 매니저가 제공하는 목록이므로 로그인 여부만 확인하고 반환된다. 행의 값 출처는 이 목록의
-이름으로 반환되고, 검색 조건에도 이 이름을 쓴다.
+## Update
 
-## 생성
+The scope and the value source cannot be changed. Within one scope, keys cannot collide, including deleted rows.
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 프로젝트 관리자가 자기 프로젝트에 행을 만든다 | 한 프로젝트의 관리자 | 그 프로젝트 스코프에 키와 값 출처를 지정해 생성 | 그 프로젝트 스코프의 행이 반환되고, 그 프로젝트의 관리자가 id로 읽을 수 있다 |
-| 프로젝트 구성원이 자기 프로젝트에 행을 만든다 | 관리자가 아닌 한 프로젝트의 구성원 | 그 프로젝트 스코프에 생성 | 권한 부족으로 거부 |
-| 도메인 관리자가 자기 도메인에 행을 만든다 | 한 도메인의 관리자 | 그 도메인 스코프에 생성 | 그 도메인 스코프의 행이 반환된다 |
-| 도메인 관리자가 다른 도메인에 행을 만든다 | 두 도메인, 한 도메인의 관리자 | 다른 도메인 스코프에 생성 | 권한 부족으로 거부 |
-| superadmin이 public 스코프에 행을 만든다 | superadmin | 스코프 id 없이 public 스코프에 생성 | public 스코프의 행이 반환된다 |
-| 같은 스코프에 이미 있는 키로 만든다 | 한 프로젝트에 행 하나를 미리 만들어 둠, superadmin | 그 프로젝트 스코프에 같은 키로 생성 | 키 충돌로 거부 |
-| 같은 스코프의 삭제된 행의 키로 만든다 | 한 프로젝트에 삭제된 행 하나를 미리 만들어 둠, superadmin | 그 프로젝트 스코프에 같은 키로 생성 | 키 충돌로 거부 |
-| 다른 스코프에 있는 키로 만든다 | public 스코프에 행 하나를 미리 만들어 둠, superadmin | 한 프로젝트 스코프에 같은 키로 생성 | 그 프로젝트 스코프의 행이 반환된다 |
-| 환경변수 이름이 아닌 키로 만든다 | superadmin | 숫자로 시작하는 키로 생성 | 요청 검증에서 거부 |
-| 없는 값 출처로 만든다 | superadmin | 매니저가 제공하지 않는 값 출처 이름으로 생성 | 알 수 없는 값 출처로 거부 |
-| public 스코프에 스코프 id를 지정한다 | superadmin | public 스코프와 스코프 id를 함께 지정해 생성 | 요청 검증에서 거부 |
-| 도메인 스코프에 스코프 id를 지정하지 않는다 | superadmin | 도메인 스코프에 스코프 id 없이 생성 | 요청 검증에서 거부 |
-| 없는 도메인에 만든다 | superadmin | 어느 도메인의 것도 아닌 id로 도메인 스코프에 생성 | 도메인 없음으로 거부 |
-| 없는 프로젝트에 만든다 | superadmin | 어느 프로젝트의 것도 아닌 id로 프로젝트 스코프에 생성 | 프로젝트 없음으로 거부 |
+## Delete
 
-## 수정
+A deleted row is not injected into sessions that start afterwards.
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 프로젝트 관리자가 자기 프로젝트의 행의 키를 바꾼다 | 한 프로젝트에 행 하나를 미리 만들어 둠, 그 프로젝트의 관리자 | 새 키를 지정해 수정 | 키가 바뀐 행이 반환된다 |
-| 프로젝트 구성원이 자기 프로젝트의 행의 키를 바꾼다 | 한 프로젝트에 행 하나를 미리 만들어 둠, 관리자가 아닌 그 프로젝트의 구성원 | 새 키를 지정해 수정 | 권한 부족으로 거부 |
-| 도메인 관리자가 자기 도메인의 행의 키를 바꾼다 | 한 도메인에 행 하나를 미리 만들어 둠, 그 도메인의 관리자 | 새 키를 지정해 수정 | 키가 바뀐 행이 반환된다 |
-| 도메인 관리자가 다른 도메인의 행을 수정한다 | 두 도메인에 행을 하나씩 미리 만들어 둠, 한 도메인의 관리자 | 다른 도메인의 행에 새 키를 지정해 수정 | 권한 부족으로 거부 |
-| 같은 스코프에 이미 있는 키로 바꾼다 | 한 프로젝트에 키가 서로 다른 행 둘을 미리 만들어 둠, superadmin | 한 행의 키를 다른 행의 키로 수정 | 키 충돌로 거부 |
-| 다른 스코프에 있는 키로 바꾼다 | public 스코프와 한 프로젝트에 키가 서로 다른 행을 하나씩 미리 만들어 둠, superadmin | 프로젝트 행의 키를 public 행의 키로 수정 | 키가 바뀐 행이 반환된다 |
-| 환경변수 이름이 아닌 키로 바꾼다 | 한 프로젝트에 행 하나를 미리 만들어 둠, superadmin | 숫자로 시작하는 키로 수정 | 잘못된 키로 거부 |
-| 아무 값도 지정하지 않는다 | 한 프로젝트에 행 하나를 미리 만들어 둠, superadmin | 키를 비워 수정 | 바뀌지 않은 행이 반환된다 |
-| 삭제된 행의 키를 바꾼다 | 한 프로젝트에 삭제된 행 하나를 미리 만들어 둠, superadmin | 새 키를 지정해 수정 | 삭제된 행으로 거부 |
-| 삭제된 행의 키로 바꾼다 | 한 프로젝트에 삭제된 행 하나와 키가 다른 행 하나를 미리 만들어 둠, superadmin | 삭제되지 않은 행의 키를 삭제된 행의 키로 수정 | 키 충돌로 거부 |
+## Restore
 
-스코프와 값 출처는 바꿀 수 없다. 같은 스코프에서는 삭제된 행을 포함해 키가 겹칠 수 없다.
+## Purge
 
-## 삭제
+## Reading several rows by id
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 프로젝트 관리자가 자기 프로젝트의 행을 삭제한다 | 한 프로젝트에 행 하나를 미리 만들어 둠, 그 프로젝트의 관리자 | 그 행을 삭제 | 삭제 시각이 기록된 행이 반환된다 |
-| 프로젝트 구성원이 자기 프로젝트의 행을 삭제한다 | 한 프로젝트에 행 하나를 미리 만들어 둠, 관리자가 아닌 그 프로젝트의 구성원 | 그 행을 삭제 | 권한 부족으로 거부 |
-| 도메인 관리자가 자기 도메인의 행을 삭제한다 | 한 도메인에 행 하나를 미리 만들어 둠, 그 도메인의 관리자 | 그 행을 삭제 | 삭제 시각이 기록된 행이 반환된다 |
+Reading several rows does not reject the whole call and responds per entry.
 
-삭제된 행은 그 뒤에 시작하는 세션에 주입되지 않는다.
-
-## 복원
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 프로젝트 관리자가 자기 프로젝트의 삭제된 행을 복원한다 | 한 프로젝트에 삭제된 행 하나를 미리 만들어 둠, 그 프로젝트의 관리자 | 그 행을 복원 | 삭제 시각이 비워진 행이 반환된다 |
-| 프로젝트 구성원이 자기 프로젝트의 삭제된 행을 복원한다 | 한 프로젝트에 삭제된 행 하나를 미리 만들어 둠, 관리자가 아닌 그 프로젝트의 구성원 | 그 행을 복원 | 권한 부족으로 거부 |
-
-## 영구 삭제
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 프로젝트 관리자가 자기 프로젝트의 행을 영구 삭제한다 | 한 프로젝트에 행 하나를 미리 만들어 둠, 그 프로젝트의 관리자 | 그 행을 영구 삭제 | 그 행의 id가 반환되고, 그 id로 읽으면 빈 값 |
-| 프로젝트 구성원이 자기 프로젝트의 행을 영구 삭제한다 | 한 프로젝트에 행 하나를 미리 만들어 둠, 관리자가 아닌 그 프로젝트의 구성원 | 그 행을 영구 삭제 | 권한 부족으로 거부 |
-| superadmin이 삭제된 행을 영구 삭제한다 | 한 프로젝트에 삭제된 행 하나를 미리 만들어 둠, superadmin | 그 행을 영구 삭제 | 그 행의 id가 반환된다 |
-| 영구 삭제한 행의 키로 다시 만든다 | 한 프로젝트에 삭제된 행 하나를 미리 만들어 둠, superadmin | 그 행을 영구 삭제한 뒤 같은 스코프에 같은 키로 생성 | 새 행이 반환된다 |
-
-## id로 여러 행 읽기
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| superadmin이 여러 스코프의 행을 함께 읽는다 | public 스코프, 한 도메인, 한 프로젝트의 행을 하나씩 미리 만들어 둠, superadmin | public 스코프, 도메인, 프로젝트 행의 id 목록으로 조회 | 요청한 순서대로 public 스코프, 도메인, 프로젝트의 행 |
-| 프로젝트 관리자가 자기 프로젝트의 행과 다른 프로젝트의 행을 함께 읽는다 | 관리자인 프로젝트와 다른 프로젝트에 행을 하나씩 미리 만들어 둠, 한 프로젝트의 관리자 | 자기 프로젝트의 행과 다른 프로젝트의 행의 id 목록으로 조회 | 자기 프로젝트의 행은 반환되고, 다른 프로젝트 행의 항목은 권한 부족으로 거부 |
-| 프로젝트 구성원이 자기 프로젝트의 행을 읽는다 | 한 프로젝트에 행 하나를 미리 만들어 둠, 관리자가 아닌 그 프로젝트의 구성원 | 그 행의 id 목록으로 조회 | 그 항목이 권한 부족으로 거부 |
-| 도메인 구성원이 자기 도메인의 행과 구성원이 아닌 프로젝트의 행을 읽는다 | 한 도메인과 그 도메인의 한 프로젝트에 행을 하나씩 미리 만들어 둠, 관리자가 아니고 그 프로젝트의 구성원도 아닌 그 도메인의 구성원 | 도메인의 행과 프로젝트의 행의 id 목록으로 조회 | 도메인 행과 프로젝트 행의 항목이 모두 권한 부족으로 거부 |
-| 도메인 관리자가 다른 도메인의 행을 읽는다 | 다른 도메인의 행 하나, 한 도메인의 관리자 | 그 행의 id 목록으로 조회 | 그 항목이 권한 부족으로 거부 |
-| superadmin이 어느 행의 것도 아닌 id를 읽는다 | superadmin | 그 id 목록으로 조회 | 그 항목이 빈 값 |
-| 프로젝트 구성원이 어느 행의 것도 아닌 id를 읽는다 | 한 프로젝트의 구성원 | 그 id 목록으로 조회 | 그 항목이 권한 부족으로 거부 |
-
-여럿 읽기는 호출 전체를 거부하지 않고 항목마다 응답한다.
-
-없는 id는 superadmin과 그 밖의 사용자에게 서로 다르게 응답한다. 권한 검사는 id마다 권한 그래프를
-보는데, 그래프에 없는 id는 권한을 확인할 수 없어 superadmin이 아닌 사용자에게는 권한 부족으로
-응답한다. 그 검사를 통과하는 superadmin만 빈 값을 받는다.
-
-## 아직 적지 않은 것
-
-없다. 어댑터가 제공하는 전체 검색, 스코프 안에서 검색, 값 출처 목록, 생성, 수정, 삭제, 복원, 영구 삭제,
-id로 여러 행 읽기가 모두 위에 있다.
-
-모든 어댑터가 물려받는 공용 도우미는 이 엔티티의 호출이 아니므로 적을 시나리오가 없다.
+A missing id receives a different response for superadmin and for other users. The permission check reads the permission graph per id, and the permission of an id absent from the graph cannot be checked, so a user who is not superadmin receives an insufficient permission response. Only superadmin, who passes that check, receives an empty value.

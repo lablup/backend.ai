@@ -1,4 +1,4 @@
-# Search field declarations — Guardrails
+# Search field declarations: Guardrails
 
 > For background and rationale, see `KNOWLEDGE.md` in the same directory.
 
@@ -27,7 +27,7 @@ Declares what an entity search can filter and order by. A declaration holds SQL 
 
 A slot is emptied for one of three reasons. Do not empty one for a reason that is not here.
 
-### Impossible — the type does not support the operation
+### Impossible: the type does not support the operation
 
 | Column kind | Filter | Order |
 |---|---|---|
@@ -41,7 +41,7 @@ A slot is emptied for one of three reasons. Do not empty one for a reason that i
 - Leave the filter empty when no shared condition class takes the column's type. Today that is interval (`retention_policies.retention_period`, `audit_logs.duration`).
 - Adding a shared condition class adds that type's scenarios to the shared declaration DB test in the same change.
 
-### Sensitive — it works, but the value leaks
+### Sensitive: it works, but the value leaks
 
 Repeating a partial-match filter recovers the value one character at a time even when it is not in the response. An order does the same.
 Empty both slots for the values below. Do not leave equality either.
@@ -53,15 +53,15 @@ Empty both slots for the values below. Do not leave equality either.
 | `sessions.callback_url`, `deployment_revisions.callback_url` | External callback address |
 | `sessions.bootstrap_script`, `sessions.startup_command` | User-written script |
 | `deployment_revisions.bootstrap_script`, `deployment_revisions.startup_command` | User-written script |
-| `huggingface_registries.token` | Plaintext token. `sa.String`, so the type axis does not catch it |
+| `huggingface_registries.token` | Plaintext token. `sa.String`, so the type alone does not catch it |
 | `reservoir_registries.secret_key`, `object_storages.secret_key` | Plaintext credential. `sa.String` for the same reason |
 | `audit_logs.client_ip` | The address a call came from |
 
 - To narrow by ownership, use the owner identifier (`user_id`, `creator_id`) instead of the value.
 - A new column of the same kind as a row here gets a row of its own and empty slots.
-- What this says is to leave the slot out of the declaration. Where an internal query already uses such a condition, finding another route belongs to that entity's migration issue.
+- The rule is to leave the slot out of the declaration. Where an internal query already uses such a condition, finding another route belongs to that entity's migration issue.
 
-### Cost — it works, but the query cannot carry it
+### Cost: it works, but the query cannot carry it
 
 | Column kind | Index | Operations allowed |
 |---|---|---|
@@ -70,7 +70,7 @@ Empty both slots for the values below. Do not leave equality either.
 | `sa.Text`, or N above 1024 | One that serves partial matches | All |
 | Order by the entity's own column | Either way | Order allowed |
 | Order by a to-one correlated column | Either way | `ToOneCorrelation.order` |
-| To-many aggregate (count, min, max) | Either way | None — filter and order alike |
+| To-many aggregate (count, min, max) | Either way | None (filter and order alike) |
 
 - There is one boundary, 1024, and the schema divides there: 1024 and below holds single-line values such as names, paths, URLs and descriptions, and anything larger is `sa.Text` or a `16 * 1024` script.
 - A to-many aggregate runs its subquery again for every outer row. Promote a folded value to a parent column (`Rows of other tables`).
@@ -86,7 +86,7 @@ A filled slot is not an API surface by itself.
 - Read that off the published schema (`docs/manager/graphql-reference/`), not off the
   row: a column can be accepted by a create input and absent from the node.
 - A concept held back from the API stays unexposed although it is declared. The
-  declaration serves the internal callers and the day it is opened — `replica_groups` is
+  declaration serves the internal callers and the day it is opened: `replica_groups` is
   declared on the deployment and reaches no DTO.
 - A value the API reports through another shape is exposed under that shape or not at
   all. One deployment status covers several lifecycle stages, so `lifecycle_stage`
@@ -106,9 +106,9 @@ A filled slot is not an API surface by itself.
 - Declare fields of other tables as `nested`, not flattened. Conditions gathered into one EXISTS apply to the same row.
 - Use `ToManyCorrelation` (exists / not_exists / some / every / none) for to-many and
   `ToOneCorrelation` (exists, has, order) for to-one.
-- A matching mode takes the conditions one related row must meet and refuses an empty list.
+- A matching mode takes the conditions one related row must meet and rejects an empty list.
   Whether a related row is there at all is `exists` / `not_exists`, which take no condition.
-- **A to-many opens filters and declares no order.** `ToManyCorrelation` building conditions only, with no `order`, is that rule.
+- **A to-many opens filters and declares no order.** `ToManyCorrelation` builds conditions only, with no `order`; that is the rule.
 
 | Shape | Asks | Filter | Order |
 |---|---|---|---|
@@ -116,12 +116,12 @@ A filled slot is not an API surface by itself.
 | some | Is there any child satisfying the condition | Open | Not open |
 | every / none | Do all children satisfy it / does none | Open | Not open |
 | aggregate | What is the children's count, min or max | Not open | Not open |
-| Child column value | — | Used as a condition inside the three shapes above | No such shape |
+| Child column value | None | Used as a condition inside the three shapes above | No such shape |
 
 - With several children it is undefined which row's value an order would take. A to-one is one row, so `ToOneCorrelation.order` is open.
 - To order by a value folded from the children, promote that value to a parent column and declare it as `own`. Do not turn a child condition into an order key.
 - Use conditions and orders built by a `Correlation` only inside a query whose FROM has `correlate_row`.
-- Do not name anything `Relation`. It collides with the link rows on the permission side (`specs/relation.py`, BEP-1075).
+- Do not name anything `Relation`. It collides with the link rows on the permission side (`specs/relation.py`, BEP-1075 (permission-side relation rows)).
 
 ### How deep a declaration nests
 
@@ -141,7 +141,7 @@ Depth follows the permission axis, not the foreign keys.
 - A column naming another entity stays an identifier filter on the owning row:
   `routings.session`, `routings.session_owner`, `routings.domain`, `routings.project`,
   `endpoint_auto_scaling_rules.prometheus_query_preset_id`. A relation between two entities
-  is answered by `used_by`, which is where the second permission check belongs.
+  goes through `used_by`, which is where the second permission check belongs.
 - The public exception is read off the wiring, not asserted: `runtime_variants` is wired
   `public_get_ops` / `public_search_ops`, so a revision may order by the variant's name.
 
@@ -153,7 +153,7 @@ Depth follows the permission axis, not the foreign keys.
 
 ## Usage between entities
 
-- A usage that is not ownership, such as session → vfolder, stays out of the ownership graph. It is decided from a table column.
+- A usage that is not ownership, such as a session using a vfolder, stays out of the ownership graph. It is decided from a table column.
 - Only a foreign key column counts as a usage. An id inside a JSON value does not. A key sitting on the searched row (`roles.role_preset_id`) is a usage too.
 - There is one bundle, usage, and two directions inside it.
 
@@ -163,7 +163,7 @@ Depth follows the permission axis, not the foreign keys.
 | `uses` | The using side | The used entity's id | The sessions using this agent, the roles using this role preset |
 
 - Declare them under `linked.usage.<entities>`, named after the other entity in the plural
-  (`deployments`, `model_cards`). The declaration's type states the direction —
+  (`deployments`, `model_cards`). The declaration's type states the direction:
   `UsedByConditions` or `UsesConditions`. Do not put the direction on the path as well.
 - That type's one method builds the condition, and its name is the direction.
 
@@ -172,16 +172,16 @@ Depth follows the permission axis, not the foreign keys.
 | `UsedByConditions` | `linked.usage.sessions.used_by(session_id)` | The images this session uses |
 | `UsesConditions` | `linked.usage.agents.uses(agent_id)` | The sessions using this agent |
 
-- One declaration answers one direction, because the correlation is built around the searched
-  row. The other direction is declared on the other entity. Do not leave a usage declared from
+- One declaration covers one direction, because the correlation is built around the searched
+  row. The other direction is declared on the other entity. Do not declare a usage from
   one side only.
 - Do not declare `UsageConditions` itself. Only the two subtypes that name a direction.
 - The API input carries one `usage` per search, holding `usedBy` and `uses`.
 - The rules are the same both ways: narrow with AND, require the caller to be able to read the
   entity the condition names, grant no permission, and pull in no row the scopes disallow.
 - A scoped search passes them through `ScopedSearcher`; one named entity the caller cannot read
-  refuses the whole search. A global search passes them through `GlobalSearcher`, where the
-  SUPERADMIN gate answers, so the named entities are not checked.
+  rejects the whole search. A global search passes them through `GlobalSearcher`, where the
+  SUPERADMIN gate applies, so the named entities are not checked.
 - What the search carries is one list either way: `ScopedSearcher.used_by` and
   `GlobalSearcher.used_by` take both directions' conditions, and one condition is a `UsedBy`.
 - The agent has no `searchable_fields.py` yet, so `used_by.sessions` cannot be declared on it.
@@ -198,7 +198,7 @@ The per-entity tables are under `Scopes a search accepts` in `KNOWLEDGE.md`. Add
 
 - A field search is the bulk shape that checks permission per owning entity. Its execution path is to move onto the new search path.
 - Read the owning scopes off `created_in` on the creator and the upserter. Read the READ-granting relations off the `RelationCreator` declarations and the share writes.
-- public is a scope like any other. A public read is a scope action, and one Target declares both what is authorized against (the public singleton) and the row condition (rows registered in public). Precedent: `PublicImageTarget` (`models/image/scopes.py`).
+- public is a scope like any other. A public read is a scope action, and one Target declares both what is authorized against (the public singleton) and the row condition (rows registered in public). See `PublicImageTarget` (`models/image/scopes.py`).
 - The `is_global` column keeps its name. It means "registered in public". Names in code say public.
 - Registration in public is membership. An entity whose whole type is public and an entity switched per row by a column (container registry, image, resource preset) both name public in `created_in`. For the per-row kind, its Target puts that column on as the row condition.
 - A global read keeps the action shape. It checks the entity type and operation at the global singleton and adds no scope condition to the query. Permission is per type.

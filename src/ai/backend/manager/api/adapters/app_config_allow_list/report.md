@@ -1,96 +1,96 @@
 ## app_config_allow_list
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/app_config_allow_list/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/app_config_allow_list/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/app_config_allow_list/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/app_config_allow_list/adapter.py)
 
-시나리오: 미완 2 / 8
+Scenario: incomplete 2 / 8
 
-- ops 로 구성 (6)
-  - admin_create — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_get — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_search — 대표 성공 ✓ · 대표 실패 ✓
-  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
-  - partial_bulk_update — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - update — 대표 성공 ✓ · 대표 실패 ✓
-- 직접 구현 (2)
-  - partial_bulk_purge — 성공 있음 2 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - purge — 성공 있음 2 · 실패 있음 2 (single_entity)
+- built from ops (6)
+  - admin_create: representative success ✓ · representative rejection ✓
+  - admin_get: representative success ✓ · representative rejection ✓
+  - admin_search: representative success ✓ · representative rejection ✓
+  - batch_load_by_ids: representative success ✓ · representative rejection ✓
+  - partial_bulk_update: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - update: representative success ✓ · representative rejection ✓
+- direct implementation (2)
+  - partial_bulk_purge: success present 2 · rejection absent (partial_bulk): SCENARIO-GAP
+  - purge: success present 2 · rejection present 2 (single_entity)
 
 **admin_create**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 순위를 지정해 allow_list를 생성하면, 지정한 값이 그대로 저장된다](#creating-a-rank-given-in-the-request-is-kept-as-is) | 성공 |
-| [슈퍼관리자가 순위를 생략하고 도메인 스코프 유형의 allow_list를 생성하면, 순위 200이 적용된다](#creating-leaving-the-rank-out-opens-the-domain-kind-at-its-default-rank) | 성공 |
-| [슈퍼관리자가 순위를 생략하고 공개 스코프 유형의 allow_list를 생성하면, 순위 100이 적용된다](#creating-leaving-the-rank-out-opens-the-public-kind-at-its-default-rank) | 성공 |
-| [슈퍼관리자가 순위를 생략하고 사용자 스코프 유형의 allow_list를 생성하면, 순위 300이 적용된다](#creating-leaving-the-rank-out-opens-the-user-kind-at-its-default-rank) | 성공 |
-| [슈퍼관리자가 등록되지 않은 설정 이름으로 allow_list를 생성하면, 정의 없음 오류가 반환된다](#creating-a-name-nothing-registers-cannot-be-opened) | 거부 |
-| [일반 사용자가 allow_list를 생성하면, 슈퍼관리자 권한이 없어 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-open-a-name) | 거부 |
-| [슈퍼관리자가 같은 설정 이름과 스코프 유형으로 allow_list를 다시 생성하면, 데이터베이스의 고유 제약 오류가 반환된다](#creating-opening-the-same-name-to-the-same-kind-twice-is-refused-as-a-constraint-violation) | 거부 |
-| [RBAC 강제를 꺼도 일반 사용자의 allow_list 생성은 거부된다](#creating-turning-enforcement-off-still-does-not-let-a-user-open-a-name) | 거부 |
+| [슈퍼관리자가 순위를 지정해 allow_list를 생성하면, 지정한 값이 그대로 저장된다](#creating-a-rank-given-in-the-request-is-kept-as-is) | answered |
+| [슈퍼관리자가 순위를 생략하고 도메인 스코프 유형의 allow_list를 생성하면, 순위 200이 적용된다](#creating-leaving-the-rank-out-opens-the-domain-kind-at-its-default-rank) | answered |
+| [슈퍼관리자가 순위를 생략하고 공개 스코프 유형의 allow_list를 생성하면, 순위 100이 적용된다](#creating-leaving-the-rank-out-opens-the-public-kind-at-its-default-rank) | answered |
+| [슈퍼관리자가 순위를 생략하고 사용자 스코프 유형의 allow_list를 생성하면, 순위 300이 적용된다](#creating-leaving-the-rank-out-opens-the-user-kind-at-its-default-rank) | answered |
+| [슈퍼관리자가 등록되지 않은 설정 이름으로 allow_list를 생성하면, 정의 없음 오류가 반환된다](#creating-a-name-nothing-registers-cannot-be-opened) | rejected |
+| [일반 사용자가 allow_list를 생성하면, 슈퍼관리자 권한이 없어 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-open-a-name) | rejected |
+| [슈퍼관리자가 같은 설정 이름과 스코프 유형으로 allow_list를 다시 생성하면, 데이터베이스의 고유 제약 오류가 반환된다](#creating-opening-the-same-name-to-the-same-kind-twice-is-refused-as-a-constraint-violation) | rejected |
+| [RBAC 강제를 꺼도 일반 사용자의 allow_list 생성은 거부된다](#creating-turning-enforcement-off-still-does-not-let-a-user-open-a-name) | rejected |
 
 **admin_get**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [allow_list 하나가 있고 슈퍼관리자가 ID로 조회하면, 그 allow_list의 모든 필드가 반환된다](#reading-the-superadmin-reads-an-entry-by-id) | 성공 |
-| [RBAC 강제를 끄면 권한이 없는 일반 사용자도 allow_list를 조회할 수 있다](#reading-turning-enforcement-off-lets-a-plain-user-read) | 성공 |
-| [같은 allow_list를 권한이 없는 일반 사용자가 조회하면, 엔티티 읽기 권한이 없어 거부된다](#reading-a-user-who-is-not-the-superadmin-may-not-read-an-entry) | 거부 |
-| [슈퍼관리자가 존재하지 않는 ID로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다](#reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
+| [allow_list 하나가 있고 슈퍼관리자가 ID로 조회하면, 그 allow_list의 모든 필드가 반환된다](#reading-the-superadmin-reads-an-entry-by-id) | answered |
+| [RBAC 강제를 끄면 권한이 없는 일반 사용자도 allow_list를 조회할 수 있다](#reading-turning-enforcement-off-lets-a-plain-user-read) | answered |
+| [같은 allow_list를 권한이 없는 일반 사용자가 조회하면, 엔티티 읽기 권한이 없어 거부된다](#reading-a-user-who-is-not-the-superadmin-may-not-read-an-entry) | rejected |
+| [슈퍼관리자가 존재하지 않는 ID로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다](#reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
 
 **admin_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [생성 시각이 모두 같은 allow_list 넷이 있고 슈퍼관리자가 기본 순서 첫 항목의 커서 뒤로 한 건을 검색하면, 바로 다음 allow_list 하나와 앞뒤 페이지가 모두 있다고 응답한다](#searching-a-forward-cursor-answers-the-one-right-after-it) | 성공 |
-| [설정 이름 둘에 allow_list 넷이 있고 슈퍼관리자가 필터 없이 검색하면, 네 allow_list가 모두 반환된다](#searching-the-superadmin-counts-every-entry) | 성공 |
-| [일반 사용자가 allow_list를 검색하면, 슈퍼관리자 권한이 없어 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-entries) | 거부 |
+| [생성 시각이 모두 같은 allow_list 넷이 있고 슈퍼관리자가 기본 순서 첫 항목의 커서 뒤로 한 건을 검색하면, 바로 다음 allow_list 하나와 앞뒤 페이지가 모두 있다고 응답한다](#searching-a-forward-cursor-answers-the-one-right-after-it) | answered |
+| [설정 이름 둘에 allow_list 넷이 있고 슈퍼관리자가 필터 없이 검색하면, 네 allow_list가 모두 반환된다](#searching-the-superadmin-counts-every-entry) | answered |
+| [일반 사용자가 allow_list를 검색하면, 슈퍼관리자 권한이 없어 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-entries) | rejected |
 
 **batch_load_by_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [빈 ID 목록으로 조회하면 빈 목록이 반환된다](#reading_many-an-empty-id-list-answers-empty) | 성공 |
-| [슈퍼관리자가 같은 allow_list의 ID를 두 번 조회하면, 같은 노드가 두 위치에 반환된다](#reading_many-duplicate-ids-keep-their-input-positions) | 성공 |
-| [슈퍼관리자가 allow_list 둘과 없는 ID 하나를 함께 조회하면, 입력 순서대로 노드 둘과 None이 반환된다](#reading_many-the-superadmin-reads-both-and-a-missing-id-comes-back-empty) | 성공 |
-| [권한이 없는 일반 사용자가 allow_list 둘과 없는 ID 하나를 함께 조회하면, 각 입력 위치에 엔티티 읽기 권한 오류가 반환된다](#reading_many-a-user-who-is-not-the-superadmin-is-refused-per-id) | 거부 |
+| [빈 ID 목록으로 조회하면 빈 목록이 반환된다](#reading_many-an-empty-id-list-answers-empty) | answered |
+| [슈퍼관리자가 같은 allow_list의 ID를 두 번 조회하면, 같은 노드가 두 위치에 반환된다](#reading_many-duplicate-ids-keep-their-input-positions) | answered |
+| [슈퍼관리자가 allow_list 둘과 없는 ID 하나를 함께 조회하면, 입력 순서대로 노드 둘과 None이 반환된다](#reading_many-the-superadmin-reads-both-and-a-missing-id-comes-back-empty) | answered |
+| [권한이 없는 일반 사용자가 allow_list 둘과 없는 ID 하나를 함께 조회하면, 각 입력 위치에 엔티티 읽기 권한 오류가 반환된다](#reading_many-a-user-who-is-not-the-superadmin-is-refused-per-id) | rejected |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [권한이 없는 일반 사용자가 allow_list 둘의 순위를 한 번에 바꾸려 하면, 바뀐 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-reranks-none-of-several-entries) | 성공 |
-| [슈퍼관리자가 allow_list 둘의 순위를 한 번에 바꾸면, 둘 다 새 순위로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-reranks-several-entries-at-once) | 성공 |
+| [권한이 없는 일반 사용자가 allow_list 둘의 순위를 한 번에 바꾸려 하면, 바뀐 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-reranks-none-of-several-entries) | answered |
+| [슈퍼관리자가 allow_list 둘의 순위를 한 번에 바꾸면, 둘 다 새 순위로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-reranks-several-entries-at-once) | answered |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 아무 값도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-an-edit-carrying-no-value-changes-nothing) | 성공 |
-| [allow_list 하나가 있고 슈퍼관리자가 순위를 바꾸면, 순위만 변경되고 설정 이름과 스코프 유형은 그대로다](#editing-the-superadmin-changes-an-entrys-rank) | 성공 |
-| [같은 allow_list를 권한이 없는 일반 사용자가 수정하면, 엔티티 수정 권한이 없어 거부된다](#editing-a-user-who-is-not-the-superadmin-may-not-change-a-rank) | 거부 |
-| [슈퍼관리자가 존재하지 않는 ID의 순위를 수정하면, 대상을 찾을 수 없다는 이유로 거부된다](#editing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
+| [슈퍼관리자가 아무 값도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-an-edit-carrying-no-value-changes-nothing) | answered |
+| [allow_list 하나가 있고 슈퍼관리자가 순위를 바꾸면, 순위만 변경되고 설정 이름과 스코프 유형은 그대로다](#editing-the-superadmin-changes-an-entrys-rank) | answered |
+| [같은 allow_list를 권한이 없는 일반 사용자가 수정하면, 엔티티 수정 권한이 없어 거부된다](#editing-a-user-who-is-not-the-superadmin-may-not-change-a-rank) | rejected |
+| [슈퍼관리자가 존재하지 않는 ID의 순위를 수정하면, 대상을 찾을 수 없다는 이유로 거부된다](#editing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [권한이 없는 일반 사용자가 allow_list 둘을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-entries) | 성공 |
-| [슈퍼관리자가 allow_list 둘과 존재하지 않는 ID를 한 번에 영구 삭제하면, 둘은 처리된 목록에 오고 없는 ID는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | 성공 |
+| [권한이 없는 일반 사용자가 allow_list 둘을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-entries) | answered |
+| [슈퍼관리자가 allow_list 둘과 존재하지 않는 ID를 한 번에 영구 삭제하면, 둘은 처리된 목록에 오고 없는 ID는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | answered |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [설정 조각이 있는 allow_list를 슈퍼관리자가 영구 삭제하면, 설정 조각이 막지 않고 allow_list의 ID가 반환된다](#purging-an-entry-holding-a-fragment-is-still-purged) | 성공 |
-| [설정 조각이 없는 allow_list를 슈퍼관리자가 영구 삭제하면, 삭제한 allow_list의 ID가 반환된다](#purging-the-superadmin-purges-an-entry) | 성공 |
-| [같은 allow_list를 권한이 없는 일반 사용자가 영구 삭제하면, 엔티티 삭제 권한이 없어 거부된다](#purging-a-user-who-is-not-the-superadmin-may-not-purge-an-entry) | 거부 |
-| [슈퍼관리자가 존재하지 않는 ID를 영구 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다](#purging-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
+| [설정 조각이 있는 allow_list를 슈퍼관리자가 영구 삭제하면, 설정 조각이 막지 않고 allow_list의 ID가 반환된다](#purging-an-entry-holding-a-fragment-is-still-purged) | answered |
+| [설정 조각이 없는 allow_list를 슈퍼관리자가 영구 삭제하면, 삭제한 allow_list의 ID가 반환된다](#purging-the-superadmin-purges-an-entry) | answered |
+| [같은 allow_list를 권한이 없는 일반 사용자가 영구 삭제하면, 엔티티 삭제 권한이 없어 거부된다](#purging-a-user-who-is-not-the-superadmin-may-not-purge-an-entry) | rejected |
+| [슈퍼관리자가 존재하지 않는 ID를 영구 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다](#purging-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
 
 ### admin_create
 
 <a id="creating-a-rank-given-in-the-request-is-kept-as-is"></a>
 
-#### [a-rank-given-in-the-request-is-kept-as-is](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py) — pass
+#### [a-rank-given-in-the-request-is-kept-as-is](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py): pass
 
 슈퍼관리자가 순위를 지정해 allow_list를 생성하면, 지정한 값이 그대로 저장된다
 
@@ -107,12 +107,12 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.admin_create — user-1이 config-1의 도메인 allow_list 생성 (순위 250)
+- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 도메인 allow_list 생성 (순위 250)
 
 Then
 
 - 생성한 allow_list의 모든 필드가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - config_name = 'config-1'
   - scope_type = <AppConfigScopeType.DOMAIN: 'domain'>
   - rank = 250
@@ -121,7 +121,7 @@ Then
 
 <a id="creating-leaving-the-rank-out-opens-the-domain-kind-at-its-default-rank"></a>
 
-#### [leaving-the-rank-out-opens-the-domain-kind-at-its-default-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py) — pass
+#### [leaving-the-rank-out-opens-the-domain-kind-at-its-default-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py): pass
 
 슈퍼관리자가 순위를 생략하고 도메인 스코프 유형의 allow_list를 생성하면, 순위 200이 적용된다
 
@@ -138,12 +138,12 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.admin_create — user-1이 config-1의 도메인 allow_list 생성 (순위 생략)
+- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 도메인 allow_list 생성 (순위 생략)
 
 Then
 
 - 생성한 allow_list의 모든 필드가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - config_name = 'config-1'
   - scope_type = <AppConfigScopeType.DOMAIN: 'domain'>
   - rank = 200
@@ -152,7 +152,7 @@ Then
 
 <a id="creating-leaving-the-rank-out-opens-the-public-kind-at-its-default-rank"></a>
 
-#### [leaving-the-rank-out-opens-the-public-kind-at-its-default-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py) — pass
+#### [leaving-the-rank-out-opens-the-public-kind-at-its-default-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py): pass
 
 슈퍼관리자가 순위를 생략하고 공개 스코프 유형의 allow_list를 생성하면, 순위 100이 적용된다
 
@@ -169,12 +169,12 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.admin_create — user-1이 config-1의 공개 allow_list 생성 (순위 생략)
+- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 공개 allow_list 생성 (순위 생략)
 
 Then
 
 - 생성한 allow_list의 모든 필드가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - config_name = 'config-1'
   - scope_type = <AppConfigScopeType.PUBLIC: 'public'>
   - rank = 100
@@ -183,7 +183,7 @@ Then
 
 <a id="creating-leaving-the-rank-out-opens-the-user-kind-at-its-default-rank"></a>
 
-#### [leaving-the-rank-out-opens-the-user-kind-at-its-default-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py) — pass
+#### [leaving-the-rank-out-opens-the-user-kind-at-its-default-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py): pass
 
 슈퍼관리자가 순위를 생략하고 사용자 스코프 유형의 allow_list를 생성하면, 순위 300이 적용된다
 
@@ -200,12 +200,12 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.admin_create — user-1이 config-1의 사용자 allow_list 생성 (순위 생략)
+- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 사용자 allow_list 생성 (순위 생략)
 
 Then
 
 - 생성한 allow_list의 모든 필드가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - config_name = 'config-1'
   - scope_type = <AppConfigScopeType.USER: 'user'>
   - rank = 300
@@ -214,7 +214,7 @@ Then
 
 <a id="creating-a-name-nothing-registers-cannot-be-opened"></a>
 
-#### [a-name-nothing-registers-cannot-be-opened](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py) — pass
+#### [a-name-nothing-registers-cannot-be-opened](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py): pass
 
 슈퍼관리자가 등록되지 않은 설정 이름으로 allow_list를 생성하면, 정의 없음 오류가 반환된다
 
@@ -230,7 +230,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.admin_create — user-1이 unregistered의 공개 allow_list 생성 (순위 생략)
+- AppConfigAllowListAdapter.admin_create: user-1이 unregistered의 공개 allow_list 생성 (순위 생략)
 
 Then
 
@@ -239,7 +239,7 @@ Then
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-open-a-name"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-open-a-name](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-open-a-name](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py): pass
 
 일반 사용자가 allow_list를 생성하면, 슈퍼관리자 권한이 없어 거부된다
 
@@ -256,7 +256,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.admin_create — user-1이 config-1의 공개 allow_list 생성 (순위 생략)
+- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 공개 allow_list 생성 (순위 생략)
 
 Then
 
@@ -265,7 +265,7 @@ Then
 
 <a id="creating-opening-the-same-name-to-the-same-kind-twice-is-refused-as-a-constraint-violation"></a>
 
-#### [opening-the-same-name-to-the-same-kind-twice-is-refused-as-a-constraint-violation](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py) — pass
+#### [opening-the-same-name-to-the-same-kind-twice-is-refused-as-a-constraint-violation](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py): pass
 
 슈퍼관리자가 같은 설정 이름과 스코프 유형으로 allow_list를 다시 생성하면, 데이터베이스의 고유 제약 오류가 반환된다
 
@@ -283,7 +283,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.admin_create — user-1이 config-1의 공개 allow_list 생성 (순위 생략)
+- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 공개 allow_list 생성 (순위 생략)
 
 Then
 
@@ -292,7 +292,7 @@ Then
 
 <a id="creating-turning-enforcement-off-still-does-not-let-a-user-open-a-name"></a>
 
-#### [turning-enforcement-off-still-does-not-let-a-user-open-a-name](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py) — pass
+#### [turning-enforcement-off-still-does-not-let-a-user-open-a-name](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_creating.py): pass
 
 RBAC 강제를 꺼도 일반 사용자의 allow_list 생성은 거부된다
 
@@ -309,7 +309,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.admin_create — user-1이 config-1의 공개 allow_list 생성 (순위 생략)
+- AppConfigAllowListAdapter.admin_create: user-1이 config-1의 공개 allow_list 생성 (순위 생략)
 
 Then
 
@@ -320,7 +320,7 @@ Then
 
 <a id="reading-the-superadmin-reads-an-entry-by-id"></a>
 
-#### [the-superadmin-reads-an-entry-by-id](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py) — pass
+#### [the-superadmin-reads-an-entry-by-id](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py): pass
 
 allow_list 하나가 있고 슈퍼관리자가 ID로 조회하면, 그 allow_list의 모든 필드가 반환된다
 
@@ -338,7 +338,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.admin_get — user-1이 config-1의 allow_list 조회
+- AppConfigAllowListAdapter.admin_get: user-1이 config-1의 allow_list 조회
 
 Then
 
@@ -352,7 +352,7 @@ Then
 
 <a id="reading-turning-enforcement-off-lets-a-plain-user-read"></a>
 
-#### [turning-enforcement-off-lets-a-plain-user-read](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py) — pass
+#### [turning-enforcement-off-lets-a-plain-user-read](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py): pass
 
 RBAC 강제를 끄면 권한이 없는 일반 사용자도 allow_list를 조회할 수 있다
 
@@ -370,7 +370,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.admin_get — user-1이 config-1의 allow_list 조회
+- AppConfigAllowListAdapter.admin_get: user-1이 config-1의 allow_list 조회
 
 Then
 
@@ -384,7 +384,7 @@ Then
 
 <a id="reading-a-user-who-is-not-the-superadmin-may-not-read-an-entry"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-read-an-entry](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-read-an-entry](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py): pass
 
 같은 allow_list를 권한이 없는 일반 사용자가 조회하면, 엔티티 읽기 권한이 없어 거부된다
 
@@ -402,7 +402,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.admin_get — user-1이 config-1의 allow_list 조회
+- AppConfigAllowListAdapter.admin_get: user-1이 config-1의 allow_list 조회
 
 Then
 
@@ -411,7 +411,7 @@ Then
 
 <a id="reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
-#### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py) — pass
+#### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading.py): pass
 
 슈퍼관리자가 존재하지 않는 ID로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다
 
@@ -429,7 +429,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.admin_get — user-1이 존재하지 않는 ID 조회
+- AppConfigAllowListAdapter.admin_get: user-1이 존재하지 않는 ID 조회
 
 Then
 
@@ -440,7 +440,7 @@ Then
 
 <a id="searching-a-forward-cursor-answers-the-one-right-after-it"></a>
 
-#### [a-forward-cursor-answers-the-one-right-after-it](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_searching.py) — pass
+#### [a-forward-cursor-answers-the-one-right-after-it](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_searching.py): pass
 
 생성 시각이 모두 같은 allow_list 넷이 있고 슈퍼관리자가 기본 순서 첫 항목의 커서 뒤로 한 건을 검색하면, 바로 다음 allow_list 하나와 앞뒤 페이지가 모두 있다고 응답한다
 
@@ -464,7 +464,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.admin_search — user-1이 기본 순서 첫 항목의 커서 뒤로 한 건 검색
+- AppConfigAllowListAdapter.admin_search: user-1이 기본 순서 첫 항목의 커서 뒤로 한 건 검색
 
 Then
 
@@ -476,7 +476,7 @@ Then
 
 <a id="searching-the-superadmin-counts-every-entry"></a>
 
-#### [the-superadmin-counts-every-entry](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_searching.py) — pass
+#### [the-superadmin-counts-every-entry](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_searching.py): pass
 
 설정 이름 둘에 allow_list 넷이 있고 슈퍼관리자가 필터 없이 검색하면, 네 allow_list가 모두 반환된다
 
@@ -498,7 +498,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.admin_search — user-1이 필터 없이 검색
+- AppConfigAllowListAdapter.admin_search: user-1이 필터 없이 검색
 
 Then
 
@@ -510,7 +510,7 @@ Then
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-entries"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-entries](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_searching.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-entries](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_searching.py): pass
 
 일반 사용자가 allow_list를 검색하면, 슈퍼관리자 권한이 없어 거부된다
 
@@ -530,7 +530,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.admin_search — user-1이 필터 없이 검색
+- AppConfigAllowListAdapter.admin_search: user-1이 필터 없이 검색
 
 Then
 
@@ -541,7 +541,7 @@ Then
 
 <a id="reading_many-an-empty-id-list-answers-empty"></a>
 
-#### [an-empty-id-list-answers-empty](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading_many.py) — pass
+#### [an-empty-id-list-answers-empty](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading_many.py): pass
 
 빈 ID 목록으로 조회하면 빈 목록이 반환된다
 
@@ -560,7 +560,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.batch_load_by_ids — user-1이 빈 ID 목록으로 조회
+- AppConfigAllowListAdapter.batch_load_by_ids: user-1이 빈 ID 목록으로 조회
 
 Then
 
@@ -569,7 +569,7 @@ Then
 
 <a id="reading_many-duplicate-ids-keep-their-input-positions"></a>
 
-#### [duplicate-ids-keep-their-input-positions](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading_many.py) — pass
+#### [duplicate-ids-keep-their-input-positions](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading_many.py): pass
 
 슈퍼관리자가 같은 allow_list의 ID를 두 번 조회하면, 같은 노드가 두 위치에 반환된다
 
@@ -588,7 +588,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.batch_load_by_ids — user-1이 첫 번째 allow_list의 ID를 두 번 조회
+- AppConfigAllowListAdapter.batch_load_by_ids: user-1이 첫 번째 allow_list의 ID를 두 번 조회
 
 Then
 
@@ -599,7 +599,7 @@ Then
 
 <a id="reading_many-the-superadmin-reads-both-and-a-missing-id-comes-back-empty"></a>
 
-#### [the-superadmin-reads-both-and-a-missing-id-comes-back-empty](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading_many.py) — pass
+#### [the-superadmin-reads-both-and-a-missing-id-comes-back-empty](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading_many.py): pass
 
 슈퍼관리자가 allow_list 둘과 없는 ID 하나를 함께 조회하면, 입력 순서대로 노드 둘과 None이 반환된다
 
@@ -618,7 +618,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.batch_load_by_ids — user-1이 allow_list 둘과 존재하지 않는 ID를 한 번에 조회
+- AppConfigAllowListAdapter.batch_load_by_ids: user-1이 allow_list 둘과 존재하지 않는 ID를 한 번에 조회
 
 Then
 
@@ -630,7 +630,7 @@ Then
 
 <a id="reading_many-a-user-who-is-not-the-superadmin-is-refused-per-id"></a>
 
-#### [a-user-who-is-not-the-superadmin-is-refused-per-id](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading_many.py) — pass
+#### [a-user-who-is-not-the-superadmin-is-refused-per-id](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_reading_many.py): pass
 
 권한이 없는 일반 사용자가 allow_list 둘과 없는 ID 하나를 함께 조회하면, 각 입력 위치에 엔티티 읽기 권한 오류가 반환된다
 
@@ -649,7 +649,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.batch_load_by_ids — user-1이 allow_list 둘과 존재하지 않는 ID를 한 번에 조회
+- AppConfigAllowListAdapter.batch_load_by_ids: user-1이 allow_list 둘과 존재하지 않는 ID를 한 번에 조회
 
 Then
 
@@ -663,7 +663,7 @@ Then
 
 <a id="partial_bulk_editing-a-user-granted-nothing-reranks-none-of-several-entries"></a>
 
-#### [a-user-granted-nothing-reranks-none-of-several-entries](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-nothing-reranks-none-of-several-entries](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_editing.py): pass
 
 권한이 없는 일반 사용자가 allow_list 둘의 순위를 한 번에 바꾸려 하면, 바뀐 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다
 
@@ -682,7 +682,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.partial_bulk_update — user-1이 allow_list 둘의 순위를 한 번에 150(으)로 변경
+- AppConfigAllowListAdapter.partial_bulk_update: user-1이 allow_list 둘의 순위를 한 번에 150(으)로 변경
 
 Then
 
@@ -696,7 +696,7 @@ Then
 
 <a id="partial_bulk_editing-the-superadmin-reranks-several-entries-at-once"></a>
 
-#### [the-superadmin-reranks-several-entries-at-once](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_editing.py) — pass
+#### [the-superadmin-reranks-several-entries-at-once](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_editing.py): pass
 
 슈퍼관리자가 allow_list 둘의 순위를 한 번에 바꾸면, 둘 다 새 순위로 오고 실패한 것은 없다
 
@@ -715,7 +715,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.partial_bulk_update — user-1이 allow_list 둘의 순위를 한 번에 150(으)로 변경
+- AppConfigAllowListAdapter.partial_bulk_update: user-1이 allow_list 둘의 순위를 한 번에 150(으)로 변경
 
 Then
 
@@ -737,7 +737,7 @@ Then
 
 <a id="editing-an-edit-carrying-no-value-changes-nothing"></a>
 
-#### [an-edit-carrying-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py) — pass
+#### [an-edit-carrying-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py): pass
 
 슈퍼관리자가 아무 값도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환된다
 
@@ -755,7 +755,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.update — user-1이 config-1의 allow_list 수정 (빈 요청)
+- AppConfigAllowListAdapter.update: user-1이 config-1의 allow_list 수정 (빈 요청)
 
 Then
 
@@ -769,7 +769,7 @@ Then
 
 <a id="editing-the-superadmin-changes-an-entrys-rank"></a>
 
-#### [the-superadmin-changes-an-entrys-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py) — pass
+#### [the-superadmin-changes-an-entrys-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py): pass
 
 allow_list 하나가 있고 슈퍼관리자가 순위를 바꾸면, 순위만 변경되고 설정 이름과 스코프 유형은 그대로다
 
@@ -787,7 +787,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.update — user-1이 config-1의 allow_list 수정 (순위 150(으)로 변경)
+- AppConfigAllowListAdapter.update: user-1이 config-1의 allow_list 수정 (순위 150(으)로 변경)
 
 Then
 
@@ -801,7 +801,7 @@ Then
 
 <a id="editing-a-user-who-is-not-the-superadmin-may-not-change-a-rank"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-change-a-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-change-a-rank](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py): pass
 
 같은 allow_list를 권한이 없는 일반 사용자가 수정하면, 엔티티 수정 권한이 없어 거부된다
 
@@ -819,7 +819,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.update — user-1이 config-1의 allow_list 수정 (순위 150(으)로 변경)
+- AppConfigAllowListAdapter.update: user-1이 config-1의 allow_list 수정 (순위 150(으)로 변경)
 
 Then
 
@@ -828,7 +828,7 @@ Then
 
 <a id="editing-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
-#### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py) — pass
+#### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_editing.py): pass
 
 슈퍼관리자가 존재하지 않는 ID의 순위를 수정하면, 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -846,7 +846,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.update — user-1이 존재하지 않는 ID 수정 (순위 150(으)로 변경)
+- AppConfigAllowListAdapter.update: user-1이 존재하지 않는 ID 수정 (순위 150(으)로 변경)
 
 Then
 
@@ -857,7 +857,7 @@ Then
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-entries"></a>
 
-#### [a-user-granted-nothing-purges-none-of-several-entries](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_purging.py) — pass
+#### [a-user-granted-nothing-purges-none-of-several-entries](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_purging.py): pass
 
 권한이 없는 일반 사용자가 allow_list 둘을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다
 
@@ -876,7 +876,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.partial_bulk_purge — user-1이 allow_list 둘를 한 번에 영구 삭제
+- AppConfigAllowListAdapter.partial_bulk_purge: user-1이 allow_list 둘를 한 번에 영구 삭제
 
 Then
 
@@ -890,7 +890,7 @@ Then
 
 <a id="partial_bulk_purging-purging-several-answers-for-the-missing-one"></a>
 
-#### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_purging.py) — pass
+#### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_purging.py): pass
 
 슈퍼관리자가 allow_list 둘과 존재하지 않는 ID를 한 번에 영구 삭제하면, 둘은 처리된 목록에 오고 없는 ID는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -909,7 +909,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.partial_bulk_purge — user-1이 allow_list 둘와 존재하지 않는 ID를 한 번에 영구 삭제
+- AppConfigAllowListAdapter.partial_bulk_purge: user-1이 allow_list 둘와 존재하지 않는 ID를 한 번에 영구 삭제
 
 Then
 
@@ -923,7 +923,7 @@ Then
 
 <a id="purging-an-entry-holding-a-fragment-is-still-purged"></a>
 
-#### [an-entry-holding-a-fragment-is-still-purged](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_purging.py) — pass
+#### [an-entry-holding-a-fragment-is-still-purged](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_purging.py): pass
 
 설정 조각이 있는 allow_list를 슈퍼관리자가 영구 삭제하면, 설정 조각이 막지 않고 allow_list의 ID가 반환된다
 
@@ -942,7 +942,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.purge — user-1이 config-1의 allow_list 영구 삭제
+- AppConfigAllowListAdapter.purge: user-1이 config-1의 allow_list 영구 삭제
 
 Then
 
@@ -951,7 +951,7 @@ Then
 
 <a id="purging-the-superadmin-purges-an-entry"></a>
 
-#### [the-superadmin-purges-an-entry](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_purging.py) — pass
+#### [the-superadmin-purges-an-entry](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_purging.py): pass
 
 설정 조각이 없는 allow_list를 슈퍼관리자가 영구 삭제하면, 삭제한 allow_list의 ID가 반환된다
 
@@ -969,7 +969,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.purge — user-1이 config-1의 allow_list 영구 삭제
+- AppConfigAllowListAdapter.purge: user-1이 config-1의 allow_list 영구 삭제
 
 Then
 
@@ -978,7 +978,7 @@ Then
 
 <a id="purging-a-user-who-is-not-the-superadmin-may-not-purge-an-entry"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-purge-an-entry](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_purging.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-purge-an-entry](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_purging.py): pass
 
 같은 allow_list를 권한이 없는 일반 사용자가 영구 삭제하면, 엔티티 삭제 권한이 없어 거부된다
 
@@ -996,7 +996,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.purge — user-1이 config-1의 allow_list 영구 삭제
+- AppConfigAllowListAdapter.purge: user-1이 config-1의 allow_list 영구 삭제
 
 Then
 
@@ -1005,7 +1005,7 @@ Then
 
 <a id="purging-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
-#### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_purging.py) — pass
+#### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_purging.py): pass
 
 슈퍼관리자가 존재하지 않는 ID를 영구 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -1023,7 +1023,7 @@ Given
 
 When
 
-- AppConfigAllowListAdapter.purge — user-1이 존재하지 않는 ID 영구 삭제
+- AppConfigAllowListAdapter.purge: user-1이 존재하지 않는 ID 영구 삭제
 
 Then
 

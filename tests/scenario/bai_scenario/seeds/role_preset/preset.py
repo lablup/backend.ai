@@ -26,6 +26,7 @@ class TestSeedRolePreset(TestSeedRow[RolePresetData]):
     """A role preset in the global catalog, carrying no permission entry."""
 
     name_hint: str = "preset"
+    scope_type: EntityType = ProjectEntityType()
 
     @override
     def kind(self) -> str:
@@ -33,7 +34,9 @@ class TestSeedRolePreset(TestSeedRow[RolePresetData]):
 
     @override
     def detail(self) -> str:
-        return "프로젝트 스코프용이고 자동 부여는 꺼져 있다"
+        if self.scope_type == ProjectEntityType():
+            return "프로젝트 스코프용이고 자동 부여는 꺼져 있다"
+        return f"{self.scope_type} 스코프용이고 자동 부여는 꺼져 있다"
 
     @override
     def name(self, naming: Naming) -> str:
@@ -41,7 +44,7 @@ class TestSeedRolePreset(TestSeedRow[RolePresetData]):
 
     @override
     def seed(self, name: str) -> RolePresetCreator:
-        return RolePresetCreator(name=name, scope_type=ProjectEntityType())
+        return RolePresetCreator(name=name, scope_type=self.scope_type)
 
 
 @dataclass(frozen=True)

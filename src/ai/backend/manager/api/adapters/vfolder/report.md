@@ -1,116 +1,116 @@
 ## vfolder
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/vfolder/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/vfolder/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/vfolder/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/vfolder/adapter.py)
 
-시나리오: 미완 25 / 30
+Scenario: incomplete 25 / 30
 
-- ops 로 구성 (4)
-  - admin_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
-  - project_search — 대표 성공 ✓ · 대표 실패 ✓
-  - scoped_search — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-- 직접 구현 (26)
-  - batch_load_mount_permissions — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - batch_load_permissions — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - bulk_delete — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - bulk_purge — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - clone — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - create — 성공 있음 1 · 실패 있음 1 (scope)
-  - create_download_session — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - create_in_project — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
-  - create_upload_session — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - delete — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - delete_files — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - deploy — 성공 없음 · 실패 없음 (scope, single_entity) — SCENARIO-GAP
-  - get — 성공 있음 2 · 실패 있음 2 (single_entity)
-  - get_folder_usage — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - list_files — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - list_mount_policies — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - mkdir — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - move_file — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - partial_bulk_delete — 성공 있음 2 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - partial_bulk_restore — 성공 있음 1 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - partial_bulk_update — 성공 있음 2 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - purge — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - restore — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - set_mount_policy — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - unset_mount_policy — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - update — 성공 있음 1 · 실패 있음 2 (single_entity)
+- built from ops (4)
+  - admin_search: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_by_ids: representative success ✓ · representative rejection ✓
+  - project_search: representative success ✓ · representative rejection ✓
+  - scoped_search: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+- direct implementation (26)
+  - batch_load_mount_permissions: success absent · rejection absent (partial_bulk): SCENARIO-GAP
+  - batch_load_permissions: success absent · rejection absent (partial_bulk): SCENARIO-GAP
+  - bulk_delete: success absent · rejection absent (partial_bulk): SCENARIO-GAP
+  - bulk_purge: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - clone: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - create: success present 1 · rejection present 1 (scope)
+  - create_download_session: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - create_in_project: success absent · rejection absent (scope): SCENARIO-GAP
+  - create_upload_session: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - delete: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - delete_files: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - deploy: success absent · rejection absent (scope, single_entity): SCENARIO-GAP
+  - get: success present 2 · rejection present 2 (single_entity)
+  - get_folder_usage: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - list_files: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - list_mount_policies: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - mkdir: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - move_file: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - partial_bulk_delete: success present 2 · rejection absent (partial_bulk): SCENARIO-GAP
+  - partial_bulk_restore: success present 1 · rejection absent (partial_bulk): SCENARIO-GAP
+  - partial_bulk_update: success present 2 · rejection absent (partial_bulk): SCENARIO-GAP
+  - purge: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - restore: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - set_mount_policy: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - unset_mount_policy: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - update: success present 1 · rejection present 2 (single_entity)
 
 **batch_load_by_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 빈 id 목록을 주면, 권한 검사 없이 빈 목록이 온다](#batch_loading-a-batch-load-of-no-ids-answers-an-empty-list) | 성공 |
-| [자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더 id로 일괄 읽기를 하면, 그 폴더가 온다](#batch_loading-a-user-granted-folder-read-loads-their-own-folder-by-id) | 성공 |
-| [남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더 id로 일괄 읽기를 하면, 그 폴더가 온다](#batch_loading-an-accepted-share-loads-someone-elses-folder-by-id) | 성공 |
-| [슈퍼관리자가 남의 폴더와 없는 id를 함께 요청하면, 그 폴더는 노드로, 없는 id 자리는 빈 값으로 온다](#batch_loading-the-superadmin-batch-load-leaves-a-missing-id-empty) | 성공 |
-| [자기 폴더만 읽을 수 있는 사용자가 자기 폴더, 공유받지 않은 남의 폴더, 없는 id를 한 번에 요청하면, 입력 순서대로 그 폴더, 거부, 거부가 온다](#batch_loading-a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order) | 거부 |
-| [아무 권한도 받지 않은 사용자가 자기 폴더 id로 일괄 읽기를 하면, 호출은 성공하되 그 자리는 권한 부족으로 거부된다](#batch_loading-a-user-granted-nothing-gets-a-refusal-in-place-of-their-own-folder) | 거부 |
-| [남의 폴더를 공유 제안만 받고 받아들이지 않은 사용자가 그 폴더 id로 일괄 읽기를 하면, 호출은 성공하되 그 자리는 권한 부족으로 거부된다](#batch_loading-an-unanswered-offer-gets-a-refusal-in-place-of-someone-elses-folder) | 거부 |
+| [아무 권한도 받지 않은 사용자가 빈 id 목록을 주면, 권한 검사 없이 빈 목록이 온다](#batch_loading-a-batch-load-of-no-ids-answers-an-empty-list) | answered |
+| [자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더 id로 일괄 읽기를 하면, 그 폴더가 온다](#batch_loading-a-user-granted-folder-read-loads-their-own-folder-by-id) | answered |
+| [남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더 id로 일괄 읽기를 하면, 그 폴더가 온다](#batch_loading-an-accepted-share-loads-someone-elses-folder-by-id) | answered |
+| [슈퍼관리자가 남의 폴더와 없는 id를 함께 요청하면, 그 폴더는 노드로, 없는 id 자리는 빈 값으로 온다](#batch_loading-the-superadmin-batch-load-leaves-a-missing-id-empty) | answered |
+| [자기 폴더만 읽을 수 있는 사용자가 자기 폴더, 공유받지 않은 남의 폴더, 없는 id를 한 번에 요청하면, 입력 순서대로 그 폴더, 거부, 거부가 온다](#batch_loading-a-batch-load-answers-a-node-or-a-rejection-for-each-id-in-order) | rejected |
+| [아무 권한도 받지 않은 사용자가 자기 폴더 id로 일괄 읽기를 하면, 호출은 성공하되 그 자리는 권한 부족으로 거부된다](#batch_loading-a-user-granted-nothing-gets-a-rejection-in-place-of-their-own-folder) | rejected |
+| [남의 폴더를 공유 제안만 받고 받아들이지 않은 사용자가 그 폴더 id로 일괄 읽기를 하면, 호출은 성공하되 그 자리는 권한 부족으로 거부된다](#batch_loading-an-unanswered-offer-gets-a-rejection-in-place-of-someone-elses-folder) | rejected |
 
 **project_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프로젝트에서 폴더 읽기 권한을 받은 사용자가 그 프로젝트의 폴더를 조회하면, 그 프로젝트의 폴더가 온다](#reaching-a-user-granted-folder-read-in-a-project-lists-its-folder) | 성공 |
-| [아무 권한도 받지 않은 사용자가 프로젝트의 폴더를 조회하려 하면 권한 부족으로 거부된다](#reaching-a-user-granted-nothing-may-not-list-a-projects-folders) | 거부 |
+| [프로젝트에서 폴더 읽기 권한을 받은 사용자가 그 프로젝트의 폴더를 조회하면, 그 프로젝트의 폴더가 온다](#reaching-a-user-granted-folder-read-in-a-project-lists-its-folder) | answered |
+| [아무 권한도 받지 않은 사용자가 프로젝트의 폴더를 조회하려 하면 권한 부족으로 거부된다](#reaching-a-user-granted-nothing-may-not-list-a-projects-folders) | rejected |
 
 **scoped_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [폴더를 하나도 만들지 않은 사용자가 자기 폴더를 조회하면, 답은 비어 있다](#vfolder-a-user-who-has-made-no-folder-lists-none) | 성공 |
+| [폴더를 하나도 만들지 않은 사용자가 자기 폴더를 조회하면, 답은 비어 있다](#vfolder-a-user-who-has-made-no-folder-lists-none) | answered |
 
 **create**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 스코프에서 폴더 생성 권한을 받은 사용자가 폴더를 만들면, 그 폴더의 소유는 그 사용자에게 있다](#vfolder-a-user-granted-folder-create-makes-one-of-their-own) | 성공 |
-| [아무 권한도 받지 않은 사용자가 폴더를 만들려 하면 권한 부족으로 거부된다](#vfolder-a-user-granted-nothing-may-not-make-a-folder) | 거부 |
+| [자기 스코프에서 폴더 생성 권한을 받은 사용자가 폴더를 만들면, 그 폴더의 소유는 그 사용자에게 있다](#vfolder-a-user-granted-folder-create-makes-one-of-their-own) | answered |
+| [아무 권한도 받지 않은 사용자가 폴더를 만들려 하면 권한 부족으로 거부된다](#vfolder-a-user-granted-nothing-may-not-make-a-folder) | rejected |
 
 **get**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더를 읽으면, 그 폴더가 온다](#reaching-a-user-granted-folder-read-reads-their-own-folder) | 성공 |
-| [남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더를 읽으면, 그 폴더가 온다](#reaching-an-accepted-share-reads-someone-elses-folder) | 성공 |
-| [아무 권한도 받지 않은 사용자가 자기 폴더를 읽으려 하면 권한 부족으로 거부된다](#reaching-a-user-granted-nothing-may-not-read-their-own-folder) | 거부 |
-| [남의 폴더를 공유 제안만 받고 받아들이지 않은 사용자가 그 폴더를 읽으려 하면 권한 부족으로 거부된다](#reaching-an-unanswered-offer-may-not-read-someone-elses-folder) | 거부 |
+| [자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더를 읽으면, 그 폴더가 온다](#reaching-a-user-granted-folder-read-reads-their-own-folder) | answered |
+| [남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더를 읽으면, 그 폴더가 온다](#reaching-an-accepted-share-reads-someone-elses-folder) | answered |
+| [아무 권한도 받지 않은 사용자가 자기 폴더를 읽으려 하면 권한 부족으로 거부된다](#reaching-a-user-granted-nothing-may-not-read-their-own-folder) | rejected |
+| [남의 폴더를 공유 제안만 받고 받아들이지 않은 사용자가 그 폴더를 읽으려 하면 권한 부족으로 거부된다](#reaching-an-unanswered-offer-may-not-read-someone-elses-folder) | rejected |
 
 **partial_bulk_delete**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 개인 프로젝트에서 폴더 soft delete 권한을 받은 사용자가 자기 폴더 둘과 남의 폴더 하나를 한 번에 soft delete 하면, 자기 폴더 둘은 삭제 대기로 오고 남의 폴더는 권한 부족으로 실패 목록에 온다](#partial_bulk-a-user-granted-folder-soft-delete-soft-deletes-their-folders-of-several) | 성공 |
-| [아무 권한도 받지 않은 사용자가 폴더 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk-a-user-granted-nothing-soft-deletes-none-of-several-folders) | 성공 |
+| [자기 개인 프로젝트에서 폴더 soft delete 권한을 받은 사용자가 자기 폴더 둘과 남의 폴더 하나를 한 번에 soft delete 하면, 자기 폴더 둘은 삭제 대기로 오고 남의 폴더는 권한 부족으로 실패 목록에 온다](#partial_bulk-a-user-granted-folder-soft-delete-soft-deletes-their-folders-of-several) | answered |
+| [아무 권한도 받지 않은 사용자가 폴더 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk-a-user-granted-nothing-soft-deletes-none-of-several-folders) | answered |
 
 **partial_bulk_restore**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [폴더 soft delete 권한을 받은 사용자가 soft delete 한 자기 폴더 둘을 한 번에 restore 하면, 둘 다 쓸 수 있는 상태로 온다](#partial_bulk-restoring-several-folders-brings-them-back) | 성공 |
+| [폴더 soft delete 권한을 받은 사용자가 soft delete 한 자기 폴더 둘을 한 번에 restore 하면, 둘 다 쓸 수 있는 상태로 온다](#partial_bulk-restoring-several-folders-brings-them-back) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 개인 프로젝트에서 폴더 수정 권한을 받은 사용자가 자기 폴더 둘과 남의 폴더 하나를 한 번에 수정하면, 자기 폴더 둘은 수정되어 오고 남의 폴더는 권한 부족으로 실패 목록에 온다](#partial_bulk-a-user-granted-folder-update-updates-their-folders-of-several) | 성공 |
-| [아무 권한도 받지 않은 사용자가 폴더 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk-a-user-granted-nothing-updates-none-of-several-folders) | 성공 |
+| [자기 개인 프로젝트에서 폴더 수정 권한을 받은 사용자가 자기 폴더 둘과 남의 폴더 하나를 한 번에 수정하면, 자기 폴더 둘은 수정되어 오고 남의 폴더는 권한 부족으로 실패 목록에 온다](#partial_bulk-a-user-granted-folder-update-updates-their-folders-of-several) | answered |
+| [아무 권한도 받지 않은 사용자가 폴더 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk-a-user-granted-nothing-updates-none-of-several-folders) | answered |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 개인 프로젝트에서 폴더 수정 권한을 받은 사용자가 자기 폴더의 이름과 옵션을 바꾸면, 바뀐 폴더가 온다](#editing-a-user-granted-folder-update-renames-their-folder) | 성공 |
-| [아무 권한도 받지 않은 사용자가 자기 폴더를 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-update-their-folder) | 거부 |
-| [자기 다른 폴더가 이미 쓰는 이름으로 바꾸려 하면, 잘못된 값으로 거부된다](#editing-renaming-to-a-name-the-owner-already-uses-is-refused) | 거부 |
+| [자기 개인 프로젝트에서 폴더 수정 권한을 받은 사용자가 자기 폴더의 이름과 옵션을 바꾸면, 바뀐 폴더가 온다](#editing-a-user-granted-folder-update-renames-their-folder) | answered |
+| [아무 권한도 받지 않은 사용자가 자기 폴더를 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-update-their-folder) | rejected |
+| [자기 다른 폴더가 이미 쓰는 이름으로 바꾸려 하면, 잘못된 값으로 거부된다](#editing-renaming-to-a-name-the-owner-already-uses-is-refused) | rejected |
 
 ### batch_load_by_ids
 
 <a id="batch_loading-a-batch-load-of-no-ids-answers-an-empty-list"></a>
 
-#### [a-batch-load-of-no-ids-answers-an-empty-list](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
+#### [a-batch-load-of-no-ids-answers-an-empty-list](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py): pass
 
 아무 권한도 받지 않은 사용자가 빈 id 목록을 주면, 권한 검사 없이 빈 목록이 온다
 
@@ -126,7 +126,7 @@ Given
 
 When
 
-- VFolderAdapter.batch_load_by_ids — user-1이 빈 목록으로 일괄 읽음
+- VFolderAdapter.batch_load_by_ids: user-1이 빈 목록으로 일괄 읽음
 
 Then
 
@@ -135,7 +135,7 @@ Then
 
 <a id="batch_loading-a-user-granted-folder-read-loads-their-own-folder-by-id"></a>
 
-#### [a-user-granted-folder-read-loads-their-own-folder-by-id](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
+#### [a-user-granted-folder-read-loads-their-own-folder-by-id](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py): pass
 
 자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더 id로 일괄 읽기를 하면, 그 폴더가 온다
 
@@ -156,7 +156,7 @@ Given
 
 When
 
-- VFolderAdapter.batch_load_by_ids — user-1이 folder-1 폴더 id로 일괄 읽음
+- VFolderAdapter.batch_load_by_ids: user-1이 folder-1 폴더 id로 일괄 읽음
 
 Then
 
@@ -174,15 +174,15 @@ Then
   - [0].ownership.creator_id: 만든 사람와 같다
   - [0].ownership.creator_email = 'user-1@scenario.local'
   - [0].unmanaged_path = None
-  - [0].metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
-  - [0].metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
-  - [0].access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
-  - [0].quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
+  - [0].metadata.usage_mode: 무시함: 타입이 이미 값을 못박는다
+  - [0].metadata.quota_scope_id: 무시함: 주인의 id로 만들어져 실행마다 다르다
+  - [0].access_control.permission: 무시함: 마운트 권한이라 이 표가 묻는 것이 아니다
+  - [0].quota: 무시함: 저장소가 답하는 값이라 여기서 말할 수 없다
   - [0].metadata.created_at: 이 실행이 쓴 시각
 
 <a id="batch_loading-an-accepted-share-loads-someone-elses-folder-by-id"></a>
 
-#### [an-accepted-share-loads-someone-elses-folder-by-id](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
+#### [an-accepted-share-loads-someone-elses-folder-by-id](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py): pass
 
 남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더 id로 일괄 읽기를 하면, 그 폴더가 온다
 
@@ -208,7 +208,7 @@ Given
 
 When
 
-- VFolderAdapter.batch_load_by_ids — user-2이 folder-1 폴더 id로 일괄 읽음
+- VFolderAdapter.batch_load_by_ids: user-2이 folder-1 폴더 id로 일괄 읽음
 
 Then
 
@@ -226,15 +226,15 @@ Then
   - [0].ownership.creator_id: 만든 사람와 같다
   - [0].ownership.creator_email = 'user-1@scenario.local'
   - [0].unmanaged_path = None
-  - [0].metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
-  - [0].metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
-  - [0].access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
-  - [0].quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
+  - [0].metadata.usage_mode: 무시함: 타입이 이미 값을 못박는다
+  - [0].metadata.quota_scope_id: 무시함: 주인의 id로 만들어져 실행마다 다르다
+  - [0].access_control.permission: 무시함: 마운트 권한이라 이 표가 묻는 것이 아니다
+  - [0].quota: 무시함: 저장소가 답하는 값이라 여기서 말할 수 없다
   - [0].metadata.created_at: 이 실행이 쓴 시각
 
 <a id="batch_loading-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
 
-#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
+#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py): pass
 
 슈퍼관리자가 남의 폴더와 없는 id를 함께 요청하면, 그 폴더는 노드로, 없는 id 자리는 빈 값으로 온다
 
@@ -254,7 +254,7 @@ Given
 
 When
 
-- VFolderAdapter.batch_load_by_ids — user-2이 folder-1 폴더와 없는 id를 일괄 읽음
+- VFolderAdapter.batch_load_by_ids: user-2이 folder-1 폴더와 없는 id를 일괄 읽음
 
 Then
 
@@ -272,16 +272,16 @@ Then
   - [0].ownership.creator_id: 만든 사람와 같다
   - [0].ownership.creator_email = 'user-1@scenario.local'
   - [0].unmanaged_path = None
-  - [0].metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
-  - [0].metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
-  - [0].access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
-  - [0].quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
+  - [0].metadata.usage_mode: 무시함: 타입이 이미 값을 못박는다
+  - [0].metadata.quota_scope_id: 무시함: 주인의 id로 만들어져 실행마다 다르다
+  - [0].access_control.permission: 무시함: 마운트 권한이라 이 표가 묻는 것이 아니다
+  - [0].quota: 무시함: 저장소가 답하는 값이라 여기서 말할 수 없다
   - [0].metadata.created_at: 이 실행이 쓴 시각
   - [1] = None
 
-<a id="batch_loading-a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order"></a>
+<a id="batch_loading-a-batch-load-answers-a-node-or-a-rejection-for-each-id-in-order"></a>
 
-#### [a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
+#### [a-batch-load-answers-a-node-or-a-rejection-for-each-id-in-order](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py): pass
 
 자기 폴더만 읽을 수 있는 사용자가 자기 폴더, 공유받지 않은 남의 폴더, 없는 id를 한 번에 요청하면, 입력 순서대로 그 폴더, 거부, 거부가 온다
 
@@ -306,7 +306,7 @@ Given
 
 When
 
-- VFolderAdapter.batch_load_by_ids — user-1이 folder-1, folder-2, 없는 id 순으로 일괄 읽음
+- VFolderAdapter.batch_load_by_ids: user-1이 folder-1, folder-2, 없는 id 순으로 일괄 읽음
 
 Then
 
@@ -324,17 +324,17 @@ Then
   - [0].ownership.creator_id: 만든 사람와 같다
   - [0].ownership.creator_email = 'user-1@scenario.local'
   - [0].unmanaged_path = None
-  - [0].metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
-  - [0].metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
-  - [0].access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
-  - [0].quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
+  - [0].metadata.usage_mode: 무시함: 타입이 이미 값을 못박는다
+  - [0].metadata.quota_scope_id: 무시함: 주인의 id로 만들어져 실행마다 다르다
+  - [0].access_control.permission: 무시함: 마운트 권한이라 이 표가 묻는 것이 아니다
+  - [0].quota: 무시함: 저장소가 답하는 값이라 여기서 말할 수 없다
   - [0].metadata.created_at: 이 실행이 쓴 시각
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
 
-<a id="batch_loading-a-user-granted-nothing-gets-a-refusal-in-place-of-their-own-folder"></a>
+<a id="batch_loading-a-user-granted-nothing-gets-a-rejection-in-place-of-their-own-folder"></a>
 
-#### [a-user-granted-nothing-gets-a-refusal-in-place-of-their-own-folder](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
+#### [a-user-granted-nothing-gets-a-rejection-in-place-of-their-own-folder](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py): pass
 
 아무 권한도 받지 않은 사용자가 자기 폴더 id로 일괄 읽기를 하면, 호출은 성공하되 그 자리는 권한 부족으로 거부된다
 
@@ -351,7 +351,7 @@ Given
 
 When
 
-- VFolderAdapter.batch_load_by_ids — user-1이 folder-1 폴더 id로 일괄 읽음
+- VFolderAdapter.batch_load_by_ids: user-1이 folder-1 폴더 id로 일괄 읽음
 
 Then
 
@@ -359,9 +359,9 @@ Then
   - length = 1
   - 거부: NotEnoughPermission
 
-<a id="batch_loading-an-unanswered-offer-gets-a-refusal-in-place-of-someone-elses-folder"></a>
+<a id="batch_loading-an-unanswered-offer-gets-a-rejection-in-place-of-someone-elses-folder"></a>
 
-#### [an-unanswered-offer-gets-a-refusal-in-place-of-someone-elses-folder](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py) — pass
+#### [an-unanswered-offer-gets-a-rejection-in-place-of-someone-elses-folder](/tests/scenario/bai_scenario/manager/vfolder/test_batch_loading.py): pass
 
 남의 폴더를 공유 제안만 받고 받아들이지 않은 사용자가 그 폴더 id로 일괄 읽기를 하면, 호출은 성공하되 그 자리는 권한 부족으로 거부된다
 
@@ -386,7 +386,7 @@ Given
 
 When
 
-- VFolderAdapter.batch_load_by_ids — user-2이 folder-1 폴더 id로 일괄 읽음
+- VFolderAdapter.batch_load_by_ids: user-2이 folder-1 폴더 id로 일괄 읽음
 
 Then
 
@@ -398,7 +398,7 @@ Then
 
 <a id="reaching-a-user-granted-folder-read-in-a-project-lists-its-folder"></a>
 
-#### [a-user-granted-folder-read-in-a-project-lists-its-folder](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py) — pass
+#### [a-user-granted-folder-read-in-a-project-lists-its-folder](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py): pass
 
 프로젝트에서 폴더 읽기 권한을 받은 사용자가 그 프로젝트의 폴더를 조회하면, 그 프로젝트의 폴더가 온다
 
@@ -420,7 +420,7 @@ Given
 
 When
 
-- VFolderAdapter.project_search — user-1이 folder-1 폴더가 놓인 프로젝트의 폴더를 조회
+- VFolderAdapter.project_search: user-1이 folder-1 폴더가 놓인 프로젝트의 폴더를 조회
 
 Then
 
@@ -441,15 +441,15 @@ Then
   - items[0].ownership.creator_id: 만든 사람와 같다
   - items[0].ownership.creator_email = 'user-1@scenario.local'
   - items[0].unmanaged_path = None
-  - items[0].metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
-  - items[0].metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
-  - items[0].access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
-  - items[0].quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
+  - items[0].metadata.usage_mode: 무시함: 타입이 이미 값을 못박는다
+  - items[0].metadata.quota_scope_id: 무시함: 주인의 id로 만들어져 실행마다 다르다
+  - items[0].access_control.permission: 무시함: 마운트 권한이라 이 표가 묻는 것이 아니다
+  - items[0].quota: 무시함: 저장소가 답하는 값이라 여기서 말할 수 없다
   - items[0].metadata.created_at: 이 실행이 쓴 시각
 
 <a id="reaching-a-user-granted-nothing-may-not-list-a-projects-folders"></a>
 
-#### [a-user-granted-nothing-may-not-list-a-projects-folders](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py) — pass
+#### [a-user-granted-nothing-may-not-list-a-projects-folders](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py): pass
 
 아무 권한도 받지 않은 사용자가 프로젝트의 폴더를 조회하려 하면 권한 부족으로 거부된다
 
@@ -467,7 +467,7 @@ Given
 
 When
 
-- VFolderAdapter.project_search — user-1이 folder-1 폴더가 놓인 프로젝트의 폴더를 조회
+- VFolderAdapter.project_search: user-1이 folder-1 폴더가 놓인 프로젝트의 폴더를 조회
 
 Then
 
@@ -478,7 +478,7 @@ Then
 
 <a id="vfolder-a-user-who-has-made-no-folder-lists-none"></a>
 
-#### [a-user-who-has-made-no-folder-lists-none](/tests/scenario/bai_scenario/manager/vfolder/test_vfolder.py) — pass
+#### [a-user-who-has-made-no-folder-lists-none](/tests/scenario/bai_scenario/manager/vfolder/test_vfolder.py): pass
 
 폴더를 하나도 만들지 않은 사용자가 자기 폴더를 조회하면, 답은 비어 있다
 
@@ -499,7 +499,7 @@ Given
 
 When
 
-- VFolderAdapter.scoped_search — user-1이 자기 폴더를 조회
+- VFolderAdapter.scoped_search: user-1이 자기 폴더를 조회
 
 Then
 
@@ -513,7 +513,7 @@ Then
 
 <a id="vfolder-a-user-granted-folder-create-makes-one-of-their-own"></a>
 
-#### [a-user-granted-folder-create-makes-one-of-their-own](/tests/scenario/bai_scenario/manager/vfolder/test_vfolder.py) — pass
+#### [a-user-granted-folder-create-makes-one-of-their-own](/tests/scenario/bai_scenario/manager/vfolder/test_vfolder.py): pass
 
 자기 스코프에서 폴더 생성 권한을 받은 사용자가 폴더를 만들면, 그 폴더의 소유는 그 사용자에게 있다
 
@@ -534,7 +534,7 @@ Given
 
 When
 
-- VFolderAdapter.create — user-1이 work이라는 폴더를 만듦
+- VFolderAdapter.create: user-1이 work이라는 폴더를 만듦
 
 Then
 
@@ -545,21 +545,21 @@ Then
   - metadata.last_used = None
   - access_control.ownership_type = 'user'
   - ownership.user_id: 만든 사람와 같다
-  - ownership.project_id: 무시함 — 개인 폴더는 그 사람의 개인 프로젝트에 붙는다. 그 id는 사용자를 만들 때 생긴다
+  - ownership.project_id: 무시함: 개인 폴더는 그 사람의 개인 프로젝트에 붙는다. 그 id는 사용자를 만들 때 생긴다
   - ownership.creator_id: 만든 사람와 같다
   - ownership.creator_email = 'user-1@scenario.local'
   - unmanaged_path = None
-  - id: 무시함 — 데이터베이스가 만든다
-  - status: 무시함 — 폴더가 만들어지는 동안 오가는 값이다
-  - metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
-  - metadata.quota_scope_id: 무시함 — 저장소가 정한다
-  - access_control.permission: 무시함 — 만든 사람에게는 물어볼 것이 없다
-  - quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
+  - id: 무시함: 데이터베이스가 만든다
+  - status: 무시함: 폴더가 만들어지는 동안 오가는 값이다
+  - metadata.usage_mode: 무시함: 타입이 이미 값을 못박는다
+  - metadata.quota_scope_id: 무시함: 저장소가 정한다
+  - access_control.permission: 무시함: 만든 사람에게는 물어볼 것이 없다
+  - quota: 무시함: 저장소가 답하는 값이라 여기서 말할 수 없다
   - metadata.created_at: 이 실행이 쓴 시각
 
 <a id="vfolder-a-user-granted-nothing-may-not-make-a-folder"></a>
 
-#### [a-user-granted-nothing-may-not-make-a-folder](/tests/scenario/bai_scenario/manager/vfolder/test_vfolder.py) — pass
+#### [a-user-granted-nothing-may-not-make-a-folder](/tests/scenario/bai_scenario/manager/vfolder/test_vfolder.py): pass
 
 아무 권한도 받지 않은 사용자가 폴더를 만들려 하면 권한 부족으로 거부된다
 
@@ -575,7 +575,7 @@ Given
 
 When
 
-- VFolderAdapter.create — user-1이 denied이라는 폴더를 만듦
+- VFolderAdapter.create: user-1이 denied이라는 폴더를 만듦
 
 Then
 
@@ -586,7 +586,7 @@ Then
 
 <a id="reaching-a-user-granted-folder-read-reads-their-own-folder"></a>
 
-#### [a-user-granted-folder-read-reads-their-own-folder](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py) — pass
+#### [a-user-granted-folder-read-reads-their-own-folder](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py): pass
 
 자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더를 읽으면, 그 폴더가 온다
 
@@ -607,7 +607,7 @@ Given
 
 When
 
-- VFolderAdapter.get — user-1이 folder-1 폴더를 읽음
+- VFolderAdapter.get: user-1이 folder-1 폴더를 읽음
 
 Then
 
@@ -624,15 +624,15 @@ Then
   - ownership.creator_id: 만든 사람와 같다
   - ownership.creator_email = 'user-1@scenario.local'
   - unmanaged_path = None
-  - metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
-  - metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
-  - access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
-  - quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
+  - metadata.usage_mode: 무시함: 타입이 이미 값을 못박는다
+  - metadata.quota_scope_id: 무시함: 주인의 id로 만들어져 실행마다 다르다
+  - access_control.permission: 무시함: 마운트 권한이라 이 표가 묻는 것이 아니다
+  - quota: 무시함: 저장소가 답하는 값이라 여기서 말할 수 없다
   - metadata.created_at: 이 실행이 쓴 시각
 
 <a id="reaching-an-accepted-share-reads-someone-elses-folder"></a>
 
-#### [an-accepted-share-reads-someone-elses-folder](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py) — pass
+#### [an-accepted-share-reads-someone-elses-folder](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py): pass
 
 남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더를 읽으면, 그 폴더가 온다
 
@@ -658,7 +658,7 @@ Given
 
 When
 
-- VFolderAdapter.get — user-2이 folder-1 폴더를 읽음
+- VFolderAdapter.get: user-2이 folder-1 폴더를 읽음
 
 Then
 
@@ -675,15 +675,15 @@ Then
   - ownership.creator_id: 만든 사람와 같다
   - ownership.creator_email = 'user-1@scenario.local'
   - unmanaged_path = None
-  - metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
-  - metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
-  - access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
-  - quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
+  - metadata.usage_mode: 무시함: 타입이 이미 값을 못박는다
+  - metadata.quota_scope_id: 무시함: 주인의 id로 만들어져 실행마다 다르다
+  - access_control.permission: 무시함: 마운트 권한이라 이 표가 묻는 것이 아니다
+  - quota: 무시함: 저장소가 답하는 값이라 여기서 말할 수 없다
   - metadata.created_at: 이 실행이 쓴 시각
 
 <a id="reaching-a-user-granted-nothing-may-not-read-their-own-folder"></a>
 
-#### [a-user-granted-nothing-may-not-read-their-own-folder](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py) — pass
+#### [a-user-granted-nothing-may-not-read-their-own-folder](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py): pass
 
 아무 권한도 받지 않은 사용자가 자기 폴더를 읽으려 하면 권한 부족으로 거부된다
 
@@ -700,7 +700,7 @@ Given
 
 When
 
-- VFolderAdapter.get — user-1이 folder-1 폴더를 읽음
+- VFolderAdapter.get: user-1이 folder-1 폴더를 읽음
 
 Then
 
@@ -709,7 +709,7 @@ Then
 
 <a id="reaching-an-unanswered-offer-may-not-read-someone-elses-folder"></a>
 
-#### [an-unanswered-offer-may-not-read-someone-elses-folder](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py) — pass
+#### [an-unanswered-offer-may-not-read-someone-elses-folder](/tests/scenario/bai_scenario/manager/vfolder/test_reaching.py): pass
 
 남의 폴더를 공유 제안만 받고 받아들이지 않은 사용자가 그 폴더를 읽으려 하면 권한 부족으로 거부된다
 
@@ -734,7 +734,7 @@ Given
 
 When
 
-- VFolderAdapter.get — user-2이 folder-1 폴더를 읽음
+- VFolderAdapter.get: user-2이 folder-1 폴더를 읽음
 
 Then
 
@@ -745,7 +745,7 @@ Then
 
 <a id="partial_bulk-a-user-granted-folder-soft-delete-soft-deletes-their-folders-of-several"></a>
 
-#### [a-user-granted-folder-soft-delete-soft-deletes-their-folders-of-several](/tests/scenario/bai_scenario/manager/vfolder/test_partial_bulk.py) — pass
+#### [a-user-granted-folder-soft-delete-soft-deletes-their-folders-of-several](/tests/scenario/bai_scenario/manager/vfolder/test_partial_bulk.py): pass
 
 자기 개인 프로젝트에서 폴더 soft delete 권한을 받은 사용자가 자기 폴더 둘과 남의 폴더 하나를 한 번에 soft delete 하면, 자기 폴더 둘은 삭제 대기로 오고 남의 폴더는 권한 부족으로 실패 목록에 온다
 
@@ -771,7 +771,7 @@ Given
 
 When
 
-- VFolderAdapter.partial_bulk_delete — user-1이 자기 폴더 둘과 남의 폴더 하나를 한 번에 soft delete 함
+- VFolderAdapter.partial_bulk_delete: user-1이 자기 폴더 둘과 남의 폴더 하나를 한 번에 soft delete 함
 
 Then
 
@@ -789,10 +789,10 @@ Then
   - successes[0].ownership.creator_id: 만든 사람와 같다
   - successes[0].ownership.creator_email = 'user-1@scenario.local'
   - successes[0].unmanaged_path = None
-  - successes[0].metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
-  - successes[0].metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
-  - successes[0].access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
-  - successes[0].quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
+  - successes[0].metadata.usage_mode: 무시함: 타입이 이미 값을 못박는다
+  - successes[0].metadata.quota_scope_id: 무시함: 주인의 id로 만들어져 실행마다 다르다
+  - successes[0].access_control.permission: 무시함: 마운트 권한이라 이 표가 묻는 것이 아니다
+  - successes[0].quota: 무시함: 저장소가 답하는 값이라 여기서 말할 수 없다
   - successes[0].metadata.created_at: 이 실행이 쓴 시각
   - successes[1].id: 심은 폴더와 같다
   - successes[1].host = 'local:volume1'
@@ -806,10 +806,10 @@ Then
   - successes[1].ownership.creator_id: 만든 사람와 같다
   - successes[1].ownership.creator_email = 'user-1@scenario.local'
   - successes[1].unmanaged_path = None
-  - successes[1].metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
-  - successes[1].metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
-  - successes[1].access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
-  - successes[1].quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
+  - successes[1].metadata.usage_mode: 무시함: 타입이 이미 값을 못박는다
+  - successes[1].metadata.quota_scope_id: 무시함: 주인의 id로 만들어져 실행마다 다르다
+  - successes[1].access_control.permission: 무시함: 마운트 권한이라 이 표가 묻는 것이 아니다
+  - successes[1].quota: 무시함: 저장소가 답하는 값이라 여기서 말할 수 없다
   - successes[1].metadata.created_at: 이 실행이 쓴 시각
   - failed count = 1
   - failed[0].id: 대상 폴더의 id와 같다
@@ -817,7 +817,7 @@ Then
 
 <a id="partial_bulk-a-user-granted-nothing-soft-deletes-none-of-several-folders"></a>
 
-#### [a-user-granted-nothing-soft-deletes-none-of-several-folders](/tests/scenario/bai_scenario/manager/vfolder/test_partial_bulk.py) — pass
+#### [a-user-granted-nothing-soft-deletes-none-of-several-folders](/tests/scenario/bai_scenario/manager/vfolder/test_partial_bulk.py): pass
 
 아무 권한도 받지 않은 사용자가 폴더 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -839,7 +839,7 @@ Given
 
 When
 
-- VFolderAdapter.partial_bulk_delete — user-1이 자기 폴더 둘과 남의 폴더 하나를 한 번에 soft delete 함
+- VFolderAdapter.partial_bulk_delete: user-1이 자기 폴더 둘과 남의 폴더 하나를 한 번에 soft delete 함
 
 Then
 
@@ -857,7 +857,7 @@ Then
 
 <a id="partial_bulk-restoring-several-folders-brings-them-back"></a>
 
-#### [restoring-several-folders-brings-them-back](/tests/scenario/bai_scenario/manager/vfolder/test_partial_bulk.py) — pass
+#### [restoring-several-folders-brings-them-back](/tests/scenario/bai_scenario/manager/vfolder/test_partial_bulk.py): pass
 
 폴더 soft delete 권한을 받은 사용자가 soft delete 한 자기 폴더 둘을 한 번에 restore 하면, 둘 다 쓸 수 있는 상태로 온다
 
@@ -883,7 +883,7 @@ Given
 
 When
 
-- VFolderAdapter.partial_bulk_restore — user-1이 자기 폴더 둘을 한 번에 soft delete 했다가 한 번에 restore 함
+- VFolderAdapter.partial_bulk_restore: user-1이 자기 폴더 둘을 한 번에 soft delete 했다가 한 번에 restore 함
 
 Then
 
@@ -901,10 +901,10 @@ Then
   - successes[0].ownership.creator_id: 만든 사람와 같다
   - successes[0].ownership.creator_email = 'user-1@scenario.local'
   - successes[0].unmanaged_path = None
-  - successes[0].metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
-  - successes[0].metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
-  - successes[0].access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
-  - successes[0].quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
+  - successes[0].metadata.usage_mode: 무시함: 타입이 이미 값을 못박는다
+  - successes[0].metadata.quota_scope_id: 무시함: 주인의 id로 만들어져 실행마다 다르다
+  - successes[0].access_control.permission: 무시함: 마운트 권한이라 이 표가 묻는 것이 아니다
+  - successes[0].quota: 무시함: 저장소가 답하는 값이라 여기서 말할 수 없다
   - successes[0].metadata.created_at: 이 실행이 쓴 시각
   - successes[1].id: 심은 폴더와 같다
   - successes[1].host = 'local:volume1'
@@ -918,10 +918,10 @@ Then
   - successes[1].ownership.creator_id: 만든 사람와 같다
   - successes[1].ownership.creator_email = 'user-1@scenario.local'
   - successes[1].unmanaged_path = None
-  - successes[1].metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
-  - successes[1].metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
-  - successes[1].access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
-  - successes[1].quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
+  - successes[1].metadata.usage_mode: 무시함: 타입이 이미 값을 못박는다
+  - successes[1].metadata.quota_scope_id: 무시함: 주인의 id로 만들어져 실행마다 다르다
+  - successes[1].access_control.permission: 무시함: 마운트 권한이라 이 표가 묻는 것이 아니다
+  - successes[1].quota: 무시함: 저장소가 답하는 값이라 여기서 말할 수 없다
   - successes[1].metadata.created_at: 이 실행이 쓴 시각
   - failed = []
 
@@ -929,7 +929,7 @@ Then
 
 <a id="partial_bulk-a-user-granted-folder-update-updates-their-folders-of-several"></a>
 
-#### [a-user-granted-folder-update-updates-their-folders-of-several](/tests/scenario/bai_scenario/manager/vfolder/test_partial_bulk.py) — pass
+#### [a-user-granted-folder-update-updates-their-folders-of-several](/tests/scenario/bai_scenario/manager/vfolder/test_partial_bulk.py): pass
 
 자기 개인 프로젝트에서 폴더 수정 권한을 받은 사용자가 자기 폴더 둘과 남의 폴더 하나를 한 번에 수정하면, 자기 폴더 둘은 수정되어 오고 남의 폴더는 권한 부족으로 실패 목록에 온다
 
@@ -955,7 +955,7 @@ Given
 
 When
 
-- VFolderAdapter.partial_bulk_update — user-1이 자기 폴더 둘과 남의 폴더 하나를 한 번에 복제 가능으로 바꿈
+- VFolderAdapter.partial_bulk_update: user-1이 자기 폴더 둘과 남의 폴더 하나를 한 번에 복제 가능으로 바꿈
 
 Then
 
@@ -973,10 +973,10 @@ Then
   - successes[0].ownership.creator_id: 만든 사람와 같다
   - successes[0].ownership.creator_email = 'user-1@scenario.local'
   - successes[0].unmanaged_path = None
-  - successes[0].metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
-  - successes[0].metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
-  - successes[0].access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
-  - successes[0].quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
+  - successes[0].metadata.usage_mode: 무시함: 타입이 이미 값을 못박는다
+  - successes[0].metadata.quota_scope_id: 무시함: 주인의 id로 만들어져 실행마다 다르다
+  - successes[0].access_control.permission: 무시함: 마운트 권한이라 이 표가 묻는 것이 아니다
+  - successes[0].quota: 무시함: 저장소가 답하는 값이라 여기서 말할 수 없다
   - successes[0].metadata.created_at: 이 실행이 쓴 시각
   - successes[1].id: 심은 폴더와 같다
   - successes[1].host = 'local:volume1'
@@ -990,10 +990,10 @@ Then
   - successes[1].ownership.creator_id: 만든 사람와 같다
   - successes[1].ownership.creator_email = 'user-1@scenario.local'
   - successes[1].unmanaged_path = None
-  - successes[1].metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
-  - successes[1].metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
-  - successes[1].access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
-  - successes[1].quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
+  - successes[1].metadata.usage_mode: 무시함: 타입이 이미 값을 못박는다
+  - successes[1].metadata.quota_scope_id: 무시함: 주인의 id로 만들어져 실행마다 다르다
+  - successes[1].access_control.permission: 무시함: 마운트 권한이라 이 표가 묻는 것이 아니다
+  - successes[1].quota: 무시함: 저장소가 답하는 값이라 여기서 말할 수 없다
   - successes[1].metadata.created_at: 이 실행이 쓴 시각
   - failed count = 1
   - failed[0].id: 대상 폴더의 id와 같다
@@ -1001,7 +1001,7 @@ Then
 
 <a id="partial_bulk-a-user-granted-nothing-updates-none-of-several-folders"></a>
 
-#### [a-user-granted-nothing-updates-none-of-several-folders](/tests/scenario/bai_scenario/manager/vfolder/test_partial_bulk.py) — pass
+#### [a-user-granted-nothing-updates-none-of-several-folders](/tests/scenario/bai_scenario/manager/vfolder/test_partial_bulk.py): pass
 
 아무 권한도 받지 않은 사용자가 폴더 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -1023,7 +1023,7 @@ Given
 
 When
 
-- VFolderAdapter.partial_bulk_update — user-1이 자기 폴더 둘과 남의 폴더 하나를 한 번에 복제 가능으로 바꿈
+- VFolderAdapter.partial_bulk_update: user-1이 자기 폴더 둘과 남의 폴더 하나를 한 번에 복제 가능으로 바꿈
 
 Then
 
@@ -1041,7 +1041,7 @@ Then
 
 <a id="editing-a-user-granted-folder-update-renames-their-folder"></a>
 
-#### [a-user-granted-folder-update-renames-their-folder](/tests/scenario/bai_scenario/manager/vfolder/test_editing.py) — pass
+#### [a-user-granted-folder-update-renames-their-folder](/tests/scenario/bai_scenario/manager/vfolder/test_editing.py): pass
 
 자기 개인 프로젝트에서 폴더 수정 권한을 받은 사용자가 자기 폴더의 이름과 옵션을 바꾸면, 바뀐 폴더가 온다
 
@@ -1067,7 +1067,7 @@ Given
 
 When
 
-- VFolderAdapter.update — user-1이 자기 첫 폴더를 renamed으로 바꾸고 복제 가능으로 바꿈
+- VFolderAdapter.update: user-1이 자기 첫 폴더를 renamed으로 바꾸고 복제 가능으로 바꿈
 
 Then
 
@@ -1084,15 +1084,15 @@ Then
   - vfolder.ownership.creator_id: 만든 사람와 같다
   - vfolder.ownership.creator_email = 'user-1@scenario.local'
   - vfolder.unmanaged_path = None
-  - vfolder.metadata.usage_mode: 무시함 — 타입이 이미 값을 못박는다
-  - vfolder.metadata.quota_scope_id: 무시함 — 주인의 id로 만들어져 실행마다 다르다
-  - vfolder.access_control.permission: 무시함 — 마운트 권한이라 이 표가 묻는 것이 아니다
-  - vfolder.quota: 무시함 — 저장소가 답하는 값이라 여기서 말할 수 없다
+  - vfolder.metadata.usage_mode: 무시함: 타입이 이미 값을 못박는다
+  - vfolder.metadata.quota_scope_id: 무시함: 주인의 id로 만들어져 실행마다 다르다
+  - vfolder.access_control.permission: 무시함: 마운트 권한이라 이 표가 묻는 것이 아니다
+  - vfolder.quota: 무시함: 저장소가 답하는 값이라 여기서 말할 수 없다
   - vfolder.metadata.created_at: 이 실행이 쓴 시각
 
 <a id="editing-a-user-granted-nothing-may-not-update-their-folder"></a>
 
-#### [a-user-granted-nothing-may-not-update-their-folder](/tests/scenario/bai_scenario/manager/vfolder/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-update-their-folder](/tests/scenario/bai_scenario/manager/vfolder/test_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 자기 폴더를 바꾸려 하면 권한 부족으로 거부된다
 
@@ -1114,7 +1114,7 @@ Given
 
 When
 
-- VFolderAdapter.update — user-1이 자기 첫 폴더를 renamed으로 바꾸고 복제 가능으로 바꿈
+- VFolderAdapter.update: user-1이 자기 첫 폴더를 renamed으로 바꾸고 복제 가능으로 바꿈
 
 Then
 
@@ -1123,7 +1123,7 @@ Then
 
 <a id="editing-renaming-to-a-name-the-owner-already-uses-is-refused"></a>
 
-#### [renaming-to-a-name-the-owner-already-uses-is-refused](/tests/scenario/bai_scenario/manager/vfolder/test_editing.py) — pass
+#### [renaming-to-a-name-the-owner-already-uses-is-refused](/tests/scenario/bai_scenario/manager/vfolder/test_editing.py): pass
 
 자기 다른 폴더가 이미 쓰는 이름으로 바꾸려 하면, 잘못된 값으로 거부된다
 
@@ -1149,7 +1149,7 @@ Given
 
 When
 
-- VFolderAdapter.update — user-1이 자기 첫 폴더를 둘째 폴더의 이름으로 바꾸고 복제 가능으로 바꿈
+- VFolderAdapter.update: user-1이 자기 첫 폴더를 둘째 폴더의 이름으로 바꾸고 복제 가능으로 바꿈
 
 Then
 

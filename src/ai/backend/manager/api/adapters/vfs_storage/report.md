@@ -1,55 +1,55 @@
 ## vfs_storage
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/vfs_storage/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/vfs_storage/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/vfs_storage/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/vfs_storage/adapter.py)
 
-시나리오: 미완 7 / 9
+Scenario: incomplete 7 / 9
 
-- ops 로 구성 (9)
-  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - create — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - get — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - list_all — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - purge — 대표 성공 ✓ · 대표 실패 ✓
-  - search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - update — 대표 성공 ✓ · 대표 실패 ✓
+- built from ops (9)
+  - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - create: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - get: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - list_all: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_update: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - purge: representative success ✓ · representative rejection ✓
+  - search: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - update: representative success ✓ · representative rejection ✓
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 VFS storage 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-vfs-storages) | 성공 |
-| [슈퍼관리자가 VFS storage 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-the-superadmin-purges-several-vfs-storages-and-a-missing-id) | 성공 |
+| [아무 권한도 받지 않은 사용자가 VFS storage 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-vfs-storages) | answered |
+| [슈퍼관리자가 VFS storage 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-the-superadmin-purges-several-vfs-storages-and-a-missing-id) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 VFS storage 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-vfs-storages) | 성공 |
-| [슈퍼관리자가 VFS storage 여럿의 기본 경로를 한 번에 바꾸면, 모두 새 기본 경로로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-vfs-storages-at-once) | 성공 |
+| [아무 권한도 받지 않은 사용자가 VFS storage 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-vfs-storages) | answered |
+| [슈퍼관리자가 VFS storage 여럿의 기본 경로를 한 번에 바꾸면, 모두 새 기본 경로로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-vfs-storages-at-once) | answered |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 VFS storage 를 purge 하면 purge 한 것의 id 가 반환된다](#purging-the-superadmin-purges-a-vfs-storage) | 성공 |
-| [아무 권한도 받지 않은 사용자가 VFS storage 를 purge 하면 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-purge-a-vfs-storage) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 purge 하면 대상을 찾을 수 없다는 이유로 거부된다](#purging-purging-a-vfs-storage-id-nothing-answers-to-is-not-found) | 거부 |
+| [슈퍼관리자가 VFS storage 를 purge 하면 purge 한 것의 id 가 반환된다](#purging-the-superadmin-purges-a-vfs-storage) | answered |
+| [아무 권한도 받지 않은 사용자가 VFS storage 를 purge 하면 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-purge-a-vfs-storage) | rejected |
+| [슈퍼관리자가 존재하지 않는 id를 purge 하면 대상을 찾을 수 없다는 이유로 거부된다](#purging-purging-a-vfs-storage-id-nothing-answers-to-is-not-found) | rejected |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 기본 경로만 바꾸면, 기본 경로는 새 값이 되고 나머지는 그대로 남는다](#editing-the-superadmin-changes-the-base-path-of-a-vfs-storage) | 성공 |
-| [아무 권한도 받지 않은 사용자가 VFS storage 를 수정하면 권한 부족으로 거부된다. VFS storage 는 global 에만 속해 그 권한을 받을 방법이 없다](#editing-a-user-granted-nothing-may-not-edit-a-vfs-storage) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-a-vfs-storage-id-nothing-answers-to-is-not-found) | 거부 |
+| [슈퍼관리자가 기본 경로만 바꾸면, 기본 경로는 새 값이 되고 나머지는 그대로 남는다](#editing-the-superadmin-changes-the-base-path-of-a-vfs-storage) | answered |
+| [아무 권한도 받지 않은 사용자가 VFS storage 를 수정하면 권한 부족으로 거부된다. VFS storage 는 global 에만 속해 그 권한을 받을 방법이 없다](#editing-a-user-granted-nothing-may-not-edit-a-vfs-storage) | rejected |
+| [슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-a-vfs-storage-id-nothing-answers-to-is-not-found) | rejected |
 
 ### partial_bulk_purge
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-vfs-storages"></a>
 
-#### [a-user-granted-nothing-purges-none-of-several-vfs-storages](/tests/scenario/bai_scenario/manager/vfs_storage/test_partial_bulk_purging.py) — pass
+#### [a-user-granted-nothing-purges-none-of-several-vfs-storages](/tests/scenario/bai_scenario/manager/vfs_storage/test_partial_bulk_purging.py): pass
 
 아무 권한도 받지 않은 사용자가 VFS storage 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -67,7 +67,7 @@ Given
 
 When
 
-- VFSStorageAdapter.partial_bulk_purge — user-1이 VFS storage 2개를 한 번에 purge
+- VFSStorageAdapter.partial_bulk_purge: user-1이 VFS storage 2개를 한 번에 purge
 
 Then
 
@@ -81,7 +81,7 @@ Then
 
 <a id="partial_bulk_purging-the-superadmin-purges-several-vfs-storages-and-a-missing-id"></a>
 
-#### [the-superadmin-purges-several-vfs-storages-and-a-missing-id](/tests/scenario/bai_scenario/manager/vfs_storage/test_partial_bulk_purging.py) — pass
+#### [the-superadmin-purges-several-vfs-storages-and-a-missing-id](/tests/scenario/bai_scenario/manager/vfs_storage/test_partial_bulk_purging.py): pass
 
 슈퍼관리자가 VFS storage 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -99,7 +99,7 @@ Given
 
 When
 
-- VFSStorageAdapter.partial_bulk_purge — user-1이 VFS storage 2개 와 없는 id 하나를 한 번에 purge
+- VFSStorageAdapter.partial_bulk_purge: user-1이 VFS storage 2개 와 없는 id 하나를 한 번에 purge
 
 Then
 
@@ -123,7 +123,7 @@ Then
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-vfs-storages"></a>
 
-#### [a-user-granted-nothing-edits-none-of-several-vfs-storages](/tests/scenario/bai_scenario/manager/vfs_storage/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-nothing-edits-none-of-several-vfs-storages](/tests/scenario/bai_scenario/manager/vfs_storage/test_partial_bulk_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 VFS storage 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -141,7 +141,7 @@ Given
 
 When
 
-- VFSStorageAdapter.partial_bulk_update — user-1이 VFS storage 2개의 기본 경로를 한 번에 수정
+- VFSStorageAdapter.partial_bulk_update: user-1이 VFS storage 2개의 기본 경로를 한 번에 수정
 
 Then
 
@@ -155,7 +155,7 @@ Then
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-vfs-storages-at-once"></a>
 
-#### [the-superadmin-edits-several-vfs-storages-at-once](/tests/scenario/bai_scenario/manager/vfs_storage/test_partial_bulk_editing.py) — pass
+#### [the-superadmin-edits-several-vfs-storages-at-once](/tests/scenario/bai_scenario/manager/vfs_storage/test_partial_bulk_editing.py): pass
 
 슈퍼관리자가 VFS storage 여럿의 기본 경로를 한 번에 바꾸면, 모두 새 기본 경로로 오고 실패한 것은 없다
 
@@ -173,7 +173,7 @@ Given
 
 When
 
-- VFSStorageAdapter.partial_bulk_update — user-1이 VFS storage 2개의 기본 경로를 한 번에 수정
+- VFSStorageAdapter.partial_bulk_update: user-1이 VFS storage 2개의 기본 경로를 한 번에 수정
 
 Then
 
@@ -195,7 +195,7 @@ Then
 
 <a id="purging-the-superadmin-purges-a-vfs-storage"></a>
 
-#### [the-superadmin-purges-a-vfs-storage](/tests/scenario/bai_scenario/manager/vfs_storage/test_purging.py) — pass
+#### [the-superadmin-purges-a-vfs-storage](/tests/scenario/bai_scenario/manager/vfs_storage/test_purging.py): pass
 
 슈퍼관리자가 VFS storage 를 purge 하면 purge 한 것의 id 가 반환된다
 
@@ -212,7 +212,7 @@ Given
 
 When
 
-- VFSStorageAdapter.purge — user-1이 vfs-storage-1 purge
+- VFSStorageAdapter.purge: user-1이 vfs-storage-1 purge
 
 Then
 
@@ -221,7 +221,7 @@ Then
 
 <a id="purging-a-user-granted-nothing-may-not-purge-a-vfs-storage"></a>
 
-#### [a-user-granted-nothing-may-not-purge-a-vfs-storage](/tests/scenario/bai_scenario/manager/vfs_storage/test_purging.py) — pass
+#### [a-user-granted-nothing-may-not-purge-a-vfs-storage](/tests/scenario/bai_scenario/manager/vfs_storage/test_purging.py): pass
 
 아무 권한도 받지 않은 사용자가 VFS storage 를 purge 하면 권한 부족으로 거부된다
 
@@ -238,7 +238,7 @@ Given
 
 When
 
-- VFSStorageAdapter.purge — user-1이 vfs-storage-1 purge
+- VFSStorageAdapter.purge: user-1이 vfs-storage-1 purge
 
 Then
 
@@ -247,7 +247,7 @@ Then
 
 <a id="purging-purging-a-vfs-storage-id-nothing-answers-to-is-not-found"></a>
 
-#### [purging-a-vfs-storage-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/vfs_storage/test_purging.py) — pass
+#### [purging-a-vfs-storage-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/vfs_storage/test_purging.py): pass
 
 슈퍼관리자가 존재하지 않는 id를 purge 하면 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -264,7 +264,7 @@ Given
 
 When
 
-- VFSStorageAdapter.purge — user-1이 존재하지 않는 id purge
+- VFSStorageAdapter.purge: user-1이 존재하지 않는 id purge
 
 Then
 
@@ -275,7 +275,7 @@ Then
 
 <a id="editing-the-superadmin-changes-the-base-path-of-a-vfs-storage"></a>
 
-#### [the-superadmin-changes-the-base-path-of-a-vfs-storage](/tests/scenario/bai_scenario/manager/vfs_storage/test_editing.py) — pass
+#### [the-superadmin-changes-the-base-path-of-a-vfs-storage](/tests/scenario/bai_scenario/manager/vfs_storage/test_editing.py): pass
 
 슈퍼관리자가 기본 경로만 바꾸면, 기본 경로는 새 값이 되고 나머지는 그대로 남는다
 
@@ -292,7 +292,7 @@ Given
 
 When
 
-- VFSStorageAdapter.update — user-1이 vfs-storage-1의 기본 경로 수정
+- VFSStorageAdapter.update: user-1이 vfs-storage-1의 기본 경로 수정
 
 Then
 
@@ -305,7 +305,7 @@ Then
 
 <a id="editing-a-user-granted-nothing-may-not-edit-a-vfs-storage"></a>
 
-#### [a-user-granted-nothing-may-not-edit-a-vfs-storage](/tests/scenario/bai_scenario/manager/vfs_storage/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-a-vfs-storage](/tests/scenario/bai_scenario/manager/vfs_storage/test_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 VFS storage 를 수정하면 권한 부족으로 거부된다. VFS storage 는 global 에만 속해 그 권한을 받을 방법이 없다
 
@@ -322,7 +322,7 @@ Given
 
 When
 
-- VFSStorageAdapter.update — user-1이 vfs-storage-1의 기본 경로 수정
+- VFSStorageAdapter.update: user-1이 vfs-storage-1의 기본 경로 수정
 
 Then
 
@@ -331,7 +331,7 @@ Then
 
 <a id="editing-the-superadmin-editing-a-vfs-storage-id-nothing-answers-to-is-not-found"></a>
 
-#### [the-superadmin-editing-a-vfs-storage-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/vfs_storage/test_editing.py) — pass
+#### [the-superadmin-editing-a-vfs-storage-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/vfs_storage/test_editing.py): pass
 
 슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -348,7 +348,7 @@ Given
 
 When
 
-- VFSStorageAdapter.update — user-1이 존재하지 않는 id의 기본 경로 수정
+- VFSStorageAdapter.update: user-1이 존재하지 않는 id의 기본 경로 수정
 
 Then
 

@@ -14,9 +14,9 @@ Automates the post-implementation submission pipeline: quality enforcement, comm
 
 ## Parameters
 
-- **jira_key** (optional): JIRA issue key (e.g., `BA-1234`). Auto-detected from branch name if pattern `BA-\d+` exists.
+- **jira_key** (optional): JIRA issue key (for example `BA-1234`). Auto-detected from branch name if pattern `BA-\d+` exists.
 - **changelog_type** (optional): One of `breaking`, `feature`, `enhance`, `deprecation`, `fix`, `doc`, `deps`, `misc`, `test`. If omitted, infer from the most significant change.
-- **changelog_message** (optional): One-line English summary for the news fragment. If omitted, generate from PR description.
+- **changelog_message** (optional): One-line English summary for the changelog fragment. If omitted, generate from PR description.
 - **base_branch** (optional): Target branch for PR. Defaults to `main`.
 
 ## Workflow
@@ -29,14 +29,14 @@ Automates the post-implementation submission pipeline: quality enforcement, comm
    - If not found, ask user
 
 2. **Review changes**
-   - `git status` to see all changed/untracked files
+   - `git status` to see all changed and untracked files
    - `git diff` and `git diff --staged` to review content
    - `git log {base_branch}..HEAD` to see existing commits on branch
    - Summarize changes to user before proceeding
 
 ### Phase 2: Quality Enforcement (Local)
 
-**MANDATORY - never skip.**
+**Do not skip this phase.**
 
 Run sequentially, stop on first failure:
 
@@ -50,18 +50,18 @@ pants lint --changed-since=origin/{base_branch}
 - If `lint` fails, fix the issues and re-run
 - After all pass, continue to next phase
 
-**Note:** Type checking (`pants check`) and tests (`pants test`) are enforced by CI only. Do NOT run them locally — they consume excessive resources when multiple workers run concurrently.
+**Note:** Type checking (`pants check`) and tests (`pants test`) are enforced by CI only. Do not run them locally; they consume excessive resources when multiple workers run concurrently.
 
 ### Phase 3: Commit
 
 1. **Stage changes**
    - `git add` specific files (avoid `-A` to prevent accidental inclusion of secrets)
-   - Never stage `.env`, credentials, or other sensitive files
+   - Do not stage `.env`, credentials or other sensitive files
 
 2. **Generate commit message**
    - Use conventional commit style: `type(BA-XXXX): description`
    - Types: `fix`, `feat`, `refactor`, `test`, `doc`, `ci`, `chore`, `perf`
-   - **When a JIRA key is available, ALWAYS use it as the conventional commit scope. Never use component names like `manager`, `client`, `client-sdk` as the scope.**
+   - **When a JIRA key is available, always use it as the conventional commit scope. Do not use component names like `manager`, `client` or `client-sdk` as the scope.**
    - Example: `fix(BA-1234): resolve session cleanup race condition`
    - Keep first line under 80 characters
    - Add detailed body if multiple significant changes
@@ -79,7 +79,7 @@ pants lint --changed-since=origin/{base_branch}
    - **Title**: Conventional commit style with JIRA key as scope
      - Format: `type(BA-XXXX): description`
      - Example: `fix(BA-1234): resolve session cleanup race condition`
-     - See `changes/KNOWLEDGE.md` for the category-to-prefix/changelog-type mapping, including same-release fixes (`chore`, not `fix`)
+     - See `changes/KNOWLEDGE.md` for the category-to-prefix and changelog-type mapping, including same-release fixes (`chore`, not `fix`)
    - **Body**: Use this template:
 
    ```markdown
@@ -92,7 +92,9 @@ pants lint --changed-since=origin/{base_branch}
    Resolves BA-XXXX
    ```
 
-3. **Decide backport targets** (before creating the PR — the trailer lives in the PR body)
+   - **Do not mention a JIRA issue other than the assigned one** in the title or the body.
+
+3. **Decide backport targets** (before creating the PR; the trailer lives in the PR body)
 
    Backporting is automatic. There is no milestone to set; the target release branches are
    decided from the PR title prefix, the PR body and the labels.
@@ -102,12 +104,12 @@ pants lint --changed-since=origin/{base_branch}
    | Situation | What to do |
    |---|---|
    | `fix:` PR going to every maintained version | Nothing |
-   | Any PR going to particular versions | Add `Backport: 26.8, 26.4` to the PR body — comma- or space-separated |
-   | `fix:` PR that must NOT be backported | Add `Backport: none` to the PR body |
+   | Any PR going to particular versions | Add `Backport: 26.8, 26.4` to the PR body, comma- or space-separated |
+   | `fix:` PR that must not be backported | Add `Backport: none` to the PR body |
    | Non-`fix:` PR that stays on `main` | Nothing |
    | A target realized only after the merge | Comment `/backport <version>` on the merged PR |
 
-   - Valid versions are exactly the entries of `.github/maintained-versions.yml` — read that file
+   - Valid versions are exactly the entries of `.github/maintained-versions.yml`; read that file
      rather than guessing. A trailer naming anything else fails the backport job and backports
      nothing, so get it right or leave the trailer out.
    - Writing a `Backport:` trailer is a release decision: ask the user before adding one.
@@ -119,15 +121,15 @@ pants lint --changed-since=origin/{base_branch}
 
 5. **Extract PR number** from `gh pr create` output
 
-### Phase 5: Changelog (News Fragment)
+### Phase 5: Changelog Fragment
 
-1. **Determine changelog type** (if not provided) — see `changes/KNOWLEDGE.md` for valid types and the category mapping
+1. **Determine changelog type** (if not provided); see `changes/KNOWLEDGE.md` for valid types and the category mapping
 
 2. **Generate changelog message** (if not provided)
    - Single-line English sentence
    - Imperative/commanding form: "Fix XXX", "Add YYY", "Support ZZZ"
    - Or complete sentence: "Now it does ZZZ"
-   - Focus on what the change means to users/developers, not implementation details
+   - Focus on what the change means to users and developers, not implementation details
 
 3. **Create file**
    - Path: `changes/{pr_number}.{changelog_type}.md`
@@ -220,15 +222,15 @@ User: /submit BA-5678 --type=fix --message="Fix session cleanup race condition w
 Agent: [Uses provided parameters, runs full workflow]
 ```
 
-## Related Skills
+## Related documents
 
 - `/test-guide` - Scenario-first testing (run before /submit)
 
 ## Implementation Notes
 
 - Local quality checks (`fmt`, `fix`, `lint`) use `--changed-since=origin/{base_branch}` to cover all PR changes, not just the last commit
-- Type checking and tests run in CI only — do not run them locally
+- Type checking and tests run in CI only; do not run them locally
 - Changelog follows [towncrier](https://github.com/twisted/towncrier) format configured in `pyproject.toml`
 - PR number is only available after `gh pr create`, so changelog is always a second commit
-- A single PR may have multiple news fragments (e.g., both `feature` and `fix`)
-- News fragment content should be a single-line sentence per `changes/README.md` guidelines
+- A single PR may have multiple changelog fragments (for example both `feature` and `fix`)
+- Changelog fragment content should be a single-line sentence per `changes/README.md` guidelines

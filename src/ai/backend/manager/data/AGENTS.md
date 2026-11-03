@@ -1,6 +1,6 @@
-# Manager Data layer — Guardrails
+# Manager Data layer: Guardrails
 
-> Pure domain types only — no framework dependencies.
+> Pure domain types only: no framework dependencies.
 
 ## Purpose
 
@@ -13,13 +13,13 @@ This package does not allow SQLAlchemy, Pydantic, or aiohttp imports.
 ## Directory structure (per domain)
 
 Per domain: `data/{domain}/__init__.py` + `types.py` (frozen dataclass). Existing `__init__.py` re-export the
-dataclasses (established pattern); for new code, do not add re-exports — import the module directly (root global rule).
+dataclasses (established pattern); for new code, do not add re-exports: import the module directly (root global rule).
 
 ## Type rules
 
 - Every data class must be a `@dataclass(frozen=True)`.
-- Allowed imports: Python stdlib and `ai.backend.common.types` — nothing else.
-- Do NOT import from `manager/models/`, `manager/repositories/`, `manager/services/`, or external frameworks (`pydantic`,
+- Allowed imports: Python stdlib and `ai.backend.common.types`. Nothing else.
+- Do not import from `manager/models/`, `manager/repositories/`, `manager/services/`, or external frameworks (`pydantic`,
   `sqlalchemy`, `aiohttp`).
 
 ## `EntityData` / `FieldData` carries what its own domain's row holds
@@ -32,17 +32,17 @@ dataclasses (established pattern); for new code, do not add re-exports — impor
   repository method of that domain.
 - A virtual entity id (`virtual_entities.id`) never appears on a data type. It names a
   graph node, not an entity or a field; the data type carries the entity the node
-  stands for, read by the query that read the row.
+  represents, read by the query that read the row.
 - An entity a row names is carried as one `EntityIdentifier` (`RuntimeEntityID` where
   the kind is a value), not as an `entity_type` / `entity_id` pair.
 
 ## Legacy distinction
 
-- For types that support legacy paths rather than the v2 / GraphQL path, it is recommended to add `Legacy` to the name —
+- For types that support legacy paths rather than the v2 / GraphQL path, it is recommended to add `Legacy` to the name:
   so that, where possible, legacy types can be distinguished from v2 types.
 
-## What does NOT belong here
+## What does not belong here
 
 - Business-logic methods (pure data containers only).
-- Pydantic models — use `manager/dto/` or `common/dto/` for request/response types.
+- Pydantic models: use `manager/dto/` or `common/dto/` for request/response types.
 - default-factory fields that hide mutable state or complexity.

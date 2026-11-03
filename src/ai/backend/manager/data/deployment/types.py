@@ -35,7 +35,7 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.data.reconciler.types import BaseReconcilerCategory
-from ai.backend.manager.data.session.options import HandlerOptions
+from ai.backend.manager.data.session.options import AgentSelectionPolicy, HandlerOptions
 
 if TYPE_CHECKING:
     from ai.backend.common.schema.deployment import (
@@ -537,6 +537,10 @@ class DeploymentOptions(ConfiguredModel):
     """
 
     handler_options: DeploymentHandlerOptions = Field(default_factory=DeploymentHandlerOptions)
+    agent_selection_policy: AgentSelectionPolicy = Field(
+        default=AgentSelectionPolicy.PREFERRED,
+        description="How the deployment's designated agents are enforced on its route sessions.",
+    )
 
 
 class ResourceSpec(ConfiguredModel):

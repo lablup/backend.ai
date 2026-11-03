@@ -4,12 +4,12 @@
 
 ## Overview
 
-Sequencers are plugins that determine the scheduling order of pending sessions that passed validation. Different policies can be applied per scaling group, controlling the resource allocation order by determining session priorities.
+Sequencers are plugins that determine the scheduling order of the pending sessions that passed validation. A resource group can apply a different policy, which controls the resource allocation order through session priority.
 
 **Key Responsibilities:**
-- Determining pending session priorities
-- Fair resource distribution
-- Custom policy per scaling group
+- determining the priority of pending sessions
+- fair resource distribution
+- custom policy per resource group
 
 ## Architecture
 
@@ -43,7 +43,7 @@ Sequencers are plugins that determine the scheduling order of pending sessions t
 
 ### WorkloadSequencer (Abstract Base)
 
-Base class for all Sequencers.
+Base class of all Sequencers.
 
 ```python
 class WorkloadSequencer(abc.ABC):
@@ -70,15 +70,15 @@ class WorkloadSequencer(abc.ABC):
 
 ### FIFOSequencer (First-In-First-Out)
 
-Schedules earlier created sessions first.
+Schedules earlier-created sessions first.
 
 **Algorithm:**
-- Sort in ascending order by `created_at` timestamp
-- Longest waiting session has highest priority
+- sort ascending by the `created_at` timestamp
+- the longest waiting session has the highest priority
 
 **Use Cases:**
-- When fair waiting order guarantee is needed
-- General work queue processing
+- when a fair waiting order is required
+- general work queue processing
 
 ```python
 class FIFOSequencer(WorkloadSequencer):
@@ -98,15 +98,15 @@ Output: [Session(created=10:01), Session(created=10:02), Session(created=10:03)]
 
 ### LIFOSequencer (Last-In-First-Out)
 
-Schedules later created sessions first.
+Schedules later-created sessions first.
 
 **Algorithm:**
-- Sort in descending order by `created_at` timestamp
-- Most recently requested session has highest priority
+- sort descending by the `created_at` timestamp
+- the most recently requested session has the highest priority
 
 **Use Cases:**
-- When latest request priority is needed
-- Interactive workloads where real-time response is important
+- when the latest request needs priority
+- interactive workloads where real-time response is important
 
 ```python
 class LIFOSequencer(WorkloadSequencer):
@@ -129,9 +129,9 @@ Output: [Session(created=10:03), Session(created=10:02), Session(created=10:01)]
 Determines priority based on resource fairness.
 
 **Algorithm:**
-1. Calculate each user's "dominant resource" (resource type most heavily used)
-2. Assign higher priority to sessions from users with lower dominant resource usage
-3. Apply FIFO policy among sessions from the same user
+1. Calculate each user's dominant resource (the resource type the user uses most).
+2. Give higher priority to the sessions of users with lower dominant resource usage.
+3. Apply FIFO among the sessions of the same user.
 
 **Dominant Resource Calculation:**
 ```
@@ -142,9 +142,9 @@ User B: CPU 20% used, Memory 60% used → Dominant = Memory (60%)
 ```
 
 **Use Cases:**
-- Fair resource distribution in multi-user environments
-- Preventing resource monopolization by specific users
-- Cluster utilization optimization
+- fair resource distribution in a multi-user environment
+- preventing resource monopolization by specific users
+- cluster utilization optimization
 
 ```python
 class DRFSequencer(WorkloadSequencer):
@@ -269,7 +269,7 @@ def get_sequencer(self, scheduler_name: str) -> WorkloadSequencer:
 
 ## Configuration
 
-Configure Sequencer per scaling group:
+Configure the Sequencer per resource group:
 
 ```python
 # Scaling group configuration
@@ -289,11 +289,11 @@ scaling_group = {
 
 ## Performance Considerations
 
-- Sorting operations have O(n log n) complexity
-- Consider sorting cost with large numbers of pending sessions
-- DRF requires additional resource usage calculations
+- Sorting is O(n log n).
+- Consider the sorting cost with many pending sessions.
+- DRF needs additional resource usage calculations.
 
-## Related Documents
+## Related documents
 
 - [Provisioner README](../README.md)
 - [Scheduler README](../../README.md)

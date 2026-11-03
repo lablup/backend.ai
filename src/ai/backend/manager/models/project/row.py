@@ -275,7 +275,6 @@ class ProjectModel(RBACModel[ProjectPermission]):
     _allowed_vfolder_hosts: VFolderHostPermissionMap
     _dotfiles: bytes
     _resource_policy: str
-    _container_registry: dict[str, str] | None
 
     _permissions: frozenset[ProjectPermission] = field(default_factory=frozenset)
 
@@ -309,11 +308,6 @@ class ProjectModel(RBACModel[ProjectPermission]):
     def resource_policy(self) -> str:
         return self._resource_policy
 
-    @property
-    @required_permission(ProjectPermission.READ_SENSITIVE_ATTRIBUTE)
-    def container_registry(self) -> dict[str, Any] | None:
-        return self._container_registry
-
     @classmethod
     def from_row(cls, row: ProjectRow, permissions: Iterable[ProjectPermission]) -> Self:
         return cls(
@@ -330,7 +324,6 @@ class ProjectModel(RBACModel[ProjectPermission]):
             _allowed_vfolder_hosts=row.allowed_vfolder_hosts,
             _dotfiles=row.dotfiles,
             _resource_policy=row.resource_policy,
-            _container_registry=row.container_registry,
             _permissions=frozenset(permissions),
         )
 

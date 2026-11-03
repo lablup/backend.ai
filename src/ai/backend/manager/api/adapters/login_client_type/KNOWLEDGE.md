@@ -1,7 +1,7 @@
 ---
 name: login-client-type-adapter-scenarios
 type: reference
-description: what the login client type adapter guarantees, as scenarios; the reads open to every authenticated user, the superadmin role on create, the entity gate nobody but a superadmin passes on update and purge, single and partial bulk, the page size of fifty
+description: "what the login client type adapter guarantees: the reads open to every authenticated user, the superadmin role on create, the entity gate nobody but a superadmin passes on update and purge, single and partial bulk, the page size of fifty"
 scope: src/ai/backend/manager/api/adapters/login_client_type
 keywords: [login client type, scenario, adapter, superadmin, public read, page size]
 generated:
@@ -25,23 +25,10 @@ status: draft
 
 ## 생성
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 이름만 지정해 생성한다 | `login_client_type` 없음, 슈퍼관리자 | 이름만 지정해 생성 | 설명이 비어 있는 노드 |
-| 이름과 설명을 함께 지정해 생성한다 | `login_client_type` 없음, 슈퍼관리자 | 이름과 설명으로 생성 | 지정한 값이 그대로 담긴 노드 |
-| 이미 사용 중인 이름으로 생성한다 | 그 이름의 `login_client_type` 있음, 슈퍼관리자 | 생성 | 이름 중복으로 거부 |
-| 슈퍼관리자가 아닌 사용자가 생성한다 | 슈퍼관리자 아님 | 생성 | 역할 부족으로 거부 |
-| 권한 검사를 꺼도 슈퍼관리자가 아니면 생성할 수 없다 | 권한 검사 비활성화, 슈퍼관리자 아님 | 생성 | 역할 부족으로 거부 |
-
 이름이 비어 있거나 길이 제한을 넘는 요청은 시나리오로 두지 않는다. 요청 타입이 이미 막기
 때문이다.
 
 ## 조회
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| public 에서 읽는 사용자가 id로 조회한다 | `login_client_type` 하나, public 조회 권한만 있음 | id로 조회 | 그 `login_client_type` 노드 전체 |
-| 존재하지 않는 id로 조회한다 | 다른 `login_client_type` 행만 있음 | id로 조회 | 권한 부족으로 거부 |
 
 조회는 public 에서 READ 를 검사한다. public 조회 권한만 받은 사용자가 성공하는 시나리오가 그것을
 증명하고, 대응하는 거부 시나리오는 생성 절의 역할 부족으로 거부되는 시나리오다. 존재하지 않는 id와
@@ -51,26 +38,11 @@ status: draft
 
 ## 검색
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 아무 권한도 없는 사용자가 검색한다 | `login_client_type` 둘, 아무 권한도 없음 | 전체 조회 | 둘 다 반환된다 |
-
 이름 필터가 무엇을 좁히는지와 페이지 방식 — 기본 크기 50, `first`만 지정한 요청을 커서로 읽는지
 (BA-7927) — 는 시나리오로 두지 않는다. 필터를 조건으로 옮기고 페이지를 자르는 것은 단위 테스트의
 자리다.
 
 ## 수정
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 이름만 바꾼다 | 설명이 있는 `login_client_type` 하나, 슈퍼관리자 | 이름 수정 | 이름은 새 값, 설명은 그대로 |
-| 설명을 지운다 | 설명이 있는 `login_client_type`, 슈퍼관리자 | 설명을 비우는 수정 | 설명이 없어진다 |
-| 값을 하나도 지정하지 않는다 | `login_client_type` 하나, 슈퍼관리자 | 빈 수정 | 아무것도 바뀌지 않은 노드 |
-| 이미 사용 중인 이름으로 바꾼다 | `login_client_type` 둘, 슈퍼관리자 | 한쪽 이름을 다른 쪽 이름으로 수정 | 이름 중복으로 거부 |
-| 존재하지 않는 id를 수정한다 | 다른 `login_client_type` 행만 있음, 슈퍼관리자 | 이름 수정 | 대상을 찾을 수 없어 거부 |
-| 아무 권한도 없는 사용자가 수정한다 | 같은 `login_client_type`, 아무 권한도 없음 | 이름 수정 | 권한 부족으로 거부 |
-| 아무 권한도 없는 사용자가 없는 id를 수정한다 | 다른 `login_client_type` 행만 있음, 아무 권한도 없음 | 이름 수정 | 권한 부족으로 거부 |
-| 권한 검사를 끄면 권한 없이도 수정된다 | 권한 검사 비활성화, 아무 권한도 없음 | 이름 수정 | 이름이 새 값인 노드 |
 
 수정은 대상 id를 요청 본문 밖에서 별도 인자로 받는다. 시나리오가 id를 인자와 본문에 거듭 적지
 않도록 이 구조를 유지한다.
@@ -85,36 +57,11 @@ status: draft
 
 ## purge
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 purge 한다 | `login_client_type` 하나, 슈퍼관리자 | purge | purge 한 id를 담은 응답 |
-| 존재하지 않는 id를 purge 한다 | 다른 `login_client_type` 행만 있음, 슈퍼관리자 | purge | 대상을 찾을 수 없어 거부 |
-| 아무 권한도 없는 사용자가 purge 한다 | 같은 `login_client_type`, 아무 권한도 없음 | purge | 권한 부족으로 거부 |
-| 권한 검사를 끄면 권한 없이도 purge 된다 | 권한 검사 비활성화, 아무 권한도 없음 | purge | purge 한 id를 담은 응답 |
-
 이 어댑터에는 soft delete가 없다.
 
 ## 여럿 수정하기
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 여럿의 설명을 한 번에 바꾼다 | `login_client_type` 둘, 슈퍼관리자 | 둘의 설명 수정 | 둘 다 새 설명으로 오고 실패한 것은 없음 |
-| 아무 권한도 없는 사용자가 여럿을 수정한다 | 같은 `login_client_type` 둘 | 둘의 설명 수정 | 수정된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
-
 ## 여럿 purge
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 둘과 없는 id 하나를 한 번에 purge 한다 | `login_client_type` 둘, 슈퍼관리자 | 셋 purge | 둘은 지워지기 전 모습으로 처리된 목록에 오고, 없는 id 는 대상 없음 이유로 실패 목록에 옴 |
-| 아무 권한도 없는 사용자가 여럿을 purge 한다 | 같은 `login_client_type` 둘 | 둘 purge | purge 된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
 
 여럿 연산은 호출 전체를 거부하지 않는다. 처리한 종류는 처리된 목록에, 처리하지 못한 것은 id 와
 이유를 실패 목록에 싣는다.
-
-## 아직 적지 않은 것
-
-없다. 어댑터가 제공하는 `admin_create`, `get`, `search`, `update`, `purge`, `partial_bulk_update`,
-`partial_bulk_purge`가 모두 위에 있다.
-
-`batch_load_fields`는 모든 어댑터가 상속받는 공용 헬퍼이지 이 엔티티의 호출이 아니다. 리포트는
-이것도 함께 세지만 적을 것이 없다.

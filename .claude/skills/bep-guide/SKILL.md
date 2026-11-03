@@ -130,6 +130,16 @@ The **by-area current-design table** is the distinguishing element: it makes "wh
 exists vs. what is missing" explicit per area, which a single prose "Current Design"
 section obscures. Reference example: `BEP-1055-preemption-scheduler-mechanics.md`.
 
+## English and Korean Pairs
+
+A BEP is a pair in the same folder: English `BEP-NNNN-title.md` and Korean `BEP-NNNN-title.ko.md`.
+Each sub-document of a segmented BEP is a pair too, such as `component-a.md` and `component-a.ko.md`.
+
+- Frontmatter goes only in the English file.
+- Both files keep the same headings in the same order.
+- Update both files in the same change.
+- `scripts/knowledge/check_bilingual.py` validates the pairs.
+
 ## Document Segmentation
 
 ### When to Segment

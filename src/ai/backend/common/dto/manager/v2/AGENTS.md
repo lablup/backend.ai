@@ -1,10 +1,10 @@
-# DTO v2 — Guardrails
+# DTO v2: Guardrails
 
 ## Single Source of Truth
 
 The DTOs in this package are the schema shared by the GraphQL (Strawberry) and REST v2 APIs.
-Field names, enum values, and structure must remain stable — both APIs depend on them.
-A breaking change here requires a coordinated update of the GQL types and the REST v2 handlers.
+Field names, enum values, and structure must remain stable: both APIs depend on them.
+A breaking change here requires a coordinated update of the GraphQL types and the REST v2 handlers.
 
 ## Naming
 
@@ -16,11 +16,11 @@ A breaking change here requires a coordinated update of the GQL types and the RE
 
 Per domain: `v2/{domain}/types.py`, `request.py`, `response.py`, `__init__.py`
 
-- `types.py` — re-exports domain enums from `common/data/` plus DTO-specific enums (sort fields, direction) and
-  nested submodel definitions (e.g., `PermissionSummary`)
-- `request.py` — Input models (mapped 1:1 to GQL `@strawberry.input` types)
-- `response.py` — Node models (entity representation) and Payload models (mutation results)
-- `__init__.py` — avoid re-exports where possible and import modules directly. Use re-exports only when splitting an
+- `types.py` - re-exports domain enums from `common/data/` plus DTO-specific enums (sort fields, direction) and
+  nested submodel definitions (for example, `PermissionSummary`)
+- `request.py` - Input models (mapped 1:1 to GraphQL `@strawberry.input` types)
+- `response.py` - Node models (entity representation) and Payload models (mutation results)
+- `__init__.py` - avoid re-exports where possible and import modules directly. Use re-exports only when splitting an
   existing single file into a package makes compatibility hard, and afterward avoid re-exports where possible.
 
 ## Base classes
@@ -30,7 +30,7 @@ Per domain: `v2/{domain}/types.py`, `request.py`, `response.py`, `__init__.py`
 
 ## Nesting
 
-- Group semantically related fields into submodels (e.g., `UserBasicInfo`, `UserSecurityInfo`).
+- Group semantically related fields into submodels (for example, `UserBasicInfo`, `UserSecurityInfo`).
 - Use a flat structure only when there are fewer than 5 fields and no logical grouping.
 - Nested submodels must also inherit from `BaseResponseModel`.
 - Avoid nesting deeper than 2 levels to keep serialization predictable.
@@ -38,11 +38,11 @@ Per domain: `v2/{domain}/types.py`, `request.py`, `response.py`, `__init__.py`
 ## Validation
 
 - Use `Field()` constraints: `min_length`, `max_length`, `ge`, `le`, `pattern`.
-- Use `field_validator` for cross-field/format validation (e.g., stripping whitespace, verifying non-empty after strip).
+- Use `field_validator` for cross-field/format validation (for example, stripping whitespace, verifying non-empty after strip).
 - Update fields follow the "Update" section of `src/ai/backend/common/dto/AGENTS.md`: `X | None | Unset = Field(default=UNSET)`.
 
 ## Conversion
 
-- DTOs are pure data structures — no conversion logic inside DTOs.
+- DTOs are pure data structures: no conversion logic inside DTOs.
 - Domain Data type → DTO conversion happens in the Adapter layer (`manager/api/adapters/{domain}.py`).
-- Do NOT import DB models or domain Data types directly in DTO modules.
+- Do not import DB models or domain Data types directly in DTO modules.

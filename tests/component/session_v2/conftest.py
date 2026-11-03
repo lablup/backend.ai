@@ -84,6 +84,7 @@ from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
@@ -144,7 +145,12 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
-    from tests.component.conftest import ServerInfo, UserFixtureData
+    from tests.component.conftest import (
+        ProvisionedUserData,
+        ServerInfo,
+        UserFixtureData,
+        VirtualEntitySeeder,
+    )
 
     from ai.backend.common.plugin.hook import HookPluginContext
 
@@ -527,6 +533,53 @@ async def admin_session_seed(
     )
     yield seed
     await _cleanup_session(db_engine, seed.session_id)
+
+
+@pytest.fixture()
+async def place_personal_session(
+    db_engine: SAEngine,
+    domain_fixture: DomainFixtureData,
+    resource_group_name: ResourceGroupName,
+    resource_group_id: ResourceGroupID,
+    virtual_entity_seeder: VirtualEntitySeeder,
+    provision_user: Callable[[], Coroutine[Any, Any, ProvisionedUserData]],
+) -> AsyncIterator[Callable[[ProvisionedUserData], Coroutine[Any, Any, SessionID]]]:
+    """Seed a RUNNING session in a user's personal project, with the graph rows creating
+    it writes: the user and the project each own and govern it."""
+    placed: list[SessionID] = []
+
+    async def place(owner: ProvisionedUserData) -> SessionID:
+        seed = await _seed_session(
+            db_engine,
+            domain_name=domain_fixture.domain_name,
+            domain_id=domain_fixture.domain_id,
+            group_id=owner.personal_project_id,
+            user_uuid=owner.user_id,
+            access_key=owner.keypair.access_key,
+            resource_group=resource_group_name,
+            resource_group_id=resource_group_id,
+        )
+        placed.append(seed.session_id)
+        async with db_engine.begin() as conn:
+            await virtual_entity_seeder.place_entity(
+                conn,
+                SessionEntityType(),
+                seed.session_id,
+                [
+                    (UserEntityType(), owner.user_id),
+                    (ProjectEntityType(), owner.personal_project_id),
+                ],
+            )
+        return seed.session_id
+
+    yield place
+    ve = VirtualEntityRow.__table__
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            ve.delete().where(ve.c.entity_type == SessionEntityType(), ve.c.entity_id.in_(placed))
+        )
+    for session_id in placed:
+        await _cleanup_session(db_engine, session_id)
 
 
 @pytest.fixture()

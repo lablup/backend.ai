@@ -56,3 +56,7 @@ class RolePresetRow(SoftDeleteMixin, LifecycleTimestampsMixin, Base):
     auto_assign: Mapped[bool] = mapped_column(
         "auto_assign", sa.Boolean, nullable=False, server_default=sa.false()
     )
+    # Whether a personal project's owner is mapped to the role made from this preset.
+    auto_assign_to_owner: Mapped[bool] = mapped_column(
+        "auto_assign_to_owner", sa.Boolean, nullable=False, server_default=sa.false()
+    )

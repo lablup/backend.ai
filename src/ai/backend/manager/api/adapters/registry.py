@@ -335,7 +335,7 @@ class Adapters:
             storage_namespace=StorageNamespaceAdapter(processors.storage_namespace),
             system_session_environ=SystemSessionEnvironAdapter(processors.system_session_environ),
             user=UserAdapter(processors.user, processors.domain, auth_config, key_provider_pool),
-            user_config=UserConfigAdapter(processors.user, processors.dotfile),
+            user_config=UserConfigAdapter(processors.user, processors.auto_generated_file),
             vfolder=VFolderAdapter(
                 processors.vfolder,
                 processors.vfolder_file,

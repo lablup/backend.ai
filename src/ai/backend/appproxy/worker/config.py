@@ -997,6 +997,25 @@ class ProxyWorkerConfig(BaseSchema):
                     raise ValueError("http2 config must be set when protocol = 'h2'")
         return self
 
+    def served_wildcard_domain(self) -> str | None:
+        match self.frontend_mode:
+            case FrontendServerMode.PORT:
+                return None
+            case FrontendServerMode.WILDCARD_DOMAIN:
+                if self.wildcard_domain is None:
+                    return None
+                return self.wildcard_domain.domain
+            case FrontendServerMode.TRAEFIK:
+                if self.traefik is None:
+                    return None
+                match self.traefik.frontend_mode:
+                    case FrontendMode.PORT:
+                        return None
+                    case FrontendMode.WILDCARD_DOMAIN:
+                        if self.traefik.wildcard_domain is None:
+                            return None
+                        return self.traefik.wildcard_domain.domain
+
 
 class ServerConfig(BaseSchema):
     redis: Annotated[

@@ -78,7 +78,7 @@ class TheLaidAndTheUnknownComeBackInOrder(
 ):
     @override
     def summary(self) -> str:
-        return "loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-refusal"
+        return "loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-rejection"
 
     @override
     def describe(self) -> str:

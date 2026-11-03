@@ -58,7 +58,7 @@ class Editing(When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVarian
     def describe(self, laid: APresetAndACaller) -> str:
         target = "존재하지 않는 ID" if self.unknown else laid.preset.name
         changing = ", ".join(self.changes) or "변경 항목 없음"
-        return f"{laid.caller.username}의 수정 요청 — 대상: {target}, 변경 항목: {changing}"
+        return f"{laid.caller.username}의 수정 요청: 대상: {target}, 변경 항목: {changing}"
 
     @override
     async def call(

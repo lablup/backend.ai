@@ -65,7 +65,7 @@ jobs:
         PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
         echo "PKGVER=$PKGVER" >> $GITHUB_ENV
     - name: Install conda-pack
-      uses: s-weigand/setup-conda@v1
+      uses: s-weigand/setup-conda@7e8fd4c763d3ccb2296fe2a06814d45b3e447dc7  # v1
       with:
         activate-conda: false
     - name: Download wheels

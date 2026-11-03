@@ -8,9 +8,11 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from ai.backend.common.data.entity.global_entity import GlobalEntityID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.dto.manager.v2.common import (
     OrderDirection,
     PartialBulkFailure,
@@ -63,10 +65,14 @@ from ai.backend.common.dto.manager.v2.role_preset.response import (
     SearchRolePresetsPayload,
     UpdateRolePresetPayload,
 )
-from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetOrderField, RolePresetUsage
+from ai.backend.common.dto.manager.v2.role_preset.types import (
+    RolePresetOrderField,
+    RolePresetUsage,
+)
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
+from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
 from ai.backend.manager.data.role_preset.types import (
     RolePermissionPresetData,
     RolePresetData,
@@ -165,6 +171,7 @@ class RolePresetAdapter(BaseAdapter):
             name=input.name,
             scope_type=input.scope_type,
             auto_assign=input.auto_assign,
+            auto_assign_to_owner=input.auto_assign_to_owner,
         )
         permission_creators = [
             RolePermissionPresetCreator(
@@ -491,6 +498,11 @@ class RolePresetAdapter(BaseAdapter):
                 if input.auto_assign is not None
                 else OptionalState.nop()
             ),
+            auto_assign_to_owner=(
+                OptionalState.update(input.auto_assign_to_owner)
+                if input.auto_assign_to_owner is not None
+                else OptionalState.nop()
+            ),
         )
 
     def _to_partial_bulk_payload(
@@ -525,6 +537,9 @@ class RolePresetAdapter(BaseAdapter):
             *self.apply_string_filter(filter_.name, fields.name.filter),
             *self.apply_string_filter(filter_.scope_type, fields.scope_type.filter),
             *self.apply_bool_filter(filter_.auto_assign, fields.auto_assign.filter),
+            *self.apply_bool_filter(
+                filter_.auto_assign_to_owner, fields.auto_assign_to_owner.filter
+            ),
             *self._deleted_conditions(filter_.deleted),
             *self.apply_nullable_datetime_filter(filter_.deleted_at, fields.deleted_at.filter),
             *self.apply_to_many_filter(
@@ -648,13 +663,21 @@ class RolePresetAdapter(BaseAdapter):
             id=data.id,
             entity_id=data.entity_id(),
             name=data.name,
-            scope_type=data.scope_type,
+            scope_type=RolePresetAdapter._scope_type_or_global_entity_name(data),
+            role_name_template=data.role_name_template,
             auto_assign=data.auto_assign,
+            auto_assign_to_owner=data.auto_assign_to_owner,
             deleted=data.deleted_at is not None,
             deleted_at=data.deleted_at,
             created_at=data.created_at,
             updated_at=data.updated_at,
         )
+
+    @staticmethod
+    def _scope_type_or_global_entity_name(data: RolePresetData) -> str:
+        if data.scope_type != GlobalEntityType() or data.scope_id is None:
+            return str(data.scope_type)
+        return str(GlobalEntityIDCache.name_of(GlobalEntityID(data.scope_id)))
 
     @staticmethod
     def _permission_data_to_node(data: RolePermissionPresetData) -> RolePermissionPresetNode:

@@ -2,27 +2,27 @@
 
 ## Service Overview
 
-The User Service is a core component of Backend.AI that handles comprehensive user account management operations. It provides a robust, action-based architecture for creating, modifying, deleting, and managing user accounts, along with advanced features like resource usage statistics and user data purging.
+The User Service is a core component of Backend.AI that handles user account management operations. It provides an action-based architecture for creating, modifying, deleting and managing user accounts, with resource usage statistics and user data purging.
 
 ## Key Features and Capabilities
 
 ### Core User Management
 - **User Creation**: Create new user accounts with customizable properties
-- **User Modification**: Update user information, roles, and permissions
-- **User Deletion**: Soft delete users while preserving audit trails
-- **User Purging**: Permanently remove users and all associated resources
+- **User Modification**: Update user information, roles and permissions
+- **User Deletion**: Delete users while preserving audit trails
+- **User Purging**: Remove users and all associated resources permanently
 
 ### Advanced Features
 - **Resource Usage Statistics**: Detailed monthly usage tracking per user
 - **Admin Statistics**: System-wide usage analytics and monitoring
 - **Container Configuration**: Support for custom UID/GID settings
-- **Security Features**: TOTP authentication, IP restrictions, and sudo session control
+- **Security Features**: TOTP authentication, IP restrictions and sudo session control
 
 ### Architecture
-- **Action-Based Design**: Each operation is encapsulated in typed action classes
-- **Repository Pattern**: Clean separation between business logic and data access
+- **Action-Based Design**: Each operation is wrapped in typed action classes
+- **Repository Pattern**: Separation between business logic and data access
 - **Processor Pattern**: Asynchronous processing with monitoring capabilities
-- **Type Safety**: Comprehensive type definitions for all operations
+- **Type Safety**: Type definitions for all operations
 
 ## Operation Scenarios
 
@@ -128,7 +128,7 @@ action = UpdateUserAction(
 
 ### 3. User Deletion
 
-#### Soft Delete (Preserves Data)
+#### Delete (Preserves Data)
 ```python
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
 
@@ -209,19 +209,19 @@ except Exception as e:
 ## Integration Points
 
 ### Database Integration
-- **User Repository**: Handles user CRUD operations
+- **User Repository**: Handles user create, get, update and delete operations
 - **Admin Repository**: Manages admin-level operations and force operations
 - **Transaction Management**: Supports database transactions for data consistency
 
 ### External Service Integration
-- **Valkey/Redis**: Usage statistics and caching
+- **Valkey**: Usage statistics and caching
 - **Agent Registry**: Session management and resource allocation
-- **Storage Manager**: VFolder management and storage operations
+- **Storage Manager**: vfolder management and storage operations
 
 ### Security Integration
-- **TOTP**: Two-factor authentication support
+- **TOTP**: 2FA support
 - **IP Restrictions**: Client IP-based access control
-- **Role-Based Access**: Admin, user, and monitor role management
+- **Role-Based Access**: Admin, user and monitor role management
 
 ## Testing Guidelines
 
@@ -264,21 +264,21 @@ def mock_dependencies():
 
 ### Required Dependencies
 - Database connection (PostgreSQL)
-- Valkey/Redis client for statistics
+- Valkey client for statistics
 - Agent registry for session management
-- Storage manager for VFolder operations
+- Storage manager for vfolder operations
 
 ### Environment Variables
 - Database connection settings
-- Redis/Valkey connection configuration
+- Valkey connection configuration
 - Security settings (TOTP, IP restrictions)
 
 ## Best Practices
 
 1. **Always use transactions** for multi-step operations
 2. **Validate input data** before processing
-3. **Handle exceptions gracefully** with proper error messages
-4. **Use soft delete** for user removal unless purging is explicitly required
+3. **Handle exceptions gracefully** with error messages
+4. **Use delete** for user removal unless purging is explicitly required
 5. **Monitor performance** for statistics operations
 6. **Test all edge cases** including concurrent operations
 
@@ -287,8 +287,8 @@ def mock_dependencies():
 ### Common Issues
 - **Permission denied**: Check user roles and domain access
 - **Database constraints**: Verify unique constraints (email, username)
-- **Resource cleanup**: Ensure proper cleanup of user resources during purging
-- **Statistics errors**: Check Valkey/Redis connection and data consistency
+- **Resource cleanup**: Ensure cleanup of user resources during purging
+- **Statistics errors**: Check the Valkey connection and data consistency
 
 ### Debugging
 - Enable debug logging for detailed operation traces

@@ -1,7 +1,7 @@
 ---
 name: service-catalog-adapter-scenarios
 type: reference
-description: what the service catalog adapter guarantees, as scenarios; a single search behind the superadmin role that the monitor role also passes, a status filter checked over one service of every status, a service with endpoints counted once
+description: what the service catalog adapter guarantees; the single search behind the global role that the monitor role also passes, the status filter conditions it accepts, and the cursor fields it ignores
 scope: src/ai/backend/manager/api/adapters/service_catalog
 keywords: [service catalog, scenario, adapter, superadmin, monitor, search, endpoints]
 generated:
@@ -12,43 +12,18 @@ updated:
   at: 2026-10-07
 status: draft
 ---
-# service_catalog 어댑터 — 시나리오
+# service_catalog adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 어긋나면 문장 쪽을 먼저
-의심한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-이 어댑터가 제공하는 호출은 검색(`admin_search`) 하나다. 카탈로그 행은 서비스가 스스로 등록하고
-heartbeat를 보낼 때 이벤트 처리기가 기록하며, 관리자가 생성·수정·삭제하는 호출은 없다. 검색은
-전역 역할이 있어야 하고, 읽기 연산이므로 모니터 역할의 사용자도 권한 검사를 통과한다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-src에서 행을 만드는 write spec은 등록 처리기가 쓰는 upsert spec 하나이고, 그 spec은 상태를 언제나
-정상으로 기록한다. 등록 해제 처리와 heartbeat가 끊긴 서비스를 비정상으로 바꾸는 처리는 spec 없이
-행을 직접 수정한다. 그래서 비정상·등록 해제 상태의 서비스는 시나리오 트리가 자체로 정의한 spec —
-등록 spec에서 상태만 바꿔 쓰는 것 — 으로 만든다. 정상 상태의 서비스는 src의 spec으로 만든다.
+The only call this adapter provides is the search (`admin_search`). A service registers a catalog row itself, and the event handler records it when the service sends the service catalog heartbeat; no call lets an administrator create, update or delete a row. The search needs a global role, and since it is a read operation, a user with the monitor role passes the permission check too.
 
-## 검색
+The only write spec in src that creates a row is the upsert spec the registration handler writes, and that spec always records the status as healthy. The deregistration handler and the handler that marks a service with a broken service catalog heartbeat as unhealthy update the row directly without a spec. A service in the unhealthy or deregistered status is therefore created with a spec the scenario tree defines itself, written from the registration spec with only the status changed. A service in the healthy status is built with the src spec.
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 검색한다 | 서비스 둘, 그중 하나에 엔드포인트 하나, 전역 역할 있음 | 전체 조회 | 둘 다 한 번씩 반환된다 |
-| `service_group` 필터로 검색한다 | `service_group` 값이 다른 서비스 둘, 전역 역할 있음 | `service_group` 필터로 조회 | `service_group` 값이 일치하는 서비스만 반환된다 |
-| 상태가 같은 것을 고른다 | 정상·비정상·등록 해제 서비스 하나씩, 전역 역할 있음 | `equals` 조건에 비정상을 지정해 조회 | 비정상 서비스만 반환된다 |
-| 상태가 다른 것을 고른다 | 정상·비정상·등록 해제 서비스 하나씩, 전역 역할 있음 | `not_equals` 조건에 비정상을 지정해 조회 | 정상과 등록 해제 서비스만 반환된다 |
-| 상태 목록에 든 것을 고른다 | 정상·비정상·등록 해제 서비스 하나씩, 전역 역할 있음 | `in` 조건에 비정상·등록 해제를 지정해 조회 | 비정상과 등록 해제 서비스만 반환된다 |
-| 상태 목록에 들지 않은 것을 고른다 | 정상·비정상·등록 해제 서비스 하나씩, 전역 역할 있음 | `not_in` 조건에 비정상·등록 해제를 지정해 조회 | 정상 서비스만 반환된다 |
-| 페이지 크기를 생략한다 | 서비스 11개, 전역 역할 있음 | `limit` 없이 조회 | 10건까지 반환되고 다음 페이지가 있다고 응답한다 |
-| 모니터 역할이 검색한다 | 서비스 둘, 모니터 역할 | 전체 조회 | 슈퍼관리자와 같은 응답 |
-| 슈퍼관리자가 아닌 사용자가 검색한다 | 전역 역할 없음 | 전체 조회 | 역할 부족으로 거부 |
+## Search
 
-상태 필터는 `equals`, `in`, `not_equals`, `not_in` 네 조건을 받고, 상태가 같은 것·다른 것·목록에
-든 것·목록에 들지 않은 것을 검색하는 시나리오가 조건을 하나씩 확인한다. 네 시나리오 모두 상태마다
-서비스 하나씩을 두고, 지정한 상태의 서비스만 남는지 본다.
+The status filter accepts the four conditions `equals`, `in`, `not_equals` and `not_in`, and one scenario per condition checks it by searching for services whose status is the same as the specified one/different from it/in the list/not in it. All four scenarios place one service per status and check that only the services in the specified status remain.
 
-요청 타입에는 `first`·`after`·`last`·`before` 필드가 있지만 이 검색은 페이지 크기(`limit`)와
-`offset` 값만 읽는다. 커서 필드를 함께 지정하면 지금은 오류 없이 무시된다. 커서 시나리오는 이 필드를
-무시할 것인지 사용할 것인지 정한 뒤에 적는다.
-
-## 아직 적지 않은 것
-
-`batch_load_fields`는 모든 어댑터가 상속하는 공용 메서드이지 이 엔티티의 호출이 아니다. 리포트의
-호출 집계에는 포함되지만 이 문서에 적을 시나리오는 없다.
+The request type has `first`, `after`, `last` and `before` fields, but this search reads only the page size (`limit`) and `offset` values. If a cursor field is also specified, it is currently ignored without an error. The cursor scenario is written after settling whether to ignore or use these fields.

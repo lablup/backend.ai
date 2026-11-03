@@ -6,7 +6,8 @@ Usage:
 
 Every `<name>.ko.md` needs a `<name>.md` beside it with the same number of
 headings at each level. With --base, the change since REF must not add Korean
-to a `.md` file and must update both files of a pair. Prints one
+to a `.md` file and must update both files of a pair. A newly added `.ko.md` is
+exempt, since it translates an English file that does not change. Prints one
 "path: problem" line per violation and exits 1 when any exist. CI runs this via
 knowledge-check.yml.
 """
@@ -25,7 +26,7 @@ HANGUL = re.compile(r"[\u1100-\u11ff\u3130-\u318f\uac00-\ud7a3]")
 HEADING = re.compile(r"^(#{1,6}) ")
 FENCE = re.compile(r"^\s*(```|~~~)")
 DIFF_FILE = re.compile(r"^\+\+\+ b/(.+)$")
-# The scenario tests still generate report.md in Korean.
+# The scenario report falls back to Korean for sentences without English yet.
 KOREAN_ALLOWED_NAMES = frozenset({"report.md"})
 # The glossary is generated, and a wording fix can change only one language.
 ONE_SIDE_CHANGE_ALLOWED = "glossary/"
@@ -99,11 +100,24 @@ def check_added_korean(root: Path, base: str) -> list[str]:
 
 def check_pair_updates(root: Path, base: str) -> list[str]:
     changed = set(_git(root, "diff", "--name-only", f"{base}...HEAD", "--", "*.md").splitlines())
+    added = set(
+        _git(
+            root,
+            "diff",
+            "--name-only",
+            "--diff-filter=A",
+            f"{base}...HEAD",
+            "--",
+            "*.md",
+        ).splitlines()
+    )
     problems = []
     for path in sorted(changed):
         if path.startswith(ONE_SIDE_CHANGE_ALLOWED):
             continue
         if path.endswith(KO_SUFFIX):
+            if path in added:
+                continue
             partner = _english_path(path)
         else:
             partner = path.removesuffix(".md") + KO_SUFFIX

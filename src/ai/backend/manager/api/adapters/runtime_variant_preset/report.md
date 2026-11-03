@@ -1,96 +1,96 @@
 ## runtime_variant_preset
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/runtime_variant_preset/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/runtime_variant_preset/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/runtime_variant_preset/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/runtime_variant_preset/adapter.py)
 
-시나리오: 미완 4 / 8
+Scenario: incomplete 4 / 8
 
-- ops 로 구성 (6)
-  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - create — 대표 성공 ✓ · 대표 실패 ✓
-  - get — 대표 성공 ✓ · 대표 실패 ✓
-  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - purge — 대표 성공 ✓ · 대표 실패 ✓
-  - search — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-- 직접 구현 (2)
-  - partial_bulk_update — 성공 있음 2 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - update — 성공 있음 5 · 실패 있음 2 (single_entity)
+- built from ops (6)
+  - batch_load_by_ids: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - create: representative success ✓ · representative rejection ✓
+  - get: representative success ✓ · representative rejection ✓
+  - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - purge: representative success ✓ · representative rejection ✓
+  - search: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+- direct implementation (2)
+  - partial_bulk_update: success present 2 · rejection absent (partial_bulk): SCENARIO-GAP
+  - update: success present 5 · rejection present 2 (single_entity)
 
 **batch_load_by_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [빈 ID 목록으로 조회하면 빈 응답이 반환되며 하위 계층은 호출하지 않는다](#reading-an-empty-preset-id-list-answers-empty-without-a-call) | 성공 |
-| [존재하는 ID 둘과 존재하지 않는 ID 하나를 함께 조회하면 요청한 순서대로 반환되고, 존재하지 않는 ID의 위치는 비어 있다](#reading-presets-read-by-many-ids-come-back-in-the-order-asked) | 성공 |
+| [빈 ID 목록으로 조회하면 빈 응답이 반환되며 하위 계층은 호출하지 않는다](#reading-an-empty-preset-id-list-answers-empty-without-a-call) | answered |
+| [존재하는 ID 둘과 존재하지 않는 ID 하나를 함께 조회하면 요청한 순서대로 반환되고, 존재하지 않는 ID의 위치는 비어 있다](#reading-presets-read-by-many-ids-come-back-in-the-order-asked) | answered |
 
 **create**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프리셋이 하나 있는 변형에 슈퍼관리자가 하나 더 생성하면 새 프리셋의 순위가 100 더 크다](#creating-a-second-preset-in-the-same-variant-is-ranked-a-hundred-higher) | 성공 |
-| [슬라이더 옵션을 추가하여 생성하면 UI 종류를 옵션에서 읽어 응답 노드에 함께 담는다](#creating-a-ui-option-given-on-create-carries-its-type-into-the-node) | 성공 |
-| [대상·값 종류·기본값·키를 모두 지정해 생성하면 네 값이 하나의 명세로 묶여 반환된다](#creating-target-value-type-default-and-key-come-back-as-one-spec) | 성공 |
-| [프리셋이 없는 변형에 슈퍼관리자가 필수 항목만 지정해 생성하면 순위는 100이고, 필수 항목으로 지정되지 않으며, 나머지 선택 항목은 비어 있다](#creating-the-first-preset-of-a-variant-is-ranked-a-hundred) | 성공 |
-| [고유성 제약은 변형과 이름의 조합에 적용되므로 다른 변형에는 같은 이름의 프리셋을 생성할 수 있다](#creating-the-same-preset-name-is-free-in-another-variant) | 성공 |
-| [같은 변형에 같은 이름의 프리셋을 다시 생성하면 이름이 중복되어 요청이 거부된다](#creating-a-preset-name-taken-in-the-same-variant-is-refused) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 프리셋을 생성하면 역할이 부족하여 요청이 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-preset) | 거부 |
-| [권한 검사를 꺼도 슈퍼관리자가 아니면 프리셋을 생성할 수 없다](#creating-turning-enforcement-off-does-not-let-a-user-create-a-preset) | 거부 |
+| [프리셋이 하나 있는 변형에 슈퍼관리자가 하나 더 생성하면 새 프리셋의 순위가 100 더 크다](#creating-a-second-preset-in-the-same-variant-is-ranked-a-hundred-higher) | answered |
+| [슬라이더 옵션을 추가하여 생성하면 UI 종류를 옵션에서 읽어 응답 노드에 함께 담는다](#creating-a-ui-option-given-on-create-carries-its-type-into-the-node) | answered |
+| [대상·값 종류·기본값·키를 모두 지정해 생성하면 네 값이 하나의 명세로 묶여 반환된다](#creating-target-value-type-default-and-key-come-back-as-one-spec) | answered |
+| [프리셋이 없는 변형에 슈퍼관리자가 필수 항목만 지정해 생성하면 순위는 100이고, 필수 항목으로 지정되지 않으며, 나머지 선택 항목은 비어 있다](#creating-the-first-preset-of-a-variant-is-ranked-a-hundred) | answered |
+| [고유성 제약은 변형과 이름의 조합에 적용되므로 다른 변형에는 같은 이름의 프리셋을 생성할 수 있다](#creating-the-same-preset-name-is-free-in-another-variant) | answered |
+| [같은 변형에 같은 이름의 프리셋을 다시 생성하면 이름이 중복되어 요청이 거부된다](#creating-a-preset-name-taken-in-the-same-variant-is-refused) | rejected |
+| [슈퍼관리자가 아닌 사용자가 프리셋을 생성하면 역할이 부족하여 요청이 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-preset) | rejected |
+| [권한 검사를 꺼도 슈퍼관리자가 아니면 프리셋을 생성할 수 없다](#creating-turning-enforcement-off-does-not-let-a-user-create-a-preset) | rejected |
 
 **get**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 ID로 조회해도 해당 프리셋 전체가 반환된다. 이 조회는 인증 여부만 확인한다](#reading-a-user-granted-nothing-reads-a-preset-by-id) | 성공 |
-| [존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다](#reading-reading-a-preset-id-nothing-answers-to-is-refused) | 거부 |
+| [아무 권한도 없는 사용자가 ID로 조회해도 해당 프리셋 전체가 반환된다. 이 조회는 인증 여부만 확인한다](#reading-a-user-granted-nothing-reads-a-preset-by-id) | answered |
+| [존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다](#reading-reading-a-preset-id-nothing-answers-to-is-refused) | rejected |
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets) | 성공 |
-| [슈퍼관리자가 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 모습으로 처리된 목록에 오고 없는 id 는 실패 목록에 온다](#partial_bulk_purging-purging-several-presets-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 없는 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets) | answered |
+| [슈퍼관리자가 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 모습으로 처리된 목록에 오고 없는 id 는 실패 목록에 온다](#partial_bulk_purging-purging-several-presets-answers-for-the-missing-one) | answered |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 프리셋을 삭제하면 삭제한 프리셋의 ID를 담은 응답이 반환된다](#retiring-the-superadmin-deletes-a-preset) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-delete-a-preset) | 성공 |
-| [아무 권한도 없는 사용자가 프리셋을 삭제하면 권한이 부족하여 요청이 거부된다](#retiring-a-user-granted-nothing-may-not-delete-a-preset) | 거부 |
-| [슈퍼관리자가 존재하지 않는 ID를 삭제하면 대상을 찾을 수 없어 요청이 거부된다](#retiring-deleting-a-preset-id-nothing-answers-to-is-not-found) | 거부 |
+| [슈퍼관리자가 프리셋을 삭제하면 삭제한 프리셋의 ID를 담은 응답이 반환된다](#retiring-the-superadmin-deletes-a-preset) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-delete-a-preset) | answered |
+| [아무 권한도 없는 사용자가 프리셋을 삭제하면 권한이 부족하여 요청이 거부된다](#retiring-a-user-granted-nothing-may-not-delete-a-preset) | rejected |
+| [슈퍼관리자가 존재하지 않는 ID를 삭제하면 대상을 찾을 수 없어 요청이 거부된다](#retiring-deleting-a-preset-id-nothing-answers-to-is-not-found) | rejected |
 
 **search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프리셋이 둘 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 두 프리셋이 모두 반환된다](#searching-a-user-granted-nothing-counts-every-preset-laid) | 성공 |
-| [프리셋이 두 변형에 나뉘어 있을 때 한 변형을 필터로 조회하면 해당 변형의 프리셋만 반환된다](#searching-a-variant-filter-narrows-the-answer-to-that-variants-presets) | 성공 |
-| [추가 버전과 폐기 버전이 서로 다른 프리셋을 버전 필터로 조회하면 추가 버전 이상이고 폐기 버전 미만인 프리셋만 반환된다. 값이 비어 있는 쪽에는 제한이 없다](#searching-a-version-filter-keeps-only-the-presets-valid-at-that-version) | 성공 |
-| [프리셋이 11개 있을 때 페이지 크기를 생략하면 10건을 반환하고 다음 페이지가 있음을 표시한다](#searching-omitting-the-page-size-answers-ten-presets-and-a-next-page) | 성공 |
+| [프리셋이 둘 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 두 프리셋이 모두 반환된다](#searching-a-user-granted-nothing-counts-every-preset-laid) | answered |
+| [프리셋이 두 변형에 나뉘어 있을 때 한 변형을 필터로 조회하면 해당 변형의 프리셋만 반환된다](#searching-a-variant-filter-narrows-the-answer-to-that-variants-presets) | answered |
+| [추가 버전과 폐기 버전이 서로 다른 프리셋을 버전 필터로 조회하면 추가 버전 이상이고 폐기 버전 미만인 프리셋만 반환된다. 값이 비어 있는 쪽에는 제한이 없다](#searching-a-version-filter-keeps-only-the-presets-valid-at-that-version) | answered |
+| [프리셋이 11개 있을 때 페이지 크기를 생략하면 10건을 반환하고 다음 페이지가 있음을 표시한다](#searching-omitting-the-page-size-answers-ten-presets-and-a-next-page) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | 성공 |
-| [슈퍼관리자가 프리셋 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | 성공 |
+| [아무 권한도 없는 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | answered |
+| [슈퍼관리자가 프리셋 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | answered |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [변경할 값을 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-a-preset-edit-giving-no-value-changes-nothing) | 성공 |
-| [설명이 있는 프리셋의 설명을 비우면 설명이 없어진다](#editing-clearing-a-preset-description-leaves-it-empty) | 성공 |
-| [슈퍼관리자가 프리셋의 순위를 바꾸면 순위가 변경된 노드가 반환된다](#editing-editing-a-preset-rank-sets-the-new-rank) | 성공 |
-| [슈퍼관리자가 프리셋의 이름만 바꾸면 이름은 새 값으로 바뀌고 나머지는 그대로 유지된다](#editing-renaming-a-preset-leaves-the-rest-alone) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있다](#editing-turning-enforcement-off-lets-a-user-edit-a-preset) | 성공 |
-| [아무 권한도 없는 사용자가 프리셋을 수정하면 권한이 부족하여 요청이 거부된다. 프리셋은 어느 스코프에도 속하지 않아 현재는 해당 권한을 부여할 방법이 없다](#editing-a-user-granted-nothing-may-not-edit-a-preset) | 거부 |
-| [슈퍼관리자가 존재하지 않는 ID를 수정하면 대상을 찾을 수 없어 요청이 거부된다](#editing-the-superadmin-editing-a-preset-id-nothing-answers-to-is-not-found) | 거부 |
+| [변경할 값을 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-a-preset-edit-giving-no-value-changes-nothing) | answered |
+| [설명이 있는 프리셋의 설명을 비우면 설명이 없어진다](#editing-clearing-a-preset-description-leaves-it-empty) | answered |
+| [슈퍼관리자가 프리셋의 순위를 바꾸면 순위가 변경된 노드가 반환된다](#editing-editing-a-preset-rank-sets-the-new-rank) | answered |
+| [슈퍼관리자가 프리셋의 이름만 바꾸면 이름은 새 값으로 바뀌고 나머지는 그대로 유지된다](#editing-renaming-a-preset-leaves-the-rest-alone) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있다](#editing-turning-enforcement-off-lets-a-user-edit-a-preset) | answered |
+| [아무 권한도 없는 사용자가 프리셋을 수정하면 권한이 부족하여 요청이 거부된다. 프리셋은 어느 스코프에도 속하지 않아 현재는 해당 권한을 부여할 방법이 없다](#editing-a-user-granted-nothing-may-not-edit-a-preset) | rejected |
+| [슈퍼관리자가 존재하지 않는 ID를 수정하면 대상을 찾을 수 없어 요청이 거부된다](#editing-the-superadmin-editing-a-preset-id-nothing-answers-to-is-not-found) | rejected |
 
 ### batch_load_by_ids
 
 <a id="reading-an-empty-preset-id-list-answers-empty-without-a-call"></a>
 
-#### [an-empty-preset-id-list-answers-empty-without-a-call](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py) — pass
+#### [an-empty-preset-id-list-answers-empty-without-a-call](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py): pass
 
 빈 ID 목록으로 조회하면 빈 응답이 반환되며 하위 계층은 호출하지 않는다
 
@@ -112,7 +112,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.batch_load_by_ids — user-1이 빈 ID 목록으로 조회
+- RuntimeVariantPresetAdapter.batch_load_by_ids: user-1이 빈 ID 목록으로 조회
 
 Then
 
@@ -121,7 +121,7 @@ Then
 
 <a id="reading-presets-read-by-many-ids-come-back-in-the-order-asked"></a>
 
-#### [presets-read-by-many-ids-come-back-in-the-order-asked](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py) — pass
+#### [presets-read-by-many-ids-come-back-in-the-order-asked](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py): pass
 
 존재하는 ID 둘과 존재하지 않는 ID 하나를 함께 조회하면 요청한 순서대로 반환되고, 존재하지 않는 ID의 위치는 비어 있다
 
@@ -144,13 +144,13 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.batch_load_by_ids — user-1이 미리 만들어 둔 프리셋 2개와 존재하지 않는 ID 하나를 함께 조회
+- RuntimeVariantPresetAdapter.batch_load_by_ids: user-1이 미리 만들어 둔 프리셋 2개와 존재하지 않는 ID 하나를 함께 조회
 
 Then
 
 - 요청한 순서대로 반환되며, 존재하지 않는 ID의 위치에는 빈 항목이 반환된다
   - len(items) = 3
-  - items[0].id: 무시함 — 데이터베이스가 만든다
+  - items[0].id: 무시함: 데이터베이스가 만든다
   - items[0].runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
   - items[0].name = 'preset-1'
   - items[0].description = '미리 만들어 둔 프리셋'
@@ -165,7 +165,7 @@ Then
   - items[0].ui_option = None
   - items[0].created_at: 이 실행이 쓴 시각
   - items[0].updated_at: 이 실행이 쓴 시각
-  - items[1].id: 무시함 — 데이터베이스가 만든다
+  - items[1].id: 무시함: 데이터베이스가 만든다
   - items[1].runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
   - items[1].name = 'preset-2'
   - items[1].description = '미리 만들어 둔 프리셋'
@@ -186,7 +186,7 @@ Then
 
 <a id="creating-a-second-preset-in-the-same-variant-is-ranked-a-hundred-higher"></a>
 
-#### [a-second-preset-in-the-same-variant-is-ranked-a-hundred-higher](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
+#### [a-second-preset-in-the-same-variant-is-ranked-a-hundred-higher](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py): pass
 
 프리셋이 하나 있는 변형에 슈퍼관리자가 하나 더 생성하면 새 프리셋의 순위가 100 더 크다
 
@@ -208,12 +208,12 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 runtime-1 변형에 max-tokens 프리셋을 하나 더 생성
+- RuntimeVariantPresetAdapter.create: user-1이 runtime-1 변형에 max-tokens 프리셋을 하나 더 생성
 
 Then
 
 - 순위가 기존 프리셋보다 지정된 간격만큼 큰 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
   - name = 'max-tokens'
   - description = None
@@ -231,7 +231,7 @@ Then
 
 <a id="creating-a-ui-option-given-on-create-carries-its-type-into-the-node"></a>
 
-#### [a-ui-option-given-on-create-carries-its-type-into-the-node](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
+#### [a-ui-option-given-on-create-carries-its-type-into-the-node](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py): pass
 
 슬라이더 옵션을 추가하여 생성하면 UI 종류를 옵션에서 읽어 응답 노드에 함께 담는다
 
@@ -252,12 +252,12 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1 변형에 max-tokens 프리셋을 생성
+- RuntimeVariantPresetAdapter.create: user-1이 variant-1 변형에 max-tokens 프리셋을 생성
 
 Then
 
 - 생성한 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
   - name = 'max-tokens'
   - description = None
@@ -275,7 +275,7 @@ Then
 
 <a id="creating-target-value-type-default-and-key-come-back-as-one-spec"></a>
 
-#### [target-value-type-default-and-key-come-back-as-one-spec](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
+#### [target-value-type-default-and-key-come-back-as-one-spec](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py): pass
 
 대상·값 종류·기본값·키를 모두 지정해 생성하면 네 값이 하나의 명세로 묶여 반환된다
 
@@ -296,12 +296,12 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1 변형에 max-tokens 프리셋을 생성
+- RuntimeVariantPresetAdapter.create: user-1이 variant-1 변형에 max-tokens 프리셋을 생성
 
 Then
 
 - 생성한 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
   - name = 'max-tokens'
   - description = None
@@ -319,7 +319,7 @@ Then
 
 <a id="creating-the-first-preset-of-a-variant-is-ranked-a-hundred"></a>
 
-#### [the-first-preset-of-a-variant-is-ranked-a-hundred](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
+#### [the-first-preset-of-a-variant-is-ranked-a-hundred](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py): pass
 
 프리셋이 없는 변형에 슈퍼관리자가 필수 항목만 지정해 생성하면 순위는 100이고, 필수 항목으로 지정되지 않으며, 나머지 선택 항목은 비어 있다
 
@@ -340,12 +340,12 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1 변형에 max-tokens 프리셋을 생성
+- RuntimeVariantPresetAdapter.create: user-1이 variant-1 변형에 max-tokens 프리셋을 생성
 
 Then
 
 - 생성한 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
   - name = 'max-tokens'
   - description = None
@@ -363,7 +363,7 @@ Then
 
 <a id="creating-the-same-preset-name-is-free-in-another-variant"></a>
 
-#### [the-same-preset-name-is-free-in-another-variant](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
+#### [the-same-preset-name-is-free-in-another-variant](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py): pass
 
 고유성 제약은 변형과 이름의 조합에 적용되므로 다른 변형에는 같은 이름의 프리셋을 생성할 수 있다
 
@@ -386,12 +386,12 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 free-1 변형에 preset-1 프리셋을 생성
+- RuntimeVariantPresetAdapter.create: user-1이 free-1 변형에 preset-1 프리셋을 생성
 
 Then
 
 - 다른 변형에 생성한 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
   - name = 'preset-1'
   - description = None
@@ -409,7 +409,7 @@ Then
 
 <a id="creating-a-preset-name-taken-in-the-same-variant-is-refused"></a>
 
-#### [a-preset-name-taken-in-the-same-variant-is-refused](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
+#### [a-preset-name-taken-in-the-same-variant-is-refused](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py): pass
 
 같은 변형에 같은 이름의 프리셋을 다시 생성하면 이름이 중복되어 요청이 거부된다
 
@@ -431,7 +431,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 runtime-1 변형에 preset-1 프리셋을 하나 더 생성
+- RuntimeVariantPresetAdapter.create: user-1이 runtime-1 변형에 preset-1 프리셋을 하나 더 생성
 
 Then
 
@@ -440,7 +440,7 @@ Then
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-create-a-preset"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-create-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-create-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py): pass
 
 슈퍼관리자가 아닌 사용자가 프리셋을 생성하면 역할이 부족하여 요청이 거부된다
 
@@ -461,7 +461,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1 변형에 max-tokens 프리셋을 생성
+- RuntimeVariantPresetAdapter.create: user-1이 variant-1 변형에 max-tokens 프리셋을 생성
 
 Then
 
@@ -470,7 +470,7 @@ Then
 
 <a id="creating-turning-enforcement-off-does-not-let-a-user-create-a-preset"></a>
 
-#### [turning-enforcement-off-does-not-let-a-user-create-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py) — pass
+#### [turning-enforcement-off-does-not-let-a-user-create-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_creating.py): pass
 
 권한 검사를 꺼도 슈퍼관리자가 아니면 프리셋을 생성할 수 없다
 
@@ -491,7 +491,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.create — user-1이 variant-1 변형에 max-tokens 프리셋을 생성
+- RuntimeVariantPresetAdapter.create: user-1이 variant-1 변형에 max-tokens 프리셋을 생성
 
 Then
 
@@ -502,7 +502,7 @@ Then
 
 <a id="reading-a-user-granted-nothing-reads-a-preset-by-id"></a>
 
-#### [a-user-granted-nothing-reads-a-preset-by-id](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py) — pass
+#### [a-user-granted-nothing-reads-a-preset-by-id](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py): pass
 
 아무 권한도 없는 사용자가 ID로 조회해도 해당 프리셋 전체가 반환된다. 이 조회는 인증 여부만 확인한다
 
@@ -524,12 +524,12 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.get — user-1의 조회 요청 — 대상: preset-1
+- RuntimeVariantPresetAdapter.get: user-1의 조회 요청: 대상: preset-1
 
 Then
 
 - 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
   - name = 'preset-1'
   - description = '미리 만들어 둔 프리셋'
@@ -547,7 +547,7 @@ Then
 
 <a id="reading-reading-a-preset-id-nothing-answers-to-is-refused"></a>
 
-#### [reading-a-preset-id-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py) — pass
+#### [reading-a-preset-id-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_reading.py): pass
 
 존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다
 
@@ -569,7 +569,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.get — user-1의 조회 요청 — 대상: 존재하지 않는 ID
+- RuntimeVariantPresetAdapter.get: user-1의 조회 요청: 대상: 존재하지 않는 ID
 
 Then
 
@@ -580,7 +580,7 @@ Then
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets"></a>
 
-#### [a-user-granted-nothing-purges-none-of-several-presets](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_partial_bulk_purging.py) — pass
+#### [a-user-granted-nothing-purges-none-of-several-presets](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_partial_bulk_purging.py): pass
 
 아무 권한도 없는 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -603,7 +603,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.partial_bulk_purge — user-1이 프리셋 2개를 한 번에 purge 함
+- RuntimeVariantPresetAdapter.partial_bulk_purge: user-1이 프리셋 2개를 한 번에 purge 함
 
 Then
 
@@ -617,7 +617,7 @@ Then
 
 <a id="partial_bulk_purging-purging-several-presets-answers-for-the-missing-one"></a>
 
-#### [purging-several-presets-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_partial_bulk_purging.py) — pass
+#### [purging-several-presets-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_partial_bulk_purging.py): pass
 
 슈퍼관리자가 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 모습으로 처리된 목록에 오고 없는 id 는 실패 목록에 온다
 
@@ -640,13 +640,13 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.partial_bulk_purge — user-1이 프리셋 2개 와 없는 id 하나를 한 번에 purge 함
+- RuntimeVariantPresetAdapter.partial_bulk_purge: user-1이 프리셋 2개 와 없는 id 하나를 한 번에 purge 함
 
 Then
 
 - 미리 만들어 둔 프리셋이 모두 처리된 목록에 오고, 없는 id 는 실패 목록에 온다
   - successes count = 2
-  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].id: 무시함: 데이터베이스가 만든다
   - successes[0].runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
   - successes[0].name = 'preset-1'
   - successes[0].description = '미리 만들어 둔 프리셋'
@@ -661,7 +661,7 @@ Then
   - successes[0].ui_option = None
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].updated_at: 이 실행이 쓴 시각
-  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].id: 무시함: 데이터베이스가 만든다
   - successes[1].runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
   - successes[1].name = 'preset-2'
   - successes[1].description = '미리 만들어 둔 프리셋'
@@ -678,13 +678,13 @@ Then
   - successes[1].updated_at: 이 실행이 쓴 시각
   - failed count = 1
   - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 무시함 — 이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다
+  - failed[0].message: 무시함: 이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다
 
 ### purge
 
 <a id="retiring-the-superadmin-deletes-a-preset"></a>
 
-#### [the-superadmin-deletes-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
+#### [the-superadmin-deletes-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py): pass
 
 슈퍼관리자가 프리셋을 삭제하면 삭제한 프리셋의 ID를 담은 응답이 반환된다
 
@@ -706,7 +706,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.purge — user-1의 삭제 요청 — 대상: preset-1
+- RuntimeVariantPresetAdapter.purge: user-1의 삭제 요청: 대상: preset-1
 
 Then
 
@@ -715,7 +715,7 @@ Then
 
 <a id="retiring-turning-enforcement-off-lets-a-user-delete-a-preset"></a>
 
-#### [turning-enforcement-off-lets-a-user-delete-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
+#### [turning-enforcement-off-lets-a-user-delete-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py): pass
 
 권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다
 
@@ -737,7 +737,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.purge — user-1의 삭제 요청 — 대상: preset-1
+- RuntimeVariantPresetAdapter.purge: user-1의 삭제 요청: 대상: preset-1
 
 Then
 
@@ -746,7 +746,7 @@ Then
 
 <a id="retiring-a-user-granted-nothing-may-not-delete-a-preset"></a>
 
-#### [a-user-granted-nothing-may-not-delete-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
+#### [a-user-granted-nothing-may-not-delete-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py): pass
 
 아무 권한도 없는 사용자가 프리셋을 삭제하면 권한이 부족하여 요청이 거부된다
 
@@ -768,7 +768,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.purge — user-1의 삭제 요청 — 대상: preset-1
+- RuntimeVariantPresetAdapter.purge: user-1의 삭제 요청: 대상: preset-1
 
 Then
 
@@ -777,7 +777,7 @@ Then
 
 <a id="retiring-deleting-a-preset-id-nothing-answers-to-is-not-found"></a>
 
-#### [deleting-a-preset-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py) — pass
+#### [deleting-a-preset-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_retiring.py): pass
 
 슈퍼관리자가 존재하지 않는 ID를 삭제하면 대상을 찾을 수 없어 요청이 거부된다
 
@@ -799,7 +799,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.purge — user-1의 삭제 요청 — 대상: 존재하지 않는 ID
+- RuntimeVariantPresetAdapter.purge: user-1의 삭제 요청: 대상: 존재하지 않는 ID
 
 Then
 
@@ -810,7 +810,7 @@ Then
 
 <a id="searching-a-user-granted-nothing-counts-every-preset-laid"></a>
 
-#### [a-user-granted-nothing-counts-every-preset-laid](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py) — pass
+#### [a-user-granted-nothing-counts-every-preset-laid](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py): pass
 
 프리셋이 둘 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 두 프리셋이 모두 반환된다
 
@@ -833,7 +833,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.search — user-1이 필터 없이 전체를 조회
+- RuntimeVariantPresetAdapter.search: user-1이 필터 없이 전체를 조회
 
 Then
 
@@ -845,7 +845,7 @@ Then
 
 <a id="searching-a-variant-filter-narrows-the-answer-to-that-variants-presets"></a>
 
-#### [a-variant-filter-narrows-the-answer-to-that-variants-presets](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py) — pass
+#### [a-variant-filter-narrows-the-answer-to-that-variants-presets](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py): pass
 
 프리셋이 두 변형에 나뉘어 있을 때 한 변형을 필터로 조회하면 해당 변형의 프리셋만 반환된다
 
@@ -870,7 +870,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.search — user-1이 변형 필터로 조회 — 대상: wanted-1
+- RuntimeVariantPresetAdapter.search: user-1이 변형 필터로 조회: 대상: wanted-1
 
 Then
 
@@ -882,7 +882,7 @@ Then
 
 <a id="searching-a-version-filter-keeps-only-the-presets-valid-at-that-version"></a>
 
-#### [a-version-filter-keeps-only-the-presets-valid-at-that-version](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py) — pass
+#### [a-version-filter-keeps-only-the-presets-valid-at-that-version](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py): pass
 
 추가 버전과 폐기 버전이 서로 다른 프리셋을 버전 필터로 조회하면 추가 버전 이상이고 폐기 버전 미만인 프리셋만 반환된다. 값이 비어 있는 쪽에는 제한이 없다
 
@@ -908,7 +908,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.search — user-1이 버전 2.5.0에 유효한 프리셋만 조회
+- RuntimeVariantPresetAdapter.search: user-1이 버전 2.5.0에 유효한 프리셋만 조회
 
 Then
 
@@ -920,7 +920,7 @@ Then
 
 <a id="searching-omitting-the-page-size-answers-ten-presets-and-a-next-page"></a>
 
-#### [omitting-the-page-size-answers-ten-presets-and-a-next-page](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py) — pass
+#### [omitting-the-page-size-answers-ten-presets-and-a-next-page](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_searching.py): pass
 
 프리셋이 11개 있을 때 페이지 크기를 생략하면 10건을 반환하고 다음 페이지가 있음을 표시한다
 
@@ -952,7 +952,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.search — user-1이 필터 없이 전체를 조회
+- RuntimeVariantPresetAdapter.search: user-1이 필터 없이 전체를 조회
 
 Then
 
@@ -966,7 +966,7 @@ Then
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets"></a>
 
-#### [a-user-granted-nothing-edits-none-of-several-presets](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-nothing-edits-none-of-several-presets](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_partial_bulk_editing.py): pass
 
 아무 권한도 없는 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -989,7 +989,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.partial_bulk_update — user-1이 프리셋 2개의 설명을 한 번에 고침
+- RuntimeVariantPresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 설명을 한 번에 고침
 
 Then
 
@@ -1003,7 +1003,7 @@ Then
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-presets-at-once"></a>
 
-#### [the-superadmin-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_partial_bulk_editing.py) — pass
+#### [the-superadmin-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_partial_bulk_editing.py): pass
 
 슈퍼관리자가 프리셋 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다
 
@@ -1026,13 +1026,13 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.partial_bulk_update — user-1이 프리셋 2개의 설명을 한 번에 고침
+- RuntimeVariantPresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 설명을 한 번에 고침
 
 Then
 
 - 미리 만들어 둔 프리셋이 모두 처리된 목록에 오고, 실패한 것은 없다
   - successes count = 2
-  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].id: 무시함: 데이터베이스가 만든다
   - successes[0].runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
   - successes[0].name = 'preset-1'
   - successes[0].description = '한 번에 고친 설명'
@@ -1047,7 +1047,7 @@ Then
   - successes[0].ui_option = None
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].updated_at: 이 실행이 쓴 시각
-  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].id: 무시함: 데이터베이스가 만든다
   - successes[1].runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
   - successes[1].name = 'preset-2'
   - successes[1].description = '한 번에 고친 설명'
@@ -1068,7 +1068,7 @@ Then
 
 <a id="editing-a-preset-edit-giving-no-value-changes-nothing"></a>
 
-#### [a-preset-edit-giving-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
+#### [a-preset-edit-giving-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py): pass
 
 변경할 값을 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다
 
@@ -1090,12 +1090,12 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1의 수정 요청 — 대상: preset-1, 변경 항목: 변경 항목 없음
+- RuntimeVariantPresetAdapter.update: user-1의 수정 요청: 대상: preset-1, 변경 항목: 변경 항목 없음
 
 Then
 
 - 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
   - name = 'preset-1'
   - description = '미리 만들어 둔 프리셋'
@@ -1113,7 +1113,7 @@ Then
 
 <a id="editing-clearing-a-preset-description-leaves-it-empty"></a>
 
-#### [clearing-a-preset-description-leaves-it-empty](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
+#### [clearing-a-preset-description-leaves-it-empty](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py): pass
 
 설명이 있는 프리셋의 설명을 비우면 설명이 없어진다
 
@@ -1135,12 +1135,12 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1의 수정 요청 — 대상: preset-1, 변경 항목: description
+- RuntimeVariantPresetAdapter.update: user-1의 수정 요청: 대상: preset-1, 변경 항목: description
 
 Then
 
 - 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
   - name = 'preset-1'
   - description = None
@@ -1158,7 +1158,7 @@ Then
 
 <a id="editing-editing-a-preset-rank-sets-the-new-rank"></a>
 
-#### [editing-a-preset-rank-sets-the-new-rank](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
+#### [editing-a-preset-rank-sets-the-new-rank](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py): pass
 
 슈퍼관리자가 프리셋의 순위를 바꾸면 순위가 변경된 노드가 반환된다
 
@@ -1180,12 +1180,12 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1의 수정 요청 — 대상: preset-1, 변경 항목: rank
+- RuntimeVariantPresetAdapter.update: user-1의 수정 요청: 대상: preset-1, 변경 항목: rank
 
 Then
 
 - 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
   - name = 'preset-1'
   - description = '미리 만들어 둔 프리셋'
@@ -1203,7 +1203,7 @@ Then
 
 <a id="editing-renaming-a-preset-leaves-the-rest-alone"></a>
 
-#### [renaming-a-preset-leaves-the-rest-alone](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
+#### [renaming-a-preset-leaves-the-rest-alone](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py): pass
 
 슈퍼관리자가 프리셋의 이름만 바꾸면 이름은 새 값으로 바뀌고 나머지는 그대로 유지된다
 
@@ -1225,12 +1225,12 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1의 수정 요청 — 대상: preset-1, 변경 항목: name
+- RuntimeVariantPresetAdapter.update: user-1의 수정 요청: 대상: preset-1, 변경 항목: name
 
 Then
 
 - 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
   - name = 'renamed'
   - description = '미리 만들어 둔 프리셋'
@@ -1248,7 +1248,7 @@ Then
 
 <a id="editing-turning-enforcement-off-lets-a-user-edit-a-preset"></a>
 
-#### [turning-enforcement-off-lets-a-user-edit-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
+#### [turning-enforcement-off-lets-a-user-edit-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py): pass
 
 권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있다
 
@@ -1270,12 +1270,12 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1의 수정 요청 — 대상: preset-1, 변경 항목: name
+- RuntimeVariantPresetAdapter.update: user-1의 수정 요청: 대상: preset-1, 변경 항목: name
 
 Then
 
 - 미리 만들어 둔 프리셋 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - runtime_variant_id: 미리 만들어 둔 변형의 식별자와 같다
   - name = 'renamed'
   - description = '미리 만들어 둔 프리셋'
@@ -1293,7 +1293,7 @@ Then
 
 <a id="editing-a-user-granted-nothing-may-not-edit-a-preset"></a>
 
-#### [a-user-granted-nothing-may-not-edit-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-a-preset](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py): pass
 
 아무 권한도 없는 사용자가 프리셋을 수정하면 권한이 부족하여 요청이 거부된다. 프리셋은 어느 스코프에도 속하지 않아 현재는 해당 권한을 부여할 방법이 없다
 
@@ -1315,7 +1315,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1의 수정 요청 — 대상: preset-1, 변경 항목: name
+- RuntimeVariantPresetAdapter.update: user-1의 수정 요청: 대상: preset-1, 변경 항목: name
 
 Then
 
@@ -1324,7 +1324,7 @@ Then
 
 <a id="editing-the-superadmin-editing-a-preset-id-nothing-answers-to-is-not-found"></a>
 
-#### [the-superadmin-editing-a-preset-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py) — pass
+#### [the-superadmin-editing-a-preset-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/runtime_variant_preset/test_editing.py): pass
 
 슈퍼관리자가 존재하지 않는 ID를 수정하면 대상을 찾을 수 없어 요청이 거부된다
 
@@ -1346,7 +1346,7 @@ Given
 
 When
 
-- RuntimeVariantPresetAdapter.update — user-1의 수정 요청 — 대상: 존재하지 않는 ID, 변경 항목: name
+- RuntimeVariantPresetAdapter.update: user-1의 수정 요청: 대상: 존재하지 않는 ID, 변경 항목: name
 
 Then
 
