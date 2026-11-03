@@ -94,12 +94,17 @@ OTHER_ORIGIN = "https://other.example.com"
 PREFLIGHT_METHOD_HEADER = {"Access-Control-Request-Method": "POST"}
 
 
-async def _cors_client(aiohttp_client: Any, allowed_origins: list[str]) -> Any:
+async def _cors_client(
+    aiohttp_client: Any, allowed_origins: list[str], *, allow_all_origins: bool = False
+) -> Any:
     async def handler(_request: web.Request) -> web.Response:
         return web.json_response({})
 
     app = web.Application()
-    cors = aiohttp_cors.setup(app, defaults=build_cors_options(allowed_origins))
+    cors = aiohttp_cors.setup(
+        app,
+        defaults=build_cors_options(allowed_origins, allow_all_origins=allow_all_origins),
+    )
     cors.add(app.router.add_route("POST", "/server/login-check", handler))
     return await aiohttp_client(app)
 
@@ -163,9 +168,49 @@ class TestCorsOptions:
         assert "Access-Control-Allow-Origin" not in resp.headers
 
 
+class TestCorsAllowAllOptions:
+    async def test_unlisted_origin_receives_cors_headers(self, aiohttp_client: Any) -> None:
+        client = await _cors_client(aiohttp_client, [], allow_all_origins=True)
+
+        resp = await client.post("/server/login-check", headers={"Origin": OTHER_ORIGIN})
+
+        assert resp.status == 200
+        assert resp.headers["Access-Control-Allow-Origin"] == OTHER_ORIGIN
+        assert resp.headers["Access-Control-Allow-Credentials"] == "true"
+
+    async def test_unlisted_origin_passes_preflight(self, aiohttp_client: Any) -> None:
+        client = await _cors_client(aiohttp_client, [], allow_all_origins=True)
+
+        resp = await client.options(
+            "/server/login-check",
+            headers={"Origin": OTHER_ORIGIN, **PREFLIGHT_METHOD_HEADER},
+        )
+
+        assert resp.status == 200
+        assert resp.headers["Access-Control-Allow-Origin"] == OTHER_ORIGIN
+        assert resp.headers["Access-Control-Allow-Credentials"] == "true"
+
+
 class TestCorsAllowedOriginsConfig:
     async def test_default_is_empty(self) -> None:
         assert SecurityConfig.model_validate({}).cors_allowed_origins == []
+
+    async def test_allow_all_origins_default_is_false(self) -> None:
+        assert SecurityConfig.model_validate({}).cors_allow_all_origins is False
+
+    @pytest.mark.parametrize(
+        ("raw_config", "expected"),
+        [
+            ({"cors-allow-all-origins": True}, True),
+            ({"cors_allow_all_origins": True}, True),
+            ({"cors-allow-all-origins": False}, False),
+        ],
+    )
+    async def test_accepts_allow_all_origins(
+        self, raw_config: dict[str, bool], expected: bool
+    ) -> None:
+        config = SecurityConfig.model_validate(raw_config)
+        assert config.cors_allow_all_origins is expected
 
     @pytest.mark.parametrize(
         "origin",
