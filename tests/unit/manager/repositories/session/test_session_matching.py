@@ -8,6 +8,7 @@ import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import PurePosixPath
 from typing import Protocol
 
 import pytest
@@ -22,15 +23,19 @@ from ai.backend.common.types import (
     ClusterMode,
     DefaultForUnspecified,
     KernelId,
+    MountPermission,
     ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
+    VFolderID,
+    VFolderMount,
+    VFolderUsageMode,
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.errors.kernel import SessionAlreadyExists, TooManySessionsMatched
+from ai.backend.manager.errors.kernel import SessionAlreadyExists, SessionNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
@@ -55,7 +60,9 @@ from ai.backend.manager.models.resource_policy.row import (
 )
 from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session.searchers import LiveSessionsMountingVFolderSearcher
 from ai.backend.manager.models.session.updaters import SessionUpdater
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -86,6 +93,7 @@ class _SessionFactory(Protocol):
         created_at: datetime | None = None,
         access_key: AccessKey | None = None,
         with_main_kernel: bool = False,
+        mounted: VFolderID | None = None,
     ) -> SessionId: ...
 
 
@@ -273,6 +281,18 @@ async def other_access_key(db_with_tables: ExtendedAsyncSAEngine, owner: _Owner)
     return access_key
 
 
+def _mount_of(vfolder_id: VFolderID) -> VFolderMount:
+    return VFolderMount(
+        name="data",
+        vfid=vfolder_id,
+        vfsubpath=PurePosixPath("."),
+        host_path=PurePosixPath("/mnt/host/data"),
+        kernel_path=PurePosixPath("/home/work/data"),
+        mount_perm=MountPermission.READ_WRITE,
+        usage_mode=VFolderUsageMode.GENERAL,
+    )
+
+
 @pytest.fixture
 def add_session(db_with_tables: ExtendedAsyncSAEngine, owner: _Owner) -> _SessionFactory:
     """Insert a session of ``owner`` (or of another access key's user), optionally with a main kernel."""
@@ -284,6 +304,7 @@ def add_session(db_with_tables: ExtendedAsyncSAEngine, owner: _Owner) -> _Sessio
         created_at: datetime | None = None,
         access_key: AccessKey | None = None,
         with_main_kernel: bool = False,
+        mounted: VFolderID | None = None,
     ) -> SessionId:
         session_id = SessionId(uuid.uuid4())
         key = access_key or owner.access_key
@@ -316,7 +337,7 @@ def add_session(db_with_tables: ExtendedAsyncSAEngine, owner: _Owner) -> _Sessio
                     starts_at=None,
                     startup_command=None,
                     callback_url=None,
-                    vfolder_mounts=[],
+                    vfolder_mounts=[_mount_of(mounted)] if mounted is not None else [],
                     environ=None,
                     bootstrap_script=None,
                     use_host_network=False,
@@ -457,15 +478,18 @@ class TestUpdateSessionRename:
         with pytest.raises(SessionAlreadyExists):
             await db_source.update_session(self._rename(target, "taken"), session_name="taken")
 
-    async def test_two_namesakes_raise_too_many_matched(
+    async def test_errored_namesake_does_not_block(
         self, db_source: SessionDBSource, add_session: _SessionFactory
     ) -> None:
         target = await add_session(name="renamed-me", with_main_kernel=True)
-        await add_session(name="crowded", status=SessionStatus.ERROR)
-        await add_session(name="crowded", status=SessionStatus.ERROR)
+        await add_session(name="failed", status=SessionStatus.ERROR)
 
-        with pytest.raises(TooManySessionsMatched):
-            await db_source.update_session(self._rename(target, "crowded"), session_name="crowded")
+        result = await db_source.update_session(
+            self._rename(target, "failed"), session_name="failed"
+        )
+
+        assert result is not None
+        assert result.name == "failed"
 
     async def test_terminated_namesake_does_not_block(
         self,
@@ -487,3 +511,57 @@ class TestUpdateSessionRename:
                 )
             )
         assert kernel_names == ["freed"]
+
+
+class TestGetSessionValidated:
+    async def test_an_errored_session_is_not_found_as_live(
+        self, db_source: SessionDBSource, add_session: _SessionFactory
+    ) -> None:
+        errored = await add_session(name="failed", status=SessionStatus.ERROR)
+
+        with pytest.raises(SessionNotFound):
+            await db_source.get_session_validated(errored)
+
+    async def test_an_errored_session_is_found_when_stale_is_allowed(
+        self, db_source: SessionDBSource, add_session: _SessionFactory
+    ) -> None:
+        errored = await add_session(name="failed", status=SessionStatus.ERROR)
+
+        row = await db_source.get_session_validated(errored, allow_stale=True)
+
+        assert row.id == errored
+
+
+class TestGetSessionWithRoutingMinimal:
+    async def test_an_errored_session_is_not_found(
+        self, db_source: SessionDBSource, add_session: _SessionFactory
+    ) -> None:
+        errored = await add_session(name="failed", status=SessionStatus.ERROR)
+
+        with pytest.raises(SessionNotFound):
+            await db_source.get_session_with_routing_minimal(SessionID(errored))
+
+
+class TestLiveSessionsMountingVFolder:
+    @pytest.fixture
+    def vfolder_id(self) -> VFolderID:
+        return VFolderID(None, uuid.uuid4())
+
+    async def test_lists_only_the_sessions_still_running(
+        self,
+        db_with_tables: ExtendedAsyncSAEngine,
+        add_session: _SessionFactory,
+        vfolder_id: VFolderID,
+    ) -> None:
+        running = await add_session(name="running", mounted=vfolder_id)
+        for status in SessionStatus.terminal_statuses():
+            await add_session(name=f"ended-{status.value}", status=status, mounted=vfolder_id)
+
+        async with V2DBOpsProvider(db_with_tables).read_ops() as r:
+            result = await r.search_in_global(
+                LiveSessionsMountingVFolderSearcher(
+                    pagination=NoPagination(), vfolder_id=vfolder_id
+                )
+            )
+
+        assert result.items == [running]
