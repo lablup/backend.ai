@@ -62,6 +62,17 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
             "`public`."
         )
     )
+    scope_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "ID of the one scope of `scopeType` the preset's role is created in: a domain, a "
+                "project or a global entity. Null when the role is created in every scope of the "
+                "type."
+            ),
+        ),
+        default=None,
+    )
     role_name_template: str | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,

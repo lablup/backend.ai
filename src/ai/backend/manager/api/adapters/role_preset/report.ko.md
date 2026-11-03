@@ -2,7 +2,7 @@
 
 [배경](/src/ai/backend/manager/api/adapters/role_preset/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/role_preset/adapter.py)
 
-시나리오: 미완 16 / 21
+시나리오: 미완 15 / 21
 
 - ops 로 구성 (14)
   - batch_load_by_ids: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
@@ -17,7 +17,7 @@
   - partial_bulk_restore: 대표 성공 ✓ · 대표 실패 ✗: SCENARIO-GAP
   - purge: 대표 성공 ✓ · 대표 실패 ✓
   - restore: 대표 성공 ✓ · 대표 실패 ✓
-  - search: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - search: 대표 성공 ✓ · 대표 실패 ✓
   - search_permission_presets: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
 - 직접 구현 (7)
   - atomic_bulk_add_permissions: 성공 있음 1 · 실패 있음 1 (single_entity)
@@ -68,6 +68,13 @@
 |---|---|
 | [soft delete 된 프리셋을 restore 하면, 삭제 표시가 꺼진 프리셋 전체가 온다](#deleting-restoring-a-soft-deleted-preset-brings-it-back) | 성공 |
 | [아무 권한도 받지 않은 사용자가 프리셋을 restore 하려 하면, 권한 부족으로 거부된다](#deleting-a-user-granted-nothing-may-not-restore-a-preset) | 거부 |
+
+**search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [슈퍼관리자가 스코프 타입 global로 프리셋을 검색하면, public 하나에만 역할을 만드는 프리셋만 반환된다](#searching-a-global-scope-type-finds-the-preset-for-public) | 성공 |
+| [아무 권한도 받지 않은 사용자가 프리셋을 검색하려 하면, 권한 부족으로 거부된다](#searching-a-user-granted-nothing-may-not-search-presets) | 거부 |
 
 **atomic_bulk_add_permissions**
 
@@ -136,6 +143,7 @@ Then
   - entity_id: 미리 만든 프리셋의 id와 같다
   - name = 'preset-1'
   - scope_type = 'project'
+  - scope_id = None
   - auto_assign = False
   - deleted = True
   - created_at: 이 실행이 쓴 시각
@@ -231,6 +239,7 @@ Then
   - successes[0].entity_id: 미리 만든 프리셋의 id와 같다
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
+  - successes[0].scope_id = None
   - successes[0].auto_assign = False
   - successes[0].deleted = True
   - successes[0].created_at: 이 실행이 쓴 시각
@@ -239,6 +248,7 @@ Then
   - successes[1].entity_id: 미리 만든 프리셋의 id와 같다
   - successes[1].name = 'preset-2'
   - successes[1].scope_type = 'project'
+  - successes[1].scope_id = None
   - successes[1].auto_assign = False
   - successes[1].deleted = True
   - successes[1].created_at: 이 실행이 쓴 시각
@@ -311,6 +321,7 @@ Then
   - successes[0].entity_id: 미리 만든 프리셋의 id와 같다
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
+  - successes[0].scope_id = None
   - successes[0].auto_assign = False
   - successes[0].deleted = False
   - successes[0].created_at: 이 실행이 쓴 시각
@@ -319,6 +330,7 @@ Then
   - successes[1].entity_id: 미리 만든 프리셋의 id와 같다
   - successes[1].name = 'preset-2'
   - successes[1].scope_type = 'project'
+  - successes[1].scope_id = None
   - successes[1].auto_assign = False
   - successes[1].deleted = False
   - successes[1].created_at: 이 실행이 쓴 시각
@@ -359,6 +371,7 @@ Then
   - successes[0].entity_id: 미리 만든 프리셋의 id와 같다
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
+  - successes[0].scope_id = None
   - successes[0].auto_assign = False
   - successes[0].deleted = False
   - successes[0].created_at: 이 실행이 쓴 시각
@@ -367,6 +380,7 @@ Then
   - successes[1].entity_id: 미리 만든 프리셋의 id와 같다
   - successes[1].name = 'preset-2'
   - successes[1].scope_type = 'project'
+  - successes[1].scope_id = None
   - successes[1].auto_assign = False
   - successes[1].deleted = False
   - successes[1].created_at: 이 실행이 쓴 시각
@@ -403,6 +417,7 @@ Then
   - entity_id: 미리 만든 프리셋의 id와 같다
   - name = 'preset-1'
   - scope_type = 'project'
+  - scope_id = None
   - auto_assign = False
   - deleted = False
   - created_at: 이 실행이 쓴 시각
@@ -464,6 +479,7 @@ Then
   - entity_id: 미리 만든 프리셋의 id와 같다
   - name = 'preset-1'
   - scope_type = 'project'
+  - scope_id = None
   - auto_assign = False
   - deleted = False
   - created_at: 이 실행이 쓴 시각
@@ -494,6 +510,74 @@ Then
 
 - 거부된다
   - 거부: NotEnoughPermission
+
+### search
+
+<a id="searching-a-global-scope-type-finds-the-preset-for-public"></a>
+
+#### [a-global-scope-type-finds-the-preset-for-public](/tests/scenario/bai_scenario/manager/role_preset/test_searching.py): pass
+
+슈퍼관리자가 스코프 타입 global로 프리셋을 검색하면, public 하나에만 역할을 만드는 프리셋만 반환된다
+
+Given
+
+- public 하나에만 역할을 만드는 프리셋 하나와 모든 프로젝트에 역할을 만드는 프리셋 하나, 그리고 superadmin 한 명
+  - 역할 프리셋 for-public-1: global 스코프 하나에만 역할을 만들고 자동 부여는 꺼져 있다
+  - 역할 프리셋 for-every-project-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- RolePresetAdapter.search: user-1이 스코프 타입이 global인 프리셋을 검색
+
+Then
+
+- public 하나에만 역할을 만드는 프리셋만 반환된다
+  - items count = 1
+  - items[0].id: 미리 만든 프리셋의 id와 같다
+  - items[0].entity_id: 미리 만든 프리셋의 id와 같다
+  - items[0].name = 'for-public-1'
+  - items[0].scope_type = 'public'
+  - items[0].scope_id: 미리 만든 프리셋이 지정한 스코프의 id와 같다
+  - items[0].auto_assign = False
+  - items[0].deleted = False
+  - items[0].created_at: 이 실행이 쓴 시각
+  - items[0].updated_at: 이 실행이 쓴 시각
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-a-user-granted-nothing-may-not-search-presets"></a>
+
+#### [a-user-granted-nothing-may-not-search-presets](/tests/scenario/bai_scenario/manager/role_preset/test_searching.py): pass
+
+아무 권한도 받지 않은 사용자가 프리셋을 검색하려 하면, 권한 부족으로 거부된다
+
+Given
+
+- public 하나에만 역할을 만드는 프리셋 하나와 모든 프로젝트에 역할을 만드는 프리셋 하나, 그리고 user 한 명
+  - 역할 프리셋 for-public-1: global 스코프 하나에만 역할을 만들고 자동 부여는 꺼져 있다
+  - 역할 프리셋 for-every-project-1: 프로젝트 스코프용이고 자동 부여는 꺼져 있다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- RolePresetAdapter.search: user-1이 스코프 타입이 global인 프리셋을 검색
+
+Then
+
+- 거부된다
+  - 거부: InsufficientPrivilege
 
 ### atomic_bulk_add_permissions
 
@@ -733,6 +817,7 @@ Then
   - successes[0].entity_id: 미리 만든 프리셋의 id와 같다
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
+  - successes[0].scope_id = None
   - successes[0].auto_assign = False
   - successes[0].deleted = False
   - successes[0].created_at: 이 실행이 쓴 시각
@@ -769,6 +854,7 @@ Then
   - successes[0].entity_id: 미리 만든 프리셋의 id와 같다
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
+  - successes[0].scope_id = None
   - successes[0].auto_assign = True
   - successes[0].deleted = False
   - successes[0].created_at: 이 실행이 쓴 시각
@@ -777,6 +863,7 @@ Then
   - successes[1].entity_id: 미리 만든 프리셋의 id와 같다
   - successes[1].name = 'preset-2'
   - successes[1].scope_type = 'project'
+  - successes[1].scope_id = None
   - successes[1].auto_assign = True
   - successes[1].deleted = False
   - successes[1].created_at: 이 실행이 쓴 시각
@@ -814,6 +901,7 @@ Then
   - entity_id: 미리 만든 프리셋의 id와 같다
   - name = 'preset-1'
   - scope_type = 'project'
+  - scope_id = None
   - auto_assign = False
   - deleted = False
   - created_at: 이 실행이 쓴 시각
@@ -847,6 +935,7 @@ Then
   - entity_id: 미리 만든 프리셋의 id와 같다
   - name = 'renamed-preset'
   - scope_type = 'project'
+  - scope_id = None
   - auto_assign = False
   - deleted = False
   - created_at: 이 실행이 쓴 시각

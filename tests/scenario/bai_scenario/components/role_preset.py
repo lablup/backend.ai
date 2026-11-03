@@ -13,18 +13,25 @@ from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.data.entity.role_preset import RolePresetScopeID
+from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
     RolePermissionPresetNode,
 )
-from ai.backend.common.dto.manager.v2.role_preset.response import RolePresetNode
+from ai.backend.common.dto.manager.v2.role_preset.response import (
+    RolePresetNode,
+    SearchRolePresetsPayload,
+)
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.role_preset.types import RolePermissionPresetData, RolePresetData
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -70,6 +77,15 @@ class APresetWithEntriesAndACaller:
 
     preset: RolePresetData
     entries: tuple[RolePermissionPresetData, ...]
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class PresetsForPublicAndEveryProjectAndACaller:
+    """public 하나에만 역할을 만드는 프리셋, 모든 프로젝트에 역할을 만드는 프리셋, 호출할 사용자."""
+
+    for_public: RolePresetData
+    for_every_project: RolePresetData
     caller: UserData
 
 
@@ -163,11 +179,47 @@ class APresetWithEntriesAndSomeone(Given[Any, APresetWithEntriesAndACaller]):
 
 
 @dataclass(frozen=True)
+class PresetsForPublicAndEveryProjectAndSomeone(
+    Given[Any, PresetsForPublicAndEveryProjectAndACaller]
+):
+    """public 하나에만 역할을 만드는 프리셋과 모든 프로젝트에 역할을 만드는 프리셋, 호출자 한 명."""
+
+    role: UserRole = UserRole.USER
+
+    @override
+    def describe(self) -> str:
+        return (
+            f"{GlobalEntityName.PUBLIC} 하나에만 역할을 만드는 프리셋 하나와 모든 프로젝트에 "
+            f"역할을 만드는 프리셋 하나, 그리고 {self.role.value} 한 명"
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> PresetsForPublicAndEveryProjectAndACaller:
+        for_public = await seeding.creating(
+            TestSeedRolePreset(
+                name_hint="for-public",
+                scope_type=GlobalEntityType(),
+                scope_id=RolePresetScopeID(global_entity_id(GlobalEntityName.PUBLIC)),
+            )
+        )
+        for_every_project = await seeding.creating(
+            TestSeedRolePreset(name_hint="for-every-project")
+        )
+        caller = await lay_a_caller(seeding, self.role)
+        return PresetsForPublicAndEveryProjectAndACaller(
+            for_public=seeding.made(for_public),
+            for_every_project=seeding.made(for_every_project),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
 class PresetLook:
     """노드 하나를 미리 만든 프리셋과 맞춰 본다. 바뀌어야 하는 값만 인자로 받는다."""
 
     started: datetime
     named: str | None = None
+    shown_scope_type: str | None = None
     auto_assign: bool | None = None
     auto_assign_to_owner: bool | None = None
     deleted: bool = False
@@ -186,7 +238,22 @@ class PresetLook:
                 f"{at}entity_id", node.entity_id, SameAs(seeded.id, "미리 만든 프리셋의 id")
             ),
             Same(f"{at}name", node.name, self.named if self.named is not None else seeded.name),
-            Same(f"{at}scope_type", str(node.scope_type), str(seeded.scope_type)),
+            Same(
+                f"{at}scope_type",
+                str(node.scope_type),
+                self.shown_scope_type
+                if self.shown_scope_type is not None
+                else str(seeded.scope_type),
+            ),
+            (
+                Same(f"{at}scope_id", node.scope_id, None)
+                if seeded.scope_id is None
+                else Held[UUID | None](
+                    f"{at}scope_id",
+                    node.scope_id,
+                    SameAs[UUID | None](seeded.scope_id, "미리 만든 프리셋이 지정한 스코프의 id"),
+                )
+            ),
             Same(
                 f"{at}auto_assign",
                 node.auto_assign,
@@ -220,6 +287,39 @@ class ThePresetComesBack(Then[APresetAndACaller, RolePresetNode]):
         if node is None:
             return [Refused(NotEnoughPermission, answered.raised)]
         return self.expected.verdicts("", node, laid.preset)
+
+
+@dataclass(frozen=True)
+class OnlyThePresetForPublicComesBack(
+    Then[PresetsForPublicAndEveryProjectAndACaller, SearchRolePresetsPayload]
+):
+    """미리 만든 두 프리셋 중 public 하나에만 역할을 만드는 것만 통째로 반환된다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return f"{GlobalEntityName.PUBLIC} 하나에만 역할을 만드는 프리셋만 반환된다"
+
+    @override
+    def look(
+        self,
+        laid: PresetsForPublicAndEveryProjectAndACaller,
+        answered: Answered[SearchRolePresetsPayload],
+    ) -> list[Verdict]:
+        page = answered.response
+        if page is None:
+            return [Refused(InsufficientPrivilege, answered.raised)]
+        expected = PresetLook(self.started, shown_scope_type=str(GlobalEntityName.PUBLIC))
+        verdicts: list[Verdict] = [Same("items count", len(page.items), 1)]
+        for i, node in enumerate(page.items):
+            verdicts += expected.verdicts(f"items[{i}].", node, laid.for_public)
+        return [
+            *verdicts,
+            Same("total_count", page.total_count, 1),
+            Same("has_next_page", page.has_next_page, False),
+            Same("has_previous_page", page.has_previous_page, False),
+        ]
 
 
 @dataclass(frozen=True)

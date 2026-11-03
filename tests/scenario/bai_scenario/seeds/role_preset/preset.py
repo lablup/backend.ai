@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.project import ProjectEntityType
-from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.role_preset import RolePresetID, RolePresetScopeID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.role_preset.types import RolePermissionPresetData, RolePresetData
@@ -23,10 +23,12 @@ from bai_scenario.seeds.seeder import Naming, TestSeedFieldCreator, TestSeedRow
 
 @dataclass(frozen=True)
 class TestSeedRolePreset(TestSeedRow[RolePresetData]):
-    """A role preset in the global catalog, carrying no permission entry."""
+    """A role preset in the global catalog, carrying no permission entry. Without
+    ``scope_id`` it is for every scope of ``scope_type``; with one, for that scope alone."""
 
     name_hint: str = "preset"
     scope_type: EntityType = ProjectEntityType()
+    scope_id: RolePresetScopeID | None = None
 
     @override
     def kind(self) -> str:
@@ -34,6 +36,8 @@ class TestSeedRolePreset(TestSeedRow[RolePresetData]):
 
     @override
     def detail(self) -> str:
+        if self.scope_id is not None:
+            return f"{self.scope_type} 스코프 하나에만 역할을 만들고 자동 부여는 꺼져 있다"
         if self.scope_type == ProjectEntityType():
             return "프로젝트 스코프용이고 자동 부여는 꺼져 있다"
         return f"{self.scope_type} 스코프용이고 자동 부여는 꺼져 있다"
@@ -44,7 +48,7 @@ class TestSeedRolePreset(TestSeedRow[RolePresetData]):
 
     @override
     def seed(self, name: str) -> RolePresetCreator:
-        return RolePresetCreator(name=name, scope_type=self.scope_type)
+        return RolePresetCreator(name=name, scope_type=self.scope_type, scope_id=self.scope_id)
 
 
 @dataclass(frozen=True)
