@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import NewType, Self
+from typing import Annotated, Literal, NewType, Self, override
 from uuid import UUID
 
 from pydantic import ConfigDict, Field, IPvAnyNetwork, model_validator
 
 from ai.backend.common.api_handlers import BaseFieldModel
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.types import SessionId
 
 IngressID = NewType("IngressID", str)
 IngressAuthority = NewType("IngressAuthority", str)
@@ -35,6 +37,10 @@ class IngressAccessMode(StrEnum):
     PUBLIC = "public"
     USER = "user"
     TOKEN = "token"
+
+
+class IngressTargetKind(StrEnum):
+    SESSION = "session"
 
 
 class PortFrontend(BaseFieldModel):
@@ -113,16 +119,34 @@ class IngressAccess(BaseFieldModel):
         return self
 
 
-class IngressTarget(BaseFieldModel):
-    id: IngressTargetID
+class IngressTarget(BaseFieldModel, ABC):
+    kind: IngressTargetKind
     host: str
     port: int = Field(ge=1, le=65535)
+
+    @property
+    @abstractmethod
+    def id(self) -> IngressTargetID:
+        raise NotImplementedError
+
+
+class SessionIngressTarget(IngressTarget):
+    kind: Literal[IngressTargetKind.SESSION] = IngressTargetKind.SESSION
+    session_id: SessionId
+
+    @property
+    @override
+    def id(self) -> IngressTargetID:
+        return IngressTargetID(str(self.session_id))
+
+
+AnyIngressTarget = Annotated[SessionIngressTarget, Field(discriminator="kind")]
 
 
 class IngressTargetGroup(BaseFieldModel):
     id: IngressTargetGroupID
     weight: int = Field(ge=0)
-    targets: list[IngressTarget]
+    targets: list[AnyIngressTarget]
 
 
 class IngressBackend(BaseFieldModel):
