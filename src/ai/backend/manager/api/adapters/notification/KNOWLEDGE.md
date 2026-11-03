@@ -9,94 +9,74 @@ generated:
   at: 2026-09-17
 status: draft
 ---
-# notification 어댑터 — 시나리오
+# notification adapter: Knowledge
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 어긋나면 문장 쪽을 먼저
-의심한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result disagree, doubt the sentence first.
 
-이 어댑터는 `notification_channel`과 `notification_rule` 두 엔티티를 다룬다. 둘 다 어느 스코프에도
-속하지 않게 만들어진다. 생성과 검색은 호출한 사용자가 슈퍼관리자인지 검사하고(검색은 모니터도
-통과한다), id를 지정하는 조회·수정·삭제·검증은 그 행에 부여된 권한을 검사하지만 그 권한을 받을
-방법이 없다. 그래서 어느 호출이든 슈퍼관리자만 통과하지만 거부 이유가 서로 다르다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-규칙은 채널을 `channel_id` 값으로만 가리킨다. 두 테이블을 잇는 외래 키가 없으므로, 없는 채널
-id로 규칙을 만들 수 있고 규칙이 가리키는 채널을 지워도 규칙은 남는다.
+This adapter handles two entities, `notification_channel` and `notification_rule`. Both are created outside every scope. Create and search check whether the calling user is superadmin (a monitor passes the search too), and the get, update, delete and validate by id check the permission granted on that row, but there is no way to receive that permission. Every call therefore passes only for superadmin, with different rejection reasons.
 
-호출자는 요청과 별도로 `created_by` 값을 준다. 생성된 행의 `created_by` 값은 그 값이다.
+A rule refers to its channel by the `channel_id` value only. No foreign key joins the two tables, so a rule can be created with a missing channel id, and deleting the channel a rule refers to keeps the rule.
 
-## 채널 생성
+The caller gives a `created_by` value separately from the request. The `created_by` value of the created row is that value.
 
-`spec`에 `webhook`과 `email`을 둘 다 주면 `webhook` 쪽을 쓴다. 어댑터가 `spec`을 먼저 읽고
-`channel_type` 값은 따로 저장하므로, 둘이 어긋난 요청은 행을 쓴 뒤 그 행을 다시 읽어 답을
-만드는 자리에서 명세 형식 검사에 걸려 거부된다. 같은 트랜잭션 안이라 쓴 행은 되돌려진다.
+## Create a channel
 
-이름이 비어 있거나 길이 제한을 넘는 요청은 시나리오로 두지 않는다. 요청 타입이 이미 거부한다.
+When `spec` carries both `webhook` and `email`, the adapter uses `webhook`. The adapter reads `spec` first and stores the `channel_type` value separately. A request where the two disagree writes the row, and the spec format validation rejects it where the row is read back to build the response. The write is in the same transaction and is rolled back.
 
-"모니터가 만든다"는 검색 절의 "모니터가 검색한다"와 짝이다. 같은 사용자가 검색은 할 수 있고
-생성은 할 수 없다.
+A request whose name is empty or exceeds the length limit is not a scenario. The request type already rejects it.
 
-## 채널 조회
+"a monitor creates" is paired with "a monitor searches" in the search section. The same user can search and cannot create.
 
-모니터는 검색은 통과하지만 id로 하나를 조회하지는 못한다. 검색은 슈퍼관리자 검사가 읽기에 한해
-모니터를 통과시키는 반면, id 조회는 권한 검사이고 모니터에게도 부여된 권한이 없기 때문이다.
+## Get a channel
 
-존재하지 않는 id는 슈퍼관리자와 그 밖의 사용자에게 서로 다른 이유로 거부된다. 권한 검사가 먼저
-실행되는데 없는 행에는 부여된 권한도 없으므로, 그 검사를 통과하는 슈퍼관리자만 대상을 찾을 수
-없어 거부된다. 아래 절들의 없는 id 시나리오도 모두 같다.
+A monitor passes the search but cannot get one by id. The superadmin check of the search passes a monitor for reads, while the get by id is a permission check and a monitor has no granted permission either.
 
-한 번에 여럿을 조회할 때 없는 id는 빈 항목으로, 권한이 없는 id는 거부가 담긴 항목으로 온다.
-둘을 구분해 담으므로, 권한이 없는 사용자에게 행이 없다고 답하지 않는다.
+A non-existent id is rejected for different reasons for superadmin and for other users. The permission check runs first and a missing row has no granted permission either, so only superadmin, who passes that check, is rejected for a missing target. The missing id scenarios in the sections below are all the same.
 
-## 채널 검색
+In a get of several at once, a missing id comes as an empty entry and an id without permission as an entry carrying the rejection. The two are distinguished, so the adapter does not tell a user without permission that the row is missing.
 
-## 채널 수정
+## Search channels
 
-`channel_type` 값은 수정할 수 없다. `spec`만 바꿀 수 있으므로 `webhook` 채널에 `email` `spec`을
-주면 생성 절의 어긋난 요청과 같은 경로로 거부된다.
+## Update a channel
 
-## 채널 삭제
+The `channel_type` value cannot be changed. Only `spec` can be changed, so giving an `email` `spec` to a `webhook` channel is rejected through the same path as the disagreeing request in the create section.
 
-삭제는 행을 지우는 purge다. soft delete는 없다. 규칙이 가리키는 채널을 지워도 막히지 않는 것은 두
-테이블 사이에 외래 키가 없기 때문이다.
+## Delete a channel
 
-수정과 purge는 접두어 없는 이름(`updateNotificationChannel`, `purgeNotificationChannel`)이
-기본이고 권한 검사만 거친다. 옛 이름(`adminUpdateNotificationChannel`,
-`adminDeleteNotificationChannel`, `deleteNotificationChannel`)과 본문에 id를 받는 옛 REST 삭제 경로는
-같은 호출로 잇는 deprecated 별칭이고, 슈퍼관리자 검사를 그대로 거친다. 규칙도 같다.
+Delete is a purge that removes the row. There is no delete that keeps the row. Deleting the channel a rule refers to is not blocked because no foreign key joins the two tables.
 
-## 여럿 채널 수정
+Update and purge default to the names without prefix (`updateNotificationChannel`, `purgeNotificationChannel`) and pass the permission check only. The old names (`adminUpdateNotificationChannel`, `adminDeleteNotificationChannel`, `deleteNotificationChannel`) and the old REST delete path that carries the id in the body are deprecated aliases leading to the same call, and still pass the superadmin check. Rules are the same.
 
-## 여럿 채널 purge
+## Bulk update channels
 
-여럿 연산은 호출 전체를 거부하지 않는다. 처리한 채널은 처리된 목록에, 처리하지 못한 것은 id 와
-이유를 실패 목록에 싣는다. 규칙의 여럿 연산도 같다.
+## Bulk purge channels
 
-## 채널 검증
+A bulk operation does not reject the whole call. Processed channels go into the processed list, and failures carry the id and the reason in the failure list. Rules are the same.
 
-검증은 시험 메시지를 그 채널로 실제로 보낸다. 시나리오는 보내는 쪽을 받아 적기만 하는 대역으로
-바꿔 돌린다. 보내기가 실패했을 때의 거부는 대역이 만들 수 없으므로 시나리오로 두지 않는다.
+## Validate a channel
 
-## 규칙 생성
+Validation actually sends a test message through that channel. The scenario runs with the sending side replaced by a mock that only records. A rejection for a failed send cannot be produced by the mock, so it is not a scenario.
 
-`message_template` 값은 만들 때 검사하지 않는다. 깨진 템플릿도 저장되고, 검증에서야 거부된다.
+## Create a rule
 
-## 규칙 조회
+The `message_template` value is not checked when created. A broken template is stored too and rejected only at validation.
 
-## 규칙 검색
+## Get a rule
 
-## 규칙 수정
+## Search rules
 
-`rule_type` 값과 `channel_id` 값은 수정할 수 없다. 요청 타입에 그 자리가 없다.
+## Update a rule
 
-## 규칙 삭제
+The `rule_type` and `channel_id` values cannot be changed. The request type has no field for them.
 
-## 여럿 규칙 수정
+## Delete a rule
 
-## 여럿 규칙 purge
+## Bulk update rules
 
-## 규칙 검증
+## Bulk purge rules
 
-검증은 규칙과 그 채널을 읽고, 시험 데이터를 `rule_type`의 형식으로 검사한 뒤, 템플릿을 그려
-채널로 보낸다. 시나리오는 보내는 쪽만 대역으로 바꾼다. 형식에 맞지 않는 시험 데이터와 그릴 수
-없는 템플릿의 거부는 시나리오로 두지 않는다. 어댑터와 데이터베이스가 결과를 바꾸지 않고, 서비스의
-단위 테스트가 검사한다.
+## Validate a rule
+
+Validation reads the rule and its channel, checks the test data in the format of the `rule_type`, then renders the template and sends it through the channel. The scenario replaces only the sending side with a mock. A rejection for test data that does not match the format and for a template that cannot be rendered is not a scenario. The adapter and the database do not change the result, and the service unit tests check it.

@@ -9,92 +9,71 @@ generated:
   at: 2026-09-11
 status: draft
 ---
-# 이미지 어댑터는 이미지 요청과 응답을 변환한다
+# The image adapter converts image requests and responses
 
-규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 다르면 문장을 먼저
-의심한다.
+The rules are in `AGENTS.md` in the parent directory. When this document and a run result differ, doubt the sentence first.
 
-호출을 막는 검사는 슈퍼관리자 검사, 이미지 권한 검사, 레지스트리 권한 검사, 커스텀 이미지
-작성자 검사다.
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-| 검사 | 적용되는 호출 | 확인하는 것 |
+Four checks block calls: the superadmin check, the image permission check, the container registry permission check and the custom image creator check.
+
+| Check | Calls it applies to | What it checks |
 |---|---|---|
-| 슈퍼관리자 검사 | 검색, 별칭 | 호출자가 슈퍼관리자인가 |
-| 이미지 권한 검사 | 수정, soft delete, 복원, 완전 삭제, 여러 ID 조회(ID마다), 여럿 수정·soft delete·복원(ID마다), 한 이미지의 별칭 검색 | 호출자가 해당 이미지의 권한을 받았는가 |
-| 레지스트리 권한 검사 | 한 레지스트리를 스코프로 하는 이미지 검색 | 호출자가 해당 레지스트리의 권한을 받았는가 |
-| 커스텀 이미지 작성자 검사 | 완전 삭제 | 이미지가 커스텀 이미지이고 호출자가 만들었는가 |
+| superadmin check | search, alias | whether the caller is superadmin |
+| image permission check | update, delete, restore, purge, several ID get (per ID), bulk update/delete/restore (per ID), alias search of one image | whether the caller has permission on that image |
+| container registry permission check | image search with one container registry as the scope | whether the caller has permission on that container registry |
+| custom image creator check | purge | whether the image is a custom image and the caller created it |
 
-완전 삭제에서는 이미지 권한 검사와 커스텀 이미지 작성자 검사가 차례로 실행된다. 이미지 권한 검사를
-통과해도 커스텀 이미지 작성자 검사가 남는다.
+On purge, the image permission check and the custom image creator check run in order. Passing the image permission check still requires the custom image creator check.
 
-`image` 엔티티는 컨테이너 레지스트리에 속한다. 세션 커밋으로 만든 커스텀 이미지는 커밋한 사람의
-개인 프로젝트에도 속하므로, 그 개인 프로젝트에서 받은 이미지 권한이 그 이미지에 닿는다. 레지스트리 자체의 시나리오는
-`../container_registry/KNOWLEDGE.md`에 있다.
+An `image` entity belongs to a container registry. A custom image made by session commit also belongs to the personal project of the user who committed, so the image permission received in that personal project applies to that image. The scenarios of the container registry itself are in `../container_registry/KNOWLEDGE.md`.
 
-## 검색
+## Search
 
-요청 타입은 크기·오프셋과 커서를 모두 받지만 한 요청에는 한 방식만 쓴다. 둘을 함께 지정하면
-잘못된 입력으로 거부된다. 크기와 커서를 모두 생략하면 오프셋으로 50개를 읽는다.
+The request type accepts size, offset and a cursor, but one request uses one method only. Specifying both is rejected as invalid input. With size and cursor omitted, the adapter reads 50 images by offset.
 
-커서를 사용하는 검색은 이미지 검색과 별칭 검색으로 따로 있다.
+A cursor search exists separately for image search and alias search.
 
-별칭 검색은 두 가지다. 전체 별칭 검색은 슈퍼관리자 검사가 막고, 한 이미지의 별칭 검색은
-그 이미지의 권한 검사가 막는다. 같은 일반 사용자라도 거부 이유가 다르다.
+There are two alias searches. The superadmin check blocks the alias search across all images, and the permission check on that image blocks the alias search of one image. The rejection reason differs even for the same regular user.
 
-크기와 커서를 함께 지정하거나 커서 값이 잘못된 경우의 거부는 요청 타입이 막는 것이
-아니다. 어댑터가 페이지 방식을 고르는 과정에서 발생한다. 어댑터가 보장하는 동작이므로
-시나리오로 남긴다.
+A rejection for specifying size and cursor together or for a bad cursor value does not come from the request type. It comes from the adapter choosing the paging method. It is behavior the adapter guarantees, so it stays as a scenario.
 
-이미지 검색도 두 가지다. 전체 검색은 슈퍼관리자 검사가 막고, 한 레지스트리를 스코프로 하는
-검색은 그 레지스트리의 권한 검사가 막는다.
+There are two image searches too. The superadmin check blocks the unscoped search, and the permission check on that container registry blocks the search with one container registry as the scope.
 
-## 여러 ID로 조회
+## Getting by several IDs
 
-여러 ID 조회는 요청 전체가 아니라 ID마다 이미지 권한 검사를 거친다. 거부된 ID 위치에는 예외
-객체가 반환되고, 나머지 ID 위치에는 조회 결과가 그대로 반환된다.
+Getting by several IDs passes the image permission check per ID, not per request. A rejected ID position returns the exception object, and the other ID positions return the read result as it is.
 
-## soft delete와 복원
+## Delete and restore
 
-soft delete는 행을 지우지 않는다. 상태만 `DELETED` 값으로 바꾸므로 복원할 수 있다. 행까지 없애는
-것은 아래의 완전 삭제다.
+Delete does not remove the row. It changes only the status to the `DELETED` value, so the image can be restored. Removing the row itself is the purge below.
 
-soft delete와 복원은 이미지 권한 검사만 거친다. 커스텀 이미지가 아니어도 권한을 받은 사용자는
-soft delete할 수 있다.
+Delete and restore pass the image permission check only. A user with the granted permission can delete even a non-custom image.
 
-soft delete는 `ALIVE` 상태인 이미지에 적용된다. 복원은 `DELETED` 상태인 이미지와 `ALIVE` 상태인
-이미지 모두에 적용되고, `ALIVE` 상태인 이미지를 복원하면 아무것도 바뀌지 않는다. 그 밖의 상태는
-대상을 찾을 수 없어 거부된다.
+Delete applies to an image in the `ALIVE` status. Restore applies to both an image in the `DELETED` status and one in the `ALIVE` status, and restoring an image in the `ALIVE` status changes nothing. Any other status is rejected for a missing target.
 
-수정, soft delete, 복원은 id 를 받는다. body 에 id 를 싣는 옛 REST 경로는 같은 호출로 잇는다.
+Update, delete and restore take an id. The old REST path that carries the id in the body leads to the same call.
 
-## 여럿 soft delete와 복원
+## Bulk delete and restore
 
-여럿 연산은 호출 전체를 거부하지 않는다. 처리한 이미지는 처리된 목록에, 처리하지 못한 것은 id 와
-이유를 실패 목록에 싣는다. 여럿 완전 삭제는 없다.
+A bulk operation does not reject the whole call. Processed images go into the processed list, and the failure list contains the id and the reason. There is no bulk purge.
 
-## 완전 삭제
+## Purge
 
-이미지 권한 검사의 거부(권한 부족)와 커스텀 이미지 작성자 검사의 거부(접근 금지)를 하나로 합치면
-안 된다. 합치면 권한을 더 받으면 되는 상황인지를 호출자가 구분할 수 없다.
+Do not merge the rejection of the image permission check (insufficient permission) and the rejection of the custom image creator check (access denied). If the rejections are merged, the caller cannot distinguish whether getting more permission would resolve the situation.
 
-커스텀 이미지가 아니면 작성자 검사를 통과할 수 없다. 슈퍼관리자만 이 검사를 건너뛰고
-완전 삭제할 수 있다. 이는 이미지와 레지스트리의 RBAC 소유 관계를 의미하지 않는다.
+A non-custom image cannot pass the creator check. Only superadmin skips this check and purges. This does not mean an RBAC ownership relation between the image and the container registry.
 
-## 별칭 등록과 해제
+## Registering and removing aliases
 
-별칭은 이미지에 속한 값이다. 등록과 해제는 이미지 권한이 아니라 슈퍼관리자 검사로 보호된다.
-soft delete는 이미지 권한 검사가, 별칭 등록은 슈퍼관리자 검사가 막으므로 같은 이미지라도 거부
-이유가 다르다. "커스텀 이미지 작성자가 자기 이미지에 별칭을 등록한다"가 그 차이를 확인한다.
-커스텀 이미지 작성자라도 자기 이미지에 별칭을 등록할 수는 없다.
+An alias is a value that belongs to an image. Registration and removal are protected by the superadmin check, not by the image permission. The image permission check blocks delete and the superadmin check blocks alias registration, so the rejection reason differs even for the same image. "a custom image creator registers an alias on their own image" checks the difference. Even a custom image creator cannot register an alias on their own image.
 
-## 수정
+## Update
 
-생략, 비우기, 값 지정을 구분하는 것은 `supported_accelerators` 필드뿐이다. 나머지 필드는 생략과
-값 지정만 받으므로 비우는 시나리오는 `supported_accelerators` 필드에만 둔다.
+Only the `supported_accelerators` field distinguishes omission, emptying and specifying a value. The other fields accept only omission and specifying a value, so the scenario that empties a field exists only for the `supported_accelerators` field.
 
-## 여럿 수정하기
+## Bulk update
 
-## 단일 태그 스캔
+## Single-tag scan
 
-태그 스캔은 기존 스캐너대로 모든 아키텍처를 등록·갱신하고, 응답은 요청한 아키텍처로 제한한다.
-요청한 아키텍처가 없으면 이미지를 찾을 수 없어 거부한다.
+A tag scan registers and updates every architecture as the existing scanner does, and restricts the response to the requested architecture. When the requested architecture is absent, the call is rejected for a missing image.
