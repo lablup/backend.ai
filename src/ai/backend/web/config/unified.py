@@ -982,6 +982,24 @@ class SecurityConfig(BaseConfigSchema):
             ),
         ),
     ]
+    cors_allow_all_origins: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("cors_allow_all_origins", "cors-allow-all-origins"),
+            serialization_alias="cors-allow-all-origins",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Accept CORS requests from any origin, with credentials allowed. This is for "
+                "development environments only, where the WebUI dev server origin changes per "
+                "run. Do not enable it in production: any site can then send credentialed "
+                "requests to the web server."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="true", prod="false"),
+        ),
+    ]
     csp: Annotated[
         CSPConfig | None,
         Field(default=None),
