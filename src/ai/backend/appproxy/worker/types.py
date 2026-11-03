@@ -26,7 +26,6 @@ from ai.backend.appproxy.common.types import (
     AppMode,
     FrontendMode,
     ProxyProtocol,
-    RouteInfo,
     SerializableCircuit,
 )
 from ai.backend.common.clients.http_client.client_pool import ClientPool
@@ -478,31 +477,27 @@ class Circuit(SerializableCircuit):
             revision=0,
             frontend=frontend,
             access=access,
-            backend=self.ingress_backend_of_routes(self.route_info),
-        )
-
-    @staticmethod
-    def ingress_backend_of_routes(routes: list[RouteInfo]) -> IngressBackend:
-        return IngressBackend(
-            # TODO: Use the backend id once ingresses are stored as their own entity.
-            id=IngressBackendID(str(UUID(int=0))),
-            # TODO: Use the replica groups once the manager sends target groups; until then the
-            # routes are the targets of one group, which spreads traffic over them evenly.
-            target_groups=[
-                IngressTargetGroup(
-                    id=IngressTargetGroupID(str(UUID(int=0))),
-                    weight=1,
-                    targets=[
-                        SessionIngressTarget(
-                            host=route.current_kernel_host,
-                            port=route.kernel_port,
-                            session_id=SessionId(route.session_id),
-                        )
-                        for route in routes
-                        if route.traffic_ratio > 0
-                    ],
-                )
-            ],
+            backend=IngressBackend(
+                # TODO: Use the backend id once ingresses are stored as their own entity.
+                id=IngressBackendID(str(UUID(int=0))),
+                # TODO: Use the replica groups once the manager sends target groups; until then the
+                # routes are the targets of one group, which spreads traffic over them evenly.
+                target_groups=[
+                    IngressTargetGroup(
+                        id=IngressTargetGroupID(str(UUID(int=0))),
+                        weight=1,
+                        targets=[
+                            SessionIngressTarget(
+                                host=route.current_kernel_host,
+                                port=route.kernel_port,
+                                session_id=SessionId(route.session_id),
+                            )
+                            for route in self.route_info
+                            if route.traffic_ratio > 0
+                        ],
+                    )
+                ],
+            ),
         )
 
     def to_ingress_key(self, authority: IngressAuthority) -> IngressKey:
