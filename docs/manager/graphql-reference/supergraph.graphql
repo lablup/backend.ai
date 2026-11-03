@@ -14830,7 +14830,7 @@ type Mutation
   deleteModelDeployment(input: DeleteDeploymentInput!): DeleteDeploymentPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.4.4. Fully replace the ``options`` surface of a deployment. Replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
+  Added in 26.10.0. Fully replace the ``options`` surface of a deployment. Replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
   """
   replaceDeploymentOptions(input: ReplaceDeploymentOptionsInput!): ReplaceDeploymentOptionsPayload @join__field(graph: STRAWBERRY)
 
@@ -22671,7 +22671,7 @@ input RejectRoleInvitationInput
 }
 
 """
-Added in 26.4.4. Input for the replaceDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
+Added in 26.10.0. Input for the replaceDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
 """
 input ReplaceDeploymentOptionsInput
   @join__type(graph: STRAWBERRY)
@@ -22681,7 +22681,7 @@ input ReplaceDeploymentOptionsInput
 }
 
 """
-Added in 26.4.4. Payload returned after replacing a deployment's options. Only the refreshed options surface is returned.
+Added in 26.10.0. Payload returned after replacing a deployment's options. Only the refreshed options surface is returned.
 """
 type ReplaceDeploymentOptionsPayload
   @join__type(graph: STRAWBERRY)

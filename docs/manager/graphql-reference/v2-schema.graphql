@@ -10340,7 +10340,7 @@ type Mutation {
   deleteModelDeployment(input: DeleteDeploymentInput!): DeleteDeploymentPayload
 
   """
-  Added in 26.4.4. Fully replace the ``options`` surface of a deployment. Replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
+  Added in 26.10.0. Fully replace the ``options`` surface of a deployment. Replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
   """
   replaceDeploymentOptions(input: ReplaceDeploymentOptionsInput!): ReplaceDeploymentOptionsPayload
 
@@ -16999,7 +16999,7 @@ input RejectRoleInvitationInput {
 }
 
 """
-Added in 26.4.4. Input for the replaceDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
+Added in 26.10.0. Input for the replaceDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
 """
 input ReplaceDeploymentOptionsInput {
   deploymentId: UUID!
@@ -17007,7 +17007,7 @@ input ReplaceDeploymentOptionsInput {
 }
 
 """
-Added in 26.4.4. Payload returned after replacing a deployment's options. Only the refreshed options surface is returned.
+Added in 26.10.0. Payload returned after replacing a deployment's options. Only the refreshed options surface is returned.
 """
 type ReplaceDeploymentOptionsPayload {
   """ID of the deployment whose ``options`` were replaced."""
