@@ -66,7 +66,8 @@ class BaseBackend:
 
     @final
     async def mark_last_used_time(self, target: IngressTarget) -> None:
-        # TODO: Use the ingress id once ingresses are stored as their own entity.
+        # TODO: Legacy last access of the circuit, which the coordinator reads by circuit id.
+        # Use the ingress id once ingresses are stored as their own entity.
         last_access_keys = [f"circuit.{self._circuit.id}.last_access"]
         match target:
             case SessionIngressTarget():
