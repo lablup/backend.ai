@@ -498,13 +498,13 @@ class ResourceGroupAdapter(BaseAdapter):
         """
         creator = ResourceGroupCreator(
             name=input.name,
-            # ResourceGroupCreator requires driver and scheduler fields
-            # which are not exposed in CreateResourceGroupInput.
-            # Default to "static" driver and "fifo" scheduler as reasonable defaults.
+            # ResourceGroupCreator requires a driver field which is not exposed in
+            # CreateResourceGroupInput. Default to the "static" driver.
             driver="static",
-            scheduler="fifo",
+            scheduler=SchedulerType(input.scheduler_type).value,
             description=input.description,
-            is_active=True,
+            is_active=input.is_active,
+            is_public=input.is_public,
             is_default=input.is_default,
         )
         action_result = await self._resource_group.create_resource_group.run(
