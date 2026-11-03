@@ -132,6 +132,12 @@ class TCPFrontend(BaseFrontend[TCPBackend]):
             protocol=IngressProtocol.TCP,
             port=PortFrontend(number=port),
         ).key()
+        try:
+            ingress = await self._read_registered_ingress(frontend_key)
+        except IngressFrontendNotRegisteredError:
+            log.trace("rejecting a TCP connection to a frontend with no ingress")
+            await self._close_writer(writer)
+            return
         backend = self.backends.get(frontend_key)
         if backend is None:
             await self._close_writer(writer)
@@ -139,12 +145,6 @@ class TCPFrontend(BaseFrontend[TCPBackend]):
 
         # TODO: Use the ingress id once ingresses are stored as their own entity.
         with with_log_context(circuit_id=backend.circuit_id):
-            try:
-                ingress = await self._read_registered_ingress(frontend_key)
-            except IngressFrontendNotRegisteredError:
-                log.trace("rejecting a TCP connection to a frontend with no ingress")
-                await self._close_writer(writer)
-                return
             if not self._is_peer_allowed(writer, ingress.access):
                 await self._close_writer(writer)
                 return

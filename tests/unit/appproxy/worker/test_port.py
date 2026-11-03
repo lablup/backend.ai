@@ -29,6 +29,7 @@ from ai.backend.appproxy.worker.errors.ingress import (
 from ai.backend.appproxy.worker.proxy.frontend.http.port import PortFrontend
 from ai.backend.appproxy.worker.types import Circuit, InferenceAppInfo, PortFrontendInfo
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
+    Ingress,
     IngressAccess,
     IngressAccessMode,
     IngressAuthority,
@@ -101,6 +102,7 @@ class _PortSlotSituation:
     request: web.Request
     handler: AsyncMock
     circuit: Circuit
+    held_ingress: Ingress
     backend: MagicMock
     read_ingress: AsyncMock
     ensure_credential: MagicMock
@@ -185,6 +187,7 @@ class TestPortFrontend:
             ),
             handler=mocker.AsyncMock(return_value=web.Response(text="success")),
             circuit=circuit,
+            held_ingress=held_ingress,
             backend=backend,
             read_ingress=root_context.ingress_state.reader.get,
             ensure_credential=mocker.patch.object(frontend, "ensure_credential"),
@@ -232,7 +235,9 @@ class TestPortFrontend:
         situation.read_ingress.assert_awaited_once_with(
             situation.circuit.to_ingress_frontend().key()
         )
-        situation.ensure_credential.assert_called_once_with(situation.request, situation.circuit)
+        situation.ensure_credential.assert_called_once_with(
+            situation.request, situation.held_ingress, situation.backend
+        )
 
     @pytest.mark.parametrize(
         "case",
