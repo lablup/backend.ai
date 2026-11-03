@@ -640,6 +640,7 @@ class ScheduleCoordinator:
             for failure in result.failures:
                 await self._kernel_state_engine.mark_kernel_terminated(
                     failure.kernel_id,
+                    failure.session_id,
                     failure.reason or KernelLifecycleEventReason.KERNEL_HANDLER_FAILURE,
                 )
             log.debug("kernels terminated", kernel_count=len(result.failures))
@@ -1577,7 +1578,7 @@ class ScheduleCoordinator:
         """Handle kernel terminated event through the kernel state engine."""
         log.trace("kernel termination handling", kernel_id=event.kernel_id)
         result = await self._kernel_state_engine.mark_kernel_terminated(
-            event.kernel_id, event.reason, event.exit_code
+            event.kernel_id, event.session_id, event.reason, event.exit_code
         )
         if result:
             # Request DETECT_KERNEL_TERMINATION and CHECK_TERMINATING_PROGRESS

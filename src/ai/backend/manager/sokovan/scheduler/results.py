@@ -132,6 +132,7 @@ class KernelTransitionInfo:
     """
 
     kernel_id: KernelId
+    session_id: SessionId
     from_status: KernelStatus
     reason: KernelLifecycleEventReason | None = None
 
