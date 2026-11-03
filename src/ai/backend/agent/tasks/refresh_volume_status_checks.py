@@ -44,8 +44,8 @@ class RefreshVolumeStatusChecksTask(PeriodicTask):
     """
     Periodically read the volumes declared for the agents and run one check per volume.
 
-    The running checks stay as they are when a read fails, or when the declarations of an
-    agent are missing, as missing tells nothing about the volumes.
+    The running checks stay as they are when a read fails. An agent whose declarations are
+    missing keeps the declarations last read for it, as missing tells nothing about the volumes.
     """
 
     _valkey_storage_volume_client: Final[ValkeyStorageVolumeClient]
@@ -53,6 +53,7 @@ class RefreshVolumeStatusChecksTask(PeriodicTask):
     _registry: Final[VolumeStatusCheckRegistry]
     _runner: Final[ProbeCheckRunner[StorageVolumeName]]
     _local_config: Final[AgentUnifiedConfig]
+    _agent_declarations: dict[AgentId, list[StorageVolumeDeclaration]]
     _checks: dict[StorageVolumeName, _DeclaredCheck]
 
     def __init__(self, args: RefreshVolumeStatusChecksTaskArgs) -> None:
@@ -61,6 +62,7 @@ class RefreshVolumeStatusChecksTask(PeriodicTask):
         self._registry = args.registry
         self._runner = args.runner
         self._local_config = args.local_config
+        self._agent_declarations = {}
         self._checks = {}
 
     @property
@@ -81,47 +83,35 @@ class RefreshVolumeStatusChecksTask(PeriodicTask):
     @override
     async def run(self) -> None:
         declarations = await self._read_declarations()
-        if declarations is None:
-            return
-        removed = self._checks.keys() - declarations.keys()
-        for volume_name in removed:
-            await self._remove_check(volume_name)
-        changed = 0
+        for undeclared_volume_name in self._checks.keys() - declarations.keys():
+            await self._remove_check(undeclared_volume_name)
         for volume_name, declaration in declarations.items():
             current = self._checks.get(volume_name)
-            if current is not None and current.declaration == declaration:
-                continue
-            if current is not None:
+            if current is None:
+                self._add_check(declaration)
+            elif current.declaration != declaration:
                 await self._remove_check(volume_name)
-            self._add_check(declaration)
-            changed += 1
-        if removed or changed:
-            log.debug(
-                "volume status checks refreshed",
-                removed_count=len(removed),
-                changed_count=changed,
-                check_count=len(self._checks),
-            )
+                self._add_check(declaration)
 
     async def close(self) -> None:
         """Stops every check and shuts down their executors."""
         for volume_name in list(self._checks):
             await self._remove_check(volume_name)
 
-    async def _read_declarations(
-        self,
-    ) -> dict[StorageVolumeName, StorageVolumeDeclaration] | None:
-        declarations: dict[StorageVolumeName, StorageVolumeDeclaration] = {}
-        for agent_id in self._agent_ids:
-            agent_declarations = await self._valkey_storage_volume_client.get_volume_declarations(
-                agent_id
-            )
-            if agent_declarations is None:
+    async def _read_declarations(self) -> dict[StorageVolumeName, StorageVolumeDeclaration]:
+        read = await self._valkey_storage_volume_client.get_volume_declarations(self._agent_ids)
+        agent_declarations: dict[AgentId, list[StorageVolumeDeclaration]] = {}
+        for agent_id, declarations in read.items():
+            if declarations is None:
                 log.debug("volume declarations missing", agent_id=agent_id)
-                return None
-            for declaration in agent_declarations:
-                declarations[declaration.volume_name] = declaration
-        return declarations
+                declarations = self._agent_declarations.get(agent_id, [])
+            agent_declarations[agent_id] = declarations
+        self._agent_declarations = agent_declarations
+        return {
+            declaration.volume_name: declaration
+            for declarations in agent_declarations.values()
+            for declaration in declarations
+        }
 
     def _add_check(self, declaration: StorageVolumeDeclaration) -> None:
         check = VolumeMountStatusCheck.create(

@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
-from typing import Final, Self
+from collections.abc import Mapping, Sequence
+from typing import Final, Self, cast
 
-from glide import ExpirySet, ExpiryType
+from glide import Batch, ExpirySet, ExpiryType
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
@@ -93,28 +93,47 @@ class ValkeyStorageVolumeClient:
 
     @valkey_storage_volume_resilience.apply()
     async def get_volume_declarations(
-        self, agent_id: AgentId
-    ) -> list[StorageVolumeDeclaration] | None:
-        """The volumes declared for the agent, None when the key does not exist."""
-        key = self._make_volume_declarations_key(agent_id)
+        self, agent_ids: Sequence[AgentId]
+    ) -> dict[AgentId, list[StorageVolumeDeclaration] | None]:
+        """The volumes declared for each agent, None for an agent whose key does not exist."""
+        if not agent_ids:
+            return {}
+        keys = [self._make_volume_declarations_key(agent_id) for agent_id in agent_ids]
         async with self._client.client() as conn:
-            raw_declarations = await conn.get(key)
+            raw_values = await conn.mget(cast(list[str | bytes], keys))
+        return {
+            agent_id: self._parse_volume_declarations(raw_declarations)
+            for agent_id, raw_declarations in zip(agent_ids, raw_values, strict=True)
+        }
+
+    @valkey_storage_volume_resilience.apply()
+    async def set_volume_declarations(
+        self,
+        declarations: Mapping[AgentId, Sequence[StorageVolumeDeclaration]],
+        ttl_seconds: int,
+    ) -> None:
+        """Replaces the volumes declared for each agent at once; an empty sequence declares
+        no volume."""
+        if not declarations:
+            return
+        batch = Batch(is_atomic=True)
+        for agent_id, agent_declarations in declarations.items():
+            batch.set(
+                self._make_volume_declarations_key(agent_id),
+                dump_json([
+                    declaration.model_dump(mode="json") for declaration in agent_declarations
+                ]),
+                expiry=ExpirySet(ExpiryType.SEC, ttl_seconds),
+            )
+        async with self._client.client() as conn:
+            await conn.exec(batch, raise_on_error=True)
+
+    def _parse_volume_declarations(
+        self, raw_declarations: bytes | None
+    ) -> list[StorageVolumeDeclaration] | None:
         if raw_declarations is None:
             return None
         return [
             StorageVolumeDeclaration.model_validate(raw_declaration)
             for raw_declaration in load_json(raw_declarations)
         ]
-
-    @valkey_storage_volume_resilience.apply()
-    async def set_volume_declarations(
-        self,
-        agent_id: AgentId,
-        declarations: Sequence[StorageVolumeDeclaration],
-        ttl_seconds: int,
-    ) -> None:
-        """Replaces the volumes declared for the agent; an empty sequence declares no volume."""
-        key = self._make_volume_declarations_key(agent_id)
-        value = dump_json([declaration.model_dump(mode="json") for declaration in declarations])
-        async with self._client.client() as conn:
-            await conn.set(key, value, expiry=ExpirySet(ExpiryType.SEC, ttl_seconds))
