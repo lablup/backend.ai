@@ -11,16 +11,18 @@ generated:
   at: 2026-08-10
 status: stable
 ---
-# Manager Repositories layer — Knowledge
+# Manager Repositories layer: Knowledge
 
 > For rules, see `AGENTS.md` in the same directory.
+
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 ## Choosing the data-access path
 
 | Situation | Path |
 |---|---|
-| Operation serving the external API | v2 ops (`V2DBOpsProvider` + `models/specs/` types) — preferred |
-| Pure pass-through (spec in, data out, no branch) | the generic `OpsRepository` through the ops-generic services — write no domain repository at all |
+| Operation serving the external API | v2 ops (`V2DBOpsProvider` + `models/specs/` types): preferred |
+| Pure pass-through (spec in, data out, no branch) | the generic `OpsRepository` through the ops-generic services: write no domain repository at all |
 | Complex internal operation (multi-table, scheduler internals) | repository method over the db objects (`db_source`) |
 
 The default is the first row; drop to db objects only when the operation genuinely
@@ -49,7 +51,7 @@ pass-through would remain.
 - There is no `delete`: which column marks a row deleted is domain knowledge, so a
   delete action carries a `DataUpdater` and runs the update path.
 - `OpsRepository` turns a missing row into `EntityNotFoundError` / `FieldNotFoundError`
-  rather than `None` — that seam is the only thing it adds over ops. The error's domain
+  rather than `None`: that seam is the only thing it adds over ops. The error's domain
   is read off the identifier the spec carries, or off the lookup for a row named by key.
 
 ## Gradual migration to the ops provider
