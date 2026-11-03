@@ -33,22 +33,22 @@ class HttpRequest:
 class BaseBackendArgs:
     ingress: Ingress
     circuit: Circuit
-    last_used_time_marker_redis_queue: asyncio.Queue[LastUsedTimeMark]
-    request_counter_redis_queue: asyncio.Queue[str]
+    last_used_time_mark_queue: asyncio.Queue[LastUsedTimeMark]
+    request_counter_key_queue: asyncio.Queue[str]
 
 
 class BaseBackend:
     _ingress: Ingress
     # TODO: Drop the circuit once an ingress carries what is read from it.
     _circuit: Circuit
-    _last_used_time_marker_redis_queue: asyncio.Queue[LastUsedTimeMark]
-    _request_counter_redis_queue: asyncio.Queue[str]
+    _last_used_time_mark_queue: asyncio.Queue[LastUsedTimeMark]
+    _request_counter_key_queue: asyncio.Queue[str]
 
     def __init__(self, args: BaseBackendArgs) -> None:
         self._ingress = args.ingress
         self._circuit = args.circuit
-        self._last_used_time_marker_redis_queue = args.last_used_time_marker_redis_queue
-        self._request_counter_redis_queue = args.request_counter_redis_queue
+        self._last_used_time_mark_queue = args.last_used_time_mark_queue
+        self._request_counter_key_queue = args.request_counter_key_queue
 
     @property
     def ingress(self) -> Ingress:
@@ -72,11 +72,11 @@ class BaseBackend:
         match target:
             case SessionIngressTarget():
                 last_access_keys.append(f"session.{target.session_id}.last_access")
-        await self._last_used_time_marker_redis_queue.put(
+        await self._last_used_time_mark_queue.put(
             LastUsedTimeMark(valkey_keys=last_access_keys, used_at=time.time())
         )
 
     @final
     async def increase_request_counter(self) -> None:
         # TODO: Use the ingress id once ingresses are stored as their own entity.
-        await self._request_counter_redis_queue.put(f"circuit.{self._circuit.id}.requests")
+        await self._request_counter_key_queue.put(f"circuit.{self._circuit.id}.requests")

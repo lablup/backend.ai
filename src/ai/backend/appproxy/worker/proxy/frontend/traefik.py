@@ -197,8 +197,8 @@ class TraefikFrontend(BaseFrontend[TraefikBackend]):
     async def initialize_backend(self, ingress: Ingress, circuit: Circuit) -> TraefikBackend:
         return TraefikBackend(
             BaseBackendArgs(
-                last_used_time_marker_redis_queue=self.root_context.last_used_time_marker_redis_queue,
-                request_counter_redis_queue=self.root_context.request_counter_redis_queue,
+                last_used_time_mark_queue=self.root_context.last_used_time_mark_queue,
+                request_counter_key_queue=self.root_context.request_counter_key_queue,
                 ingress=ingress,
                 circuit=circuit,
             )

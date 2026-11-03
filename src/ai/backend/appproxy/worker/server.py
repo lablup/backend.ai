@@ -263,7 +263,7 @@ async def request_counter_marker(root_ctx: RootContext) -> None:
     """Request counter marker function using the valkey client."""
     failure_count = 0
     while True:
-        redis_key = await root_ctx.request_counter_redis_queue.get()
+        redis_key = await root_ctx.request_counter_key_queue.get()
         try:
             await root_ctx.valkey_live.incr_live_data(redis_key)
         except Exception as e:
@@ -285,7 +285,7 @@ async def last_used_time_marker(root_ctx: RootContext) -> None:
     """Last used time marker function using the valkey client."""
     failure_count = 0
     while True:
-        last_used_time_mark = await root_ctx.last_used_time_marker_redis_queue.get()
+        last_used_time_mark = await root_ctx.last_used_time_mark_queue.get()
         try:
             data = {
                 key: str(last_used_time_mark.used_at) for key in last_used_time_mark.valkey_keys
@@ -340,8 +340,8 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         human_readable_name="appproxy-worker",
         sentinel_monitor=root_ctx.sentinel_monitors.monitor_for(stat_target),
     )
-    root_ctx.last_used_time_marker_redis_queue = asyncio.Queue()
-    root_ctx.request_counter_redis_queue = asyncio.Queue()
+    root_ctx.last_used_time_mark_queue = asyncio.Queue()
+    root_ctx.request_counter_key_queue = asyncio.Queue()
 
     last_used_time_marker_task = asyncio.create_task(last_used_time_marker(root_ctx))
     request_counter_marker_task = asyncio.create_task(request_counter_marker(root_ctx))

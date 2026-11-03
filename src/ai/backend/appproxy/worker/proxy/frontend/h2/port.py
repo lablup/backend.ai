@@ -100,8 +100,8 @@ class PortFrontend(H2Frontend):
         api_port = self.api_ports[ingress.frontend.port.number]
         backend = H2Backend(
             H2BackendArgs(
-                last_used_time_marker_redis_queue=self.root_context.last_used_time_marker_redis_queue,
-                request_counter_redis_queue=self.root_context.request_counter_redis_queue,
+                last_used_time_mark_queue=self.root_context.last_used_time_mark_queue,
+                request_counter_key_queue=self.root_context.request_counter_key_queue,
                 ingress=ingress,
                 circuit=circuit,
                 api_endpoint=URL(f"http://localhost:{api_port}"),

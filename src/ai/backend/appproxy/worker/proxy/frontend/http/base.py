@@ -95,8 +95,8 @@ class BaseHTTPFrontend(BaseFrontend[HTTPBackend]):
     async def initialize_backend(self, ingress: Ingress, circuit: Circuit) -> HTTPBackend:
         return HTTPBackend(
             HTTPBackendArgs(
-                last_used_time_marker_redis_queue=self.root_context.last_used_time_marker_redis_queue,
-                request_counter_redis_queue=self.root_context.request_counter_redis_queue,
+                last_used_time_mark_queue=self.root_context.last_used_time_mark_queue,
+                request_counter_key_queue=self.root_context.request_counter_key_queue,
                 worker_config=self.root_context.local_config.proxy_worker,
                 metrics=self.root_context.metrics,
                 ingress=ingress,

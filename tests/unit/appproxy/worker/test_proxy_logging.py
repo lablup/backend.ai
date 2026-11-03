@@ -91,8 +91,8 @@ def _worker_records(caplog: pytest.LogCaptureFixture, min_level: int) -> list[lo
 @pytest.fixture
 def root_context() -> MagicMock:
     root_ctx = MagicMock()
-    root_ctx.last_used_time_marker_redis_queue = asyncio.Queue()
-    root_ctx.request_counter_redis_queue = asyncio.Queue()
+    root_ctx.last_used_time_mark_queue = asyncio.Queue()
+    root_ctx.request_counter_key_queue = asyncio.Queue()
     return root_ctx
 
 
@@ -112,8 +112,8 @@ class TestHTTPProxyLogging:
         circuit = _create_circuit(ProxyProtocol.HTTP, kernel_port=_closed_port())
         backend = HTTPBackend(
             HTTPBackendArgs(
-                last_used_time_marker_redis_queue=root_context.last_used_time_marker_redis_queue,
-                request_counter_redis_queue=root_context.request_counter_redis_queue,
+                last_used_time_mark_queue=root_context.last_used_time_mark_queue,
+                request_counter_key_queue=root_context.request_counter_key_queue,
                 worker_config=root_context.local_config.proxy_worker,
                 metrics=root_context.metrics,
                 ingress=circuit.to_ingress(AUTHORITY),
@@ -190,8 +190,8 @@ class TestTCPProxyLogging:
         circuit = _create_circuit(ProxyProtocol.TCP, kernel_port=_closed_port())
         backend = TCPBackend(
             TCPBackendArgs(
-                last_used_time_marker_redis_queue=root_context.last_used_time_marker_redis_queue,
-                request_counter_redis_queue=root_context.request_counter_redis_queue,
+                last_used_time_mark_queue=root_context.last_used_time_mark_queue,
+                request_counter_key_queue=root_context.request_counter_key_queue,
                 metrics=root_context.metrics,
                 ingress=circuit.to_ingress(AUTHORITY),
                 circuit=circuit,

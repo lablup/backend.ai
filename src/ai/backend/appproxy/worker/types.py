@@ -354,8 +354,8 @@ class RootContext:
     http_client_pool: ClientPool
     worker_id: UUID
     local_config: ServerConfig
-    last_used_time_marker_redis_queue: asyncio.Queue[LastUsedTimeMark]
-    request_counter_redis_queue: asyncio.Queue[str]
+    last_used_time_mark_queue: asyncio.Queue[LastUsedTimeMark]
+    request_counter_key_queue: asyncio.Queue[str]
     cors_options: dict[str, aiohttp_cors.ResourceOptions]
     metrics: WorkerMetricRegistry
     health_probe: HealthProbe
