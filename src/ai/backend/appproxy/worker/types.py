@@ -26,6 +26,7 @@ from ai.backend.appproxy.common.types import (
     AppMode,
     FrontendMode,
     ProxyProtocol,
+    RouteInfo,
     SerializableCircuit,
 )
 from ai.backend.common.clients.http_client.client_pool import ClientPool
@@ -481,23 +482,37 @@ class Circuit(SerializableCircuit):
                 # TODO: Use the backend id once ingresses are stored as their own entity.
                 id=IngressBackendID(str(UUID(int=0))),
                 # TODO: Use the replica groups once the manager sends target groups; until then the
-                # routes are the targets of one group, which spreads traffic over them evenly.
+                # routes with traffic share one group evenly, and the routes without it sit in a group
+                # of weight 0 that receives no traffic but is still handed to nghttpx.
                 target_groups=[
                     IngressTargetGroup(
                         id=IngressTargetGroupID(str(UUID(int=0))),
                         weight=1,
                         targets=[
-                            SessionIngressTarget(
-                                host=route.current_kernel_host,
-                                port=route.kernel_port,
-                                session_id=SessionId(route.session_id),
-                            )
+                            self._session_target_of_route(route)
                             for route in self.route_info
                             if route.traffic_ratio > 0
                         ],
-                    )
+                    ),
+                    IngressTargetGroup(
+                        id=IngressTargetGroupID(str(UUID(int=0))),
+                        weight=0,
+                        targets=[
+                            self._session_target_of_route(route)
+                            for route in self.route_info
+                            if route.traffic_ratio <= 0
+                        ],
+                    ),
                 ],
             ),
+        )
+
+    @staticmethod
+    def _session_target_of_route(route: RouteInfo) -> SessionIngressTarget:
+        return SessionIngressTarget(
+            host=route.current_kernel_host,
+            port=route.kernel_port,
+            session_id=SessionId(route.session_id),
         )
 
     def to_ingress_key(self, authority: IngressAuthority) -> IngressKey:
@@ -521,10 +536,11 @@ class Circuit(SerializableCircuit):
                     kind=IngressFrontendKind.PORT, protocol=protocol, port=PortFrontend(number=port)
                 )
             case SubdomainFrontendInfo(subdomain=subdomain):
+                # The subdomain frontends match a request host in lowercase.
                 return IngressFrontend(
                     kind=IngressFrontendKind.WILDCARD,
                     protocol=protocol,
-                    wildcard=WildcardFrontend(subdomain=subdomain),
+                    wildcard=WildcardFrontend(subdomain=subdomain.lower()),
                 )
             case _:
                 raise UnreachableError("a circuit holds only a port or subdomain frontend")
