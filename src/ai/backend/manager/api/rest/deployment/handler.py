@@ -105,7 +105,10 @@ from .adapter import (
 
 
 class DeploymentAPIHandler:
-    """REST API handler class for deployment operations with constructor DI."""
+    """REST API handler class for deployment operations with constructor DI.
+
+    Deprecated: the REST v1 deployment API. Use `/v2/deployments`.
+    """
 
     def __init__(
         self,
