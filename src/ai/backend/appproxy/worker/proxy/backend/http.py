@@ -10,9 +10,19 @@ from typing import Any, Final, override
 
 import aiohttp
 from aiohttp import ClientConnectorError, web
-from multidict import CIMultiDict, istr
+from multidict import CIMultiDict
 from yarl import URL
 
+from ai.backend.appproxy.common.defs import (
+    FORWARDED_HEADER,
+    HOST_HEADER,
+    X_FORWARDED_FOR_HEADER,
+    X_FORWARDED_HOST_HEADER,
+    X_FORWARDED_PORT_HEADER,
+    X_FORWARDED_PROTO_HEADER,
+    X_RSTUDIO_PROTO_HEADER,
+    X_RSTUDIO_REQUEST_HEADER,
+)
 from ai.backend.appproxy.common.errors import ContainerConnectionRefused
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.types import Circuit
@@ -42,23 +52,14 @@ HOP_ONLY_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
     ("Upgrade", 1),
 ])
 
-_HOST_HEADER: Final[istr] = istr("Host")
-_FORWARDED_HEADER: Final[istr] = istr("Forwarded")
-_X_FORWARDED_FOR_HEADER: Final[istr] = istr("X-Forwarded-For")
-_X_FORWARDED_HOST_HEADER: Final[istr] = istr("X-Forwarded-Host")
-_X_FORWARDED_PORT_HEADER: Final[istr] = istr("X-Forwarded-Port")
-_X_FORWARDED_PROTO_HEADER: Final[istr] = istr("X-Forwarded-Proto")
-_X_RSTUDIO_PROTO_HEADER: Final[istr] = istr("X-RStudio-Proto")
-_X_RSTUDIO_REQUEST_HEADER: Final[istr] = istr("X-RStudio-Request")
-
 _FORWARDING_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
-    (_FORWARDED_HEADER, 1),
-    (_X_FORWARDED_FOR_HEADER, 1),
-    (_X_FORWARDED_HOST_HEADER, 1),
-    (_X_FORWARDED_PORT_HEADER, 1),
-    (_X_FORWARDED_PROTO_HEADER, 1),
-    (_X_RSTUDIO_PROTO_HEADER, 1),
-    (_X_RSTUDIO_REQUEST_HEADER, 1),
+    (FORWARDED_HEADER, 1),
+    (X_FORWARDED_FOR_HEADER, 1),
+    (X_FORWARDED_HOST_HEADER, 1),
+    (X_FORWARDED_PORT_HEADER, 1),
+    (X_FORWARDED_PROTO_HEADER, 1),
+    (X_RSTUDIO_PROTO_HEADER, 1),
+    (X_RSTUDIO_REQUEST_HEADER, 1),
 ])
 
 
@@ -108,15 +109,13 @@ class HTTPBackend(BaseBackend):
         use_tls = worker_config.tls_advertised or worker_config.tls_listen
         configured_proto = "https" if use_tls else "http"
         if worker_config.trusted_proxies:
-            return request.headers.get(_X_FORWARDED_PROTO_HEADER) or configured_proto
+            return request.headers.get(X_FORWARDED_PROTO_HEADER) or configured_proto
         return configured_proto
 
     def get_x_forwarded_host(self, request: web.Request) -> str | None:
         if self.root_context.local_config.proxy_worker.trusted_proxies:
-            return request.headers.get(_X_FORWARDED_HOST_HEADER) or request.headers.get(
-                _HOST_HEADER
-            )
-        return request.headers.get(_HOST_HEADER)
+            return request.headers.get(X_FORWARDED_HOST_HEADER) or request.headers.get(HOST_HEADER)
+        return request.headers.get(HOST_HEADER)
 
     @asynccontextmanager
     async def request_http(
@@ -180,23 +179,23 @@ class HTTPBackend(BaseBackend):
             if key not in HOP_ONLY_HEADERS and key not in _FORWARDING_HEADERS:
                 backend_rqst_hdrs.add(key, value)
         # overwrite proxy-related headers
-        backend_rqst_hdrs[_X_FORWARDED_PROTO_HEADER] = protocol
+        backend_rqst_hdrs[X_FORWARDED_PROTO_HEADER] = protocol
         if self.circuit.app == "rstudio":
-            backend_rqst_hdrs[_X_RSTUDIO_PROTO_HEADER] = protocol
+            backend_rqst_hdrs[X_RSTUDIO_PROTO_HEADER] = protocol
         if host:
-            backend_rqst_hdrs[_FORWARDED_HEADER] = f"host={host};proto={protocol}"
-            backend_rqst_hdrs[_X_FORWARDED_HOST_HEADER] = host
+            backend_rqst_hdrs[FORWARDED_HEADER] = f"host={host};proto={protocol}"
+            backend_rqst_hdrs[X_FORWARDED_HOST_HEADER] = host
             if self.circuit.app == "rstudio":
-                backend_rqst_hdrs[_X_RSTUDIO_REQUEST_HEADER] = (
+                backend_rqst_hdrs[X_RSTUDIO_REQUEST_HEADER] = (
                     f"{protocol}://{host}{frontend_request.path or ''}"
                 )
             split = host.split(":")
             if len(split) >= 2:
-                backend_rqst_hdrs[_X_FORWARDED_PORT_HEADER] = split[1]
+                backend_rqst_hdrs[X_FORWARDED_PORT_HEADER] = split[1]
             elif remote_port:
-                backend_rqst_hdrs[_X_FORWARDED_PORT_HEADER] = remote_port
+                backend_rqst_hdrs[X_FORWARDED_PORT_HEADER] = remote_port
         if remote_host:
-            backend_rqst_hdrs[_X_FORWARDED_FOR_HEADER] = f"{remote_host[0]}:{remote_host[1]}"
+            backend_rqst_hdrs[X_FORWARDED_FOR_HEADER] = f"{remote_host[0]}:{remote_host[1]}"
         if frontend_request.body_exists:
             backend_rqst_body = frontend_request.content.iter_any()
         else:
