@@ -5,6 +5,7 @@ A mockup plugin for accelerators
 This plugin deceives the agent and manager to think as if there are accelerator devices.
 The configuration follows `mock-accelerator.toml` placed in the same location of `agent.toml`.
 Please refer the sample configurations in the `configs/accelerator` directory and copy one of them as a starting point.
+The agent loads the plugin only when `allow-compute-plugins` in `agent.toml` lists `ai.backend.accelerator.mock`.
 
 The statistics are randomly generated in reasonable ranges, but it may seem like "jumping around" because there is no smoothing mechanism of generated values.
 The configurations for fractional/discrete mode, fraction size, and device masks in etcd are exactly same as the original plugin.
