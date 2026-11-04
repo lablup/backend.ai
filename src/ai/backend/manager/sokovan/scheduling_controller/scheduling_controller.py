@@ -34,6 +34,9 @@ from ai.backend.manager.sokovan.scheduling_controller.preparers.drop_zero_resour
     DropZeroResourceSlotsRule,
 )
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
+from ai.backend.manager.sokovan.scheduling_controller.validators.runner_reserved_environ_rule import (
+    RunnerReservedEnvironRule,
+)
 
 from .preparers import (
     AssignContainerUserMappingRule,
@@ -141,6 +144,7 @@ class SchedulingController:
             MountNameValidationRule(),
             InferenceModelFolderRule(),
             DotfileVFolderConflictRule(),
+            RunnerReservedEnvironRule(),
         ])
 
     async def enqueue_session_from_draft(
