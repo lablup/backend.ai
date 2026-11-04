@@ -8,6 +8,7 @@ from typing import (
 )
 
 import aiodocker
+import trafaret as t
 
 from ai.backend.agent.resources import (
     AbstractAllocMap,
@@ -75,8 +76,12 @@ class ROCmPlugin(AbstractComputePlugin):
     enabled: bool = True
 
     _all_devices: list[ROCmDevice] | None
+    _seccomp_unconfined: bool
 
     async def init(self, context: Any = None) -> None:
+        self._seccomp_unconfined = t.ToBool().check(
+            self.plugin_config.get("seccomp_unconfined", True)
+        )
         self._all_devices = None
 
         raw_device_mask = self.local_config.get("device_mask")
@@ -377,7 +382,7 @@ class ROCmPlugin(AbstractComputePlugin):
                     },
                 ],
                 # "Privileged": True,
-                "SecurityOpt": ["seccomp=unconfined"],
+                **({"SecurityOpt": ["seccomp=unconfined"]} if self._seccomp_unconfined else {}),
                 "GroupAdd": ["video", "render"],
             },
         }
