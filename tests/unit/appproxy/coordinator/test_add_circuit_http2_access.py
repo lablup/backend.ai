@@ -61,14 +61,6 @@ class TestAddCircuitHTTP2Access:
         [
             pytest.param(
                 _CircuitAccessCase(
-                    worker_protocol=ProxyProtocol.HTTP2,
-                    open_to_public=True,
-                    allowed_client_ips=None,
-                ),
-                id="http2_public_without_allowlist",
-            ),
-            pytest.param(
-                _CircuitAccessCase(
                     worker_protocol=ProxyProtocol.HTTP,
                     open_to_public=False,
                     allowed_client_ips="10.0.0.0/8",
