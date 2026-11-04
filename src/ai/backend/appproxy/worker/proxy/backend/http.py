@@ -9,8 +9,8 @@ from functools import partial
 from typing import Any, Final, override
 
 import aiohttp
-from aiohttp import ClientConnectorError, web
-from multidict import CIMultiDict
+from aiohttp import ClientConnectorError, hdrs, web
+from multidict import CIMultiDict, istr
 from yarl import URL
 
 from ai.backend.appproxy.common.errors import ContainerConnectionRefused
@@ -42,14 +42,18 @@ HOP_ONLY_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
     ("Upgrade", 1),
 ])
 
+_X_FORWARDED_PORT: Final[istr] = istr("X-Forwarded-Port")
+_X_RSTUDIO_PROTO: Final[istr] = istr("X-RStudio-Proto")
+_X_RSTUDIO_REQUEST: Final[istr] = istr("X-RStudio-Request")
+
 _FORWARDING_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
-    ("Forwarded", 1),
-    ("X-Forwarded-For", 1),
-    ("X-Forwarded-Host", 1),
-    ("X-Forwarded-Port", 1),
-    ("X-Forwarded-Proto", 1),
-    ("X-RStudio-Proto", 1),
-    ("X-RStudio-Request", 1),
+    (hdrs.FORWARDED, 1),
+    (hdrs.X_FORWARDED_FOR, 1),
+    (hdrs.X_FORWARDED_HOST, 1),
+    (_X_FORWARDED_PORT, 1),
+    (hdrs.X_FORWARDED_PROTO, 1),
+    (_X_RSTUDIO_PROTO, 1),
+    (_X_RSTUDIO_REQUEST, 1),
 ])
 
 
@@ -99,13 +103,13 @@ class HTTPBackend(BaseBackend):
         use_tls = worker_config.tls_advertised or worker_config.tls_listen
         configured_proto = "https" if use_tls else "http"
         if worker_config.trusted_proxies:
-            return request.headers.get("x-forwarded-proto") or configured_proto
+            return request.headers.get(hdrs.X_FORWARDED_PROTO) or configured_proto
         return configured_proto
 
     def get_x_forwarded_host(self, request: web.Request) -> str | None:
         if self.root_context.local_config.proxy_worker.trusted_proxies:
-            return request.headers.get("x-forwarded-host") or request.headers.get("host")
-        return request.headers.get("host")
+            return request.headers.get(hdrs.X_FORWARDED_HOST) or request.headers.get(hdrs.HOST)
+        return request.headers.get(hdrs.HOST)
 
     @asynccontextmanager
     async def request_http(
@@ -169,23 +173,23 @@ class HTTPBackend(BaseBackend):
             if key not in HOP_ONLY_HEADERS and key not in _FORWARDING_HEADERS:
                 backend_rqst_hdrs.add(key, value)
         # overwrite proxy-related headers
-        backend_rqst_hdrs["x-forwarded-proto"] = protocol
+        backend_rqst_hdrs[hdrs.X_FORWARDED_PROTO] = protocol
         if self.circuit.app == "rstudio":
-            backend_rqst_hdrs["x-rstudio-proto"] = protocol
+            backend_rqst_hdrs[_X_RSTUDIO_PROTO] = protocol
         if host:
-            backend_rqst_hdrs["forwarded"] = f"host={host};proto={protocol}"
-            backend_rqst_hdrs["x-forwarded-host"] = host
+            backend_rqst_hdrs[hdrs.FORWARDED] = f"host={host};proto={protocol}"
+            backend_rqst_hdrs[hdrs.X_FORWARDED_HOST] = host
             if self.circuit.app == "rstudio":
-                backend_rqst_hdrs["x-rstudio-request"] = (
+                backend_rqst_hdrs[_X_RSTUDIO_REQUEST] = (
                     f"{protocol}://{host}{frontend_request.path or ''}"
                 )
             split = host.split(":")
             if len(split) >= 2:
-                backend_rqst_hdrs["x-forwarded-port"] = split[1]
+                backend_rqst_hdrs[_X_FORWARDED_PORT] = split[1]
             elif remote_port:
-                backend_rqst_hdrs["x-forwarded-port"] = remote_port
+                backend_rqst_hdrs[_X_FORWARDED_PORT] = remote_port
         if remote_host:
-            backend_rqst_hdrs["x-forwarded-for"] = f"{remote_host[0]}:{remote_host[1]}"
+            backend_rqst_hdrs[hdrs.X_FORWARDED_FOR] = f"{remote_host[0]}:{remote_host[1]}"
         if frontend_request.body_exists:
             backend_rqst_body = frontend_request.content.iter_any()
         else:
