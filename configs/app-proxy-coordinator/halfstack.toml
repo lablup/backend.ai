@@ -22,9 +22,6 @@ aiomonitor_termui_port = 48510
 aiomonitor_webui_port = 49510
 allow_unauthorized_configure_request = true
 
-[proxy_coordinator.kernel_host]
-allow_loopback = true
-
 [proxy_coordinator.bind_addr]
 host = "0.0.0.0"
 port = 10200

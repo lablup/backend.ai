@@ -18,7 +18,6 @@ from ai.backend.appproxy.common.defs import (
 )
 from ai.backend.appproxy.common.types import IngressDeliveryMode
 from ai.backend.appproxy.coordinator.clients.worker.traefik.client import TraefikWorkerClient
-from ai.backend.appproxy.coordinator.config import KernelHostConfig
 from ai.backend.appproxy.coordinator.errors.circuit import InvalidKernelHostError
 from ai.backend.appproxy.coordinator.errors.ingress import (
     ApiDeliveryWorkerServerError,
@@ -26,7 +25,6 @@ from ai.backend.appproxy.coordinator.errors.ingress import (
     IngressPushFailedError,
     TraefikIngressWriteFailedError,
 )
-from ai.backend.appproxy.coordinator.kernel_host import KernelHostValidator
 from ai.backend.appproxy.coordinator.services.ingress import IngressService
 from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.dto.appproxy.v2.ingress.request import (
@@ -265,7 +263,6 @@ def traefik_accepting_ingresses_of_two_authorities(
             client_pool,
             secrets,
             traefik_worker_client=traefik_worker_client,
-            kernel_host_validator=KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         ),
         traefik_worker_client=traefik_worker_client,
         worker_sessions=worker_sessions,
@@ -300,7 +297,6 @@ def traefik_failing_the_write_of_one_authority(
             client_pool,
             secrets,
             traefik_worker_client=traefik_worker_client,
-            kernel_host_validator=KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         ),
         ingresses=[worker_1_ingress, worker_2_ingress],
         other_authority_write_finished=other_authority_write_finished,
@@ -312,11 +308,7 @@ def api_delivery_ingress_service(
     worker_service_discovery: AsyncMock, client_pool: Mock, secrets: SecretConfig
 ) -> IngressService:
     return IngressService(
-        worker_service_discovery,
-        client_pool,
-        secrets,
-        traefik_worker_client=None,
-        kernel_host_validator=KernelHostValidator(KernelHostConfig(allow_loopback=False)),
+        worker_service_discovery, client_pool, secrets, traefik_worker_client=None
     )
 
 
@@ -431,11 +423,7 @@ class TestIngressService:
         worker_1_ingress: Ingress,
     ) -> None:
         ingress_service = IngressService(
-            empty_worker_service_discovery,
-            client_pool,
-            secrets,
-            traefik_worker_client=None,
-            kernel_host_validator=KernelHostValidator(KernelHostConfig(allow_loopback=False)),
+            empty_worker_service_discovery, client_pool, secrets, traefik_worker_client=None
         )
         await ingress_service.upsert([worker_1_ingress])
         for session in worker_sessions.values():

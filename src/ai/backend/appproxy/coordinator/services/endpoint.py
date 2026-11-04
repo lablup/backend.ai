@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import AnyUrl
 
-from ai.backend.appproxy.coordinator.kernel_host import KernelHostValidator
+from ai.backend.appproxy.coordinator.kernel_host import find_kernel_host_rejection_reason
 from ai.backend.appproxy.coordinator.models import Circuit
 from ai.backend.appproxy.coordinator.repositories.endpoint import (
     EndpointRepository,
@@ -42,17 +42,14 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 class EndpointService:
     _repository: EndpointRepository
     _circuit_manager: CircuitManager
-    _kernel_host_validator: KernelHostValidator
 
     def __init__(
         self,
         repository: EndpointRepository,
         circuit_manager: CircuitManager,
-        kernel_host_validator: KernelHostValidator,
     ) -> None:
         self._repository = repository
         self._circuit_manager = circuit_manager
-        self._kernel_host_validator = kernel_host_validator
 
     async def sync_endpoint(
         self,
@@ -336,11 +333,7 @@ class EndpointService:
             rejection_reasons = [
                 rejection_reason
                 for route in item.routes
-                if (
-                    rejection_reason := self._kernel_host_validator.find_rejection_reason(
-                        route.kernel_host
-                    )
-                )
+                if (rejection_reason := find_kernel_host_rejection_reason(route.kernel_host))
                 is not None
             ]
             if rejection_reasons:

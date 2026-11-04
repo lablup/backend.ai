@@ -29,6 +29,7 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.appproxy.common.utils import mime_match, pydantic_api_handler
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
+from ai.backend.appproxy.coordinator.kernel_host import ensure_kernel_host_allowed
 from ai.backend.appproxy.coordinator.models import Circuit, Token, Worker, add_circuit
 from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
 from ai.backend.appproxy.coordinator.types import RootContext
@@ -173,7 +174,7 @@ async def proxy(
         log.debug("reusing existing circuit {}", existing_circuit.id)
         circuit = existing_circuit
     else:
-        root_ctx.kernel_host_validator.ensure_allowed(token.kernel_host)
+        ensure_kernel_host_allowed(token.kernel_host)
         routes = [
             RouteInfo(
                 session_id=token.session_id,

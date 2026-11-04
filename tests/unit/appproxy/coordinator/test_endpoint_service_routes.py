@@ -16,8 +16,6 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from ai.backend.appproxy.coordinator.config import KernelHostConfig
-from ai.backend.appproxy.coordinator.kernel_host import KernelHostValidator
 from ai.backend.appproxy.coordinator.repositories.endpoint import (
     EndpointRepository,
     RegisteredRouteSet,
@@ -59,7 +57,6 @@ class TestRegisterRoutesBulk:
         service = EndpointService(
             cast(EndpointRepository, repo),
             cast(CircuitManager, circuit_manager),
-            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         )
 
         result = await service.register_routes_bulk([])
@@ -91,7 +88,6 @@ class TestRegisterRoutesBulk:
         service = EndpointService(
             cast(EndpointRepository, repo),
             cast(CircuitManager, circuit_manager),
-            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         )
 
         result = await service.register_routes_bulk([
@@ -114,7 +110,6 @@ class TestRegisterRoutesBulk:
         service = EndpointService(
             cast(EndpointRepository, repo),
             cast(CircuitManager, circuit_manager),
-            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         )
 
         result = await service.register_routes_bulk([
@@ -151,7 +146,6 @@ class TestRegisterRoutesBulk:
         service = EndpointService(
             cast(EndpointRepository, repo),
             cast(CircuitManager, circuit_manager),
-            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         )
 
         result = await service.register_routes_bulk([
@@ -194,7 +188,6 @@ class TestRegisterRoutesBulk:
         service = EndpointService(
             cast(EndpointRepository, repo),
             cast(CircuitManager, circuit_manager),
-            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         )
 
         result = await service.register_routes_bulk([
@@ -219,7 +212,6 @@ class TestUnregisterRoutesBulk:
         service = EndpointService(
             cast(EndpointRepository, repo),
             cast(CircuitManager, circuit_manager),
-            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         )
 
         result = await service.unregister_routes_bulk([])
@@ -251,7 +243,6 @@ class TestUnregisterRoutesBulk:
         service = EndpointService(
             cast(EndpointRepository, repo),
             cast(CircuitManager, circuit_manager),
-            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         )
 
         result = await service.unregister_routes_bulk([
@@ -273,7 +264,6 @@ class TestUnregisterRoutesBulk:
         service = EndpointService(
             cast(EndpointRepository, repo),
             cast(CircuitManager, circuit_manager),
-            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         )
 
         result = await service.unregister_routes_bulk([
@@ -310,7 +300,6 @@ class TestUnregisterRoutesBulk:
         service = EndpointService(
             cast(EndpointRepository, repo),
             cast(CircuitManager, circuit_manager),
-            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         )
 
         result = await service.unregister_routes_bulk([
@@ -355,7 +344,6 @@ class TestRejectedKernelHost:
         return EndpointService(
             cast(EndpointRepository, repository_without_any_result),
             cast(CircuitManager, AsyncMock(spec=CircuitManager)),
-            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         )
 
     @pytest.fixture

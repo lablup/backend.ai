@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import inspect
-from dataclasses import dataclass
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
@@ -14,92 +13,52 @@ from ai.backend.appproxy.common.types import ProxyProtocol
 from ai.backend.appproxy.coordinator.api.conf import conf_v2
 from ai.backend.appproxy.coordinator.api.proxy import ProxyRequestModel, proxy
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
-from ai.backend.appproxy.coordinator.config import KernelHostConfig
 from ai.backend.appproxy.coordinator.errors.circuit import InvalidKernelHostError
-from ai.backend.appproxy.coordinator.kernel_host import KernelHostValidator
+from ai.backend.appproxy.coordinator.kernel_host import ensure_kernel_host_allowed
 
 _SESSION_ID = UUID("f5cd34ba-ae53-4537-a813-09f38496443d")
 _TOKEN_ID = UUID("4eeb260b-6cc5-4362-baf3-ea978388becd")
 
 
-@dataclass(frozen=True)
-class _KernelHostCase:
-    kernel_host: str
-    allow_loopback: bool
-
-
-class TestKernelHostValidator:
-    @pytest.fixture
-    def validator_of_the_case(self, case: _KernelHostCase) -> KernelHostValidator:
-        return KernelHostValidator(KernelHostConfig(allow_loopback=case.allow_loopback))
-
-    @pytest.fixture
-    def validator_with_the_default_config(self) -> KernelHostValidator:
-        return KernelHostValidator(KernelHostConfig.model_validate({}))
+class TestEnsureKernelHostAllowed:
+    @pytest.mark.parametrize(
+        "kernel_host",
+        [
+            "10.0.0.1",
+            "172.17.0.2",
+            "192.168.1.100",
+            "fd00::1",
+            "127.0.0.1",
+            "::1",
+            "localhost",
+            "agent-1.example.com",
+            "agent_1",
+        ],
+    )
+    def test_allows_the_kernel_host(self, kernel_host: str) -> None:
+        ensure_kernel_host_allowed(kernel_host)
 
     @pytest.mark.parametrize(
-        "case",
+        "kernel_host",
         [
-            _KernelHostCase(kernel_host="10.0.0.1", allow_loopback=False),
-            _KernelHostCase(kernel_host="172.17.0.2", allow_loopback=False),
-            _KernelHostCase(kernel_host="192.168.1.100", allow_loopback=False),
-            _KernelHostCase(kernel_host="fd00::1", allow_loopback=False),
-            _KernelHostCase(kernel_host="agent-1.example.com", allow_loopback=False),
-            _KernelHostCase(kernel_host="agent_1", allow_loopback=False),
-            _KernelHostCase(kernel_host="127.0.0.1", allow_loopback=True),
-            _KernelHostCase(kernel_host="::1", allow_loopback=True),
-            _KernelHostCase(kernel_host="::ffff:127.0.0.1", allow_loopback=True),
-            _KernelHostCase(kernel_host="localhost", allow_loopback=True),
+            "169.254.169.254",
+            "::ffff:169.254.169.254",
+            "fe80::1",
+            "2852039166",
+            "169.254.43518",
+            "0xa9.0xfe.0xa9.0xfe",
+            "169.254.169.254.",
+            "",
+            "host name",
+            "host/path",
+            "user@host",
+            "host:80",
+            "10.0.0.1\nbackend=10.0.0.2,80",
         ],
-        ids=lambda case: f"{case.kernel_host}-allow_loopback={case.allow_loopback}",
     )
-    def test_allowed(
-        self, case: _KernelHostCase, validator_of_the_case: KernelHostValidator
-    ) -> None:
-        validator_of_the_case.ensure_allowed(case.kernel_host)
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _KernelHostCase(kernel_host="127.0.0.1", allow_loopback=False),
-            _KernelHostCase(kernel_host="127.1.2.3", allow_loopback=False),
-            _KernelHostCase(kernel_host="::1", allow_loopback=False),
-            _KernelHostCase(kernel_host="::ffff:127.0.0.1", allow_loopback=False),
-            _KernelHostCase(kernel_host="localhost", allow_loopback=False),
-            _KernelHostCase(kernel_host="LOCALHOST", allow_loopback=False),
-            _KernelHostCase(kernel_host="localhost.", allow_loopback=False),
-            _KernelHostCase(kernel_host="app.localhost", allow_loopback=False),
-            _KernelHostCase(kernel_host="169.254.169.254", allow_loopback=True),
-            _KernelHostCase(kernel_host="::ffff:169.254.169.254", allow_loopback=True),
-            _KernelHostCase(kernel_host="fe80::1", allow_loopback=True),
-            _KernelHostCase(kernel_host="224.0.0.1", allow_loopback=True),
-            _KernelHostCase(kernel_host="ff02::1", allow_loopback=True),
-            _KernelHostCase(kernel_host="0.0.0.0", allow_loopback=True),
-            _KernelHostCase(kernel_host="::", allow_loopback=True),
-            _KernelHostCase(kernel_host="127.1", allow_loopback=True),
-            _KernelHostCase(kernel_host="2130706433", allow_loopback=True),
-            _KernelHostCase(kernel_host="0x7f.0.0.1", allow_loopback=True),
-            _KernelHostCase(kernel_host="127.0.0.1.", allow_loopback=True),
-            _KernelHostCase(kernel_host="", allow_loopback=True),
-            _KernelHostCase(kernel_host="host name", allow_loopback=True),
-            _KernelHostCase(kernel_host="host/path", allow_loopback=True),
-            _KernelHostCase(kernel_host="user@host", allow_loopback=True),
-            _KernelHostCase(kernel_host="host:80", allow_loopback=True),
-            _KernelHostCase(kernel_host="10.0.0.1\nbackend=10.0.0.2,80", allow_loopback=True),
-        ],
-        ids=lambda case: f"{case.kernel_host!r}-allow_loopback={case.allow_loopback}",
-    )
-    def test_rejected(
-        self, case: _KernelHostCase, validator_of_the_case: KernelHostValidator
-    ) -> None:
+    def test_rejects_the_kernel_host(self, kernel_host: str) -> None:
         with pytest.raises(InvalidKernelHostError):
-            validator_of_the_case.ensure_allowed(case.kernel_host)
-
-    def test_loopback_is_rejected_by_default(
-        self, validator_with_the_default_config: KernelHostValidator
-    ) -> None:
-        with pytest.raises(InvalidKernelHostError):
-            validator_with_the_default_config.ensure_allowed("127.0.0.1")
+            ensure_kernel_host_allowed(kernel_host)
 
 
 class TestAppSessionEntryPoints:
@@ -107,7 +66,6 @@ class TestAppSessionEntryPoints:
     def coordinator_request(self) -> web.Request:
         root_ctx = MagicMock()
         root_ctx.local_config.proxy_coordinator.allow_unauthorized_configure_request = True
-        root_ctx.kernel_host_validator = KernelHostValidator(KernelHostConfig(allow_loopback=False))
         app = web.Application()
         app["_root.context"] = root_ctx
         return make_mocked_request("GET", "/", app=app)

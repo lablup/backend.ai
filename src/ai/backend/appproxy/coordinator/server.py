@@ -85,7 +85,6 @@ from ai.backend.appproxy.coordinator.dependencies.composer import (
     DependencyInput,
     DependencyResources,
 )
-from ai.backend.appproxy.coordinator.kernel_host import KernelHostValidator
 from ai.backend.appproxy.coordinator.models.worker import WorkerStatus
 from ai.backend.appproxy.coordinator.services.ingress import IngressService
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
@@ -713,7 +712,6 @@ async def endpoint_service_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.endpoint_service = EndpointService(
         repository=EndpointRepository(root_ctx.db),
         circuit_manager=root_ctx.circuit_manager,
-        kernel_host_validator=root_ctx.kernel_host_validator,
     )
     yield
 
@@ -725,7 +723,6 @@ async def ingress_service_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.worker_client_pool,
         root_ctx.local_config.secrets,
         root_ctx.traefik_worker_client,
-        root_ctx.kernel_host_validator,
     )
     yield
 
@@ -914,7 +911,6 @@ def build_root_app(
     loop.set_exception_handler(global_exception_handler)
     app["_root.context"] = root_ctx
     root_ctx.local_config = local_config
-    root_ctx.kernel_host_validator = KernelHostValidator(local_config.proxy_coordinator.kernel_host)
     root_ctx.pidx = pidx
     infrastructure = dependency_resources.infrastructure
     root_ctx.db = infrastructure.db

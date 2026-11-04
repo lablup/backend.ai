@@ -16,7 +16,7 @@ from ai.backend.appproxy.coordinator.clients.worker.base import AbstractWorkerCl
 from ai.backend.appproxy.coordinator.clients.worker.client import AppProxyWorkerClient
 from ai.backend.appproxy.coordinator.clients.worker.traefik.client import TraefikWorkerClient
 from ai.backend.appproxy.coordinator.errors.ingress import IngressPushFailedError
-from ai.backend.appproxy.coordinator.kernel_host import KernelHostValidator
+from ai.backend.appproxy.coordinator.kernel_host import ensure_kernel_host_allowed
 from ai.backend.common.clients.http_client.client_pool import ClientKey, ClientPool
 from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressAuthority, IngressKey
 from ai.backend.common.exception import BackendAIError
@@ -31,7 +31,6 @@ class IngressService:
     _client_pool: ClientPool
     _secrets: SecretConfig
     _traefik_worker_client: TraefikWorkerClient | None
-    _kernel_host_validator: KernelHostValidator
 
     def __init__(
         self,
@@ -39,19 +38,17 @@ class IngressService:
         client_pool: ClientPool,
         secrets: SecretConfig,
         traefik_worker_client: TraefikWorkerClient | None,
-        kernel_host_validator: KernelHostValidator,
     ) -> None:
         self._worker_service_discovery = worker_service_discovery
         self._client_pool = client_pool
         self._secrets = secrets
         self._traefik_worker_client = traefik_worker_client
-        self._kernel_host_validator = kernel_host_validator
 
     async def upsert(self, ingresses: Sequence[Ingress]) -> None:
         for ingress in ingresses:
             for target_group in ingress.backend.target_groups:
                 for target in target_group.targets:
-                    self._kernel_host_validator.ensure_allowed(target.host)
+                    ensure_kernel_host_allowed(target.host)
         ingresses_by_authority: defaultdict[IngressAuthority, list[Ingress]] = defaultdict(list)
         for ingress in ingresses:
             ingresses_by_authority[ingress.authority].append(ingress)

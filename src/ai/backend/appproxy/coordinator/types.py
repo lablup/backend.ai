@@ -59,7 +59,6 @@ if TYPE_CHECKING:
     from ai.backend.appproxy.coordinator.clients.worker.traefik.client import TraefikWorkerClient
     from ai.backend.appproxy.coordinator.services.ingress import IngressService
 
-    from .kernel_host import KernelHostValidator
     from .services.endpoint import EndpointService
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -419,7 +418,6 @@ class RootContext:
     traefik_etcd: TraefikEtcd | None
 
     circuit_manager: CircuitManager
-    kernel_host_validator: KernelHostValidator
     endpoint_service: EndpointService
     worker_client_pool: ClientPool
     traefik_worker_client: TraefikWorkerClient | None

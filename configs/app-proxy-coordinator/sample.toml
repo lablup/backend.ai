@@ -284,17 +284,6 @@
     # Added in 26.10.0
     rejected_encodings = ["br"]
 
-  # Rules applied to the kernel host of a route before it becomes a proxy target.
-  # Malformed hosts and link-local, multicast and unspecified addresses are always
-  # rejected.
-  # Added in 26.10.0
-  [proxy_coordinator.kernel_host]
-    # Accept loopback addresses and 'localhost' as the kernel host of a route.
-    # Enable this only when kernels publish their ports on the loopback interface
-    # of the proxy host, as in a single-node installation.
-    # Added in 26.10.0
-    allow_loopback = false
-
   # Configuration for Traefik integration when enable_traefik is true. Includes
   # the etcd connection settings that Traefik uses as its configuration backend.
   # Required when enable_traefik is enabled.
