@@ -186,11 +186,22 @@ class DellEMCOneFSVolume(BaseVolume):
         self.dell_api_version = self.config["dell_api_version"]
         self.dell_system_name = self.config["dell_system_name"]
         self.api_client = OneFSClient(
+<<<<<<< HEAD
             str(self.endpoint),
             self.dell_admin,
             self.dell_password,
             api_version=self.dell_api_version,
             system_name=self.dell_system_name,
+=======
+            OneFSClientArgs(
+                endpoint=str(self.config["dell_endpoint"]),
+                user=self.config["dell_username"],
+                password=str(self.config["dell_password"]),
+                api_version=self.config["dell_api_version"],
+                system_name=self.config["dell_system_name"],
+                ssl_context=self.config["dell_verify_ssl"],
+            )
+>>>>>>> 18e94b52 (feat(BA-8908): make storage client TLS and accelerator container options configurable (#16423))
         )
 
     @override
