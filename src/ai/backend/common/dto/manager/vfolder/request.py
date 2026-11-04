@@ -147,7 +147,7 @@ class RestoreVFolderReq(BaseRequestModel):
 class CloneVFolderReq(BaseRequestModel):
     """Request to clone a virtual folder."""
 
-    target_name: str = Field(description="Name for the cloned vfolder")
+    target_name: VFolderName = Field(description="Name for the cloned vfolder")
     target_host: str | None = Field(
         default=None,
         validation_alias=AliasChoices("target_host", "folder_host"),

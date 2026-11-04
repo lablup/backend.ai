@@ -375,6 +375,9 @@ class VFolderService:
             pass
         else:
             vfolder_data = await self._vfolder_repository.get_by_id(updater.vfolder_id)
+            self._check_name_parameter(
+                new_name, vfolder_data.ownership_type == VFolderOwnershipType.GROUP
+            )
             if await self._vfolder_repository.check_vfolder_name_exists(
                 self._owning_scope(vfolder_data), new_name
             ):
