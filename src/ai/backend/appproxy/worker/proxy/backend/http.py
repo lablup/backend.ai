@@ -42,6 +42,16 @@ HOP_ONLY_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
     ("Upgrade", 1),
 ])
 
+_HEADERS_SET_BY_THE_PROXY: Final[CIMultiDict[int]] = CIMultiDict([
+    ("Forwarded", 1),
+    ("X-Forwarded-For", 1),
+    ("X-Forwarded-Host", 1),
+    ("X-Forwarded-Port", 1),
+    ("X-Forwarded-Proto", 1),
+    ("X-RStudio-Proto", 1),
+    ("X-RStudio-Request", 1),
+])
+
 
 class HTTPBackend(BaseBackend):
     """HTTP proxy backend that keeps the targets of its Ingress backend in a health-checked pool.
@@ -85,14 +95,17 @@ class HTTPBackend(BaseBackend):
         await self.client_pool.close()
 
     def get_x_forwarded_proto(self, request: web.Request) -> str:
-        use_tls = (
-            self.root_context.local_config.proxy_worker.tls_advertised
-            or self.root_context.local_config.proxy_worker.tls_listen
-        )
-        return request.headers.get("x-forwarded-proto") or ("https" if use_tls else "http")
+        worker_config = self.root_context.local_config.proxy_worker
+        use_tls = worker_config.tls_advertised or worker_config.tls_listen
+        configured_proto = "https" if use_tls else "http"
+        if worker_config.trusted_proxies:
+            return request.headers.get("x-forwarded-proto") or configured_proto
+        return configured_proto
 
     def get_x_forwarded_host(self, request: web.Request) -> str | None:
-        return request.headers.get("x-forwarded-host") or request.headers.get("host")
+        if self.root_context.local_config.proxy_worker.trusted_proxies:
+            return request.headers.get("x-forwarded-host") or request.headers.get("host")
+        return request.headers.get("host")
 
     @asynccontextmanager
     async def request_http(
@@ -153,7 +166,7 @@ class HTTPBackend(BaseBackend):
         # copy frontend request headers without hop-by-hop headers,
         # preserving repeated headers (multidict add(), not dict assignment)
         for key, value in frontend_request.headers.items():
-            if key not in HOP_ONLY_HEADERS:
+            if key not in HOP_ONLY_HEADERS and key not in _HEADERS_SET_BY_THE_PROXY:
                 backend_rqst_hdrs.add(key, value)
         # overwrite proxy-related headers
         backend_rqst_hdrs["x-forwarded-proto"] = protocol

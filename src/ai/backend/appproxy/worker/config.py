@@ -934,11 +934,14 @@ class ProxyWorkerConfig(BaseSchema):
         BackendAIConfigMeta(
             description=(
                 "CIDR blocks (or bare IP addresses) of load balancers / reverse proxies that sit "
-                "in front of this worker and may be trusted to set the 'X-Forwarded-For' header. "
-                "Client-IP allowlist checks honor 'X-Forwarded-For' only when the immediate peer "
-                "matches one of these networks; otherwise the direct connection address is used, so "
-                "a directly-exposed worker cannot be spoofed by a forged header. Leave empty when "
-                "clients connect directly to the worker."
+                "in front of this worker and may be trusted to set the 'X-Forwarded-For', "
+                "'X-Forwarded-Host' and 'X-Forwarded-Proto' headers. Client-IP allowlist checks "
+                "honor 'X-Forwarded-For' only when the immediate peer matches one of these "
+                "networks; otherwise the direct connection address is used, so a directly-exposed "
+                "worker cannot be spoofed by a forged header. Session apps receive the forwarded "
+                "host and proto only when this is set; otherwise they receive the 'Host' header "
+                "and the proto of the worker TLS configuration. Leave empty when clients connect "
+                "directly to the worker."
             ),
             added_version="26.4.5",
             example=ConfigExample(local="[]", prod='["10.0.0.0/8"]'),
