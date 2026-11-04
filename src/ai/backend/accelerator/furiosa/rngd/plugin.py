@@ -8,6 +8,7 @@ from pprint import pformat
 from typing import Any
 
 import aiodocker
+import trafaret as t
 
 from ai.backend.accelerator.furiosa import __version__
 from ai.backend.common.asyncio import run_in_executor_with_context
@@ -87,9 +88,9 @@ class RngdPlugin(AbstractComputePlugin):
     _seccomp_unconfined: bool
 
     async def init(self, context: Any = None) -> None:
-        self._host_ipc = str(self.plugin_config.get("host_ipc", "true")).lower() != "false"
-        self._seccomp_unconfined = (
-            str(self.plugin_config.get("seccomp_unconfined", "true")).lower() != "false"
+        self._host_ipc = t.ToBool().check(self.plugin_config.get("host_ipc", True))
+        self._seccomp_unconfined = t.ToBool().check(
+            self.plugin_config.get("seccomp_unconfined", True)
         )
         self._all_devices = None
 

@@ -86,7 +86,7 @@ class IPUPlugin(AbstractComputePlugin):
     subnet_network_map: Mapping[ipaddress.IPv4Network, str]
 
     async def init(self, context: Any = None) -> None:
-        self._host_ipc = str(self.plugin_config.get("host_ipc", "true")).lower() != "false"
+        self._host_ipc = t.ToBool().check(self.plugin_config.get("host_ipc", True))
         self._all_devices = None
         raw_device_mask = self.plugin_config.get("device_mask")
         if raw_device_mask is not None:

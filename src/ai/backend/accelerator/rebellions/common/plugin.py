@@ -82,7 +82,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
     _enable_rsd: bool
 
     async def init(self, context: Any = None) -> None:
-        self._host_ipc = str(self.plugin_config.get("host_ipc", "true")).lower() != "false"
+        self._host_ipc = t.ToBool().check(self.plugin_config.get("host_ipc", True))
         self._all_devices = None
 
         raw_device_mask = self.plugin_config.get("device_mask")

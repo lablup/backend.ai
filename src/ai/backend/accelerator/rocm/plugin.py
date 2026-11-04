@@ -8,6 +8,7 @@ from typing import (
 )
 
 import aiodocker
+import trafaret as t
 
 from ai.backend.agent.resources import (
     AbstractAllocMap,
@@ -78,8 +79,8 @@ class ROCmPlugin(AbstractComputePlugin):
     _seccomp_unconfined: bool
 
     async def init(self, context: Any = None) -> None:
-        self._seccomp_unconfined = (
-            str(self.plugin_config.get("seccomp_unconfined", "true")).lower() != "false"
+        self._seccomp_unconfined = t.ToBool().check(
+            self.plugin_config.get("seccomp_unconfined", True)
         )
         self._all_devices = None
 
