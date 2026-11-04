@@ -22,8 +22,14 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsEntryDTO
+<<<<<<< HEAD
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+=======
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.tristate.unset import UNSET, Unset
+from ai.backend.common.typed_validators import HealthCheckPath
+>>>>>>> 07891376f (fix(BA-8803): build health check URLs from parts and stop following redirects (#16433))
 
 
 class PresetModelHealthCheckInput(BaseRequestModel):
@@ -33,7 +39,7 @@ class PresetModelHealthCheckInput(BaseRequestModel):
         "immediately and the remaining fields are ignored.",
     )
     interval: float = Field(default=10.0, description="Interval in seconds between health checks.")
-    path: str = Field(default="/health", description="Path to check for health status.")
+    path: HealthCheckPath = Field(default="/health", description="Path to check for health status.")
     max_retries: int = Field(default=10, description="Maximum number of retries for health check.")
     max_wait_time: float = Field(
         default=15.0, description="Maximum time in seconds to wait for a health check response."
@@ -145,6 +151,72 @@ class CreateDeploymentRevisionPresetInput(BaseRequestModel):
     )
 
 
+<<<<<<< HEAD
+=======
+class UpdatePresetModelHealthCheckInput(BaseRequestModel):
+    """Patch for a preset model's health check. Omit a field to keep its current stored value."""
+
+    enable: bool | None | Unset = Field(default=UNSET)
+    interval: float | None | Unset = Field(default=UNSET)
+    path: HealthCheckPath | None | Unset = Field(default=UNSET)
+    max_retries: int | None | Unset = Field(default=UNSET)
+    max_wait_time: float | None | Unset = Field(default=UNSET)
+    expected_status_code: Annotated[int, Field(gt=100)] | None | Unset = Field(default=UNSET)
+    initial_delay: Annotated[float, Field(ge=0)] | None | Unset = Field(default=UNSET)
+
+
+class UpdatePresetModelMetadataInput(BaseRequestModel):
+    """Patch for a preset model's metadata. Omit a field to keep its current stored value."""
+
+    author: str | None | Unset = Field(default=UNSET)
+    title: str | None | Unset = Field(default=UNSET)
+    version: str | None | Unset = Field(default=UNSET)
+    created: str | None | Unset = Field(default=UNSET)
+    description: str | None | Unset = Field(default=UNSET)
+    task: str | None | Unset = Field(default=UNSET)
+    category: str | None | Unset = Field(default=UNSET)
+    architecture: str | None | Unset = Field(default=UNSET)
+    framework: list[str] | None | Unset = Field(default=UNSET)
+    label: list[str] | None | Unset = Field(default=UNSET)
+    license: str | None | Unset = Field(default=UNSET)
+    min_resource: dict[str, Any] | None | Unset = Field(default=UNSET)
+
+
+class UpdatePresetModelServiceConfigInput(BaseRequestModel):
+    """Patch for a preset model's service config. Omit a field to keep its current stored value."""
+
+    pre_start_actions: list[PreStartAction] | None | Unset = Field(default=UNSET)
+    command: str | None | Unset = Field(default=UNSET)
+    start_command: list[str] | None | Unset = Field(default=UNSET)
+    shell: str | None | Unset = Field(default=UNSET)
+    port: Annotated[int, Field(gt=1)] | None | Unset = Field(default=UNSET)
+    health_check: UpdatePresetModelHealthCheckInput | None | Unset = Field(default=UNSET)
+
+
+class UpdatePresetModelConfigInput(BaseRequestModel):
+    """Patch for a single preset model entry. Omit a field to keep its current stored value."""
+
+    name: Annotated[str, Field(min_length=1)] | None | Unset = Field(default=UNSET)
+    model_path: Annotated[str, Field(min_length=1)] | None | Unset = Field(default=UNSET)
+    service: UpdatePresetModelServiceConfigInput | None | Unset = Field(default=UNSET)
+    metadata: UpdatePresetModelMetadataInput | None | Unset = Field(default=UNSET)
+
+
+class UpdatePresetModelDefinitionInput(BaseRequestModel):
+    """Patch for a preset's model definition. Omit `models` to keep the current model entry."""
+
+    models: Annotated[list[UpdatePresetModelConfigInput], Field(max_length=1)] | None | Unset = (
+        Field(default=UNSET)
+    )
+
+    def to_draft(self) -> PresetModelDefinitionDraft:
+        # exclude_unset keeps the resulting draft's model_fields_set aligned with what the
+        # caller actually provided, so merging onto the stored preset doesn't clobber fields
+        # the caller didn't touch.
+        return PresetModelDefinitionDraft.model_validate(self.model_dump(exclude_unset=True))
+
+
+>>>>>>> 07891376f (fix(BA-8803): build health check URLs from parts and stop following redirects (#16433))
 class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     id: UUID = Field(description="Preset ID.")
     runtime_variant_id: RuntimeVariantID | None = Field(default=None)
