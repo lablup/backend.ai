@@ -582,13 +582,13 @@ class TestFirstCompletedDispatch:
     async def test_dispatch_result(
         self, case: _FirstCompletedCase, first_completed_dispatch: _FirstCompletedDispatch
     ) -> None:
-        result = await first_completed_dispatch.ctx.dispatch(
+        hook_result = await first_completed_dispatch.ctx.dispatch(
             _HOOK_EVENT, (), return_when=FIRST_COMPLETED
         )
 
-        assert result.status == case.expected_status
-        assert result.result == case.expected_result
-        assert result.src_plugin == case.expected_src_plugin
+        assert hook_result.status == case.expected_status
+        assert hook_result.result == case.expected_result
+        assert hook_result.src_plugin == case.expected_src_plugin
         called_plugins = [
             plugin_name
             for plugin_name, handler in first_completed_dispatch.handler_by_plugin.items()
