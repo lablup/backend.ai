@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import stat
-from collections.abc import Callable
 from pathlib import Path
 
-import click
 import pytest
 from click.testing import CliRunner
+
+from ai.backend.client.cli.v2 import v2
 
 
 @pytest.fixture
@@ -22,10 +22,9 @@ class TestConfigSetCredentialsFile:
     def test_new_file_is_owner_only_in_owner_only_directory(
         self,
         runner: CliRunner,
-        cli_entrypoint: Callable[[], click.Group],
         isolated_home: Path,
     ) -> None:
-        result = runner.invoke(cli_entrypoint, ["v2", "config", "set", "secret-key", "secret"])
+        result = runner.invoke(v2, ["config", "set", "secret-key", "secret"])
 
         assert result.exit_code == 0, result.output
         config_dir = isolated_home / ".backend.ai"
@@ -35,10 +34,9 @@ class TestConfigSetCredentialsFile:
     def test_loose_existing_file_is_tightened_and_keeps_values(
         self,
         runner: CliRunner,
-        cli_entrypoint: Callable[[], click.Group],
         loose_credentials_file: Path,
     ) -> None:
-        result = runner.invoke(cli_entrypoint, ["v2", "config", "set", "secret-key", "secret"])
+        result = runner.invoke(v2, ["config", "set", "secret-key", "secret"])
 
         assert result.exit_code == 0, result.output
         assert stat.S_IMODE(loose_credentials_file.stat().st_mode) == 0o600
@@ -49,10 +47,9 @@ class TestProfileFiles:
     def test_profile_create_makes_every_directory_owner_only(
         self,
         runner: CliRunner,
-        cli_entrypoint: Callable[[], click.Group],
         isolated_home: Path,
     ) -> None:
-        result = runner.invoke(cli_entrypoint, ["v2", "profile", "create", "staging"])
+        result = runner.invoke(v2, ["profile", "create", "staging"])
 
         assert result.exit_code == 0, result.output
         directory_modes = {
@@ -72,14 +69,13 @@ class TestProfileFiles:
     def test_profile_credentials_file_is_owner_only(
         self,
         runner: CliRunner,
-        cli_entrypoint: Callable[[], click.Group],
         isolated_home: Path,
     ) -> None:
-        runner.invoke(cli_entrypoint, ["v2", "profile", "create", "staging"])
+        runner.invoke(v2, ["profile", "create", "staging"])
 
         result = runner.invoke(
-            cli_entrypoint,
-            ["v2", "--profile", "staging", "config", "set", "secret-key", "secret"],
+            v2,
+            ["--profile", "staging", "config", "set", "secret-key", "secret"],
         )
 
         assert result.exit_code == 0, result.output
