@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import os
+import ssl
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from typing import Any, NotRequired, TypedDict, cast
@@ -28,6 +29,7 @@ class OneFSClient:
     password: str
     api_version: str
     system_name: str | None
+    _ssl_context: ssl.SSLContext | bool
     _session: aiohttp.ClientSession
 
     def __init__(
@@ -38,12 +40,14 @@ class OneFSClient:
         *,
         api_version: str = "12",
         system_name: str | None = "nfs",
+        ssl_context: ssl.SSLContext | bool = False,
     ) -> None:
         self.endpoint = endpoint
         self.user = user
         self.password = password
         self.api_version = api_version
         self.system_name = system_name
+        self._ssl_context = ssl_context
         self._session = aiohttp.ClientSession()
 
     async def aclose(self) -> None:
@@ -68,7 +72,7 @@ class OneFSClient:
             method,
             f"{self.endpoint}/platform/{self.api_version}/{path}",
             auth=aiohttp.BasicAuth(self.user, self.password),
-            ssl=False,
+            ssl=self._ssl_context,
             raise_for_status=True,
             **kwargs,
         ) as resp:

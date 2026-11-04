@@ -479,7 +479,6 @@ class NetAppVolume(BaseVolume):
 
     @override
     async def init(self) -> None:
-<<<<<<< HEAD
         self.ontap_endpoint = self.config["netapp_ontap_endpoint"]
         self.netapp_client = NetAppClient(
             self.ontap_endpoint,
@@ -487,15 +486,7 @@ class NetAppVolume(BaseVolume):
             self.config["netapp_ontap_password"],
             self.local_config["storage-proxy"]["user"],
             self.local_config["storage-proxy"]["group"],
-=======
-        self._netapp_client = NetAppClient(
-            NetAppClientArgs(
-                endpoint=self.config["netapp_ontap_endpoint"],
-                user=self.config["netapp_ontap_user"],
-                password=self.config["netapp_ontap_password"],
-                ssl_context=t.ToBool().check(self.config.get("netapp_verify_ssl", False)),
-            )
->>>>>>> 18e94b52 (feat(BA-8908): make storage client TLS and accelerator container options configurable (#16423))
+            ssl_context=t.ToBool().check(self.config.get("netapp_verify_ssl", False)),
         )
         self.netapp_nfs_host = self.config["netapp_nfs_host"]
         self.netapp_xcp_cmd = self.config["netapp_xcp_cmd"]
