@@ -3,18 +3,21 @@
 The listing behind `GET /folders/_/shared` must only hand back the sharing entries the
 requester is party to: the share is granted to them, or it stands on a folder they own,
 created, or reach through their project membership. Everything else — including the
-grantee's UUID and e-mail — must stay out of the result. Omitting the requester lists
-every entry, which is the superadmin/monitor path.
+grantee's UUID and e-mail — must stay out of the result. The requester comes from the
+user context, and a superadmin or monitor there is listed without that bound.
 """
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.types import (
     BinarySize,
     ResourceSlot,
@@ -26,6 +29,7 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.data.permission.types import (
     ScopeType as PermissionScopeType,
 )
+from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -58,6 +62,21 @@ from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.testutils.db import with_tables
 
 DOMAIN_NAME_FIXED = "test-domain-shared-scope"
+
+
+@contextmanager
+def _as_requester(user_id: UUID, role: UserRole = UserRole.USER) -> Iterator[None]:
+    """Put `user_id` in the user context, the way the auth middleware does."""
+    user = UserData(
+        user_id=user_id,
+        is_authorized=True,
+        is_admin=role in (UserRole.ADMIN, UserRole.SUPERADMIN),
+        is_superadmin=role == UserRole.SUPERADMIN,
+        role=role,
+        domain_name=DOMAIN_NAME_FIXED,
+    )
+    with with_user(user):
+        yield
 
 
 def _password() -> PasswordInfo:
@@ -306,7 +325,8 @@ class TestListSharedVFolderPermissionsScope:
         """Granted to them, owned, created, or reached through their project."""
         repo = VfolderRepository(db_with_cleanup)
 
-        rows = await repo.list_shared_vfolder_permissions(requester_id=seeded.requester)
+        with _as_requester(seeded.requester):
+            rows = await repo.list_shared_vfolder_permissions()
 
         assert {row["vfolder_id"] for row in rows} == seeded.visible_vfolder_ids
 
@@ -318,7 +338,8 @@ class TestListSharedVFolderPermissionsScope:
         """A stranger's share leaks neither the folder nor the grantee's UUID or e-mail."""
         repo = VfolderRepository(db_with_cleanup)
 
-        rows = await repo.list_shared_vfolder_permissions(requester_id=seeded.requester)
+        with _as_requester(seeded.requester):
+            rows = await repo.list_shared_vfolder_permissions()
 
         listed_vfolder_ids = {row["vfolder_id"] for row in rows}
         assert not (listed_vfolder_ids & seeded.hidden_vfolder_ids)
@@ -334,24 +355,54 @@ class TestListSharedVFolderPermissionsScope:
         """The project folder the requester does not belong to stays hidden."""
         repo = VfolderRepository(db_with_cleanup)
 
-        rows = await repo.list_shared_vfolder_permissions(requester_id=seeded.requester)
+        with _as_requester(seeded.requester):
+            rows = await repo.list_shared_vfolder_permissions()
 
         assert seeded.in_other_project not in {row["vfolder_id"] for row in rows}
         assert seeded.in_requester_project in {row["vfolder_id"] for row in rows}
 
-    async def test_omitting_the_requester_lists_every_entry(
+    @pytest.mark.parametrize("role", [UserRole.USER, UserRole.ADMIN])
+    async def test_non_privileged_roles_stay_bounded(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         seeded: _Fixture,
+        role: UserRole,
     ) -> None:
-        """The superadmin/monitor path names no requester and is left unbounded."""
+        """A domain admin is no more entitled to a stranger's share than a plain user."""
         repo = VfolderRepository(db_with_cleanup)
 
-        rows = await repo.list_shared_vfolder_permissions()
+        with _as_requester(seeded.requester, role=role):
+            rows = await repo.list_shared_vfolder_permissions()
+
+        assert {row["vfolder_id"] for row in rows} == seeded.visible_vfolder_ids
+
+    @pytest.mark.parametrize("role", [UserRole.SUPERADMIN, UserRole.MONITOR])
+    async def test_privileged_roles_see_every_entry(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        seeded: _Fixture,
+        role: UserRole,
+    ) -> None:
+        """Superadmins and monitors audit the whole system and are left unbounded."""
+        repo = VfolderRepository(db_with_cleanup)
+
+        with _as_requester(seeded.requester, role=role):
+            rows = await repo.list_shared_vfolder_permissions()
 
         assert {row["vfolder_id"] for row in rows} == (
             seeded.visible_vfolder_ids | seeded.hidden_vfolder_ids
         )
+
+    async def test_missing_user_context_is_rejected(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        seeded: _Fixture,
+    ) -> None:
+        """Without a requester there is no bound to apply, so nothing is listed."""
+        repo = VfolderRepository(db_with_cleanup)
+
+        with pytest.raises(AuthorizationFailed):
+            await repo.list_shared_vfolder_permissions()
 
     async def test_vfolder_id_filter_still_honors_the_requester_bound(
         self,
@@ -361,10 +412,8 @@ class TestListSharedVFolderPermissionsScope:
         """Naming a stranger's folder does not reveal its share."""
         repo = VfolderRepository(db_with_cleanup)
 
-        rows = await repo.list_shared_vfolder_permissions(
-            vfolder_id=seeded.unrelated,
-            requester_id=seeded.requester,
-        )
+        with _as_requester(seeded.requester):
+            rows = await repo.list_shared_vfolder_permissions(vfolder_id=seeded.unrelated)
 
         assert rows == []
 
@@ -375,16 +424,16 @@ class TestListSharedVFolderPermissionsScope:
     ) -> None:
         repo = VfolderRepository(db_with_cleanup)
 
-        rows = await repo.list_shared_vfolder_permissions(
-            vfolder_id=seeded.granted_to_requester,
-            requester_id=seeded.requester,
-        )
+        with _as_requester(seeded.requester):
+            rows = await repo.list_shared_vfolder_permissions(
+                vfolder_id=seeded.granted_to_requester
+            )
 
         assert len(rows) == 1
         assert rows[0]["vfolder_id"] == seeded.granted_to_requester
         assert rows[0]["email"] == seeded.requester_email
 
-    async def test_vfolder_id_filter_without_a_requester_returns_the_entry(
+    async def test_vfolder_id_filter_is_honored_for_a_privileged_requester(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         seeded: _Fixture,
@@ -392,7 +441,8 @@ class TestListSharedVFolderPermissionsScope:
         """The unbounded path keeps filtering by folder as before."""
         repo = VfolderRepository(db_with_cleanup)
 
-        rows = await repo.list_shared_vfolder_permissions(vfolder_id=seeded.unrelated)
+        with _as_requester(seeded.requester, role=UserRole.SUPERADMIN):
+            rows = await repo.list_shared_vfolder_permissions(vfolder_id=seeded.unrelated)
 
         assert len(rows) == 1
         assert rows[0]["vfolder_id"] == seeded.unrelated

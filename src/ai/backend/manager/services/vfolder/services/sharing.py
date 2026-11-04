@@ -1,6 +1,3 @@
-from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
@@ -94,21 +91,7 @@ class VFolderSharingService:
     async def list_shared_vfolders(
         self, action: ListSharedVFoldersAction
     ) -> ListSharedVFoldersActionResult:
-        """List the sharing permissions the requester is party to.
-
-        The requester is the user in context, never a field a caller fills in, so no
-        caller learns of a share on a folder they neither hold, own, created, nor
-        reach through their projects. Superadmins and monitors audit every share and
-        are listed without that bound.
-        """
-        me = current_user()
-        if me is None:
-            raise UnreachableError("User context is not available")
-        requester_id = None if me.role in (UserRole.SUPERADMIN, UserRole.MONITOR) else me.user_id
-        raw_list = await self._vfolder_repository.list_shared_vfolder_permissions(
-            vfolder_id=action.vfolder_id,
-            requester_id=requester_id,
-        )
+        raw_list = await self._vfolder_repository.list_shared_vfolder_permissions(action.vfolder_id)
         shared_info = []
         for row in raw_list:
             owner = row["group"] if row["group"] else row["vfolder_user"]
