@@ -4,15 +4,9 @@ import ipaddress
 import logging
 import urllib.parse
 from collections.abc import Iterable
-<<<<<<< HEAD
-from typing import TYPE_CHECKING, Annotated
-from uuid import UUID
-=======
 from datetime import UTC, datetime, timedelta
-from http import HTTPStatus
 from typing import TYPE_CHECKING, Annotated, Final
 from uuid import UUID, uuid4
->>>>>>> 636540ffe (feat(BA-8915): give the AppProxy setup token an expiry and a unique id (#16411))
 
 import jwt
 from aiohttp import hdrs, web
