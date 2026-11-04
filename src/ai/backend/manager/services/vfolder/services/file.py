@@ -10,11 +10,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-<<<<<<< HEAD
-=======
 from ai.backend.manager.data.vfolder.types import VFolderData
-from ai.backend.manager.defs import is_unmanaged
->>>>>>> a410b0e8 (fix(BA-8911): enforce permission checks on vfolder sharing and invitation (#16424))
 from ai.backend.manager.errors.storage import VFolderInvalidParameter
 from ai.backend.manager.models.vfolder import (
     is_unmanaged,
