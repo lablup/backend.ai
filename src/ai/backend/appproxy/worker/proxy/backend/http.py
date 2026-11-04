@@ -31,16 +31,16 @@ from .pool import RoutePool
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
-HOP_ONLY_HEADERS: Final[frozenset[str]] = frozenset({
-    "connection",
-    "keep-alive",
-    "proxy-authenticate",
-    "proxy-authorization",
-    "te",
-    "trailers",
-    "transfer-encoding",
-    "upgrade",
-})
+HOP_ONLY_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
+    ("Connection", 1),
+    ("Keep-Alive", 1),
+    ("Proxy-Authenticate", 1),
+    ("Proxy-Authorization", 1),
+    ("TE", 1),
+    ("Trailers", 1),
+    ("Transfer-Encoding", 1),
+    ("Upgrade", 1),
+])
 
 _HEADERS_SET_BY_THE_PROXY: Final[frozenset[str]] = frozenset({
     "forwarded",
@@ -166,7 +166,7 @@ class HTTPBackend(BaseBackend):
         # copy frontend request headers without hop-by-hop headers,
         # preserving repeated headers (multidict add(), not dict assignment)
         for key, value in frontend_request.headers.items():
-            if key.lower() not in HOP_ONLY_HEADERS and key.lower() not in _HEADERS_SET_BY_THE_PROXY:
+            if key not in HOP_ONLY_HEADERS and key.lower() not in _HEADERS_SET_BY_THE_PROXY:
                 backend_rqst_hdrs.add(key, value)
         # overwrite proxy-related headers
         backend_rqst_hdrs["x-forwarded-proto"] = protocol
@@ -215,7 +215,7 @@ class HTTPBackend(BaseBackend):
                 # auth flows such as RStudio Server's sign-in.
                 frontend_resp_hdrs: CIMultiDict[str] = CIMultiDict()
                 for key, value in backend_response.headers.items():
-                    if key.lower() not in HOP_ONLY_HEADERS:
+                    if key not in HOP_ONLY_HEADERS:
                         frontend_resp_hdrs.add(key, value)
                 frontend_resp_hdrs["Access-Control-Allow-Origin"] = "*"
                 frontend_response = web.StreamResponse(
