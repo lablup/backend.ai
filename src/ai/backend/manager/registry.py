@@ -180,8 +180,8 @@ from .models.utils import (
     execute_with_retry,
     reenter_txn_session,
 )
-from .models.vfolder import (
-    verify_vfolder_name,
+from .models.vfolder.row import (
+    verify_mount_destination,
 )
 from .types import UserScope
 
@@ -502,7 +502,7 @@ class AgentRegistry:
                 alias_name = alias_name.replace("/home/work/", "")
             if alias_name == "":
                 raise InvalidAPIParameters("Alias name cannot be empty.")
-            if not verify_vfolder_name(alias_name):
+            if not verify_mount_destination(alias_name):
                 raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
             if alias_name in original_folders:
                 raise InvalidAPIParameters(
