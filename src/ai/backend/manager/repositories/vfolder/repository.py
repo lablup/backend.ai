@@ -772,7 +772,7 @@ class VfolderRepository:
         """The access a legacy share request lends beside the mount level it names."""
         match permission:
             case VFolderMountPolicy.READ_WRITE:
-                return Permission.READ | Permission.UPDATE | Permission.SOFT_DELETE
+                return Permission.READ | Permission.UPDATE
             case VFolderMountPolicy.READ_ONLY | VFolderMountPolicy.NONE:
                 return Permission.READ
 

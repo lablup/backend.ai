@@ -9,6 +9,7 @@ from typing import (
 from ai.backend.common.data.entity.entity_share import EntityShareEntityType, EntityShareID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
@@ -76,7 +77,15 @@ class VFolderInvitationScopeAction(BaseScopeAction):
 
 
 @dataclass
-class InviteVFolderAction(VFolderAction):
+class InviteVFolderAction(BaseScopeAction):
+    """Offer a folder to other users, writing one ``entity_share`` row per invitee.
+
+    Asked as CREATE on ``entity_share`` in the scope owning the folder, which a project
+    member or a recipient of the folder does not hold.
+    """
+
+    vfolder_uuid: VFolderUUID
+    owner_scope: EntityIdentifier
     keypair_resource_policy: Mapping[str, Any]
     user_uuid: uuid.UUID
 
@@ -85,8 +94,17 @@ class InviteVFolderAction(VFolderAction):
 
     @override
     @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityShareEntityType()
+
+    @override
+    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
+
+    @override
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.owner_scope,)
 
     @override
     @classmethod
@@ -95,9 +113,13 @@ class InviteVFolderAction(VFolderAction):
 
 
 @dataclass
-class InviteVFolderActionResult:
+class InviteVFolderActionResult(BaseScopeActionResult):
     vfolder_uuid: uuid.UUID
     invitation_ids: list[str]
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return tuple(EntityShareID(uuid.UUID(id_)) for id_ in self.invitation_ids)
 
 
 @dataclass
