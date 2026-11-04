@@ -838,6 +838,7 @@ class VFolderHandler:
         result = await self._vfolder_file.mkdir.run(
             MkdirAction(
                 user_id=vfctx.user_uuid,
+                keypair_resource_policy=req.request["keypair"]["resource_policy"],
                 vfolder_uuid=VFolderUUID(row["id"]),
                 path=params.path,
                 parents=params.parents,
@@ -1027,6 +1028,7 @@ class VFolderHandler:
         await self._vfolder_file.delete_files.run(
             DeleteFilesAction(
                 user_uuid=vfctx.user_uuid,
+                keypair_resource_policy=req.request["keypair"]["resource_policy"],
                 vfolder_uuid=VFolderUUID(row["id"]),
                 files=params.files,
                 recursive=params.recursive,
@@ -1061,6 +1063,7 @@ class VFolderHandler:
         result = await self._vfolder_file.delete_files_async.run(
             DeleteFilesAsyncAction(
                 user_uuid=vfctx.user_uuid,
+                keypair_resource_policy=req.request["keypair"]["resource_policy"],
                 vfolder_uuid=VFolderUUID(row["id"]),
                 files=params.files,
                 recursive=params.recursive,
@@ -1175,11 +1178,16 @@ class VFolderHandler:
             req.request.match_info["name"],
             ",".join(invitee_emails),
         )
+        # Every folder lands in a project; one left with none yet is its user's.
+        owner_scope: EntityIdentifier = (
+            ProjectID(row["group"]) if row["group"] is not None else UserID(row["user"])
+        )
         result = await self._vfolder_invite.invite_vfolder.run(
             InviteVFolderAction(
                 keypair_resource_policy=req.request["keypair"]["resource_policy"],
                 user_uuid=vfctx.user_uuid,
                 vfolder_uuid=VFolderUUID(row["id"]),
+                owner_scope=owner_scope,
                 mount_permission=perm,
                 invitee_emails=invitee_emails,
             )

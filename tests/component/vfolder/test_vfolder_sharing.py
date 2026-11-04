@@ -643,7 +643,7 @@ async def _share_caps(db_engine: Any, vfolder_id: uuid.UUID) -> dict[uuid.UUID, 
     return caps
 
 
-_WRITABLE_CAP = Permission.READ | Permission.UPDATE | Permission.SOFT_DELETE
+_WRITABLE_CAP = Permission.READ | Permission.UPDATE
 _EXPECTED_CAP: dict[VFolderMountPolicy, Permission] = {
     VFolderMountPolicy.NONE: Permission.READ,
     VFolderMountPolicy.READ_ONLY: Permission.READ,
