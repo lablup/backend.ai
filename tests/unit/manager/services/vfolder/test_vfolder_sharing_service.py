@@ -159,6 +159,7 @@ def _make_vfolder_data(
     vf.id = vfolder_uuid
     vf.name = name
     vf.host = host
+    vf.domain_name = "default"
     vf.group = group or uuid.uuid4()
     vf.ownership_type = ownership_type
     vf.status = VFolderOperationStatus.READY
