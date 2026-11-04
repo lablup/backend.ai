@@ -61,7 +61,7 @@ def main(
     "--output",
     "-o",
     default=None,
-    type=click.Path(dir_okay=False, writable=True),
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
     help="Output file path (default: stdout)",
 )
 def generate_example_configuration(output: Path | None) -> None:
