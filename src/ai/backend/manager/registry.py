@@ -362,19 +362,7 @@ class AgentRegistry:
                 )
             )
         if len(result.items) > 1:
-            raise TooManySessionsMatched(
-                extra_data={
-                    "matches": [
-                        {
-                            "session_id": sess.id,
-                            "session_name": sess.name,
-                            "status": sess.status,
-                            "created_at": sess.created_at,
-                        }
-                        for sess in result.items
-                    ]
-                }
-            )
+            raise TooManySessionsMatched.from_sessions(result.items)
         return result.items[0] if result.items else None
 
     async def init(self) -> None:
