@@ -104,6 +104,21 @@ class AuthenticationRequired(BackendAIError, web.HTTPUnauthorized):
         )
 
 
+class LoginRejectedByHook(BackendAIError, web.HTTPUnauthorized):
+    """Raised when a POST_AUTHORIZE hook plugin refuses a login whose password matched."""
+
+    error_type = "https://api.backend.ai/probs/rejected-by-hook"
+    error_title = "Login rejected by a hook plugin."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PLUGIN,
+            operation=ErrorOperation.HOOK,
+            error_detail=ErrorDetail.UNAUTHORIZED,
+        )
+
+
 class PasswordNotExpired(BackendAIError, web.HTTPBadRequest):
     """Raised when a password change without a login names a password that has not expired."""
 
