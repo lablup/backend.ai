@@ -44,10 +44,7 @@ from ai.backend.manager.errors.auth import (
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.user import KeyPairNotFound, UserCreationBadRequest
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.hasher.factory import (
-    PasswordHasherFactory,
-    compare_to_hashed_password,
-)
+from ai.backend.manager.models.hasher.factory import PasswordHasherFactory
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import (
     KEYPAIR_SECRET_KEY_CONTEXT,
@@ -397,21 +394,27 @@ class AuthDBSource:
         row: sa.Row[Any] | None,
         target_password_info: PasswordInfo,
     ) -> sa.Row[Any]:
-        """The user row whose stored hash the password matches. A missing user or hash
-        still costs one hash, so the answer time does not tell whether the account exists."""
+        """The user row whose stored hash the password matches. Every refusal costs at least
+        one hash at the configured cost, so the answer time does not tell whether the account
+        exists, even when its stored hash is older and cheaper."""
+        configured_hasher = PasswordHasherFactory.get_hasher(target_password_info.algorithm)
         if row is None or row.password is None:
-            await asyncio.to_thread(
-                PasswordHasherFactory.get_hasher(target_password_info.algorithm).generate_new_hash,
-                target_password_info,
-            )
+            await asyncio.to_thread(configured_hasher.generate_new_hash, target_password_info)
             raise AuthorizationFailed("User credential mismatch.")
         try:
-            if not await asyncio.to_thread(
-                compare_to_hashed_password, target_password_info.password, row.password
-            ):
-                raise PasswordMismatch(UserID(row.uuid))
+            stored = HashInfo.from_hash_string(row.password)
+            matched = await asyncio.to_thread(
+                PasswordHasherFactory.get_hasher(stored.algorithm).verify,
+                target_password_info.password,
+                stored,
+            )
         except ValueError:
+            await asyncio.to_thread(configured_hasher.generate_new_hash, target_password_info)
             raise AuthorizationFailed("User credential mismatch.") from None
+        if not matched:
+            if target_password_info.need_migration(stored):
+                await asyncio.to_thread(configured_hasher.generate_new_hash, target_password_info)
+            raise PasswordMismatch(UserID(row.uuid))
         return row
 
     async def _migrate_password_hash(
