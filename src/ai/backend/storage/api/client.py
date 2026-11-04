@@ -13,6 +13,7 @@ import urllib.parse
 import uuid
 from collections.abc import AsyncGenerator, Iterator, Mapping, MutableMapping
 from contextlib import AbstractAsyncContextManager
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from email.utils import format_datetime
 from http import HTTPStatus
@@ -45,6 +46,7 @@ from ai.backend.common.dto.storage.request import (
     ArchiveDownloadQueryParams,
     ArchiveDownloadTokenData,
 )
+from ai.backend.common.files import open_dir_beneath
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.middlewares.exception import general_exception_middleware
@@ -105,6 +107,85 @@ def _staging_file_exists(staging_path: Path) -> bool:
             return False
         raise
     return stat.S_ISREG(st.st_mode)
+
+
+@dataclass(frozen=True)
+class DownloadTarget:
+    fd: int
+    stat_result: os.stat_result
+
+
+def _open_download_target(root: Path, file_path: Path) -> DownloadTarget:
+    """Open ``file_path`` beneath ``root`` without following symlinks.
+
+    A missing path, or one that leaves ``root`` or meets a symlink, raises ``FileNotFoundError``.
+    """
+    try:
+        parts = file_path.resolve().relative_to(root).parts
+    except ValueError as e:
+        raise FileNotFoundError(file_path) from e
+    try:
+        if not parts:
+            fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+        else:
+            with open_dir_beneath(root, parts[:-1]) as dir_fd:
+                fd = os.open(parts[-1], os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=dir_fd)
+    except OSError as e:
+        if e.errno == errno.ENOENT or e.errno in NOFOLLOW_REFUSED_ERRNOS:
+            raise FileNotFoundError(file_path) from e
+        raise
+    try:
+        return DownloadTarget(fd=fd, stat_result=os.fstat(fd))
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+async def _stream_file_fd(
+    request: web.Request,
+    target: DownloadTarget,
+    headers: Mapping[str, str],
+) -> web.StreamResponse:
+    """Send the file at ``fd``, handling ``Range`` and ``If-Range`` like ``web.FileResponse``."""
+    st = target.stat_result
+    size = st.st_size
+    start, end = 0, size
+    not_satisfiable = web.Response(
+        status=HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE,
+        headers={hdrs.CONTENT_RANGE: f"bytes */{size}"},
+    )
+    resp = web.StreamResponse(headers=headers)
+    if (ifrange := request.if_range) is None or st.st_mtime <= ifrange.timestamp():
+        try:
+            rng = request.http_range
+        except ValueError:
+            return not_satisfiable
+        if rng.start is not None:
+            if rng.start < 0 and rng.stop is None:
+                start = max(rng.start + size, 0)
+            else:
+                start = rng.start
+                end = min(rng.stop if rng.stop is not None else size, size)
+            if start >= size:
+                return not_satisfiable
+            resp.set_status(HTTPStatus.PARTIAL_CONTENT)
+            resp.headers[hdrs.CONTENT_RANGE] = f"bytes {start}-{end - 1}/{size}"
+    resp.headers[hdrs.ACCEPT_RANGES] = "bytes"
+    resp.etag = f"{st.st_mtime_ns:x}-{st.st_size:x}"
+    resp.last_modified = st.st_mtime
+    resp.content_length = end - start
+    await resp.prepare(request)
+    offset = start
+    while offset < end:
+        chunk = await run_in_executor_with_context(
+            None, os.pread, target.fd, min(DEFAULT_CHUNK_SIZE, end - offset), offset
+        )
+        if not chunk:
+            break
+        await resp.write(chunk)
+        offset += len(chunk)
+    await resp.write_eof()
+    return resp
 
 
 def _commit_upload(
@@ -299,15 +380,15 @@ async def download(request: web.Request) -> web.StreamResponse:
             vfpath = Path(token_data["unmanaged_path"]).resolve()
         else:
             vfpath = volume.mangle_vfpath(token_data["vfid"]).resolve()
+        parent_dir = vfpath
+        if (dst_dir := params["dst_dir"]) is not None:
+            parent_dir = vfpath / dst_dir
+        file_path = parent_dir / token_data["relpath"]
         try:
-            parent_dir = vfpath
-            if (dst_dir := params["dst_dir"]) is not None:
-                parent_dir = vfpath / dst_dir
-            file_path = parent_dir / token_data["relpath"]
-            file_path.resolve().relative_to(vfpath)
-            if not file_path.exists():
-                raise FileNotFoundError
-        except (ValueError, FileNotFoundError) as e:
+            target = await run_in_executor_with_context(
+                None, _open_download_target, vfpath, file_path
+            )
+        except FileNotFoundError as e:
             raise web.HTTPNotFound(
                 body=dump_json_str(
                     {
@@ -317,14 +398,16 @@ async def download(request: web.Request) -> web.StreamResponse:
                 ),
                 content_type="application/problem+json",
             ) from e
-        if not file_path.is_file():
+    try:
+        st = target.stat_result
+        if not stat.S_ISREG(st.st_mode):
             if params["archive"]:
                 # Download directory as an archive when archive param is set.
                 return await download_directory_as_archive(request, file_path)
             raise InvalidAPIParameters(extra_msg="The file is not a regular file.")
         if request.method == "HEAD":
             ifrange: datetime | None = request.if_range
-            mtime = file_path.stat().st_mtime
+            mtime = st.st_mtime
             last_mdt = datetime.fromtimestamp(mtime, tz=UTC)
             resp_status = 200
             if ifrange is not None and mtime <= ifrange.timestamp():
@@ -334,7 +417,7 @@ async def download(request: web.Request) -> web.StreamResponse:
                 status=resp_status,
                 headers={
                     hdrs.ACCEPT_RANGES: "bytes",
-                    hdrs.CONTENT_LENGTH: str(file_path.stat().st_size),
+                    hdrs.CONTENT_LENGTH: str(st.st_size),
                     hdrs.LAST_MODIFIED: (
                         f"{last_mdt.strftime('%a')}, {last_mdt.day} "
                         f"{last_mdt.strftime('%b')} {last_mdt.year} "
@@ -342,22 +425,12 @@ async def download(request: web.Request) -> web.StreamResponse:
                     ),
                 },
             )
-    ascii_filename = (
-        file_path.name.encode("ascii", errors="ignore").decode("ascii").replace('"', r"\"")
-    )
-    encoded_filename = urllib.parse.quote(file_path.name, encoding="utf-8")
-    headers = {
-        hdrs.CONTENT_TYPE: "application/octet-stream",
-        hdrs.CONTENT_DISPOSITION: " ".join(
-            [
-                f'attachment;filename="{ascii_filename}";',  # RFC-2616 sec2.2
-                f"filename*=UTF-8''{encoded_filename}",  # RFC-5987
-            ],
-        ),
-    }
-    if params["no_cache"]:
-        headers[hdrs.CACHE_CONTROL] = "no-store"
-    return web.FileResponse(file_path, headers=cast(Mapping[str, str], headers))
+        headers = build_attachment_headers(file_path.name)
+        if params["no_cache"]:
+            headers[hdrs.CACHE_CONTROL] = "no-store"
+        return await _stream_file_fd(request, target, headers)
+    finally:
+        os.close(target.fd)
 
 
 async def download_directory_as_archive(

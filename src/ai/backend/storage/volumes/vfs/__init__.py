@@ -9,7 +9,9 @@ import secrets
 import shutil
 import time
 from collections import deque
-from collections.abc import AsyncIterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, ClassVar, final, override
 
@@ -29,6 +31,7 @@ from ai.backend.common.data.storage.types import (
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.files import open_dir_beneath
 from ai.backend.common.storage.probe.volume import AbstractVolumeStatusCheck
 from ai.backend.common.storage.volume.mount import VolumeMountStatusCheck
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
@@ -74,6 +77,12 @@ from ai.backend.storage.volumes.abc import (
 from ai.backend.storage.watcher import DeletePathTask, WatcherClient
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
+
+
+@dataclass(frozen=True)
+class ResolvedSubpath:
+    vfpath: Path
+    parts: tuple[str, ...]
 
 
 class BaseQuotaModel(AbstractQuotaModel):
@@ -628,6 +637,45 @@ class BaseVolume(AbstractVolume):
         target_path = self.sanitize_vfpath(vfid, relpath)
         return self.fsop_model.scan_tree(target_path, recursive=recursive)
 
+    def _resolve_beneath(self, vfid: VFolderID, relpath: PurePosixPath) -> ResolvedSubpath:
+        target_path = self.sanitize_vfpath(vfid, relpath)
+        vfpath = self.mangle_vfpath(vfid).resolve()
+        parts = target_path.relative_to(vfpath).parts
+        if not parts:
+            raise InvalidSubpathError(vfid, relpath)
+        return ResolvedSubpath(vfpath=vfpath, parts=parts)
+
+    @contextmanager
+    def _open_parent_dir_beneath(
+        self,
+        vfid: VFolderID,
+        relpath: PurePosixPath,
+        resolved: ResolvedSubpath,
+        *,
+        create_parents: bool = False,
+    ) -> Iterator[int]:
+        """Yield the parent directory fd of ``resolved``.
+
+        A symlink met here or inside the ``with`` block raises ``InvalidSubpathError``.
+        """
+        try:
+            with open_dir_beneath(
+                resolved.vfpath,
+                resolved.parts[:-1],
+                mkdir_mode=DEFAULT_VFOLDER_PERMISSION_MODE if create_parents else None,
+                chmod_created=True,
+            ) as dir_fd:
+                yield dir_fd
+        except OSError as e:
+            if e.errno in NOFOLLOW_REFUSED_ERRNOS:
+                raise InvalidSubpathError(vfid, relpath) from e
+            raise
+
+    def _open_file_beneath(self, vfid: VFolderID, relpath: PurePosixPath, flags: int) -> int:
+        resolved = self._resolve_beneath(vfid, relpath)
+        with self._open_parent_dir_beneath(vfid, relpath, resolved) as dir_fd:
+            return os.open(resolved.parts[-1], flags | os.O_NOFOLLOW, 0o666, dir_fd=dir_fd)
+
     @override
     async def mkdir(
         self,
@@ -637,20 +685,23 @@ class BaseVolume(AbstractVolume):
         parents: bool = False,
         exist_ok: bool = False,
     ) -> None:
-        target_path = self.sanitize_vfpath(vfid, relpath)
+        resolved = self._resolve_beneath(vfid, relpath)
+        name = resolved.parts[-1]
 
         def _mkdir() -> None:
-            missing_parents: list[Path] = []
-            if parents:
-                for parent in target_path.parents:
-                    if parent.exists():
-                        break
-                    missing_parents.append(parent)
-            target_path.mkdir(DEFAULT_VFOLDER_PERMISSION_MODE, parents=parents, exist_ok=exist_ok)
-            # mkdir() masks mode with the process umask, so set the mode explicitly
-            # on the target and on every parent it implicitly created.
-            for created in (target_path, *missing_parents):
-                created.chmod(DEFAULT_VFOLDER_PERMISSION_MODE)
+            with self._open_parent_dir_beneath(
+                vfid, relpath, resolved, create_parents=parents
+            ) as dir_fd:
+                try:
+                    os.mkdir(name, DEFAULT_VFOLDER_PERMISSION_MODE, dir_fd=dir_fd)
+                except FileExistsError:
+                    if not exist_ok:
+                        raise
+                fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=dir_fd)
+                try:
+                    os.fchmod(fd, DEFAULT_VFOLDER_PERMISSION_MODE)
+                finally:
+                    os.close(fd)
 
         await run_in_executor_with_context(None, _mkdir)
 
@@ -662,8 +713,13 @@ class BaseVolume(AbstractVolume):
         *,
         recursive: bool = False,
     ) -> None:
-        target_path = self.sanitize_vfpath(vfid, relpath)
-        await run_in_executor_with_context(None, target_path.rmdir)
+        resolved = self._resolve_beneath(vfid, relpath)
+
+        def _rmdir() -> None:
+            with self._open_parent_dir_beneath(vfid, relpath, resolved) as dir_fd:
+                os.rmdir(resolved.parts[-1], dir_fd=dir_fd)
+
+        await run_in_executor_with_context(None, _rmdir)
 
     @override
     async def move_file(
@@ -744,11 +800,17 @@ class BaseVolume(AbstractVolume):
         relpath: PurePosixPath,
         payload: AsyncIterator[bytes],
     ) -> None:
-        target_path = self.sanitize_vfpath(vfid, relpath)
+        fd = await run_in_executor_with_context(
+            None,
+            self._open_file_beneath,
+            vfid,
+            relpath,
+            os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+        )
         q: janus.Queue[bytes] = janus.Queue()
 
         def _write(q: janus._SyncQueueProxy[bytes]) -> None:
-            with target_path.open("wb") as f:
+            with os.fdopen(fd, "wb") as f:
                 while True:
                     buf = q.get()
                     try:
@@ -775,7 +837,7 @@ class BaseVolume(AbstractVolume):
         *,
         chunk_size: int = 0,
     ) -> AsyncIterator[bytes]:
-        target_path = self.sanitize_vfpath(vfid, relpath)
+        self._resolve_beneath(vfid, relpath)
         q: janus.Queue[bytes | Exception] = janus.Queue()
 
         def _read(
@@ -783,7 +845,8 @@ class BaseVolume(AbstractVolume):
             chunk_size: int,
         ) -> None:
             try:
-                with target_path.open("rb") as f:
+                fd = self._open_file_beneath(vfid, relpath, os.O_RDONLY)
+                with os.fdopen(fd, "rb") as f:
                     while True:
                         buf = f.read(chunk_size)
                         if not buf:
