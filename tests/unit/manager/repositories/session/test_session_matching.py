@@ -44,6 +44,7 @@ from ai.backend.manager.models.container_registry.row import ContainerRegistryRo
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.kernel.searchers import MainKernelSearcher
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.resource_group.row import (
@@ -60,7 +61,10 @@ from ai.backend.manager.models.resource_policy.row import (
 )
 from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.session.row import SessionRow
-from ai.backend.manager.models.session.searchers import LiveSessionsMountingVFolderSearcher
+from ai.backend.manager.models.session.searchers import (
+    LiveSessionsMountingVFolderSearcher,
+    LiveSessionsNamedSearcher,
+)
 from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
@@ -478,6 +482,18 @@ class TestUpdateSessionRename:
         with pytest.raises(SessionAlreadyExists):
             await db_source.update_session(self._rename(target, "taken"), session_name="taken")
 
+    async def test_namesake_by_id_string_does_not_block(
+        self, db_source: SessionDBSource, add_session: _SessionFactory
+    ) -> None:
+        target = await add_session(name="renamed-me", with_main_kernel=True)
+        other = await add_session(name="other")
+
+        result = await db_source.update_session(
+            self._rename(target, str(other)), session_name=str(other)
+        )
+
+        assert result.name == str(other)
+
     async def test_errored_namesake_does_not_block(
         self, db_source: SessionDBSource, add_session: _SessionFactory
     ) -> None:
@@ -565,3 +581,56 @@ class TestLiveSessionsMountingVFolder:
             )
 
         assert result.items == [running]
+
+
+class TestLiveSessionsNamedSearcher:
+    async def test_lists_only_the_unended_sessions_of_the_key_with_the_name(
+        self,
+        db_with_tables: ExtendedAsyncSAEngine,
+        owner: _Owner,
+        other_access_key: AccessKey,
+        add_session: _SessionFactory,
+    ) -> None:
+        live = await add_session(name="taken")
+        await add_session(name="other-name")
+        await add_session(name="taken", access_key=other_access_key)
+        for status in SessionStatus.terminal_statuses():
+            await add_session(name="taken", status=status)
+
+        async with V2DBOpsProvider(db_with_tables).read_ops() as r:
+            result = await r.search_in_global(
+                LiveSessionsNamedSearcher(
+                    pagination=NoPagination(), access_key=owner.access_key, name="taken"
+                )
+            )
+
+        assert [row.id for row in result.items] == [live]
+
+
+class TestMainKernelSearcher:
+    async def test_returns_the_main_kernel_of_the_session(
+        self, db_with_tables: ExtendedAsyncSAEngine, add_session: _SessionFactory
+    ) -> None:
+        target = await add_session(name="with-kernel", with_main_kernel=True)
+        await add_session(name="another", with_main_kernel=True)
+
+        async with V2DBOpsProvider(db_with_tables).read_ops() as r:
+            result = await r.search_in_global(
+                MainKernelSearcher(pagination=NoPagination(), session_id=SessionID(target))
+            )
+
+        assert [kernel.session.session_id for kernel in result.items] == [str(target)]
+        assert result.items[0].image.identifier is not None
+        assert result.items[0].image.identifier.canonical == "cr.backend.ai/stable/python:latest"
+
+    async def test_returns_nothing_for_a_session_without_kernels(
+        self, db_with_tables: ExtendedAsyncSAEngine, add_session: _SessionFactory
+    ) -> None:
+        target = await add_session(name="no-kernel")
+
+        async with V2DBOpsProvider(db_with_tables).read_ops() as r:
+            result = await r.search_in_global(
+                MainKernelSearcher(pagination=NoPagination(), session_id=SessionID(target))
+            )
+
+        assert result.items == []

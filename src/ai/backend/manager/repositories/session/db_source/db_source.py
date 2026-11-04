@@ -29,7 +29,6 @@ from ai.backend.manager.data.session.types import (
     SessionStatus,
 )
 from ai.backend.manager.data.user.types import SessionOwnerContext, UserData
-from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.image import ImageNotFound
@@ -47,8 +46,7 @@ from ai.backend.manager.models.image.searchers import (
     ReferenceImageSearcher,
 )
 from ai.backend.manager.models.kernel.row import KernelRow
-from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
-from ai.backend.manager.models.kernel.searchers import KernelSearcher
+from ai.backend.manager.models.kernel.searchers import MainKernelSearcher
 from ai.backend.manager.models.kernel.updaters import KernelSessionNameBatchUpdater
 from ai.backend.manager.models.project.row import groups
 from ai.backend.manager.models.resource_group.row import resource_groups
@@ -60,7 +58,10 @@ from ai.backend.manager.models.session.row import (
     SessionRow,
 )
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
-from ai.backend.manager.models.session.searchers import SessionSearcher
+from ai.backend.manager.models.session.searchers import (
+    LiveSessionsNamedSearcher,
+    SessionSearcher,
+)
 from ai.backend.manager.models.session.updaters import SessionUpdater
 from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
 from ai.backend.manager.models.session_template.row import SessionTemplateRow
@@ -69,7 +70,6 @@ from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
 from ai.backend.manager.utils import query_userinfo
 
@@ -122,19 +122,7 @@ class SessionDBSource:
         if len(sessions) > 1:
             # Defensive: the partial unique index should prevent this for non-terminal
             # sessions, but guard against any data that escaped the constraint.
-            raise TooManySessionsMatched(
-                extra_data={
-                    "matches": [
-                        {
-                            "session_id": session.id,
-                            "session_name": session.name,
-                            "status": session.status,
-                            "created_at": session.created_at,
-                        }
-                        for session in sessions
-                    ]
-                }
-            )
+            raise TooManySessionsMatched.from_sessions(sessions)
         return SessionId(sessions[0].id)
 
     async def get_session_name(self, session_id: SessionId) -> str:
@@ -189,7 +177,7 @@ class SessionDBSource:
     ) -> SessionRow:
         options: list[_AbstractLoad] = [*eager_loading_op]
         if kernel_loading_strategy != KernelLoadingStrategy.NONE:
-            # MAIN_KERNEL_ONLY loads every kernel as well, the same as SessionRow.get_session.
+            # MAIN_KERNEL_ONLY loads every kernel as well.
             options.extend([
                 noload("*"),
                 selectinload(SessionRow.kernels).options(
@@ -216,61 +204,47 @@ class SessionDBSource:
         id_or_name_prefix: str,
         owner_access_key: AccessKey,
     ) -> list[SessionEntityData]:
-        async with self._ops_provider.read_ops() as r:
-            return await self._match_sessions(
-                r, id_or_name_prefix, owner_access_key, allow_stale=True
-            )
-
-    @staticmethod
-    async def _match_sessions(
-        r: V2ReadOps,
-        id_or_name: str,
-        access_key: AccessKey,
-        *,
-        allow_stale: bool,
-    ) -> list[SessionEntityData]:
-        """The sessions of ``access_key`` whose id or name equals ``id_or_name``.
+        """The sessions of ``owner_access_key`` whose id or name equals ``id_or_name_prefix``.
 
         An id match shuts out the name matches; up to 10 name matches come newest first.
         """
         fields = SessionSearchableFields.own
-        owned = [
-            fields.access_key.filter.equals(
-                StringMatchSpec(access_key, case_insensitive=False, negated=False)
-            )
-        ]
-        if not allow_stale:
-            owned.append(fields.status.filter.not_in(list(SessionStatus.terminal_statuses())))
-        try:
-            session_id = uuid.UUID(id_or_name)
-        except ValueError:
-            pass
-        else:
-            by_id = await r.search_in_global(
+        owned = fields.access_key.filter.equals(
+            StringMatchSpec(owner_access_key, case_insensitive=False, negated=False)
+        )
+        async with self._ops_provider.read_ops() as r:
+            try:
+                session_id = uuid.UUID(id_or_name_prefix)
+            except ValueError:
+                pass
+            else:
+                by_id = await r.search_in_global(
+                    SessionSearcher(
+                        pagination=NoPagination(),
+                        conditions=[
+                            owned,
+                            fields.id.filter.equals(
+                                UUIDEqualMatchSpec(value=session_id, negated=False)
+                            ),
+                        ],
+                    )
+                )
+                if by_id.items:
+                    return list(by_id.items)
+            by_name = await r.search_in_global(
                 SessionSearcher(
-                    pagination=NoPagination(),
+                    pagination=OffsetPagination(limit=10),
                     conditions=[
-                        *owned,
-                        fields.id.filter.equals(
-                            UUIDEqualMatchSpec(value=session_id, negated=False)
+                        owned,
+                        fields.name.filter.equals(
+                            StringMatchSpec(
+                                id_or_name_prefix, case_insensitive=False, negated=False
+                            )
                         ),
                     ],
+                    orders=[fields.created_at.order.apply(ascending=False)],
                 )
             )
-            if by_id.items:
-                return list(by_id.items)
-        by_name = await r.search_in_global(
-            SessionSearcher(
-                pagination=OffsetPagination(limit=10),
-                conditions=[
-                    *owned,
-                    fields.name.filter.equals(
-                        StringMatchSpec(id_or_name, case_insensitive=False, negated=False)
-                    ),
-                ],
-                orders=[fields.created_at.order.apply(ascending=False)],
-            )
-        )
         return list(by_name.items)
 
     async def get_template_by_id(
@@ -441,7 +415,6 @@ class SessionDBSource:
     ) -> SessionData:
         session_id = updater.session_id
         session_fields = SessionSearchableFields.own
-        kernel_fields = KernelSearchableFields.own
         async with self._ops_provider.write_ops() as w:
             found = await w.search_in_global(
                 SessionSearcher(
@@ -459,26 +432,15 @@ class SessionDBSource:
 
             if session_name and access_key is not None:
                 # Check the owner of the target session has any session with the same name
-                matches = await self._match_sessions(
-                    w,
-                    session_name,
-                    access_key,
-                    allow_stale=False,
-                )
-                if len(matches) > 1:
-                    raise TooManySessionsMatched(
-                        extra_data={
-                            "matches": [
-                                {
-                                    "session_id": sess.id,
-                                    "session_name": sess.name,
-                                    "status": sess.status,
-                                    "created_at": sess.created_at,
-                                }
-                                for sess in matches
-                            ]
-                        }
+                matches = (
+                    await w.search_in_global(
+                        LiveSessionsNamedSearcher(
+                            pagination=NoPagination(), access_key=access_key, name=session_name
+                        )
                     )
+                ).items
+                if len(matches) > 1:
+                    raise TooManySessionsMatched.from_sessions(matches)
                 if matches:
                     raise SessionAlreadyExists(
                         f"Duplicate session name. Session(id:{matches[0].id}) already has the name"
@@ -495,17 +457,7 @@ class SessionDBSource:
 
             main_kernels = (
                 await w.search_in_global(
-                    KernelSearcher(
-                        pagination=NoPagination(),
-                        conditions=[
-                            kernel_fields.session_id.filter.equals(
-                                UUIDEqualMatchSpec(value=session_id, negated=False)
-                            ),
-                            kernel_fields.cluster_role.filter.equals(
-                                StringMatchSpec(DEFAULT_ROLE, case_insensitive=False, negated=False)
-                            ),
-                        ],
-                    )
+                    MainKernelSearcher(pagination=NoPagination(), session_id=session_id)
                 )
             ).items
         service_ports = main_kernels[0].network.service_ports if main_kernels else None
@@ -647,7 +599,6 @@ class SessionDBSource:
         entity's own columns.
         """
         session_fields = SessionSearchableFields.own
-        kernel_fields = KernelSearchableFields.own
         async with self._ops_provider.read_ops() as r:
             sessions = (
                 await r.search_in_global(
@@ -669,17 +620,7 @@ class SessionDBSource:
             session = sessions[0]
             kernels = (
                 await r.search_in_global(
-                    KernelSearcher(
-                        pagination=NoPagination(),
-                        conditions=[
-                            kernel_fields.session_id.filter.equals(
-                                UUIDEqualMatchSpec(value=session.id, negated=False)
-                            ),
-                            kernel_fields.cluster_role.filter.equals(
-                                StringMatchSpec(DEFAULT_ROLE, case_insensitive=False, negated=False)
-                            ),
-                        ],
-                    )
+                    MainKernelSearcher(pagination=NoPagination(), session_id=session.id)
                 )
             ).items
         if len(kernels) > 1:

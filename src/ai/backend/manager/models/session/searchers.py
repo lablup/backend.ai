@@ -7,7 +7,7 @@ from typing import Any, override
 
 import sqlalchemy as sa
 
-from ai.backend.common.types import SessionId, VFolderID
+from ai.backend.common.types import AccessKey, SessionId, VFolderID
 from ai.backend.manager.data.session.types import SessionEntityData, SessionInfo, SessionStatus
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
@@ -42,6 +42,26 @@ class SessionInfoSearcher(Searcher[SessionRow, SessionInfo]):
     @override
     def to_data(self, row: SessionRow) -> SessionInfo:
         return row.to_session_info()
+
+
+@dataclass
+class LiveSessionsNamedSearcher(Searcher[SessionRow, SessionEntityData]):
+    """The unended sessions of ``access_key`` whose name is ``name``."""
+
+    access_key: AccessKey = field(kw_only=True)
+    name: str = field(kw_only=True)
+
+    @override
+    def build_select(self) -> sa.sql.Select[Any]:
+        return sa.select(SessionRow).where(
+            (SessionRow.access_key == self.access_key)
+            & (SessionRow.name == self.name)
+            & SessionRow.status.not_in(SessionStatus.terminal_statuses())
+        )
+
+    @override
+    def to_data(self, row: SessionRow) -> SessionEntityData:
+        return SessionSearchableFields.own.to_data(row)
 
 
 @dataclass
