@@ -66,6 +66,9 @@ from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.drop_z
     DropZeroResourceSlotsRule,
 )
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
+from ai.backend.manager.sokovan.scheduling_controller.validators.runner_reserved_environ_rule import (
+    RunnerReservedEnvironRule,
+)
 from ai.backend.manager.views.sokovan.scheduling import ComputeScheduleData
 from ai.backend.manager.views.sokovan.session import MarkTerminatingResult
 from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext
@@ -188,6 +191,7 @@ class SchedulingController:
             MountNameValidationRule(),
             InferenceModelFolderRule(),
             DotfileVFolderConflictRule(),
+            RunnerReservedEnvironRule(),
         ])
         self._agent_selector = args.agent_selector
 
