@@ -7,4 +7,3 @@ import{c as o}from"./createBrandIcon-bqlQBaRl.js";import"./index-jga3Qt2q.js";/*
  rendered to static SVG so the package (and its @lobehub/ui peer, which drags
  in the last non-antd rc-* tree) could be removed.
 */const e=o({title:"Baichuan",viewBox:"0 0 24 24",fill:"currentColor",fillRule:"evenodd",body:'<path d="M7.333 2h-3.2l-2 4.333V17.8L0 22h5.2l2.028-4.2L7.333 2zm7.334 0h-5.2v20h5.2V2zM16.8 7.733H22V22h-5.2V7.733zM22 2h-5.2v4.133H22V2z"></path>'});export{e as default};
-//# sourceMappingURL=BaichuanMono-BUP1sB1-.js.map

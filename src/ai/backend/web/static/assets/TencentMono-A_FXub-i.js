@@ -7,4 +7,3 @@ import{c as e}from"./createBrandIcon-bqlQBaRl.js";import"./index-jga3Qt2q.js";/*
  rendered to static SVG so the package (and its @lobehub/ui peer, which drags
  in the last non-antd rc-* tree) could be removed.
 */const n=e({title:"Tencent",viewBox:"0 0 24 24",fill:"currentColor",fillRule:"evenodd",body:'<path d="M9.976 1L24 9.8l-10.587.015L10.723 23H5.489L8.18 9.8H3.244L1 5.4h8.077L9.976 1z"></path>'});export{n as default};
-//# sourceMappingURL=TencentMono-A_FXub-i.js.map

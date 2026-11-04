@@ -6,4 +6,3 @@ import{aA as c,bl as u,r as m,j as d,H as y,ak as f}from"./index-jga3Qt2q.js";co
   }
 }
 `}}})();t.hash="dc51af30271ef1276b6aba8998bb5c1b";const v=({activeOnly:n=!0,...a})=>{const{t:l}=c(),[i,s]=u(a),{domains:r}=m.useLazyLoadQuery(t,{is_active:n},{fetchPolicy:"store-and-network"});return d.jsx(y,{placeholder:l("comp:BAIDomainSelect.SelectDomain"),...a,value:i,onChange:(e,o)=>{s(e,o)},options:f(r,e=>({label:e==null?void 0:e.name,value:e==null?void 0:e.name}))})};export{v as B};
-//# sourceMappingURL=BAIDomainSelect-DVCTt0fw.js.map

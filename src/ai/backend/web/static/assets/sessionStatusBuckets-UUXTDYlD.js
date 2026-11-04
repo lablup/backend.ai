@@ -2,4 +2,3 @@ import{i as F,aA as E,r as N,aU as P,ak as U,ag as D,j as d,c as G,a_ as v,ep as
  @license
  Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
  */const Fe=["RESERVED","PREEMPTED","RESCHEDULING"],h=["PENDING","RESERVED","SCHEDULED","PREPARING","PREPARED","CREATING","RUNNING","DEPRIORITIZING","PREEMPTED","RESCHEDULING","TERMINATING"],Ee=["TERMINATED","CANCELLED"],be=["running","finished"],Ke=n=>({running:n?h:h.filter(e=>!Fe.includes(e)),finished:Ee});export{Ae as B,Ve as a,Ke as g,be as s};
-//# sourceMappingURL=sessionStatusBuckets-UUXTDYlD.js.map

@@ -2,4 +2,3 @@ import{i as R,cp as q,a7 as O,b as F,l as w,gc as P,aq as D,j as N}from"./index-
  @license
  Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
  */const V="/resources/fluentemoji/{type}/assets/{emoji}.{ext}";function W(t){return[...t].map(s=>{var o;return(o=s.codePointAt(0))==null?void 0:o.toString(16)}).join("-")}function X(t,s){const o=s.type==="anim"||s.type==="3d"?"webp":"svg";return V.replace("{emoji}",W(t)).replace("{ext}",o).replace("{type}",s.type)}const tt=({emoji:t="😀",height:s="1em",width:o="1em"})=>N.jsx("img",{width:o,height:s,src:X(t,{type:"3d"}),alt:t});export{tt as F,b as u};
-//# sourceMappingURL=FluentEmojiIcon-bIosKEyK.js.map
