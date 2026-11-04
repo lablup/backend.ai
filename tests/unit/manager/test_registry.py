@@ -5,10 +5,13 @@ import time
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Mapping
 from dataclasses import dataclass
+from datetime import datetime
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from dateutil.tz import tzutc
 
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import (
@@ -21,11 +24,16 @@ from ai.backend.common.events.event_types.session.broadcast import SchedulingBro
 from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
+    AccessKey,
     SessionId,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.errors.kernel import (
+    SessionNotFound,
+    TooManySessionsMatched,
+)
+from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
 
@@ -381,3 +389,54 @@ class TestWaitForSessionRunning:
                 await mock_registry_obj._wait_for_session_running(
                     session_id, mock_propagator, max_wait=0
                 )
+
+
+def _registry_reading(items: list[Any]) -> MagicMock:
+    """A registry whose ops provider answers every global search with ``items``."""
+    registry = MagicMock(spec=AgentRegistry)
+    read_ops = MagicMock()
+    read_ops.search_in_global = AsyncMock(
+        return_value=SearcherResult(
+            items=items, total_count=len(items), has_next_page=False, has_previous_page=False
+        )
+    )
+    registry._ops_provider = MagicMock()
+    registry._ops_provider.read_ops.return_value.__aenter__.return_value = read_ops
+    registry._live_session_named = AgentRegistry._live_session_named.__get__(
+        registry, AgentRegistry
+    )
+    return registry
+
+
+class TestLiveSessionNamed:
+    @pytest.fixture
+    def access_key(self) -> AccessKey:
+        return AccessKey("AKIATEST")
+
+    async def test_none_when_no_unended_session_carries_the_name(
+        self, access_key: AccessKey
+    ) -> None:
+        registry = _registry_reading([])
+
+        assert await registry._live_session_named("fresh", access_key) is None
+
+    async def test_returns_the_one_session_carrying_the_name(self, access_key: AccessKey) -> None:
+        session = MagicMock()
+        registry = _registry_reading([session])
+
+        assert await registry._live_session_named("taken", access_key) is session
+
+    async def test_several_sessions_carrying_the_name_raise(self, access_key: AccessKey) -> None:
+        namesakes = [
+            SimpleNamespace(
+                id=uuid.uuid4(),
+                name="taken",
+                status=SessionStatus.RUNNING,
+                created_at=datetime.now(tzutc()),
+            )
+            for _ in range(2)
+        ]
+        registry = _registry_reading(namesakes)
+
+        with pytest.raises(TooManySessionsMatched):
+            await registry._live_session_named("taken", access_key)

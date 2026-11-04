@@ -123,7 +123,7 @@ from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
 )
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import SessionEntityData, SessionStatus
 from ai.backend.manager.data.vfolder.types import verify_vfolder_name
 from ai.backend.manager.models.agent.row import AgentRow, agents
 from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
@@ -145,16 +145,17 @@ from ai.backend.manager.models.kernel.row import (
     KernelRow,
     kernels,
 )
+from ai.backend.manager.models.kernel.searchers import MainKernelSearcher
 from ai.backend.manager.models.network.row import NetworkRow, NetworkType
 from ai.backend.manager.models.resource_group.row import resource_groups
 from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
 from ai.backend.manager.models.session.row import (
     PRIVATE_SESSION_TYPES,
-    KernelLoadingStrategy,
     SessionRow,
     handle_session_exception,
 )
-from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.session.searchers import LiveSessionsNamedSearcher
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -173,6 +174,7 @@ from .errors.api import InvalidAPIParameters
 from .errors.image import ImageNotFound
 from .errors.kernel import (
     InvalidKernelConfig,
+    MainKernelNotFound,
     SessionAlreadyExists,
     SessionNotFound,
     TooManySessionsMatched,
@@ -348,6 +350,32 @@ class AgentRegistry:
         if not result.items:
             raise ImageNotFound()
         return result.items[0]
+
+    async def _live_session_named(
+        self, session_name: str, access_key: AccessKey
+    ) -> SessionEntityData | None:
+        """The unended session of ``access_key`` named ``session_name``, if there is one."""
+        async with self._ops_provider.read_ops() as r:
+            result = await r.search_in_global(
+                LiveSessionsNamedSearcher(
+                    pagination=NoPagination(), access_key=access_key, name=session_name
+                )
+            )
+        if len(result.items) > 1:
+            raise TooManySessionsMatched(
+                extra_data={
+                    "matches": [
+                        {
+                            "session_id": sess.id,
+                            "session_name": sess.name,
+                            "status": sess.status,
+                            "created_at": sess.created_at,
+                        }
+                        for sess in result.items
+                    ]
+                }
+            )
+        return result.items[0] if result.items else None
 
     async def init(self) -> None:
         self.heartbeat_lock = asyncio.Lock()
@@ -544,47 +572,46 @@ class AgentRegistry:
             raise ImageNotFound("unknown alias or disallowed registry") from e
 
         # Check existing (access_key, session_name) instance
-        try:
-            # NOTE: We can reuse the session IDs of TERMINATED sessions only.
-            # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
-            async with self.db.begin_readonly_session() as db_session:
-                sess = await SessionRow.get_session(
-                    db_session,
-                    session_name,
-                    owner_access_key,
-                    kernel_loading_strategy=KernelLoadingStrategy.MAIN_KERNEL_ONLY,
+        # NOTE: We can reuse the session IDs of TERMINATED sessions only.
+        # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
+        existing = await self._live_session_named(session_name, owner_access_key)
+        if existing is not None:
+            async with self._ops_provider.read_ops() as r:
+                main_kernels = await r.search_in_global(
+                    MainKernelSearcher(pagination=NoPagination(), session_id=existing.id)
                 )
-                if sess.main_kernel.image is None:
-                    raise InvalidKernelConfig("Session main kernel has no image specified")
-                if sess.main_kernel.architecture is None:
-                    raise InvalidKernelConfig("Session main kernel has no architecture specified")
-                running_image_ref = (
-                    await self._first_image(
-                        self._canonical_image_searcher(
-                            sess.main_kernel.image, sess.main_kernel.architecture
-                        )
+            if not main_kernels.items:
+                raise MainKernelNotFound(f"Session (id={existing.id}) has no main kernel.")
+            main_kernel = main_kernels.items[0]
+            if main_kernel.image.identifier is None:
+                raise InvalidKernelConfig("Session main kernel has no image specified")
+            if not main_kernel.image.identifier.architecture:
+                raise InvalidKernelConfig("Session main kernel has no architecture specified")
+            running_image_ref = (
+                await self._first_image(
+                    self._canonical_image_searcher(
+                        main_kernel.image.identifier.canonical,
+                        main_kernel.image.identifier.architecture,
                     )
-                ).image_ref
+                )
+            ).image_ref
             if running_image_ref != image_ref:
                 # The image must be same if get_or_create() called multiple times
                 # against an existing (non-terminated) session
-                raise SessionAlreadyExists(extra_data={"existingSessionId": str(sess.id)})
+                raise SessionAlreadyExists(extra_data={"existingSessionId": str(existing.id)})
             if not reuse:
                 # Respond as error since the client did not request to reuse,
                 # but provide the overlapping session ID for later use.
-                raise SessionAlreadyExists(extra_data={"existingSessionId": str(sess.id)})
+                raise SessionAlreadyExists(extra_data={"existingSessionId": str(existing.id)})
             # Respond as success with the reused session's information.
             return {
-                "sessionId": str(sess.id),
-                "sessionName": str(sess.name),
-                "status": sess.status.name,
-                "service_ports": sess.main_kernel.service_ports,  # deprecated, left for compatibility.
-                "servicePorts": sess.main_kernel.service_ports,
+                "sessionId": str(existing.id),
+                "sessionName": str(existing.name),
+                "status": existing.status.name,
+                "service_ports": main_kernel.network.service_ports,  # deprecated, left for compatibility.
+                "servicePorts": main_kernel.network.service_ports,
                 "created": False,
             }
-        except SessionNotFound:
-            # It's time to create a new session.
-            pass
 
         if session_type == SessionTypes.BATCH and not startup_command:
             raise InvalidAPIParameters("Batch sessions must have a non-empty startup command.")
@@ -777,18 +804,9 @@ class AgentRegistry:
             raise NoCurrentTaskContext("No current task context")
 
         # Check existing (access_key, session) kernel instance
-        try:
-            # NOTE: We can reuse the session IDs of TERMINATED sessions only.
-            # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
-            async with self.db.begin_readonly_session() as db_sess:
-                await SessionRow.get_session(
-                    db_sess,
-                    session_name,
-                    owner_access_key,
-                )
-        except SessionNotFound:
-            pass
-        else:
+        # NOTE: We can reuse the session IDs of TERMINATED sessions only.
+        # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
+        if await self._live_session_named(session_name, owner_access_key) is not None:
             raise TooManySessionsMatched
 
         mounts = []
