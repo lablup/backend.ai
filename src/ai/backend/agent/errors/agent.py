@@ -272,21 +272,6 @@ class InvalidMountPathError(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class InvalidVFolderMountSourceError(BackendAIError, web.HTTPBadRequest):
-    """Raised when a vfolder mount source does not resolve inside its vfolder."""
-
-    error_type = "https://api.backend.ai/probs/agent/invalid-vfolder-mount-source"
-    error_title = "Invalid vfolder mount source."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )
-
-
 class InvalidLoggingConfigError(BackendAIError, web.HTTPBadRequest):
     """Raised when logging configuration is invalid."""
 

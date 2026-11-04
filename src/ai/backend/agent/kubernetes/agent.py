@@ -58,7 +58,6 @@ from ai.backend.agent.resources import (
 )
 from ai.backend.agent.scratch.utils import RestartStateStore
 from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo, Port
-from ai.backend.agent.vfolder_mount import resolve_vfolder_mount_source
 from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cgroup import CgroupController
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
@@ -473,7 +472,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 # in image importer kernels.
                 if vfolder.name != ".logs":
                     continue
-            source = await run_in_executor_with_context(None, resolve_vfolder_mount_source, vfolder)
+            source = await self._resolve_vfolder_mount_source(vfolder)
             mount = Mount(
                 MountTypes.K8S_HOSTPATH,
                 source,
