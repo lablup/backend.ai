@@ -441,9 +441,8 @@ async def add_circuit(
     else:
         worker = await pick_worker(session, session_info, endpoint_info, protocol, mode)
 
-    if worker.protocol == ProxyProtocol.HTTP2 and (
-        not open_to_public or ClientIPValidator(allowed_client_ips).is_restricted
-    ):
+    needs_access_control = not open_to_public or ClientIPValidator(allowed_client_ips).is_restricted
+    if worker.protocol == ProxyProtocol.HTTP2 and needs_access_control:
         raise HTTP2AccessControlNotSupportedError
 
     circuit_params: dict[str, Any] = {}
