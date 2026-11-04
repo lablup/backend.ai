@@ -5,6 +5,7 @@ import pytest
 
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.repositories.auth.repository import AuthRepository
@@ -62,6 +63,8 @@ async def test_signout_successful_with_valid_credentials(
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_password",
+        status=UserStatus.ACTIVE,
+        password_changed_at=None,
     )
     mock_auth_repository.deactivate_user_and_keypairs.return_value = None
 

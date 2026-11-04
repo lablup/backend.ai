@@ -36,6 +36,7 @@ from ai.backend.common.plugin.hook import (
     REJECTED,
     HookPluginContext,
 )
+from ai.backend.common.typed_validators import TVariousDelta
 from ai.backend.common.types import AccessKey, SecretKey, SSHPrivateKey, SSHPublicKey
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -50,6 +51,7 @@ from ai.backend.manager.errors.auth import (
     EmailAlreadyExistsError,
     GroupMembershipNotFoundError,
     PasswordExpired,
+    PasswordNotExpired,
     TooManyConcurrentLoginSessions,
 )
 from ai.backend.manager.errors.common import (
@@ -752,6 +754,15 @@ class AuthService:
                 salt_size=auth_config.password_hash_salt_size,
             ),
         )
+        # This path skips the login, so it stays open only to an active user whose
+        # password the login refuses as expired.
+        if checked_user.status != UserStatus.ACTIVE:
+            raise AuthorizationFailed("User credential mismatch.")
+        expires_at = self._password_expires_at(
+            checked_user.password_changed_at, auth_config.max_password_age
+        )
+        if expires_at is None or expires_at >= await self._auth_repository.get_current_time():
+            raise PasswordNotExpired("Change the password after logging in.")
         new_password = action.new_password
         if compare_to_hashed_password(new_password, checked_user.hashed_password):
             raise AuthorizationFailed("Cannot update to the same password as an existing password.")
@@ -852,17 +863,22 @@ class AuthService:
         )
 
     async def _check_password_age(self, user: RowMapping, auth_config: AuthConfig | None) -> None:
-        if (
-            auth_config is not None
-            and (max_password_age := auth_config.max_password_age) is not None
-        ):
-            password_changed_at: datetime | None = user.password_changed_at
-            if password_changed_at is None:
-                return  # Skip check if password_changed_at is not set
+        if auth_config is None:
+            return
+        expires_at = self._password_expires_at(
+            user.password_changed_at, auth_config.max_password_age
+        )
+        if expires_at is None:
+            return
+        if expires_at < await self._auth_repository.get_current_time():
+            # Force user to update password
+            raise PasswordExpired(extra_msg=f"Password expired on {expires_at}.")
 
-            current_dt: datetime = await self._auth_repository.get_current_time()
-            if password_changed_at + max_password_age < current_dt:
-                # Force user to update password
-                raise PasswordExpired(
-                    extra_msg=f"Password expired on {password_changed_at + max_password_age}."
-                )
+    @staticmethod
+    def _password_expires_at(
+        password_changed_at: datetime | None, max_password_age: TVariousDelta | None
+    ) -> datetime | None:
+        """When the password expires; ``None`` when no age limit or no change time is set."""
+        if password_changed_at is None or max_password_age is None:
+            return None
+        return password_changed_at + max_password_age

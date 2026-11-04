@@ -6,6 +6,7 @@ import pytest
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import RejectedByHook
 from ai.backend.manager.repositories.auth.repository import AuthRepository
@@ -75,6 +76,8 @@ async def test_update_password_successful(
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_password",
+        status=UserStatus.ACTIVE,
+        password_changed_at=None,
     )
 
     # Password update succeeds
@@ -115,6 +118,8 @@ async def test_update_password_fails_when_new_passwords_dont_match(
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_password",
+        status=UserStatus.ACTIVE,
+        password_changed_at=None,
     )
 
     result = await auth_service.update_password(action)
@@ -183,6 +188,8 @@ async def test_update_password_with_hook_rejection(
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_password",
+        status=UserStatus.ACTIVE,
+        password_changed_at=None,
     )
 
     # Hook rejects the new password format
@@ -218,6 +225,8 @@ async def test_update_password_repository_call(
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         hashed_password="hashed_password",
+        status=UserStatus.ACTIVE,
+        password_changed_at=None,
     )
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
         status=HookResults.PASSED,

@@ -78,6 +78,21 @@ class AuthorizationFailed(BackendAIError, web.HTTPUnauthorized):
         )
 
 
+class PasswordNotExpired(BackendAIError, web.HTTPBadRequest):
+    """Raised when a password change without a login names a password that has not expired."""
+
+    error_type = "https://api.backend.ai/probs/password-not-expired"
+    error_title = "Password has not expired."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 class PasswordExpired(BackendAIError, web.HTTPUnauthorized):
     error_type = "https://api.backend.ai/probs/password-expired"
     error_title = "Password has expired."
