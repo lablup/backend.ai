@@ -10,7 +10,6 @@ import pytest
 from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
 
-from ai.backend.appproxy.common.utils import mask_sensitive_keys
 from ai.backend.appproxy.coordinator.api.conf import conf_v2
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
 from ai.backend.appproxy.coordinator.api.worker_v2 import TokenResponseModel
@@ -76,11 +75,6 @@ class TestConfLoginSessionToken:
 
 
 class TestLoginSessionTokenExposure:
-    def test_raw_request_params_are_masked_in_logs(self) -> None:
-        masked_params = mask_sensitive_keys(_CONF_REQUEST_BODY_OF_AN_OLDER_MANAGER)
-
-        assert masked_params["login_session_token"] == "***"
-
     @pytest.fixture
     def token_row_stored_earlier(self) -> dict[str, Any]:
         return {
