@@ -135,6 +135,19 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
         )
     )
 
+<<<<<<< HEAD
+=======
+    async def resolve_secret_key(self, info: graphene.ResolveInfo) -> str | None:
+        """The stored secret key as plaintext, only to its owner and superadmins;
+        the column holds it encrypted once a write provider is named."""
+        if self.secret_key is None:
+            return None
+        ctx: GraphQueryContext = info.context
+        if ctx.user["role"] != UserRole.SUPERADMIN and self.user != ctx.user["uuid"]:
+            return None
+        return await ctx.key_provider_pool.decrypt(self.secret_key, KEYPAIR_SECRET_KEY_CONTEXT)
+
+>>>>>>> f8937a92a (fix(BA-8895): return a keypair secret key in legacy GQL only to its owner and superadmins (#16449))
     async def resolve_user_info(
         self,
         info: graphene.ResolveInfo,
