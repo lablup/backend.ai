@@ -18,6 +18,7 @@ from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired
+from ai.backend.manager.errors.common import RejectedByHook
 from ai.backend.manager.models.user.row import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
     ActiveSessionInfo,
@@ -584,3 +585,60 @@ async def test_create_login_session_does_not_pass_max_concurrent_sessions_to_rep
     assert "max_concurrent_sessions" not in call_kwargs
     assert "tokens_to_invalidate" not in call_kwargs
     mock_auth_repository.delete_login_sessions_by_tokens.assert_not_called()
+
+
+class TestPostAuthorizeHookRefusal:
+    @pytest.fixture
+    def action(self) -> AuthorizeAction:
+        return AuthorizeAction(
+            type=AuthTokenType.KEYPAIR,
+            domain_name="default",
+            email="test@example.com",
+            password="password",
+            request=MagicMock(),
+            stoken=None,
+            client_type_id=uuid4(),
+            otp="000000",
+        )
+
+    @pytest.fixture
+    def verified_user(self, mock_auth_repository: AsyncMock) -> None:
+        mock_auth_repository.verify_credential.return_value = CredentialVerificationResult(
+            user=_make_mock_user(),
+            active_sessions=[],
+        )
+        mock_auth_repository.default_keypair.return_value = _make_mock_keypair()
+
+    @pytest.mark.usefixtures("verified_user")
+    async def test_a_rejected_second_factor_is_a_failed_login(
+        self,
+        auth_service: AuthService,
+        mock_hook_plugin_ctx: MagicMock,
+        action: AuthorizeAction,
+    ) -> None:
+        mock_hook_plugin_ctx.dispatch.side_effect = [
+            HookResult(status=HookResults.PASSED, result=None, reason=None),
+            HookResult(
+                status=HookResults.REJECTED,
+                src_plugin="totp",
+                reason="Invalid TOTP code provided",
+            ),
+        ]
+
+        with pytest.raises(AuthorizationFailed):
+            await auth_service.authorize(action)
+
+    @pytest.mark.usefixtures("verified_user")
+    async def test_a_failing_plugin_stays_a_hook_error(
+        self,
+        auth_service: AuthService,
+        mock_hook_plugin_ctx: MagicMock,
+        action: AuthorizeAction,
+    ) -> None:
+        mock_hook_plugin_ctx.dispatch.side_effect = [
+            HookResult(status=HookResults.PASSED, result=None, reason=None),
+            HookResult(status=HookResults.ERROR, src_plugin="totp", reason="RuntimeError()"),
+        ]
+
+        with pytest.raises(RejectedByHook):
+            await auth_service.authorize(action)

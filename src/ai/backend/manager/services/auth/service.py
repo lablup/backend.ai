@@ -30,7 +30,13 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
     UnreachableError,
 )
-from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
+from ai.backend.common.plugin.hook import (
+    ALL_COMPLETED,
+    FIRST_COMPLETED,
+    PASSED,
+    REJECTED,
+    HookPluginContext,
+)
 from ai.backend.common.types import AccessKey, SecretKey, SSHPrivateKey, SSHPublicKey
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -345,6 +351,10 @@ class AuthService:
             ),
             return_when=FIRST_COMPLETED,
         )
+        # A plugin refusing the second factor is a failed login, so it answers as
+        # one and counts toward the login attempt limit.
+        if hook_result.status == REJECTED:
+            raise AuthorizationFailed(hook_result.reason)
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
         if hook_result.result is not None and isinstance(hook_result.result, web.StreamResponse):
