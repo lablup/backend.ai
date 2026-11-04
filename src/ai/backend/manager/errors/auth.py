@@ -4,7 +4,7 @@ Authentication and user-related exceptions.
 
 from __future__ import annotations
 
-from typing import override
+from typing import Self, override
 
 from aiohttp import web
 
@@ -19,6 +19,7 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.common.plugin.hook import HookResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
 from ai.backend.manager.errors.base.field import FieldError, FieldErrorCode
@@ -91,6 +92,10 @@ class LoginRejectedByHook(BackendAIError, web.HTTPUnauthorized):
             operation=ErrorOperation.HOOK,
             error_detail=ErrorDetail.UNAUTHORIZED,
         )
+
+    @classmethod
+    def from_hook_result(cls, result: HookResult) -> Self:
+        return cls(extra_msg=result.reason, extra_data={"plugins": result.src_plugin})
 
 
 class PasswordNotExpired(BackendAIError, web.HTTPBadRequest):

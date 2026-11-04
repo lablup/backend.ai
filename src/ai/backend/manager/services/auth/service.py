@@ -353,7 +353,7 @@ class AuthService:
         # A plugin refusing the second factor is a failed login, so it answers as
         # one and counts toward the login attempt limit.
         if hook_result.status == REJECTED:
-            raise LoginRejectedByHook(hook_result.reason)
+            raise LoginRejectedByHook.from_hook_result(hook_result)
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
         if hook_result.result is not None and isinstance(hook_result.result, web.StreamResponse):
