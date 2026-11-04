@@ -350,7 +350,7 @@ class DeploymentService:
             )
         deployment_info = await self._deployment_controller.create_deployment(action.creator)
         if designated_agents:
-            await self._deployment_repository.replace_designated_agents(
+            await self._deployment_repository.set_designated_agents(
                 DeploymentID(deployment_info.id), set(designated_agents)
             )
         if action.creator.model_revision is not None:
@@ -421,7 +421,7 @@ class DeploymentService:
             action.updater.deployment_id, action.updater
         )
         if designated_agents is not None:
-            await self._deployment_repository.replace_designated_agents(
+            await self._deployment_repository.set_designated_agents(
                 action.deployment_id, set(designated_agents)
             )
         return UpdateDeploymentActionResult(data=_convert_deployment_info_to_data(deployment_info))

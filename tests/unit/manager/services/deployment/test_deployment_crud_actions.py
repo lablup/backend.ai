@@ -404,7 +404,7 @@ class TestDesignatedAgentsOnCreate(DeploymentCRUDBaseFixtures):
     ) -> None:
         mock_deployment_controller.create_deployment = AsyncMock(return_value=endpoint_info)
         mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
-        mock_deployment_repository.replace_designated_agents = AsyncMock()
+        mock_deployment_repository.set_designated_agents = AsyncMock()
 
     async def test_agents_of_the_resource_group_are_designated(
         self,
@@ -421,7 +421,7 @@ class TestDesignatedAgentsOnCreate(DeploymentCRUDBaseFixtures):
 
         await deployment_service.create_deployment(creating)
 
-        mock_deployment_repository.replace_designated_agents.assert_awaited_once_with(
+        mock_deployment_repository.set_designated_agents.assert_awaited_once_with(
             endpoint_info.id, {agent_uuid}
         )
 
@@ -441,7 +441,7 @@ class TestDesignatedAgentsOnCreate(DeploymentCRUDBaseFixtures):
         assert raised.value.entity_error_code().operation == ActionOperationType.CREATE
 
         mock_deployment_controller.create_deployment.assert_not_awaited()
-        mock_deployment_repository.replace_designated_agents.assert_not_awaited()
+        mock_deployment_repository.set_designated_agents.assert_not_awaited()
 
 
 class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
@@ -458,7 +458,7 @@ class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
     ) -> None:
         mock_deployment_controller.update_deployment = AsyncMock(return_value=endpoint_info)
         mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
-        mock_deployment_repository.replace_designated_agents = AsyncMock()
+        mock_deployment_repository.set_designated_agents = AsyncMock()
         mock_deployment_repository.fetch_agents_in_resource_group = AsyncMock(return_value=set())
 
     def _updating(
@@ -470,7 +470,7 @@ class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
             designated_agents=designated_agents,
         )
 
-    async def test_the_given_agents_replace_the_designation(
+    async def test_the_given_agents_become_the_designation(
         self,
         deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
@@ -486,7 +486,7 @@ class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
             self._updating(endpoint_info, frozenset({agent_uuid}))
         )
 
-        mock_deployment_repository.replace_designated_agents.assert_awaited_once_with(
+        mock_deployment_repository.set_designated_agents.assert_awaited_once_with(
             endpoint_info.id, {agent_uuid}
         )
 
@@ -499,7 +499,7 @@ class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
     ) -> None:
         await deployment_service.update_deployment(self._updating(endpoint_info, frozenset()))
 
-        mock_deployment_repository.replace_designated_agents.assert_awaited_once_with(
+        mock_deployment_repository.set_designated_agents.assert_awaited_once_with(
             endpoint_info.id, set()
         )
 
@@ -520,7 +520,7 @@ class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
         assert raised.value.entity_error_code().operation == ActionOperationType.UPDATE
 
         mock_deployment_controller.update_deployment.assert_not_awaited()
-        mock_deployment_repository.replace_designated_agents.assert_not_awaited()
+        mock_deployment_repository.set_designated_agents.assert_not_awaited()
 
     async def test_omitting_the_agents_leaves_the_designation(
         self,
@@ -531,4 +531,4 @@ class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
     ) -> None:
         await deployment_service.update_deployment(self._updating(endpoint_info, None))
 
-        mock_deployment_repository.replace_designated_agents.assert_not_awaited()
+        mock_deployment_repository.set_designated_agents.assert_not_awaited()
