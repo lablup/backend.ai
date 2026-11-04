@@ -42,7 +42,7 @@ HOP_ONLY_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
     ("Upgrade", 1),
 ])
 
-_HEADERS_SET_BY_THE_PROXY: Final[CIMultiDict[int]] = CIMultiDict([
+_FORWARDING_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
     ("Forwarded", 1),
     ("X-Forwarded-For", 1),
     ("X-Forwarded-Host", 1),
@@ -166,7 +166,7 @@ class HTTPBackend(BaseBackend):
         # copy frontend request headers without hop-by-hop headers,
         # preserving repeated headers (multidict add(), not dict assignment)
         for key, value in frontend_request.headers.items():
-            if key not in HOP_ONLY_HEADERS and key not in _HEADERS_SET_BY_THE_PROXY:
+            if key not in HOP_ONLY_HEADERS and key not in _FORWARDING_HEADERS:
                 backend_rqst_hdrs.add(key, value)
         # overwrite proxy-related headers
         backend_rqst_hdrs["x-forwarded-proto"] = protocol
