@@ -219,12 +219,17 @@ def _strip_route_prefix(request: web.Request, *, prefix: str) -> str | None:
     routes without a captured name fall back to stripping the URL prefix.
     """
     path = request.match_info.get("path", None)
-    if path is not None:
-        return path
-    request_path = request.path
-    if request_path.startswith(prefix):
-        return request_path.removeprefix(prefix)
-    return None
+    if path is None and request.path.startswith(prefix):
+        path = request.path.removeprefix(prefix)
+    _reject_dot_segments(path)
+    return path
+
+
+def _reject_dot_segments(path: str | None) -> None:
+    # The route matched the still-encoded path, but `path` is decoded: a `..` here makes the
+    # upstream URL collapse onto a path the route never allowed.
+    if path is not None and any(segment in (".", "..") for segment in path.split("/")):
+        raise InvalidAPIParameters("The path must not contain '.' or '..' segments.")
 
 
 def _reject_disabled_signup(request: web.Request, path: str | None) -> None:
@@ -543,6 +548,7 @@ async def web_plugin_handler(
     It also configures the domain in the json body for "auth/signup" requests.
     """
     path = frontend_rqst.match_info["path"]
+    _reject_dot_segments(path)
     _reject_disabled_signup(frontend_rqst, path)
     stats: WebStats = frontend_rqst.app["stats"]
     stats.active_proxy_plugin_handlers.add(asyncio.current_task())  # type: ignore
@@ -655,11 +661,7 @@ async def websocket_handler(
     # healthy-endpoint pool, so their callers hand a chosen URL directly.
     stats: WebStats = request.app["stats"]
     stats.active_proxy_websocket_handlers.add(asyncio.current_task())  # type: ignore
-    path = request.match_info.get("path", None)
-    if path is None:
-        request_path = request.path
-        if request_path.startswith("/func"):
-            path = request_path.removeprefix("/func")
+    path = _strip_route_prefix(request, prefix="/func")
     session = await get_session(request)
     app = request.query.get("app")
 
