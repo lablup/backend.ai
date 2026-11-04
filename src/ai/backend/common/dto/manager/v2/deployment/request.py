@@ -137,7 +137,7 @@ __all__ = (
 class ModelHealthCheckInput(BaseRequestModel):
     enable: bool = False
     interval: float | None = None
-    path: str | None = None
+    path: str | None = Field(default=None, pattern=r"^/")
     max_retries: int | None = None
     max_wait_time: float | None = None
     expected_status_code: int | None = None
