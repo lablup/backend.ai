@@ -21,6 +21,7 @@
 | [superadmin 이 deployments 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환됩니다](#creating-a-policy-for-the-deployments-category-is-made) | 성공 |
 | [superadmin 이 login 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환됩니다](#creating-a-policy-for-the-login-category-is-made) | 성공 |
 | [superadmin 이 logs 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환됩니다](#creating-a-policy-for-the-logs-category-is-made) | 성공 |
+| [superadmin 이 projects 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환됩니다](#creating-a-policy-for-the-projects-category-is-made) | 성공 |
 | [superadmin 이 reconcile_history 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환됩니다](#creating-a-policy-for-the-reconcile-history-category-is-made) | 성공 |
 | [superadmin 이 roles_invitations 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환됩니다](#creating-a-policy-for-the-roles-invitations-category-is-made) | 성공 |
 | [superadmin 이 sessions 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환됩니다](#creating-a-policy-for-the-sessions-category-is-made) | 성공 |
@@ -177,6 +178,37 @@ Then
 - 생성한 정책 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
   - category = <RetentionCategory.LOGS: 'logs'>
+  - retention_period_days = 90
+  - enabled = True
+  - last_swept_at = None
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
+
+<a id="creating-a-policy-for-the-projects-category-is-made"></a>
+
+#### [a-policy-for-the-projects-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
+
+superadmin 이 projects 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환됩니다
+
+Given
+
+- superadmin 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- RetentionPolicyAdapter.create: user-1 이 projects 카테고리 정책을 생성합니다
+
+Then
+
+- 생성한 정책 전체가 반환됩니다
+  - id: 건너뜀: 데이터베이스가 생성합니다
+  - category = <RetentionCategory.PROJECTS: 'projects'>
   - retention_period_days = 90
   - enabled = True
   - last_swept_at = None

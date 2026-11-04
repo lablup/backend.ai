@@ -1802,11 +1802,12 @@ class TestUsageBucketsRetention:
 
 
 class TestCatalogCompleteness:
-    def test_every_category_is_wired(self) -> None:
-        # The sweep iterates enabled policies of any category, so every
-        # RetentionCategory must resolve to a purger spec set.
+    def test_every_drainable_category_is_wired(self) -> None:
+        # The sweep iterates enabled policies of any category, so every category it
+        # can drain must resolve to a purger spec set. ``projects`` is drained by the
+        # leader task through the project repository instead.
         catalog = RetentionDBSource._catalog(_THRESHOLD)
-        assert set(catalog) == set(RetentionCategory)
+        assert set(catalog) == set(RetentionCategory) - {RetentionCategory.PROJECTS}
 
 
 class TestSweepCategoryIsolation:
