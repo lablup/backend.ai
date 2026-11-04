@@ -6,32 +6,10 @@ import logging
 import re
 from typing import Any
 
-<<<<<<< HEAD
-from ai.backend.common.types import HardwareMetadata
-from ai.backend.logging import BraceStyleAdapter
-=======
 import trafaret as t
 
-from ai.backend.common.clients.storage_backends.purestorage.client import (
-    PurityClient,
-    PurityClientArgs,
-    RapidFileToolkitClient,
-    RapidFileToolkitV2Client,
-    get_toolkit_version,
-)
-from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
-from ai.backend.common.data.entity.storage_volume import StorageVolumeName
-from ai.backend.common.data.storage.types import (
-    StorageBackendCapability,
-    StorageBackendType,
-)
-from ai.backend.common.dto.clients.storage_backends.purestorage.response import RapidFileEntry
-from ai.backend.common.dto.clients.storage_backends.purestorage.types import RapidFileEntryType
-from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
-from ai.backend.common.types import BinarySize, HardwareMetadata
-from ai.backend.logging.structured import StructuredLogger
->>>>>>> 18e94b527 (feat(BA-8908): make storage client TLS and accelerator container options configurable (#16423))
+from ai.backend.common.types import HardwareMetadata
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.errors import (
     MetricNotFoundError,
     PureStorageCommandFailedError,
@@ -118,20 +96,11 @@ class FlashBladeVolume(BaseVolume):
                 "PureStorage RapidFile Toolkit is not installed. "
                 "You cannot use the PureStorage backend for the storage proxy."
             )
-<<<<<<< HEAD
         self.purity_client = PurityClient(
             self.config["purity_endpoint"],
             self.config["purity_api_token"],
             api_version=self.config["purity_api_version"],
-=======
-        self._purity_client = PurityClient(
-            PurityClientArgs(
-                endpoint=self.config["purity_endpoint"],
-                api_token=self.config["purity_api_token"],
-                api_version=self.config["purity_api_version"],
-                ssl_context=t.ToBool().check(self.config.get("purity_verify_ssl", False)),
-            )
->>>>>>> 18e94b527 (feat(BA-8908): make storage client TLS and accelerator container options configurable (#16423))
+            ssl_context=t.ToBool().check(self.config.get("purity_verify_ssl", False)),
         )
         await super().init()
 
