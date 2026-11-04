@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 import uuid
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -41,6 +41,7 @@ _ACTIVE_USER_WITH_TOTP = AuthorizingUser(
     totp_activated=True,
     totp_key=_TOTP_KEY,
 )
+_INACTIVE_USER = replace(_ACTIVE_USER_WITH_TOTP, status=UserStatus.INACTIVE)
 _HOOK_PARAMS_WITHOUT_TOKEN: Mapping[str, str] = {"stoken": "", "sToken": ""}
 
 
@@ -56,11 +57,13 @@ def _openid_stoken_expiring_in(seconds: int) -> str:
     )
 
 
-def _request_with_cookies(cookies: Mapping[str, str]) -> MagicMock:
+def _request_with_cookies(
+    cookies: Mapping[str, str], user_in_repository: AuthorizingUser = _ACTIVE_USER_WITH_TOTP
+) -> MagicMock:
     config_provider = MagicMock()
     config_provider.legacy_etcd_config_loader.load = AsyncMock(return_value={})
     auth_repository = MagicMock()
-    auth_repository.query_user_data = AsyncMock(return_value=_ACTIVE_USER_WITH_TOTP)
+    auth_repository.query_user_data = AsyncMock(return_value=user_in_repository)
     request = MagicMock()
     request.cookies = cookies
     request.json = AsyncMock(return_value={})
@@ -79,6 +82,7 @@ class _AuthorizeDispatchCase:
     expected_status: HookResults
     expected_result: AuthorizingUser | None
     expected_src_plugin: str | list[str]
+    user_in_repository: AuthorizingUser = _ACTIVE_USER_WITH_TOTP
 
 
 @dataclass(frozen=True)
@@ -97,7 +101,10 @@ class TestAuthorizeAfterKeypairReturnsNone:
             "auth_keypair": KeypairAuthHookPlugin({}, {}),
             "openid": OIDCHookPlugin({"secret": _OPENID_SECRET}, {}),
         }
-        return _KeypairAndOpenIDDispatch(ctx=ctx, request=_request_with_cookies(case.cookies))
+        return _KeypairAndOpenIDDispatch(
+            ctx=ctx,
+            request=_request_with_cookies(case.cookies, case.user_in_repository),
+        )
 
     @pytest.mark.parametrize(
         "case",
@@ -113,12 +120,31 @@ class TestAuthorizeAfterKeypairReturnsNone:
             ),
             pytest.param(
                 _AuthorizeDispatchCase(
-                    cookies={"sToken": _openid_stoken_expiring_in(-3600)},
+                    cookies={"sToken": _openid_stoken_expiring_in(3600)},
+                    user_in_repository=_INACTIVE_USER,
                     expected_status=REJECTED,
                     expected_result=None,
                     expected_src_plugin="openid",
                 ),
-                id="openid_rejects_the_expired_cookie",
+                id="openid_rejects_the_inactive_user",
+            ),
+            pytest.param(
+                _AuthorizeDispatchCase(
+                    cookies={"sToken": _openid_stoken_expiring_in(-3600)},
+                    expected_status=PASSED,
+                    expected_result=None,
+                    expected_src_plugin=["auth_keypair", "openid"],
+                ),
+                id="expired_cookie_leaves_the_login_unhandled",
+            ),
+            pytest.param(
+                _AuthorizeDispatchCase(
+                    cookies={"sToken": "not-a-jwt"},
+                    expected_status=PASSED,
+                    expected_result=None,
+                    expected_src_plugin=["auth_keypair", "openid"],
+                ),
+                id="invalid_cookie_leaves_the_login_unhandled",
             ),
             pytest.param(
                 _AuthorizeDispatchCase(

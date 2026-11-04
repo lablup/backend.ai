@@ -65,18 +65,26 @@ class OIDCHookPlugin(HookPlugin):
         auth_repository = cast(AuthRepository, root_app["_auth_repository"])
         secret = self._config.secret
 
-        stoken = params.get("stoken") or params.get("sToken") or request.cookies.get("sToken")
+        stoken_in_params = params.get("stoken") or params.get("sToken")
+        stoken = stoken_in_params or request.cookies.get("sToken")
         if not stoken:
             log.debug("openid auth token not found, proceeding with normal auth")
             return None
+        # A browser sends the cookie on its own, so a stale one must not block a password login.
         try:
             payload = jwt.decode(stoken, secret, algorithms=["HS256"])
             user_id = UserID(uuid.UUID(payload["user"]))
             email = payload["email"]
         except jwt.ExpiredSignatureError:
-            raise Reject("Expired authentication token") from None
+            if stoken_in_params:
+                raise Reject("Expired authentication token") from None
+            log.debug("openid auth cookie expired, proceeding with normal auth")
+            return None
         except (jwt.PyJWTError, KeyError, ValueError):
-            raise Reject("Invalid authentication token") from None
+            if stoken_in_params:
+                raise Reject("Invalid authentication token") from None
+            log.debug("openid auth cookie invalid, proceeding with normal auth")
+            return None
 
         log.debug("openid auth token decoded", user_id=user_id)
 
