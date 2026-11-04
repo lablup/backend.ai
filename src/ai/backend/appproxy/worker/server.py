@@ -498,12 +498,21 @@ async def proxy_frontend_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 "unsupported proxy protocol",
                 proxy_protocol=root_ctx.local_config.proxy_worker.protocol,
             )
+    try:
+        yield
+    finally:
+        await root_ctx.proxy_frontend.terminate_all_circuits()
+
+
+@asynccontextmanager
+async def proxy_frontend_serving_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    # Runs after worker_registration_ctx, so no request reaches the frontend before the
+    # initial circuit load.
     await root_ctx.proxy_frontend.start()
     log.info("started the proxy frontend", frontend_name=type(root_ctx.proxy_frontend).__name__)
     try:
         yield
     finally:
-        await root_ctx.proxy_frontend.terminate_all_circuits()
         try:
             await root_ctx.proxy_frontend.stop()
         except CleanupError as ee:
@@ -890,6 +899,7 @@ def build_root_app(
                 health_probe_ctx,
                 service_discovery_ctx,
                 worker_registration_ctx,
+                proxy_frontend_serving_ctx,
             ]
         else:
             cleanup_contexts = [
@@ -903,6 +913,7 @@ def build_root_app(
                 health_probe_ctx,
                 service_discovery_ctx,
                 worker_registration_ctx,
+                proxy_frontend_serving_ctx,
             ]
     shutdown_context_instances = []
 
