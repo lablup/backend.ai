@@ -3,6 +3,7 @@ import asyncio
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.types import VFolderHostPermission
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.common import Forbidden, InternalServerError
@@ -70,6 +71,18 @@ class VFolderInviteService:
         if vfolder_data.name.startswith("."):
             raise Forbidden("Cannot share private dot-prefixed vfolders.")
 
+        allowed_vfolder_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
+        )
+        await self._vfolder_repository.ensure_host_permission_allowed(
+            vfolder_data.host,
+            permission=VFolderHostPermission.INVITE_OTHERS,
+            allowed_vfolder_types=allowed_vfolder_types,
+            user_uuid=action.user_uuid,
+            resource_policy=action.keypair_resource_policy,
+            domain_name=vfolder_data.domain_name,
+        )
+
         # An address with an account gets a mount level with the offer; one without
         # gets the offer alone and mounts at the folder's default once it has one.
         invitee_users = await self._vfolder_repository.get_users_by_emails(action.invitee_emails)
@@ -108,11 +121,15 @@ class VFolderInviteService:
         if not invitation_data:
             raise VFolderInvitationNotFound
 
-        # Get target user by email
-        user_info = await self._vfolder_repository.get_user_by_email(invitation_data.invitee)
-        if not user_info:
-            raise VFolderNotFound
-        user_id, _ = user_info
+        # Only the invitee answers the offer
+        requester_email = await self._vfolder_repository.get_user_email_by_id(
+            action.requester_user_uuid
+        )
+        if requester_email is None:
+            raise UserNotFound
+        if requester_email != invitation_data.invitee:
+            raise Forbidden("Cannot accept other user's invitation")
+        user_id = action.requester_user_uuid
 
         # Get target vfolder
         vfolder_data = await self._vfolder_repository.get_by_id(invitation_data.vfolder)
@@ -248,6 +265,8 @@ class VFolderInviteService:
         requester = current_user()
         if requester is None:
             raise UnreachableError("User context is not available")
+        if action.user_id == requester.user_id:
+            raise Forbidden("Cannot change your own mount permission")
         await self._vfolder_repository.update_invited_vfolder_mount_permission(
             action.vfolder_uuid,
             action.user_id,

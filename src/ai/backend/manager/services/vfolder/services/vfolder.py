@@ -435,9 +435,12 @@ class VFolderService:
     async def force_delete(
         self, action: ForceDeleteVFolderAction
     ) -> ForceDeleteVFolderActionResult:
-        # TODO: Implement proper permission checking and business logic
-        # For now, use admin repository for the operation
         vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_uuid)
+        await self._vfolder_repository.ensure_host_permission_allowed_by_user(
+            vfolder_data.host,
+            permission=VFolderHostPermission.DELETE,
+            user_uuid=action.user_uuid,
+        )
         # Explicit escape hatch: bypass the in-use / status guards.
         result = await self._vfolder_repository.delete_vfolders_forever(
             [action.vfolder_uuid], force=True
