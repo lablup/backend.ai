@@ -85,6 +85,7 @@ from ai.backend.agent.tasks import (
     ScanImagesTask,
     SyncContainerLifecyclesTask,
 )
+from ai.backend.agent.vfolder_mount import resolve_vfolder_mount_source
 from ai.backend.common.asyncio import cancel_tasks, current_loop, run_in_executor_with_context
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
 from ai.backend.common.cgroup import CgroupController
@@ -565,9 +566,10 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
             if self.internal_data.get("prevent_vfolder_mounts", False):
                 if vfolder.name != ".logs":
                     continue
+            source = await run_in_executor_with_context(None, resolve_vfolder_mount_source, vfolder)
             mount = Mount(
                 MountTypes.BIND,
-                Path(vfolder.host_path),
+                source,
                 Path(vfolder.kernel_path),
                 vfolder.mount_perm,
             )
