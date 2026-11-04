@@ -551,7 +551,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
             base_path=Path(*host_path.parts[: -len(subpath_parts)]),
             subpath=vfolder.vfsubpath,
         )
-        return await run_in_executor_with_context(None, resolve_vfolder_subpath, target)
+        return await current_loop().run_in_executor(None, resolve_vfolder_subpath, target)
 
     async def mount_vfolders(
         self,
