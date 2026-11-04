@@ -41,7 +41,7 @@ from ai.backend.manager.data.session.spec import (
     SessionSpec,
 )
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.data.vfolder.types import verify_vfolder_name
+from ai.backend.manager.data.vfolder.types import verify_mount_destination
 from ai.backend.manager.errors.common import InternalServerError, RejectedByHook
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.metrics.scheduler import (
@@ -686,7 +686,7 @@ class SchedulingController:
                 alias_name = alias_name.replace("/home/work/", "")
             if alias_name == "":
                 raise InvalidAPIParameters("Alias name cannot be empty.")
-            if not verify_vfolder_name(alias_name):
+            if not verify_mount_destination(alias_name):
                 raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
             if alias_name in original_refs:
                 raise InvalidAPIParameters(
