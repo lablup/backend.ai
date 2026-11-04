@@ -7,6 +7,8 @@ services:
     image: lablup/backend.ai-manager:{{VERSION}}
     network_mode: host
     privileged: true
+    environment:
+      - BACKEND_WHEELHOUSE_PATH=/app/wheelhouse
     depends_on:
       backendai-half-db:
         condition: service_healthy
@@ -42,6 +44,8 @@ services:
     image: lablup/backend.ai-agent:{{VERSION}}
     network_mode: host
     privileged: true
+    environment:
+      - BACKEND_WHEELHOUSE_PATH=/app/wheelhouse
     depends_on:
       backendai-half-redis:
         condition: service_healthy

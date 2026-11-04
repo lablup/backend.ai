@@ -171,9 +171,9 @@ def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
         for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
             entrypoints[entrypoint.name] = entrypoint
     if os.environ.get("SCIE", None) is None:
-        # Override with the entrypoints found in the current build-root directory.
+        # Override with the entrypoints found in the build root holding this package.
         try:
-            build_root = find_build_root()
+            build_root = find_build_root(Path(__file__).parent)
         except ValueError:
             pass
         else:
@@ -197,7 +197,7 @@ def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
 def scan_entrypoint_from_plugin_checkouts(group_name: str) -> Iterator[EntryPoint]:
     entrypoints = {}
     try:
-        build_root = find_build_root()
+        build_root = find_build_root(Path(__file__).parent)
     except ValueError:
         pass
     else:
@@ -220,10 +220,20 @@ def scan_entrypoint_from_plugin_checkouts(group_name: str) -> Iterator[EntryPoin
     yield from entrypoints.values()
 
 
-def prepare_wheelhouse(base_dir: Path | None = None) -> None:
-    if base_dir is None:
-        base_dir = Path.cwd()
-    for whl_path in (base_dir / "wheelhouse").glob("*.whl"):
+def _find_wheelhouse_path() -> Path | None:
+    if env_wheelhouse_path := os.environ.get("BACKEND_WHEELHOUSE_PATH", None):
+        return Path(env_wheelhouse_path)
+    try:
+        return find_build_root(Path(__file__).parent) / "wheelhouse"
+    except ValueError:
+        return None
+
+
+def prepare_wheelhouse() -> None:
+    wheelhouse_path = _find_wheelhouse_path()
+    if wheelhouse_path is None:
+        return
+    for whl_path in wheelhouse_path.glob("*.whl"):
         extracted_path = whl_path.with_suffix("")  # strip the extension
         log.debug("prepare_wheelhouse(): loading %s", whl_path)
         if not extracted_path.exists():

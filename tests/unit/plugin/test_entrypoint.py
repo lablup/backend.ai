@@ -1,8 +1,21 @@
+import sys
 import tempfile
 import textwrap as tw
+import zipfile
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass
+from importlib.metadata import EntryPoint
 from pathlib import Path
 
-from ai.backend.plugin.entrypoint import extract_entrypoints_from_buildscript, match_plugin_list
+import pytest
+
+from ai.backend.plugin.entrypoint import (
+    extract_entrypoints_from_buildscript,
+    match_plugin_list,
+    prepare_wheelhouse,
+    scan_entrypoint_from_buildscript,
+    scan_entrypoint_from_plugin_checkouts,
+)
 
 
 def test_parse_build() -> None:
@@ -87,3 +100,112 @@ def test_match_blocklist() -> None:
     assert not match_plugin_list("ai.backend.manager:abc", {"ai.backend.agent"})
     assert match_plugin_list("ai.backend.manager.plugin.totp.hook:TOTPHook", {"ai.backend.manager"})
     assert not match_plugin_list("ai.backend.common.monitor:ErrorMonitor", {"ai.backend.manager"})
+
+
+_PLANTED_GROUP = "backendai_planted_v1"
+_PLANTED_WHEEL_STEM = "planted-1.0-py3-none-any"
+
+
+@pytest.fixture
+def discovery_environ_cleared(monkeypatch: pytest.MonkeyPatch) -> None:
+    for env_name in ("BACKEND_BUILD_ROOT", "BACKEND_WHEELHOUSE_PATH", "SCIE"):
+        monkeypatch.delenv(env_name, raising=False)
+
+
+@pytest.fixture
+def directory_with_planted_wheel(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    wheelhouse_path = tmp_path / "wheelhouse"
+    wheelhouse_path.mkdir()
+    with zipfile.ZipFile(wheelhouse_path / f"{_PLANTED_WHEEL_STEM}.whl", "w") as wheel:
+        wheel.writestr("planted.py", "")
+    monkeypatch.setattr(sys, "path", [*sys.path])
+    return tmp_path
+
+
+@pytest.fixture
+def directory_with_planted_build_files(tmp_path: Path) -> Path:
+    (tmp_path / "BUILD_ROOT").touch()
+    for build_file_parent in (tmp_path / "src" / "planted", tmp_path / "plugins" / "planted"):
+        build_file_parent.mkdir(parents=True)
+        (build_file_parent / "BUILD").write_text(
+            f'python_distribution(entry_points={{"{_PLANTED_GROUP}": {{"planted": "planted:Plugin"}}}})'
+        )
+    return tmp_path
+
+
+@dataclass(frozen=True)
+class _ExplicitWheelhouseCase:
+    env_name: str
+    env_path_under_directory: str
+
+
+@pytest.mark.usefixtures("discovery_environ_cleared")
+class TestPrepareWheelhouse:
+    def test_ignores_wheels_in_the_current_directory(
+        self, directory_with_planted_wheel: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(directory_with_planted_wheel)
+
+        prepare_wheelhouse()
+
+        extracted_path = directory_with_planted_wheel / "wheelhouse" / _PLANTED_WHEEL_STEM
+        assert not extracted_path.exists()
+        assert str(extracted_path) not in sys.path
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ExplicitWheelhouseCase(
+                env_name="BACKEND_WHEELHOUSE_PATH", env_path_under_directory="wheelhouse"
+            ),
+            _ExplicitWheelhouseCase(env_name="BACKEND_BUILD_ROOT", env_path_under_directory="."),
+        ],
+        ids=lambda case: case.env_name,
+    )
+    def test_loads_wheels_from_the_configured_path(
+        self,
+        case: _ExplicitWheelhouseCase,
+        directory_with_planted_wheel: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv(
+            case.env_name, str(directory_with_planted_wheel / case.env_path_under_directory)
+        )
+
+        prepare_wheelhouse()
+
+        extracted_path = directory_with_planted_wheel / "wheelhouse" / _PLANTED_WHEEL_STEM
+        assert (extracted_path / "planted.py").exists()
+        assert any(Path(entry) == extracted_path for entry in sys.path)
+
+
+@pytest.mark.parametrize(
+    "scan_build_root",
+    [scan_entrypoint_from_buildscript, scan_entrypoint_from_plugin_checkouts],
+    ids=lambda scanner: scanner.__name__,
+)
+@pytest.mark.usefixtures("discovery_environ_cleared")
+class TestBuildRootDiscovery:
+    def test_ignores_a_build_root_above_the_current_directory(
+        self,
+        scan_build_root: Callable[[str], Iterator[EntryPoint]],
+        directory_with_planted_build_files: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.chdir(directory_with_planted_build_files / "src")
+
+        entrypoints = [*scan_build_root(_PLANTED_GROUP)]
+
+        assert entrypoints == []
+
+    def test_reads_the_build_root_named_by_the_environment(
+        self,
+        scan_build_root: Callable[[str], Iterator[EntryPoint]],
+        directory_with_planted_build_files: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("BACKEND_BUILD_ROOT", str(directory_with_planted_build_files))
+
+        entrypoints = [*scan_build_root(_PLANTED_GROUP)]
+
+        assert [entrypoint.name for entrypoint in entrypoints] == ["planted"]

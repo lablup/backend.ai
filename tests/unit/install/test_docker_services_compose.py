@@ -258,6 +258,7 @@ def test_rendered_compose_wheelhouse_mounts(template: str) -> None:
     for name, service in services.items():
         if name in ("manager", "agent"):
             assert wheelhouse in service["volumes"], name
+            assert "BACKEND_WHEELHOUSE_PATH=/app/wheelhouse" in service["environment"], name
         else:
             assert not any("wheelhouse" in v for v in service["volumes"]), name
 
