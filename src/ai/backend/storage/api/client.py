@@ -33,6 +33,7 @@ import janus
 import trafaret as t
 import zipstream
 from aiohttp import hdrs, web
+from aiohttp.helpers import ETAG_ANY, ETag
 
 from ai.backend.common import validators as tx
 from ai.backend.common.api_handlers import (
@@ -141,14 +142,43 @@ def _open_download_target(root: Path, file_path: Path) -> DownloadTarget:
         raise
 
 
+def _etag_matches(etag_value: str, etags: tuple[ETag, ...], *, weak: bool) -> bool:
+    if len(etags) == 1 and etags[0].value == ETAG_ANY:
+        return True
+    return any(etag.value == etag_value for etag in etags if weak or not etag.is_weak)
+
+
 async def _stream_file_fd(
     request: web.Request,
     target: DownloadTarget,
     headers: Mapping[str, str],
 ) -> web.StreamResponse:
-    """Send the file at ``fd``, handling ``Range`` and ``If-Range`` like ``web.FileResponse``."""
+    """Send the file at ``fd``, handling preconditions and ranges like ``web.FileResponse``."""
     st = target.stat_result
     size = st.st_size
+    etag_value = f"{st.st_mtime_ns:x}-{st.st_size:x}"
+    if (ifmatch := request.if_match) is not None and not _etag_matches(
+        etag_value, ifmatch, weak=False
+    ):
+        return web.Response(status=HTTPStatus.PRECONDITION_FAILED)
+    if (
+        (unmodsince := request.if_unmodified_since) is not None
+        and ifmatch is None
+        and st.st_mtime > unmodsince.timestamp()
+    ):
+        return web.Response(status=HTTPStatus.PRECONDITION_FAILED)
+    if (
+        (ifnonematch := request.if_none_match) is not None
+        and _etag_matches(etag_value, ifnonematch, weak=True)
+    ) or (
+        (modsince := request.if_modified_since) is not None
+        and ifnonematch is None
+        and st.st_mtime <= modsince.timestamp()
+    ):
+        not_modified = web.Response(status=HTTPStatus.NOT_MODIFIED)
+        not_modified.etag = etag_value
+        not_modified.last_modified = st.st_mtime
+        return not_modified
     start, end = 0, size
     not_satisfiable = web.Response(
         status=HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE,
@@ -171,7 +201,7 @@ async def _stream_file_fd(
             resp.set_status(HTTPStatus.PARTIAL_CONTENT)
             resp.headers[hdrs.CONTENT_RANGE] = f"bytes {start}-{end - 1}/{size}"
     resp.headers[hdrs.ACCEPT_RANGES] = "bytes"
-    resp.etag = f"{st.st_mtime_ns:x}-{st.st_size:x}"
+    resp.etag = etag_value
     resp.last_modified = st.st_mtime
     resp.content_length = end - start
     await resp.prepare(request)
