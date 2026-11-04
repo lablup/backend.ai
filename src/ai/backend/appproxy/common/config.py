@@ -1,5 +1,6 @@
 import enum
 import pwd
+import tomllib
 import types
 import typing
 from pathlib import Path
@@ -21,6 +22,7 @@ from ai.backend.common.meta import (
     NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
+    ConfigEnvironment,
     ConfigExample,
 )
 from ai.backend.common.types import BackendAISchema
@@ -62,7 +64,7 @@ class PermitHashConfig(BaseSchema):
         BackendAIConfigMeta(
             description="Hash digest method to use.",
             added_version="25.13.0",
-            example=ConfigExample(local="SHA256", prod="SHA256"),
+            example=ConfigExample(local="sha256", prod="sha256"),
         ),
     ]
 
@@ -738,12 +740,18 @@ class ProfilingConfig(BaseSchema):
     ]
 
 
-class Undefined:
-    pass
-
-
 class UnsupportedTypeError(RuntimeError):
     pass
+
+
+def _parse_config_example(example: ConfigExample, annotation: Any) -> Any:
+    example_text = example.get(ConfigEnvironment.PROD)
+    if annotation is str:
+        return example_text
+    try:
+        return tomllib.loads(f"value = {example_text}")["value"]
+    except tomllib.TOMLDecodeError:
+        return example_text
 
 
 def generate_example_json(
@@ -752,31 +760,42 @@ def generate_example_json(
 ) -> dict[str, Any] | list[Any]:
     if parent is None:
         parent = []
-    if isinstance(schema, types.UnionType):
+    if typing.get_origin(schema) in (types.UnionType, typing.Union, typing.Annotated):
         return generate_example_json(typing.get_args(schema)[0], parent=[*parent])
     if isinstance(schema, types.GenericAlias):
         if typing.get_origin(schema) is not list:
             raise RuntimeError("GenericAlias other than list not supported!")
         return [generate_example_json(typing.get_args(schema)[0], parent=[*parent])]
-    if issubclass(schema, BaseModel):
+    if isinstance(schema, type) and issubclass(schema, BaseModel):
         res = {}
         for name, info in schema.model_fields.items():
             config_key = [*parent, name]
             if not info.annotation:
                 raise MissingAnnotationError(f"Field '{name}' is missing type annotation")
-            alternative_example = Undefined
             if info.examples:
                 res[name] = info.examples[0]
-            elif info.default != PydanticUndefined:
-                alternative_example = info.default
-            if name not in res:
-                try:
-                    res[name] = generate_example_json(info.annotation, parent=config_key)
-                except RuntimeError:
-                    if alternative_example != Undefined and alternative_example is not None:
-                        res[name] = alternative_example
-                    else:
-                        raise
+                continue
+            try:
+                res[name] = generate_example_json(info.annotation, parent=config_key)
+            except RuntimeError:
+                if info.default is None:
+                    # TOML has no null: leave the optional field out.
+                    continue
+                config_example = next(
+                    (
+                        meta.example
+                        for meta in info.metadata
+                        if isinstance(meta, BackendAIConfigMeta)
+                    ),
+                    None,
+                )
+                if config_example is not None:
+                    res[name] = _parse_config_example(config_example, info.annotation)
+                    continue
+                field_default = info.get_default(call_default_factory=True)
+                if field_default is PydanticUndefined:
+                    raise
+                res[name] = field_default
         return res
     raise UnsupportedTypeError(str(schema))
 

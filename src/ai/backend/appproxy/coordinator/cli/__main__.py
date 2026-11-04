@@ -74,7 +74,7 @@ def main(
     "--output",
     "-o",
     default=None,
-    type=click.Path(dir_okay=False, writable=True),
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
     help="Output file path (default: stdout)",
 )
 def generate_example_configuration(output: Path | None) -> None:
@@ -87,11 +87,12 @@ def generate_example_configuration(output: Path | None) -> None:
     from ai.backend.appproxy.common.utils import ensure_json_serializable
     from ai.backend.appproxy.coordinator.config import ServerConfig
 
+    generated_example = generate_example_json(ServerConfig)
     if output is None:
-        print(tomli_w.dumps(ensure_json_serializable(generate_example_json(ServerConfig))))
+        print(tomli_w.dumps(ensure_json_serializable(generated_example)))
     else:
         with output.open(mode="w") as fw:
-            fw.write(tomli_w.dumps(ensure_json_serializable(generate_example_json(ServerConfig))))
+            fw.write(tomli_w.dumps(ensure_json_serializable(generated_example)))
 
 
 async def _generate() -> dict[str, Any]:

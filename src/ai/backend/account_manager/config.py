@@ -220,7 +220,7 @@ class GroupID:
 
 
 class EtcdConfig(BaseSchema):
-    namespace: Annotated[str, Field(description="etcd namespace.")]
+    namespace: Annotated[str, Field(description="etcd namespace.", examples=["local"])]
     addr: Annotated[
         HostPortPair,
         Field(
@@ -228,8 +228,8 @@ class EtcdConfig(BaseSchema):
             examples=[HostPortPair(host="127.0.0.1", port=8121)],
         ),
     ]
-    user: Annotated[str, Field(description="etcd user.")]
-    password: Annotated[str, Field(description="etcd password.")]
+    user: Annotated[str, Field(description="etcd user.", examples=[""])]
+    password: Annotated[str, Field(description="etcd password.", examples=[""])]
 
 
 class DBConfig(BaseSchema):
@@ -254,10 +254,10 @@ class DBConfig(BaseSchema):
             examples=[HostPortPair(host="127.0.0.1", port=8001)],
         ),
     ]
-    name: Annotated[str, Field(description="Database name.")]
+    name: Annotated[str, Field(description="Database name.", examples=["backend"])]
 
-    user: Annotated[str, Field(description="Database account user.")]
-    password: Annotated[str, Field(description="Database account password.")]
+    user: Annotated[str, Field(description="Database account user.", examples=["postgres"])]
+    password: Annotated[str, Field(description="Database account password.", examples=["develove"])]
 
     pool_size: Annotated[
         int,
@@ -345,7 +345,7 @@ class AccountManagerConfig(BaseSchema):
         Path | None, Field(description="SSL Certificate file path. Default is null.", default=None)
     ]
     ssl_privkey: Annotated[
-        Path | None, Field(description="SSL Private key file path. Default is null.", default=False)
+        Path | None, Field(description="SSL Private key file path. Default is null.", default=None)
     ]
     num_workers: Annotated[
         int,
@@ -428,10 +428,6 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
         return server_config
 
 
-class Undefined:
-    pass
-
-
 class UnsupportedTypeError(RuntimeError):
     pass
 
@@ -442,30 +438,30 @@ def generate_example_json(
 ) -> dict[str, Any] | list[Any]:
     if parent is None:
         parent = []
-    if isinstance(schema, types.UnionType):
+    if typing.get_origin(schema) in (types.UnionType, typing.Union, typing.Annotated):
         return generate_example_json(typing.get_args(schema)[0], parent=[*parent])
     if isinstance(schema, types.GenericAlias):
         if typing.get_origin(schema) is not list:
             raise RuntimeError("GenericAlias other than list not supported!")
         return [generate_example_json(typing.get_args(schema)[0], parent=[*parent])]
-    if issubclass(schema, BaseSchema):
+    if isinstance(schema, type) and issubclass(schema, BaseSchema):
         res = {}
         for name, info in schema.model_fields.items():
             config_key = [*parent, name]
             if not info.annotation:
                 raise ValueError(f"Field {name} in {schema} has no annotation")
-            alternative_example = Undefined
             if info.examples:
                 res[name] = info.examples[0]
-            elif info.default != PydanticUndefined:
-                alternative_example = info.default
-            if name not in res:
-                try:
-                    res[name] = generate_example_json(info.annotation, parent=config_key)
-                except RuntimeError:
-                    if alternative_example != Undefined:
-                        res[name] = alternative_example
-                    else:
-                        raise
+                continue
+            try:
+                res[name] = generate_example_json(info.annotation, parent=config_key)
+            except RuntimeError:
+                if info.default is None:
+                    # TOML has no null: leave the optional field out.
+                    continue
+                field_default = info.get_default(call_default_factory=True)
+                if field_default is PydanticUndefined:
+                    raise
+                res[name] = field_default
         return res
     raise UnsupportedTypeError(str(schema))

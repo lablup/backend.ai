@@ -154,7 +154,7 @@
   # endpoints. Separate workers for each traffic type enables specialized
   # scaling.
   # Added in 25.9.0
-  accepted_traffics = "interactive,inference"
+  accepted_traffics = ["interactive", "inference"]
   # When enabled, this worker only proxies applications that match the defined
   # app_filters. When disabled (default), the worker accepts all traffic
   # matching accepted_traffics. Use with app_filters to create dedicated workers
@@ -428,7 +428,7 @@
   secret = "PERMIT_HASH_SECRET"
   # Hash digest method to use.
   # Added in 25.13.0
-  digest_mod = "SHA256"
+  digest_mod = "sha256"
 
 # Logging configuration including log levels, output formats, and destinations.
 # Supports console, file, and external log aggregation systems.
@@ -646,6 +646,15 @@
   # environments. Set together with the user field for authentication.
   # Added in 22.03.0
   ## password = "ETCD_PASSWORD"
+  # Seconds without a frame from an etcd member before a keep-alive ping is sent
+  # on a connection with requests in flight. Must not be below the server's
+  # --grpc-keepalive-min-time (5 seconds by default).
+  # Added in 26.10.0
+  keep-alive-interval = 5.0
+  # Seconds to wait for a keep-alive ping reply before the connection to that
+  # etcd member is closed and its requests go to the other members.
+  # Added in 26.10.0
+  keep-alive-timeout = 3.0
 
   # Addresses of the etcd cluster members. List every member of an etcd cluster,
   # or a single address of a standalone server.
