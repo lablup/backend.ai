@@ -27,6 +27,7 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.api.gql.base import parse_uuid
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.models.group import (
+    AssocGroupUserRow,
     GroupRow,
     ProjectType,
     get_permission_ctx,
@@ -253,8 +254,24 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
         graph_ctx: GraphQueryContext = info.context
         _, raw_group_id = AsyncNode.resolve_global_id(info, id)
         group_id = parse_uuid(raw_group_id)
-        query = sa.select(GroupRow).where(GroupRow.id == group_id)
-        async with graph_ctx.db.begin_readonly_session() as db_session:
+        user = graph_ctx.user
+        visible: sa.ColumnElement[bool]
+        match user["role"]:
+            case UserRole.SUPERADMIN:
+                visible = sa.true()
+            case UserRole.ADMIN:
+                visible = GroupRow.domain_name == user["domain_name"]
+            case UserRole.USER:
+                member_groups = sa.select(AssocGroupUserRow.group_id).where(
+                    AssocGroupUserRow.user_id == user["uuid"]
+                )
+                visible = (GroupRow.domain_name == user["domain_name"]) & GroupRow.id.in_(
+                    member_groups
+                )
+            case _:
+                visible = sa.false()
+        query = sa.select(GroupRow).where(visible & (GroupRow.id == group_id))
+        async with graph_ctx.db.begin_readonly_session_read_committed() as db_session:
             group_row = (await db_session.scalars(query)).first()
             if group_row is None:
                 raise GroupNotFound(f"Group not found: {group_id}")
