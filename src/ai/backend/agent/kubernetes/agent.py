@@ -543,11 +543,12 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                                 "env": [{"name": k, "value": v} for k, v in environ.items()],
                                 "volumeMounts": [cattr.unstructure(v) for v in self.volume_mounts],
                                 "ports": [{"containerPort": x} for x in ports],
-                                "securityContext": {"privileged": True},
+                                "securityContext": {
+                                    "capabilities": {"add": ["IPC_LOCK", "SYS_NICE"]},
+                                },
                             }
                         ],
                         "volumes": [cattr.unstructure(v) for v in self.volumes],
-                        "securityContext": {"privileged": True},
                     },
                 },
             },
