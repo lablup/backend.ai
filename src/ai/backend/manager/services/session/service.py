@@ -1362,6 +1362,8 @@ class SessionService:
                 "Failed to launch the app service", extra_data=result["error"]
             )
 
+        if session_data.user_uuid is None:
+            raise InternalServerError("The session has no owner to request an app token for")
         token = await client.create_session_app_token(
             CreateSessionAppTokenRequestBody(
                 login_session_token=login_session_token,
