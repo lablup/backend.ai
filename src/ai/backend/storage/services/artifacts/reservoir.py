@@ -32,8 +32,6 @@ from ai.backend.common.data.storage.types import (
 )
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
-from ai.backend.common.exception import InvalidVFolderMountSourceError
-from ai.backend.common.storage.vfolder.subpath import VFolderSubpath, resolve_vfolder_subpath
 from ai.backend.common.typed_validators import VFolderRelativePath
 from ai.backend.common.types import DispatchResult, StreamReader
 from ai.backend.logging.structured import StructuredLogger
@@ -788,10 +786,9 @@ class ReservoirDownloadStep(ImportStep[None]):
         total_bytes = 0
         for file_info, relative_path in zip(file_entries, relative_paths, strict=True):
             remote_file_path = file_info.path
-            await run_in_executor_with_context(
-                None, self._prepare_parent_inside, dest_path, relative_path
+            local_file_path = await run_in_executor_with_context(
+                None, self._prepare_local_path, dest_path, relative_path
             )
-            local_file_path = dest_path / relative_path
             bytes_downloaded = await downloader.download_file(
                 remote_file_path, local_file_path, file_info.size or 0
             )
@@ -823,17 +820,18 @@ class ReservoirDownloadStep(ImportStep[None]):
             ) from e
         return relative
 
-    def _prepare_parent_inside(self, dest_path: Path, relative_path: PurePosixPath) -> None:
-        """Create the file's parent directory and reject one a symlink leads out of ``dest_path``."""
-        (dest_path / relative_path).parent.mkdir(parents=True, exist_ok=True)
-        try:
-            resolve_vfolder_subpath(
-                VFolderSubpath(base_path=dest_path, subpath=relative_path.parent)
-            )
-        except InvalidVFolderMountSourceError as e:
+    def _prepare_local_path(self, dest_path: Path, relative_path: PurePosixPath) -> Path:
+        """The local file path, with its parent created once no symlink is found to lead it out.
+
+        The path is resolved before any directory is created, the file itself included.
+        """
+        local_path = dest_path / relative_path
+        if not local_path.resolve().is_relative_to(dest_path.resolve()):
             raise ReservoirFilePathInvalidError(
                 f"The Reservoir file path points outside the download path: {relative_path}"
-            ) from e
+            )
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        return local_path
 
     async def _handle_object_storage_download(
         self,
