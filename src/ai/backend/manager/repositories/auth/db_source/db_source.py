@@ -39,11 +39,15 @@ from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     GroupMembershipNotFoundError,
     LoginSessionNotFoundError,
+    PasswordMismatch,
 )
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.user import KeyPairNotFound, UserCreationBadRequest
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
+from ai.backend.manager.models.hasher.factory import (
+    PasswordHasherFactory,
+    compare_to_hashed_password,
+)
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import (
     KEYPAIR_SECRET_KEY_CONTEXT,
@@ -388,21 +392,27 @@ class AuthDBSource:
         async with self._v2_ops.read_ops() as r:
             return await r.query_data(querier)
 
-    async def _check_password(
+    async def _password_matched_row(
         self,
-        row: sa.Row[Any],
+        row: sa.Row[Any] | None,
         target_password_info: PasswordInfo,
-    ) -> None:
-        """Verify password against stored hash. Raises AuthorizationFailed on mismatch."""
-        if row.password is None:
+    ) -> sa.Row[Any]:
+        """The user row whose stored hash the password matches. A missing user or hash
+        still costs one hash, so the answer time does not tell whether the account exists."""
+        if row is None or row.password is None:
+            await asyncio.to_thread(
+                PasswordHasherFactory.get_hasher(target_password_info.algorithm).generate_new_hash,
+                target_password_info,
+            )
             raise AuthorizationFailed("User credential mismatch.")
         try:
             if not await asyncio.to_thread(
                 compare_to_hashed_password, target_password_info.password, row.password
             ):
-                raise AuthorizationFailed("User credential mismatch.")
+                raise PasswordMismatch(UserID(row.uuid))
         except ValueError:
             raise AuthorizationFailed("User credential mismatch.") from None
+        return row
 
     async def _migrate_password_hash(
         self,
@@ -486,12 +496,7 @@ class AuthDBSource:
                 .select_from(users)
                 .where((users.c.email == email) & (users.c.domain_name == domain_name)),
             )
-            row = result.first()
-
-            if row is None:
-                raise AuthorizationFailed("User credential mismatch.")
-
-            await self._check_password(row, target_password_info)
+            row = await self._password_matched_row(result.first(), target_password_info)
             await self._migrate_password_hash(conn, row, domain_name, email, target_password_info)
 
             # Fetch active sessions for the user within the same connection
@@ -612,10 +617,7 @@ class AuthDBSource:
                     (users.c.email == email) & (users.c.domain_name == domain_name)
                 ),
             )
-            row = result.first()
-            if row is None:
-                raise AuthorizationFailed("User credential mismatch.")
-            await self._check_password(row, target_password_info)
+            row = await self._password_matched_row(result.first(), target_password_info)
         return UserCredential(user_id=UserID(row.uuid), hashed_password=row.password)
 
     @auth_db_source_resilience.apply()

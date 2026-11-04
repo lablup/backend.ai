@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
+from unittest.mock import patch
 
 import pytest
 
@@ -12,13 +13,14 @@ from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.errors.auth import AuthorizationFailed
+from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordMismatch
 from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
+from ai.backend.manager.models.hasher.pbkdf2 import PBKDF2_SHA256Hasher
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
@@ -206,27 +208,40 @@ class TestCheckCredentialWithoutMigration:
         assert credential.user_id == user_with_password.user_uuid
         assert compare_to_hashed_password(_PASSWORD, credential.hashed_password)
 
-    async def test_rejects_a_wrong_password(
+    async def test_a_wrong_password_names_the_user(
         self,
         auth_repository: AuthRepository,
         user_with_password: _Credential,
     ) -> None:
-        with pytest.raises(AuthorizationFailed):
+        with pytest.raises(PasswordMismatch) as raised:
             await auth_repository.check_credential_without_migration(
                 user_with_password.domain_name,
                 user_with_password.email,
                 _password_info("wrong_password"),
             )
 
-    async def test_rejects_an_unknown_email(
+        assert raised.value.user_id == user_with_password.user_uuid
+
+    async def test_an_unknown_email_is_refused_after_one_hash(
         self,
         auth_repository: AuthRepository,
         user_with_password: _Credential,
     ) -> None:
-        with pytest.raises(AuthorizationFailed):
+        with (
+            patch.object(
+                PBKDF2_SHA256Hasher,
+                "generate_new_hash",
+                autospec=True,
+                side_effect=PBKDF2_SHA256Hasher.generate_new_hash,
+            ) as hashed,
+            pytest.raises(AuthorizationFailed) as raised,
+        ):
             await auth_repository.check_credential_without_migration(
                 user_with_password.domain_name, "nobody@example.com", _password_info(_PASSWORD)
             )
+
+        assert not isinstance(raised.value, PasswordMismatch)
+        hashed.assert_called_once()
 
     async def test_rejects_the_email_under_another_domain(
         self,
@@ -239,14 +254,25 @@ class TestCheckCredentialWithoutMigration:
                 other_domain.domain_name, user_with_password.email, _password_info(_PASSWORD)
             )
 
-    async def test_rejects_a_user_without_a_password(
+    async def test_a_user_without_a_password_is_refused_after_one_hash(
         self,
         auth_repository: AuthRepository,
         user_without_password: _Credential,
     ) -> None:
-        with pytest.raises(AuthorizationFailed):
+        with (
+            patch.object(
+                PBKDF2_SHA256Hasher,
+                "generate_new_hash",
+                autospec=True,
+                side_effect=PBKDF2_SHA256Hasher.generate_new_hash,
+            ) as hashed,
+            pytest.raises(AuthorizationFailed) as raised,
+        ):
             await auth_repository.check_credential_without_migration(
                 user_without_password.domain_name,
                 user_without_password.email,
                 _password_info(_PASSWORD),
             )
+
+        assert not isinstance(raised.value, PasswordMismatch)
+        hashed.assert_called_once()
