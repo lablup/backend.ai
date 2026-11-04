@@ -50,6 +50,7 @@ from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     EmailAlreadyExistsError,
     GroupMembershipNotFoundError,
+    LoginRejectedByHook,
     PasswordExpired,
     PasswordNotExpired,
     TooManyConcurrentLoginSessions,
@@ -136,6 +137,7 @@ _FAILURE_MAP: dict[type[Exception], LoginAttemptResult] = {
     AuthorizationFailed: LoginAttemptResult.FAILED_INVALID_CREDENTIALS,
     PasswordExpired: LoginAttemptResult.FAILED_PASSWORD_EXPIRED,
     RejectedByHook: LoginAttemptResult.FAILED_REJECTED_BY_HOOK,
+    LoginRejectedByHook: LoginAttemptResult.FAILED_REJECTED_BY_HOOK,
     TooManyConcurrentLoginSessions: LoginAttemptResult.FAILED_SESSION_ALREADY_EXISTS,
 }
 
@@ -273,6 +275,7 @@ class AuthService:
             AuthorizationFailed,
             PasswordExpired,
             RejectedByHook,
+            LoginRejectedByHook,
             TooManyConcurrentLoginSessions,
         ) as e:
             await self._record_login_failure(
@@ -350,7 +353,7 @@ class AuthService:
         # A plugin refusing the second factor is a failed login, so it answers as
         # one and counts toward the login attempt limit.
         if hook_result.status == REJECTED:
-            raise AuthorizationFailed(hook_result.reason)
+            raise LoginRejectedByHook(hook_result.reason)
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
         if hook_result.result is not None and isinstance(hook_result.result, web.StreamResponse):

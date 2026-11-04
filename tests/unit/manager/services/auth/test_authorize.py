@@ -17,7 +17,11 @@ from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired
+from ai.backend.manager.errors.auth import (
+    AuthorizationFailed,
+    LoginRejectedByHook,
+    PasswordExpired,
+)
 from ai.backend.manager.errors.common import RejectedByHook
 from ai.backend.manager.models.user.row import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
@@ -609,13 +613,8 @@ class TestPostAuthorizeHookRefusal:
         )
         mock_auth_repository.default_keypair.return_value = _make_mock_keypair()
 
-    @pytest.mark.usefixtures("verified_user")
-    async def test_a_rejected_second_factor_is_a_failed_login(
-        self,
-        auth_service: AuthService,
-        mock_hook_plugin_ctx: MagicMock,
-        action: AuthorizeAction,
-    ) -> None:
+    @pytest.fixture
+    def rejecting_hook(self, mock_hook_plugin_ctx: MagicMock) -> None:
         mock_hook_plugin_ctx.dispatch.side_effect = [
             HookResult(status=HookResults.PASSED, result=None, reason=None),
             HookResult(
@@ -625,8 +624,29 @@ class TestPostAuthorizeHookRefusal:
             ),
         ]
 
-        with pytest.raises(AuthorizationFailed):
+    @pytest.mark.usefixtures("verified_user", "rejecting_hook")
+    async def test_a_rejected_second_factor_answers_as_a_failed_login(
+        self,
+        auth_service: AuthService,
+        action: AuthorizeAction,
+    ) -> None:
+        with pytest.raises(LoginRejectedByHook) as exc_info:
             await auth_service.authorize(action)
+
+        assert exc_info.value.status_code == 401
+
+    @pytest.mark.usefixtures("verified_user", "rejecting_hook")
+    async def test_a_rejected_second_factor_is_recorded_as_a_hook_rejection(
+        self,
+        auth_service: AuthService,
+        mock_auth_repository: AsyncMock,
+        action: AuthorizeAction,
+    ) -> None:
+        with pytest.raises(LoginRejectedByHook):
+            await auth_service.authorize(action)
+
+        recorded_result = mock_auth_repository.record_login_history.call_args.args[2]
+        assert recorded_result == LoginAttemptResult.FAILED_REJECTED_BY_HOOK
 
     @pytest.mark.usefixtures("verified_user")
     async def test_a_failing_plugin_stays_a_hook_error(
