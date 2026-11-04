@@ -780,6 +780,18 @@ class ScalingGroupNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
+class InvalidVFolderMountSourceError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-vfolder-mount-source"
+    error_title = "Invalid vfolder mount source."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 class ScalingGroupConflict(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-scaling-group"
     error_title = "Duplicate Scaling Group"
