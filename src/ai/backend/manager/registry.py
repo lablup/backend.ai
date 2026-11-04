@@ -123,19 +123,6 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
 )
 from ai.backend.manager.data.session.types import SessionStatus
-<<<<<<< HEAD
-=======
-from ai.backend.manager.data.vfolder.types import verify_mount_destination
-from ai.backend.manager.models.agent.row import AgentRow, agents
-from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
-    BootstrapScriptRevisionSearchableFields,
-)
-from ai.backend.manager.models.bootstrap_script_revision.searchers import (
-    DefaultBootstrapScriptRevisionSearcher,
-)
-from ai.backend.manager.models.domain.row import domains
-from ai.backend.manager.models.endpoint.row import EndpointRow
->>>>>>> 1b01ca06 (fix(BA-8806): reject mount destinations under reserved paths (#16473))
 from ai.backend.manager.models.image.searchers import (
     CanonicalImageSearcher,
     ImageSearcher,
@@ -193,8 +180,8 @@ from .models.utils import (
     execute_with_retry,
     reenter_txn_session,
 )
-from .models.vfolder import (
-    verify_vfolder_name,
+from .models.vfolder.row import (
+    verify_mount_destination,
 )
 from .types import UserScope
 

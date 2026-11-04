@@ -5,12 +5,8 @@ from __future__ import annotations
 from typing import override
 
 from ai.backend.manager.data.session.spec import SessionSpec
-<<<<<<< HEAD
-=======
-from ai.backend.manager.data.vfolder.types import verify_mount_destination
->>>>>>> 1b01ca06 (fix(BA-8806): reject mount destinations under reserved paths (#16473))
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.models.vfolder import verify_vfolder_name
+from ai.backend.manager.models.vfolder.row import verify_mount_destination
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
     SessionSpecValidatorRule,
 )
