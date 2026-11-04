@@ -205,6 +205,9 @@ class TestCheckCredentialWithoutMigration:
 
         assert credential.user_id == user_with_password.user_uuid
         assert compare_to_hashed_password(_PASSWORD, credential.hashed_password)
+        assert credential.status == UserStatus.ACTIVE
+        # The column defaults to the insert time, so a new user carries one.
+        assert credential.password_changed_at is not None
 
     async def test_rejects_a_wrong_password(
         self,

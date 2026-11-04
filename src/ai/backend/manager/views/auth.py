@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.manager.data.user.types import UserStatus
 
 __all__ = ("UserCredential",)
 
@@ -16,3 +18,5 @@ class UserCredential:
     user_id: UserID
     username: str
     hashed_password: str
+    status: UserStatus
+    password_changed_at: datetime | None
