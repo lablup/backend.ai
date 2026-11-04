@@ -12,6 +12,7 @@ import jwt
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestClient
+from pytest_aiohttp import AiohttpClient
 
 from ai.backend.storage.api.client import download
 
@@ -64,7 +65,7 @@ def make_token() -> Callable[[str], str]:
 
 
 @pytest.fixture
-async def client(vfolder: Path, aiohttp_client: Any) -> TestClient[Any, Any]:
+async def client(vfolder: Path, aiohttp_client: AiohttpClient) -> TestClient[Any, Any]:
     volume = MagicMock()
     volume.mangle_vfpath.return_value = vfolder
     ctx = MagicMock()
