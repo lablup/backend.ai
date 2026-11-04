@@ -275,11 +275,10 @@ class TestDotSegmentPath:
         url: str,
     ) -> None:
         endpoint, received = cookie_upstream
-        async with _endpoint_pool([endpoint]) as endpoint_pool:
-            client = await _cookie_proxy_client(
-                aiohttp_client, server_client_pool, endpoint_pool, is_anonymous=True
-            )
-            resp = await client.get(yarl.URL(url, encoded=True))
+        client = await _cookie_proxy_client(
+            aiohttp_client, server_client_pool, endpoint, is_anonymous=True
+        )
+        resp = await client.get(yarl.URL(url, encoded=True))
 
         assert resp.status == 400
         assert received == []
@@ -295,11 +294,10 @@ class TestDotSegmentPath:
         url: str,
     ) -> None:
         endpoint, received = cookie_upstream
-        async with _endpoint_pool([endpoint]) as endpoint_pool:
-            client = await _cookie_proxy_client(
-                aiohttp_client, server_client_pool, endpoint_pool, is_anonymous=True
-            )
-            resp = await client.get(url)
+        client = await _cookie_proxy_client(
+            aiohttp_client, server_client_pool, endpoint, is_anonymous=True
+        )
+        resp = await client.get(url)
 
         assert resp.status == 200
         assert len(received) == 1
