@@ -164,10 +164,11 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
                 src_plugin=executed_plugin_names,  # empty
                 result=results,  # empty
             )
+        result_after_all_handlers = None if return_when == FIRST_COMPLETED else results
         return HookResult(
             status=PASSED,
             src_plugin=executed_plugin_names,
-            result=None if return_when == FIRST_COMPLETED else results,
+            result=result_after_all_handlers,
         )
 
     async def notify(
