@@ -26,6 +26,13 @@ into/from the console server.
    $ backend.ai logout
    ✔ Logout done.
 
+.. note::
+
+   ``login``, ``update-password`` and ``update-password-no-auth`` refuse to send
+   a password to an endpoint that is neither https nor loopback, because it can
+   be read on the network.
+   Pass ``--allow-insecure-http`` to send it anyway.
+
 
 API Mode
 --------

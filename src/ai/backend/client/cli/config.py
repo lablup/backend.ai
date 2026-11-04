@@ -12,6 +12,7 @@ from ai.backend.client.config import get_config, local_state_path
 from ai.backend.client.exceptions import BackendClientError
 from ai.backend.client.session import Session
 
+from .insecure_http_guard import allow_insecure_http_option, reject_insecure_password_endpoints
 from .pretty import print_done, print_error, print_fail, print_warn
 
 
@@ -112,16 +113,19 @@ def config() -> None:
 
 
 @main.command()
-def login() -> None:
+@allow_insecure_http_option
+def login(allow_insecure_http: bool) -> None:
     """
     Log-in to the console API proxy.
     It stores the current session cookie in the OS-default
     local application data location.
     """
+    config = get_config()
+    reject_insecure_password_endpoints(config.endpoints, allow_insecure_http)
+
     user_id = input("User ID: ")
     password = getpass.getpass()
 
-    config = get_config()
     if config.endpoint_type != "session":
         print_warn('To use login, your endpoint type must be "session".')
         raise click.Abort()
@@ -177,7 +181,10 @@ def logout() -> None:
 @click.argument("old_password", metavar="OLD_PASSWORD")
 @click.argument("new_password", metavar="NEW_PASSWORD")
 @click.argument("new_password2", metavar="NEW_PASSWORD2")
-def update_password(old_password: str, new_password: str, new_password2: str) -> None:
+@allow_insecure_http_option
+def update_password(
+    old_password: str, new_password: str, new_password2: str, allow_insecure_http: bool
+) -> None:
     """
     Update user's password.
     """
@@ -185,6 +192,7 @@ def update_password(old_password: str, new_password: str, new_password2: str) ->
     if config.endpoint_type != "session":
         print_warn('To update password, your endpoint type must be "session".')
         raise click.Abort()
+    reject_insecure_password_endpoints(config.endpoints, allow_insecure_http)
 
     with Session() as session:
         try:
@@ -199,12 +207,15 @@ def update_password(old_password: str, new_password: str, new_password2: str) ->
 @click.argument("user_id", metavar="USER_ID")
 @click.argument("current_password", metavar="CURRENT_PASSWORD")
 @click.argument("new_password", metavar="NEW_PASSWORD")
+@allow_insecure_http_option
 def update_password_no_auth(
-    domain: str, user_id: str, current_password: str, new_password: str
+    domain: str, user_id: str, current_password: str, new_password: str, allow_insecure_http: bool
 ) -> None:
     """
     Update user's password. This is used to update `EXPIRED` password only.
     """
+    reject_insecure_password_endpoints(get_config().endpoints, allow_insecure_http)
+
     with Session() as session:
         try:
             config = get_config()

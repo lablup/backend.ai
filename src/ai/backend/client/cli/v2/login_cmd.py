@@ -10,6 +10,11 @@ from typing import Any
 
 import click
 
+from ai.backend.client.cli.insecure_http_guard import (
+    allow_insecure_http_option,
+    reject_insecure_password_endpoints,
+)
+
 from .helpers import ProfileStore, create_v2_registry, load_v2_config
 
 
@@ -17,18 +22,20 @@ from .helpers import ProfileStore, create_v2_registry, load_v2_config
 @click.option(
     "--force", is_flag=True, default=False, help="Force login, invalidating existing sessions."
 )
-def login(force: bool) -> None:
+@allow_insecure_http_option
+def login(force: bool, allow_insecure_http: bool) -> None:
     """Log in to a Backend.AI webserver endpoint.
 
     Stores the session cookie in ``session/cookie.dat`` of the selected profile.
     Requires ``endpoint-type`` to be ``session``.
     """
+    config = load_v2_config()
+    reject_insecure_password_endpoints([config.endpoint], allow_insecure_http)
+
     user_id = os.environ.get("BACKEND_USER") or input("User ID: ")
     password = os.environ.get("BACKEND_PASSWORD") or getpass.getpass("Password: ")
 
     async def _run() -> None:
-        config = load_v2_config()
-
         if config.endpoint_type != "session":
             click.echo(
                 click.style(
