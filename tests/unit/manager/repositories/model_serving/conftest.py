@@ -222,14 +222,6 @@ def patch_user_get(mocker: MockerFixture) -> AsyncMock:
     return mocker.patch("ai.backend.manager.models.user.row.UserRow.get", new_callable=AsyncMock)
 
 
-@pytest.fixture
-def patch_session_get(mocker: MockerFixture) -> AsyncMock:
-    """Patch SessionRow.get_session method using mocker."""
-    return mocker.patch(
-        "ai.backend.manager.models.session.row.SessionRow.get_session", new_callable=AsyncMock
-    )
-
-
 def setup_db_session_mock(mock_db_engine: MagicMock, mock_session: AsyncMock) -> AsyncMock:
     """Helper function to set up database session mocking consistently."""
     mock_db_engine.begin_readonly_session.return_value.__aenter__.return_value = mock_session
