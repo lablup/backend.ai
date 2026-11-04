@@ -634,6 +634,8 @@ class TestPostAuthorizeHookRefusal:
             await auth_service.authorize(action)
 
         assert exc_info.value.status_code == 401
+        assert exc_info.value.extra_msg == "Invalid TOTP code provided"
+        assert exc_info.value.extra_data == {"plugins": "totp"}
 
     @pytest.mark.usefixtures("verified_user", "rejecting_hook")
     async def test_a_rejected_second_factor_is_recorded_as_a_hook_rejection(
