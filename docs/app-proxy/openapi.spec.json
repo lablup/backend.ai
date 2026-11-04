@@ -540,10 +540,13 @@
             "title": "Login Session Token"
           },
           "kernel_host": {
+            "maxLength": 255,
             "title": "Kernel Host",
             "type": "string"
           },
           "kernel_port": {
+            "maximum": 65535,
+            "minimum": 1,
             "title": "Kernel Port",
             "type": "integer"
           },
@@ -1593,7 +1596,7 @@
           }
         },
         "parameters": [],
-        "description": "\nGenerates and returns a token which will be used as an authentication credential for\n /v2/proxy/{token}/{session}/add request.\n"
+        "description": "\nGenerates and returns a token which will be used as an authentication credential for\n /v2/proxy/{token}/{session}/add request.\n\n\n**Preconditions:**\n* Requires Manager token present at `X-BackendAI-Token` request header to work.\n"
       }
     },
     "/v2/endpoints/{endpoint_id}": {

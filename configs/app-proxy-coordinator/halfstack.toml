@@ -20,7 +20,6 @@ tls_listen = false
 tls_advertised = false
 aiomonitor_termui_port = 48510
 aiomonitor_webui_port = 49510
-allow_unauthorized_configure_request = true
 
 [proxy_coordinator.bind_addr]
 host = "0.0.0.0"

@@ -520,20 +520,6 @@ class ProxyCoordinatorConfig(BaseSchema):
         ),
     ]
 
-    allow_unauthorized_configure_request: Annotated[
-        bool,
-        Field(default=False),
-        BackendAIConfigMeta(
-            description=(
-                "Allow configuration requests without authentication tokens. WARNING: This is a "
-                "security risk and should only be enabled for backward compatibility with older "
-                "Backend.AI clusters. Keep this disabled in production environments."
-            ),
-            added_version="25.9.0",
-            example=ConfigExample(local="false", prod="false"),
-        ),
-    ]
-
     content_encoding: Annotated[
         ContentEncodingConfig,
         Field(default_factory=lambda: ContentEncodingConfig()),

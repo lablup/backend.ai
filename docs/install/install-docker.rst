@@ -246,7 +246,6 @@ Create ``proxy-coordinator.toml`` with the following content:
    [proxy_coordinator]
    tls_listen = false
    tls_advertised = false
-   allow_unauthorized_configure_request = true
 
    [proxy_coordinator.bind_addr]
    host = "0.0.0.0"
@@ -282,6 +281,15 @@ The coordinator requires its own PostgreSQL database. Create it before starting:
      psql -U postgres -c "CREATE USER appproxy WITH PASSWORD 'develove';"
    docker exec backendai-backendai-half-postgres-1 \
      psql -U postgres -c "CREATE DATABASE appproxy OWNER appproxy;"
+
+The manager authenticates to the coordinator with the resource group's
+``wsproxy_api_token``, which must match ``[secrets].api_secret`` above.
+Set it after the manager database is populated:
+
+.. code-block:: bash
+
+   docker exec backendai-backendai-half-postgres-1 \
+     psql -U postgres -d backend -c "UPDATE scaling_groups SET wsproxy_api_token = 'some_api_secret', wsproxy_addr = 'http://backend-ai-appproxy-coordinator:10200' WHERE name = 'default';"
 
 AppProxy Worker Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

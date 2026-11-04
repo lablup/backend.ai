@@ -5,10 +5,10 @@ from collections.abc import Iterable
 import aiohttp_cors
 from aiohttp import web
 
-from ai.backend.appproxy.common.errors import AuthorizationFailed
 from ai.backend.appproxy.common.types import CORSOptions, PydanticResponse, WebMiddleware
 from ai.backend.appproxy.common.utils import pydantic_api_handler
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
+from ai.backend.appproxy.coordinator.api.utils import auth_required
 from ai.backend.appproxy.coordinator.errors import InvalidSessionParameterError
 from ai.backend.appproxy.coordinator.models import Token
 from ai.backend.appproxy.coordinator.types import RootContext
@@ -22,6 +22,7 @@ class TokenResponseModel(BackendAISchema):
     token: str
 
 
+@auth_required("manager")
 @pydantic_api_handler(ConfRequestModel)
 async def conf_v2(
     request: web.Request, params: ConfRequestModel
@@ -32,10 +33,6 @@ async def conf_v2(
     """
 
     root_ctx: RootContext = request.app["_root.context"]
-    if not root_ctx.local_config.proxy_coordinator.allow_unauthorized_configure_request:
-        token_to_evaluate = request.headers.get("X-BackendAI-Token")
-        if token_to_evaluate != root_ctx.local_config.secrets.api_secret:
-            raise AuthorizationFailed("Unauthorized access")
 
     if not params.session.id or not params.session.access_key:
         raise InvalidSessionParameterError("Not meant for inference apps")
