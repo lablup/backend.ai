@@ -1152,7 +1152,9 @@ class VFolderHandler:
         )
         # Every folder lands in a project; one left with none yet is its user's.
         owner_scope: EntityIdentifier = (
-            ProjectID(row["group"]) if row["group"] is not None else UserID(row["user"])
+            ProjectID(uuid.UUID(row["group"]))
+            if row["group"] is not None
+            else UserID(uuid.UUID(row["user"]))
         )
         result = await self._vfolder_invite.invite_vfolder.run(
             InviteVFolderAction(
