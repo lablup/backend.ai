@@ -150,7 +150,8 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
                     reason=repr(e),
                 )
             else:
-                if return_when == FIRST_COMPLETED and result is not None:
+                should_return_this_result = return_when == FIRST_COMPLETED and result is not None
+                if should_return_this_result:
                     return HookResult(
                         status=PASSED,
                         src_plugin=plugin_name,
