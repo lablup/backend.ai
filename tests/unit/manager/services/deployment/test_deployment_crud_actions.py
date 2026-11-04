@@ -407,7 +407,7 @@ class TestDesignatedAgentsOnCreate(DeploymentCRUDBaseFixtures):
         return AgentUUID(uuid.uuid4())
 
     @pytest.fixture
-    def creating(
+    def create_action(
         self, endpoint_info: DeploymentInfo, agent_uuid: AgentUUID
     ) -> CreateDeploymentAction:
         return CreateDeploymentAction(
@@ -418,8 +418,8 @@ class TestDesignatedAgentsOnCreate(DeploymentCRUDBaseFixtures):
             auto_activate=False,
         )
 
-    @pytest.fixture
-    def wired(
+    @pytest.fixture(autouse=True)
+    def stub_controller_and_repository(
         self,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
@@ -435,14 +435,13 @@ class TestDesignatedAgentsOnCreate(DeploymentCRUDBaseFixtures):
         mock_deployment_repository: MagicMock,
         endpoint_info: DeploymentInfo,
         agent_uuid: AgentUUID,
-        creating: CreateDeploymentAction,
-        wired: None,
+        create_action: CreateDeploymentAction,
     ) -> None:
         mock_deployment_repository.search_agents = AsyncMock(
             return_value=[_agent_in(endpoint_info.metadata.resource_group, agent_uuid)]
         )
 
-        await deployment_service.create_deployment(creating)
+        await deployment_service.create_deployment(create_action)
 
         mock_deployment_repository.set_designated_agents.assert_awaited_once_with(
             endpoint_info.id, {agent_uuid}
@@ -453,13 +452,12 @@ class TestDesignatedAgentsOnCreate(DeploymentCRUDBaseFixtures):
         deployment_service: DeploymentService,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
-        creating: CreateDeploymentAction,
-        wired: None,
+        create_action: CreateDeploymentAction,
     ) -> None:
         mock_deployment_repository.search_agents = AsyncMock(return_value=[])
 
         with pytest.raises(DesignatedAgentOutsideResourceGroup) as raised:
-            await deployment_service.create_deployment(creating)
+            await deployment_service.create_deployment(create_action)
 
         assert raised.value.entity_error_code().operation == ActionOperationType.CREATE
 
@@ -472,8 +470,8 @@ class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
     def agent_uuid(self) -> AgentUUID:
         return AgentUUID(uuid.uuid4())
 
-    @pytest.fixture
-    def wired(
+    @pytest.fixture(autouse=True)
+    def stub_controller_and_repository(
         self,
         mock_deployment_controller: MagicMock,
         mock_deployment_repository: MagicMock,
@@ -484,7 +482,7 @@ class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
         mock_deployment_repository.set_designated_agents = AsyncMock()
         mock_deployment_repository.search_agents = AsyncMock(return_value=[])
 
-    def _updating(
+    def _update_action(
         self, endpoint_info: DeploymentInfo, designated_agents: frozenset[AgentUUID] | None
     ) -> UpdateDeploymentAction:
         return UpdateDeploymentAction(
@@ -501,14 +499,13 @@ class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
         mock_deployment_repository: MagicMock,
         endpoint_info: DeploymentInfo,
         agent_uuid: AgentUUID,
-        wired: None,
     ) -> None:
         mock_deployment_repository.search_agents = AsyncMock(
             return_value=[_agent_in(endpoint_info.metadata.resource_group, agent_uuid)]
         )
 
         await deployment_service.update_deployment(
-            self._updating(endpoint_info, frozenset({agent_uuid}))
+            self._update_action(endpoint_info, frozenset({agent_uuid}))
         )
 
         mock_deployment_repository.set_designated_agents.assert_awaited_once_with(
@@ -520,9 +517,8 @@ class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
         deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         endpoint_info: DeploymentInfo,
-        wired: None,
     ) -> None:
-        await deployment_service.update_deployment(self._updating(endpoint_info, frozenset()))
+        await deployment_service.update_deployment(self._update_action(endpoint_info, frozenset()))
 
         mock_deployment_repository.set_designated_agents.assert_awaited_once_with(
             endpoint_info.id, set()
@@ -535,11 +531,10 @@ class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
         mock_deployment_repository: MagicMock,
         endpoint_info: DeploymentInfo,
         agent_uuid: AgentUUID,
-        wired: None,
     ) -> None:
         with pytest.raises(DesignatedAgentOutsideResourceGroup) as raised:
             await deployment_service.update_deployment(
-                self._updating(endpoint_info, frozenset({agent_uuid}))
+                self._update_action(endpoint_info, frozenset({agent_uuid}))
             )
 
         assert raised.value.entity_error_code().operation == ActionOperationType.UPDATE
@@ -552,8 +547,7 @@ class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
         deployment_service: DeploymentService,
         mock_deployment_repository: MagicMock,
         endpoint_info: DeploymentInfo,
-        wired: None,
     ) -> None:
-        await deployment_service.update_deployment(self._updating(endpoint_info, None))
+        await deployment_service.update_deployment(self._update_action(endpoint_info, None))
 
         mock_deployment_repository.set_designated_agents.assert_not_awaited()
