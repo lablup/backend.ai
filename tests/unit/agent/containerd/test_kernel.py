@@ -7,9 +7,9 @@ import ipaddress
 import socket
 import ssl
 import uuid
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 from unittest.mock import MagicMock
 
 import pytest
@@ -34,6 +34,7 @@ from ai.backend.agent.errors.containerd import (
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.types import KernelId, ServicePortProtocols
 
+from .conftest import FakeProfile
 from .fakes import FakeContainerd
 
 
@@ -547,3 +548,40 @@ class TestCheckStatusTlsTaskExit:
             await tls_kernel.check_status()
 
         assert refused.calls >= 2
+
+
+class _SummarizingProfile(FakeProfile):
+    calls: list[tuple[str, int, float]]
+
+    def __init__(self) -> None:
+        super().__init__("summarizing", accepts=True)
+        self.calls = []
+
+    @override
+    async def summarize_attestation(
+        self, host: str, port: int, timeout_s: float
+    ) -> Mapping[str, Any] | None:
+        self.calls.append((host, port, timeout_s))
+        return {"attested": True}
+
+
+class TestSummarizeAttestation:
+    async def test_asks_the_profile_with_the_published_endpoint(
+        self, tls_kernel: ContainerdKernel
+    ) -> None:
+        profile = _SummarizingProfile()
+        tls_kernel._profile = profile
+        tls_kernel.data["published_host"] = "10.0.0.5"
+        _publish(tls_kernel, 30001)
+
+        assert await tls_kernel.summarize_attestation(4.0) == {"attested": True}
+        assert profile.calls == [("10.0.0.5", 30001, 4.0)]
+
+    async def test_kernel_runner_readiness_summarizes_nothing(
+        self, kernel: ContainerdKernel
+    ) -> None:
+        profile = _SummarizingProfile()
+        kernel._profile = profile
+
+        assert await kernel.summarize_attestation(4.0) is None
+        assert profile.calls == []

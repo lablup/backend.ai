@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack
+from ai.backend.common.attestation import build_attestation_status
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.domain import DomainID, DomainName
@@ -91,6 +92,7 @@ from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryData,
     SessionStatus,
 )
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import IncompleteSessionSpec
@@ -2826,9 +2828,13 @@ class ScheduleDBSource:
         log.debug("kernel running status updating", kernel_id=kernel_id, status_reason=reason)
         async with self._db.begin_session_read_committed() as db_sess:
             # Check current kernel status and fetch agent_id before update
-            check_stmt = sa.select(KernelRow.status, KernelRow.starts_at, KernelRow.agent).where(
-                KernelRow.id == kernel_id
-            )
+            check_stmt = sa.select(
+                KernelRow.status,
+                KernelRow.starts_at,
+                KernelRow.agent,
+                KernelRow.session_id,
+                KernelRow.cluster_role,
+            ).where(KernelRow.id == kernel_id)
             check_result = await db_sess.execute(check_stmt)
             current = check_result.first()
             if current:
@@ -2861,6 +2867,14 @@ class ScheduleDBSource:
                 for device_name, units in used_devices.units.items()
             }
             service_ports = [port.model_dump(mode="json") for port in creation_info.service_ports]
+            attestation = build_attestation_status(creation_info.attestation)
+            status_data_values: dict[str, Any] = {}
+            if attestation is not None:
+                status_data_values["status_data"] = sql_json_merge(
+                    KernelRow.__table__.c.status_data,
+                    (),
+                    {"attestation": attestation},
+                )
             stmt = (
                 sa.update(KernelRow)
                 .where(
@@ -2870,6 +2884,7 @@ class ScheduleDBSource:
                     )
                 )
                 .values(
+                    **status_data_values,
                     status=KernelStatus.RUNNING,
                     status_info=reason,
                     status_changed=now,
@@ -2897,6 +2912,19 @@ class ScheduleDBSource:
             )
             if rowcount == 0:
                 return False
+
+            if attestation is not None and current and current.cluster_role == DEFAULT_ROLE:
+                await db_sess.execute(
+                    sa.update(SessionRow)
+                    .where(SessionRow.id == current.session_id)
+                    .values(
+                        status_data=sql_json_merge(
+                            SessionRow.__table__.c.status_data,
+                            (),
+                            {"attestation": attestation},
+                        )
+                    )
+                )
 
             # Allocate kernel resources in the same transaction.
             # This ensures resource allocation happens atomically with the
