@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
 import pytest
+import yarl
 from aiohttp import web
 from aiohttp.typedefs import Handler
 
@@ -140,3 +141,51 @@ class TestRequestCookieForwarding:
 
         assert resp.status == 200
         assert received[-1] is None
+
+
+class TestDotSegmentPath:
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "/func/cloud/..%2Fauth%2Fauthorize",
+            "/func/v2/x/public/%2E%2E%2F%2E%2E%2F%2E%2E%2Fadmin%2Fgql",
+            "/func/cloud/.%2Fauth",
+            "/pipeline/cloud/..%2Fauth%2Fauthorize",
+        ],
+    )
+    async def test_dot_segment_is_rejected_before_upstream(
+        self,
+        aiohttp_client: Any,
+        server_client_pool: ClientPool,
+        cookie_upstream: tuple[str, list[str | None]],
+        url: str,
+    ) -> None:
+        endpoint, received = cookie_upstream
+        async with _endpoint_pool([endpoint]) as endpoint_pool:
+            client = await _cookie_proxy_client(
+                aiohttp_client, server_client_pool, endpoint_pool, is_anonymous=True
+            )
+            resp = await client.get(yarl.URL(url, encoded=True))
+
+        assert resp.status == 400
+        assert received == []
+
+    @pytest.mark.parametrize(
+        "url", ["/func/cloud/signup", "/func/v2/x/public/y", "/pipeline/folders/a..b"]
+    )
+    async def test_path_without_dot_segment_is_proxied(
+        self,
+        aiohttp_client: Any,
+        server_client_pool: ClientPool,
+        cookie_upstream: tuple[str, list[str | None]],
+        url: str,
+    ) -> None:
+        endpoint, received = cookie_upstream
+        async with _endpoint_pool([endpoint]) as endpoint_pool:
+            client = await _cookie_proxy_client(
+                aiohttp_client, server_client_pool, endpoint_pool, is_anonymous=True
+            )
+            resp = await client.get(url)
+
+        assert resp.status == 200
+        assert len(received) == 1
