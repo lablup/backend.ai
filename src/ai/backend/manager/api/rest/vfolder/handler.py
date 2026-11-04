@@ -230,19 +230,7 @@ class VFolderHandler:
         user_role = req.request["user"]["role"]
         keypair_resource_policy = req.request["keypair"]["resource_policy"]
 
-<<<<<<< HEAD
         group_id_or_name: str | uuid.UUID | None = None
-=======
-        # A project folder is created in the project named; with none named the folder
-        # is the caller's own, and its spec finds the personal project by its owner.
-        # Only a superadmin may point a folder at a path the manager does not own.
-        creator: VFolderBaseCreator
-        if params.unmanaged_path and ctx.user_role != UserRole.SUPERADMIN:
-            raise Forbidden("Only superadmins can create a vfolder with an unmanaged path.")
-        mount_permission = (
-            None if params.permission is None else VFolderMountPolicy(params.permission.value)
-        )
->>>>>>> a1cd61685 (fix(BA-8901): restrict unmanaged vfolder creation to superadmins (#16425))
         if params.group_id is not None:
             group_id_or_name = params.group_id
 

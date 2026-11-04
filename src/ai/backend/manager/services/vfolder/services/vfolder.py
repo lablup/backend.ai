@@ -283,10 +283,9 @@ class VFolderService:
                 )
         # Check if user is trying to created unmanaged vFolder
         if unmanaged_path:
-            # Approve only if user is Admin or Superadmin
-            if user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
-                raise Forbidden("Insufficient permission")
-                # Assign ghost host to unmanaged vfolder
+            # Only a superadmin may point a folder at a path the manager does not own.
+            if user_role != UserRole.SUPERADMIN:
+                raise Forbidden("Only superadmins can create a vfolder with an unmanaged path.")
 
         allowed_vfolder_types = (
             await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
