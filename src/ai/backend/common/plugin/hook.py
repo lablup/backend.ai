@@ -132,11 +132,11 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
         ``FIRST_COMPLETED`` also ends it at the first non-None result; None means not handled.
         """
         executed_plugin_names = []
-        results: list[Any] = []
+        handler_results: list[Any] = []
         for plugin_name, hook_handler in self._get_handlers(event_name, order=order):
             try:
                 executed_plugin_names.append(plugin_name)
-                result = await hook_handler(*args)
+                handler_result = await hook_handler(*args)
             except Reject as e:
                 return HookResult(
                     status=REJECTED,
@@ -150,25 +150,27 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
                     reason=repr(e),
                 )
             else:
-                should_return_this_result = return_when == FIRST_COMPLETED and result is not None
-                if should_return_this_result:
+                first_completed_result_found = (
+                    return_when == FIRST_COMPLETED and handler_result is not None
+                )
+                if first_completed_result_found:
                     return HookResult(
                         status=PASSED,
                         src_plugin=plugin_name,
-                        result=result,
+                        result=handler_result,
                     )
                 if return_when == ALL_COMPLETED:
-                    results.append(result)
+                    handler_results.append(handler_result)
         if not success_if_no_hook and not executed_plugin_names:
             return HookResult(
                 status=REJECTED,
                 src_plugin=executed_plugin_names,  # empty
-                result=results,  # empty
+                result=handler_results,  # empty
             )
         return HookResult(
             status=PASSED,
             src_plugin=executed_plugin_names,
-            result=results,
+            result=handler_results,
         )
 
     async def notify(
