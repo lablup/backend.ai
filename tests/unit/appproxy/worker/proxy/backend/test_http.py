@@ -9,6 +9,7 @@ from uuid import UUID
 
 import pytest
 import pytest_mock
+from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
 
 from ai.backend.appproxy.common.types import ProxyProtocol, RouteInfo
@@ -80,6 +81,10 @@ class TestProxyHttpForwardedHeaders:
             yield backend
         finally:
             await backend.close()
+
+    @pytest.fixture
+    def frontend_request(self, case: _ForwardedHeadersCase) -> web.Request:
+        return make_mocked_request("GET", "/", headers=case.request_headers)
 
     @pytest.mark.parametrize(
         "case",
@@ -199,10 +204,11 @@ class TestProxyHttpForwardedHeaders:
         ],
     )
     async def test_headers_sent_to_the_session_app(
-        self, case: _ForwardedHeadersCase, http_backend: HTTPBackend
+        self,
+        case: _ForwardedHeadersCase,
+        http_backend: HTTPBackend,
+        frontend_request: web.Request,
     ) -> None:
-        frontend_request = make_mocked_request("GET", "/", headers=case.request_headers)
-
         with pytest.raises(_BackendRequestCaptured):
             await http_backend.proxy_http(frontend_request)
 
