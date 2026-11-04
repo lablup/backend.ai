@@ -157,18 +157,18 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
                         src_plugin=plugin_name,
                         result=result,
                     )
-                results.append(result)
+                if return_when == ALL_COMPLETED:
+                    results.append(result)
         if not success_if_no_hook and not executed_plugin_names:
             return HookResult(
                 status=REJECTED,
                 src_plugin=executed_plugin_names,  # empty
                 result=results,  # empty
             )
-        result_after_all_handlers = None if return_when == FIRST_COMPLETED else results
         return HookResult(
             status=PASSED,
             src_plugin=executed_plugin_names,
-            result=result_after_all_handlers,
+            result=results,
         )
 
     async def notify(
