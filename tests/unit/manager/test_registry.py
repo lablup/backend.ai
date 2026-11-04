@@ -6,8 +6,7 @@ import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -20,15 +19,25 @@ from ai.backend.common.config import (
     ModelHealthCheck,
     ModelServiceConfig,
 )
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
 from ai.backend.common.events.types import AbstractEvent
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AccessKey,
+    ClusterMode,
     SessionId,
+    SessionResult,
+    SessionTypes,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.options import SessionStoredOptions
+from ai.backend.manager.data.session.types import SessionEntityData, SessionStatus
 from ai.backend.manager.errors.kernel import (
     SessionNotFound,
     TooManySessionsMatched,
@@ -62,6 +71,7 @@ async def registry_ctx() -> AsyncGenerator[
     mock_loader.load = AsyncMock(
         return_value={
             "db": {"name": "test_db", "user": "postgres", "password": "develove"},
+            "etcd": {"user": "test", "password": "test"},
             "logging": {},
         }
     )
@@ -391,21 +401,67 @@ class TestWaitForSessionRunning:
                 )
 
 
-def _registry_reading(items: list[Any]) -> MagicMock:
-    """A registry whose ops provider answers every global search with ``items``."""
-    registry = MagicMock(spec=AgentRegistry)
+def _session_entity_data(name: str, access_key: AccessKey) -> SessionEntityData:
+    """A running session of ``access_key`` named ``name``."""
+    return SessionEntityData(
+        id=SessionID(uuid.uuid4()),
+        creation_id=None,
+        name=name,
+        session_type=SessionTypes.INTERACTIVE,
+        priority=SESSION_PRIORITY_DEFAULT,
+        is_preemptible=True,
+        job_priority=JOB_PRIORITY_DEFAULT,
+        cluster_mode=ClusterMode.SINGLE_NODE.value,
+        cluster_size=1,
+        options=SessionStoredOptions(),
+        agent_ids=None,
+        session_group_id=None,
+        resource_group_id=ResourceGroupID(uuid.uuid4()),
+        resource_group_name="default",
+        target_sgroup_names=None,
+        domain_name="default",
+        domain_id=DomainID(uuid.uuid4()),
+        group_id=ProjectID(uuid.uuid4()),
+        user_uuid=UserID(uuid.uuid4()),
+        access_key=access_key,
+        images=None,
+        image_ids=None,
+        tag=None,
+        vfolder_mounts=None,
+        environ=None,
+        bootstrap_script=None,
+        use_host_network=False,
+        timeout=None,
+        batch_timeout=None,
+        terminated_at=None,
+        starts_at=None,
+        requested_starts_at=None,
+        status=SessionStatus.RUNNING,
+        status_info=None,
+        status_data=None,
+        status_history=None,
+        callback_url=None,
+        startup_command=None,
+        result=SessionResult.UNDEFINED,
+        num_queries=None,
+        last_stat=None,
+        network_type=None,
+        network_id=None,
+        replica_id=None,
+        created_at=datetime.now(tzutc()),
+    )
+
+
+def _answer_global_searches(registry: AgentRegistry, items: list[SessionEntityData]) -> None:
+    """Make the registry's ops provider answer every global search with ``items``."""
     read_ops = MagicMock()
     read_ops.search_in_global = AsyncMock(
         return_value=SearcherResult(
             items=items, total_count=len(items), has_next_page=False, has_previous_page=False
         )
     )
-    registry._ops_provider = MagicMock()
-    registry._ops_provider.read_ops.return_value.__aenter__.return_value = read_ops
-    registry._live_session_named = AgentRegistry._live_session_named.__get__(
-        registry, AgentRegistry
-    )
-    return registry
+    provider = cast(MagicMock, registry._ops_provider)
+    provider.read_ops.return_value.__aenter__.return_value = read_ops
 
 
 class TestLiveSessionNamed:
@@ -413,30 +469,41 @@ class TestLiveSessionNamed:
     def access_key(self) -> AccessKey:
         return AccessKey("AKIATEST")
 
+    @pytest.fixture
+    def registry(
+        self,
+        registry_ctx: tuple[
+            AgentRegistry,
+            MagicMock,
+            MagicMock,
+            MagicMock,
+            ManagerConfigProvider,
+            MagicMock,
+            MagicMock,
+        ],
+    ) -> AgentRegistry:
+        return registry_ctx[0]
+
     async def test_none_when_no_unended_session_carries_the_name(
-        self, access_key: AccessKey
+        self, registry: AgentRegistry, access_key: AccessKey
     ) -> None:
-        registry = _registry_reading([])
+        _answer_global_searches(registry, [])
 
         assert await registry._live_session_named("fresh", access_key) is None
 
-    async def test_returns_the_one_session_carrying_the_name(self, access_key: AccessKey) -> None:
-        session = MagicMock()
-        registry = _registry_reading([session])
+    async def test_returns_the_one_session_carrying_the_name(
+        self, registry: AgentRegistry, access_key: AccessKey
+    ) -> None:
+        session = _session_entity_data("taken", access_key)
+        _answer_global_searches(registry, [session])
 
         assert await registry._live_session_named("taken", access_key) is session
 
-    async def test_several_sessions_carrying_the_name_raise(self, access_key: AccessKey) -> None:
-        namesakes = [
-            SimpleNamespace(
-                id=uuid.uuid4(),
-                name="taken",
-                status=SessionStatus.RUNNING,
-                created_at=datetime.now(tzutc()),
-            )
-            for _ in range(2)
-        ]
-        registry = _registry_reading(namesakes)
+    async def test_several_sessions_carrying_the_name_raise(
+        self, registry: AgentRegistry, access_key: AccessKey
+    ) -> None:
+        namesakes = [_session_entity_data("taken", access_key) for _ in range(2)]
+        _answer_global_searches(registry, namesakes)
 
         with pytest.raises(TooManySessionsMatched):
             await registry._live_session_named("taken", access_key)
