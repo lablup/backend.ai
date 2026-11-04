@@ -115,6 +115,7 @@ from ai.backend.common.docker import (
     DEFAULT_KERNEL_FEATURE,
     MAX_KERNELSPEC,
     MIN_KERNELSPEC,
+    RUNNER_RESERVED_ENVIRON_KEYS,
     ImageRef,
     KernelFeatures,
     LabelName,
@@ -2639,7 +2640,12 @@ class AbstractAgent[
                     cluster_ssh_port_mapping=cluster_info.get("cluster_ssh_port_mapping"),
                 )
                 log.debug("kernel creation context initialized")
-                environ: dict[str, str] = {**kernel_config["environ"]}
+                # Drop the runner-reserved keys the caller sent; the agent sets them below.
+                environ: dict[str, str] = {
+                    k: v
+                    for k, v in kernel_config["environ"].items()
+                    if k not in RUNNER_RESERVED_ENVIRON_KEYS
+                }
 
                 # Inject Backend.AI-intrinsic env-variables for gosu
                 if (ouid := ctx.get_overriding_uid()) is not None:

@@ -130,6 +130,9 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.required_resour
 from ai.backend.manager.sokovan.scheduling_controller.validators.resource_limit_rule import (
     ResourceLimitRule,
 )
+from ai.backend.manager.sokovan.scheduling_controller.validators.runner_reserved_environ_rule import (
+    RunnerReservedEnvironRule,
+)
 from ai.backend.manager.sokovan.scheduling_controller.validators.service_port_rule import (
     ServicePortRule,
 )
@@ -235,6 +238,7 @@ class SchedulingController:
             MountNameValidationRule(),
             InferenceModelFolderRule(),
             DotfileVFolderConflictRule(),
+            RunnerReservedEnvironRule(),
         ])
         self._agent_selector = args.agent_selector
 
