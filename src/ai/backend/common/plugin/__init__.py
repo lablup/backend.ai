@@ -30,8 +30,9 @@ def load_configured_wheelhouse(wheelhouse_config: WheelhouseConfig) -> None:
     Called by ``start-server`` before its workers start, which inherit ``sys.path``.
     """
     if wheelhouse_config.allow:
-        prepare_wheelhouse(wheelhouse_config.path)
-        log.info("wheelhouse loaded", wheelhouse_path=str(wheelhouse_config.path))
+        wheelhouse_path = wheelhouse_config.path.resolve()
+        prepare_wheelhouse(wheelhouse_path)
+        log.info("wheelhouse loaded", wheelhouse_path=str(wheelhouse_path))
     elif any((Path.cwd() / "wheelhouse").glob("*.whl")):
         log.warning("wheels in ./wheelhouse not loaded, wheelhouse.allow is off")
 

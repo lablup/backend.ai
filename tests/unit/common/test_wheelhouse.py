@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 
 from ai.backend.common.configs.wheelhouse import WheelhouseConfig
-from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.plugin import load_configured_wheelhouse
 
 _PLANTED_WHEEL_STEM = "planted-1.0-py3-none-any"
@@ -39,9 +38,8 @@ class TestWheelhouseConfig:
     def test_does_not_allow_by_default(self) -> None:
         assert WheelhouseConfig.model_validate({}).allow is False
 
-    def test_rejects_a_relative_path(self) -> None:
-        with pytest.raises(BackendAISchemaValidationFailed, match="absolute path"):
-            WheelhouseConfig.model_validate({"path": "wheelhouse"})
+    def test_uses_wheelhouse_under_the_current_directory_by_default(self) -> None:
+        assert WheelhouseConfig.model_validate({}).path == Path("wheelhouse")
 
 
 class TestLoadConfiguredWheelhouse:
@@ -53,6 +51,17 @@ class TestLoadConfiguredWheelhouse:
         load_configured_wheelhouse(WheelhouseConfig(allow=True, path=wheelhouse_path))
 
         extracted_path = wheelhouse_path / _PLANTED_WHEEL_STEM
+        assert (extracted_path / "planted.py").exists()
+        assert str(extracted_path) in sys.path
+
+    def test_loads_the_wheels_in_the_current_directory_by_default_when_allowed(
+        self, current_directory_with_planted_wheel: Path
+    ) -> None:
+        load_configured_wheelhouse(WheelhouseConfig.model_validate({"allow": True}))
+
+        extracted_path = (
+            current_directory_with_planted_wheel / "wheelhouse" / _PLANTED_WHEEL_STEM
+        ).resolve()
         assert (extracted_path / "planted.py").exists()
         assert str(extracted_path) in sys.path
 

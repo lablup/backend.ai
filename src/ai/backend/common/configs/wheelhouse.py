@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import Field, field_validator
+from pydantic import Field
 
 from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.meta import NEXT_RELEASE_VERSION, BackendAIConfigMeta, ConfigExample
@@ -29,22 +29,14 @@ class WheelhouseConfig(BaseConfigSchema):
     ]
     path: Annotated[
         Path,
-        Field(default=Path("/opt/backend.ai/wheelhouse")),
+        Field(default=Path("wheelhouse")),
         BackendAIConfigMeta(
             description=(
-                "Absolute path of the directory holding the plugin wheels. "
-                "A relative path is rejected so that the current directory cannot choose it."
+                "Directory holding the plugin wheels. A relative path starts from the current "
+                "directory of the server. The storage-proxy changes it to the directory of its "
+                "config file before reading this."
             ),
             added_version=NEXT_RELEASE_VERSION,
-            example=ConfigExample(
-                local="/opt/backend.ai/wheelhouse", prod="/opt/backend.ai/wheelhouse"
-            ),
+            example=ConfigExample(local="wheelhouse", prod="wheelhouse"),
         ),
     ]
-
-    @field_validator("path")
-    @classmethod
-    def _reject_relative_path(cls, path: Path) -> Path:
-        if not path.is_absolute():
-            raise ValueError("wheelhouse.path must be an absolute path")
-        return path

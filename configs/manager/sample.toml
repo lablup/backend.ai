@@ -504,10 +504,11 @@
   # /etc/backend.ai, can turn this on.
   # Added in 26.10.0
   allow = false
-  # Absolute path of the directory holding the plugin wheels. A relative path is
-  # rejected so that the current directory cannot choose it.
+  # Directory holding the plugin wheels. A relative path starts from the current
+  # directory of the server. The storage-proxy changes it to the directory of
+  # its config file before reading this.
   # Added in 26.10.0
-  path = "/opt/backend.ai/wheelhouse"
+  path = "wheelhouse"
 
 # Debugging options configuration. Controls various debugging features that aid
 # in development and troubleshooting. Most debug options should be disabled in
