@@ -65,6 +65,7 @@ from ai.backend.manager.services.deployment.actions.update_deployment import (
 from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
+from ai.backend.manager.types import OptionalState
 
 
 class DeploymentCRUDBaseFixtures:
@@ -466,8 +467,10 @@ class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
     ) -> UpdateDeploymentAction:
         return UpdateDeploymentAction(
             deployment_id=endpoint_info.id,
-            updater=DeploymentUpdater(deployment_id=endpoint_info.id),
-            designated_agents=designated_agents,
+            updater=DeploymentUpdater(
+                deployment_id=endpoint_info.id,
+                designated_agents=OptionalState.from_nullable(designated_agents),
+            ),
         )
 
     async def test_the_given_agents_become_the_designation(
