@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import ssl
 from collections.abc import AsyncGenerator, Mapping
 from typing import Any
 
@@ -15,6 +16,7 @@ class PurityClient:
     api_token: str
     api_version: str
     _auth_token: str | None
+    _ssl_context: ssl.SSLContext | bool
 
     _session: aiohttp.ClientSession
 
@@ -24,11 +26,13 @@ class PurityClient:
         api_token: str,
         *,
         api_version: str = "1.8",
+        ssl_context: ssl.SSLContext | bool = False,
     ) -> None:
         self.endpoint = URL(endpoint)
         self.api_token = api_token
         self.api_version = api_version
         self._auth_token = None
+        self._ssl_context = ssl_context
         self._lock = asyncio.Lock()
         self._session = aiohttp.ClientSession()
 
@@ -41,7 +45,7 @@ class PurityClient:
             async with self._session.post(
                 self.endpoint / "api" / "login",
                 headers={"api-token": self.api_token},
-                ssl=False,
+                ssl=self._ssl_context,
                 raise_for_status=True,
             ) as resp:
                 auth_token = resp.headers["x-auth-token"]
@@ -73,7 +77,7 @@ class PurityClient:
                     "items_returned": 10,
                     "token": pagination_token,
                 },
-                ssl=False,
+                ssl=self._ssl_context,
                 raise_for_status=True,
             ) as resp:
                 data = await resp.json()
@@ -112,7 +116,7 @@ class PurityClient:
                     "items_returned": 10,
                     "token": pagination_token,
                 },
-                ssl=False,
+                ssl=self._ssl_context,
                 raise_for_status=True,
             ) as resp:
                 data = await resp.json()
@@ -136,7 +140,7 @@ class PurityClient:
                     "items_returned": 10,
                     "token": pagination_token,
                 },
-                ssl=False,
+                ssl=self._ssl_context,
                 raise_for_status=True,
             ) as resp:
                 data = await resp.json()

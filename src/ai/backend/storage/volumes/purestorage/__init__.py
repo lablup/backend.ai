@@ -6,6 +6,8 @@ import logging
 import re
 from typing import Any, override
 
+import trafaret as t
+
 from ai.backend.common.types import HardwareMetadata
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.errors import (
@@ -100,6 +102,7 @@ class FlashBladeVolume(BaseVolume):
             self.config["purity_endpoint"],
             self.config["purity_api_token"],
             api_version=self.config["purity_api_version"],
+            ssl_context=t.ToBool().check(self.config.get("purity_verify_ssl", False)),
         )
         await super().init()
 

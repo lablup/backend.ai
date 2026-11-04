@@ -191,6 +191,7 @@ class DellEMCOneFSVolume(BaseVolume):
             self.dell_password,
             api_version=self.dell_api_version,
             system_name=self.dell_system_name,
+            ssl_context=self.config["dell_verify_ssl"],
         )
 
     @override

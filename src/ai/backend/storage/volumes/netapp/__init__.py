@@ -14,6 +14,7 @@ from typing import Any, override
 
 import aiofiles
 import aiofiles.os
+import trafaret as t
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -485,6 +486,7 @@ class NetAppVolume(BaseVolume):
             self.config["netapp_ontap_password"],
             self.local_config["storage-proxy"]["user"],
             self.local_config["storage-proxy"]["group"],
+            ssl_context=t.ToBool().check(self.config.get("netapp_verify_ssl", False)),
         )
         self.netapp_nfs_host = self.config["netapp_nfs_host"]
         self.netapp_xcp_cmd = self.config["netapp_xcp_cmd"]
