@@ -159,13 +159,18 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
                         src_plugin=plugin_name,
                         result=handler_result,
                     )
-                if return_when == ALL_COMPLETED:
-                    handler_results.append(handler_result)
+                handler_results.append(handler_result)
         if not success_if_no_hook and not executed_plugin_names:
             return HookResult(
                 status=REJECTED,
                 src_plugin=executed_plugin_names,  # empty
                 result=handler_results,  # empty
+            )
+        if return_when == FIRST_COMPLETED:
+            return HookResult(
+                status=PASSED,
+                src_plugin=executed_plugin_names,
+                result=None,
             )
         return HookResult(
             status=PASSED,
