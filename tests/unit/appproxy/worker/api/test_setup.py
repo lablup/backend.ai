@@ -17,7 +17,12 @@ from aiohttp.test_utils import make_mocked_request
 from ai.backend.appproxy.common.config import PermitHashConfig
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
 from ai.backend.appproxy.common.errors import InvalidCredentials
-from ai.backend.appproxy.common.types import FrontendMode, FrontendServerMode, ProxyProtocol
+from ai.backend.appproxy.common.types import (
+    DigestModType,
+    FrontendMode,
+    FrontendServerMode,
+    ProxyProtocol,
+)
 from ai.backend.appproxy.worker.api.setup import setup
 from ai.backend.appproxy.worker.config import PortProxyConfig
 from ai.backend.appproxy.worker.types import InteractiveAppInfo
@@ -40,7 +45,9 @@ class _RejectedSetupTokenCase:
 def worker_app(mocker: pytest_mock.MockerFixture) -> web.Application:
     root_ctx = Mock()
     root_ctx.local_config.secrets.jwt_secret = _JWT_SECRET
-    root_ctx.local_config.permit_hash = PermitHashConfig(secret=b"permit-secret")
+    root_ctx.local_config.permit_hash = PermitHashConfig(
+        secret=b"permit-secret", digest_mod=DigestModType.SHA256
+    )
     worker_config = root_ctx.local_config.proxy_worker
     worker_config.frontend_mode = FrontendServerMode.PORT
     worker_config.port_proxy = Mock(
