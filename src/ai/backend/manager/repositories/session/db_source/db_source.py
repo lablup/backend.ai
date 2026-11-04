@@ -122,19 +122,7 @@ class SessionDBSource:
         if len(sessions) > 1:
             # Defensive: the partial unique index should prevent this for non-terminal
             # sessions, but guard against any data that escaped the constraint.
-            raise TooManySessionsMatched(
-                extra_data={
-                    "matches": [
-                        {
-                            "session_id": session.id,
-                            "session_name": session.name,
-                            "status": session.status,
-                            "created_at": session.created_at,
-                        }
-                        for session in sessions
-                    ]
-                }
-            )
+            raise TooManySessionsMatched.from_sessions(sessions)
         return SessionId(sessions[0].id)
 
     async def get_session_name(self, session_id: SessionId) -> str:
@@ -189,7 +177,7 @@ class SessionDBSource:
     ) -> SessionRow:
         options: list[_AbstractLoad] = [*eager_loading_op]
         if kernel_loading_strategy != KernelLoadingStrategy.NONE:
-            # MAIN_KERNEL_ONLY loads every kernel as well, the same as SessionRow.get_session.
+            # MAIN_KERNEL_ONLY loads every kernel as well.
             options.extend([
                 noload("*"),
                 selectinload(SessionRow.kernels).options(
@@ -452,19 +440,7 @@ class SessionDBSource:
                     )
                 ).items
                 if len(matches) > 1:
-                    raise TooManySessionsMatched(
-                        extra_data={
-                            "matches": [
-                                {
-                                    "session_id": sess.id,
-                                    "session_name": sess.name,
-                                    "status": sess.status,
-                                    "created_at": sess.created_at,
-                                }
-                                for sess in matches
-                            ]
-                        }
-                    )
+                    raise TooManySessionsMatched.from_sessions(matches)
                 if matches:
                     raise SessionAlreadyExists(
                         f"Duplicate session name. Session(id:{matches[0].id}) already has the name"
