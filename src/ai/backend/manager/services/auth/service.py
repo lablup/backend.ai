@@ -304,13 +304,14 @@ class AuthService:
         )
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
-        if hook_result.result is not None:
-            user = hook_result.result
+        user_authorized_by_plugin = hook_result.result
+        if user_authorized_by_plugin is not None:
             active_sessions = await self._auth_repository.get_active_session_tokens(
-                user.uuid, login_client_type_id=login_client_type_id
+                user_authorized_by_plugin.uuid, login_client_type_id=login_client_type_id
             )
-            return user, active_sessions
+            return user_authorized_by_plugin, active_sessions
 
+        # No AUTHORIZE plugin handled this login, so verify the password.
         target_password_info = PasswordInfo(
             password=action.password,
             algorithm=auth_config.password_hash_algorithm,

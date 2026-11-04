@@ -32,10 +32,8 @@ __all__ = (
 
 class HookHandler(Protocol):
     """
-    The handler should accept a single argument containing
-    a tuple of parameters passed to the handler.
-    If it decides to cancel the ongoing event, it should raise
-    :class:`HookDenied` exception.
+    Returns the result of the handler, or None when it has no result for this event.
+    Raises :class:`Reject` to cancel the ongoing event.
     """
 
     async def __call__(self, *args: Any) -> Any:
