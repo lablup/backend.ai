@@ -771,7 +771,6 @@ install_editable_webui() {
     git clone https://github.com/lablup/backend.ai-webui ./src/ai/backend/webui
     cd src/ai/backend/webui
     cp configs/default.toml config.toml
-    local site_name=$(basename $(pwd))
     # The debug mode here is only for 'hard-core' debugging scenarios -- it changes lots of behaviors.
     # (e.g., separate debugging of Electron's renderer and main threads)
     sed_inplace "s@debug = true@debug = false@" config.toml
