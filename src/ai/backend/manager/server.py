@@ -36,7 +36,7 @@ from aiohttp.typedefs import Handler, Middleware
 from setproctitle import setproctitle
 
 from ai.backend.common.cli import LazyGroup
-from ai.backend.common.config import find_server_config_file
+from ai.backend.common.config import find_config_file
 from ai.backend.common.dependencies import DependencyBuilderStack
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.http import (
@@ -549,7 +549,7 @@ def main(
     log_level = LogLevel.DEBUG if debug else log_level
 
     if config_path is None:
-        discovered_cfg_path = find_server_config_file("manager")
+        discovered_cfg_path = find_config_file("manager")
     else:
         discovered_cfg_path = Path(config_path)
 

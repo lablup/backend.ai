@@ -18,11 +18,7 @@ class WheelhouseConfig(BaseConfigSchema):
         bool,
         Field(default=False),
         BackendAIConfigMeta(
-            description=(
-                "Whether to load the plugin wheels in the path when the server starts. "
-                "Only a config file named with the -f option, or found in "
-                "~/.config/backend.ai or /etc/backend.ai, can turn this on."
-            ),
+            description=("Whether to load the plugin wheels in the path when the server starts."),
             added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="false", prod="false"),
         ),
@@ -33,8 +29,8 @@ class WheelhouseConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Directory holding the plugin wheels. A relative path starts from the current "
-                "directory of the server. The storage-proxy changes it to the directory of its "
-                "config file before reading this."
+                "directory of the server. The storage-proxy runs from the directory of its "
+                "config file."
             ),
             added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="wheelhouse", prod="wheelhouse"),

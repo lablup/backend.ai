@@ -1659,8 +1659,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
         Field(default_factory=WheelhouseConfig),
         BackendAIConfigMeta(
             description=(
-                "Plugin wheels loaded when the storage-proxy starts. Read only from the "
-                "config file: etcd values are ignored. Wheels provided here run without "
+                "Plugin wheels loaded when the storage-proxy starts. Wheels run without "
                 "verification, so keep the path writable only by trusted operators."
             ),
             added_version=NEXT_RELEASE_VERSION,

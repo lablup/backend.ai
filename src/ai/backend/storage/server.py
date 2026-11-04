@@ -28,7 +28,6 @@ from setproctitle import setproctitle
 
 from ai.backend.common.config import (
     ConfigurationError,
-    find_server_config_file,
 )
 from ai.backend.common.dependencies import DependencyBuilderStack
 from ai.backend.common.etcd import AsyncEtcd
@@ -36,11 +35,7 @@ from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_mult
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
-from ai.backend.common.plugin import (
-    AbstractPlugin,
-    BasePluginContext,
-    load_configured_wheelhouse,
-)
+from ai.backend.common.plugin import AbstractPlugin, BasePluginContext, load_configured_wheelhouse
 from ai.backend.common.types import HostPortPair as CommonHostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import Logger, LogLevel
@@ -450,7 +445,7 @@ async def server_main(
 @click.pass_context
 def main(
     cli_ctx: click.Context,
-    config_path: Path | None,
+    config_path: Path,
     log_level: LogLevel,
     debug: bool = False,
 ) -> int:
@@ -459,10 +454,7 @@ def main(
     log_level = LogLevel.DEBUG if debug else log_level
     resolved_config_path = config_path.resolve() if config_path is not None else None
     try:
-        local_config = load_local_config(
-            resolved_config_path or find_server_config_file("storage-proxy"),
-            log_level=log_level,
-        )
+        local_config = load_local_config(resolved_config_path, log_level=log_level)
     except ConfigurationError as e:
         print(
             "ConfigurationError: Could not read or validate the storage-proxy local config:",

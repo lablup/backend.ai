@@ -2398,8 +2398,7 @@ class AgentGlobalConfig(BaseConfigSchema):
         Field(default_factory=WheelhouseConfig),
         BackendAIConfigMeta(
             description=(
-                "Plugin wheels loaded when the agent starts. Read only from the "
-                "config file: etcd values are ignored. Wheels provided here run without "
+                "Plugin wheels loaded when the agent starts. Wheels run without "
                 "verification, so keep the path writable only by trusted operators."
             ),
             added_version=NEXT_RELEASE_VERSION,

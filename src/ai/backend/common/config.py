@@ -1027,33 +1027,6 @@ def find_config_file(daemon_name: str) -> Path:
         })
 
 
-def _config_file_allows_wheelhouse(toml_path: Path) -> bool:
-    try:
-        config = tomli.loads(toml_path.read_text())
-    except (OSError, tomli.TOMLDecodeError):
-        # Reading the file for real reports these.
-        return False
-    wheelhouse = config.get("wheelhouse")
-    return isinstance(wheelhouse, Mapping) and bool(wheelhouse.get("allow"))
-
-
-def find_server_config_file(daemon_name: str) -> Path:
-    """
-    Find the config file for ``start-server`` when ``-f`` is not given. Only the home and system
-    config directories may set ``wheelhouse.allow``: not the current directory or an env var.
-    """
-    toml_path = find_config_file(daemon_name)
-    trusted_directories = (Path.home() / ".config" / "backend.ai", Path("/etc/backend.ai"))
-    if toml_path.parent not in trusted_directories and _config_file_allows_wheelhouse(toml_path):
-        raise ConfigurationError({
-            "find_server_config_file()": (
-                f"{toml_path} sets wheelhouse.allow. Name it with the -f option, or move it to"
-                f" {trusted_directories[0]} or {trusted_directories[1]}."
-            ),
-        })
-    return toml_path
-
-
 def read_from_file(toml_path: Path | str | None, daemon_name: str) -> tuple[dict[str, Any], Path]:
     config: dict[str, Any]
     discovered_path: Path
