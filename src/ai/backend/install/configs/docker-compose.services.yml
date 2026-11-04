@@ -33,10 +33,6 @@ services:
     working_dir: {{BASE_PATH}}
     profiles: ["cli"]
     command: ["true"]
-    environment:
-      # working_dir also holds manager.toml, and a config file found through the
-      # working directory must not set wheelhouse.allow
-      - BACKEND_CONFIG_FILE=/etc/backend.ai/manager.toml
     volumes:
       - /etc/machine-id:/etc/machine-id:ro
       - {{BASE_PATH}}/manager.toml:/etc/backend.ai/manager.toml:ro

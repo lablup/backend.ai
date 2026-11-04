@@ -132,9 +132,9 @@
 # so keep the path writable only by trusted operators.
 # Added in 26.10.0
 [wheelhouse]
-  # Whether to load the plugin wheels in the path when the server starts. A
-  # config file found through the current directory cannot turn this on: name it
-  # with the -f option or BACKEND_CONFIG_FILE.
+  # Whether to load the plugin wheels in the path when the server starts. Only a
+  # config file named with the -f option, or found in ~/.config/backend.ai or
+  # /etc/backend.ai, can turn this on.
   # Added in 26.10.0
   allow = false
   # Absolute path of the directory holding the plugin wheels. A relative path is

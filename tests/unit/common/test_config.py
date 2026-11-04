@@ -23,6 +23,7 @@ from ai.backend.common.config import (
     _merge_metadata,
     _merge_service_config,
     find_config_file,
+    find_server_config_file,
     merge,
     override_key,
 )
@@ -803,7 +804,7 @@ def config_file_named_by_the_environment(
     return config_path
 
 
-class TestFindConfigFileWithWheelhouseAllowed:
+class TestFindServerConfigFile:
     @pytest.mark.parametrize(
         "case",
         [
@@ -819,9 +820,14 @@ class TestFindConfigFileWithWheelhouseAllowed:
         ids=lambda case: case.directory_under_home,
     )
     @pytest.mark.usefixtures("config_file_under_home")
-    def test_rejects_a_file_found_through_the_current_directory(self) -> None:
+    def test_rejects_wheelhouse_allow_found_through_the_current_directory(self) -> None:
         with pytest.raises(ConfigurationError, match=r"wheelhouse\.allow"):
-            find_config_file("manager")
+            find_server_config_file("manager")
+
+    @pytest.mark.usefixtures("config_file_named_by_the_environment")
+    def test_rejects_wheelhouse_allow_named_by_the_environment(self) -> None:
+        with pytest.raises(ConfigurationError, match=r"wheelhouse\.allow"):
+            find_server_config_file("manager")
 
     @pytest.mark.parametrize(
         "case",
@@ -841,10 +847,22 @@ class TestFindConfigFileWithWheelhouseAllowed:
         ],
         ids=["home-config-allowing", "cwd-config-disallowing", "cwd-config-without-section"],
     )
-    def test_returns_a_file_that_may_set_it(self, config_file_under_home: Path) -> None:
-        assert find_config_file("manager") == config_file_under_home
+    def test_returns_a_file_that_may_be_used(self, config_file_under_home: Path) -> None:
+        assert find_server_config_file("manager") == config_file_under_home
 
-    def test_returns_a_file_named_by_the_environment(
-        self, config_file_named_by_the_environment: Path
+
+class TestFindConfigFile:
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ConfigFileUnderHomeCase(
+                directory_under_home=_CURRENT_DIRECTORY_UNDER_HOME,
+                content=_CONFIG_ALLOWING_THE_WHEELHOUSE,
+            ),
+        ],
+        ids=lambda case: case.directory_under_home,
+    )
+    def test_returns_a_file_allowing_the_wheelhouse_for_commands_that_load_no_wheels(
+        self, config_file_under_home: Path
     ) -> None:
-        assert find_config_file("manager") == config_file_named_by_the_environment
+        assert find_config_file("manager") == config_file_under_home

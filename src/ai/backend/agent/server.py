@@ -1750,7 +1750,9 @@ def main(
 
     # Determine where to read configuration.
     try:
-        raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
+        raw_cfg, cfg_src_path = config.read_from_file(
+            config_path or config.find_server_config_file("agent"), "agent"
+        )
     except config.ConfigurationError as e:
         print(
             "ConfigurationError: Could not read or validate the storage-proxy local config:",

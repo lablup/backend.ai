@@ -20,8 +20,8 @@ class WheelhouseConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Whether to load the plugin wheels in the path when the server starts. "
-                "A config file found through the current directory cannot turn this on: "
-                "name it with the -f option or BACKEND_CONFIG_FILE."
+                "Only a config file named with the -f option, or found in "
+                "~/.config/backend.ai or /etc/backend.ai, can turn this on."
             ),
             added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="false", prod="false"),

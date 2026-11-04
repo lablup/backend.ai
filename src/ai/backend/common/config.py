@@ -993,29 +993,19 @@ class PresetModelDefinitionDraft(BaseConfigModel):
         })
 
 
-def _config_file_allows_wheelhouse(toml_path: Path) -> bool:
-    try:
-        config = tomli.loads(toml_path.read_text())
-    except (OSError, tomli.TOMLDecodeError):
-        # Reading the file for real reports these.
-        return False
-    wheelhouse = config.get("wheelhouse")
-    return isinstance(wheelhouse, Mapping) and bool(wheelhouse.get("allow"))
-
-
 def find_config_file(daemon_name: str) -> Path:
     toml_path_from_env = os.environ.get("BACKEND_CONFIG_FILE", None)
-    cwd_derived_toml_paths: list[Path] = []
     if not toml_path_from_env:
-        cwd_derived_toml_paths.append(Path.cwd() / f"{daemon_name}.toml")
+        toml_paths = [
+            Path.cwd() / f"{daemon_name}.toml",
+        ]
         if sys.platform.startswith("linux") or sys.platform.startswith("darwin"):
             parent_path = Path.cwd().parent
             while parent_path.is_relative_to(Path.home()):
                 if (parent_path / "BUILD_ROOT").exists():
-                    cwd_derived_toml_paths.append(parent_path / f"{daemon_name}.toml")
+                    toml_paths.append(parent_path / f"{daemon_name}.toml")
                 parent_path = parent_path.parent
-            toml_paths = [
-                *cwd_derived_toml_paths,
+            toml_paths += [
                 Path.home() / ".config" / "backend.ai" / f"{daemon_name}.toml",
                 Path(f"/etc/backend.ai/{daemon_name}.toml"),
             ]
@@ -1029,19 +1019,39 @@ def find_config_file(daemon_name: str) -> Path:
         toml_paths = [Path(toml_path_from_env)]
     for _path in toml_paths:
         if _path.is_file():
-            if _path in cwd_derived_toml_paths and _config_file_allows_wheelhouse(_path):
-                raise ConfigurationError({
-                    "find_config_file()": (
-                        f"{_path} sets wheelhouse.allow but was found through the current"
-                        " directory. Name it with the -f option or BACKEND_CONFIG_FILE."
-                    ),
-                })
             return _path
     else:
         searched_paths = ",".join(map(str, toml_paths))
         raise ConfigurationError({
             "find_config_file()": f"Could not read config from: {searched_paths}",
         })
+
+
+def _config_file_allows_wheelhouse(toml_path: Path) -> bool:
+    try:
+        config = tomli.loads(toml_path.read_text())
+    except (OSError, tomli.TOMLDecodeError):
+        # Reading the file for real reports these.
+        return False
+    wheelhouse = config.get("wheelhouse")
+    return isinstance(wheelhouse, Mapping) and bool(wheelhouse.get("allow"))
+
+
+def find_server_config_file(daemon_name: str) -> Path:
+    """
+    Find the config file for ``start-server`` when ``-f`` is not given. Only the home and system
+    config directories may set ``wheelhouse.allow``: not the current directory or an env var.
+    """
+    toml_path = find_config_file(daemon_name)
+    trusted_directories = (Path.home() / ".config" / "backend.ai", Path("/etc/backend.ai"))
+    if toml_path.parent not in trusted_directories and _config_file_allows_wheelhouse(toml_path):
+        raise ConfigurationError({
+            "find_server_config_file()": (
+                f"{toml_path} sets wheelhouse.allow. Name it with the -f option, or move it to"
+                f" {trusted_directories[0]} or {trusted_directories[1]}."
+            ),
+        })
+    return toml_path
 
 
 def read_from_file(toml_path: Path | str | None, daemon_name: str) -> tuple[dict[str, Any], Path]:

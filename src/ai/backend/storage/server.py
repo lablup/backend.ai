@@ -28,6 +28,7 @@ from setproctitle import setproctitle
 
 from ai.backend.common.config import (
     ConfigurationError,
+    find_server_config_file,
 )
 from ai.backend.common.dependencies import DependencyBuilderStack
 from ai.backend.common.etcd import AsyncEtcd
@@ -449,7 +450,7 @@ async def server_main(
 @click.pass_context
 def main(
     cli_ctx: click.Context,
-    config_path: Path,
+    config_path: Path | None,
     log_level: LogLevel,
     debug: bool = False,
 ) -> int:
@@ -458,7 +459,10 @@ def main(
     log_level = LogLevel.DEBUG if debug else log_level
     resolved_config_path = config_path.resolve() if config_path is not None else None
     try:
-        local_config = load_local_config(resolved_config_path, log_level=log_level)
+        local_config = load_local_config(
+            resolved_config_path or find_server_config_file("storage-proxy"),
+            log_level=log_level,
+        )
     except ConfigurationError as e:
         print(
             "ConfigurationError: Could not read or validate the storage-proxy local config:",
