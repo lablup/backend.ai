@@ -544,7 +544,12 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                                 "volumeMounts": [cattr.unstructure(v) for v in self.volume_mounts],
                                 "ports": [{"containerPort": x} for x in ports],
                                 "securityContext": {
-                                    "capabilities": {"add": ["IPC_LOCK", "SYS_NICE"]},
+                                    "capabilities": {
+                                        "add": [
+                                            "IPC_LOCK",  # for hugepages and RDMA
+                                            "SYS_NICE",  # for NFS based GPUDirect Storage
+                                        ],
+                                    },
                                 },
                             }
                         ],
