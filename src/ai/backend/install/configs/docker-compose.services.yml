@@ -35,6 +35,8 @@ services:
     working_dir: {{BASE_PATH}}
     profiles: ["cli"]
     command: ["true"]
+    environment:
+      - BACKEND_WHEELHOUSE_PATH={{BASE_PATH}}/wheelhouse
     volumes:
       - /etc/machine-id:/etc/machine-id:ro
       - {{BASE_PATH}}/manager.toml:/etc/backend.ai/manager.toml:ro

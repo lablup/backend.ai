@@ -18,4 +18,4 @@ This package is the **entry-point scanner / CLI** (`entrypoint.py`, `cli.py`). P
 - Duplicate plugin name across sources raises at load; a name in both allowlist and blocklist is a `ConfigurationError`.
 - A class not inheriting `AbstractPlugin` is skipped with a warning.
 - Plugin etcd config path is `config/plugins/{group_key}/{plugin_name}/`.
-- Discovery does not read the current directory. The build root comes from `BACKEND_BUILD_ROOT` or the location of this package; wheels come from `BACKEND_WHEELHOUSE_PATH` or `<build root>/wheelhouse`.
+- Discovery loads nothing from the current directory and only warns when `./wheelhouse` holds wheels it does not load. The build root comes from `BACKEND_BUILD_ROOT` or the location of this package; wheels come from `BACKEND_WHEELHOUSE_PATH` or `<build root>/wheelhouse`.

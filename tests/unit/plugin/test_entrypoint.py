@@ -148,6 +148,11 @@ def current_directory_with_planted_wheel(
 
 
 @pytest.fixture
+def current_directory_without_wheels(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+
+@pytest.fixture
 def wheel_on_the_configured_path(
     case: _ExplicitWheelhouseCase,
     discovery_environ_cleared: None,
@@ -158,6 +163,13 @@ def wheel_on_the_configured_path(
         case.env_name, str(directory_with_planted_wheel / case.env_path_under_directory)
     )
     return directory_with_planted_wheel
+
+
+@pytest.fixture
+def current_directory_holding_the_configured_wheelhouse(
+    wheel_on_the_configured_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(wheel_on_the_configured_path)
 
 
 @pytest.fixture
@@ -186,6 +198,39 @@ class TestPrepareWheelhouse:
         extracted_path = current_directory_with_planted_wheel / "wheelhouse" / _PLANTED_WHEEL_STEM
         assert not extracted_path.exists()
         assert str(extracted_path) not in sys.path
+
+    def test_warns_about_wheels_ignored_in_the_current_directory(
+        self, current_directory_with_planted_wheel: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        prepare_wheelhouse()
+
+        assert "BACKEND_WHEELHOUSE_PATH" in caplog.text
+
+    @pytest.mark.usefixtures("current_directory_without_wheels")
+    def test_does_not_warn_without_wheels_in_the_current_directory(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        prepare_wheelhouse()
+
+        assert "BACKEND_WHEELHOUSE_PATH" not in caplog.text
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ExplicitWheelhouseCase(
+                env_name="BACKEND_WHEELHOUSE_PATH", env_path_under_directory="wheelhouse"
+            ),
+            _ExplicitWheelhouseCase(env_name="BACKEND_BUILD_ROOT", env_path_under_directory="."),
+        ],
+        ids=lambda case: case.env_name,
+    )
+    @pytest.mark.usefixtures("current_directory_holding_the_configured_wheelhouse")
+    def test_does_not_warn_when_the_current_directory_holds_the_configured_wheelhouse(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        prepare_wheelhouse()
+
+        assert "BACKEND_WHEELHOUSE_PATH" not in caplog.text
 
     @pytest.mark.parametrize(
         "case",

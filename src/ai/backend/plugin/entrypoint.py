@@ -12,6 +12,7 @@ from collections.abc import Iterable, Iterator
 from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
 
+# Not StructuredLogger: ai.backend.logging would load zmq, glide and ai.backend.common on every CLI start.
 log = logging.getLogger(__spec__.name)
 
 
@@ -229,8 +230,23 @@ def _find_wheelhouse_path() -> Path | None:
         return None
 
 
+def _warn_about_ignored_wheels_in_current_directory(loaded_wheelhouse_path: Path | None) -> None:
+    current_wheelhouse_path = Path.cwd() / "wheelhouse"
+    if (
+        loaded_wheelhouse_path is not None
+        and loaded_wheelhouse_path.resolve() == current_wheelhouse_path.resolve()
+    ):
+        return
+    if any(current_wheelhouse_path.glob("*.whl")):
+        log.warning(
+            "Not loading the wheels in ./wheelhouse of the current directory."
+            " Set BACKEND_WHEELHOUSE_PATH to load them."
+        )
+
+
 def prepare_wheelhouse() -> None:
     wheelhouse_path = _find_wheelhouse_path()
+    _warn_about_ignored_wheels_in_current_directory(wheelhouse_path)
     if wheelhouse_path is None:
         return
     for whl_path in wheelhouse_path.glob("*.whl"):

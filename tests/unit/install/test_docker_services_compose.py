@@ -261,6 +261,9 @@ def test_rendered_compose_wheelhouse_mounts(template: str) -> None:
             assert "BACKEND_WHEELHOUSE_PATH=/app/wheelhouse" in service["environment"], name
         else:
             assert not any("wheelhouse" in v for v in service["volumes"]), name
+    assert (
+        f"BACKEND_WHEELHOUSE_PATH={BASE_PATH}/wheelhouse" in services["manager-cli"]["environment"]
+    )
 
 
 def test_rendered_compose_elevated_services(template: str) -> None:
