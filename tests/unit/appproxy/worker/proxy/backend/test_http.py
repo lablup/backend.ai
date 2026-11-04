@@ -163,6 +163,26 @@ class TestProxyHttpForwardedHeaders:
             ),
             pytest.param(
                 _ForwardedHeadersCase(
+                    trusted_proxies=[],
+                    tls_advertised=False,
+                    app="jupyter",
+                    request_headers={
+                        name.lower(): value for name, value in _FORGED_HEADERS.items()
+                    },
+                    expected_headers=_ForwardedHeaders(
+                        forwarded=None,
+                        x_forwarded_for=None,
+                        x_forwarded_host=None,
+                        x_forwarded_port=None,
+                        x_forwarded_proto="http",
+                        x_rstudio_proto=None,
+                        x_rstudio_request=None,
+                    ),
+                ),
+                id="lowercase_forged_header_names_are_dropped",
+            ),
+            pytest.param(
+                _ForwardedHeadersCase(
                     trusted_proxies=["10.0.0.0/8"],
                     tls_advertised=False,
                     app="jupyter",
