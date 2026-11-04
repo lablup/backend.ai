@@ -123,6 +123,19 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+<<<<<<< HEAD
+=======
+from ai.backend.manager.data.vfolder.types import verify_mount_destination
+from ai.backend.manager.models.agent.row import AgentRow, agents
+from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
+    BootstrapScriptRevisionSearchableFields,
+)
+from ai.backend.manager.models.bootstrap_script_revision.searchers import (
+    DefaultBootstrapScriptRevisionSearcher,
+)
+from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.endpoint.row import EndpointRow
+>>>>>>> 1b01ca06 (fix(BA-8806): reject mount destinations under reserved paths (#16473))
 from ai.backend.manager.models.image.searchers import (
     CanonicalImageSearcher,
     ImageSearcher,
@@ -502,7 +515,7 @@ class AgentRegistry:
                 alias_name = alias_name.replace("/home/work/", "")
             if alias_name == "":
                 raise InvalidAPIParameters("Alias name cannot be empty.")
-            if not verify_vfolder_name(alias_name):
+            if not verify_mount_destination(alias_name):
                 raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
             if alias_name in original_folders:
                 raise InvalidAPIParameters(

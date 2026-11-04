@@ -548,6 +548,19 @@ class TestMountNameValidationRule:
         with pytest.raises(InvalidAPIParameters):
             MountNameValidationRule().validate(spec, _ctx())
 
+    @pytest.mark.parametrize(
+        "kernel_path",
+        ["/opt/container", "/opt/backend.ai/bin", "/home/work/../../opt/container"],
+    )
+    def test_rejects_path_under_reserved_path(self, kernel_path: str) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec(
+            (_kernel(img),),
+            vfolder_mounts=(_vfolder_mount("data", kernel_path=kernel_path),),
+        )
+        with pytest.raises(InvalidAPIParameters):
+            MountNameValidationRule().validate(spec, _ctx())
+
 
 class TestInferenceModelFolderRule:
     def test_noop_for_non_inference(self) -> None:

@@ -42,6 +42,10 @@ from ai.backend.manager.data.session.spec import (
     SessionSpec,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+<<<<<<< HEAD
+=======
+from ai.backend.manager.data.vfolder.types import verify_mount_destination
+>>>>>>> 1b01ca06 (fix(BA-8806): reject mount destinations under reserved paths (#16473))
 from ai.backend.manager.errors.common import InternalServerError, RejectedByHook
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.metrics.scheduler import (
@@ -643,7 +647,11 @@ class SchedulingController:
                 alias_name = alias_name.replace("/home/work/", "")
             if alias_name == "":
                 raise InvalidAPIParameters("Alias name cannot be empty.")
+<<<<<<< HEAD
             if not _verify_vfolder_name(alias_name):
+=======
+            if not verify_mount_destination(alias_name):
+>>>>>>> 1b01ca06 (fix(BA-8806): reject mount destinations under reserved paths (#16473))
                 raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
             if alias_name in original_refs:
                 raise InvalidAPIParameters(
