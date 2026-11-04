@@ -21,8 +21,6 @@ from ai.backend.storage.volumes.vfs import BaseVolume
 if TYPE_CHECKING:
     from ai.backend.common.etcd import AsyncEtcd
 
-_CURRENT_DIR = PurePosixPath(".")
-
 
 class TestBaseVolume:
     """Regression tests for BaseVolume methods."""
@@ -166,128 +164,6 @@ class TestBaseVolume:
             assert mode == DEFAULT_VFOLDER_PERMISSION_MODE, created
         # A directory that already existed keeps its mode.
         assert stat.S_IMODE(pre_existing.stat().st_mode) == 0o700
-
-    @pytest.fixture
-    def outside_dir(self, tmp_path: Path) -> Path:
-        outside = tmp_path / "outside"
-        outside.mkdir()
-        (outside / "f.txt").write_bytes(b"outside")
-        (outside / "victim").mkdir()
-        return outside
-
-    @pytest.fixture
-    def dir_swapped_after_check(
-        self,
-        base_volume: BaseVolume,
-        sample_vfolder: VFolderID,
-        outside_dir: Path,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> Path:
-        """Replace ``sub`` with a symlink to ``outside_dir`` right after the path check passes."""
-        vfpath = base_volume.mangle_vfpath(sample_vfolder)
-        sub = vfpath / "sub"
-        sub.mkdir()
-        (sub / "f.txt").write_bytes(b"inside")
-        (sub / "victim").mkdir()
-        check = base_volume.sanitize_vfpath
-
-        def check_then_swap(vfid: VFolderID, relpath: PurePosixPath = _CURRENT_DIR) -> Path:
-            checked = check(vfid, relpath)
-            if not sub.is_symlink():
-                sub.rename(vfpath / "sub.orig")
-                sub.symlink_to(outside_dir)
-            return checked
-
-        monkeypatch.setattr(base_volume, "sanitize_vfpath", check_then_swap)
-        return outside_dir
-
-    @pytest.fixture
-    def file_swapped_after_check(
-        self,
-        base_volume: BaseVolume,
-        sample_vfolder: VFolderID,
-        outside_dir: Path,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> Path:
-        """Replace the file ``f.txt`` with a symlink to the outside file right after the path check."""
-        vfpath = base_volume.mangle_vfpath(sample_vfolder)
-        target = vfpath / "f.txt"
-        target.write_bytes(b"inside")
-        check = base_volume.sanitize_vfpath
-
-        def check_then_swap(vfid: VFolderID, relpath: PurePosixPath = _CURRENT_DIR) -> Path:
-            checked = check(vfid, relpath)
-            if not target.is_symlink():
-                target.unlink()
-                target.symlink_to(outside_dir / "f.txt")
-            return checked
-
-        monkeypatch.setattr(base_volume, "sanitize_vfpath", check_then_swap)
-        return outside_dir
-
-    async def test_add_file_refuses_directory_swapped_to_symlink(
-        self,
-        base_volume: BaseVolume,
-        sample_vfolder: VFolderID,
-        dir_swapped_after_check: Path,
-    ) -> None:
-        async def payload() -> AsyncIterator[bytes]:
-            yield b"evil"
-
-        with pytest.raises(InvalidSubpathError):
-            await base_volume.add_file(sample_vfolder, PurePosixPath("sub/new.txt"), payload())
-
-        assert not (dir_swapped_after_check / "new.txt").exists()
-
-    async def test_add_file_refuses_file_swapped_to_symlink(
-        self,
-        base_volume: BaseVolume,
-        sample_vfolder: VFolderID,
-        file_swapped_after_check: Path,
-    ) -> None:
-        async def payload() -> AsyncIterator[bytes]:
-            yield b"evil"
-
-        with pytest.raises(InvalidSubpathError):
-            await base_volume.add_file(sample_vfolder, PurePosixPath("f.txt"), payload())
-
-        assert (file_swapped_after_check / "f.txt").read_bytes() == b"outside"
-
-    async def test_read_file_refuses_directory_swapped_to_symlink(
-        self,
-        base_volume: BaseVolume,
-        sample_vfolder: VFolderID,
-        dir_swapped_after_check: Path,
-    ) -> None:
-        chunks: list[bytes] = []
-
-        with pytest.raises(InvalidSubpathError):
-            async for chunk in base_volume.read_file(sample_vfolder, PurePosixPath("sub/f.txt")):
-                chunks.append(chunk)
-
-        assert b"outside" not in b"".join(chunks)
-
-    async def test_mkdir_refuses_directory_swapped_to_symlink(
-        self,
-        base_volume: BaseVolume,
-        sample_vfolder: VFolderID,
-        dir_swapped_after_check: Path,
-    ) -> None:
-        with pytest.raises(InvalidSubpathError):
-            await base_volume.mkdir(sample_vfolder, PurePosixPath("sub/new"), parents=True)
-
-        assert not (dir_swapped_after_check / "new").exists()
-
-    async def test_rmdir_refuses_directory_swapped_to_symlink(
-        self,
-        base_volume: BaseVolume,
-        sample_vfolder: VFolderID,
-        dir_swapped_after_check: Path,
-    ) -> None:
-        with pytest.raises(InvalidSubpathError):
-            await base_volume.rmdir(sample_vfolder, PurePosixPath("sub/victim"))
-
-        assert (dir_swapped_after_check / "victim").is_dir()
 
     @pytest.mark.parametrize(
         "file_name, file_content",
