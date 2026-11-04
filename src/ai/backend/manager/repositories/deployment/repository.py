@@ -48,6 +48,7 @@ from ai.backend.manager.clients.valkey_client.statistics import (
     EndpointStatistics,
     KernelStatistics,
 )
+from ai.backend.manager.data.agent.types import AgentData
 from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingAction,
@@ -94,6 +95,7 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.errors.storage import VFolderNotFound, VFolderPermissionError
+from ai.backend.manager.models.agent.searchers import AgentSearcher
 from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
@@ -436,13 +438,9 @@ class DeploymentRepository:
         await self._db_source.set_designated_agents(deployment_id, agent_uuids)
 
     @deployment_repository_resilience.apply()
-    async def fetch_agents_in_resource_group(
-        self,
-        resource_group: str,
-        agent_uuids: Collection[AgentUUID],
-    ) -> set[AgentUUID]:
-        """Return those of ``agent_uuids`` that belong to ``resource_group``."""
-        return await self._db_source.fetch_agents_in_resource_group(resource_group, agent_uuids)
+    async def search_agents(self, *, searcher: AgentSearcher) -> list[AgentData]:
+        """The agents matching ``searcher``; the caller composes the conditions."""
+        return await self._db_source.search_agents(searcher=searcher)
 
     @deployment_repository_resilience.apply()
     async def fetch_designated_agents_by_deployment_ids(

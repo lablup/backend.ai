@@ -12,6 +12,7 @@ from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import FieldIdentifier
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
@@ -51,6 +52,8 @@ from ai.backend.manager.errors.service import (
     RoutingNotFound,
 )
 from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
+from ai.backend.manager.models.agent.searchers import AgentSearcher
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
 from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
 from ai.backend.manager.models.endpoint.searchers import DeploymentIDSearcher
@@ -433,10 +436,17 @@ class DeploymentService:
         operation: ActionOperationType,
     ) -> None:
         """Refuse agents that do not belong to the deployment's resource group."""
-        found = await self._deployment_repository.fetch_agents_in_resource_group(
-            resource_group, agent_uuids
+        agents = await self._deployment_repository.search_agents(
+            searcher=AgentSearcher(
+                pagination=NoPagination(),
+                conditions=[
+                    AgentSearchableFields.own.resource_group.filter.equals(
+                        StringMatchSpec(value=resource_group, case_insensitive=False, negated=False)
+                    ),
+                ],
+            )
         )
-        if outside := agent_uuids - found:
+        if outside := agent_uuids - {agent.uuid for agent in agents}:
             raise DesignatedAgentOutsideResourceGroup(
                 f"Agents {sorted(str(u) for u in outside)} are not in resource group {resource_group}",
                 operation=operation,
