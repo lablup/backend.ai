@@ -66,9 +66,6 @@ docker_api_arch_aliases: Final[Mapping[str, str]] = {
     "386": "386",
 }
 
-<<<<<<< HEAD
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-=======
 # Environment variables the kernel runner entrypoint reads to set the container user and groups.
 # Only the agent sets them; a user-supplied value must never reach the container.
 RUNNER_RESERVED_ENVIRON_KEYS: Final[frozenset[str]] = frozenset({
@@ -77,8 +74,7 @@ RUNNER_RESERVED_ENVIRON_KEYS: Final[frozenset[str]] = frozenset({
     "ADDITIONAL_GIDS",
 })
 
-log = StructuredLogger(logging.getLogger(__spec__.name))
->>>>>>> 9d2f196d2 (fix(BA-8936): reject runner-reserved variables in user-supplied environ (#16464))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 default_registry = "index.docker.io"
 default_repository = "lablup"

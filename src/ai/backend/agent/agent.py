@@ -2583,22 +2583,17 @@ class AbstractAgent[
                     restarting=restarting,
                     cluster_ssh_port_mapping=cluster_info.get("cluster_ssh_port_mapping"),
                 )
-<<<<<<< HEAD
                 log.info(
                     "create_kernel(kernel:{}, session:{}) kernel creation context initialized",
                     kernel_id,
                     session_id,
                 )
-                environ: dict[str, str] = {**kernel_config["environ"]}
-=======
-                log.debug("kernel creation context initialized")
                 # Drop the runner-reserved keys the caller sent; the agent sets them below.
                 environ: dict[str, str] = {
                     k: v
                     for k, v in kernel_config["environ"].items()
                     if k not in RUNNER_RESERVED_ENVIRON_KEYS
                 }
->>>>>>> 9d2f196d2 (fix(BA-8936): reject runner-reserved variables in user-supplied environ (#16464))
 
                 # Inject Backend.AI-intrinsic env-variables for gosu
                 if (ouid := ctx.get_overriding_uid()) is not None:
