@@ -46,12 +46,17 @@ class TestConfLoginSessionToken:
         app["_root.context"] = root_ctx
         return make_mocked_request("POST", "/", app=app)
 
-    async def test_token_is_stored_without_the_login_session_token(
-        self, conf_request: web.Request, db_session: MagicMock
-    ) -> None:
-        params = ConfRequestModel.model_validate(_CONF_REQUEST_BODY_OF_AN_OLDER_MANAGER)
+    @pytest.fixture
+    def conf_params_of_an_older_manager(self) -> ConfRequestModel:
+        return ConfRequestModel.model_validate(_CONF_REQUEST_BODY_OF_AN_OLDER_MANAGER)
 
-        await inspect.unwrap(conf_v2)(conf_request, params)
+    async def test_token_is_stored_without_the_login_session_token(
+        self,
+        conf_request: web.Request,
+        conf_params_of_an_older_manager: ConfRequestModel,
+        db_session: MagicMock,
+    ) -> None:
+        await inspect.unwrap(conf_v2)(conf_request, conf_params_of_an_older_manager)
 
         stored_token: Token = db_session.add.call_args.args[0]
         assert stored_token.login_session_token is None
@@ -59,12 +64,13 @@ class TestConfLoginSessionToken:
         assert stored_token.session_id == _SESSION_ID
 
     async def test_login_session_token_is_not_logged(
-        self, conf_request: web.Request, caplog: pytest.LogCaptureFixture
+        self,
+        conf_request: web.Request,
+        conf_params_of_an_older_manager: ConfRequestModel,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
-        params = ConfRequestModel.model_validate(_CONF_REQUEST_BODY_OF_AN_OLDER_MANAGER)
-
         with caplog.at_level(logging.DEBUG, logger="ai.backend.appproxy.coordinator"):
-            await inspect.unwrap(conf_v2)(conf_request, params)
+            await inspect.unwrap(conf_v2)(conf_request, conf_params_of_an_older_manager)
 
         assert _LOGIN_SESSION_TOKEN not in caplog.text
 
@@ -75,8 +81,9 @@ class TestLoginSessionTokenExposure:
 
         assert masked_params["login_session_token"] == "***"
 
-    def test_token_response_omits_a_value_stored_earlier(self) -> None:
-        stored_row = {
+    @pytest.fixture
+    def token_row_stored_earlier(self) -> dict[str, Any]:
+        return {
             "login_session_token": _LOGIN_SESSION_TOKEN,
             "kernel_host": "10.0.0.1",
             "kernel_port": 8000,
@@ -87,6 +94,9 @@ class TestLoginSessionTokenExposure:
             "domain_name": "default",
         }
 
-        response = TokenResponseModel.model_validate(stored_row)
+    def test_token_response_omits_a_value_stored_earlier(
+        self, token_row_stored_earlier: dict[str, Any]
+    ) -> None:
+        response = TokenResponseModel.model_validate(token_row_stored_earlier)
 
         assert _LOGIN_SESSION_TOKEN not in response.model_dump_json()
