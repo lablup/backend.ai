@@ -139,16 +139,51 @@ class _ExplicitWheelhouseCase:
     env_path_under_directory: str
 
 
+@pytest.fixture
+def current_directory_with_planted_wheel(
+    directory_with_planted_wheel: Path, monkeypatch: pytest.MonkeyPatch
+) -> Path:
+    monkeypatch.chdir(directory_with_planted_wheel)
+    return directory_with_planted_wheel
+
+
+@pytest.fixture
+def wheel_on_the_configured_path(
+    case: _ExplicitWheelhouseCase,
+    discovery_environ_cleared: None,
+    directory_with_planted_wheel: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Path:
+    monkeypatch.setenv(
+        case.env_name, str(directory_with_planted_wheel / case.env_path_under_directory)
+    )
+    return directory_with_planted_wheel
+
+
+@pytest.fixture
+def current_directory_under_planted_build_root(
+    directory_with_planted_build_files: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(directory_with_planted_build_files / "src")
+
+
+@pytest.fixture
+def build_root_named_by_the_environment(
+    discovery_environ_cleared: None,
+    directory_with_planted_build_files: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("BACKEND_BUILD_ROOT", str(directory_with_planted_build_files))
+
+
 @pytest.mark.usefixtures("discovery_environ_cleared")
 class TestPrepareWheelhouse:
     def test_ignores_wheels_in_the_current_directory(
-        self, directory_with_planted_wheel: Path, monkeypatch: pytest.MonkeyPatch
+        self, current_directory_with_planted_wheel: Path
     ) -> None:
-        monkeypatch.chdir(directory_with_planted_wheel)
-
         prepare_wheelhouse()
 
-        extracted_path = directory_with_planted_wheel / "wheelhouse" / _PLANTED_WHEEL_STEM
+        extracted_path = current_directory_with_planted_wheel / "wheelhouse" / _PLANTED_WHEEL_STEM
         assert not extracted_path.exists()
         assert str(extracted_path) not in sys.path
 
@@ -163,18 +198,11 @@ class TestPrepareWheelhouse:
         ids=lambda case: case.env_name,
     )
     def test_loads_wheels_from_the_configured_path(
-        self,
-        case: _ExplicitWheelhouseCase,
-        directory_with_planted_wheel: Path,
-        monkeypatch: pytest.MonkeyPatch,
+        self, wheel_on_the_configured_path: Path
     ) -> None:
-        monkeypatch.setenv(
-            case.env_name, str(directory_with_planted_wheel / case.env_path_under_directory)
-        )
-
         prepare_wheelhouse()
 
-        extracted_path = directory_with_planted_wheel / "wheelhouse" / _PLANTED_WHEEL_STEM
+        extracted_path = wheel_on_the_configured_path / "wheelhouse" / _PLANTED_WHEEL_STEM
         assert (extracted_path / "planted.py").exists()
         assert any(Path(entry) == extracted_path for entry in sys.path)
 
@@ -186,26 +214,18 @@ class TestPrepareWheelhouse:
 )
 @pytest.mark.usefixtures("discovery_environ_cleared")
 class TestBuildRootDiscovery:
+    @pytest.mark.usefixtures("current_directory_under_planted_build_root")
     def test_ignores_a_build_root_above_the_current_directory(
-        self,
-        scan_build_root: Callable[[str], Iterator[EntryPoint]],
-        directory_with_planted_build_files: Path,
-        monkeypatch: pytest.MonkeyPatch,
+        self, scan_build_root: Callable[[str], Iterator[EntryPoint]]
     ) -> None:
-        monkeypatch.chdir(directory_with_planted_build_files / "src")
-
         entrypoints = [*scan_build_root(_PLANTED_GROUP)]
 
         assert entrypoints == []
 
+    @pytest.mark.usefixtures("build_root_named_by_the_environment")
     def test_reads_the_build_root_named_by_the_environment(
-        self,
-        scan_build_root: Callable[[str], Iterator[EntryPoint]],
-        directory_with_planted_build_files: Path,
-        monkeypatch: pytest.MonkeyPatch,
+        self, scan_build_root: Callable[[str], Iterator[EntryPoint]]
     ) -> None:
-        monkeypatch.setenv("BACKEND_BUILD_ROOT", str(directory_with_planted_build_files))
-
         entrypoints = [*scan_build_root(_PLANTED_GROUP)]
 
         assert [entrypoint.name for entrypoint in entrypoints] == ["planted"]
