@@ -6,7 +6,6 @@ import logging
 from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
-from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -14,7 +13,6 @@ from typing import (
 )
 from uuid import UUID
 
-import aiotools
 import sqlalchemy as sa
 import yarl
 from sqlalchemy.dialects import postgresql as pgsql
@@ -27,7 +25,6 @@ from sqlalchemy.orm import (
     joinedload,
     load_only,
     mapped_column,
-    noload,
     relationship,
     selectinload,
 )
@@ -77,7 +74,6 @@ from ai.backend.manager.errors.kernel import (
     MainKernelNotFound,
     SessionNotFound,
     TooManyKernelsFound,
-    TooManySessionsMatched,
 )
 from ai.backend.manager.exceptions import AgentError
 from ai.backend.manager.models.base import (
@@ -270,34 +266,6 @@ async def _match_sessions_by_id(
         eager_loading_op=eager_loading_op,
     )
 
-    result = await db_session.execute(query)
-    return result.scalars().all()
-
-
-async def _match_sessions_by_name(
-    db_session: SASession,
-    session_name: str,
-    access_key: AccessKey,
-    *,
-    allow_prefix: bool = False,
-    allow_stale: bool = True,
-    for_update: bool = False,
-    max_matches: int | None = None,
-    eager_loading_op: Sequence[_AbstractLoad] | None = None,
-) -> Sequence[SessionRow]:
-    cond: sa.sql.elements.ColumnElement[bool]
-    if allow_prefix:
-        cond = sa.sql.expression.cast(SessionRow.name, sa.String).like(f"{session_name}%")
-    else:
-        cond = SessionRow.name == session_name
-    query = _build_session_fetch_query(
-        cond,
-        access_key,
-        max_matches=max_matches,
-        allow_stale=allow_stale,
-        for_update=for_update,
-        eager_loading_op=eager_loading_op,
-    )
     result = await db_session.execute(query)
     return result.scalars().all()
 
@@ -880,148 +848,8 @@ class SessionRow(CreatedAtMixin, Base):
 
         await execute_with_retry(_update)
 
-    @classmethod
-    async def match_sessions(
-        cls,
-        db_session: SASession,
-        session_reference: str | UUID | list[UUID],
-        access_key: AccessKey | None,
-        *,
-        allow_prefix: bool = False,
-        allow_stale: bool = True,
-        for_update: bool = False,
-        max_matches: int | None = 10,
-        eager_loading_op: Sequence[Any] | None = None,
-    ) -> list[SessionRow]:
-        """
-        Match the prefix of session ID or session name among the sessions
-        that belongs to the given access key, and return the list of SessionRow.
-        """
-
-        if isinstance(session_reference, list):
-            query_list = [
-                partial(
-                    _match_sessions_by_id,
-                    session_id_or_list=[SessionId(item) for item in session_reference],
-                    allow_prefix=False,
-                )
-            ]
-        else:
-            query_list = [
-                aiotools.apartial(
-                    _match_sessions_by_name,
-                    session_name=str(session_reference),
-                    allow_prefix=allow_prefix,
-                )
-            ]
-            try:
-                session_id = UUID(str(session_reference))
-                # Fetch id-based query first
-                query_list = [
-                    aiotools.apartial(
-                        _match_sessions_by_id,
-                        session_id_or_list=SessionId(session_id),
-                        allow_prefix=False,
-                    ),
-                    *query_list,
-                ]
-                if allow_prefix:
-                    query_list = [
-                        aiotools.apartial(
-                            _match_sessions_by_id,
-                            session_id_or_list=SessionId(session_id),
-                            allow_prefix=True,
-                        ),
-                        *query_list,
-                    ]
-            except ValueError:
-                pass
-
-        for fetch_func in query_list:
-            rows = await fetch_func(
-                db_session,
-                access_key=access_key,
-                allow_stale=allow_stale,
-                for_update=for_update,
-                max_matches=max_matches,
-                eager_loading_op=eager_loading_op,
-            )
-            if not rows:
-                continue
-            return list(rows)
-        return []
-
-    @classmethod
-    async def get_session(
-        cls,
-        db_session: SASession,
-        session_name_or_id: str | UUID,
-        access_key: AccessKey | None = None,
-        *,
-        allow_stale: bool = False,
-        for_update: bool = False,
-        kernel_loading_strategy: KernelLoadingStrategy = KernelLoadingStrategy.NONE,
-        eager_loading_op: list[Any] | None = None,
-    ) -> SessionRow:
-        """
-        Retrieve the session information by session's UUID,
-        or session's name paired with access_key.
-        This will return the information of the session and the sibling kernel(s).
-
-        :param db_session: Database connection to use when fetching row.
-        :param session_name_or_id: Name or ID (UUID) of session to look up.
-        :param access_key: Access key used to create session.
-        :param allow_stale: If set to True, filter "inactive" sessions as well as "active" ones.
-                            Otherwise filter "active" sessions only.
-        :param for_update: Apply for_update during executing select query.
-        :param kernel_loading_strategy: Determines JOIN strategy of `kernels` relation when fetching session rows.
-        :param eager_loading_op: Extra loading operators to be passed directly to `match_sessions()` API.
-        """
-        _eager_loading_op = eager_loading_op or []
-        match kernel_loading_strategy:
-            case KernelLoadingStrategy.ALL_KERNELS:
-                _eager_loading_op.extend([
-                    noload("*"),
-                    selectinload(SessionRow.kernels).options(
-                        noload("*"),
-                        selectinload(KernelRow.agent_row).noload("*"),
-                    ),
-                ])
-            case KernelLoadingStrategy.MAIN_KERNEL_ONLY:
-                kernel_rel = SessionRow.kernels
-                kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-                _eager_loading_op.extend([
-                    noload("*"),
-                    selectinload(kernel_rel).options(
-                        noload("*"),
-                        selectinload(KernelRow.agent_row).noload("*"),
-                    ),
-                ])
-        _eager_loading_op.append(joinedload(SessionRow.user))
-
-        session_list = await cls.match_sessions(
-            db_session,
-            session_name_or_id,
-            access_key,
-            allow_stale=allow_stale,
-            for_update=for_update,
-            eager_loading_op=_eager_loading_op,
-        )
-        if not session_list:
-            raise SessionNotFound(f"Session (id={session_name_or_id}) does not exist.")
-        if len(session_list) > 1:
-            session_infos = [
-                {
-                    "session_id": sess.id,
-                    "session_name": sess.name,
-                    "status": sess.status,
-                    "created_at": sess.created_at,
-                }
-                for sess in session_list
-            ]
-            raise TooManySessionsMatched(extra_data={"matches": session_infos})
-        return session_list[0]
-
+    # Used only by AgentRegistry._clean_session_in_scope, which also loads the kernels
+    # and their agents. Leaves together with that read.
     @classmethod
     async def get_session_by_id(
         cls,
