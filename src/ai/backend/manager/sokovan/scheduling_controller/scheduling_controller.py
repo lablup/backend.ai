@@ -66,6 +66,51 @@ from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.drop_z
     DropZeroResourceSlotsRule,
 )
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
+<<<<<<< HEAD
+=======
+from ai.backend.manager.sokovan.scheduling_controller.validators.container_limit_rule import (
+    ContainerLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.dotfile_vfolder_conflict_rule import (
+    DotfileVFolderConflictRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.image_slot_type_rule import (
+    ImageSlotTypeRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.inference_model_folder_rule import (
+    InferenceModelFolderRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.mount_name_validation_rule import (
+    MountNameValidationRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.pending_session_count_limit_rule import (
+    PendingSessionCountLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.pending_session_resource_limit_rule import (
+    PendingSessionResourceLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.priority_limit_rule import (
+    PriorityLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.requested_slot_type_rule import (
+    RequestedSlotTypeRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.required_resource_slot_rule import (
+    RequiredResourceSlotRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.resource_limit_rule import (
+    ResourceLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.runner_reserved_environ_rule import (
+    RunnerReservedEnvironRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.service_port_rule import (
+    ServicePortRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
+    SessionSpecValidator,
+)
+>>>>>>> 9d2f196d (fix(BA-8936): reject runner-reserved variables in user-supplied environ (#16464))
 from ai.backend.manager.views.sokovan.scheduling import ComputeScheduleData
 from ai.backend.manager.views.sokovan.session import MarkTerminatingResult
 from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext
@@ -188,6 +233,7 @@ class SchedulingController:
             MountNameValidationRule(),
             InferenceModelFolderRule(),
             DotfileVFolderConflictRule(),
+            RunnerReservedEnvironRule(),
         ])
         self._agent_selector = args.agent_selector
 
