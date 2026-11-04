@@ -7,4 +7,3 @@ import{c as t}from"./createBrandIcon-bqlQBaRl.js";import"./index-jga3Qt2q.js";/*
  rendered to static SVG so the package (and its @lobehub/ui peer, which drags
  in the last non-antd rc-* tree) could be removed.
 */const a=t({title:"Microsoft",viewBox:"0 0 24 24",body:'<path d="M11.49 2H2v9.492h9.492V2h-.002z" fill="#F25022"></path><path d="M22 2h-9.492v9.492H22V2z" fill="#7FBA00"></path><path d="M11.49 12.508H2V22h9.492v-9.492h-.002z" fill="#00A4EF"></path><path d="M22 12.508h-9.492V22H22v-9.492z" fill="#FFB900"></path>'});export{a as default};
-//# sourceMappingURL=MicrosoftColor-CRF0fIPc.js.map

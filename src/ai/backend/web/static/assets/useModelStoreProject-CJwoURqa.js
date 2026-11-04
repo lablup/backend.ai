@@ -219,4 +219,3 @@ ${e.slice(s,f)}`,s=ie(e,f);else if(nr(e,s,f)){var h=ie(e,f);if(h<a){var m=ye(e,h
   }
 }
 `}}})();Yl.hash="72e6b16bbeffe81aafe3f2357db7ea0d";const qo=()=>{var n,i,o,d,s,f,h,m,g,p;const e=Zn(),r=Qn(),t=e.user_uuid,a=xt.useLazyLoadQuery(Yl,{userId:t,domainName:r},{fetchPolicy:"store-or-network"}),l=(((n=a.scopedProjectsV2)==null?void 0:n.ok)===!0?(d=(o=(i=a.scopedProjectsV2.value)==null?void 0:i.edges)==null?void 0:o[0])==null?void 0:d.node:null)??(((s=a.domainV2)==null?void 0:s.ok)===!0?(g=(m=(h=(f=a.domainV2.value)==null?void 0:f.projects)==null?void 0:h.edges)==null?void 0:m[0])==null?void 0:g.node:null)??null;return{id:l?dt(l.id):null,name:((p=l==null?void 0:l.basicInfo)==null?void 0:p.name)??null}};export{di as M,Ho as a,qo as u};
-//# sourceMappingURL=useModelStoreProject-CJwoURqa.js.map
