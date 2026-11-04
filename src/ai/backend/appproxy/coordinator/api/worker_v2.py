@@ -120,7 +120,6 @@ class WorkerListResponseModel(BackendAISchema):
 
 
 class TokenResponseModel(BackendAISchema):
-    login_session_token: str | None
     kernel_host: str
     kernel_port: int
     session_id: UUID

@@ -1283,7 +1283,6 @@ class SessionService:
 
         arguments = action.arguments
         envs = action.envs
-        login_session_token = action.login_session_token
 
         info = await self._session_repository.get_session_with_routing_minimal(session_id)
         session_data = info.session
@@ -1356,7 +1355,8 @@ class SessionService:
             )
 
         body = {
-            "login_session_token": login_session_token,
+            # A coordinator of an older version requires the key to be present.
+            "login_session_token": None,
             "kernel_host": kernel_host,
             "kernel_port": host_port,
             "session": {

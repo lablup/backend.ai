@@ -35,7 +35,7 @@ from .errors import InvalidAPIParameters
 # FIXME: merge majority of common definitions to ai.backend.common when ready
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
-_danger_words = ["password", "passwd", "secret"]
+_danger_words = ["password", "passwd", "secret", "token"]
 
 
 def set_handler_attr(func: Callable[..., Any], key: str, value: Any) -> None:
