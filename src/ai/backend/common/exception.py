@@ -780,7 +780,24 @@ class ScalingGroupNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
+<<<<<<< HEAD
 class ScalingGroupConflict(BackendAIError, web.HTTPConflict):
+=======
+class InvalidVFolderMountSourceError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-vfolder-mount-source"
+    error_title = "Invalid vfolder mount source."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class ResourceGroupConflict(BackendAIError, web.HTTPConflict):
+>>>>>>> dd3b56efd (fix(BA-8802): re-check the vfolder mount subpath right before kernel creation (#16437))
     error_type = "https://api.backend.ai/probs/duplicate-scaling-group"
     error_title = "Duplicate Scaling Group"
 
