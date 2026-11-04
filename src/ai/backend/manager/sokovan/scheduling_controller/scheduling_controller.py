@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
@@ -18,18 +17,13 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.draft import SessionSpecDraft
 from ai.backend.manager.data.session.types import SessionStatus
-<<<<<<< HEAD
 from ai.backend.manager.errors.common import RejectedByHook
-=======
-from ai.backend.manager.data.vfolder.types import verify_mount_destination
-from ai.backend.manager.errors.common import InternalServerError, RejectedByHook
-from ai.backend.manager.errors.image import ImageNotFound
->>>>>>> 1b01ca06e (fix(BA-8806): reject mount destinations under reserved paths (#16473))
 from ai.backend.manager.metrics.scheduler import (
     SchedulerOperationMetricObserver,
     SchedulerPhaseMetricObserver,
 )
 from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.models.vfolder.row import verify_mount_destination
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import (
     MarkTerminatingResult,
@@ -381,11 +375,7 @@ class SchedulingController:
                 alias_name = alias_name.replace("/home/work/", "")
             if alias_name == "":
                 raise InvalidAPIParameters("Alias name cannot be empty.")
-<<<<<<< HEAD
-            if not _verify_vfolder_name(alias_name):
-=======
             if not verify_mount_destination(alias_name):
->>>>>>> 1b01ca06e (fix(BA-8806): reject mount destinations under reserved paths (#16473))
                 raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
             if alias_name in original_refs:
                 raise InvalidAPIParameters(
@@ -406,12 +396,3 @@ class SchedulingController:
         if user is None:
             raise InvalidAPIParameters("User context is required for image validation.")
         await self._repository.check_available_image(spec.image_id, user.domain_name, user.user_id)
-
-
-def _verify_vfolder_name(folder: str) -> bool:
-    if folder in RESERVED_VFOLDERS:
-        return False
-    for pattern in RESERVED_VFOLDER_PATTERNS:
-        if pattern.match(folder):
-            return False
-    return True

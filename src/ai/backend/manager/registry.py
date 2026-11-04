@@ -122,42 +122,7 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
 )
 from ai.backend.manager.data.session.types import SessionStatus
-<<<<<<< HEAD
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
-=======
-from ai.backend.manager.data.vfolder.types import verify_mount_destination
-from ai.backend.manager.models.agent.row import AgentRow, agents
-from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
-    BootstrapScriptRevisionSearchableFields,
-)
-from ai.backend.manager.models.bootstrap_script_revision.searchers import (
-    DefaultBootstrapScriptRevisionSearcher,
-)
-from ai.backend.manager.models.domain.row import domains
-from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.image.searchers import (
-    CanonicalImageSearcher,
-    ImageSearcher,
-    ReferenceImageSearcher,
-)
-from ai.backend.manager.models.kernel.row import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    KernelRow,
-    kernels,
-)
-from ai.backend.manager.models.network.row import NetworkRow, NetworkType
-from ai.backend.manager.models.resource_group.row import resource_groups
-from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
-from ai.backend.manager.models.session.row import (
-    PRIVATE_SESSION_TYPES,
-    KernelLoadingStrategy,
-    SessionRow,
-    handle_session_exception,
-)
-from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.user.row import UserRow
->>>>>>> 1b01ca06e (fix(BA-8806): reject mount destinations under reserved paths (#16473))
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -215,8 +180,8 @@ from .models.utils import (
     execute_with_retry,
     reenter_txn_session,
 )
-from .models.vfolder import (
-    verify_vfolder_name,
+from .models.vfolder.row import (
+    verify_mount_destination,
 )
 from .types import UserScope
 

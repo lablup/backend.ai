@@ -1,16 +1,10 @@
 from __future__ import annotations
 
 import enum
-import posixpath
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-<<<<<<< HEAD
 from typing import Any, override
-=======
-from pathlib import PurePosixPath
-from typing import Any, Final, override
->>>>>>> 1b01ca06e (fix(BA-8806): reject mount destinations under reserved paths (#16473))
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.field import (
@@ -30,39 +24,6 @@ from ai.backend.manager.data.permission.types import OperationType
 from ai.backend.manager.errors.resource import DataTransformationFailed
 
 
-<<<<<<< HEAD
-=======
-def verify_vfolder_name(folder: str) -> bool:
-    if folder in RESERVED_VFOLDERS:
-        return False
-    for pattern in RESERVED_VFOLDER_PATTERNS:
-        if pattern.match(folder):
-            return False
-    return True
-
-
-_MOUNT_BASE: Final = PurePosixPath("/home/work")
-
-
-def verify_mount_destination(destination: str) -> bool:
-    """Return False when the mount destination is a reserved path, under one, or above one.
-
-    A relative destination is resolved under ``/home/work`` and ``..`` is normalized first.
-    """
-    joined = posixpath.normpath(posixpath.join(str(_MOUNT_BASE), destination))
-    path = PurePosixPath("/" + joined.lstrip("/"))
-    if path != _MOUNT_BASE and path.is_relative_to(_MOUNT_BASE):
-        return verify_vfolder_name(path.relative_to(_MOUNT_BASE).parts[0])
-    for reserved in RESERVED_VFOLDERS:
-        reserved_path = PurePosixPath(reserved)
-        if not reserved_path.is_absolute():
-            continue
-        if path.is_relative_to(reserved_path) or reserved_path.is_relative_to(path):
-            return False
-    return True
-
-
->>>>>>> 1b01ca06e (fix(BA-8806): reject mount destinations under reserved paths (#16473))
 class VFolderOwnershipType(CIStrEnum):
     """
     Ownership type of virtual folder.

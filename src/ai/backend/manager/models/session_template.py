@@ -12,9 +12,9 @@ from ai.backend.common import validators as tx
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.exceptions import InvalidArgument
+from ai.backend.manager.models.vfolder.row import verify_mount_destination
 
 from .base import GUID, EnumType, IDColumn, metadata
-from .vfolder import verify_vfolder_name
 
 __all__: Sequence[str] = (
     "TemplateType",
@@ -92,7 +92,7 @@ def check_task_template(raw_data: Mapping[str, Any]) -> Mapping[str, Any]:
             if p is None:
                 continue
             p = p.removeprefix("/home/work/")
-            if not verify_vfolder_name(p):
+            if not verify_mount_destination(p):
                 raise InvalidArgument(f"Path {p} is reserved for internal operations.")
     return cast(Mapping[str, Any], data)
 
