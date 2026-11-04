@@ -170,9 +170,9 @@ def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
         for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
             entrypoints[entrypoint.name] = entrypoint
     if os.environ.get("SCIE", None) is None:
-        # Override with the entrypoints found in the build root holding this package.
+        # Override with the entrypoints found in the current build-root directory.
         try:
-            build_root = find_build_root(Path(__file__).parent)
+            build_root = find_build_root()
         except ValueError:
             pass
         else:
@@ -196,7 +196,7 @@ def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
 def scan_entrypoint_from_plugin_checkouts(group_name: str) -> Iterator[EntryPoint]:
     entrypoints = {}
     try:
-        build_root = find_build_root(Path(__file__).parent)
+        build_root = find_build_root()
     except ValueError:
         pass
     else:
