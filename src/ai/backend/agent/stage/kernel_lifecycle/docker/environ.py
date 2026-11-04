@@ -4,7 +4,7 @@ from typing import Any, Final, Self, override
 
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
 from ai.backend.agent.stage.kernel_lifecycle.defs import LIBBAIHOOK_MOUNT_PATH
-from ai.backend.common.docker import KernelFeatures, LabelName
+from ai.backend.common.docker import RUNNER_RESERVED_ENVIRON_KEYS, KernelFeatures, LabelName
 from ai.backend.common.stage.types import (
     ArgsSpecGenerator,
     Provisioner,
@@ -108,9 +108,12 @@ class EnvironProvisioner(Provisioner[EnvironSpec, EnvironResult]):
 
     @override
     async def setup(self, spec: EnvironSpec) -> EnvironResult:
+        # Start with the base environment, without the runner-reserved keys the caller sent.
         environ = Environ({
-            **spec.kernel_info.kernel_creation_config["environ"]
-        })  # Start with the base environment
+            k: v
+            for k, v in spec.kernel_info.kernel_creation_config["environ"].items()
+            if k not in RUNNER_RESERVED_ENVIRON_KEYS
+        })
         environ = (
             environ.set_value(LD_PRELOAD, LIBBAIHOOK_MOUNT_PATH)
             .set_value(LOCAL_USER_ID, self._get_local_uid(spec))

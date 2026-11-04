@@ -58,6 +58,14 @@ from .validators import (
     RequestedSlotTypeRule,
     RequiredResourceSlotRule,
     ResourceLimitRule,
+<<<<<<< HEAD
+=======
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.runner_reserved_environ_rule import (
+    RunnerReservedEnvironRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.service_port_rule import (
+>>>>>>> 9d2f196d2 (fix(BA-8936): reject runner-reserved variables in user-supplied environ (#16464))
     ServicePortRule,
     SessionSpecValidationContext,
     SessionSpecValidator,
@@ -141,6 +149,7 @@ class SchedulingController:
             MountNameValidationRule(),
             InferenceModelFolderRule(),
             DotfileVFolderConflictRule(),
+            RunnerReservedEnvironRule(),
         ])
 
     async def enqueue_session_from_draft(
