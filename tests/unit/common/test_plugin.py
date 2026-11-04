@@ -551,11 +551,11 @@ class TestFirstCompletedDispatch:
                 _FirstCompletedCase(
                     handler_outcome_by_plugin={"a": None, "b": None},
                     expected_status=PASSED,
-                    expected_result=[],
+                    expected_result=None,
                     expected_src_plugin=["a", "b"],
                     expected_called_plugins=["a", "b"],
                 ),
-                id="all_none_passes_with_empty_result",
+                id="all_none_passes_with_no_result",
             ),
             pytest.param(
                 _FirstCompletedCase(
@@ -571,11 +571,11 @@ class TestFirstCompletedDispatch:
                 _FirstCompletedCase(
                     handler_outcome_by_plugin={},
                     expected_status=PASSED,
-                    expected_result=[],
+                    expected_result=None,
                     expected_src_plugin=[],
                     expected_called_plugins=[],
                 ),
-                id="no_handler_passes_with_empty_result",
+                id="no_handler_passes_with_no_result",
             ),
         ],
     )

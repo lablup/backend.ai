@@ -289,7 +289,7 @@ class AuthService:
         )
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
-        if hook_result.result:
+        if hook_result.result is not None:
             user = hook_result.result
             active_sessions = await self._auth_repository.get_active_session_tokens(
                 user.uuid, login_client_type_id=login_client_type_id
