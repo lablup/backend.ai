@@ -129,7 +129,7 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
         """
         Invoke the handlers that matches with the given ``event_name``.
         A handler raising :class:`Reject` or any other exception ends the dispatch.
-        ``FIRST_COMPLETED`` also ends it at the first non-None result; None means not handled.
+        ``FIRST_COMPLETED`` also ends it at the first non-None result, continuing past None.
         """
         executed_plugin_names = []
         handler_results: list[Any] = []
