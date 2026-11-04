@@ -119,7 +119,8 @@ class InviteVFolderActionResult(BaseScopeActionResult):
 
     @override
     def entity_ids(self) -> Sequence[EntityIdentifier]:
-        return tuple(EntityShareID(uuid.UUID(id_)) for id_ in self.invitation_ids)
+        """Names no entity: ``invitation_ids`` carries the invitee emails, not share ids."""
+        return ()
 
 
 @dataclass
