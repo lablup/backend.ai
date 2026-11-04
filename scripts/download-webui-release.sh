@@ -9,7 +9,7 @@ BASE_PATH=$(cd "$(dirname "$0")"/.. && pwd)
 TARGET_VERSION=$1
 
 cd $BASE_PATH/src/ai/backend/web
-curl --fail -sL https://github.com/lablup/backend.ai-webui/releases/download/v$TARGET_VERSION/backend.ai-webui-bundle-$TARGET_VERSION.zip > /tmp/bai-webui.zip
+curl --fail -sL https://github.com/lablup/backend.ai-webui/releases/download/v$TARGET_VERSION/backend.ai-webui-bundle-$TARGET_VERSION-nosourcemap.zip > /tmp/bai-webui.zip
 if [ $? -ne 0 ]; then
     echo "Failed to download the webui bundle."
     exit 1
