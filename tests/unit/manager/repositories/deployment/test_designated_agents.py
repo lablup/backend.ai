@@ -13,10 +13,13 @@ from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.types import AgentId, ResourceSlot
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
+from ai.backend.manager.models.agent.searchers import AgentSearcher
 from ai.backend.manager.models.deployment_designated_agent.row import (
     DeploymentDesignatedAgentRow,
 )
@@ -33,6 +36,7 @@ from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
@@ -255,13 +259,21 @@ class TestDeploymentDesignatedAgents:
                     version="26.10.0",
                 )
             )
-        unknown = AgentUUID(uuid.uuid4())
 
-        found = await repository.fetch_agents_in_resource_group(
-            resource_group.name, {agent_uuids[0], outside, unknown}
+        agents = await repository.search_agents(
+            searcher=AgentSearcher(
+                pagination=NoPagination(),
+                conditions=[
+                    AgentSearchableFields.own.resource_group.filter.equals(
+                        StringMatchSpec(
+                            value=resource_group.name, case_insensitive=False, negated=False
+                        )
+                    ),
+                ],
+            )
         )
 
-        assert found == {agent_uuids[0]}
+        assert {agent.uuid for agent in agents} == set(agent_uuids)
 
     async def test_fetching_many_groups_by_deployment_with_an_empty_list_for_none(
         self,

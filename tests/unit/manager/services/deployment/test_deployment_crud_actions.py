@@ -23,9 +23,10 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot
+from ai.backend.common.types import AgentId, ClusterMode, MountPermission, ResourceSlot
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
+from ai.backend.manager.data.agent.types import AgentData, AgentStatus
 from ai.backend.manager.data.deployment.creator import NewDeploymentCreator
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
@@ -66,6 +67,27 @@ from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.types import OptionalState
+
+
+def _agent_in(resource_group: str, agent_uuid: AgentUUID) -> AgentData:
+    return AgentData(
+        uuid=agent_uuid,
+        id=AgentId(f"i-{agent_uuid.hex[:12]}"),
+        status=AgentStatus.ALIVE,
+        status_changed=None,
+        region="local",
+        resource_group=resource_group,
+        schedulable=True,
+        addr="tcp://127.0.0.1:6001",
+        public_host=None,
+        first_contact=None,
+        lost_at=None,
+        version="test",
+        architecture="x86_64",
+        compute_plugins={},
+        public_key=None,
+        auto_terminate_abusing_kernel=False,
+    )
 
 
 class DeploymentCRUDBaseFixtures:
@@ -416,8 +438,8 @@ class TestDesignatedAgentsOnCreate(DeploymentCRUDBaseFixtures):
         creating: CreateDeploymentAction,
         wired: None,
     ) -> None:
-        mock_deployment_repository.fetch_agents_in_resource_group = AsyncMock(
-            return_value={agent_uuid}
+        mock_deployment_repository.search_agents = AsyncMock(
+            return_value=[_agent_in(endpoint_info.metadata.resource_group, agent_uuid)]
         )
 
         await deployment_service.create_deployment(creating)
@@ -434,7 +456,7 @@ class TestDesignatedAgentsOnCreate(DeploymentCRUDBaseFixtures):
         creating: CreateDeploymentAction,
         wired: None,
     ) -> None:
-        mock_deployment_repository.fetch_agents_in_resource_group = AsyncMock(return_value=set())
+        mock_deployment_repository.search_agents = AsyncMock(return_value=[])
 
         with pytest.raises(DesignatedAgentOutsideResourceGroup) as raised:
             await deployment_service.create_deployment(creating)
@@ -460,7 +482,7 @@ class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
         mock_deployment_controller.update_deployment = AsyncMock(return_value=endpoint_info)
         mock_deployment_repository.get_endpoint_info = AsyncMock(return_value=endpoint_info)
         mock_deployment_repository.set_designated_agents = AsyncMock()
-        mock_deployment_repository.fetch_agents_in_resource_group = AsyncMock(return_value=set())
+        mock_deployment_repository.search_agents = AsyncMock(return_value=[])
 
     def _updating(
         self, endpoint_info: DeploymentInfo, designated_agents: frozenset[AgentUUID] | None
@@ -481,8 +503,8 @@ class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
         agent_uuid: AgentUUID,
         wired: None,
     ) -> None:
-        mock_deployment_repository.fetch_agents_in_resource_group = AsyncMock(
-            return_value={agent_uuid}
+        mock_deployment_repository.search_agents = AsyncMock(
+            return_value=[_agent_in(endpoint_info.metadata.resource_group, agent_uuid)]
         )
 
         await deployment_service.update_deployment(
