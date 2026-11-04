@@ -32,7 +32,7 @@ class H2Frontend[TCircuitKeyType: (int, str)](BaseFrontend[H2Backend, TCircuitKe
         if circuit.open_to_public and not circuit.ip_validator.is_restricted:
             await super().register_circuit(circuit, routes)
         else:
-            log.warning("skipped an access-controlled HTTP/2 circuit", circuit_id=circuit.id)
+            log.error("skipped an access-controlled HTTP/2 circuit", circuit_id=circuit.id)
 
     @override
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
