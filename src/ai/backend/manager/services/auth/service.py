@@ -62,7 +62,11 @@ from ai.backend.manager.errors.common import (
     ObjectNotFound,
     RejectedByHook,
 )
-from ai.backend.manager.errors.user import KeyPairNotFound, UserResourcePolicyNotFound
+from ai.backend.manager.errors.user import (
+    KeyPairNotFound,
+    UserNotActive,
+    UserResourcePolicyNotFound,
+)
 from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
 from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
@@ -786,7 +790,7 @@ class AuthService:
         # This path skips the login, so it stays open only to an active user whose
         # password the login refuses as expired.
         if checked_user.status != UserStatus.ACTIVE:
-            raise AuthorizationFailed("User credential mismatch.")
+            raise UserNotActive(f"User status is {checked_user.status}.")
         expires_at = self._password_expires_at(
             checked_user.password_changed_at, auth_config.max_password_age
         )

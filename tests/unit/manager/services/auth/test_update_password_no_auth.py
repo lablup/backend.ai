@@ -14,6 +14,7 @@ from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordNotExpired
 from ai.backend.manager.errors.common import GenericBadRequest, RejectedByHook
+from ai.backend.manager.errors.user import UserNotActive
 from ai.backend.manager.plugin.hook_args import VerifyPasswordFormatHookArgs
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
@@ -337,7 +338,7 @@ class TestUpdatePasswordNoAuthEligibility:
             password_changed_at=_EXPIRED_CHANGED_AT,
         )
 
-        with pytest.raises(AuthorizationFailed):
+        with pytest.raises(UserNotActive):
             await auth_service.update_password_no_auth(no_auth_action)
 
         mock_auth_repository.update_user_password_by_uuid.assert_not_called()
