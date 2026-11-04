@@ -8,6 +8,7 @@ from typing import (
 )
 
 import aiodocker
+import trafaret as t
 
 from . import __version__, lpu_api
 from .types import LPUDevice
@@ -58,8 +59,10 @@ class LPUPlugin(AbstractComputePlugin):
     enabled: bool = True
 
     _all_devices: list[LPUDevice] | None
+    _host_ipc: bool
 
     async def init(self, context: Any = None) -> None:
+        self._host_ipc = t.ToBool().check(self.plugin_config.get("host_ipc", True))
         self._all_devices = None
 
         raw_device_mask = self.plugin_config.get("device_mask")
@@ -194,7 +197,7 @@ class LPUPlugin(AbstractComputePlugin):
         return {
             "HostConfig": {
                 "CapAdd": ["IPC_LOCK"],
-                "IpcMode": "host",
+                **({"IpcMode": "host"} if self._host_ipc else {}),
                 "Ulimits": [
                     {
                         "Name": "memlock",
