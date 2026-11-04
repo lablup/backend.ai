@@ -1,4 +1,6 @@
 import pickle
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -20,9 +22,11 @@ from ai.backend.common.config import (
     _merge_definition,
     _merge_metadata,
     _merge_service_config,
+    find_config_file,
     merge,
     override_key,
 )
+from ai.backend.common.exception import ConfigurationError
 
 
 def test_override_key() -> None:
@@ -749,3 +753,98 @@ class TestModelDefinitionWithArgsAppended:
         assert first is not None and second is not None
         assert first.start_command == "a --shared true"
         assert second.start_command == "b --shared true"
+
+
+_CONFIG_ALLOWING_THE_WHEELHOUSE = "[wheelhouse]\nallow = true\n"
+_CURRENT_DIRECTORY_UNDER_HOME = "project/workdir"
+
+
+@dataclass(frozen=True)
+class _ConfigFileUnderHomeCase:
+    directory_under_home: str
+    content: str
+
+
+@pytest.fixture
+def home_directory_holding_the_current_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Path:
+    monkeypatch.delenv("BACKEND_CONFIG_FILE", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    current_directory = tmp_path / _CURRENT_DIRECTORY_UNDER_HOME
+    current_directory.mkdir(parents=True)
+    (current_directory.parent / "BUILD_ROOT").touch()
+    monkeypatch.chdir(current_directory)
+    return tmp_path
+
+
+@pytest.fixture
+def config_file_under_home(
+    case: _ConfigFileUnderHomeCase, home_directory_holding_the_current_directory: Path
+) -> Path:
+    config_directory = home_directory_holding_the_current_directory / case.directory_under_home
+    config_directory.mkdir(parents=True, exist_ok=True)
+    config_path = config_directory / "manager.toml"
+    config_path.write_text(case.content)
+    return config_path
+
+
+@pytest.fixture
+def config_file_named_by_the_environment(
+    home_directory_holding_the_current_directory: Path, monkeypatch: pytest.MonkeyPatch
+) -> Path:
+    config_path = (
+        home_directory_holding_the_current_directory
+        / _CURRENT_DIRECTORY_UNDER_HOME
+        / "manager.toml"
+    )
+    config_path.write_text(_CONFIG_ALLOWING_THE_WHEELHOUSE)
+    monkeypatch.setenv("BACKEND_CONFIG_FILE", str(config_path))
+    return config_path
+
+
+class TestFindConfigFileWithWheelhouseAllowed:
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ConfigFileUnderHomeCase(
+                directory_under_home=_CURRENT_DIRECTORY_UNDER_HOME,
+                content=_CONFIG_ALLOWING_THE_WHEELHOUSE,
+            ),
+            _ConfigFileUnderHomeCase(
+                directory_under_home="project",
+                content=_CONFIG_ALLOWING_THE_WHEELHOUSE,
+            ),
+        ],
+        ids=lambda case: case.directory_under_home,
+    )
+    @pytest.mark.usefixtures("config_file_under_home")
+    def test_rejects_a_file_found_through_the_current_directory(self) -> None:
+        with pytest.raises(ConfigurationError, match=r"wheelhouse\.allow"):
+            find_config_file("manager")
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ConfigFileUnderHomeCase(
+                directory_under_home=".config/backend.ai",
+                content=_CONFIG_ALLOWING_THE_WHEELHOUSE,
+            ),
+            _ConfigFileUnderHomeCase(
+                directory_under_home=_CURRENT_DIRECTORY_UNDER_HOME,
+                content="[wheelhouse]\nallow = false\n",
+            ),
+            _ConfigFileUnderHomeCase(
+                directory_under_home=_CURRENT_DIRECTORY_UNDER_HOME,
+                content="",
+            ),
+        ],
+        ids=["home-config-allowing", "cwd-config-disallowing", "cwd-config-without-section"],
+    )
+    def test_returns_a_file_that_may_set_it(self, config_file_under_home: Path) -> None:
+        assert find_config_file("manager") == config_file_under_home
+
+    def test_returns_a_file_named_by_the_environment(
+        self, config_file_named_by_the_environment: Path
+    ) -> None:
+        assert find_config_file("manager") == config_file_named_by_the_environment

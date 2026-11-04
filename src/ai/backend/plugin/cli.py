@@ -76,7 +76,6 @@ def scan(
     format: FormatOptions,
 ) -> None:
     from .entrypoint import (
-        prepare_wheelhouse,
         scan_entrypoint_from_buildscript,
         scan_entrypoint_from_package_metadata,
         scan_entrypoint_from_plugin_checkouts,
@@ -85,7 +84,6 @@ def scan(
     sources: dict[str, set[str]] = defaultdict(set)
     rows = []
 
-    prepare_wheelhouse()
     for source, entrypoint in itertools.chain(
         (("buildscript", item) for item in scan_entrypoint_from_buildscript(group_name)),
         (("plugin-checkout", item) for item in scan_entrypoint_from_plugin_checkouts(group_name)),

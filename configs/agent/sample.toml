@@ -535,6 +535,21 @@
   # Added in 24.12.1
   ## sample-rate = 100
 
+# Plugin wheels loaded when the agent starts. Read only from the config file:
+# etcd values are ignored. Wheels provided here run without verification, so
+# keep the path writable only by trusted operators.
+# Added in 26.10.0
+[wheelhouse]
+  # Whether to load the plugin wheels in the path when the server starts. A
+  # config file found through the current directory cannot turn this on: name it
+  # with the -f option or BACKEND_CONFIG_FILE.
+  # Added in 26.10.0
+  allow = false
+  # Absolute path of the directory holding the plugin wheels. A relative path is
+  # rejected so that the current directory cannot choose it.
+  # Added in 26.10.0
+  path = "/opt/backend.ai/wheelhouse"
+
 # Logging configuration for the agent. Controls log levels, output destinations,
 # and log formatting. Proper logging setup is essential for debugging and
 # monitoring agent behavior in production environments.

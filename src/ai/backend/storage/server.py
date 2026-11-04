@@ -35,7 +35,11 @@ from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_mult
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
-from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
+from ai.backend.common.plugin import (
+    AbstractPlugin,
+    BasePluginContext,
+    load_configured_wheelhouse,
+)
 from ai.backend.common.types import HostPortPair as CommonHostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import Logger, LogLevel
@@ -490,6 +494,7 @@ def main(
                 log.info("Backend.AI Storage Proxy starting", version=VERSION)
                 log.info("runtime environment", runtime_info=env_info())
                 log.info("storage-proxy node", node_id=local_config.storage_proxy.node_id)
+                load_configured_wheelhouse(local_config.wheelhouse)
                 log_config = logging.getLogger("ai.backend.agent.config")
                 if local_config.debug.enabled:
                     log_config.debug("debug mode enabled.")

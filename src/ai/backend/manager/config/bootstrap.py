@@ -1,6 +1,6 @@
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Self, override
+from typing import Annotated, Any, Self, override
 
 from pydantic import Field
 
@@ -12,6 +12,7 @@ from ai.backend.common.configs.loader import (
     TomlConfigLoader,
 )
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
+from ai.backend.common.configs.wheelhouse import WheelhouseConfig
 from ai.backend.common.types import BackendAISchema
 from ai.backend.logging.config import LoggingConfig
 from ai.backend.logging.types import LogLevel
@@ -66,6 +67,16 @@ class BootstrapConfig(BackendAISchema):
         Used for monitoring and analyzing application performance.
         """,
     )
+    wheelhouse: Annotated[
+        WheelhouseConfig,
+        Field(
+            default_factory=WheelhouseConfig,
+            description="""
+            Plugin wheel loading configuration.
+            Read from here so that etcd cannot turn it on.
+            """,
+        ),
+    ]
     debug: DebugConfig = Field(
         default_factory=DebugConfig,  # type: ignore[arg-type]
         description="""

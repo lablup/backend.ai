@@ -47,6 +47,7 @@ from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
+from ai.backend.common.plugin import load_configured_wheelhouse
 from ai.backend.common.utils import env_info
 from ai.backend.logging import Logger, LogLevel
 from ai.backend.logging.otel import (
@@ -574,6 +575,7 @@ def main(
                 setproctitle(f"backend.ai: manager {ns}")
                 log.info("Backend.AI Manager starting", version=__version__)
                 log.info("runtime environment", runtime_info=env_info())
+                load_configured_wheelhouse(bootstrap_cfg.wheelhouse)
                 log_config = logging.getLogger("ai.backend.manager.config")
                 log_config.debug("debug mode enabled.")
                 runner: Callable[..., Any]

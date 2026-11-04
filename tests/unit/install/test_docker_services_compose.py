@@ -258,12 +258,16 @@ def test_rendered_compose_wheelhouse_mounts(template: str) -> None:
     for name, service in services.items():
         if name in ("manager", "agent"):
             assert wheelhouse in service["volumes"], name
-            assert "BACKEND_WHEELHOUSE_PATH=/app/wheelhouse" in service["environment"], name
         else:
             assert not any("wheelhouse" in v for v in service["volumes"]), name
-    assert (
-        f"BACKEND_WHEELHOUSE_PATH={BASE_PATH}/wheelhouse" in services["manager-cli"]["environment"]
-    )
+
+
+def test_rendered_compose_manager_cli_names_its_config_file(template: str) -> None:
+    doc = render(template, enable_gpu=False)
+    manager_cli = doc["services"]["manager-cli"]
+
+    assert "BACKEND_CONFIG_FILE=/etc/backend.ai/manager.toml" in manager_cli["environment"]
+    assert f"{BASE_PATH}/manager.toml:/etc/backend.ai/manager.toml:ro" in manager_cli["volumes"]
 
 
 def test_rendered_compose_elevated_services(template: str) -> None:

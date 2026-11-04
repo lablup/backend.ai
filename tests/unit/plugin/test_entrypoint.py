@@ -3,7 +3,6 @@ import tempfile
 import textwrap as tw
 import zipfile
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
 from importlib.metadata import EntryPoint
 from pathlib import Path
 
@@ -15,6 +14,7 @@ from ai.backend.plugin.entrypoint import (
     prepare_wheelhouse,
     scan_entrypoint_from_buildscript,
     scan_entrypoint_from_plugin_checkouts,
+    scan_entrypoints,
 )
 
 
@@ -108,7 +108,7 @@ _PLANTED_WHEEL_STEM = "planted-1.0-py3-none-any"
 
 @pytest.fixture
 def discovery_environ_cleared(monkeypatch: pytest.MonkeyPatch) -> None:
-    for env_name in ("BACKEND_BUILD_ROOT", "BACKEND_WHEELHOUSE_PATH", "SCIE"):
+    for env_name in ("BACKEND_BUILD_ROOT", "SCIE"):
         monkeypatch.delenv(env_name, raising=False)
 
 
@@ -133,43 +133,12 @@ def directory_with_planted_build_files(tmp_path: Path) -> Path:
     return tmp_path
 
 
-@dataclass(frozen=True)
-class _ExplicitWheelhouseCase:
-    env_name: str
-    env_path_under_directory: str
-
-
 @pytest.fixture
 def current_directory_with_planted_wheel(
     directory_with_planted_wheel: Path, monkeypatch: pytest.MonkeyPatch
 ) -> Path:
     monkeypatch.chdir(directory_with_planted_wheel)
     return directory_with_planted_wheel
-
-
-@pytest.fixture
-def current_directory_without_wheels(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.chdir(tmp_path)
-
-
-@pytest.fixture
-def wheel_on_the_configured_path(
-    case: _ExplicitWheelhouseCase,
-    discovery_environ_cleared: None,
-    directory_with_planted_wheel: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> Path:
-    monkeypatch.setenv(
-        case.env_name, str(directory_with_planted_wheel / case.env_path_under_directory)
-    )
-    return directory_with_planted_wheel
-
-
-@pytest.fixture
-def current_directory_holding_the_configured_wheelhouse(
-    wheel_on_the_configured_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.chdir(wheel_on_the_configured_path)
 
 
 @pytest.fixture
@@ -189,65 +158,23 @@ def build_root_named_by_the_environment(
 
 
 @pytest.mark.usefixtures("discovery_environ_cleared")
-class TestPrepareWheelhouse:
-    def test_ignores_wheels_in_the_current_directory(
+class TestWheelLoading:
+    def test_scanning_does_not_load_wheels_in_the_current_directory(
         self, current_directory_with_planted_wheel: Path
     ) -> None:
-        prepare_wheelhouse()
+        entrypoints = [*scan_entrypoints(_PLANTED_GROUP)]
 
         extracted_path = current_directory_with_planted_wheel / "wheelhouse" / _PLANTED_WHEEL_STEM
+        assert entrypoints == []
         assert not extracted_path.exists()
         assert str(extracted_path) not in sys.path
 
-    def test_warns_about_wheels_ignored_in_the_current_directory(
-        self, current_directory_with_planted_wheel: Path, caplog: pytest.LogCaptureFixture
+    def test_prepare_wheelhouse_loads_the_wheels_in_the_given_path(
+        self, directory_with_planted_wheel: Path
     ) -> None:
-        prepare_wheelhouse()
+        prepare_wheelhouse(directory_with_planted_wheel / "wheelhouse")
 
-        assert "BACKEND_WHEELHOUSE_PATH" in caplog.text
-
-    @pytest.mark.usefixtures("current_directory_without_wheels")
-    def test_does_not_warn_without_wheels_in_the_current_directory(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        prepare_wheelhouse()
-
-        assert "BACKEND_WHEELHOUSE_PATH" not in caplog.text
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _ExplicitWheelhouseCase(
-                env_name="BACKEND_WHEELHOUSE_PATH", env_path_under_directory="wheelhouse"
-            ),
-            _ExplicitWheelhouseCase(env_name="BACKEND_BUILD_ROOT", env_path_under_directory="."),
-        ],
-        ids=lambda case: case.env_name,
-    )
-    @pytest.mark.usefixtures("current_directory_holding_the_configured_wheelhouse")
-    def test_does_not_warn_when_the_current_directory_holds_the_configured_wheelhouse(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        prepare_wheelhouse()
-
-        assert "BACKEND_WHEELHOUSE_PATH" not in caplog.text
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _ExplicitWheelhouseCase(
-                env_name="BACKEND_WHEELHOUSE_PATH", env_path_under_directory="wheelhouse"
-            ),
-            _ExplicitWheelhouseCase(env_name="BACKEND_BUILD_ROOT", env_path_under_directory="."),
-        ],
-        ids=lambda case: case.env_name,
-    )
-    def test_loads_wheels_from_the_configured_path(
-        self, wheel_on_the_configured_path: Path
-    ) -> None:
-        prepare_wheelhouse()
-
-        extracted_path = wheel_on_the_configured_path / "wheelhouse" / _PLANTED_WHEEL_STEM
+        extracted_path = directory_with_planted_wheel / "wheelhouse" / _PLANTED_WHEEL_STEM
         assert (extracted_path / "planted.py").exists()
         assert any(Path(entry) == extracted_path for entry in sys.path)
 
