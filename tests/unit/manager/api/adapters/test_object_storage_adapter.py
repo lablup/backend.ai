@@ -15,6 +15,8 @@ from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.dto.manager.v2.object_storage.request import (
     AdminSearchObjectStoragesInput,
 )
+from ai.backend.common.dto.manager.v2.object_storage.response import ObjectStorageNode
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, EntityOpsResult
 from ai.backend.manager.api.adapters.object_storage.adapter import ObjectStorageAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
@@ -43,6 +45,11 @@ def adapter(storage: ObjectStorageData) -> ObjectStorageAdapter:
     processors.global_search_object_storages.run = AsyncMock(
         return_value=BatchOpsResult(
             items=[storage], total_count=1, has_next_page=False, has_previous_page=False
+        )
+    )
+    processors.bulk_get.run = AsyncMock(
+        return_value=PartialBulkResult(
+            items=[PartialBulkEntityResult[ObjectStorageData].succeeded(storage.id, storage)]
         )
     )
     return ObjectStorageAdapter(processors)
@@ -85,3 +92,12 @@ class TestObjectStorageSecretKey:
         payload = await adapter.admin_search(AdminSearchObjectStoragesInput())
 
         assert [item.secret_key for item in payload.items] == [_expected_secret(caller_role)]
+
+    async def test_the_dataloader_reveals_the_secret_only_to_a_superadmin(
+        self, adapter: ObjectStorageAdapter, storage: ObjectStorageData, caller_role: UserRole
+    ) -> None:
+        nodes = await adapter.batch_load_by_ids([storage.id])
+
+        assert [node.secret_key for node in nodes if isinstance(node, ObjectStorageNode)] == [
+            _expected_secret(caller_role)
+        ]
