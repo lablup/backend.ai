@@ -128,8 +128,8 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
     ) -> HookResult:
         """
         Invoke the handlers that matches with the given ``event_name``.
-        If any of the handlers raises :class:`HookDenied`,
-        the event caller should seize the processing.
+        A handler raising :class:`Reject` or any other exception ends the dispatch.
+        ``FIRST_COMPLETED`` also ends it at the first non-None result; None means not handled.
         """
         executed_plugin_names = []
         results: list[Any] = []
@@ -150,7 +150,7 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
                     reason=repr(e),
                 )
             else:
-                if return_when == FIRST_COMPLETED:
+                if return_when == FIRST_COMPLETED and result is not None:
                     return HookResult(
                         status=PASSED,
                         src_plugin=plugin_name,
@@ -166,7 +166,7 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
         return HookResult(
             status=PASSED,
             src_plugin=executed_plugin_names,
-            result=results,
+            result=None if return_when == FIRST_COMPLETED else results,
         )
 
     async def notify(
