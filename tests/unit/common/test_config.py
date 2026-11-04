@@ -23,6 +23,11 @@ from ai.backend.common.config import (
     merge,
     override_key,
 )
+from ai.backend.common.exception import (
+    BackendAISchemaValidationFailed,
+    ModelDefinitionValidationError,
+)
+from ai.backend.common.types import EndpointProtocol
 
 
 def test_override_key() -> None:
@@ -112,6 +117,7 @@ class TestMergeFieldCoverage:
             shell="/bin/base",
             port=9999,
             health_check=None,
+            protocol=EndpointProtocol.TCP,
         )
         override = ModelServiceConfig.model_construct(
             _fields_set=set(),
@@ -120,6 +126,7 @@ class TestMergeFieldCoverage:
             shell="",
             port=2,
             health_check=None,
+            protocol=EndpointProtocol.HTTP,
         )
         result = _merge_service_config(base, override)
         missing = set(ModelServiceConfig.model_fields) - result.model_fields_set
@@ -749,3 +756,71 @@ class TestModelDefinitionWithArgsAppended:
         assert first is not None and second is not None
         assert first.start_command == "a --shared true"
         assert second.start_command == "b --shared true"
+
+
+class TestServiceProtocol:
+    """Provisional ``service.protocol`` (``http`` | ``tcp``) of a model service."""
+
+    @staticmethod
+    def _definition(service: dict[str, Any]) -> ModelDefinition:
+        return ModelDefinition.model_validate({
+            "models": [{"name": "m", "model_path": "/m", "service": {"port": 8080, **service}}]
+        })
+
+    def test_defaults_to_http(self) -> None:
+        assert self._definition({}).service_protocol() is EndpointProtocol.HTTP
+
+    def test_tcp(self) -> None:
+        assert self._definition({"protocol": "tcp"}).service_protocol() is EndpointProtocol.TCP
+
+    def test_no_service_defaults_to_http(self) -> None:
+        definition = ModelDefinition.model_validate({"models": [{"name": "m", "model_path": "/m"}]})
+        assert definition.service_protocol() is EndpointProtocol.HTTP
+
+    def test_rejects_unsupported_value(self) -> None:
+        with pytest.raises(ModelDefinitionValidationError):
+            self._definition({"protocol": "grpc"})
+
+    def test_merge_override_wins_and_base_survives(self) -> None:
+        base = self._definition({"protocol": "tcp"})
+        override_unset = ModelDefinition.model_validate({
+            "models": [{"name": "m", "model_path": "/m", "service": {"port": 9000}}]
+        })
+        override_set = ModelDefinition.model_validate({
+            "models": [
+                {"name": "m", "model_path": "/m", "service": {"port": 9000, "protocol": "http"}}
+            ]
+        })
+        assert base.merge(override_unset).service_protocol() is EndpointProtocol.TCP
+        assert base.merge(override_set).service_protocol() is EndpointProtocol.HTTP
+
+    def test_draft_round_trip_and_merge(self) -> None:
+        base = ModelServiceConfigDraft(port=8080, protocol=EndpointProtocol.TCP)
+        assert base.to_resolved().protocol is EndpointProtocol.TCP
+        assert ModelServiceConfigDraft(port=8080).to_resolved().protocol is EndpointProtocol.HTTP
+
+    def test_tcp_with_enabled_health_check_rejected(self) -> None:
+        with pytest.raises(ModelDefinitionValidationError):
+            self._definition({"protocol": "tcp", "health_check": {"enable": True}})
+
+    def test_tcp_with_enabled_health_check_rejected_via_draft(self) -> None:
+        draft = ModelServiceConfigDraft(
+            port=8080,
+            protocol=EndpointProtocol.TCP,
+            health_check=ModelHealthCheckDraft(enable=True),
+        )
+        with pytest.raises(BackendAISchemaValidationFailed):
+            draft.to_resolved()
+
+    @pytest.mark.parametrize("health_check", [None, {}, {"enable": False}])
+    def test_tcp_without_or_with_disabled_health_check_allowed(
+        self, health_check: dict[str, Any] | None
+    ) -> None:
+        service: dict[str, Any] = {"protocol": "tcp"}
+        if health_check is not None:
+            service["health_check"] = health_check
+        assert self._definition(service).service_protocol() is EndpointProtocol.TCP
+
+    def test_http_with_health_check_allowed(self) -> None:
+        definition = self._definition({"protocol": "http", "health_check": {"enable": True}})
+        assert definition.health_check_config() is not None

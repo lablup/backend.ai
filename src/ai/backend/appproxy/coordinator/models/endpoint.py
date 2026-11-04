@@ -7,12 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 
 from ai.backend.appproxy.common.errors import ObjectNotFound
+from ai.backend.appproxy.common.types import ProxyProtocol
 from ai.backend.common.config import ModelHealthCheck
 
 from .base import (
     GUID,
     Base,
     BaseMixin,
+    StrEnumType,
     StructuredJSONObjectColumn,
 )
 
@@ -35,6 +37,13 @@ class Endpoint(Base, BaseMixin):  # type: ignore[misc]
     health_check_enabled: Mapped[bool] = mapped_column(sa.Boolean(), nullable=False, default=False)
     health_check_config: Mapped[ModelHealthCheck | None] = mapped_column(
         StructuredJSONObjectColumn(ModelHealthCheck), nullable=True
+    )
+
+    protocol: Mapped[ProxyProtocol] = mapped_column(
+        StrEnumType(ProxyProtocol),
+        nullable=False,
+        default=ProxyProtocol.HTTP,
+        server_default=ProxyProtocol.HTTP.value,
     )
 
     created_at: Mapped[datetime | None] = mapped_column(
@@ -92,9 +101,11 @@ class Endpoint(Base, BaseMixin):  # type: ignore[misc]
         endpoint_id: UUID,
         health_check_enabled: bool = False,
         health_check_config: ModelHealthCheck | None = None,
+        protocol: ProxyProtocol = ProxyProtocol.HTTP,
     ) -> "Endpoint":
         endpoint = cls()
         endpoint.id = endpoint_id
         endpoint.health_check_enabled = health_check_enabled
         endpoint.health_check_config = health_check_config
+        endpoint.protocol = protocol
         return endpoint

@@ -16,6 +16,7 @@ from pydantic import AliasChoices, AnyUrl, Field
 from ai.backend.common.api_handlers import BaseFieldModel
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.types import EndpointProtocol
 
 
 class SessionTagsModel(BaseFieldModel):
@@ -136,6 +137,15 @@ class CreateEndpointItem(BaseFieldModel):
             "Optional health check configuration. When present, the "
             "coordinator configures the load balancer to probe model "
             "service replicas using this path / interval / timeout."
+        ),
+    )
+    protocol: EndpointProtocol = Field(
+        default=EndpointProtocol.HTTP,
+        description=(
+            "Proxy protocol of the endpoint's circuit. ``http`` (default) is the "
+            "regular HTTP inference path. ``tcp`` makes the app-proxy worker pass "
+            "bytes through (TLS terminates inside the replica); it needs a "
+            "``(tcp, port)`` worker with ``inference`` in its accepted_traffics."
         ),
     )
 
