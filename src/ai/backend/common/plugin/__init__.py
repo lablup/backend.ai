@@ -5,7 +5,6 @@ import logging
 import re
 from abc import ABCMeta, abstractmethod
 from collections.abc import Iterator, Mapping
-from pathlib import Path
 from typing import Any, ClassVar, TypeVar, cast
 from weakref import WeakSet
 
@@ -33,8 +32,6 @@ def load_configured_wheelhouse(wheelhouse_config: WheelhouseConfig) -> None:
         wheelhouse_path = wheelhouse_config.path.resolve()
         prepare_wheelhouse(wheelhouse_path)
         log.info("wheelhouse loaded", wheelhouse_path=str(wheelhouse_path))
-    elif any((Path.cwd() / "wheelhouse").glob("*.whl")):
-        log.warning("wheels in ./wheelhouse not loaded, wheelhouse.allow is off")
 
 
 class AbstractPlugin(metaclass=ABCMeta):
