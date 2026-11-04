@@ -78,9 +78,11 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
 
     _rbln_stat_path: str
     _all_devices: list[TATOMDevice] | None
+    _host_ipc: bool
     _enable_rsd: bool
 
     async def init(self, context: Any = None) -> None:
+        self._host_ipc = str(self.plugin_config.get("host_ipc", "true")).lower() != "false"
         self._all_devices = None
 
         raw_device_mask = self.plugin_config.get("device_mask")
@@ -333,7 +335,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
         return {
             "HostConfig": {
                 "CapAdd": ["IPC_LOCK"],
-                "IpcMode": "host",
+                **({"IpcMode": "host"} if self._host_ipc else {}),
                 "Ulimits": [
                     {
                         "Name": "memlock",

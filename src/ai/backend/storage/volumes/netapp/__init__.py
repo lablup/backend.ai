@@ -347,6 +347,7 @@ class NetAppVolume(BaseVolume):
                 endpoint=self.config["netapp_ontap_endpoint"],
                 user=self.config["netapp_ontap_user"],
                 password=self.config["netapp_ontap_password"],
+                ssl_context=self.config.get("netapp_verify_ssl", False),
             )
         )
         self.netapp_nfs_host = self.config["netapp_nfs_host"]

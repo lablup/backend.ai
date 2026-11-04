@@ -171,6 +171,7 @@ class FlashBladeVolume(BaseVolume):
                 endpoint=self.config["purity_endpoint"],
                 api_token=self.config["purity_api_token"],
                 api_version=self.config["purity_api_version"],
+                ssl_context=self.config.get("purity_verify_ssl", False),
             )
         )
         await super().init()
