@@ -5,6 +5,7 @@ import itertools
 import json
 import logging
 from collections import defaultdict
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Self
 
 import click
@@ -20,6 +21,8 @@ log = logging.getLogger(__spec__.name)
 
 # LogLevel values for click.Choice - avoid importing ai.backend.logging at module level
 _LOG_LEVELS = ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "TRACE", "NOTSET"]
+
+_DAEMONS_LOADING_WHEELS = ("manager", "agent", "storage-proxy")
 
 
 class FormatOptions(enum.StrEnum):
@@ -62,8 +65,37 @@ def main(
     ctx.obj = ctx.with_resource(CLIContext(log_level))
 
 
+def _find_allowed_wheelhouse_paths(config_path: Path | None) -> set[Path]:
+    from ai.backend.common.config import ConfigurationError, find_config_file, read_from_file
+    from ai.backend.common.configs.wheelhouse import WheelhouseConfig
+
+    wheelhouse_paths: set[Path] = set()
+    for daemon_name in _DAEMONS_LOADING_WHEELS:
+        try:
+            toml_path = config_path or find_config_file(daemon_name)
+        except ConfigurationError:
+            # A node runs only some of the daemons.
+            continue
+        raw_config, _ = read_from_file(toml_path, daemon_name)
+        wheelhouse_config = WheelhouseConfig.model_validate(raw_config.get("wheelhouse", {}))
+        if wheelhouse_config.allow:
+            wheelhouse_paths.add(wheelhouse_config.path.resolve())
+    return wheelhouse_paths
+
+
 @main.command()
 @click.argument("group_name")
+@click.option(
+    "-f",
+    "--config-path",
+    "--config",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help=(
+        "The config file whose [wheelhouse] section to read. "
+        "(default: the manager, agent and storage-proxy config files)"
+    ),
+)
 @click.option(
     "--format",
     type=click.Choice([*FormatOptions]),
@@ -73,12 +105,14 @@ def main(
 )
 def scan(
     group_name: str,
+    config_path: Path | None,
     format: FormatOptions,
 ) -> None:
     from .entrypoint import (
         scan_entrypoint_from_buildscript,
         scan_entrypoint_from_package_metadata,
         scan_entrypoint_from_plugin_checkouts,
+        scan_entrypoint_from_wheelhouse,
     )
 
     sources: dict[str, set[str]] = defaultdict(set)
@@ -88,6 +122,11 @@ def scan(
         (("buildscript", item) for item in scan_entrypoint_from_buildscript(group_name)),
         (("plugin-checkout", item) for item in scan_entrypoint_from_plugin_checkouts(group_name)),
         (("python-package", item) for item in scan_entrypoint_from_package_metadata(group_name)),
+        (
+            ("wheelhouse", item)
+            for wheelhouse_path in _find_allowed_wheelhouse_paths(config_path)
+            for item in scan_entrypoint_from_wheelhouse(group_name, wheelhouse_path)
+        ),
     ):
         sources[entrypoint.name].add(source)
         rows.append((source, entrypoint.name, entrypoint.module))
@@ -105,6 +144,7 @@ def scan(
                 "buildscript": Fore.LIGHTYELLOW_EX,
                 "plugin-checkout": Fore.LIGHTGREEN_EX,
                 "python-package": Fore.LIGHTBLUE_EX,
+                "wheelhouse": Fore.LIGHTMAGENTA_EX,
             }
             display_headers = (
                 f"{ITALIC}Source{Style.RESET_ALL}",

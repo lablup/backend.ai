@@ -19,5 +19,6 @@ This package is the **entry-point scanner / CLI** (`entrypoint.py`, `cli.py`). P
 - A class not inheriting `AbstractPlugin` is skipped with a warning.
 - Plugin etcd config path is `config/plugins/{group_key}/{plugin_name}/`.
 - Discovery loads nothing from the current directory. The build root comes from `BACKEND_BUILD_ROOT` or the location of this package.
-- Scanning does not load wheels. `start-server` of the manager, agent and storage-proxy loads them only with `allow = true` under `[wheelhouse]` in its config file, from `wheelhouse.path` (default: `./wheelhouse`), so `plugin scan` and CLI commands do not see them.
+- Scanning does not load wheels. `start-server` of the manager, agent and storage-proxy loads them only with `allow = true` under `[wheelhouse]` in its config file, from `wheelhouse.path` (default: `./wheelhouse`), so CLI commands do not see them.
+- `plugin scan` lists the entry points of the wheels in `wheelhouse.path` of each config file with `allow = true`, without loading them. `-f` names the config file; by default it reads the manager, agent and storage-proxy config files.
 - The manager reads `[wheelhouse]` from `BootstrapConfig` so that etcd cannot turn it on.

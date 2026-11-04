@@ -9,7 +9,7 @@ import os
 import sys
 import zipfile
 from collections.abc import Iterable, Iterator
-from importlib.metadata import EntryPoint, entry_points
+from importlib.metadata import EntryPoint, distributions, entry_points
 from pathlib import Path
 
 log = logging.getLogger(__spec__.name)
@@ -217,6 +217,12 @@ def scan_entrypoint_from_plugin_checkouts(group_name: str) -> Iterator[EntryPoin
                     entrypoints[entrypoint.name] = entrypoint
         # TODO: implement pyproject.toml scanner
     yield from entrypoints.values()
+
+
+def scan_entrypoint_from_wheelhouse(group_name: str, wheelhouse_path: Path) -> Iterator[EntryPoint]:
+    for whl_path in wheelhouse_path.glob("*.whl"):
+        for distribution in distributions(path=[os.fsdecode(whl_path)]):
+            yield from distribution.entry_points.select(group=group_name)
 
 
 def prepare_wheelhouse(wheelhouse_path: Path) -> None:

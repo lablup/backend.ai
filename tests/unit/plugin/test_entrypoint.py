@@ -14,6 +14,7 @@ from ai.backend.plugin.entrypoint import (
     prepare_wheelhouse,
     scan_entrypoint_from_buildscript,
     scan_entrypoint_from_plugin_checkouts,
+    scan_entrypoint_from_wheelhouse,
     scan_entrypoints,
 )
 
@@ -118,6 +119,14 @@ def directory_with_planted_wheel(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     wheelhouse_path.mkdir()
     with zipfile.ZipFile(wheelhouse_path / f"{_PLANTED_WHEEL_STEM}.whl", "w") as wheel:
         wheel.writestr("planted.py", "")
+        wheel.writestr(
+            "planted-1.0.dist-info/METADATA",
+            "Metadata-Version: 2.1\nName: planted\nVersion: 1.0\n",
+        )
+        wheel.writestr(
+            "planted-1.0.dist-info/entry_points.txt",
+            f"[{_PLANTED_GROUP}]\nplanted = planted:Plugin\n",
+        )
     monkeypatch.setattr(sys, "path", [*sys.path])
     return tmp_path
 
@@ -166,6 +175,18 @@ class TestWheelLoading:
 
         extracted_path = current_directory_with_planted_wheel / "wheelhouse" / _PLANTED_WHEEL_STEM
         assert entrypoints == []
+        assert not extracted_path.exists()
+        assert str(extracted_path) not in sys.path
+
+    def test_scanning_a_wheelhouse_reads_entry_points_without_loading_the_wheels(
+        self, directory_with_planted_wheel: Path
+    ) -> None:
+        wheelhouse_path = directory_with_planted_wheel / "wheelhouse"
+
+        entrypoints = [*scan_entrypoint_from_wheelhouse(_PLANTED_GROUP, wheelhouse_path)]
+
+        extracted_path = wheelhouse_path / _PLANTED_WHEEL_STEM
+        assert [entrypoint.name for entrypoint in entrypoints] == ["planted"]
         assert not extracted_path.exists()
         assert str(extracted_path) not in sys.path
 
