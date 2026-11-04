@@ -467,9 +467,10 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 # in image importer kernels.
                 if vfolder.name != ".logs":
                     continue
+            source = await self._resolve_vfolder_mount_source(vfolder)
             mount = Mount(
                 MountTypes.K8S_HOSTPATH,
-                Path(vfolder.host_path),
+                source,
                 Path(vfolder.kernel_path),
                 vfolder.mount_perm,
                 opts={
@@ -480,7 +481,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 KubernetesHostPathVolume(
                     name=f"kernel-{self.kernel_id}-hostPath-{idx}",
                     hostPath={
-                        "path": vfolder.host_path.as_posix(),
+                        "path": source.as_posix(),
                         "type": "Directory",
                     },
                 ),

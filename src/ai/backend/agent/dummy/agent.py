@@ -50,6 +50,7 @@ from ai.backend.common.types import (
     ServicePort,
     SessionId,
     SlotName,
+    VFolderMount,
     current_resource_slots,
 )
 
@@ -236,6 +237,25 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
     ) -> None:
         delay = self.creation_ctx_config["delay"]["mount-krunner"]
         await asyncio.sleep(delay)
+
+    @override
+    async def mount_vfolders(
+        self,
+        vfolders: Sequence[VFolderMount],
+        resource_spec: KernelResourceSpec,
+    ) -> None:
+        for vfolder in vfolders:
+            if self.internal_data.get("prevent_vfolder_mounts", False):
+                if vfolder.name != ".logs":
+                    continue
+            resource_spec.mounts.append(
+                Mount(
+                    MountTypes.BIND,
+                    Path(vfolder.host_path),
+                    Path(vfolder.kernel_path),
+                    vfolder.mount_perm,
+                )
+            )
 
 
 class DummyAgent(
