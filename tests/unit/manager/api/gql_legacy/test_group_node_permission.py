@@ -1,10 +1,10 @@
-"""group_node and the GroupNode federation reference go through the project RBAC context. (BA-8882)"""
+"""group_node and the GroupNode federation reference read a project only within the caller's role."""
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import graphene
 import pytest
@@ -16,27 +16,21 @@ from ai.backend.manager.api.gql_legacy.group import GroupNode
 from ai.backend.manager.models.user.row import UserRole
 
 
-class TestGroupNodePermission:
+class TestGroupNodeGetNode:
     @pytest.fixture
-    def make_info(self) -> Callable[[], graphene.ResolveInfo]:
-        def _make() -> graphene.ResolveInfo:
+    def db_session(self) -> MagicMock:
+        session = MagicMock()
+        session.scalars = AsyncMock(return_value=MagicMock(first=MagicMock(return_value=None)))
+        return session
+
+    @pytest.fixture
+    def make_info(self, db_session: MagicMock) -> Callable[[UserRole], graphene.ResolveInfo]:
+        def _make(role: UserRole) -> graphene.ResolveInfo:
             ctx = MagicMock()
-            ctx.user = {"role": UserRole.USER, "domain_name": "default", "uuid": uuid.uuid4()}
-            ctx.db.connect = MagicMock(
+            ctx.user = {"role": role, "domain_name": "default", "uuid": uuid.uuid4()}
+            ctx.db.begin_readonly_session_read_committed = MagicMock(
                 return_value=AsyncMock(
-                    __aenter__=AsyncMock(return_value=MagicMock()),
-                    __aexit__=AsyncMock(return_value=None),
-                )
-            )
-            ctx.db.begin_readonly_session = MagicMock(
-                return_value=AsyncMock(
-                    __aenter__=AsyncMock(
-                        return_value=MagicMock(
-                            scalars=AsyncMock(
-                                return_value=MagicMock(first=MagicMock(return_value=None))
-                            )
-                        )
-                    ),
+                    __aenter__=AsyncMock(return_value=db_session),
                     __aexit__=AsyncMock(return_value=None),
                 )
             )
@@ -46,35 +40,40 @@ class TestGroupNodePermission:
 
         return _make
 
-    @pytest.fixture
-    def group_global_id(self) -> str:
-        return to_global_id("GroupNode", str(uuid.uuid4()))
-
-    async def test_a_caller_without_project_read_gets_null_without_a_db_read(
+    async def _read_condition(
         self,
-        make_info: Callable[[], graphene.ResolveInfo],
-        group_global_id: str,
-    ) -> None:
-        info = make_info()
-        permission_ctx = MagicMock(query_condition=None)
-        with patch(
-            "ai.backend.manager.api.gql_legacy.group.get_permission_ctx",
-            AsyncMock(return_value=permission_ctx),
-        ):
-            assert await GroupNode.get_node(info, group_global_id) is None
-        info.context.db.begin_readonly_session.assert_not_called()
+        make_info: Callable[[UserRole], graphene.ResolveInfo],
+        db_session: MagicMock,
+        role: UserRole,
+    ) -> str:
+        with pytest.raises(GroupNotFound):
+            await GroupNode.get_node(make_info(role), to_global_id("GroupNode", str(uuid.uuid4())))
+        stmt: sa.Select[tuple[object]] = db_session.scalars.await_args.args[0]
+        return str(stmt.whereclause)
 
-    async def test_a_project_outside_the_permitted_condition_is_not_found(
-        self,
-        make_info: Callable[[], graphene.ResolveInfo],
-        group_global_id: str,
+    async def test_a_superadmin_reads_any_project(
+        self, make_info: Callable[[UserRole], graphene.ResolveInfo], db_session: MagicMock
     ) -> None:
-        info = make_info()
-        permission_ctx = MagicMock(query_condition=sa.false())
-        with patch(
-            "ai.backend.manager.api.gql_legacy.group.get_permission_ctx",
-            AsyncMock(return_value=permission_ctx),
-        ):
-            with pytest.raises(GroupNotFound):
-                await GroupNode.get_node(info, group_global_id)
-        info.context.db.begin_readonly_session.assert_called_once()
+        where = await self._read_condition(make_info, db_session, UserRole.SUPERADMIN)
+        assert "groups.domain_name" not in where
+        assert "entity_memberships" not in where
+
+    async def test_an_admin_reads_projects_of_their_domain(
+        self, make_info: Callable[[UserRole], graphene.ResolveInfo], db_session: MagicMock
+    ) -> None:
+        where = await self._read_condition(make_info, db_session, UserRole.ADMIN)
+        assert "groups.domain_name" in where
+        assert "entity_memberships" not in where
+
+    async def test_a_user_reads_member_projects_of_their_domain(
+        self, make_info: Callable[[UserRole], graphene.ResolveInfo], db_session: MagicMock
+    ) -> None:
+        where = await self._read_condition(make_info, db_session, UserRole.USER)
+        assert "groups.domain_name" in where
+        assert "entity_memberships" in where
+
+    async def test_a_monitor_reads_no_project(
+        self, make_info: Callable[[UserRole], graphene.ResolveInfo], db_session: MagicMock
+    ) -> None:
+        where = await self._read_condition(make_info, db_session, UserRole.MONITOR)
+        assert "false" in where.lower()

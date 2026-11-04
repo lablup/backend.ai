@@ -56,7 +56,7 @@ from ai.backend.manager.models.project.updaters import (
     ProjectSoftDeleteUpdater,
     ProjectUpdater,
 )
-from ai.backend.manager.models.rbac import ProjectScope, SystemScope
+from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.virtual_entity.queries import (
@@ -281,21 +281,28 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
         return result.quota
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self | None:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
         graph_ctx: GraphQueryContext = info.context
         group_id = resolve_entity_id(id, ProjectID)
         user = graph_ctx.user
-        client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
-        async with graph_ctx.db.connect() as db_conn:
-            permission_ctx = await get_permission_ctx(
-                db_conn, client_ctx, ProjectPermission.READ_ATTRIBUTE, SystemScope()
-            )
-            cond = permission_ctx.query_condition
-            if cond is None:
-                return None
-            query = sa.select(ProjectRow).where(cond & (ProjectRow.id == group_id))
-            async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
-                group_row = (await db_session.scalars(query)).first()
+        visible: sa.ColumnElement[bool]
+        match user["role"]:
+            case UserRole.SUPERADMIN:
+                visible = sa.true()
+            case UserRole.ADMIN:
+                visible = ProjectRow.domain_name == user["domain_name"]
+            case UserRole.USER:
+                member_projects = user_scope_membership_query(
+                    ProjectEntityType(), user["uuid"]
+                ).subquery()
+                visible = (ProjectRow.domain_name == user["domain_name"]) & ProjectRow.id.in_(
+                    sa.select(member_projects.c.scope_id)
+                )
+            case _:
+                visible = sa.false()
+        query = sa.select(ProjectRow).where(visible & (ProjectRow.id == group_id))
+        async with graph_ctx.db.begin_readonly_session_read_committed() as db_session:
+            group_row = (await db_session.scalars(query)).first()
         if group_row is None:
             raise GroupNotFound(f"Group not found: {group_id}")
         return cls.from_data(ProjectSearchableFields.own.to_data(group_row))
@@ -368,9 +375,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
 
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
-    async def __resolve_reference(
-        self, info: graphene.ResolveInfo, **kwargs: Any
-    ) -> GroupNode | None:
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> GroupNode:
         return await GroupNode.get_node(info, self.id)
 
 

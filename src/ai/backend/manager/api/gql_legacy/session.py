@@ -36,7 +36,7 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderMount,
 )
-from ai.backend.manager.api.gql.base import resolve_global_id
+from ai.backend.manager.api.gql.base import resolve_entity_id, resolve_global_id
 from ai.backend.manager.clients.valkey_client.statistics import KernelStatistics
 from ai.backend.manager.data.permission.permission_defs import ComputeSessionPermission
 from ai.backend.manager.data.permission.permission_defs import (
@@ -324,9 +324,29 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         id: str,
     ) -> Self | None:
-        return await cls.get_accessible_node(
-            info, resolve_global_id(id), SystemScope(), ComputeSessionPermission.READ_ATTRIBUTE
-        )
+        graphene_ctx: GraphQueryContext = info.context
+        session_id = resolve_entity_id(id, SessionID)
+        user = graphene_ctx.user
+        visible: sa.ColumnElement[bool]
+        match user["role"]:
+            case UserRole.SUPERADMIN:
+                visible = sa.true()
+            case UserRole.ADMIN:
+                visible = SessionRow.domain_name == user["domain_name"]
+            case UserRole.USER:
+                visible = SessionRow.user_uuid == user["uuid"]
+            case _:
+                visible = sa.false()
+        async with graphene_ctx.db.begin_readonly_session_read_committed() as db_session:
+            stmt = (
+                sa.select(SessionRow)
+                .where(visible & (SessionRow.id == session_id))
+                .options(selectinload(SessionRow.kernels), joinedload(SessionRow.user))
+            )
+            query_result = await db_session.scalar(stmt)
+            if query_result is None:
+                return None
+            return cls.from_row(graphene_ctx, query_result)
 
     @classmethod
     def _add_basic_options_to_query(
