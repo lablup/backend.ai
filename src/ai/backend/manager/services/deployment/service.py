@@ -411,7 +411,7 @@ class DeploymentService:
             UpdateDeploymentActionResult: Result containing the updated deployment data
         """
         log.trace("deployment update requested", deployment_id=action.updater.deployment_id)
-        designated_agents = action.designated_agents
+        designated_agents = action.updater.designated_agents.optional_value()
         if designated_agents:
             current = await self._deployment_repository.get_endpoint_info(action.deployment_id)
             await self._ensure_agents_in_resource_group(

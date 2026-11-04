@@ -535,7 +535,7 @@ class TestDesignatedAgentInputs:
         action: UpdateDeploymentAction = (
             processors.deployment.update_deployment.run.await_args.args[0]
         )
-        return action.designated_agents
+        return action.updater.designated_agents.optional_value()
 
     async def test_create_takes_each_agent_once(
         self, adapter: DeploymentAdapter, processors: MagicMock

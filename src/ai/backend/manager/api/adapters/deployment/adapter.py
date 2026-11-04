@@ -868,24 +868,23 @@ class DeploymentAdapter(BaseAdapter):
         deployment_id: DeploymentID,
     ) -> UpdateDeploymentPayload:
         """Update deployment metadata and configuration."""
+        designated_agents: OptionalState[frozenset[AgentUUID]]
+        if isinstance(input.designated_agent_ids, Unset) or input.designated_agent_ids is None:
+            designated_agents = OptionalState.nop()
+        else:
+            designated_agents = OptionalState.update(
+                frozenset(AgentUUID(a) for a in input.designated_agent_ids)
+            )
         updater = DeploymentUpdater(
             deployment_id=deployment_id,
             name=OptionalState.from_unset(input.name),
             tag=self._convert_tag_state(input.tags),
             replica_count=OptionalState.from_unset(input.replica_count),
             open_to_public=OptionalState.from_unset(input.open_to_public),
+            designated_agents=designated_agents,
         )
-        designated_agent_ids = OptionalState.from_unset(input.designated_agent_ids).optional_value()
         action_result = await self._deployment.update_deployment.run(
-            UpdateDeploymentAction(
-                deployment_id=deployment_id,
-                updater=updater,
-                designated_agents=(
-                    frozenset(AgentUUID(a) for a in designated_agent_ids)
-                    if designated_agent_ids is not None
-                    else None
-                ),
-            )
+            UpdateDeploymentAction(deployment_id=deployment_id, updater=updater)
         )
         return UpdateDeploymentPayload(deployment=self._deployment_data_to_dto(action_result.data))
 
