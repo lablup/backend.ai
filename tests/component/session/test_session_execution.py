@@ -604,7 +604,7 @@ class TestSessionStartService:
                 StartServiceRequest(app="ttyd", login_session_token="login-session-token-value"),
             )
 
-        assert mock_session_obj.post.call_args[1]["json"]["login_session_token"] is None
+        assert mock_session_obj.post.call_args[1]["json"]["login_session_token"] == ""
 
     async def test_start_service_wsproxy_advertise_address_fallback(
         self,

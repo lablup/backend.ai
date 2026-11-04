@@ -1355,8 +1355,9 @@ class SessionService:
             )
 
         body = {
-            # A coordinator of an older version requires the key to be present.
-            "login_session_token": None,
+            # A coordinator of an older version requires the key, and the legacy
+            # backend.ai-proxy-coordinator saves it to a non-nullable column.
+            "login_session_token": "",
             "kernel_host": kernel_host,
             "kernel_port": host_port,
             "session": {
