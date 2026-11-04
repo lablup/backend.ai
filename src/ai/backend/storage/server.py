@@ -409,6 +409,7 @@ async def api_ctx(
                 str(local_config.api.client.ssl_privkey),
             )
         client_api_app = await init_client_app(root_ctx)
+        client_api_app.on_response_prepare.append(_on_prepare)
         client_api_runner = web.AppRunner(client_api_app)
         await client_api_runner.setup()
         client_service_addr = local_config.api.client.service_addr
@@ -436,6 +437,7 @@ async def api_ctx(
                 str(local_config.api.manager.ssl_privkey),
             )
         manager_api_app = await init_manager_app(root_ctx)
+        manager_api_app.on_response_prepare.append(_on_prepare)
         manager_api_runner = web.AppRunner(manager_api_app)
         await manager_api_runner.setup()
         manager_service_addr_config = local_config.api.manager.service_addr
@@ -460,6 +462,7 @@ async def api_ctx(
     @asynccontextmanager
     async def internal_api_ctx() -> AsyncGenerator[web.Application]:
         internal_api_app = init_internal_app(root_ctx)
+        internal_api_app.on_response_prepare.append(_on_prepare)
         internal_api_runner = web.AppRunner(internal_api_app)
         await internal_api_runner.setup()
         internal_addr = local_config.api.manager.internal_addr
