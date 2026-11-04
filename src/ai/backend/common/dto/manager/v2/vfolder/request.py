@@ -289,9 +289,11 @@ class CloneVFolderInput(BaseRequestModel):
     )
     cloneable: bool = Field(default=False, description="Whether the cloned vfolder is cloneable")
 
-    @field_validator("name")
+    @field_validator("name", mode="before")
     @classmethod
-    def strip_and_validate_name(cls, v: str) -> str:
+    def strip_and_validate_name(cls, v: object) -> object:
+        if not isinstance(v, str):
+            return v
         stripped = v.strip()
         if not stripped:
             raise ValueError("name must not be blank or whitespace-only")
