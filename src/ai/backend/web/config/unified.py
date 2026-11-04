@@ -249,25 +249,6 @@ class ServiceConfig(BaseConfigSchema):
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
-    allow_project_resource_monitor: Annotated[
-        bool,
-        Field(
-            default=False,
-            validation_alias=AliasChoices(
-                "allow_project_resource_monitor", "allow-project-resource-monitor"
-            ),
-            serialization_alias="allow-project-resource-monitor",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Enable project-level resource monitoring in the web UI. Shows aggregated "
-                "resource usage statistics per project (group). Useful for project managers "
-                "to track their team's resource consumption."
-            ),
-            added_version="25.12.0",
-            example=ConfigExample(local="false", prod="true"),
-        ),
-    ]
     allow_change_signin_mode: Annotated[
         bool,
         Field(
@@ -320,25 +301,6 @@ class ServiceConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             example=ConfigExample(local="true", prod="false"),
-        ),
-    ]
-    always_enqueue_compute_session: Annotated[
-        bool,
-        Field(
-            default=False,
-            validation_alias=AliasChoices(
-                "always_enqueue_compute_session", "always-enqueue-compute-session"
-            ),
-            serialization_alias="always-enqueue-compute-session",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Force all compute session requests to go through the scheduling queue. "
-                "When disabled, sessions may start immediately if resources are available. "
-                "Enable for fair resource allocation in multi-user environments."
-            ),
-            added_version="25.12.0",
-            example=ConfigExample(local="false", prod="true"),
         ),
     ]
     webui_debug: Annotated[
@@ -494,23 +456,6 @@ class ServiceConfig(BaseConfigSchema):
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
-    force_2fa: Annotated[
-        bool,
-        Field(
-            default=False,
-            validation_alias=AliasChoices("force_2FA", "force-2FA"),
-            serialization_alias="force-2FA",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Require all users to set up two-factor authentication. Users who haven't "
-                "configured 2FA will be prompted to do so before accessing the system. "
-                "Requires enable_2fa to be true."
-            ),
-            added_version="25.12.0",
-            example=ConfigExample(local="false", prod="false"),
-        ),
-    ]
     system_ssh_image: Annotated[
         str,
         Field(
@@ -526,23 +471,6 @@ class ServiceConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             example=ConfigExample(local="", prod="cr.backend.ai/system/ssh:latest"),
-        ),
-    ]
-    directory_based_usage: Annotated[
-        bool,
-        Field(
-            default=False,
-            validation_alias=AliasChoices("directory_based_usage", "directory-based-usage"),
-            serialization_alias="directory-based-usage",
-        ),
-        BackendAIConfigMeta(
-            description=(
-                "Track resource usage based on directory structure. When enabled, usage "
-                "statistics are calculated per directory/project hierarchy rather than "
-                "flat aggregation. Useful for organizational billing."
-            ),
-            added_version="25.12.0",
-            example=ConfigExample(local="false", prod="true"),
         ),
     ]
     allow_custom_resource_allocation: Annotated[
@@ -1358,18 +1286,6 @@ class EnvironmentsConfig(BaseConfigSchema):
     Controls which container images are visible to users and how they are presented.
     """
 
-    allowlist: Annotated[
-        CommaSeparatedStrList | None,
-        Field(default=None),
-        BackendAIConfigMeta(
-            description=(
-                "Comma-separated list of allowed environment image name patterns to display. "
-                "When set, only images matching these patterns are shown to users. "
-                "Leave empty (None) to show all available images."
-            ),
-            added_version="25.12.0",
-        ),
-    ]
     show_non_installed_images: Annotated[
         bool,
         Field(
@@ -1575,18 +1491,6 @@ class APIConfig(BaseConfigSchema):
                 local="http://127.0.0.1:8080",
                 prod="http://manager-api:8080,http://manager-api-2:8080",
             ),
-        ),
-    ]
-    text: Annotated[
-        str,
-        Field(default="Backend.AI API"),
-        BackendAIConfigMeta(
-            description=(
-                "Display text for the API endpoint shown in the web UI. This label appears "
-                "in settings and debugging panels. Customize for branded deployments."
-            ),
-            added_version="25.12.0",
-            example=ConfigExample(local="Backend.AI API", prod="Production API"),
         ),
     ]
     ssl_verify: Annotated[

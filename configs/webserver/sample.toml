@@ -61,11 +61,6 @@
   # caution as it may reduce security.
   # Added in 25.12.0
   allow-anonymous-change-password = false
-  # Enable project-level resource monitoring in the web UI. Shows aggregated
-  # resource usage statistics per project (group). Useful for project managers
-  # to track their team's resource consumption.
-  # Added in 25.12.0
-  allow-project-resource-monitor = true
   # Allow users to switch between different sign-in methods (e.g., password,
   # SSO). When disabled, users must use the sign-in method configured by the
   # administrator.
@@ -81,11 +76,6 @@
   # is not required. Disable for public-facing services.
   # Added in 25.12.0
   allow-signup-without-confirmation = false
-  # Force all compute session requests to go through the scheduling queue. When
-  # disabled, sessions may start immediately if resources are available. Enable
-  # for fair resource allocation in multi-user environments.
-  # Added in 25.12.0
-  always-enqueue-compute-session = true
   # Enable debug mode for the web UI frontend. Shows additional debugging
   # information in the browser console and may expose internal state. Should be
   # disabled in production for security.
@@ -130,21 +120,11 @@
   # proper 2FA configuration in the Manager.
   # Added in 25.12.0
   enable-2FA = true
-  # Require all users to set up two-factor authentication. Users who haven't
-  # configured 2FA will be prompted to do so before accessing the system.
-  # Requires enable_2fa to be true.
-  # Added in 25.12.0
-  force-2FA = false
   # Default container image for system SSH access sessions. Specifies which
   # image to use when users request SSH access to the system. Leave empty to use
   # the default system image.
   # Added in 25.12.0
   system-SSH-image = "cr.backend.ai/system/ssh:latest"
-  # Track resource usage based on directory structure. When enabled, usage
-  # statistics are calculated per directory/project hierarchy rather than flat
-  # aggregation. Useful for organizational billing.
-  # Added in 25.12.0
-  directory-based-usage = true
   # Allow users to customize resource allocation (CPU, memory, GPU) when
   # creating sessions. When disabled, users must choose from predefined resource
   # templates. Disable for simplified user experience.
@@ -407,11 +387,6 @@
 # preferences.
 # Added in 25.12.0
 [environments]
-  # Comma-separated list of allowed environment image name patterns to display.
-  # When set, only images matching these patterns are shown to users. Leave
-  # empty (None) to show all available images.
-  # Added in 25.12.0
-  ## allowlist = []
   # Show container images that are available but not yet installed on agents.
   # When enabled, users can see and request images that will be pulled on
   # demand. Disable to only show pre-installed images.
@@ -483,10 +458,6 @@
   # server will distribute requests across all endpoints.
   # Added in 25.12.0
   endpoint = "http://manager-api:8080,http://manager-api-2:8080"
-  # Display text for the API endpoint shown in the web UI. This label appears in
-  # settings and debugging panels. Customize for branded deployments.
-  # Added in 25.12.0
-  text = "Production API"
   # Verify SSL certificates when connecting to the Manager API. Disable only for
   # development with self-signed certificates. Always enable in production for
   # security.
