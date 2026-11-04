@@ -4,8 +4,15 @@ import ipaddress
 import logging
 import urllib.parse
 from collections.abc import Iterable
+<<<<<<< HEAD
 from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
+=======
+from datetime import UTC, datetime, timedelta
+from http import HTTPStatus
+from typing import TYPE_CHECKING, Annotated, Final
+from uuid import UUID, uuid4
+>>>>>>> 636540ffe (feat(BA-8915): give the AppProxy setup token an expiry and a unique id (#16411))
 
 import jwt
 from aiohttp import hdrs, web
@@ -38,6 +45,8 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+_SETUP_TOKEN_LIFETIME: Final = timedelta(minutes=5)
 
 
 class AddRequestModel(BackendAISchema):
@@ -81,6 +90,21 @@ class ProxyResponseModel(BackendAISchema):
 
 class TokenBodyModel(ConfRequestModel):
     exp: int
+
+
+def _sign_setup_token(token_id: UUID, circuit_id: UUID, redirect: str, jwt_secret: str) -> str:
+    return jwt.encode(
+        {
+            "id": str(token_id),
+            "version": "v2",  # TODO: add support for v1
+            "redirect": redirect,
+            "circuit": str(circuit_id),
+            "jti": str(uuid4()),
+            "exp": datetime.now(UTC) + _SETUP_TOKEN_LIFETIME,
+        },
+        jwt_secret,
+        algorithm="HS256",
+    )
 
 
 @pydantic_api_handler(AddRequestModel, is_deprecated=True)
@@ -211,14 +235,10 @@ async def proxy(
 
     await root_ctx.circuit_manager.initialize_circuits([circuit])
     log.debug("Circuit is set (id:{})", str(circuit.id))
-    token_to_generate_body = {
-        "id": str(token.id),
-        "version": "v2",  # TODO: add support for v1
-        "redirect": params.redirect,
-        "circuit": str(circuit.id),
-    }
     qdict = {
-        "token": jwt.encode(token_to_generate_body, root_ctx.local_config.secrets.jwt_secret),
+        "token": _sign_setup_token(
+            token.id, circuit.id, params.redirect, root_ctx.local_config.secrets.jwt_secret
+        ),
     }
 
     app_url = f"{worker.api_endpoint}/setup?{urllib.parse.urlencode(qdict)}"
