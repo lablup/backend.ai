@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Literal, Protocol, runtime_checkable
 
 from ai.backend.agent.containerd.rpc.types import RuntimeOptions
 from ai.backend.common.types import KernelCreationConfig, KernelId, SessionId, SlotName
@@ -39,6 +39,15 @@ class GeneratedMount:
 
 
 @dataclass(frozen=True)
+class TranslatedDevice:
+    path: str
+    type: Literal["c", "b"]
+    major: int
+    minor: int
+    access: str
+
+
+@dataclass(frozen=True)
 class KernelRunnerReadiness:
     timeout_s: float
 
@@ -55,6 +64,7 @@ class KernelLaunch:
     session_id: SessionId
     config: KernelCreationConfig  # after RuntimeProfile.prepare()
     slots: Mapping[SlotName, Decimal]  # the kernel's resource_slots, as seen by accepts()
+    devices: Sequence[TranslatedDevice]
     mounts: Sequence[GeneratedMount]
     base_spec: Mapping[str, Any]  # the agent's generic OCI spec, read-only
 

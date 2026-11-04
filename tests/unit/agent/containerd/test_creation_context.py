@@ -2,26 +2,36 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import os
+import stat as stat_mod
 import uuid
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
+from functools import partial
 from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast, override
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from ai.backend.agent.agent import AbstractKernelCreationContext
+from ai.backend.agent.containerd import agent as agent_module
 from ai.backend.agent.containerd.agent import (
     HOST_PORTS_LABEL,
     KERNEL_IP_LABEL,
     ContainerdKernelCreationContext,
 )
 from ai.backend.agent.containerd.client import MountSpec, RuntimeOptions
+from ai.backend.agent.containerd.hostconfig import translate_fragment
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.network import KernelNetwork
-from ai.backend.agent.containerd.profile.base import GeneratedMountKind, LaunchPlan
+from ai.backend.agent.containerd.profile.base import (
+    GeneratedMountKind,
+    LaunchPlan,
+    TranslatedDevice,
+)
 from ai.backend.agent.containerd.profile.runc import RuncProfile
 from ai.backend.agent.containerd.scratch import CONFIG_DIR_LABEL
 from ai.backend.agent.containerd.spec import SpecInput, build_base_spec, build_launch_spec
@@ -29,6 +39,7 @@ from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.containerd import (
     ContainerdImageNotFound,
     ContainerdOperationFailed,
+    HostConfigNotTranslatable,
     KernelNetworkSetupFailed,
     KernelVerbNotSupported,
     ProfileSpecRejected,
@@ -178,6 +189,7 @@ class TestPrepareContainer:
         assert launch.session_id == ownership_data.session_id
         assert launch.config is launch_kernel_config
         assert launch.slots is SLOTS
+        assert launch.devices == ()
         assert launch.base_spec["linux"]["resources"]["cpu"]["cpus"] == "1,3"
         assert launch.base_spec["linux"]["resources"]["memory"]["limit"] == 1073741824
         assert launch.base_spec["hostname"] == "main1"
@@ -564,6 +576,7 @@ class TestAccelerators:
         await ctx.apply_accelerator_allocation(_accelerator_plugin(slot, {}), alloc)
         await ctx.prepare_container(resource_spec, {}, [], MagicMock())
 
+        assert profile.plan_calls[0].devices == ()
         assert fake.calls == []
 
     async def test_zero_accelerator_allocation_is_accepted(
@@ -617,7 +630,169 @@ class TestAccelerators:
             "/mnt/vfolder": GeneratedMountKind.VFOLDER,
         }
 
-    async def test_plugin_with_container_arguments_is_refused_and_removes_the_scratch(
+
+class TestHostConfigTranslation:
+    @pytest.fixture
+    def fake(self) -> FakeContainerd:
+        return FakeContainerd()
+
+    @pytest.fixture
+    def profile(self, launch_plan: LaunchPlan) -> FakeProfile:
+        return FakeProfile("runc", accepts=True, plan_result=launch_plan)
+
+    @pytest.fixture
+    def ctx(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        launch_kernel_config: KernelCreationConfig,
+        computers: dict[DeviceName, ComputerContext],
+        profile: FakeProfile,
+        fake: FakeContainerd,
+    ) -> ContainerdKernelCreationContext:
+        return _make_context(
+            ownership_data,
+            launch_kernel_config,
+            profile,
+            scratch_root=tmp_path,
+            client=fake,
+            computers=computers,
+        )
+
+    @staticmethod
+    async def _apply(
+        ctx: ContainerdKernelCreationContext, key: str, fragment: Mapping[str, Any]
+    ) -> None:
+        alloc = {SlotName(f"{key}.shares"): {DeviceId("0"): Decimal(1)}}
+        await ctx.apply_accelerator_allocation(_accelerator_plugin(key, fragment), alloc)
+
+    async def test_plugin_env_reaches_environ_and_the_kernel(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        ctx: ContainerdKernelCreationContext,
+        resource_spec: KernelResourceSpec,
+    ) -> None:
+        await ctx.prepare_scratch()
+        await self._apply(ctx, "cuda", {"Env": ["X=plugin", "K=plugin"]})
+
+        kernel = await ctx.prepare_container(
+            resource_spec, {"K": "kernel", "A": "1"}, [], MagicMock()
+        )
+
+        config_dir = tmp_path / str(ownership_data.kernel_id) / "config"
+        assert (config_dir / "environ.txt").read_text() == "K=plugin\nA=1\nX=plugin\n"
+        assert kernel.environ["X"] == "plugin"
+        assert kernel.environ["K"] == "plugin"
+
+    async def test_confidential_plugin_with_no_docker_args_launches_without_devices(
+        self,
+        ctx: ContainerdKernelCreationContext,
+        profile: FakeProfile,
+        fake: FakeContainerd,
+        resource_spec: KernelResourceSpec,
+    ) -> None:
+        alloc = {SlotName("confidential.tdx"): {DeviceId("0"): Decimal(1)}}
+        await ctx.prepare_scratch()
+
+        await ctx.apply_accelerator_allocation(_accelerator_plugin("confidential", {}), alloc)
+        kernel = await ctx.prepare_container(resource_spec, {}, [], MagicMock())
+
+        assert isinstance(kernel, ContainerdKernel)
+        assert profile.plan_calls[0].devices == ()
+        assert fake.calls == []
+
+    async def test_c5_vfio_fragment_reaches_the_launch_and_the_base_spec(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        ctx: ContainerdKernelCreationContext,
+        profile: FakeProfile,
+        resource_spec: KernelResourceSpec,
+    ) -> None:
+        node = cast(
+            os.stat_result,
+            SimpleNamespace(
+                st_mode=stat_mod.S_IFCHR | 0o666, st_rdev=os.makedev(237, 0), st_uid=0, st_gid=0
+            ),
+        )
+        monkeypatch.setattr(
+            agent_module,
+            "translate_fragment",
+            partial(translate_fragment, stat=lambda _path: node),
+        )
+        fragment = {
+            "HostConfig": {
+                "Devices": [
+                    {
+                        "PathOnHost": "/dev/vfio/devices/vfio0",
+                        "PathInContainer": "/dev/vfio/devices/vfio0",
+                        "CgroupPermissions": "rwm",
+                    }
+                ]
+            }
+        }
+        alloc = {SlotName("cuda.device"): {DeviceId("0"): Decimal(1)}}
+        await ctx.prepare_scratch()
+
+        await ctx.apply_accelerator_allocation(_accelerator_plugin("cuda", fragment), alloc)
+        await ctx.prepare_container(resource_spec, {}, [], MagicMock())
+
+        (launch,) = profile.plan_calls
+        assert launch.devices == (TranslatedDevice("/dev/vfio/devices/vfio0", "c", 237, 0, "rwm"),)
+        assert launch.base_spec["linux"]["resources"]["devices"] == [
+            {"allow": False, "access": "rwm"},
+            {"allow": True, "type": "c", "major": 237, "minor": 0, "access": "rwm"},
+        ]
+
+    @pytest.mark.parametrize(
+        ("key", "fragment", "match"),
+        [
+            ("cuda", {"HostConfig": {"Sysctls": {}}}, r"cuda: HostConfig\.Sysctls"),
+            ("cuda", {"Cmd": ["x"]}, r"cuda: Cmd"),
+            ("cpu", {"HostConfig": {"CpusetCpus": "0"}}, r"cpu: HostConfig\.CpusetCpus"),
+            (
+                "cuda",
+                {"HostConfig": {"DeviceRequests": [{"Driver": "nvidia", "Count": -1}]}},
+                r"cuda: HostConfig\.DeviceRequests",
+            ),
+        ],
+    )
+    async def test_untranslatable_fragment_is_refused_before_any_containerd_call(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        ctx: ContainerdKernelCreationContext,
+        fake: FakeContainerd,
+        key: str,
+        fragment: Mapping[str, Any],
+        match: str,
+    ) -> None:
+        await ctx.prepare_scratch()
+
+        with pytest.raises(HostConfigNotTranslatable, match=match):
+            await self._apply(ctx, key, fragment)
+
+        assert not (tmp_path / str(ownership_data.kernel_id)).exists()
+        assert fake.calls == []
+
+    async def test_conflicting_plugins_raise_at_the_second_allocation(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        ctx: ContainerdKernelCreationContext,
+    ) -> None:
+        await ctx.prepare_scratch()
+        await self._apply(ctx, "cuda", {"Env": ["A=1"]})
+
+        with pytest.raises(HostConfigNotTranslatable, match='"cuda" and "rocm"'):
+            await self._apply(ctx, "rocm", {"Env": ["A=2"]})
+
+        assert [name for name, _ in ctx._host_configs] == ["cuda"]
+        assert ctx._host_config.env == (("A", "1"),)
+        scratch = tmp_path / str(ownership_data.kernel_id)
+        assert not scratch.exists()
+
+    async def test_plugin_error_propagates_and_removes_the_scratch(
         self,
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
@@ -625,14 +800,16 @@ class TestAccelerators:
         fake: FakeContainerd,
     ) -> None:
         await ctx.prepare_scratch()
-        fragment = {"HostConfig": {"Devices": [{"PathOnHost": "/dev/nvidia0"}]}}
-        plugin = _accelerator_plugin("cuda", fragment)
+        scratch = tmp_path / str(ownership_data.kernel_id)
+        assert scratch.is_dir()
+        plugin = _accelerator_plugin("cuda", {})
+        plugin.generate_docker_args = AsyncMock(side_effect=UnsupportedResource("cuda"))
         alloc = {SlotName("cuda.shares"): {DeviceId("0"): Decimal(1)}}
 
-        with pytest.raises(KernelVerbNotSupported, match="cuda"):
+        with pytest.raises(UnsupportedResource):
             await ctx.apply_accelerator_allocation(plugin, alloc)
 
-        assert not (tmp_path / str(ownership_data.kernel_id)).exists()
+        assert not scratch.exists()
         assert fake.calls == []
 
 
