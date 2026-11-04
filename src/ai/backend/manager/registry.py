@@ -43,6 +43,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectID
@@ -1908,12 +1909,12 @@ class AgentRegistry:
             service_name=endpoint.name,
             tags=TagsModel(
                 session=SessionTagsModel(
-                    user_uuid=str(endpoint.session_owner_id),
-                    project_id=str(endpoint.project),
-                    domain_name=endpoint.domain,
+                    user_uuid=UserID(endpoint.session_owner_id),
+                    project_id=ProjectID(endpoint.project),
+                    domain_name=DomainName(endpoint.domain),
                 ),
                 endpoint=EndpointTagsModel(
-                    id=str(endpoint.id),
+                    id=DeploymentID(endpoint.id),
                     runtime_variant=variant_name,
                     existing_url=str(endpoint.url) if endpoint.url else None,
                 ),
