@@ -46,6 +46,9 @@ from ai.backend.manager.repositories.artifact_registry.repository import Artifac
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
@@ -188,6 +191,7 @@ class TestArtifactRevisionService:
             huggingface_registry_repository=mock_huggingface_repository,
             reservoir_registry_repository=mock_reservoir_repository,
             vfolder_repository=mock_vfolder_repository,
+            permission_check=MagicMock(spec=RbacPermissionCheckRepository),
             storage_manager=mock_storage_manager,
             config_provider=mock_config_provider,
             valkey_artifact_client=mock_valkey_artifact_client,
@@ -629,6 +633,7 @@ class TestImportArtifactRevisionAction:
             huggingface_registry_repository=mock_huggingface_repository,
             reservoir_registry_repository=mock_reservoir_repository,
             vfolder_repository=mock_vfolder_repository,
+            permission_check=MagicMock(spec=RbacPermissionCheckRepository),
             storage_manager=mock_storage_manager,
             config_provider=mock_config_provider,
             valkey_artifact_client=mock_valkey_artifact_client,
@@ -966,6 +971,7 @@ class TestDelegateImportArtifactRevisionBatchAction:
             huggingface_registry_repository=mock_huggingface_repository,
             reservoir_registry_repository=mock_reservoir_repository,
             vfolder_repository=mock_vfolder_repository,
+            permission_check=MagicMock(spec=RbacPermissionCheckRepository),
             storage_manager=mock_storage_manager,
             config_provider=mock_config_provider,
             valkey_artifact_client=mock_valkey_artifact_client,
@@ -1211,6 +1217,7 @@ class TestCancelImportAction:
             huggingface_registry_repository=MagicMock(spec=HuggingFaceRepository),
             reservoir_registry_repository=MagicMock(spec=ReservoirRegistryRepository),
             vfolder_repository=MagicMock(spec=VfolderRepository),
+            permission_check=MagicMock(spec=RbacPermissionCheckRepository),
             storage_manager=MagicMock(),
             config_provider=MagicMock(),
             valkey_artifact_client=MagicMock(),
@@ -1308,6 +1315,7 @@ class TestAssociateWithStorageAction:
             huggingface_registry_repository=MagicMock(spec=HuggingFaceRepository),
             reservoir_registry_repository=MagicMock(spec=ReservoirRegistryRepository),
             vfolder_repository=MagicMock(spec=VfolderRepository),
+            permission_check=MagicMock(spec=RbacPermissionCheckRepository),
             storage_manager=MagicMock(),
             config_provider=MagicMock(),
             valkey_artifact_client=MagicMock(),
@@ -1401,6 +1409,7 @@ class TestDisassociateWithStorageAction:
             huggingface_registry_repository=MagicMock(spec=HuggingFaceRepository),
             reservoir_registry_repository=MagicMock(spec=ReservoirRegistryRepository),
             vfolder_repository=MagicMock(spec=VfolderRepository),
+            permission_check=MagicMock(spec=RbacPermissionCheckRepository),
             storage_manager=MagicMock(),
             config_provider=MagicMock(),
             valkey_artifact_client=MagicMock(),
@@ -1490,6 +1499,7 @@ class TestCleanupArtifactRevisionAction:
             huggingface_registry_repository=MagicMock(spec=HuggingFaceRepository),
             reservoir_registry_repository=MagicMock(spec=ReservoirRegistryRepository),
             vfolder_repository=MagicMock(spec=VfolderRepository),
+            permission_check=MagicMock(spec=RbacPermissionCheckRepository),
             storage_manager=mock_storage_manager,
             config_provider=mock_config_provider,
             valkey_artifact_client=MagicMock(),
@@ -1770,6 +1780,7 @@ class TestGetDownloadProgressAction:
             huggingface_registry_repository=MagicMock(spec=HuggingFaceRepository),
             reservoir_registry_repository=mock_reservoir_repository,
             vfolder_repository=MagicMock(spec=VfolderRepository),
+            permission_check=MagicMock(spec=RbacPermissionCheckRepository),
             storage_manager=MagicMock(),
             config_provider=mock_config_provider,
             valkey_artifact_client=mock_valkey_artifact_client,
