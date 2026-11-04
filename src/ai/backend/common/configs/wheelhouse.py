@@ -6,7 +6,7 @@ from typing import Annotated
 from pydantic import Field, field_validator
 
 from ai.backend.common.config import BaseConfigSchema
-from ai.backend.common.meta import BackendAIConfigMeta, ConfigExample
+from ai.backend.common.meta import NEXT_RELEASE_VERSION, BackendAIConfigMeta, ConfigExample
 
 __all__ = ("WheelhouseConfig",)
 
@@ -23,7 +23,7 @@ class WheelhouseConfig(BaseConfigSchema):
                 "A config file found through the current directory cannot turn this on: "
                 "name it with the -f option or BACKEND_CONFIG_FILE."
             ),
-            added_version="26.10.0",
+            added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -35,7 +35,7 @@ class WheelhouseConfig(BaseConfigSchema):
                 "Absolute path of the directory holding the plugin wheels. "
                 "A relative path is rejected so that the current directory cannot choose it."
             ),
-            added_version="26.10.0",
+            added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(
                 local="/opt/backend.ai/wheelhouse", prod="/opt/backend.ai/wheelhouse"
             ),

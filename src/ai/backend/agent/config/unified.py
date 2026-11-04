@@ -2402,7 +2402,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "config file: etcd values are ignored. Wheels provided here run without "
                 "verification, so keep the path writable only by trusted operators."
             ),
-            added_version="26.10.0",
+            added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
     ]
