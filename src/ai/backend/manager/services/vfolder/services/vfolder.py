@@ -64,6 +64,7 @@ from ai.backend.manager.errors.storage import (
     VFolderNotFound,
     VFolderOperationFailed,
 )
+from ai.backend.manager.errors.watcher import WatcherTokenNotConfigured
 from ai.backend.manager.models.project.row import ProjectType
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.user.row import UserRole
@@ -917,8 +918,8 @@ class VFolderService:
     async def _get_watcher_info(self, agent_id: str) -> dict[str, Any]:
         """Get watcher connection info for an agent."""
         token = self._config_provider.config.watcher.token
-        if token is None:
-            token = "insecure"
+        if not token:
+            raise WatcherTokenNotConfigured()
         agent_ip = await self._etcd.get(f"nodes/agents/{agent_id}/ip")
         raw_watcher_port = await self._etcd.get(
             f"nodes/agents/{agent_id}/watcher_port",

@@ -31,6 +31,7 @@ from ai.backend.manager.errors.storage import (
     VFolderFilterStatusFailed,
     VFolderNotFound,
 )
+from ai.backend.manager.errors.watcher import WatcherTokenNotConfigured
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.vfolder.actions.base import (
     PurgeVFolderAction,
@@ -449,6 +450,24 @@ class TestVFolderServiceWatcherInfo:
         watcher_info = await vfolder_service._get_watcher_info(agent_id)
 
         assert watcher_info["addr"].port == 6009
+
+    @pytest.mark.parametrize("token", [None, ""], ids=["missing", "empty"])
+    async def test_watcher_info_rejects_unconfigured_token(self, token: str | None) -> None:
+        config_provider = MagicMock()
+        config_provider.config.watcher.token = token
+        vfolder_service = VFolderService(
+            config_provider=config_provider,
+            etcd=MagicMock(),
+            storage_manager=MagicMock(),
+            background_task_manager=MagicMock(),
+            vfolder_repository=MagicMock(),
+            user_repository=MagicMock(),
+            valkey_stat_client=MagicMock(),
+            own_check=MagicMock(),
+        )
+
+        with pytest.raises(WatcherTokenNotConfigured):
+            await vfolder_service._get_watcher_info("test-agent-watcher")
 
 
 class TestVFolderServiceBulkLoadMountLevels:
