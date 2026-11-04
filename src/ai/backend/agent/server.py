@@ -315,9 +315,9 @@ class AgentRPCServer(aobject):
     rpc_function: ClassVar[RPCFunctionRegistry] = RPCFunctionRegistry()
     rpc_function_v2: ClassVar[RPCFunctionRegistryV2] = RPCFunctionRegistryV2()
 
-    rpc_auth_manager_public_key: PublicKey | None
-    rpc_auth_agent_public_key: PublicKey | None
-    rpc_auth_agent_secret_key: SecretKey | None
+    rpc_auth_manager_public_key: PublicKey
+    rpc_auth_agent_public_key: PublicKey
+    rpc_auth_agent_secret_key: SecretKey
 
     loop: asyncio.AbstractEventLoop
     etcd: AsyncEtcd
@@ -367,36 +367,30 @@ class AgentRPCServer(aobject):
         await self.stats_monitor.init()
         await self.error_monitor.init()
 
-        if self.local_config.agent_common.rpc_auth_agent_keypair is not None:
-            manager_pkey, _ = load_certificate(
-                str(self.local_config.agent_common.rpc_auth_manager_public_key)
+        manager_pkey, _ = load_certificate(
+            str(self.local_config.agent_common.rpc_auth_manager_public_key)
+        )
+        self.rpc_auth_manager_public_key = PublicKey(manager_pkey)
+        agent_pkey, agent_skey = load_certificate(
+            str(self.local_config.agent_common.rpc_auth_agent_keypair)
+        )
+        if agent_skey is None:
+            raise AgentInitializationError(
+                "Agent secret key is not available from the keypair file."
             )
-            self.rpc_auth_manager_public_key = PublicKey(manager_pkey)
-            agent_pkey, agent_skey = load_certificate(
-                str(self.local_config.agent_common.rpc_auth_agent_keypair)
-            )
-            if agent_skey is None:
-                raise AgentInitializationError(
-                    "Agent secret key is not available from the keypair file."
-                )
-            self.rpc_auth_agent_public_key = PublicKey(agent_pkey)
-            self.rpc_auth_agent_secret_key = SecretKey(agent_skey)
-            log.info(
-                "rpc encryption and authentication enabled",
-                agent_public_key=self.rpc_auth_agent_public_key.decode("ascii"),
-                manager_public_key=self.rpc_auth_manager_public_key.decode("ascii"),
-            )
-            auth_handler = AgentAuthHandler(
-                "local",
-                self.rpc_auth_manager_public_key,
-                self.rpc_auth_agent_public_key,
-                self.rpc_auth_agent_secret_key,
-            )
-        else:
-            self.rpc_auth_manager_public_key = None
-            self.rpc_auth_agent_public_key = None
-            self.rpc_auth_agent_secret_key = None
-            auth_handler = None
+        self.rpc_auth_agent_public_key = PublicKey(agent_pkey)
+        self.rpc_auth_agent_secret_key = SecretKey(agent_skey)
+        log.info(
+            "rpc encryption and authentication enabled",
+            agent_public_key=self.rpc_auth_agent_public_key.decode("ascii"),
+            manager_public_key=self.rpc_auth_manager_public_key.decode("ascii"),
+        )
+        auth_handler = AgentAuthHandler(
+            "local",
+            self.rpc_auth_manager_public_key,
+            self.rpc_auth_agent_public_key,
+            self.rpc_auth_agent_secret_key,
+        )
 
         self.runtime = await AgentRuntime.create_runtime(
             self.local_config,

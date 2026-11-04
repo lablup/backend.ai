@@ -22,9 +22,8 @@ directly and judge the result, either manually or with Claude.
 | `ag kernel assign-port` | `assign_port` | assigned host port |
 | `ag kernel local-network create/destroy --name …` | `create/destroy_local_network` | confirmation |
 
-Connection information is read from the agent's own `agent.toml` (`-f/--config`). With RPC
-authentication disabled (the local-dev default, `rpc-auth-agent-keypair` unset), no keypair is
-needed. With authentication enabled, pass `--manager-keypair <manager.key_secret>`.
+Connection information is read from the agent's own `agent.toml` (`-f/--config`). Pass
+`--manager-keypair <manager.key_secret>` for RPC authentication.
 
 ## Spec (`KernelCreateSpec`)
 

@@ -924,9 +924,8 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     rpc_auth_manager_public_key: Annotated[
-        FilePath | None,
+        FilePath,
         Field(
-            default=None,
             validation_alias=AliasChoices(
                 "rpc-auth-manager-public-key", "rpc_auth_manager_public_key"
             ),
@@ -936,7 +935,8 @@ class CommonAgentConfig(BaseConfigSchema):
             description=(
                 "Path to the manager's public key file for authenticating RPC messages. "
                 "Used with ZeroMQ CURVE authentication to verify messages from the manager. "
-                "Part of the RPC security mechanism for preventing unauthorized access."
+                "Part of the RPC security mechanism for preventing unauthorized access. "
+                f"Required since {NEXT_RELEASE_VERSION}."
             ),
             added_version="25.12.0",
             secret=True,
@@ -946,9 +946,8 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
     ]
     rpc_auth_agent_keypair: Annotated[
-        FilePath | None,
+        FilePath,
         Field(
-            default=None,
             validation_alias=AliasChoices("rpc-auth-agent-keypair", "rpc_auth_agent_keypair"),
             serialization_alias="rpc-auth-agent-keypair",
         ),
@@ -956,7 +955,8 @@ class CommonAgentConfig(BaseConfigSchema):
             description=(
                 "Path to the agent's keypair file for RPC authentication. "
                 "Contains both public and private keys used for ZeroMQ CURVE authentication. "
-                "The private key must be kept secure as it proves the agent's identity."
+                "The private key must be kept secure as it proves the agent's identity. "
+                f"Required since {NEXT_RELEASE_VERSION}."
             ),
             added_version="25.12.0",
             secret=True,

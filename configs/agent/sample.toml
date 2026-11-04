@@ -96,14 +96,16 @@
   ## advertised-rpc-addr = { host = "192.168.1.100", port = 6001 }
   # Path to the manager's public key file for authenticating RPC messages. Used
   # with ZeroMQ CURVE authentication to verify messages from the manager. Part
-  # of the RPC security mechanism for preventing unauthorized access.
+  # of the RPC security mechanism for preventing unauthorized access. Required
+  # since 26.10.0.
   # Added in 25.12.0
-  ## rpc-auth-manager-public-key = "/etc/backend.ai/keys/manager.pub"
+  rpc-auth-manager-public-key = "/etc/backend.ai/keys/manager.pub"
   # Path to the agent's keypair file for RPC authentication. Contains both
   # public and private keys used for ZeroMQ CURVE authentication. The private
-  # key must be kept secure as it proves the agent's identity.
+  # key must be kept secure as it proves the agent's identity. Required since
+  # 26.10.0.
   # Added in 25.12.0
-  ## rpc-auth-agent-keypair = "/etc/backend.ai/keys/agent.keypair"
+  rpc-auth-agent-keypair = "/etc/backend.ai/keys/agent.keypair"
   # Base directory path for Unix domain sockets and other IPC mechanisms. Used
   # for communication between the agent and its child processes. Directory is
   # created automatically with appropriate permissions.
