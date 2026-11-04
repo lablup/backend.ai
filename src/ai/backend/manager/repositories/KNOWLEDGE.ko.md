@@ -48,3 +48,10 @@ spec 안에 다중 테이블 write 를 숨기면 순서와 의존성이 드러�
 ## scope 필터 기본값
 
 `batch_query_with_scopes` 가 RBAC scope 를 강제하기 위한 기본값이다. `batch_query_in_global` 은 필터를 우회하므로 superadmin/internal 경로로 한정하고, 빈 scope 는 `EmptyOperationScopeError` 로 차단한다.
+
+## session group 보존 경계
+
+- `session_groups.deleted_at` 이 deployments 범주가 수거하는 경계이다. NULL 행은 선택되지 않으므로, 남겨야 하는 그룹은 NULL 로 둔다. live replica group 이 아직 쥐고 있는 그룹과 사용자가 만든 그룹이 그렇다.
+- 값을 쓰는 경로는 두 개이고, 둘 다 `deleted_at` 이 아직 NULL 인 행만 쓴다. replica group 이 terminal lifecycle(`ReplicaGroupLifecycle.terminal_statuses()`)에 도달할 때의 lifecycle reconcile 과, drain 이 terminal lifecycle 에 도달하기 전에 replica group 이 purge 되는 경우를 덮는 endpoint destroy retire 경로이다.
+- migration 은 terminal replica group 이 아직 참조하는 그룹만 backfill 한다. replica group 이 한 번도 참조하지 않은 그룹은 사용자 소유이고, migration 이전에 replica group 행이 purge 된 그룹은 흔적이 없다. 둘 다 NULL 로 남아 deployments 범주에서 수거되지 않는다.
+

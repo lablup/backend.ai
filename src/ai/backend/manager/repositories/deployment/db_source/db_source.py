@@ -210,6 +210,7 @@ from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.session_group.creators import SessionGroupCreator
+from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRow
@@ -3119,8 +3120,11 @@ class DeploymentDBSource:
 
         Marking the live (non-DRAINED) groups DRAINING with zeroed desired counts stops the
         reconcile from provisioning replicas for the destroyed endpoint; the group draining
-        reconcile then retires them to DRAINED. Done in one transaction so the destroy cleanup
-        cannot leave a group requesting replicas while its endpoint is gone.
+        reconcile then retires them to DRAINED. The owning session groups take the destroy
+        moment as their retention boundary, so the sweep still collects them when the
+        replica group rows are purged before the drain reaches DRAINED. Done in one
+        transaction so the destroy cleanup cannot leave a group requesting replicas while
+        its endpoint is gone.
         """
         if not deployment_ids:
             return
@@ -3135,6 +3139,18 @@ class DeploymentDBSource:
                     desired_target_replica_count=0,
                     scaling_status=ReplicaGroupScalingStatus.SCALING,
                 )
+            )
+            await db_sess.execute(
+                sa.update(SessionGroupRow)
+                .where(
+                    SessionGroupRow.id.in_(
+                        sa.select(ReplicaGroupRow.session_group_id).where(
+                            ReplicaGroupRow.deployment_id.in_(deployment_ids)
+                        )
+                    ),
+                    SessionGroupRow.deleted_at.is_(None),
+                )
+                .values(deleted_at=sa.func.now())
             )
             await db_sess.execute(
                 sa.update(EndpointRow)
