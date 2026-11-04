@@ -26,7 +26,7 @@ from ai.backend.manager.services.vfolder.services.invite import VFolderInviteSer
 
 
 class VFolderInviteProcessors:
-    invite_vfolder: SingleEntityActionProcessor[InviteVFolderAction, InviteVFolderActionResult]
+    invite_vfolder: ScopeActionProcessor[InviteVFolderAction, InviteVFolderActionResult]
     accept_invitation: ScopeActionProcessor[AcceptInvitationAction, AcceptInvitationActionResult]
     reject_invitation: ScopeActionProcessor[RejectInvitationAction, RejectInvitationActionResult]
     update_invitation: SingleEntityActionProcessor[
@@ -47,7 +47,7 @@ class VFolderInviteProcessors:
     ]
 
     def __init__(self, group: ProcessorGroup[VFolderData], service: VFolderInviteService) -> None:
-        self.invite_vfolder = group.single_entity(InviteVFolderAction, service.invite)
+        self.invite_vfolder = group.scope(InviteVFolderAction, service.invite)
         self.accept_invitation = group.scope(AcceptInvitationAction, service.accept_invitation)
         self.reject_invitation = group.scope(RejectInvitationAction, service.reject_invitation)
         self.update_invitation = group.single_entity(
