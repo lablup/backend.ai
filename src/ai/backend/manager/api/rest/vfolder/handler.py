@@ -262,10 +262,10 @@ class VFolderHandler:
 
         # A project folder is created in the project named; with none named the folder
         # is the caller's own, and its spec finds the personal project by its owner.
-        # Only an administrator may point a folder at a path the manager does not own.
+        # Only a superadmin may point a folder at a path the manager does not own.
         creator: VFolderBaseCreator
-        if params.unmanaged_path and ctx.user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
-            raise Forbidden("Insufficient permission")
+        if params.unmanaged_path and ctx.user_role != UserRole.SUPERADMIN:
+            raise Forbidden("Only superadmins can create a vfolder with an unmanaged path.")
         mount_permission = (
             None if params.permission is None else VFolderMountPolicy(params.permission.value)
         )
