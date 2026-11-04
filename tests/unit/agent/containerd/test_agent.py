@@ -30,6 +30,7 @@ from ai.backend.agent.containerd.profile.base import KernelLaunch, LaunchPlan, R
 from ai.backend.agent.containerd.profile.loader import select_profile
 from ai.backend.agent.containerd.profile.runc import RuncProfile
 from ai.backend.agent.containerd.scratch import CONFIG_DIR_LABEL
+from ai.backend.agent.containerd.trusted_storage import attach_trusted_storage
 from ai.backend.agent.errors.agent import UnsupportedBaseDistroError
 from ai.backend.agent.errors.containerd import KernelVerbNotSupported, ProfileNotApplicable
 from ai.backend.agent.port_pool import PortPool
@@ -51,7 +52,7 @@ from ai.backend.common.types import (
 )
 
 from .conftest import FakeProfile
-from .fakes import FakeCommandRunner, FakeContainerd
+from .fakes import FakeCommandRunner, FakeContainerd, FakeLosetup
 
 TDX = SlotName("confidential.tdx")
 GPU = SlotName("cuda.shares")
@@ -596,6 +597,32 @@ class TestCleanKernel:
         await agent.clean_kernel(kid, None, False)
 
         assert not (scratch_root / str(kid)).exists()
+
+    async def test_trusted_storage_is_detached_before_the_scratch_is_removed(
+        self, agent: ContainerdAgent, scratch_root: Path, losetup: FakeLosetup
+    ) -> None:
+        kid = KernelId(uuid.uuid4())
+        backing = (scratch_root / str(kid)).resolve() / "trusted-store.img"
+        backing.parent.mkdir()
+        await attach_trusted_storage(backing, 2**20)
+
+        await agent.clean_kernel(kid, None, False)
+
+        assert losetup.loops == {}
+        assert not backing.parent.exists()
+
+    async def test_scratch_is_kept_when_the_trusted_storage_cannot_be_detached(
+        self, agent: ContainerdAgent, scratch_root: Path, losetup: FakeLosetup
+    ) -> None:
+        kid = KernelId(uuid.uuid4())
+        backing = (scratch_root / str(kid)).resolve() / "trusted-store.img"
+        backing.parent.mkdir()
+        await attach_trusted_storage(backing, 2**20)
+        losetup.failing.add("--detach")
+
+        await agent.clean_kernel(kid, None, False)
+
+        assert backing.exists()
 
     async def test_restart_keeps_the_scratch(
         self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]

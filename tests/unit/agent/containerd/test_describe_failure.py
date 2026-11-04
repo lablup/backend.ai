@@ -188,8 +188,7 @@ class TestContainerCreationFailedReason:
         context._base_spec = {}
         context._resource_lock = MagicMock()
         mocker.patch.object(context, "_free_allocations", AsyncMock())
-        context.local_config = MagicMock()
-        mocker.patch.object(agent_module, "remove_scratch")
+        mocker.patch.object(context, "_release_scratch", AsyncMock())
         mocker.patch.object(
             agent_module, "resolve_image", AsyncMock(side_effect=ValueError(CREATE_ERROR))
         )

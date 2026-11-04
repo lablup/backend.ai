@@ -66,6 +66,7 @@ class KernelLaunch:
     slots: Mapping[SlotName, Decimal]  # the kernel's resource_slots, as seen by accepts()
     devices: Sequence[TranslatedDevice]
     mounts: Sequence[GeneratedMount]
+    trusted_storage_path: Path | None
     base_spec: Mapping[str, Any]  # the agent's generic OCI spec, read-only
 
 

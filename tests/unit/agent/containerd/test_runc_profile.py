@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from pathlib import Path
 from typing import cast
 
 from ai.backend.agent.containerd.profile.base import (
@@ -38,6 +39,7 @@ class TestRuncProfile:
             slots={},
             devices=(),
             mounts=(),
+            trusted_storage_path=Path("/tmp"),
             base_spec={},
         )
 
