@@ -121,18 +121,18 @@ class TestResourceGroupProxyTarget:
                 description="no_token",
                 wsproxy_addr=_WSPROXY_ADDR,
                 wsproxy_api_token=None,
-                expected_target=None,
+                expected_target=ResourceGroupProxyTarget(addr=_WSPROXY_ADDR, api_token=""),
             ),
             _ProxyTargetCase(
                 description="empty_token",
                 wsproxy_addr=_WSPROXY_ADDR,
                 wsproxy_api_token="",
-                expected_target=None,
+                expected_target=ResourceGroupProxyTarget(addr=_WSPROXY_ADDR, api_token=""),
             ),
         ],
         ids=lambda case: case.description,
     )
-    async def test_returns_target_only_when_address_and_token_are_both_set(
+    async def test_returns_target_only_when_address_is_set(
         self,
         repository: SessionRepository,
         resource_group_configured_by_case: str,

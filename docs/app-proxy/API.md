@@ -275,10 +275,6 @@ Lists statical informations about given circuit.
   
 Generates and returns a token which will be used as an authentication credential for  
  /v2/proxy/{token}/{session}/add request.  
-  
-  
-**Preconditions:**  
-* Requires Manager token present at `X-BackendAI-Token` request header to work.  
 
 
 #### RequestBody

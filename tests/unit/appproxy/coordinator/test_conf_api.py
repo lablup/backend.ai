@@ -36,8 +36,9 @@ def conf_request_body() -> dict[str, Any]:
 
 
 @dataclass(frozen=True)
-class _ConfRequestHeadersCase:
+class _ConfRequestAuthenticationCase:
     description: str
+    allow_unauthorized_configure_request: bool
     headers: dict[str, str]
 
 
@@ -50,7 +51,7 @@ class _ConfRequestSituation:
 class TestConfV2Authentication:
     @pytest.fixture
     def conf_request_situation(
-        self, case: _ConfRequestHeadersCase, conf_request_body: dict[str, Any]
+        self, case: _ConfRequestAuthenticationCase, conf_request_body: dict[str, Any]
     ) -> _ConfRequestSituation:
         coordinator_db_session = Mock(spec_set=["add"])
         begin_session_context = MagicMock()
@@ -58,6 +59,9 @@ class TestConfV2Authentication:
         begin_session_context.__aexit__.return_value = False
         root_ctx = Mock()
         root_ctx.local_config.secrets.api_secret = _API_SECRET
+        root_ctx.local_config.proxy_coordinator.allow_unauthorized_configure_request = (
+            case.allow_unauthorized_configure_request
+        )
         root_ctx.db.begin_session.return_value = begin_session_context
 
         request = Mock(spec=web.Request)
@@ -74,9 +78,14 @@ class TestConfV2Authentication:
     @pytest.mark.parametrize(
         "case",
         [
-            _ConfRequestHeadersCase(description="no_token", headers={}),
-            _ConfRequestHeadersCase(
+            _ConfRequestAuthenticationCase(
+                description="no_token",
+                allow_unauthorized_configure_request=False,
+                headers={},
+            ),
+            _ConfRequestAuthenticationCase(
                 description="wrong_token",
+                allow_unauthorized_configure_request=False,
                 headers={"X-BackendAI-Token": "not-the-api-secret"},
             ),
         ],
@@ -93,14 +102,20 @@ class TestConfV2Authentication:
     @pytest.mark.parametrize(
         "case",
         [
-            _ConfRequestHeadersCase(
+            _ConfRequestAuthenticationCase(
                 description="api_secret",
+                allow_unauthorized_configure_request=False,
                 headers={"X-BackendAI-Token": _API_SECRET},
+            ),
+            _ConfRequestAuthenticationCase(
+                description="no_token_with_unauthorized_requests_allowed",
+                allow_unauthorized_configure_request=True,
+                headers={},
             ),
         ],
         ids=lambda case: case.description,
     )
-    async def test_request_with_api_secret_stores_and_returns_a_token(
+    async def test_accepted_request_stores_and_returns_a_token(
         self, conf_request_situation: _ConfRequestSituation
     ) -> None:
         response = await conf_v2(conf_request_situation.request)

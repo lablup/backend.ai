@@ -1596,7 +1596,7 @@
           }
         },
         "parameters": [],
-        "description": "\nGenerates and returns a token which will be used as an authentication credential for\n /v2/proxy/{token}/{session}/add request.\n\n\n**Preconditions:**\n* Requires Manager token present at `X-BackendAI-Token` request header to work.\n"
+        "description": "\nGenerates and returns a token which will be used as an authentication credential for\n /v2/proxy/{token}/{session}/add request.\n"
       }
     },
     "/v2/endpoints/{endpoint_id}": {

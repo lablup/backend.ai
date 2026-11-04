@@ -44,10 +44,10 @@ _SERVICE_PORTS_TTYD = [
 
 
 @dataclass(frozen=True)
-class _UnconfiguredProxyCase:
+class _ResourceGroupApiTokenCase:
     description: str
-    wsproxy_addr: str | None
     wsproxy_api_token: str | None
+    expected_client_token: str
 
 
 # ---------------------------------------------------------------------------
@@ -324,6 +324,22 @@ class TestSessionComplete:
 class TestSessionStartService:
     """Start service endpoint — app token and wsproxy address scenarios."""
 
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ResourceGroupApiTokenCase(
+                description="api_token_set",
+                wsproxy_api_token=_WSPROXY_API_TOKEN,
+                expected_client_token=_WSPROXY_API_TOKEN,
+            ),
+            _ResourceGroupApiTokenCase(
+                description="no_api_token",
+                wsproxy_api_token=None,
+                expected_client_token="",
+            ),
+        ],
+        ids=lambda case: case.description,
+    )
     async def test_start_service_returns_token_and_wsproxy(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -332,13 +348,14 @@ class TestSessionStartService:
         resource_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
+        case: _ResourceGroupApiTokenCase,
     ) -> None:
         """S-1: Start service 'ttyd' → StartServiceResponse with token and wsproxy_addr."""
         async with db_engine.begin() as conn:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=_WSPROXY_API_TOKEN)
+                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=case.wsproxy_api_token)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
@@ -368,7 +385,9 @@ class TestSessionStartService:
         assert isinstance(result, StartServiceResponse)
         assert result.token == "test-token-xyz"
         assert result.wsproxy_addr == _WSPROXY_ADDR
-        appproxy_client_pool.load_client.assert_called_once_with(_WSPROXY_ADDR, _WSPROXY_API_TOKEN)
+        appproxy_client_pool.load_client.assert_called_once_with(
+            _WSPROXY_ADDR, case.expected_client_token
+        )
         token_request_body = mock_client.create_session_app_token.call_args.args[0]
         assert token_request_body.kernel_host == "127.0.0.1"
         assert token_request_body.kernel_port == 30080
@@ -703,36 +722,20 @@ class TestSessionStartServiceFailures:
                 StartServiceRequest(app="ttyd", port=9999),
             )
 
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _UnconfiguredProxyCase(
-                description="no_address",
-                wsproxy_addr=None,
-                wsproxy_api_token=_WSPROXY_API_TOKEN,
-            ),
-            _UnconfiguredProxyCase(
-                description="no_api_token",
-                wsproxy_addr=_WSPROXY_ADDR,
-                wsproxy_api_token=None,
-            ),
-        ],
-        ids=lambda case: case.description,
-    )
-    async def test_start_with_unconfigured_proxy(
+    async def test_start_with_no_wsproxy_addr(
         self,
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
         resource_group_name: ResourceGroupName,
-        case: _UnconfiguredProxyCase,
     ) -> None:
-        """F-BIZ-5: Scaling group lacks wsproxy_addr or wsproxy_api_token → ServerError (ServiceUnavailable)."""
+        """F-BIZ-5: Scaling group has no wsproxy_addr → ServerError (ServiceUnavailable)."""
+        # Ensure wsproxy_addr is NULL on the scaling group
         async with db_engine.begin() as conn:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=case.wsproxy_addr, wsproxy_api_token=case.wsproxy_api_token)
+                .values(wsproxy_addr=None)
             )
 
         with pytest.raises(ServerError):

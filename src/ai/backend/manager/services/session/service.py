@@ -1300,9 +1300,7 @@ class SessionService:
             session_data.resource_group_name
         )
         if proxy_target is None:
-            raise ServiceUnavailable(
-                "No coordinator address or API token configured for this resource group"
-            )
+            raise ServiceUnavailable("No coordinator configured for this resource group")
         client = self._appproxy_client_pool.load_client(proxy_target.addr, proxy_target.api_token)
         wsproxy_status = await client.fetch_status()
         if wsproxy_status.advertise_address:

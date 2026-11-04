@@ -209,6 +209,11 @@
   # proxy.
   # Added in 25.9.0
   tls_advertised = true
+  # Allow configuration requests without authentication tokens. WARNING: This is
+  # a security risk and should only be enabled for backward compatibility with
+  # older Backend.AI clusters. Keep this disabled in production environments.
+  # Added in 25.9.0
+  allow_unauthorized_configure_request = false
   # Enable Traefik integration as the proxy worker's data plane. When enabled,
   # the coordinator will manage routing rules through Traefik instead of the
   # built-in proxy workers. Requires Traefik to be deployed and configured
