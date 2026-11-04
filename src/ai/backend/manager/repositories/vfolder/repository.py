@@ -1956,10 +1956,15 @@ class VfolderRepository:
     async def list_shared_vfolder_permissions(
         self,
         vfolder_id: uuid.UUID | None = None,
+        requester_id: uuid.UUID | None = None,
     ) -> list[dict[str, Any]]:
         """
-        List all shared vfolder permission entries with vfolder and user info.
+        List shared vfolder permission entries with vfolder and user info.
         Returns list of dicts with vfolder/permission/user fields.
+
+        ``requester_id`` keeps only the entries the user is party to: the share is
+        granted to them, or it stands on a folder they own, created, or reach through
+        their project membership. Omitting it lists every entry in the system.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             perm_table = VFolderPermissionRow.__table__
@@ -1979,6 +1984,27 @@ class VfolderRepository:
             ).select_from(j)
             if vfolder_id is not None:
                 db_query = db_query.where(vf_table.c.id == vfolder_id)
+            if requester_id is not None:
+                project_membership = (
+                    sa.select(sa.literal(1))
+                    .select_from(AssociationScopesEntitiesRow)
+                    .where(
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_id
+                        == sa.cast(vf_table.c.group, sa.String),
+                        AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                        AssociationScopesEntitiesRow.entity_id == str(requester_id),
+                    )
+                    .exists()
+                )
+                db_query = db_query.where(
+                    sa.or_(
+                        perm_table.c.user == requester_id,
+                        vf_table.c.user == requester_id,
+                        vf_table.c.creator_id == requester_id,
+                        project_membership,
+                    )
+                )
             result = await session.execute(db_query)
             return [dict(row._mapping) for row in result.fetchall()]
 

@@ -5,11 +5,15 @@ Tests for VFolderSharingService and VFolderInviteService functionality.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.user.types import UserData as ContextUserData
+from ai.backend.common.data.user.types import UserRole as ContextUserRole
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
@@ -56,6 +60,21 @@ from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingS
 @pytest.fixture
 def user_uuid() -> uuid.UUID:
     return uuid.uuid4()
+
+
+@pytest.fixture(autouse=True)
+def requester_context(user_uuid: uuid.UUID) -> Iterator[None]:
+    """The shared vfolder listing reads its requester from the user context."""
+    user = ContextUserData(
+        user_id=user_uuid,
+        is_authorized=True,
+        is_admin=False,
+        is_superadmin=False,
+        role=ContextUserRole.USER,
+        domain_name="default",
+    )
+    with with_user(user):
+        yield
 
 
 @pytest.fixture
@@ -340,13 +359,16 @@ class TestListSharedVFoldersAction:
         sharing_service: VFolderSharingService,
         mock_vfolder_repo: MagicMock,
         vfolder_uuid: uuid.UUID,
+        user_uuid: uuid.UUID,
     ) -> None:
         mock_vfolder_repo.list_shared_vfolder_permissions = AsyncMock(return_value=[])
 
         action = ListSharedVFoldersAction(vfolder_id=vfolder_uuid)
         await sharing_service.list_shared_vfolders(action)
 
-        mock_vfolder_repo.list_shared_vfolder_permissions.assert_called_once_with(vfolder_uuid)
+        mock_vfolder_repo.list_shared_vfolder_permissions.assert_called_once_with(
+            vfolder_id=vfolder_uuid, requester_id=user_uuid
+        )
 
     async def test_no_permissions_returns_empty_list(
         self,
