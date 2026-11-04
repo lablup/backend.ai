@@ -1,6 +1,6 @@
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated, Any, Self, override
+from typing import Any, Self, override
 
 from pydantic import Field
 
@@ -67,16 +67,13 @@ class BootstrapConfig(BackendAISchema):
         Used for monitoring and analyzing application performance.
         """,
     )
-    wheelhouse: Annotated[
-        WheelhouseConfig,
-        Field(
-            default_factory=WheelhouseConfig,
-            description="""
-            Plugin wheel loading configuration.
-            Read from here so that etcd cannot turn it on.
-            """,
-        ),
-    ]
+    wheelhouse: WheelhouseConfig = Field(
+        default=WheelhouseConfig.model_validate({}),
+        description="""
+        Plugin wheel loading configuration.
+        Read from here so that etcd cannot turn it on.
+        """,
+    )
     debug: DebugConfig = Field(
         default_factory=DebugConfig,  # type: ignore[arg-type]
         description="""
