@@ -10,6 +10,7 @@ from uuid import UUID
 
 import aiofiles
 import aiofiles.os
+import trafaret as t
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -347,7 +348,7 @@ class NetAppVolume(BaseVolume):
                 endpoint=self.config["netapp_ontap_endpoint"],
                 user=self.config["netapp_ontap_user"],
                 password=self.config["netapp_ontap_password"],
-                ssl_context=self.config.get("netapp_verify_ssl", False),
+                ssl_context=t.ToBool().check(self.config.get("netapp_verify_ssl", False)),
             )
         )
         self.netapp_nfs_host = self.config["netapp_nfs_host"]

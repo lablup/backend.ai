@@ -6,6 +6,8 @@ from contextlib import aclosing, asynccontextmanager
 from pathlib import Path
 from typing import Any, ClassVar, override
 
+import trafaret as t
+
 from ai.backend.common.clients.storage_backends.purestorage.client import (
     PurityClient,
     PurityClientArgs,
@@ -171,7 +173,7 @@ class FlashBladeVolume(BaseVolume):
                 endpoint=self.config["purity_endpoint"],
                 api_token=self.config["purity_api_token"],
                 api_version=self.config["purity_api_version"],
-                ssl_context=self.config.get("purity_verify_ssl", False),
+                ssl_context=t.ToBool().check(self.config.get("purity_verify_ssl", False)),
             )
         )
         await super().init()
