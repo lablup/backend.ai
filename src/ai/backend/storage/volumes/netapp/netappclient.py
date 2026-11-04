@@ -59,6 +59,7 @@ import asyncio
 import contextlib
 import enum
 import logging
+import ssl
 import uuid
 from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from pathlib import Path
@@ -138,13 +139,15 @@ class NetAppClient:
         password: str,
         user_id: int,
         group_id: int,
+        *,
+        ssl_context: ssl.SSLContext | bool = False,
     ) -> None:
         self.endpoint = endpoint
         self.user = user
         self.password = password
         self.user_id = user_id
         self.group_id = group_id
-        _connector = aiohttp.TCPConnector(ssl=False)
+        _connector = aiohttp.TCPConnector(ssl=ssl_context)
         _auth = aiohttp.BasicAuth(self.user, self.password)
         self._session = aiohttp.ClientSession(
             self.endpoint,
