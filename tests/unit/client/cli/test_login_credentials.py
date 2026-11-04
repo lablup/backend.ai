@@ -5,13 +5,12 @@ import json
 import ssl
 import stat
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Protocol
 
-import click
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestServer
@@ -19,6 +18,7 @@ from click.testing import CliRunner
 from yarl import URL
 
 from ai.backend.client.cli import config as legacy_cli_config
+from ai.backend.client.cli.v2 import v2
 from ai.backend.client.config import APIConfig, set_config
 from ai.backend.web.proxy import decrypt_payload
 
@@ -234,11 +234,10 @@ class TestV2LoginRequestBody:
     def test_http_sends_encoded_body_the_webserver_can_decrypt(
         self,
         runner: CliRunner,
-        cli_entrypoint: Callable[[], click.Group],
         webserver_for_login_request_case: _StubWebserver,
         case: _LoginRequestCase,
     ) -> None:
-        result = runner.invoke(cli_entrypoint, ["v2", "login"], input=f"{_OTP}\n")
+        result = runner.invoke(v2, ["login"], input=f"{_OTP}\n")
 
         assert result.exit_code == 0, result.output
         received = webserver_for_login_request_case.received_login_requests
@@ -267,11 +266,10 @@ class TestV2LoginRequestBody:
     def test_https_sends_plain_json(
         self,
         runner: CliRunner,
-        cli_entrypoint: Callable[[], click.Group],
         webserver_for_login_request_case: _StubWebserver,
         case: _LoginRequestCase,
     ) -> None:
-        result = runner.invoke(cli_entrypoint, ["v2", "login"], input=f"{_OTP}\n")
+        result = runner.invoke(v2, ["login"], input=f"{_OTP}\n")
 
         assert result.exit_code == 0, result.output
         received = webserver_for_login_request_case.received_login_requests
@@ -283,10 +281,9 @@ class TestV2LoginSessionFiles:
     def test_new_files_are_owner_only_in_owner_only_directory(
         self,
         runner: CliRunner,
-        cli_entrypoint: Callable[[], click.Group],
         v2_session_dir_before_first_login: Path,
     ) -> None:
-        result = runner.invoke(cli_entrypoint, ["v2", "login"])
+        result = runner.invoke(v2, ["login"])
 
         assert result.exit_code == 0, result.output
         session_dir = v2_session_dir_before_first_login
@@ -297,10 +294,9 @@ class TestV2LoginSessionFiles:
     def test_loose_existing_files_are_tightened(
         self,
         runner: CliRunner,
-        cli_entrypoint: Callable[[], click.Group],
         v2_session_dir_holding_loose_files: Path,
     ) -> None:
-        result = runner.invoke(cli_entrypoint, ["v2", "login"])
+        result = runner.invoke(v2, ["login"])
 
         assert result.exit_code == 0, result.output
         session_dir = v2_session_dir_holding_loose_files
