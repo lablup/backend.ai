@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
+from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest import mock
 
@@ -37,6 +40,42 @@ def test_get_env() -> None:
     with mock.patch.dict(os.environ, {"SORNA_TESTKEY": "testkey"}):
         r = get_env("TESTKEY")
         assert r == "testkey"
+
+
+@dataclass(frozen=True)
+class _DotenvPrecedenceCase:
+    inherited_environ: dict[str, str]
+    expected_value: str
+
+
+@pytest.fixture
+def cwd_holding_dotenv(
+    case: _DotenvPrecedenceCase,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> Iterator[None]:
+    (tmp_path / ".env").write_text("BACKEND_TESTKEY=from-dotenv\n")
+    monkeypatch.chdir(tmp_path)
+    with mock.patch.dict(os.environ):
+        os.environ.pop("BACKEND_TESTKEY", None)
+        os.environ.update(case.inherited_environ)
+        yield
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        _DotenvPrecedenceCase(
+            inherited_environ={"BACKEND_TESTKEY": "from-environment"},
+            expected_value="from-environment",
+        ),
+        _DotenvPrecedenceCase(inherited_environ={}, expected_value="from-dotenv"),
+    ],
+    ids=lambda case: case.expected_value,
+)
+@pytest.mark.usefixtures("cwd_holding_dotenv")
+def test_get_env_prefers_environment_over_dotenv(case: _DotenvPrecedenceCase) -> None:
+    assert get_env("TESTKEY") == case.expected_value
 
 
 def test_bool_env() -> None:

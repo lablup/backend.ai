@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import click
+
+from ai.backend.client.owner_only_files import ensure_owner_only_file
 
 from .helpers import ProfileStore
 
@@ -31,16 +34,13 @@ def _load_toml(path: click.Path) -> dict[str, Any]:
         return tomllib.load(f)
 
 
-def _save_toml(path: click.Path, data: dict[str, Any]) -> None:
-    """Write a dict to a TOML file under the ``[backend-ai]`` section."""
-    from pathlib import Path as P
-
+def _save_toml(toml_path: Path, data: dict[str, Any]) -> None:
+    """Write a dict to an owner-only TOML file under the ``[backend-ai]`` section."""
     import tomli_w
 
-    p = P(str(path))
-    p.parent.mkdir(parents=True, exist_ok=True)
-    with p.open("wb") as f:
-        tomli_w.dump(data, f)
+    ensure_owner_only_file(toml_path)
+    with toml_path.open("wb") as toml_file:
+        tomli_w.dump(data, toml_file)
 
 
 @click.group()
