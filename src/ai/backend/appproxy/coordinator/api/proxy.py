@@ -173,6 +173,7 @@ async def proxy(
         log.debug("reusing existing circuit {}", existing_circuit.id)
         circuit = existing_circuit
     else:
+        root_ctx.kernel_host_validator.ensure_allowed(token.kernel_host)
         routes = [
             RouteInfo(
                 session_id=token.session_id,

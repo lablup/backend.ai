@@ -318,6 +318,22 @@ class TraefikConfig(BaseSchema):
     ]
 
 
+class KernelHostConfig(BaseSchema):
+    allow_loopback: Annotated[
+        bool,
+        Field(default=False),
+        BackendAIConfigMeta(
+            description=(
+                "Accept loopback addresses and 'localhost' as the kernel host of a route. Enable "
+                "this only when kernels publish their ports on the loopback interface of the "
+                "proxy host, as in a single-node installation."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="true", prod="false"),
+        ),
+    ]
+
+
 class ProxyCoordinatorConfig(BaseSchema):
     ipc_base_path: Annotated[
         Path,
@@ -531,6 +547,20 @@ class ProxyCoordinatorConfig(BaseSchema):
             ),
             added_version="25.9.0",
             example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+
+    kernel_host: Annotated[
+        KernelHostConfig,
+        Field(default_factory=lambda: KernelHostConfig()),
+        BackendAIConfigMeta(
+            description=(
+                "Rules applied to the kernel host of a route before it becomes a proxy target. "
+                "Malformed hosts and link-local, multicast and unspecified addresses are always "
+                "rejected."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
         ),
     ]
 

@@ -9,12 +9,15 @@ converge state on the next pass.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.appproxy.coordinator.config import KernelHostConfig
+from ai.backend.appproxy.coordinator.kernel_host import KernelHostValidator
 from ai.backend.appproxy.coordinator.repositories.endpoint import (
     EndpointRepository,
     RegisteredRouteSet,
@@ -27,6 +30,7 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import (
     RegisterRoutesItem,
     RouteEntry,
     UnregisterRoutesItem,
+    UpdateRoutesItem,
 )
 
 
@@ -55,6 +59,7 @@ class TestRegisterRoutesBulk:
         service = EndpointService(
             cast(EndpointRepository, repo),
             cast(CircuitManager, circuit_manager),
+            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         )
 
         result = await service.register_routes_bulk([])
@@ -86,6 +91,7 @@ class TestRegisterRoutesBulk:
         service = EndpointService(
             cast(EndpointRepository, repo),
             cast(CircuitManager, circuit_manager),
+            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         )
 
         result = await service.register_routes_bulk([
@@ -108,6 +114,7 @@ class TestRegisterRoutesBulk:
         service = EndpointService(
             cast(EndpointRepository, repo),
             cast(CircuitManager, circuit_manager),
+            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         )
 
         result = await service.register_routes_bulk([
@@ -144,6 +151,7 @@ class TestRegisterRoutesBulk:
         service = EndpointService(
             cast(EndpointRepository, repo),
             cast(CircuitManager, circuit_manager),
+            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         )
 
         result = await service.register_routes_bulk([
@@ -186,6 +194,7 @@ class TestRegisterRoutesBulk:
         service = EndpointService(
             cast(EndpointRepository, repo),
             cast(CircuitManager, circuit_manager),
+            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         )
 
         result = await service.register_routes_bulk([
@@ -210,6 +219,7 @@ class TestUnregisterRoutesBulk:
         service = EndpointService(
             cast(EndpointRepository, repo),
             cast(CircuitManager, circuit_manager),
+            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         )
 
         result = await service.unregister_routes_bulk([])
@@ -241,6 +251,7 @@ class TestUnregisterRoutesBulk:
         service = EndpointService(
             cast(EndpointRepository, repo),
             cast(CircuitManager, circuit_manager),
+            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         )
 
         result = await service.unregister_routes_bulk([
@@ -262,6 +273,7 @@ class TestUnregisterRoutesBulk:
         service = EndpointService(
             cast(EndpointRepository, repo),
             cast(CircuitManager, circuit_manager),
+            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         )
 
         result = await service.unregister_routes_bulk([
@@ -298,6 +310,7 @@ class TestUnregisterRoutesBulk:
         service = EndpointService(
             cast(EndpointRepository, repo),
             cast(CircuitManager, circuit_manager),
+            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
         )
 
         result = await service.unregister_routes_bulk([
@@ -313,3 +326,105 @@ class TestUnregisterRoutesBulk:
 # fixture is referenced; keeps mypy/ruff/pants check quiet without
 # adding suppression directives.
 _ = pytest
+
+
+@dataclass(frozen=True)
+class _UpdateItemsWithARejectedHost:
+    rejected_item: UpdateRoutesItem
+    allowed_item: UpdateRoutesItem
+
+
+@dataclass(frozen=True)
+class _RegisterItemsWithARejectedHost:
+    rejected_item: RegisterRoutesItem
+    allowed_item: RegisterRoutesItem
+
+
+class TestRejectedKernelHost:
+    """A rejected kernel host fails only its endpoint; the other endpoints still sync."""
+
+    @pytest.fixture
+    def repository_without_any_result(self) -> AsyncMock:
+        repo = AsyncMock(spec=EndpointRepository)
+        repo.update_routes = AsyncMock(return_value=[])
+        repo.register_routes = AsyncMock(return_value=[])
+        return repo
+
+    @pytest.fixture
+    def endpoint_service(self, repository_without_any_result: AsyncMock) -> EndpointService:
+        return EndpointService(
+            cast(EndpointRepository, repository_without_any_result),
+            cast(CircuitManager, AsyncMock(spec=CircuitManager)),
+            KernelHostValidator(KernelHostConfig(allow_loopback=False)),
+        )
+
+    @pytest.fixture
+    def metadata_address_route(self) -> RouteEntry:
+        return RouteEntry(
+            session_id=uuid4(),
+            route_id=uuid4(),
+            kernel_host="169.254.169.254",
+            kernel_port=80,
+        )
+
+    @pytest.fixture
+    def update_items_with_a_rejected_host(
+        self, metadata_address_route: RouteEntry
+    ) -> _UpdateItemsWithARejectedHost:
+        return _UpdateItemsWithARejectedHost(
+            rejected_item=UpdateRoutesItem(
+                deployment_id=DeploymentID(uuid4()), routes=[metadata_address_route]
+            ),
+            allowed_item=UpdateRoutesItem(
+                deployment_id=DeploymentID(uuid4()), routes=[_route_entry()]
+            ),
+        )
+
+    @pytest.fixture
+    def register_items_with_a_rejected_host(
+        self, metadata_address_route: RouteEntry
+    ) -> _RegisterItemsWithARejectedHost:
+        return _RegisterItemsWithARejectedHost(
+            rejected_item=RegisterRoutesItem(
+                deployment_id=DeploymentID(uuid4()), routes=[metadata_address_route]
+            ),
+            allowed_item=RegisterRoutesItem(
+                deployment_id=DeploymentID(uuid4()), routes=[_route_entry()]
+            ),
+        )
+
+    async def test_update_routes_reports_only_the_rejected_endpoint(
+        self,
+        endpoint_service: EndpointService,
+        repository_without_any_result: AsyncMock,
+        update_items_with_a_rejected_host: _UpdateItemsWithARejectedHost,
+    ) -> None:
+        items = update_items_with_a_rejected_host
+
+        result = await endpoint_service.update_routes_bulk([
+            items.rejected_item,
+            items.allowed_item,
+        ])
+
+        assert [(item.deployment_id, item.success) for item in result] == [
+            (items.rejected_item.deployment_id, False)
+        ]
+        repository_without_any_result.update_routes.assert_awaited_once_with([items.allowed_item])
+
+    async def test_register_routes_reports_only_the_rejected_endpoint(
+        self,
+        endpoint_service: EndpointService,
+        repository_without_any_result: AsyncMock,
+        register_items_with_a_rejected_host: _RegisterItemsWithARejectedHost,
+    ) -> None:
+        items = register_items_with_a_rejected_host
+
+        result = await endpoint_service.register_routes_bulk([
+            items.rejected_item,
+            items.allowed_item,
+        ])
+
+        assert [(item.deployment_id, item.success) for item in result] == [
+            (items.rejected_item.deployment_id, False)
+        ]
+        repository_without_any_result.register_routes.assert_awaited_once_with([items.allowed_item])

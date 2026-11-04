@@ -40,6 +40,8 @@ async def conf_v2(
     if not params.session.id or not params.session.access_key:
         raise InvalidSessionParameterError("Not meant for inference apps")
 
+    root_ctx.kernel_host_validator.ensure_allowed(params.kernel_host)
+
     async with root_ctx.db.begin_session() as sess:
         token_id = uuid.uuid4()
         token = Token.create(
