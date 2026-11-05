@@ -16,11 +16,12 @@ import sqlalchemy as sa
 from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.exception import UserNotFound
-from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.types import UserData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import GroupMembershipNotFoundError
+from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
@@ -34,6 +35,7 @@ from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.lookups import KeypairAccessKeyUserLookup
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -618,3 +620,38 @@ class TestAuthRepository:
         assert row is not None
         assert row.domain_name == default_domain.name
         assert row.domain_id == default_domain.id
+
+    @pytest.fixture
+    async def inactive_keypair_user(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_user_data: UserTestData
+    ) -> UserTestData:
+        async with db_with_cleanup.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.update(KeyPairRow)
+                .where(KeyPairRow.access_key == sample_user_data.access_key)
+                .values(is_active=False)
+            )
+        return sample_user_data
+
+    async def test_keypair_signing_material_of_active_keypair(
+        self, auth_repository: AuthRepository, sample_user_data: UserTestData
+    ) -> None:
+        result = await auth_repository.get_keypair_signing_material(sample_user_data.access_key)
+
+        assert result.user_id == sample_user_data.uuid
+        assert result.secret_key == "test_secret_key"
+
+    async def test_keypair_signing_material_of_inactive_keypair_is_refused(
+        self, auth_repository: AuthRepository, inactive_keypair_user: UserTestData
+    ) -> None:
+        with pytest.raises(KeyPairNotFound):
+            await auth_repository.get_keypair_signing_material(inactive_keypair_user.access_key)
+
+    async def test_access_key_user_lookup_skips_inactive_keypair(
+        self, auth_repository: AuthRepository, inactive_keypair_user: UserTestData
+    ) -> None:
+        result = await auth_repository.lookup(
+            KeypairAccessKeyUserLookup(AccessKey(inactive_keypair_user.access_key))
+        )
+
+        assert result is None
