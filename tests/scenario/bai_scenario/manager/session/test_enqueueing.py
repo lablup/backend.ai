@@ -60,8 +60,8 @@ from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 type Enqueued = EnqueueSessionPayload
 
 SESSION_NAME = "created-session"
-ASKED_FOR: dict[str, Decimal] = {"cpu": Decimal(1), "mem": Decimal(1073741824)}
-"""The slots the session asks for. The slot type table requires both of them."""
+ASKED_FOR: dict[str, Decimal] = {"cpu": Decimal(1), "mem": Decimal(2147483648)}
+"""The slots the session asks for, above the image minimum of cpu 1 and mem 1.06g."""
 CAPACITY: dict[str, Decimal] = {"cpu": Decimal(8), "mem": Decimal(34359738368)}
 """What the agent reports in each slot, more than the session asks for."""
 
@@ -246,8 +246,6 @@ class TheSessionIsCreated(Then[LaidPlaceAndCaller, Enqueued]):
 
     @override
     def look(self, laid: LaidPlaceAndCaller, answered: Answered[Enqueued]) -> list[Verdict]:
-        if answered.raised is not None:
-            return [Same("raised", repr(answered.raised), None)]
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]
