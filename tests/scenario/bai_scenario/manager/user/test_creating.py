@@ -113,25 +113,15 @@ class SomeoneInADomain(Given[Any, ADomainAndACaller]):
 class SomeoneWithThePolicies(Given[Any, ADomainACallerAndThePolicies]):
     """도메인 하나, 그 도메인의 사용자 한 명, 그리고 새 사용자와 새 키가 받을 정책들.
 
-    ``granted``면 호출자가 도메인 스코프에서 사용자 생성 권한을 받는다. 키페어가 정책을
-    대지 않으면 받는 기본 정책도 함께 세운다. 사용자를 만드는 경로가 그 정책을 읽는다.
+    키페어가 정책을 대지 않으면 받는 기본 정책도 함께 세운다. 사용자를 만드는 경로가 그
+    정책을 읽는다.
     """
 
-    granted: bool = True
     role: UserRole = UserRole.USER
 
     @override
     def describe(self) -> str:
         role = self.role.value
-        if self.granted:
-            return Says(
-                f"도메인 하나와 {role} 한 명, 호출자는 도메인 스코프에서 사용자 생성 권한을 "
-                "받았습니다",
-                english=(
-                    f"one domain and one {role}, and the caller holds the user create permission "
-                    "in the domain scope"
-                ),
-            )
         return Says(
             f"도메인 하나와 {role} 한 명, 호출자는 아무 권한도 받지 않았습니다",
             english=f"one domain and one {role}, and the caller holds no permission",
@@ -143,8 +133,6 @@ class SomeoneWithThePolicies(Given[Any, ADomainACallerAndThePolicies]):
         user_policy = await seeding.creating(TestSeedUserPolicy())
         keypair_policy = await seeding.creating(TestSeedDefaultKeypairPolicy())
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
-        if self.granted:
-            await seeding.within(AGrant.on_domain(domain, caller, Permission.CREATE))
         return ADomainACallerAndThePolicies(
             seeding.made(domain),
             seeding.made(caller),
@@ -482,7 +470,7 @@ def _created_user_verdicts(
         Same("user.status.status_info", node.status.status_info, None),
         Same("user.status.need_password_change", node.status.need_password_change, False),
         Same("user.organization.domain_name", node.organization.domain_name, laid.domain.name),
-        Held(
+        Held[object](
             "user.organization.domain_id",
             node.organization.domain_id,
             SameAs(
@@ -660,30 +648,29 @@ class TheBulkCreatedUserWithItsKeypair(Then[ADomainACallerAndThePolicies, Any]):
 
 
 @dataclass(frozen=True)
-class AGrantedCreatorMakesAUser(
+class TheSuperadminCreatesAUser(
     Scenario[TestSeedingSession, ADomainACallerAndThePolicies, UserAdapter, Any]
 ):
     started: datetime
 
     @override
     def summary(self) -> str:
-        return "a-user-granted-create-on-a-domain-makes-a-user-in-it"
+        return "the-superadmin-makes-a-user-and-gets-its-keypair"
 
     @override
     def describe(self) -> str:
         return Says(
-            "도메인 스코프에서 사용자 생성 권한을 받은 사용자가 그 도메인에 사용자를 만들면, "
-            "만든 사용자 전체와 기본 키가 비밀 키와 함께 옵니다",
+            "superadmin 이 도메인에 사용자를 만들면, 만든 사용자 전체와 기본 키가 비밀 키와 함께 "
+            "옵니다",
             english=(
-                "when a user granted the user create permission in the domain scope creates a "
-                "user in that domain, the whole user just created and its default keypair "
-                "with the secret key come back"
+                "when the superadmin creates a user in a domain, the whole user just created "
+                "and its default keypair with the secret key come back"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainACallerAndThePolicies]:
-        return SomeoneWithThePolicies(granted=True)
+        return SomeoneWithThePolicies(role=UserRole.SUPERADMIN)
 
     @override
     def when(self) -> When[ADomainACallerAndThePolicies, UserAdapter, Any]:
@@ -714,7 +701,7 @@ class AUserGrantedNothingMayNotCreateAUserWithThePolicies(
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainACallerAndThePolicies]:
-        return SomeoneWithThePolicies(granted=False)
+        return SomeoneWithThePolicies()
 
     @override
     def when(self) -> When[ADomainACallerAndThePolicies, UserAdapter, Any]:
@@ -799,7 +786,7 @@ SCENARIOS: list[Scenario[TestSeedingSession, Any, UserAdapter, Any]] = [
     ANameNoDomainHoldsMayNotHoldAUser(),
     OnlyTheSuperadminMayBulkCreate(),
     OnlyTheSuperadminMayBulkCreateWithKeypairs(),
-    AGrantedCreatorMakesAUser(started=datetime.now(UTC)),
+    TheSuperadminCreatesAUser(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotCreateAUserWithThePolicies(),
     TheSuperadminBulkCreatesAUser(started=datetime.now(UTC)),
     TheSuperadminBulkCreatesAUserWithItsKeypair(started=datetime.now(UTC)),

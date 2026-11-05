@@ -195,7 +195,7 @@ class TheKeyThenAGap(Then[ACallerAndAKey, Answer]):
         if isinstance(first, KeypairNode):
             seen.extend(KeypairNodeLook(self.started).verdicts(first, laid.key, laid.target))
             seen.append(
-                Held(
+                Held[object](
                     "field_id",
                     first.field_id,
                     SameAs(
