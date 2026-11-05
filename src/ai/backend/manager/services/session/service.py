@@ -1368,12 +1368,16 @@ class SessionService:
             },
         }
 
+        conf_request_headers: dict[str, str] = {}
+        if proxy_target.api_token:
+            conf_request_headers["X-BackendAI-Token"] = proxy_target.api_token
+
         async with (
             aiohttp.ClientSession() as req,
             req.post(
                 f"{proxy_target.addr}/v2/conf",
                 json=body,
-                headers={"X-BackendAI-Token": proxy_target.api_token},
+                headers=conf_request_headers,
             ) as resp,
         ):
             token_json = await resp.json()
