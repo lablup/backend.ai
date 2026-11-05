@@ -14,10 +14,11 @@ Automates the post-implementation submission pipeline: quality enforcement, comm
 
 ## Parameters
 
-- **jira_key** (optional): JIRA issue key (for example `BA-1234`). Auto-detected from branch name if pattern `BA-\d+` exists.
+- **jira_key** (optional): JIRA issue key (for example `BA-1234` or `BAI-1234`). Auto-detected from branch name if pattern `(BA|BAI)-\d+` exists.
 - **changelog_type** (optional): One of `breaking`, `feature`, `enhance`, `deprecation`, `fix`, `doc`, `deps`, `misc`, `test`. If omitted, infer from the most significant change.
 - **changelog_message** (optional): One-line English summary for the changelog fragment. If omitted, generate from PR description.
 - **base_branch** (optional): Target branch for PR. Defaults to `main`.
+- **draft** (optional): Open a draft PR. Skips local quality checks, commits with `--no-verify`, and requires no approval.
 
 ## Workflow
 
@@ -25,8 +26,8 @@ Automates the post-implementation submission pipeline: quality enforcement, comm
 
 1. **Detect JIRA key**
    - Check if user provided `jira_key`
-   - Otherwise extract from current branch name (pattern: `BA-\d+`)
-   - If not found, ask user
+   - Otherwise extract from current branch name (pattern: `(BA|BAI)-\d+`)
+   - If not found, ask user; with `--draft`, continue without a key
 
 2. **Review changes**
    - `git status` to see all changed and untracked files
@@ -36,13 +37,15 @@ Automates the post-implementation submission pipeline: quality enforcement, comm
 
 ### Phase 2: Quality Enforcement (Local)
 
-**Do not skip this phase.**
+Skip this phase with `--draft`.
+
+**Do not skip this phase otherwise.**
 
 Run sequentially, stop on first failure:
 
 ```bash
-pants fmt ::
-pants fix ::
+pants fmt --changed-since=origin/{base_branch}
+pants fix --changed-since=origin/{base_branch}
 pants lint --changed-since=origin/{base_branch}
 ```
 
@@ -59,16 +62,16 @@ pants lint --changed-since=origin/{base_branch}
    - Do not stage `.env`, credentials or other sensitive files
 
 2. **Generate commit message**
-   - Use conventional commit style: `type(BA-XXXX): description`
+   - Use conventional commit style: `type({jira_key}): description`
    - Types: `fix`, `feat`, `refactor`, `test`, `doc`, `ci`, `chore`, `perf`
    - **When a JIRA key is available, always use it as the conventional commit scope. Do not use component names like `manager`, `client` or `client-sdk` as the scope.**
-   - Example: `fix(BA-1234): resolve session cleanup race condition`
+   - Example: `fix(BAI-1234): resolve session cleanup race condition`
    - Keep first line under 80 characters
    - Add detailed body if multiple significant changes
 
 3. **Create commit**
-   - Present draft message to user for approval
-   - Commit with approved message
+   - Default: present the draft message to the user for approval, then commit
+   - `--draft`: commit without approval: `git commit --no-verify -m "..."`
 
 ### Phase 4: PR Creation
 
@@ -77,8 +80,8 @@ pants lint --changed-since=origin/{base_branch}
 
 2. **Generate PR content**
    - **Title**: Conventional commit style with JIRA key as scope
-     - Format: `type(BA-XXXX): description`
-     - Example: `fix(BA-1234): resolve session cleanup race condition`
+     - Format: `type({jira_key}): description`
+     - Example: `fix(BAI-1234): resolve session cleanup race condition`
      - See `changes/KNOWLEDGE.md` for the category-to-prefix and changelog-type mapping, including same-release fixes (`chore`, not `fix`)
    - **Body**: Use this template:
 
@@ -89,7 +92,7 @@ pants lint --changed-since=origin/{base_branch}
    ## Test plan
    - [ ] <test items>
 
-   Resolves BA-XXXX
+   Resolves {jira_key}
    ```
 
    - **Do not mention a JIRA issue other than the assigned one** in the title or the body.
@@ -113,10 +116,12 @@ pants lint --changed-since=origin/{base_branch}
      rather than guessing. A trailer naming anything else fails the backport job and backports
      nothing, so get it right or leave the trailer out.
    - Writing a `Backport:` trailer is a release decision: ask the user before adding one.
+     With `--draft`, do not ask and leave the trailer out.
 
 4. **Create PR**
    ```bash
    gh pr create --title "..." --body "..."
+   gh pr create --draft --title "..." --body "..."   # with --draft
    ```
 
 5. **Extract PR number** from `gh pr create` output
@@ -134,7 +139,7 @@ pants lint --changed-since=origin/{base_branch}
 3. **Create file**
    - Path: `changes/{pr_number}.{changelog_type}.md`
    - Content: single-line changelog message
-   - Show draft to user for approval
+   - Show the draft to the user for approval; with `--draft`, skip the approval
 
 4. **Commit and push**
    ```bash
@@ -142,6 +147,7 @@ pants lint --changed-since=origin/{base_branch}
    git commit -m "changelog: add news fragment for PR #{pr_number}"
    git push
    ```
+   - With `--draft`, add `--no-verify` to the commit
 
 ### Phase 6: Summary
 
@@ -152,13 +158,15 @@ Submission Complete
 
   PR:        #{pr_number} - {title}
   URL:       https://github.com/lablup/backend.ai/pull/{pr_number}
-  JIRA:      BA-XXXX
+  JIRA:      {jira_key}
   Branch:    {branch_name}
   Changelog: changes/{pr_number}.{changelog_type}.md
 
 Quality checks: All passed
 Commits: {count} commit(s)
 ```
+
+With `--draft`, print `Quality checks: skipped (draft)` instead.
 
 ## Error Handling
 
@@ -222,13 +230,20 @@ User: /submit BA-5678 --type=fix --message="Fix session cleanup race condition w
 Agent: [Uses provided parameters, runs full workflow]
 ```
 
+### Draft PR without waiting for approval
+```
+User: /submit --draft
+Agent: [Skips quality checks, commits with --no-verify, opens a draft PR, adds the changelog fragment]
+```
+
 ## Related documents
 
 - `/test-guide` - Scenario-first testing (run before /submit)
 
 ## Implementation Notes
 
-- Local quality checks (`fmt`, `fix`, `lint`) use `--changed-since=origin/{base_branch}` to cover all PR changes, not just the last commit
+- Local quality checks (`fmt`, `fix`, `lint`) use `--changed-since=origin/{base_branch}` to cover all commits on the branch
+- `--draft` skips them and commits with `--no-verify`
 - Type checking and tests run in CI only; do not run them locally
 - Changelog follows [towncrier](https://github.com/twisted/towncrier) format configured in `pyproject.toml`
 - PR number is only available after `gh pr create`, so changelog is always a second commit
