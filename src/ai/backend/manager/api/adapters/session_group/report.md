@@ -26,6 +26,8 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
+| [when a superadmin searches everything filtered by the project and the direction pack, only the session group the user created comes back and the deployment's group, which spreads, is left out; a role checks this operation, so the requesting user is a superadmin](#searching-a-filter-on-the-placement-direction-leaves-the-packed-group) | answered |
+| [when a superadmin searches the session groups of the project ordered by the placement direction in ascending order, the user's packed group comes first and the deployment's spreading group comes next; a role checks this operation, so the requesting user is a superadmin](#searching-ordering-by-the-placement-direction-puts-pack-before-spread) | answered |
 | [when a superadmin with no grant searches everything filtered by one project, the session group the user created in that project and the session group held by the deployment's replica group both come back; a role checks this operation, so the requesting user is a superadmin](#searching-the-superadmin-finds-a-users-group-and-a-deployments-group) | answered |
 | [when a user granted session group read in that project but not a superadmin searches everything, the role rejects it](#searching-a-user-who-is-not-a-superadmin-may-not-search-every-session-group) | rejected |
 
@@ -177,6 +179,92 @@ Then
   - rejected: NotEnoughPermission
 
 ### global_search
+
+<a id="searching-a-filter-on-the-placement-direction-leaves-the-packed-group"></a>
+
+#### [a-filter-on-the-placement-direction-leaves-the-packed-group](/tests/scenario/bai_scenario/manager/session_group/test_searching.py): pass
+
+when a superadmin searches everything filtered by the project and the direction pack, only the session group the user created comes back and the deployment's group, which spreads, is left out; a role checks this operation, so the requesting user is a superadmin
+
+Given
+
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and one superadmin holding no permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - superadmin user-3: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+
+When
+
+- SessionGroupAdapter.global_search: user-3 searches everything filtered by the project team-1 and the direction pack
+
+Then
+
+- only the one session group that places its members that way comes back
+  - items: same as the session group the user made
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-ordering-by-the-placement-direction-puts-pack-before-spread"></a>
+
+#### [ordering-by-the-placement-direction-puts-pack-before-spread](/tests/scenario/bai_scenario/manager/session_group/test_searching.py): pass
+
+when a superadmin searches the session groups of the project ordered by the placement direction in ascending order, the user's packed group comes first and the deployment's spreading group comes next; a role checks this operation, so the requesting user is a superadmin
+
+Given
+
+- the session group a user made in one project and the session group the deployment's replica group holds, the session group the same user made in another project, and the session group another user made, and one superadmin holding no permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - superadmin user-3: has their own keypair and personal project
+  - Session group a user made session-group-1: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-2: packs its members onto one agent and enforces it strictly
+  - Session group a user made session-group-3: packs its members onto one agent and enforces it strictly
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+
+When
+
+- SessionGroupAdapter.global_search: user-3 searches everything filtered by the project team-1, ordered by the placement direction
+
+Then
+
+- the session group that packs its members comes first and the one that spreads them comes next
+  - items: same as the session group the user made, then the one the deployment's replica group holds
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
 
 <a id="searching-the-superadmin-finds-a-users-group-and-a-deployments-group"></a>
 
