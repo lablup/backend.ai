@@ -35,13 +35,8 @@ const ACCEPTED_REMOVALS = {
   "Query.myVfolders.usedBy": USAGE_RENAME,
   "SessionUsedBy.agent": USAGE_RENAME,
   "SessionUsedBy.resourceGroup": USAGE_RENAME,
-<<<<<<< HEAD
-=======
-  "ServiceCatalogEndpoint": SERVICE_CATALOG_ENDPOINTS,
-  "ServiceCatalog.endpoints": SERVICE_CATALOG_ENDPOINTS,
   "ScalingGroupNode.wsproxy_api_token":
     "The token is the App Proxy API credential, and every domain member could read it through `domain_nodes { scaling_groups }`. Superadmins still read it on `ScalingGroup`.",
->>>>>>> 9f9c7939 (fix(BA-8891): remove wsproxy token and restrict domain_node in legacy GQL (#16393))
 };
 
 const REMOVAL_CHANGES = [
