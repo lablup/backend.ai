@@ -35,6 +35,8 @@ backend = "docker"
 [etcd]
 namespace = "test"
 addr = {{ host = "127.0.0.1", port = 2379 }}
+user = "test"
+password = "test"
 
 [container]
 scratch-root = "/tmp/test"
@@ -73,6 +75,8 @@ backend = "docker"
 [etcd]
 namespace = "original"
 addr = {{ host = "127.0.0.1", port = 2379 }}
+user = "test"
+password = "test"
 
 [container]
 scratch-root = "/tmp/original"
@@ -134,6 +138,8 @@ backend = "docker"
 [etcd]
 namespace = "local"
 addr = {{ host = "127.0.0.1", port = 2379 }}
+user = "test"
+password = "test"
 
 [container]
 scratch-root = "/tmp/test"

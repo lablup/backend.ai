@@ -28,9 +28,11 @@ from ai.backend.agent.errors.watcher import (
 )
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.data.config.types import EtcdConfigData
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.utils import Fstab
 from ai.backend.logging import Logger, LogLevel
 from ai.backend.logging.config import LoggingConfig
@@ -314,20 +316,18 @@ async def watcher_server(
         },
     )
     with logger:
-        etcd_credentials = None
-        if app["config"]["etcd"]["user"]:
-            etcd_credentials = {
-                "user": app["config"]["etcd"]["user"],
-                "password": app["config"]["etcd"]["password"],
-            }
-        scope_prefix_map = {
-            ConfigScopes.GLOBAL: "",
-        }
-        async with AsyncEtcd(
-            app["config"]["etcd"]["addrs"],
-            app["config"]["etcd"]["namespace"],
-            scope_prefix_map=scope_prefix_map,
-            credentials=etcd_credentials,
+        etcd_config = app["config"]["etcd"]
+        async with AsyncEtcd.create_from_config(
+            EtcdConfigData(
+                namespace=etcd_config["namespace"],
+                addrs=[
+                    HostPortPair(host=addr.host, port=addr.port) for addr in etcd_config["addrs"]
+                ],
+                user=etcd_config["user"] or "",
+                password=etcd_config["password"] or "",
+                keep_alive_interval=etcd_config["keep-alive-interval"],
+                keep_alive_timeout=etcd_config["keep-alive-timeout"],
+            )
         ) as etcd:
             app["config_server"] = etcd
 

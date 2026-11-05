@@ -65,7 +65,11 @@ def routing_config_factory(case: _ClientIPStrategyCase) -> TraefikRoutingConfigF
     return TraefikRoutingConfigFactory(
         TraefikRoutingConfigFactoryArgs(
             traefik_config=TraefikConfig(
-                etcd=EtcdConfig.model_validate({"namespace": "traefik"}),
+                etcd=EtcdConfig.model_validate({
+                    "namespace": "traefik",
+                    "user": "test",
+                    "password": "test",
+                }),
                 client_ip_strategy=case.strategy,
             ),
             secrets=SecretConfig(jwt_secret="jwt-secret", api_secret="api-secret"),
@@ -81,7 +85,12 @@ def routing_config_factory_without_client_ip_strategy() -> TraefikRoutingConfigF
     return TraefikRoutingConfigFactory(
         TraefikRoutingConfigFactoryArgs(
             traefik_config=TraefikConfig(
-                etcd=EtcdConfig.model_validate({"namespace": "traefik"}), client_ip_strategy=None
+                etcd=EtcdConfig.model_validate({
+                    "namespace": "traefik",
+                    "user": "test",
+                    "password": "test",
+                }),
+                client_ip_strategy=None,
             ),
             secrets=SecretConfig(jwt_secret="jwt-secret", api_secret="api-secret"),
             permit_hash=PermitHashConfig(

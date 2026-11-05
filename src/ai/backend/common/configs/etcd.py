@@ -60,30 +60,22 @@ class EtcdConfig(BaseConfigSchema):
         ),
     ]
     user: Annotated[
-        str | None,
-        Field(default=None),
+        str,
+        Field(min_length=1),
         BackendAIConfigMeta(
-            description=(
-                "Username for authenticating with etcd. "
-                "Optional if etcd doesn't require authentication. "
-                "Should be set along with password for secure deployments."
-            ),
+            description="Username for authenticating with etcd. Set together with the password field.",
             added_version="22.03.0",
-            example=ConfigExample(local="", prod="backend"),
+            example=ConfigExample(local="root", prod="backend"),
         ),
     ]
     password: Annotated[
-        str | None,
-        Field(default=None),
+        str,
+        Field(min_length=1),
         BackendAIConfigMeta(
-            description=(
-                "Password for authenticating with etcd. "
-                "Should be kept secret in production environments. "
-                "Set together with the user field for authentication."
-            ),
+            description="Password for authenticating with etcd. Set together with the user field.",
             added_version="22.03.0",
             secret=True,
-            example=ConfigExample(local="", prod="ETCD_PASSWORD"),
+            example=ConfigExample(local="develove", prod="ETCD_PASSWORD"),
         ),
     ]
     keep_alive_interval: Annotated[

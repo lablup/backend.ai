@@ -7,7 +7,6 @@ from typing import override
 from ai.backend.appproxy.common.etcd import TraefikEtcd
 from ai.backend.appproxy.coordinator.config import ServerConfig
 from ai.backend.appproxy.coordinator.errors import MissingTraefikConfigError
-from ai.backend.appproxy.coordinator.errors.config import InvalidTraefikEtcdCredentialsError
 from ai.backend.common.dependencies import DependencyProvider
 from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.health_checker import ServiceHealthChecker
@@ -33,21 +32,8 @@ class EtcdProvider(DependencyProvider[ServerConfig, TraefikEtcd | None]):
                     "Traefik is enabled but traefik configuration is missing."
                 )
 
-            etcd_user = traefik_config.etcd.user
-            etcd_password = traefik_config.etcd.password
-            creds: dict[str, str] | None = None
-            if etcd_user or etcd_password:
-                if not etcd_user or not etcd_password:
-                    raise InvalidTraefikEtcdCredentialsError(
-                        "Traefik etcd user and password must be set together."
-                    )
-                creds = {"user": etcd_user, "password": etcd_password}
-
-            async with TraefikEtcd(
-                [addr.to_legacy() for addr in traefik_config.etcd.addrs],
-                traefik_config.etcd.namespace,
-                {ConfigScopes.GLOBAL: ""},
-                credentials=creds,
+            async with TraefikEtcd.create_from_config(
+                traefik_config.etcd.to_dataclass(), {ConfigScopes.GLOBAL: ""}
             ) as traefik_etcd:
                 yield traefik_etcd
         else:

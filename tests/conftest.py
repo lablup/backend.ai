@@ -6,7 +6,11 @@ from pytest import Config, Parser
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.testutils.bootstrap import etcd_container  # noqa: F401
+from ai.backend.testutils.bootstrap import (
+    ETCD_PASSWORD,
+    ETCD_USER,
+    etcd_container,  # noqa: F401
+)
 
 
 def pytest_addoption(parser: Parser) -> None:
@@ -53,6 +57,7 @@ async def etcd(
             ConfigScopes.SGROUP: "sgroup/testing",
             ConfigScopes.NODE: "node/i-test",
         },
+        credentials={"user": ETCD_USER, "password": ETCD_PASSWORD},
     ) as etcd:
         await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
         await etcd.delete_prefix("", scope=ConfigScopes.SGROUP)

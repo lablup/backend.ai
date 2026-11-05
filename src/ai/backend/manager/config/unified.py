@@ -3722,7 +3722,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
     ]
     etcd: Annotated[
         EtcdConfig,
-        Field(default_factory=EtcdConfig),
+        Field(),
         BackendAIConfigMeta(
             description=(
                 "Etcd distributed key-value store configuration. Etcd is used for cluster "

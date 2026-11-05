@@ -292,7 +292,7 @@ class ClientIPStrategyConfig(BaseSchema):
 class TraefikConfig(BaseSchema):
     etcd: Annotated[
         EtcdConfig,
-        Field(default_factory=lambda: EtcdConfig(namespace="traefik")),
+        Field(),
         BackendAIConfigMeta(
             description=(
                 "Configuration for the etcd connection used by Traefik integration. "
@@ -822,18 +822,6 @@ class ServerConfig(BaseSchema):
             description=(
                 "Service discovery configuration for locating other Backend.AI components in the cluster. "
                 "Supports Redis-based or etcd-based service registration and discovery."
-            ),
-            added_version="25.9.0",
-            composite=CompositeType.FIELD,
-        ),
-    ]
-    etcd: Annotated[
-        EtcdConfig,
-        Field(default_factory=EtcdConfig),
-        BackendAIConfigMeta(
-            description=(
-                "etcd connection configuration for distributed coordination and configuration management. "
-                "Used for service discovery (if etcd-based) and Traefik integration."
             ),
             added_version="25.9.0",
             composite=CompositeType.FIELD,

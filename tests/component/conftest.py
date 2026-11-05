@@ -228,6 +228,8 @@ from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.testutils.action_validators import build_global_gate
 from ai.backend.testutils.bootstrap import (  # noqa: F401
+    ETCD_PASSWORD,
+    ETCD_USER,
     POSTGRES_MAINTENANCE_DB,
     POSTGRES_PASSWORD,
     POSTGRES_USER,
@@ -383,6 +385,8 @@ def bootstrap_config(
         etcd=EtcdConfig.model_validate({
             "namespace": test_id,
             "addr": {"host": etcd_addr.host, "port": etcd_addr.port},
+            "user": ETCD_USER,
+            "password": ETCD_PASSWORD,
         }),
         db=DatabaseConfig.model_validate({
             "addr": postgres_addr,
@@ -1672,10 +1676,9 @@ async def background_task_manager(
 def _make_async_etcd(bootstrap_config: BootstrapConfig) -> AsyncEtcd:
     """Create an AsyncEtcd instance from bootstrap config."""
     etcd_config = bootstrap_config.etcd
-    return AsyncEtcd(
-        addrs=[HostPortPair(host=a.host, port=a.port) for a in etcd_config.addrs],
-        namespace=etcd_config.namespace,
-        scope_prefix_map={
+    return AsyncEtcd.create_from_config(
+        etcd_config.to_dataclass(),
+        {
             ConfigScopes.GLOBAL: "global",
             ConfigScopes.SGROUP: "sgroup/default",
             ConfigScopes.NODE: "node/test",
