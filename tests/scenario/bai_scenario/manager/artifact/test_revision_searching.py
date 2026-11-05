@@ -131,17 +131,17 @@ class SearchingRevisionsWithoutAConditionReturnsEvery(
     @override
     def describe(self) -> str:
         return Says(
-            "global 에서 아티팩트 읽기 권한을 받은 사용자가 리비전을 조건 없이 검색하면, 미리 "
-            "저장한 리비전이 모두 한 페이지로 옵니다",
+            "읽기만 하는 monitor 가 리비전을 조건 없이 검색하면, 미리 저장한 리비전이 모두 한 "
+            "페이지로 옵니다",
             english=(
-                "when a user granted read permission on artifacts in global searches revisions "
-                "with no condition, every revision made in advance comes back on one page"
+                "when the read-only monitor searches revisions with no condition, every revision "
+                "made in advance comes back on one page"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyArtifactsWithRevisionsAndACaller]:
-        return ManyArtifactsWithRevisionsAndSomeone(role=UserRole.USER, granted=(Permission.READ,))
+        return ManyArtifactsWithRevisionsAndSomeone(role=UserRole.MONITOR)
 
     @override
     def when(
@@ -174,17 +174,16 @@ class FilteringByStatusLeavesThatStatus(
     @override
     def describe(self) -> str:
         return Says(
-            "global 에서 아티팩트 읽기 권한을 받은 사용자가 승인 대기 상태로 좁혀 검색하면, 그 "
-            "상태의 리비전만 남습니다",
+            "읽기만 하는 monitor 가 승인 대기 상태로 좁혀 검색하면, 그 상태의 리비전만 남습니다",
             english=(
-                "when a user granted read permission on artifacts in global searches revisions "
-                "narrowed to the needs-approval status, only revisions in that status remain"
+                "when the read-only monitor searches revisions narrowed to the needs-approval "
+                "status, only revisions in that status remain"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyArtifactsWithRevisionsAndACaller]:
-        return ManyArtifactsWithRevisionsAndSomeone(role=UserRole.USER, granted=(Permission.READ,))
+        return ManyArtifactsWithRevisionsAndSomeone(role=UserRole.MONITOR)
 
     @override
     def when(
