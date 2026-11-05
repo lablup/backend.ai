@@ -181,6 +181,7 @@ class AssignmentsAnswered:
     payload: SearchIdleCheckerAssignmentPayload
 
 
+@dataclass(frozen=True)
 class PartialBulkAnswered:
     """partial bulk 호출에 넣은 할당 id 와, 그 호출의 답."""
 
@@ -363,7 +364,7 @@ class EveryAssignmentIsListed(Then[AssignmentsAndACaller, AssignmentsAnswered]):
             Same("has_next_page", payload.has_next_page, False),
             Same("has_previous_page", payload.has_previous_page, False),
         ]
-        by_scope = {domain.id: domain for domain in laid.domains}
+        by_scope: dict[UUID, DomainData] = {domain.id: domain for domain in laid.domains}
         for i, node in enumerate(got):
             domain = by_scope.get(node.scope_id)
             if domain is None:

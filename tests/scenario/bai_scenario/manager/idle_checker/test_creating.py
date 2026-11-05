@@ -12,11 +12,11 @@ from ai.backend.common.data.idle_checker.types import CheckerType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
     CreateIdleCheckerInput,
-    IdleCheckerInputTypeDTO,
     IdleCheckerSpecInputDTO,
     SessionLifetimeSpecInputDTO,
 )
 from ai.backend.common.dto.manager.v2.idle_checker.response import IdleCheckerNode
+from ai.backend.common.dto.manager.v2.idle_checker.types import IdleCheckerInputTypeDTO
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.api.adapters.idle_checker.adapter import IdleCheckerAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
