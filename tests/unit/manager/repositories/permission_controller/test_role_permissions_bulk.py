@@ -13,7 +13,7 @@ from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType
-from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.data.permission.types import Permission, RoleSource
 from ai.backend.manager.errors.permission import RoleNotFound
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
@@ -104,6 +104,7 @@ class TestBulkRolePermissions:
                     scope_id=uuid.uuid4(),
                     id=role_id,
                     name=role_name,
+                    source=RoleSource.CUSTOM,
                 )
             )
             await session.flush()

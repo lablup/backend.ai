@@ -27,12 +27,14 @@ from ai.backend.manager.data.permission.role import (
     UserRoleAssignmentInput,
     UserRoleRevocationInput,
 )
+from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.errors.permission import (
     PermissionNotFound,
     RoleAlreadyAssigned,
     RoleNotAssigned,
     RoleNotFound,
 )
+from ai.backend.manager.errors.role_preset import SystemRoleNotEditable
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
@@ -201,10 +203,13 @@ class PermissionDBSource:
         """State the role's whole scoped-permission set; keys it held and the entries
         do not name are cleared. Answers the rows the role holds afterwards.
 
-        Raises ``RoleNotFound`` if the role does not exist.
+        Raises ``RoleNotFound`` if the role does not exist and ``SystemRoleNotEditable``
+        for a SYSTEM role, whose entries follow its role preset.
         """
         async with self._db.begin_readonly_session_read_committed() as read_sess:
-            await self._get_role(read_sess, role_id)
+            role = await self._get_role(read_sess, role_id)
+        if role.source == RoleSource.SYSTEM:
+            raise SystemRoleNotEditable(f"Role {role_id} is a SYSTEM role.")
         async with self._ops.write_ops() as w:
             await w.replace_permissions(role_id, entries)
         async with self._db.begin_readonly_session_read_committed() as read_sess:

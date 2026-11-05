@@ -12,18 +12,20 @@ from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.errors.role_preset import SystemRoleNotEditable
+from ai.backend.manager.models.rbac_models.permission.conditions import PermissionConditions
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
     PermissionSearchableFields,
 )
-from ai.backend.manager.models.specs.purger import FieldBatchPurger, FieldPurger
-from ai.backend.manager.models.specs.types import ConflictCheck
+from ai.backend.manager.models.specs.purger import FieldBatchPurger, GuardedFieldPurger
+from ai.backend.manager.models.specs.types import ConflictCheck, GuardCheck
 
 
 @dataclass
-class RolePermissionPurger(FieldPurger[PermissionRow, PermissionData]):
+class RolePermissionPurger(GuardedFieldPurger[PermissionRow, PermissionData]):
     """Purger for one permission entry, authorized through its role. The paths the
-    entry is scoped to follow by FK cascade."""
+    entry is scoped to follow by FK cascade. Declines an entry of a SYSTEM role."""
 
     permission_id: PermissionID
 
@@ -38,6 +40,17 @@ class RolePermissionPurger(FieldPurger[PermissionRow, PermissionData]):
     @override
     def target_id_value(self) -> PermissionID:
         return self.permission_id
+
+    @override
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return (
+            GuardCheck(
+                condition=PermissionConditions.by_custom_role(),
+                error=SystemRoleNotEditable(
+                    f"Permission {self.permission_id} belongs to a SYSTEM role."
+                ),
+            ),
+        )
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:
