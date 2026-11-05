@@ -17,8 +17,10 @@ from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
 from ai.backend.manager.models.rbac import (
+    DomainScope,
     PredefinedRole,
     ProjectScope,
+    UserScope,
     get_predefined_roles_in_scope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
@@ -45,7 +47,7 @@ _MEMBER_ROLES = [
     pytest.param(UserRole.SUPERADMIN, frozenset([PredefinedRole.OWNER]), id="superadmin"),
     pytest.param(
         UserRole.MONITOR,
-        frozenset([PredefinedRole.ADMIN, PredefinedRole.PRIVILEGED_MEMBER]),
+        frozenset([PredefinedRole.MONITOR, PredefinedRole.PRIVILEGED_MEMBER]),
         id="monitor",
     ),
     pytest.param(UserRole.ADMIN, frozenset([PredefinedRole.OWNER]), id="admin"),
@@ -54,7 +56,7 @@ _MEMBER_ROLES = [
 
 _NON_MEMBER_ROLES = [
     pytest.param(UserRole.SUPERADMIN, frozenset([PredefinedRole.ADMIN]), id="superadmin"),
-    pytest.param(UserRole.MONITOR, frozenset([PredefinedRole.ADMIN]), id="monitor"),
+    pytest.param(UserRole.MONITOR, frozenset([PredefinedRole.MONITOR]), id="monitor"),
     pytest.param(UserRole.ADMIN, frozenset([PredefinedRole.ADMIN]), id="admin"),
     pytest.param(UserRole.USER, frozenset(), id="user"),
 ]
@@ -217,11 +219,15 @@ class TestPredefinedRolesInProjectScope:
 
         assert roles == expected
 
-    async def test_another_domain_project_grants_nothing_to_domain_admin(
+    @pytest.mark.parametrize(
+        "user_role", [UserRole.ADMIN, UserRole.MONITOR], ids=["admin", "monitor"]
+    )
+    async def test_another_domain_project_grants_nothing(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_project_id: uuid.UUID,
         test_user_id: uuid.UUID,
+        user_role: UserRole,
     ) -> None:
         async with db_with_cleanup.begin_session() as sess:
             await VirtualEntitySeeder().enroll_user_in_project(sess, test_project_id, test_user_id)
@@ -230,7 +236,50 @@ class TestPredefinedRolesInProjectScope:
         )
 
         roles = await self._roles(
-            db_with_cleanup, other_domain, test_user_id, UserRole.ADMIN, test_project_id
+            db_with_cleanup, other_domain, test_user_id, user_role, test_project_id
         )
 
+        assert roles == frozenset()
+
+
+    async def test_a_monitor_reads_its_own_domain_as_monitor(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_user_id: uuid.UUID,
+    ) -> None:
+        ctx = ClientContext(
+            db_with_cleanup, test_domain.domain_name, uuid.uuid4(), UserRole.MONITOR
+        )
+        roles = await get_predefined_roles_in_scope(ctx, DomainScope(test_domain.domain_name))
+        assert roles == frozenset([PredefinedRole.MONITOR])
+
+    async def test_a_monitor_of_another_domain_gets_nothing_in_the_domain(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+    ) -> None:
+        ctx = ClientContext(db_with_cleanup, "other-domain", uuid.uuid4(), UserRole.MONITOR)
+        roles = await get_predefined_roles_in_scope(ctx, DomainScope(test_domain.domain_name))
+        assert roles == frozenset()
+
+    async def test_a_monitor_reads_a_user_of_its_domain_as_monitor(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_user_id: uuid.UUID,
+    ) -> None:
+        ctx = ClientContext(
+            db_with_cleanup, test_domain.domain_name, uuid.uuid4(), UserRole.MONITOR
+        )
+        roles = await get_predefined_roles_in_scope(ctx, UserScope(test_user_id))
+        assert roles == frozenset([PredefinedRole.MONITOR])
+
+    async def test_a_monitor_of_another_domain_gets_nothing_on_the_user(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_user_id: uuid.UUID,
+    ) -> None:
+        ctx = ClientContext(db_with_cleanup, "other-domain", uuid.uuid4(), UserRole.MONITOR)
+        roles = await get_predefined_roles_in_scope(ctx, UserScope(test_user_id))
         assert roles == frozenset()

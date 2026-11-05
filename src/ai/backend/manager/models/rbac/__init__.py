@@ -121,7 +121,6 @@ async def _calculate_role_in_scope_for_suadmin(
 async def _calculate_role_in_scope_for_monitor(
     ctx: ClientContext, db_session: AsyncSession, scope: ScopeType
 ) -> frozenset[PredefinedRole]:
-    from ai.backend.manager.models.domain.row import DomainRow
     from ai.backend.manager.models.project.row import ProjectRow
     from ai.backend.manager.models.user.row import UserRow
     from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
@@ -130,13 +129,7 @@ async def _calculate_role_in_scope_for_monitor(
         case SystemScope():
             return frozenset([PredefinedRole.MONITOR])
         case DomainScope(domain_name):
-            stmt = (
-                sa.select(DomainRow)
-                .where(DomainRow.name == domain_name)
-                .options(load_only(DomainRow.name))
-            )
-            domain_row = cast(DomainRow | None, await db_session.scalar(stmt))
-            if domain_row is not None:
+            if ctx.domain_name == domain_name:
                 return frozenset([PredefinedRole.MONITOR])
             return _EMPTY_FSET
         case ProjectScope(project_id):
@@ -151,16 +144,18 @@ async def _calculate_role_in_scope_for_monitor(
             if project_domain_name != ctx.domain_name:
                 return _EMPTY_FSET
             if is_member:
-                return frozenset([PredefinedRole.ADMIN, PredefinedRole.PRIVILEGED_MEMBER])
-            return frozenset([PredefinedRole.ADMIN])
+                return frozenset([PredefinedRole.MONITOR, PredefinedRole.PRIVILEGED_MEMBER])
+            return frozenset([PredefinedRole.MONITOR])
         case UserScope(user_id):
             if ctx.user_id == user_id:
                 return frozenset([PredefinedRole.OWNER])
             user_stmt = (
-                sa.select(UserRow).where(UserRow.uuid == user_id).options(load_only(UserRow.uuid))
+                sa.select(UserRow)
+                .where(UserRow.uuid == user_id)
+                .options(load_only(UserRow.domain_name))
             )
             user_row = cast(UserRow | None, await db_session.scalar(user_stmt))
-            if user_row is not None:
+            if user_row is not None and user_row.domain_name == ctx.domain_name:
                 return frozenset([PredefinedRole.MONITOR])
             return _EMPTY_FSET
 
