@@ -113,15 +113,26 @@ class SomeoneInADomain(Given[Any, ADomainAndACaller]):
 class SomeoneWithThePolicies(Given[Any, ADomainACallerAndThePolicies]):
     """도메인 하나, 그 도메인의 사용자 한 명, 그리고 새 사용자와 새 키가 받을 정책들.
 
-    키페어가 정책을 대지 않으면 받는 기본 정책도 함께 세운다. 사용자를 만드는 경로가 그
-    정책을 읽는다.
+    ``granted`` 면 호출자가 그 권한들을 도메인 스코프에서 받는다. 키페어가 정책을 대지
+    않으면 받는 기본 정책도 함께 세운다. 사용자를 만드는 경로가 그 정책을 읽는다.
     """
 
     role: UserRole = UserRole.USER
+    granted: tuple[Permission, ...] = ()
 
     @override
     def describe(self) -> str:
         role = self.role.value
+        if self.granted:
+            names = " and ".join(str(one.name) for one in self.granted)
+            return Says(
+                f"도메인 하나와 {role} 한 명, 호출자는 도메인 스코프에서 사용자 {names} 권한을 "
+                "받았습니다",
+                english=(
+                    f"one domain and one {role}, and the caller holds the {names} permissions "
+                    "on users in the domain scope"
+                ),
+            )
         return Says(
             f"도메인 하나와 {role} 한 명, 호출자는 아무 권한도 받지 않았습니다",
             english=f"one domain and one {role}, and the caller holds no permission",
@@ -133,6 +144,8 @@ class SomeoneWithThePolicies(Given[Any, ADomainACallerAndThePolicies]):
         user_policy = await seeding.creating(TestSeedUserPolicy())
         keypair_policy = await seeding.creating(TestSeedDefaultKeypairPolicy())
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
+        if self.granted:
+            await seeding.within(AGrant.on_domain(domain, caller, *self.granted))
         return ADomainACallerAndThePolicies(
             seeding.made(domain),
             seeding.made(caller),
@@ -648,29 +661,30 @@ class TheBulkCreatedUserWithItsKeypair(Then[ADomainACallerAndThePolicies, Any]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminCreatesAUser(
+class AGrantedCreatorMakesAUser(
     Scenario[TestSeedingSession, ADomainACallerAndThePolicies, UserAdapter, Any]
 ):
     started: datetime
 
     @override
     def summary(self) -> str:
-        return "the-superadmin-makes-a-user-and-gets-its-keypair"
+        return "a-user-granted-create-on-a-domain-makes-a-user-in-it"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 도메인에 사용자를 만들면, 만든 사용자 전체와 기본 키가 비밀 키와 함께 "
-            "옵니다",
+            "도메인 스코프에서 사용자 읽기와 생성 권한을 받은 사용자가 그 도메인에 사용자를 "
+            "만들면, 만든 사용자 전체와 기본 키가 비밀 키와 함께 옵니다",
             english=(
-                "when the superadmin creates a user in a domain, the whole user just created "
-                "and its default keypair with the secret key come back"
+                "when a user granted the read and create permissions on users in the domain "
+                "scope creates a user in that domain, the whole user just created and its "
+                "default keypair with the secret key come back"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainACallerAndThePolicies]:
-        return SomeoneWithThePolicies(role=UserRole.SUPERADMIN)
+        return SomeoneWithThePolicies(granted=(Permission.READ, Permission.CREATE))
 
     @override
     def when(self) -> When[ADomainACallerAndThePolicies, UserAdapter, Any]:
@@ -679,6 +693,37 @@ class TheSuperadminCreatesAUser(
     @override
     def then(self) -> Then[ADomainACallerAndThePolicies, Any]:
         return TheCreatedUserAndItsKeypair(started=self.started)
+
+
+@dataclass(frozen=True)
+class ACreatorWithoutReadIsRefused(
+    Scenario[TestSeedingSession, ADomainACallerAndThePolicies, UserAdapter, Any]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-create-but-not-read-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "읽기 권한 없이 생성 권한만 받은 사용자가 사용자를 만들면 호출이 거부됩니다",
+            english=(
+                "a call by a user granted the create permission but not the read permission is "
+                "refused"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADomainACallerAndThePolicies]:
+        return SomeoneWithThePolicies(granted=(Permission.CREATE,))
+
+    @override
+    def when(self) -> When[ADomainACallerAndThePolicies, UserAdapter, Any]:
+        return CreatingAUserUnderThePolicies()
+
+    @override
+    def then(self) -> Then[ADomainACallerAndThePolicies, Any]:
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
@@ -786,7 +831,8 @@ SCENARIOS: list[Scenario[TestSeedingSession, Any, UserAdapter, Any]] = [
     ANameNoDomainHoldsMayNotHoldAUser(),
     OnlyTheSuperadminMayBulkCreate(),
     OnlyTheSuperadminMayBulkCreateWithKeypairs(),
-    TheSuperadminCreatesAUser(started=datetime.now(UTC)),
+    AGrantedCreatorMakesAUser(started=datetime.now(UTC)),
+    ACreatorWithoutReadIsRefused(),
     AUserGrantedNothingMayNotCreateAUserWithThePolicies(),
     TheSuperadminBulkCreatesAUser(started=datetime.now(UTC)),
     TheSuperadminBulkCreatesAUserWithItsKeypair(started=datetime.now(UTC)),
