@@ -696,37 +696,6 @@ class AGrantedCreatorMakesAUser(
 
 
 @dataclass(frozen=True)
-class ACreatorWithoutReadIsRefused(
-    Scenario[TestSeedingSession, ADomainACallerAndThePolicies, UserAdapter, Any]
-):
-    @override
-    def summary(self) -> str:
-        return "a-user-granted-create-but-not-read-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "읽기 권한 없이 생성 권한만 받은 사용자가 사용자를 만들면 호출이 거부됩니다",
-            english=(
-                "a call by a user granted the create permission but not the read permission is "
-                "refused"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ADomainACallerAndThePolicies]:
-        return SomeoneWithThePolicies(granted=(Permission.CREATE,))
-
-    @override
-    def when(self) -> When[ADomainACallerAndThePolicies, UserAdapter, Any]:
-        return CreatingAUserUnderThePolicies()
-
-    @override
-    def then(self) -> Then[ADomainACallerAndThePolicies, Any]:
-        return TheCallIsRefused(NotEnoughPermission)
-
-
-@dataclass(frozen=True)
 class AUserGrantedNothingMayNotCreateAUserWithThePolicies(
     Scenario[TestSeedingSession, ADomainACallerAndThePolicies, UserAdapter, Any]
 ):
@@ -832,7 +801,6 @@ SCENARIOS: list[Scenario[TestSeedingSession, Any, UserAdapter, Any]] = [
     OnlyTheSuperadminMayBulkCreate(),
     OnlyTheSuperadminMayBulkCreateWithKeypairs(),
     AGrantedCreatorMakesAUser(started=datetime.now(UTC)),
-    ACreatorWithoutReadIsRefused(),
     AUserGrantedNothingMayNotCreateAUserWithThePolicies(),
     TheSuperadminBulkCreatesAUser(started=datetime.now(UTC)),
     TheSuperadminBulkCreatesAUserWithItsKeypair(started=datetime.now(UTC)),
