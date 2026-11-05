@@ -68,11 +68,11 @@ class AUserReadingPoliciesReadsById(
     @override
     def describe(self) -> str:
         return Says(
-            f"public 에서 그 정책을 읽을 수 있는 사용자가 id 로 {self.family.kind} 하나를 "
+            f"global 스코프에서 그 정책을 읽을 수 있는 사용자가 id 로 {self.family.kind} 하나를 "
             "읽으면, 그 항목에 정책 전체가 응답으로 옵니다",
             english=(
-                f"when a user who can read it in public reads one {self.family.label} by id, the "
-                "whole policy comes back for that item"
+                f"when a user who can read it in the global scope reads one {self.family.label} by "
+                "id, the whole policy comes back for that item"
             ),
         )
 

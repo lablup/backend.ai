@@ -124,17 +124,18 @@ class AUserReadingSessionsReadsTheirEffectiveAllocation(
     @override
     def describe(self) -> str:
         return Says(
-            "프로젝트 범위에서 세션을 읽을 수 있는 사용자가 자기 유효 할당을 읽으면, 기본 "
-            "설정에서는 자원 그룹 범위만 담겨 반환됩니다",
+            "프로젝트 범위에서 세션을 읽고 자기 사용자 범위에서 사용자를 읽을 수 있는 사용자가 "
+            "자기 유효 할당을 읽으면, 기본 설정에서는 자원 그룹 범위만 담겨 반환됩니다",
             english=(
-                "when a user who can read sessions in the project scope reads their own effective "
-                "allocation, only the resource group scope is included under the default settings"
+                "when a user who can read sessions in the project scope and users in their own "
+                "user scope reads their own effective allocation, only the resource group scope "
+                "is included under the default settings"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AUsagePlace]:
-        return APlaceAndSomeone(sessions_read=True)
+        return APlaceAndSomeone(sessions_read=True, self_read=True)
 
     @override
     def when(

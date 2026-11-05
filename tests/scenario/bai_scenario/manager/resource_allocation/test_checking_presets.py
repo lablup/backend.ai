@@ -115,18 +115,19 @@ class AUserReadingPresetsChecksForThemselves(
     @override
     def describe(self) -> str:
         return Says(
-            "프로젝트 범위에서 리소스 프리셋을 읽을 수 있는 사용자가 자기 키페어로 프리셋 "
-            "가용성을 확인하면, 미리 저장한 프리셋이 모두 쓸 수 있는 것으로 반환됩니다",
+            "프로젝트 범위에서 리소스 프리셋을 읽고 자기 사용자 범위에서 사용자를 읽을 수 있는 "
+            "사용자가 자기 키페어로 프리셋 가용성을 확인하면, 미리 저장한 프리셋이 모두 쓸 수 "
+            "있는 것으로 반환됩니다",
             english=(
-                "when a user who can read resource presets in the project scope checks preset "
-                "availability with their own keypair, every preset seeded in advance comes back "
-                "marked as available"
+                "when a user who can read resource presets in the project scope and users in their "
+                "own user scope checks preset availability with their own keypair, every preset "
+                "seeded in advance comes back marked as available"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AUsagePlace]:
-        return APlaceAndSomeone(preset_read=True, presets=2)
+        return APlaceAndSomeone(preset_read=True, self_read=True, presets=2)
 
     @override
     def when(

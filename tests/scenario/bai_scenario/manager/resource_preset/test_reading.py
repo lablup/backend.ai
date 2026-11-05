@@ -80,7 +80,9 @@ class ReadingTheId(When[APresetAndACaller, ResourcePresetAdapter, ResourcePreset
 
 @dataclass(frozen=True)
 class ReadingSeveralIds(When[ManyPresetsAndACaller, ResourcePresetAdapter, Loaded]):
-    """미리 만들어 둔 프리셋들의 id 와 없는 id 하나로 여럿을 읽는다."""
+    """미리 만들어 둔 프리셋들의 id 로 여럿을 읽는다. ``unknown``이면 없는 id 하나를 덧붙인다."""
+
+    unknown: bool = False
 
     @override
     def operation(self) -> str:
@@ -88,33 +90,48 @@ class ReadingSeveralIds(When[ManyPresetsAndACaller, ResourcePresetAdapter, Loade
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
+        if self.unknown:
+            return Says(
+                f"{laid.caller.username}이 프리셋 {len(laid.laid)}개와 없는 id 하나를 한 번에 "
+                "읽습니다",
+                english=(
+                    f"{laid.caller.username} reads {len(laid.laid)} presets and one unknown id at "
+                    "once"
+                ),
+            )
         return Says(
-            f"{laid.caller.username}이 프리셋 {len(laid.laid)}개와 없는 id 하나를 한 번에 읽습니다",
-            english=(
-                f"{laid.caller.username} reads {len(laid.laid)} presets and one unknown id at once"
-            ),
+            f"{laid.caller.username}이 프리셋 {len(laid.laid)}개의 id 로 여럿을 읽습니다",
+            english=f"{laid.caller.username} reads several presets by the ids of {len(laid.laid)}",
         )
 
     @override
     async def call(self, adapter: ResourcePresetAdapter, laid: ManyPresetsAndACaller) -> Loaded:
         ids = [ResourcePresetID(one.id) for one in laid.laid]
-        ids.append(ResourcePresetID(uuid4()))
+        if self.unknown:
+            ids.append(ResourcePresetID(uuid4()))
         with ActingAs(laid.caller):
             return await adapter.batch_load_by_ids(ids)
 
 
 @dataclass(frozen=True)
 class ThePresetsInTheOrderAsked(Then[ManyPresetsAndACaller, Loaded]):
-    """요청한 순서대로 프리셋 전체가 오고, 없는 id 의 자리는 비어 있다."""
+    """요청한 순서대로 프리셋 전체가 온다. ``unknown``이면 그 자리는 비어 있다."""
+
+    unknown: bool = False
 
     @override
     def says(self) -> str:
+        if self.unknown:
+            return Says(
+                "요청한 순서대로 프리셋 전체가 오고, 없는 id 의 자리는 비어 있습니다",
+                english=(
+                    "every preset comes back in the order requested, and the item for the unknown "
+                    "id is empty"
+                ),
+            )
         return Says(
-            "요청한 순서대로 프리셋 전체가 오고, 없는 id 의 자리는 비어 있습니다",
-            english=(
-                "every preset comes back in the order requested, and the item for the unknown "
-                "id is empty"
-            ),
+            "요청한 순서대로 프리셋 전체가 응답으로 옵니다",
+            english="every preset comes back in the order requested",
         )
 
     @override
@@ -122,16 +139,18 @@ class ThePresetsInTheOrderAsked(Then[ManyPresetsAndACaller, Loaded]):
         items = answered.response
         if items is None:
             return [MissingResponse(answered.raised)]
-        if len(items) != len(laid.laid) + 1:
-            return [Same("len(items)", len(items), len(laid.laid) + 1)]
-        seen: list[Verdict] = [Same("len(items)", len(items), len(laid.laid) + 1)]
+        expected = len(laid.laid) + (1 if self.unknown else 0)
+        if len(items) != expected:
+            return [Same("len(items)", len(items), expected)]
+        seen: list[Verdict] = [Same("len(items)", len(items), expected)]
         for i, preset in enumerate(laid.laid):
             node = items[i]
             if not isinstance(node, ResourcePresetNode):
                 seen.append(Same(f"items[{i}]", type(node).__name__, Says("노드", english="node")))
                 continue
             seen += preset_verdicts(f"items[{i}].", node, preset)
-        seen.append(Same(f"items[{len(laid.laid)}]", items[len(laid.laid)], None))
+        if self.unknown:
+            seen.append(Same(f"items[{len(laid.laid)}]", items[len(laid.laid)], None))
         return seen
 
 
@@ -295,12 +314,11 @@ class AUserReadingPresetsReadsSeveralIds(
     @override
     def describe(self) -> str:
         return Says(
-            "public 에서 프리셋을 읽을 수 있는 사용자가 프리셋 여럿과 없는 id 하나를 한 번에 "
-            "읽으면, 요청한 순서대로 프리셋이 오고 없는 id 의 자리는 비어 있습니다",
+            "public 에서 프리셋을 읽을 수 있는 사용자가 프리셋 여럿을 id 로 한 번에 읽으면, "
+            "요청한 순서대로 프리셋이 옵니다",
             english=(
-                "when a user who can read presets in public batch loads several presets and one "
-                "unknown id, every preset comes back in the order requested and the item for the "
-                "unknown id is empty"
+                "when a user who can read presets in public batch loads several presets by id, "
+                "every preset comes back in the order requested"
             ),
         )
 
@@ -315,6 +333,38 @@ class AUserReadingPresetsReadsSeveralIds(
     @override
     def then(self) -> Then[ManyPresetsAndACaller, Loaded]:
         return ThePresetsInTheOrderAsked()
+
+
+@dataclass(frozen=True)
+class ASuperadminLoadingAnUnknownIdFindsItEmpty(
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, ResourcePresetAdapter, Loaded]
+):
+    @override
+    def summary(self) -> str:
+        return "a-superadmin-loading-an-unknown-preset-id-finds-it-empty"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 프리셋 여럿과 없는 id 하나를 한 번에 읽으면, 프리셋은 요청한 순서대로 "
+            "오고 없는 id 의 자리는 비어 있습니다",
+            english=(
+                "when the superadmin batch loads several presets and one unknown id, the presets "
+                "come back in the order requested and the item for the unknown id is empty"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
+        return ManyPresetsAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ManyPresetsAndACaller, ResourcePresetAdapter, Loaded]:
+        return ReadingSeveralIds(unknown=True)
+
+    @override
+    def then(self) -> Then[ManyPresetsAndACaller, Loaded]:
+        return ThePresetsInTheOrderAsked(unknown=True)
 
 
 @dataclass(frozen=True)
@@ -342,7 +392,7 @@ class AUserGrantedNothingIsRefusedPerId(
 
     @override
     def when(self) -> When[ManyPresetsAndACaller, ResourcePresetAdapter, Loaded]:
-        return ReadingSeveralIds()
+        return ReadingSeveralIds(unknown=True)
 
     @override
     def then(self) -> Then[ManyPresetsAndACaller, Loaded]:
@@ -355,6 +405,7 @@ SCENARIOS: list[ReadingStep | LoadingStep] = [
     AUserGrantedNothingMayNotReadAPreset(),
     AnIdNothingAnswersToIsNotFound(),
     AUserReadingPresetsReadsSeveralIds(),
+    ASuperadminLoadingAnUnknownIdFindsItEmpty(),
     AUserGrantedNothingIsRefusedPerId(),
 ]
 

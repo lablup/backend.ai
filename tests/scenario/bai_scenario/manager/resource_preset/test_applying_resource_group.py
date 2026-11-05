@@ -119,17 +119,20 @@ class AUserGrantedUpdateBindsAPreset(
     @override
     def describe(self) -> str:
         return Says(
-            "public 에서 프리셋을 고칠 수 있는 사용자가 프리셋을 자원 그룹에 묶으면, 그 그룹 "
-            "이름을 가진 프리셋이 반환되고 나머지 값은 그대로입니다",
+            "public 에서 프리셋과 public 스코프 자체를 고칠 수 있는 사용자가 프리셋을 자원 그룹에 "
+            "묶으면, 그 그룹 이름을 가진 프리셋이 반환되고 나머지 값은 그대로입니다",
             english=(
-                "when a user who can update presets in public binds a preset to a resource group, "
-                "the preset comes back naming that group and the rest stays as it was"
+                "when a user who can update presets and the public scope itself in public binds a "
+                "preset to a resource group, the preset comes back naming that group and the rest "
+                "stays as it was"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAGroupAndACaller]:
-        return APresetAndAGroupAndSomeone(granted=Permission.UPDATE)
+        return APresetAndAGroupAndSomeone(
+            granted=Permission.UPDATE, scope_permission=Permission.UPDATE
+        )
 
     @override
     def when(self) -> When[APresetAGroupAndACaller, ResourcePresetAdapter, ResourcePresetData]:

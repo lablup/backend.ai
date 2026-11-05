@@ -12,6 +12,7 @@ from uuid import UUID
 
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
+from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import (
@@ -67,18 +68,32 @@ class ManyPresetsAndACaller:
 
 @dataclass(frozen=True)
 class SomeoneGrantedInPublic(TestSeedNest[Laid[UserData]]):
-    """public 에서 리소스 프리셋에 대한 권한 하나를 받은 사용자."""
+    """public 에서 리소스 프리셋에 대한 권한 하나를 받은 사용자.
+
+    ``scope_permission`` 이 있으면 public 스코프 자체에 대한 권한도 함께 받는다.
+    """
 
     domain: Laid[Any]
     permission: Permission
+    scope_permission: Permission | None = None
 
     @override
     def kind(self) -> str:
+        if self.scope_permission is None:
+            return Says(
+                f"public 에서 리소스 프리셋 {self.permission.name} 권한을 받은 사용자 준비",
+                english=(
+                    f"Prepare a user granted the {self.permission.name} permission "
+                    "on resource presets in public"
+                ),
+            )
         return Says(
-            f"public 에서 리소스 프리셋 {self.permission.name} 권한을 받은 사용자 준비",
+            f"public 에서 리소스 프리셋 {self.permission.name} 권한과 public 스코프 자체에 대한 "
+            f"{self.scope_permission.name} 권한을 받은 사용자 준비",
             english=(
-                f"Prepare a user granted the {self.permission.name} permission "
-                "on resource presets in public"
+                f"Prepare a user granted the {self.permission.name} permission on resource "
+                f"presets in public and the {self.scope_permission.name} permission on the "
+                "public scope itself"
             ),
         )
 
@@ -95,21 +110,44 @@ class SomeoneGrantedInPublic(TestSeedNest[Laid[UserData]]):
             TestSeedPermission(entity_type=ResourcePresetEntityType(), permission=self.permission),
             granted,
         )
+        if self.scope_permission is not None:
+            seed.adding(
+                TestSeedPermission(
+                    entity_type=GlobalEntityType(), permission=self.scope_permission
+                ),
+                granted,
+            )
         seed.granting(granted, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
         return someone
 
 
-async def _lay_caller(seeding: Any, role: UserRole, granted: Permission | None) -> Laid[UserData]:
+async def _lay_caller(
+    seeding: Any,
+    role: UserRole,
+    granted: Permission | None,
+    scope_permission: Permission | None = None,
+) -> Laid[UserData]:
     home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
     caller: Laid[UserData]
     if granted is not None:
-        caller = await seeding.within(SomeoneGrantedInPublic(home, granted))
+        caller = await seeding.within(SomeoneGrantedInPublic(home, granted, scope_permission))
     else:
         caller = await seeding.within(SomeoneOf(home, role=role))
     return caller
 
 
-def _caller_named(role: UserRole, granted: Permission | None) -> Says:
+def _caller_named(
+    role: UserRole, granted: Permission | None, scope_permission: Permission | None = None
+) -> Says:
+    if scope_permission is not None and granted is not None:
+        return Says(
+            f"public 에서 {granted.name} 권한과 public 스코프 자체에 대한 "
+            f"{scope_permission.name} 권한을 받은 일반 사용자",
+            english=(
+                f"regular user granted the {granted.name} permission in public and the "
+                f"{scope_permission.name} permission on the public scope itself"
+            ),
+        )
     if granted is not None:
         return Says(
             f"public 에서 {granted.name} 권한을 받은 일반 사용자",
@@ -124,10 +162,11 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
 
     role: UserRole = UserRole.USER
     granted: Permission | None = None
+    scope_permission: Permission | None = None
 
     @override
     def describe(self) -> str:
-        caller = _caller_named(self.role, self.granted)
+        caller = _caller_named(self.role, self.granted, self.scope_permission)
         return Says(
             f"프리셋 하나와 {caller} 한 명",
             english=f"one preset and one {in_language(caller, Language.ENGLISH)}",
@@ -136,7 +175,7 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
     @override
     async def lay(self, seeding: Any) -> APresetAndACaller:
         preset = await seeding.creating(TestSeedResourcePreset())
-        caller = await _lay_caller(seeding, self.role, self.granted)
+        caller = await _lay_caller(seeding, self.role, self.granted, self.scope_permission)
         return APresetAndACaller(seeding.made(preset), seeding.made(caller))
 
 
@@ -211,10 +250,11 @@ class APresetAndAGroupAndSomeone(Given[Any, APresetAGroupAndACaller]):
 
     role: UserRole = UserRole.SUPERADMIN
     granted: Permission | None = None
+    scope_permission: Permission | None = None
 
     @override
     def describe(self) -> str:
-        caller = _caller_named(self.role, self.granted)
+        caller = _caller_named(self.role, self.granted, self.scope_permission)
         return Says(
             f"프리셋 하나와 자원 그룹 하나, 그리고 {caller} 한 명",
             english=(
@@ -226,7 +266,7 @@ class APresetAndAGroupAndSomeone(Given[Any, APresetAGroupAndACaller]):
     async def lay(self, seeding: Any) -> APresetAGroupAndACaller:
         preset = await seeding.creating(TestSeedResourcePreset())
         group = await seeding.creating(TestSeedResourceGroup(name_hint="group"))
-        caller = await _lay_caller(seeding, self.role, self.granted)
+        caller = await _lay_caller(seeding, self.role, self.granted, self.scope_permission)
         return APresetAGroupAndACaller(
             preset=seeding.made(preset),
             group=seeding.made(group),
