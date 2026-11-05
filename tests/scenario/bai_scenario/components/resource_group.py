@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, override
 from uuid import UUID
 
@@ -54,6 +55,7 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.domain import WAS_HERE, Mentions, SomeoneOf, WrittenByThisRun
 from bai_scenario.components.system import KEPT, Kept, role_named
+from bai_scenario.seeds.agent.agent import TestSeedAgent
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.project.project import TestSeedProject
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
@@ -63,12 +65,16 @@ from bai_scenario.seeds.resource_group.resource_group import (
     TestSeedResourceGroup,
 )
 from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.resource_slot.agent_resource import TestSeedReportedSlot
+from bai_scenario.seeds.resource_slot.slot_type import TestSeedResourceSlotType
 from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 
 type Loaded = list[ResourceGroupDetailNode | Exception | None]
 type Processed = PartialBulkPayload[ResourceGroupDetailNode]
 
 SCHEDULER = "fifo"
+REPORTED_CAPACITY = Decimal("10")
+REPORTED_USED = Decimal("0")
 
 
 # ------------------------------------------------------------------ situations
@@ -76,10 +82,14 @@ SCHEDULER = "fifo"
 
 @dataclass(frozen=True)
 class AGroupAndACaller:
-    """리소스 그룹 하나와, 그것을 호출할 사용자."""
+    """리소스 그룹 하나와, 그것을 호출할 사용자.
+
+    ``slot_name``은 그룹의 에이전트가 보고한 슬롯 종류다. 보고하는 에이전트가 없으면 비어 있다.
+    """
 
     group: ResourceGroupData
     caller: UserData
+    slot_name: str = ""
 
 
 @dataclass(frozen=True)
@@ -172,13 +182,17 @@ class SomeoneReadingGroupsInTheDomain(TestSeedNest[Laid[None]]):
 
 @dataclass(frozen=True)
 class AGroupAndSomeone(Given[Any, AGroupAndACaller]):
-    """그룹 하나와 사용자 한 명. ``granted``를 주면 그 그룹에 앉힌 역할로 그 권한을 받는다."""
+    """그룹 하나와 사용자 한 명. ``granted``를 주면 그 그룹에 앉힌 역할로 그 권한을 받는다.
+
+    ``reports_a_slot``이면 그 그룹의 에이전트가 슬롯 종류 하나를 용량과 함께 보고한다.
+    """
 
     role: UserRole = UserRole.USER
     granted: Permission | None = None
     description: str | None = None
     is_active: bool = True
     is_default: bool = False
+    reports_a_slot: bool = False
 
     @override
     def describe(self) -> str:
@@ -190,6 +204,15 @@ class AGroupAndSomeone(Given[Any, AGroupAndACaller]):
                 english=(
                     f"{in_language(named, Language.ENGLISH)} granted the "
                     f"{self.granted.name} role in the group scope"
+                ),
+            )
+        if self.reports_a_slot:
+            return Says(
+                f"리소스 그룹 하나와, {who} 한 명. 그 그룹의 에이전트가 슬롯 종류 하나를 용량과 "
+                "함께 보고합니다",
+                english=(
+                    f"one resource group and one {in_language(who, Language.ENGLISH)}. "
+                    "the group's agent reports one resource slot type with its capacity"
                 ),
             )
         return Says(
@@ -205,10 +228,24 @@ class AGroupAndSomeone(Given[Any, AGroupAndACaller]):
                 description=self.description, is_active=self.is_active, is_default=self.is_default
             )
         )
+        slot_name = ""
+        if self.reports_a_slot:
+            slot_type = await seeding.creating(TestSeedResourceSlotType(name_hint="slot"))
+            agent = await seeding.creating_from(TestSeedAgent(), group)
+            slot_name = slot_type.name
+            await seeding.adding(
+                TestSeedReportedSlot(
+                    agent_id=agent.name,
+                    slot_name=slot_name,
+                    capacity=REPORTED_CAPACITY,
+                    used=REPORTED_USED,
+                ),
+                agent,
+            )
         caller = await seeding.within(SomeoneOf(home, role=self.role))
         if self.granted is not None:
             await seeding.within(SomeoneGrantedOnTheGroup(group, caller, self.granted))
-        return AGroupAndACaller(seeding.made(group), seeding.made(caller))
+        return AGroupAndACaller(seeding.made(group), seeding.made(caller), slot_name)
 
 
 @dataclass(frozen=True)
@@ -865,10 +902,9 @@ class EachItemIsRefused(Then[Any, list[Any]]):
         for i in range(self.asked):
             got = items[i] if i < len(items) else None
             seen.append(
-                Same(
-                    f"items[{i}]",
-                    type(got).__name__ if got is not None else None,
-                    NotEnoughPermission.__name__,
+                Refused(
+                    NotEnoughPermission,
+                    got if isinstance(got, BaseException) else None,
                 )
             )
         return seen

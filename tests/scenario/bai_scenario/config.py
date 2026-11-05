@@ -10,10 +10,12 @@ from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.common.types import SlotName, SlotTypes
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.data.manager_status.types import ManagerStatus
+from ai.backend.manager.defs import INTRINSIC_SLOTS
 from ai.backend.testutils.bootstrap import POSTGRES_PASSWORD, POSTGRES_USER
 
 VFOLDER_HOST = "local:volume1"
@@ -30,6 +32,10 @@ class _KitLegacyEtcdLoader:
 
     async def get_manager_status(self) -> ManagerStatus:
         return ManagerStatus.RUNNING
+
+    async def get_resource_slots(self) -> Mapping[SlotName, SlotTypes]:
+        """The intrinsic slots alone; the kit configures no additional slot."""
+        return INTRINSIC_SLOTS
 
 
 class ScenarioConfigProvider(ManagerConfigProvider):
