@@ -47,6 +47,7 @@ from bai_scenario.seeds.project.project import TestSeedProject
 from bai_scenario.seeds.resource_policy.keypair import TestSeedKeypairPolicy
 from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
 from bai_scenario.seeds.resource_policy.user import TestSeedUserPolicy
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 from bai_scenario.seeds.user.user import TestSeedUserOf
 
 type Searched = AdminSearchDomainsPayload
@@ -108,7 +109,9 @@ class TwoDomainsWithProjectsAndUsers(Given[Any, TwoDomainsAndTheirRows]):
             TestSeedProject(name_hint="beta-team"), second, projects
         )
         first_user = await seeding.within(SomeoneOf(first))
-        second_user = await self._second_user(seeding, second)
+        second_user = await seeding.within(
+            AnInactiveUserOf(second) if self.second_user_inactive else SomeoneOf(second)
+        )
         caller = await seeding.within(SomeoneOf(first, role=UserRole.SUPERADMIN))
         return TwoDomainsAndTheirRows(
             seeding.made(first),
@@ -120,14 +123,28 @@ class TwoDomainsWithProjectsAndUsers(Given[Any, TwoDomainsAndTheirRows]):
             seeding.made(caller),
         )
 
-    async def _second_user(self, seeding: Any, second: Any) -> Any:
-        if not self.second_user_inactive:
-            return await seeding.within(SomeoneOf(second))
-        policy = await seeding.creating(TestSeedUserPolicy())
-        key_policy = await seeding.creating(TestSeedKeypairPolicy())
-        return await seeding.provisioning(
+
+@dataclass(frozen=True)
+class AnInactiveUserOf(TestSeedNest[Laid[UserData]]):
+    """그 도메인에 사는 비활성 사용자 한 명. 매니저가 사용자를 만드는 경로를 그대로 탄다."""
+
+    domain: Laid[DomainData]
+
+    @override
+    def kind(self) -> str:
+        return Says(
+            "도메인에 속한 비활성 사용자 한 명 준비",
+            english="Prepare one inactive user in the domain",
+        )
+
+    @override
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
+        seed.once(TestSeedProjectPolicy())
+        policy = seed.creating(TestSeedUserPolicy())
+        key_policy = seed.creating(TestSeedKeypairPolicy())
+        return seed.provisioning(
             TestSeedUserOf(is_active=False, status=UserStatus.INACTIVE),
-            second,
+            self.domain,
             policy,
             key_policy,
         )
