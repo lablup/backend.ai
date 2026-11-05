@@ -25920,7 +25920,6 @@ type ScalingGroupNode implements Node
   is_public: Boolean @join__field(graph: GRAPHENE)
   created_at: DateTime @join__field(graph: GRAPHENE)
   wsproxy_addr: String @join__field(graph: GRAPHENE)
-  wsproxy_api_token: String @join__field(graph: GRAPHENE)
   driver: String @join__field(graph: GRAPHENE)
   driver_opts: JSONString @join__field(graph: GRAPHENE)
   scheduler: String @join__field(graph: GRAPHENE)
