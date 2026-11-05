@@ -2178,7 +2178,7 @@ Then
   - metadata.creation_id: a non-empty value this run made
   - metadata.name = 'created-session'
   - metadata.session_type = 'interactive'
-  - metadata.access_key = 'AKF5065012ED824071'
+  - metadata.access_key: same as the key the session was requested with
   - metadata.cluster_mode = 'SINGLE_NODE'
   - metadata.cluster_size = 1
   - metadata.tier = 10

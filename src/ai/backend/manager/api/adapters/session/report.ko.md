@@ -2178,7 +2178,7 @@ Then
   - metadata.creation_id: 이 실행이 만든 비어 있지 않은 값
   - metadata.name = 'created-session'
   - metadata.session_type = 'interactive'
-  - metadata.access_key = 'AKF5065012ED824071'
+  - metadata.access_key: 세션을 요청한 키와 같다
   - metadata.cluster_mode = 'SINGLE_NODE'
   - metadata.cluster_size = 1
   - metadata.tier = 10
