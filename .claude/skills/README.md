@@ -46,6 +46,7 @@ For finding and defining exceptions, see `src/ai/backend/manager/errors/AGENTS.m
 | Skill | Purpose | Use When |
 |-------|---------|----------|
 | `/submit` | Quality checks, commit, PR creation, changelog, push | After finishing implementation, ready to submit PR |
+| `/backport` | Find the committed conflict markers, resolve or reapply on the release branch, verify, commit, push | CI fails on a backport pull request |
 
 ## Release
 
