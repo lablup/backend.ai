@@ -14,7 +14,7 @@
   - purge: 대표 성공 ✓ · 대표 거부 ✓
   - update: 대표 성공 ✓ · 대표 거부 ✓
 - 직접 구현 (2)
-  - get_presigned_download_url: 성공 있음 1 · 거부 있음 2 (single_field)
+  - get_presigned_download_url: 성공 있음 1 · 거부 있음 3 (single_field)
   - get_presigned_upload_url: 성공 있음 1 · 거부 있음 1 (single_field)
 
 **admin_search**
@@ -82,6 +82,7 @@
 |---|---|
 | [superadmin 이 사용 가능한 리비전의 객체를 내려받을 URL 을 요청하면 그 객체의 저장 경로로 만든 URL 이 반환됩니다](#presigned_urls-the-superadmin-gets-a-download-url-for-an-available-revision) | 성공 |
 | [사용 가능 상태가 아닌 리비전의 객체를 내려받을 URL 을 요청하면 승인되지 않았다는 이유로 거부됩니다](#presigned_urls-downloading-an-unavailable-revision-is-refused) | 거부 |
+| [전역 설정의 reservoir 가 오브젝트 스토리지가 아니면 내려받기 URL 을 요청해도 발급되지 않고 지원하지 않는 저장소라는 이유로 거부됩니다](#presigned_urls-downloading-from-a-vfs-reservoir-is-refused) | 거부 |
 | [전역 설정에 reservoir 가 없으면 내려받기 URL 을 요청해도 발급되지 않고 서버 설정이 잘못됐다는 이유로 거부됩니다](#presigned_urls-downloading-with-no-reservoir-config-is-refused) | 거부 |
 
 **get_presigned_upload_url**
@@ -746,6 +747,35 @@ Then
 
 - 거부됩니다
   - 거부: ArtifactRevisionNotApproved
+
+<a id="presigned_urls-downloading-from-a-vfs-reservoir-is-refused"></a>
+
+#### [downloading-from-a-vfs-reservoir-is-refused](/tests/scenario/bai_scenario/manager/object_storage/test_presigned_urls.py): pass
+
+전역 설정의 reservoir 가 오브젝트 스토리지가 아니면 내려받기 URL 을 요청해도 발급되지 않고 지원하지 않는 저장소라는 이유로 거부됩니다
+
+Given
+
+- 쓸 수 있는 artifact 하나와 그 리비전 하나, superadmin 한 명
+  - object storage archive-storage: 호스트는 seeded.object-storage.test 입니다
+  - 저장소 네임스페이스 archive-bucket: 오브젝트 스토리지에 등록된 버킷 이름입니다
+  - 아티팩트 artifact-1: 허깅 페이스 레지스트리에서 스캔한 모델
+  - 아티팩트 artifact-1: 아티팩트 리비전
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- ObjectStorageAdapter.get_presigned_download_url: user-1이 리비전의 model.bin 객체를 내려받을 URL 을 요청합니다
+
+Then
+
+- 거부됩니다
+  - 거부: ObjectStorageOperationNotSupported
 
 <a id="presigned_urls-downloading-with-no-reservoir-config-is-refused"></a>
 

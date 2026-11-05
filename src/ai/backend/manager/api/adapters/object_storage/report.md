@@ -14,7 +14,7 @@ Scenario: complete
   - purge: representative success ✓ · representative rejection ✓
   - update: representative success ✓ · representative rejection ✓
 - direct implementation (2)
-  - get_presigned_download_url: success present 1 · rejection present 2 (single_field)
+  - get_presigned_download_url: success present 1 · rejection present 3 (single_field)
   - get_presigned_upload_url: success present 1 · rejection present 1 (single_field)
 
 **admin_search**
@@ -82,6 +82,7 @@ Scenario: complete
 |---|---|
 | [when the superadmin asks for a URL to download an object of an available revision, a URL made from the object's stored path comes back](#presigned_urls-the-superadmin-gets-a-download-url-for-an-available-revision) | answered |
 | [when a download URL is asked for a revision that is not available, it is rejected because the revision is not approved](#presigned_urls-downloading-an-unavailable-revision-is-refused) | rejected |
+| [when the reservoir in the global config is not an object storage, a download URL request is rejected because the storage is not supported](#presigned_urls-downloading-from-a-vfs-reservoir-is-refused) | rejected |
 | [when the global config has no reservoir, a download URL request is rejected because the server is misconfigured](#presigned_urls-downloading-with-no-reservoir-config-is-refused) | rejected |
 
 **get_presigned_upload_url**
@@ -746,6 +747,35 @@ Then
 
 - the call is rejected
   - rejected: ArtifactRevisionNotApproved
+
+<a id="presigned_urls-downloading-from-a-vfs-reservoir-is-refused"></a>
+
+#### [downloading-from-a-vfs-reservoir-is-refused](/tests/scenario/bai_scenario/manager/object_storage/test_presigned_urls.py): pass
+
+when the reservoir in the global config is not an object storage, a download URL request is rejected because the storage is not supported
+
+Given
+
+- one writable artifact and one of its revisions, and one superadmin
+  - Object storage archive-storage: host is seeded.object-storage.test
+  - storage namespace archive-bucket: a bucket name registered on the object storage
+  - Artifact artifact-1: a model scanned from a HuggingFace registry
+  - Artifact artifact-1: artifact revision
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ObjectStorageAdapter.get_presigned_download_url: user-1 asks for a URL to download model.bin of the revision
+
+Then
+
+- the call is rejected
+  - rejected: ObjectStorageOperationNotSupported
 
 <a id="presigned_urls-downloading-with-no-reservoir-config-is-refused"></a>
 
