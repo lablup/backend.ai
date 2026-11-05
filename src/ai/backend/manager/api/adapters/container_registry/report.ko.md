@@ -2,10 +2,10 @@
 
 [배경](/src/ai/backend/manager/api/adapters/container_registry/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/container_registry/adapter.py)
 
-시나리오: 미완성 2 / 10
+시나리오: 완성
 
 - ops 구성 (4)
-  - admin_partial_bulk_purge: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - admin_partial_bulk_purge: 대표 성공 ✓ · 대표 거부 ✓
   - admin_search: 대표 성공 ✓ · 대표 거부 ✓
   - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
   - lookup_by_name_and_registry_project: 대표 성공 ✓ · 대표 거부 ✓
@@ -14,15 +14,15 @@
   - admin_purge: 성공 있음 2 · 거부 있음 2 (global_scope)
   - admin_update: 성공 있음 3 · 거부 있음 4 (global_scope, membership, relation)
   - apply_allowed_groups: 성공 있음 8 · 거부 있음 6 (relation)
-  - apply_global: 성공 없음 · 거부 없음 (membership): SCENARIO-GAP
+  - apply_global: 성공 있음 2 · 거부 있음 1 (membership)
   - link_project_as_default: 성공 있음 1 · 거부 있음 3 (relation)
 
 **admin_partial_bulk_purge**
 
 | 시나리오 | 판정 |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 컨테이너 레지스트리 여럿을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-registries) | 성공 |
 | [superadmin 이 컨테이너 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 영구 삭제하면, 둘은 삭제되기 전 모습으로 오고 존재하지 않는 id 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-purging-several-registries-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 받지 않은 사용자가 컨테이너 레지스트리 여럿을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-registries) | 거부 |
 
 **admin_search**
 
@@ -98,6 +98,14 @@
 | [양쪽 스코프에 생성 권한만 받은 사용자가 프로젝트를 제거하면 권한 부족으로 거부됩니다](#allowing_projects-create-permission-does-not-allow-removing-a-project) | 거부 |
 | [양쪽 스코프에 삭제 권한만 받은 사용자가 프로젝트를 추가하면 권한 부족으로 거부됩니다](#allowing_projects-soft-delete-permission-does-not-allow-adding-a-project) | 거부 |
 
+**apply_global**
+
+| 시나리오 | 판정 |
+|---|---|
+| [레지스트리와 public 두 범위에 수정 권한을 받은 사용자가 레지스트리의 전역 여부를 거짓으로 바꾸면, 같은 레지스트리가 전역이 아닌 채로 통째로 반환됩니다](#setting_global-a-user-granted-on-both-scopes-takes-a-registry-out-of-public) | 성공 |
+| [superadmin 이 레지스트리의 전역 여부를 거짓으로 바꾸면, 같은 레지스트리가 전역이 아닌 채로 통째로 반환됩니다](#setting_global-the-superadmin-takes-a-registry-out-of-public) | 성공 |
+| [아무 권한도 받지 않은 사용자가 레지스트리의 전역 여부를 바꾸려 하면 권한 부족으로 거부됩니다. 이 호출은 레지스트리와 public 스코프 양쪽의 권한을 함께 봅니다](#setting_global-a-user-granted-nothing-may-not-change-a-registry-visibility) | 거부 |
+
 **link_project_as_default**
 
 | 시나리오 | 판정 |
@@ -108,38 +116,6 @@
 | [컨테이너 레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 association 을 만들며 default 로 지정하려 하면, 관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부됩니다](#linking_default_project-a-user-granted-on-the-registry-but-not-the-project-cannot-link-a-default) | 거부 |
 
 ### admin_partial_bulk_purge
-
-<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-registries"></a>
-
-#### [a-user-granted-nothing-purges-none-of-several-registries](/tests/scenario/bai_scenario/manager/container_registry/test_partial_bulk_purging.py): pass
-
-아무 권한도 받지 않은 사용자가 컨테이너 레지스트리 여럿을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다
-
-Given
-
-- 레지스트리 2개, user 한 명
-  - 도메인 home-1
-  - 컨테이너 레지스트리 wanted-1: 이미지를 가져오는 곳
-  - 컨테이너 레지스트리 other-1: 이미지를 가져오는 곳
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- ContainerRegistryAdapter.admin_partial_bulk_purge: user-1이 컨테이너 레지스트리 2개를 한 번에 영구 삭제합니다
-
-Then
-
-- 처리된 컨테이너 레지스트리 없이 대상이 모두 실패 목록에 옵니다
-  - successes = []
-  - failed count = 2
-  - failed[0].id: 미리 저장한 컨테이너 레지스트리의 id 와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 미리 저장한 컨테이너 레지스트리의 id 와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
 
 <a id="partial_bulk_purging-purging-several-registries-answers-for-the-missing-one"></a>
 
@@ -188,6 +164,38 @@ Then
   - failed count = 1
   - failed[0].id: 요청에 넣은, 존재하지 않는 id 와 같다
   - failed[0].message: 'not found'를 담은 이유
+
+<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-registries"></a>
+
+#### [a-user-granted-nothing-purges-none-of-several-registries](/tests/scenario/bai_scenario/manager/container_registry/test_partial_bulk_purging.py): pass
+
+아무 권한도 받지 않은 사용자가 컨테이너 레지스트리 여럿을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다
+
+Given
+
+- 레지스트리 2개, user 한 명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 wanted-1: 이미지를 가져오는 곳
+  - 컨테이너 레지스트리 other-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- ContainerRegistryAdapter.admin_partial_bulk_purge: user-1이 컨테이너 레지스트리 2개를 한 번에 영구 삭제합니다
+
+Then
+
+- 처리된 컨테이너 레지스트리 없이 대상이 모두 실패 목록에 옵니다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 미리 저장한 컨테이너 레지스트리의 id 와 같다
+  - 거부: failed[0]: Insufficient permission
+  - failed[1].id: 미리 저장한 컨테이너 레지스트리의 id 와 같다
+  - 거부: failed[1]: Insufficient permission
 
 ### admin_search
 
@@ -1419,6 +1427,111 @@ Given
 When
 
 - ContainerRegistryAdapter.apply_allowed_groups: user-1이 허용 목록에 넣음
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### apply_global
+
+<a id="setting_global-a-user-granted-on-both-scopes-takes-a-registry-out-of-public"></a>
+
+#### [a-user-granted-on-both-scopes-takes-a-registry-out-of-public](/tests/scenario/bai_scenario/manager/container_registry/test_setting_global.py): pass
+
+레지스트리와 public 두 범위에 수정 권한을 받은 사용자가 레지스트리의 전역 여부를 거짓으로 바꾸면, 같은 레지스트리가 전역이 아닌 채로 통째로 반환됩니다
+
+Given
+
+- 레지스트리 하나, user 한 명, 레지스트리와 public 두 범위에 수정 권한을 받은
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 레지스트리와 public 두 범위에 수정 권한을 받은 사용자 준비
+    - 역할 registry-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 registry-keeper-1: container_registry 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 registry-keeper-1 보유
+    - 역할 public-registry-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 public-registry-keeper-1: global 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 public-registry-keeper-1 보유
+
+When
+
+- ContainerRegistryAdapter.apply_global: user-1이 host-1의 전역 여부를 바꿉니다
+
+Then
+
+- 미리 저장한 레지스트리 전체가 새 전역 여부로 반환됩니다
+  - id: 미리 저장한 컨테이너 레지스트리의 id 와 같다
+  - url = 'https://host-1.scenario.local'
+  - registry_name = 'host-1'
+  - type = <ContainerRegistryType.DOCKER: 'docker'>
+  - project = None
+  - username = None
+  - password = None
+  - ssl_verify = True
+  - is_global = False
+  - extra = None
+
+<a id="setting_global-the-superadmin-takes-a-registry-out-of-public"></a>
+
+#### [the-superadmin-takes-a-registry-out-of-public](/tests/scenario/bai_scenario/manager/container_registry/test_setting_global.py): pass
+
+superadmin 이 레지스트리의 전역 여부를 거짓으로 바꾸면, 같은 레지스트리가 전역이 아닌 채로 통째로 반환됩니다
+
+Given
+
+- 레지스트리 하나, superadmin 한 명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- ContainerRegistryAdapter.apply_global: user-1이 host-1의 전역 여부를 바꿉니다
+
+Then
+
+- 미리 저장한 레지스트리 전체가 새 전역 여부로 반환됩니다
+  - id: 미리 저장한 컨테이너 레지스트리의 id 와 같다
+  - url = 'https://host-1.scenario.local'
+  - registry_name = 'host-1'
+  - type = <ContainerRegistryType.DOCKER: 'docker'>
+  - project = None
+  - username = None
+  - password = None
+  - ssl_verify = True
+  - is_global = False
+  - extra = None
+
+<a id="setting_global-a-user-granted-nothing-may-not-change-a-registry-visibility"></a>
+
+#### [a-user-granted-nothing-may-not-change-a-registry-visibility](/tests/scenario/bai_scenario/manager/container_registry/test_setting_global.py): pass
+
+아무 권한도 받지 않은 사용자가 레지스트리의 전역 여부를 바꾸려 하면 권한 부족으로 거부됩니다. 이 호출은 레지스트리와 public 스코프 양쪽의 권한을 함께 봅니다
+
+Given
+
+- 레지스트리 하나, user 한 명
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- ContainerRegistryAdapter.apply_global: user-1이 host-1의 전역 여부를 바꿉니다
 
 Then
 
