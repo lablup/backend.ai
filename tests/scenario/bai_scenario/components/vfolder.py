@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
@@ -15,24 +16,36 @@ from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
+from ai.backend.common.types import VFolderUsageMode
+from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.data.resource_group.types import ResourceGroupData
+from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.data.vfolder.types import VFolderData
+from ai.backend.manager.data.vfolder.types import VFolderData, VFolderOperationStatus
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
+    Answered,
     Given,
     Held,
+    Refused,
     Same,
     SameAs,
     Says,
     Skipped,
+    Then,
     Verdict,
 )
 from bai_scenario.components.domain import WAS_HERE, GrantedUser, SomeoneOf, WrittenByThisRun
+from bai_scenario.seeds.deployment.revision_preset import TestSeedDeploymentRevisionPreset
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.entity_share.share import TestSeedShareTaken, TestSeedVFolderShare
 from bai_scenario.seeds.project.project import TestSeedProject
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.resource_group.resource_group import TestSeedResourceGroup
 from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.runtime_variant.runtime_variant import TestSeedRuntimeVariant
 from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest, TestSeedRow
 from bai_scenario.seeds.vfolder.vfolder import TestSeedPersonalVFolder, TestSeedProjectVFolder
 
@@ -457,6 +470,413 @@ class SomeoneGrantedOnFoldersIn[S](TestSeedNest[Laid[None]]):
 
 
 @dataclass(frozen=True)
+class SomeoneHoldingFolderPermissions(TestSeedNest[Laid[None]]):
+    """그 사용자 자신의 스코프에서 vfolder 권한을 받은 사용자."""
+
+    someone: Laid[UserData]
+    permissions: tuple[Permission, ...]
+    name_hint: str = "folder-holder"
+
+    @override
+    def kind(self) -> str:
+        names = ", ".join(permission.name or "" for permission in self.permissions)
+        return Says(
+            f"자기 스코프에서 vfolder {names} 권한을 받은 사용자 준비",
+            english=f"Prepare a user granted the {names} permission on vfolders in their own scope",
+        )
+
+    @override
+    def lay(self, seed: TestSeeder) -> Laid[None]:
+        role = seed.creating_from(
+            TestSeedRole(lambda u: UserID(u.id), name_hint=self.name_hint), self.someone
+        )
+        for permission in self.permissions:
+            seed.adding(
+                TestSeedPermission(entity_type=VFolderEntityType(), permission=permission), role
+            )
+        return seed.granting(
+            role, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
+        )
+
+
+@dataclass(frozen=True)
+class AFolderAndPeople:
+    """폴더 하나와, 그것을 부를 사람, 그리고 필요하면 또 한 사람."""
+
+    folder: VFolderData
+    caller: UserData
+    other: UserData | None
+
+
+@dataclass(frozen=True)
+class SomeoneWithAFolder(Given[Any, AFolderAndPeople]):
+    """자기 개인 폴더 하나를 가진 사용자. 그 폴더에 받은 권한은 행이 정한다.
+
+    ``in_own_scope``이면 역할을 그 사용자의 스코프에, 아니면 개인 프로젝트에 앉힌다.
+    ``with_other``이면 그 폴더와 상관없는 사용자 한 명을 함께 둔다.
+    """
+
+    permissions: tuple[Permission, ...] = ()
+    status: VFolderOperationStatus = VFolderOperationStatus.READY
+    usage_mode: VFolderUsageMode = VFolderUsageMode.GENERAL
+    cloneable: bool = False
+    in_own_scope: bool = False
+    with_other: bool = False
+
+    @override
+    def describe(self) -> str:
+        if self.permissions:
+            names = ", ".join(permission.name or "" for permission in self.permissions)
+            grant_ko = f"자기 개인 폴더에 {names} 권한을 받은"
+            grant_en = f"granted the {names} permission on their personal folder"
+        else:
+            grant_ko = "아무 권한도 받지 않은"
+            grant_en = "holding no permission"
+        state_ko = (
+            "사용할 수 있는 상태의"
+            if self.status is VFolderOperationStatus.READY
+            else f"{self.status.value} 상태의"
+        )
+        state_en = "ready" if self.status is VFolderOperationStatus.READY else self.status.value
+        parts_ko = [f"{state_ko} 개인 vfolder 하나를 가진, {grant_ko} 사용자 한 명"]
+        parts_en = [f"one user with one {state_en} personal vfolder, {grant_en}"]
+        if self.with_other:
+            parts_ko.append("그 폴더를 쓰지 않는 다른 사용자 한 명")
+            parts_en.append("one other user who does not use that folder")
+        return Says(", 그리고 ".join(parts_ko), english=", and ".join(parts_en))
+
+    @override
+    async def lay(self, seeding: Any) -> AFolderAndPeople:
+        domain = await seeding.creating(
+            TestSeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+        )
+        caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        other = (
+            await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+            if self.with_other
+            else None
+        )
+        folder = await seeding.creating_from(
+            TestSeedPersonalVFolder(
+                host=STORAGE_HOST,
+                status=self.status,
+                usage_mode=self.usage_mode,
+                cloneable=self.cloneable,
+            ),
+            caller,
+        )
+        if self.permissions:
+            if self.in_own_scope:
+                await seeding.within(SomeoneHoldingFolderPermissions(caller, self.permissions))
+            else:
+                own = await seeding.personal_project_of(caller)
+                await seeding.within(
+                    SomeoneGrantedOnFoldersIn(
+                        own, lambda p: ProjectID(p.id), caller, self.permissions
+                    )
+                )
+        return AFolderAndPeople(
+            seeding.made(folder),
+            seeding.made(caller),
+            seeding.made(other) if other is not None else None,
+        )
+
+
+@dataclass(frozen=True)
+class ATwoFoldersAndPeople:
+    """자기 폴더 둘과, 그것을 부를 사람, 그리고 또 한 사람."""
+
+    first: VFolderData
+    second: VFolderData
+    caller: UserData
+    other: UserData
+
+
+@dataclass(frozen=True)
+class SomeoneWithTwoOwnFolders(Given[Any, ATwoFoldersAndPeople]):
+    """자기 개인 폴더 둘을 가진 사용자와, 그 사람과 상관없는 다른 사용자 한 명."""
+
+    permissions: tuple[Permission, ...] = ()
+    first_status: VFolderOperationStatus = VFolderOperationStatus.READY
+    second_status: VFolderOperationStatus = VFolderOperationStatus.READY
+    first_cloneable: bool = False
+    in_own_scope: bool = True
+
+    @override
+    def describe(self) -> str:
+        if self.permissions:
+            names = ", ".join(permission.name or "" for permission in self.permissions)
+            grant_ko = f"자기 스코프에서 vfolder {names} 권한을 받은"
+            grant_en = f"granted the {names} permission on vfolders in their own scope"
+        else:
+            grant_ko = "아무 권한도 받지 않은"
+            grant_en = "holding no permission"
+        return Says(
+            f"자기 개인 vfolder 둘을 가진, {grant_ko} 사용자 한 명과, "
+            "그 사람과 상관없는 다른 사용자 한 명",
+            english=(
+                f"one user with two personal vfolders of their own, {grant_en}, and "
+                "one other user unrelated to them"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> ATwoFoldersAndPeople:
+        domain = await seeding.creating(
+            TestSeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+        )
+        caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        other = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        first = await seeding.creating_from(
+            TestSeedPersonalVFolder(
+                host=STORAGE_HOST,
+                name_hint="first",
+                status=self.first_status,
+                cloneable=self.first_cloneable,
+            ),
+            caller,
+        )
+        second = await seeding.creating_from(
+            TestSeedPersonalVFolder(
+                host=STORAGE_HOST, name_hint="second", status=self.second_status
+            ),
+            caller,
+        )
+        if self.permissions:
+            if self.in_own_scope:
+                await seeding.within(SomeoneHoldingFolderPermissions(caller, self.permissions))
+            else:
+                own = await seeding.personal_project_of(caller)
+                await seeding.within(
+                    SomeoneGrantedOnFoldersIn(
+                        own, lambda p: ProjectID(p.id), caller, self.permissions
+                    )
+                )
+        return ATwoFoldersAndPeople(
+            seeding.made(first),
+            seeding.made(second),
+            seeding.made(caller),
+            seeding.made(other),
+        )
+
+
+@dataclass(frozen=True)
+class AProjectAndMaker:
+    """폴더를 받아줄 프로젝트와, 거기서 폴더를 만들 사람."""
+
+    project: ProjectData
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class AProjectWhereSomeoneMayMakeFolders(Given[Any, AProjectAndMaker]):
+    """프로젝트 하나와, 그 프로젝트에서 폴더를 만들 수 있는지가 행으로 정해진 사용자."""
+
+    granted: bool
+
+    @override
+    def describe(self) -> str:
+        grant_ko = (
+            "그 프로젝트에서 vfolder 생성 권한을 받은" if self.granted else "아무 권한도 받지 않은"
+        )
+        grant_en = (
+            "granted vfolder create in that project" if self.granted else "holding no permission"
+        )
+        return Says(
+            f"vfolder 를 받아줄 프로젝트와, {grant_ko} 사용자 한 명",
+            english=f"a project that can hold vfolders and one user {grant_en}",
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> AProjectAndMaker:
+        domain = await seeding.creating(
+            TestSeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+        )
+        caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(), domain, policy)
+        if self.granted:
+            role = await seeding.creating_from(
+                TestSeedRole(lambda p: ProjectID(p.id), name_hint="folder-maker"), project
+            )
+            await seeding.adding(
+                TestSeedPermission(entity_type=VFolderEntityType(), permission=Permission.CREATE),
+                role,
+            )
+            await seeding.granting(
+                role, caller, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
+            )
+        return AProjectAndMaker(seeding.made(project), seeding.made(caller))
+
+
+@dataclass(frozen=True)
+class AModelFolderPlace:
+    """배포가 놓일 프로젝트·자원 그룹과, 모델 폴더, 런타임 종류, 리비전 프리셋, 부를 사람."""
+
+    domain: DomainData
+    project: ProjectData
+    resource_group: ResourceGroupData
+    caller: UserData
+    variant: RuntimeVariantData
+    preset: DeploymentRevisionPresetData
+    folder: VFolderData
+
+
+@dataclass(frozen=True)
+class AModelFolderForDeployment(Given[Any, AModelFolderPlace]):
+    """모델 폴더 하나를 배포할 수 있는 자리와 사람. 폴더의 용도는 행이 정한다."""
+
+    usage_mode: VFolderUsageMode = VFolderUsageMode.MODEL
+    granted: bool = True
+
+    @override
+    def describe(self) -> str:
+        mode = self.usage_mode.value
+        grant_ko = "배포를 만들 수 있는" if self.granted else "아무 권한도 받지 않은"
+        grant_en = (
+            "granted deployment create in that project" if self.granted else "holding no permission"
+        )
+        return Says(
+            f"배포를 놓을 프로젝트와 자원 그룹, {mode} 용도 vfolder 하나, 런타임 종류와 "
+            f"리비전 프리셋, 그리고 {grant_ko} 사용자 한 명",
+            english=(
+                f"a project and a resource group to hold deployments, one {mode} vfolder, "
+                f"a runtime variant and a revision preset, and one user {grant_en}"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> AModelFolderPlace:
+        domain = await seeding.creating(
+            TestSeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+        )
+        caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(), domain, policy)
+        group = await seeding.creating(TestSeedResourceGroup())
+        folder = await seeding.creating_from_two(
+            TestSeedProjectVFolder(host=STORAGE_HOST, usage_mode=self.usage_mode),
+            project,
+            caller,
+        )
+        if self.granted:
+            await seeding.within(
+                SomeoneGrantedOnFoldersIn(
+                    project, lambda p: ProjectID(p.id), caller, (Permission.READ,)
+                )
+            )
+            role = await seeding.creating_from(
+                TestSeedRole(lambda p: ProjectID(p.id), name_hint="deployer"), project
+            )
+            await seeding.adding(
+                TestSeedPermission(
+                    entity_type=DeploymentEntityType(), permission=Permission.CREATE
+                ),
+                role,
+            )
+            await seeding.granting(
+                role, caller, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
+            )
+        variant = await seeding.creating(TestSeedRuntimeVariant())
+        preset = await seeding.creating_from(TestSeedDeploymentRevisionPreset(), variant)
+        return AModelFolderPlace(
+            domain=seeding.made(domain),
+            project=seeding.made(project),
+            resource_group=seeding.made(group),
+            caller=seeding.made(caller),
+            variant=seeding.made(variant),
+            preset=seeding.made(preset),
+            folder=seeding.made(folder),
+        )
+
+
+@dataclass(frozen=True)
+class TheNewFolderNode(Then[AProjectAndMaker, VFolderNode]):
+    """방금 만든 폴더가 통째로 온다. 이름과 소유는 시나리오가 정한 값이다."""
+
+    started: datetime
+    named: str
+    ownership_type: str
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "방금 만든 vfolder 전체가 응답으로 옵니다",
+            english="the whole vfolder just created comes back",
+        )
+
+    @override
+    def look(self, laid: AProjectAndMaker, answered: Answered[VFolderNode]) -> list[Verdict]:
+        node = answered.response
+        if node is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        owner_id = laid.caller.id if self.ownership_type == "user" else None
+        return [
+            Held(
+                "id",
+                node.id,
+                SameAs[UUID](node.entity_id, Says("응답의 entity_id", english="the entity_id")),
+            ),
+            Same("host", node.host, STORAGE_HOST),
+            Same("status", node.status, "ready"),
+            Same("metadata.name", node.metadata.name, self.named),
+            Same("metadata.cloneable", node.metadata.cloneable, False),
+            Same("metadata.last_used", node.metadata.last_used, None),
+            Same(
+                "access_control.ownership_type",
+                node.access_control.ownership_type,
+                self.ownership_type,
+            ),
+            Held(
+                "ownership.user_id",
+                node.ownership.user_id,
+                SameAs[UUID | None](owner_id, Says("폴더 소유자", english="the folder owner")),
+            ),
+            Held(
+                "ownership.project_id",
+                node.ownership.project_id,
+                SameAs[UUID | None](
+                    laid.project.id,
+                    Says("폴더가 놓인 프로젝트", english="the project the folder landed in"),
+                ),
+            ),
+            Held(
+                "ownership.creator_id",
+                node.ownership.creator_id,
+                SameAs[UUID | None](laid.caller.id, Says("만든 사람", english="the creator")),
+            ),
+            Same("ownership.creator_email", node.ownership.creator_email, laid.caller.email),
+            Same("unmanaged_path", node.unmanaged_path, None),
+            Skipped(
+                "metadata.usage_mode",
+                Says("타입이 이미 값을 고정합니다", english="the type already fixes the value"),
+            ),
+            Skipped(
+                "metadata.quota_scope_id",
+                Says(
+                    "소유자의 id 로 만들어져 실행마다 다릅니다",
+                    english="it is made from the owner's id, so it differs per run",
+                ),
+            ),
+            Skipped(
+                "access_control.permission",
+                Says(
+                    "마운트 권한이라 이 표가 확인하는 값이 아닙니다",
+                    english="it is a mount permission, which this table does not check",
+                ),
+            ),
+            Skipped(
+                "quota",
+                Says(
+                    "저장소가 응답하는 값이라 여기서 말할 수 없습니다",
+                    english="the storage answers it, so it cannot be stated here",
+                ),
+            ),
+            Held("metadata.created_at", node.metadata.created_at, WrittenByThisRun(self.started)),
+        ]
+
+
+@dataclass(frozen=True)
 class TwoOwnFoldersAndAnothers:
     """자기 개인 폴더 둘과 남의 개인 폴더 하나, 그리고 그것들에 손대려는 사람."""
 
@@ -473,6 +893,8 @@ class SomeoneWithTwoFoldersAndAnothers(Given[Any, TwoOwnFoldersAndAnothers]):
     """
 
     permissions: tuple[Permission, ...] = ()
+    first_status: VFolderOperationStatus = VFolderOperationStatus.READY
+    second_status: VFolderOperationStatus = VFolderOperationStatus.READY
 
     @override
     def describe(self) -> str:
@@ -483,12 +905,36 @@ class SomeoneWithTwoFoldersAndAnothers(Given[Any, TwoOwnFoldersAndAnothers]):
         else:
             grant_ko = "아무 권한도 받지 않은"
             grant_en = "holding no permission"
+        states = (self.first_status, self.second_status)
+        if all(state is VFolderOperationStatus.READY for state in states):
+            folders_ko = "자기 개인 vfolder 둘을 가진"
+            folders_en = "with two personal vfolders of their own"
+        else:
+            one_ko = (
+                "사용할 수 있는 상태"
+                if states[0] is VFolderOperationStatus.READY
+                else states[0].value
+            )
+            two_ko = (
+                "사용할 수 있는 상태"
+                if states[1] is VFolderOperationStatus.READY
+                else states[1].value
+            )
+            one_en = "ready" if states[0] is VFolderOperationStatus.READY else states[0].value
+            two_en = "ready" if states[1] is VFolderOperationStatus.READY else states[1].value
+            folders_ko = (
+                f"{one_ko}의 자기 개인 vfolder 하나와 {two_ko}의 자기 개인 vfolder 하나를 가진"
+            )
+            folders_en = (
+                f"with one {one_en} personal vfolder of their own and one {two_en} personal "
+                "vfolder of their own"
+            )
         return Says(
-            f"자기 개인 vfolder 둘을 가진, {grant_ko} 사용자 한 명과, "
+            f"{folders_ko}, {grant_ko} 사용자 한 명과, "
             "그 사람에게 공유되지 않은 남의 개인 vfolder 하나",
             english=(
-                f"one user with two personal vfolders of their own, {grant_en}, and one "
-                "other user's personal vfolder not shared with them"
+                f"one user {folders_en}, {grant_en}, and one other user's personal vfolder not "
+                "shared with them"
             ),
         )
 
@@ -500,10 +946,14 @@ class SomeoneWithTwoFoldersAndAnothers(Given[Any, TwoOwnFoldersAndAnothers]):
         caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
         other = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
         first = await seeding.creating_from(
-            TestSeedPersonalVFolder(host=STORAGE_HOST, name_hint="first"), caller
+            TestSeedPersonalVFolder(host=STORAGE_HOST, name_hint="first", status=self.first_status),
+            caller,
         )
         second = await seeding.creating_from(
-            TestSeedPersonalVFolder(host=STORAGE_HOST, name_hint="second"), caller
+            TestSeedPersonalVFolder(
+                host=STORAGE_HOST, name_hint="second", status=self.second_status
+            ),
+            caller,
         )
         others = await seeding.creating_from(TestSeedPersonalVFolder(host=STORAGE_HOST), other)
         if self.permissions:
