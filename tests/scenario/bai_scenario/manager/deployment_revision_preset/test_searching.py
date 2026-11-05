@@ -94,8 +94,15 @@ class TheSeededPresetsComeBack(Then[PresetsAndACaller, Answer]):
             Same("has_next_page", page.has_next_page, False),
             Same("has_previous_page", page.has_previous_page, False),
         ]
-        for i, (node, preset) in enumerate(zip(page.items, laid.presets, strict=False)):
-            verdicts.extend(ThePresetNode(self.started).verdicts(node, preset, at=f"items[{i}]."))
+        by_id = {preset.id: preset for preset in laid.presets}
+        for i, node in enumerate(page.items):
+            preset = by_id.get(node.id)
+            if preset is None:
+                verdicts.append(Same(f"items[{i}].id", node.id, "a preset seeded in advance"))
+            else:
+                verdicts.extend(
+                    ThePresetNode(self.started).verdicts(node, preset, at=f"items[{i}].")
+                )
         return verdicts
 
 

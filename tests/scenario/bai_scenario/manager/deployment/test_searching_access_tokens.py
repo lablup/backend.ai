@@ -92,8 +92,13 @@ class TheTokenPageComesBack(Then[TokensOfADeploymentAndACaller, Answer]):
             Same("has_next_page", page.has_next_page, False),
             Same("has_previous_page", page.has_previous_page, False),
         ]
-        for i, (node, token) in enumerate(zip(page.items, laid.tokens, strict=False)):
-            verdicts += TheTokenNode(self.started).verdicts(node, token, f"items[{i}].")
+        by_id = {token.id: token for token in laid.tokens}
+        for i, node in enumerate(page.items):
+            token = by_id.get(node.id)
+            if token is None:
+                verdicts.append(Same(f"items[{i}].id", node.id, "a token the deployment holds"))
+            else:
+                verdicts += TheTokenNode(self.started).verdicts(node, token, f"items[{i}].")
         return verdicts
 
 

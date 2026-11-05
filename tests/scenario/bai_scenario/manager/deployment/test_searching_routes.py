@@ -91,10 +91,15 @@ class TheRoutePageComesBack(Then[ARoutedDeploymentAndACaller, Answer]):
             Same("has_next_page", page.has_next_page, False),
             Same("has_previous_page", page.has_previous_page, False),
         ]
+        by_id = {route.id: route for route in laid.routes}
         for i, node in enumerate(page.items):
-            verdicts += TheRouteNode(self.started, revision_id=laid.revision_id).verdicts(
-                node, laid.routes[i], f"items[{i}]."
-            )
+            route = by_id.get(node.id)
+            if route is None:
+                verdicts.append(Same(f"items[{i}].id", node.id, "a route the deployment holds"))
+            else:
+                verdicts += TheRouteNode(self.started, revision_id=laid.revision_id).verdicts(
+                    node, route, f"items[{i}]."
+                )
         return verdicts
 
 

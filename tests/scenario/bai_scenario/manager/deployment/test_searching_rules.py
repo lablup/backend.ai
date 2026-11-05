@@ -90,8 +90,13 @@ class TheRulePageComesBack(Then[RulesOfADeploymentAndACaller, Answer]):
             Same("has_next_page", page.has_next_page, False),
             Same("has_previous_page", page.has_previous_page, False),
         ]
-        for i, (node, rule) in enumerate(zip(page.items, laid.rules, strict=False)):
-            verdicts += TheRuleNode(self.started).verdicts(node, rule, f"items[{i}].")
+        by_id = {rule.id: rule for rule in laid.rules}
+        for i, node in enumerate(page.items):
+            rule = by_id.get(node.id)
+            if rule is None:
+                verdicts.append(Same(f"items[{i}].id", node.id, "a rule the deployment holds"))
+            else:
+                verdicts += TheRuleNode(self.started).verdicts(node, rule, f"items[{i}].")
         return verdicts
 
 
