@@ -233,7 +233,6 @@ When
 Then
 
 - every checker seeded in advance is counted once, and each whole checker comes back
-  - items.id = [IdleCheckerID('01a1acc0-0159-7195-8ff3-0ddd44ce1147'), IdleCheckerID('01a1acc0-016f-754f-875b-c255724bb08e')]
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False

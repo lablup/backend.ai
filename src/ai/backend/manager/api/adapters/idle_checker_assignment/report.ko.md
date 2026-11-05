@@ -156,16 +156,17 @@ When
 Then
 
 - 미리 저장한 할당이 모두 한 번씩 집계되어 전체가 반환됩니다
-  - items.id = [UUID('01a1acbf-8ba0-709f-8a94-8ca2981485e8'), UUID('01a1acbf-8bb2-75f7-aee1-77f8f789ffe5')]
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
+  - items[0].id: id 순으로 읽은 미리 저장한 할당와 같다
   - items[0].scope_type = <IdleCheckerScopeTypeDTO.DOMAIN: 'domain'>
   - items[0].scope_id: 미리 저장한 도메인와 같다
   - items[0].idle_checker_id: 미리 저장한 검사기와 같다
   - items[0].enabled = True
   - items[0].created_at: 이 실행이 쓴 시각
   - items[0].updated_at: 이 실행이 쓴 시각
+  - items[1].id: id 순으로 읽은 미리 저장한 할당와 같다
   - items[1].scope_type = <IdleCheckerScopeTypeDTO.DOMAIN: 'domain'>
   - items[1].scope_id: 미리 저장한 도메인와 같다
   - items[1].idle_checker_id: 미리 저장한 검사기와 같다
@@ -555,16 +556,17 @@ When
 Then
 
 - 미리 저장한 할당이 모두 한 번씩 집계되어 전체가 반환됩니다
-  - items.id = [UUID('01a1acbf-a6ef-710e-997b-169522a12af6'), UUID('01a1acbf-a700-7fe7-8c64-add4d28912af')]
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
+  - items[0].id: id 순으로 읽은 미리 저장한 할당와 같다
   - items[0].scope_type = <IdleCheckerScopeTypeDTO.DOMAIN: 'domain'>
   - items[0].scope_id: 미리 저장한 도메인와 같다
   - items[0].idle_checker_id: 미리 저장한 검사기와 같다
   - items[0].enabled = True
   - items[0].created_at: 이 실행이 쓴 시각
   - items[0].updated_at: 이 실행이 쓴 시각
+  - items[1].id: id 순으로 읽은 미리 저장한 할당와 같다
   - items[1].scope_type = <IdleCheckerScopeTypeDTO.DOMAIN: 'domain'>
   - items[1].scope_id: 미리 저장한 도메인와 같다
   - items[1].idle_checker_id: 미리 저장한 검사기와 같다

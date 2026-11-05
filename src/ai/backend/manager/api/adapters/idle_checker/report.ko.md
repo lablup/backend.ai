@@ -233,7 +233,6 @@ When
 Then
 
 - 미리 저장한 검사기가 모두 한 번씩 집계되어 전체가 반환됩니다
-  - items.id = [IdleCheckerID('01a1acc0-0159-7195-8ff3-0ddd44ce1147'), IdleCheckerID('01a1acc0-016f-754f-875b-c255724bb08e')]
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False

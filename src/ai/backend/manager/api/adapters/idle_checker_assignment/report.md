@@ -156,16 +156,17 @@ When
 Then
 
 - every assignment seeded in advance is counted once and each comes back whole
-  - items.id = [UUID('01a1acbf-8ba0-709f-8a94-8ca2981485e8'), UUID('01a1acbf-8bb2-75f7-aee1-77f8f789ffe5')]
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
+  - items[0].id: same as the seeded assignment in the order read by id
   - items[0].scope_type = <IdleCheckerScopeTypeDTO.DOMAIN: 'domain'>
   - items[0].scope_id: same as the domain seeded in advance
   - items[0].idle_checker_id: same as the checker seeded in advance
   - items[0].enabled = True
   - items[0].created_at: the time this run wrote
   - items[0].updated_at: the time this run wrote
+  - items[1].id: same as the seeded assignment in the order read by id
   - items[1].scope_type = <IdleCheckerScopeTypeDTO.DOMAIN: 'domain'>
   - items[1].scope_id: same as the domain seeded in advance
   - items[1].idle_checker_id: same as the checker seeded in advance
@@ -555,16 +556,17 @@ When
 Then
 
 - every assignment seeded in advance is counted once and each comes back whole
-  - items.id = [UUID('01a1acbf-a6ef-710e-997b-169522a12af6'), UUID('01a1acbf-a700-7fe7-8c64-add4d28912af')]
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
+  - items[0].id: same as the seeded assignment in the order read by id
   - items[0].scope_type = <IdleCheckerScopeTypeDTO.DOMAIN: 'domain'>
   - items[0].scope_id: same as the domain seeded in advance
   - items[0].idle_checker_id: same as the checker seeded in advance
   - items[0].enabled = True
   - items[0].created_at: the time this run wrote
   - items[0].updated_at: the time this run wrote
+  - items[1].id: same as the seeded assignment in the order read by id
   - items[1].scope_type = <IdleCheckerScopeTypeDTO.DOMAIN: 'domain'>
   - items[1].scope_id: same as the domain seeded in advance
   - items[1].idle_checker_id: same as the checker seeded in advance
