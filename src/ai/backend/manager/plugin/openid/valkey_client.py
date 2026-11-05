@@ -22,7 +22,7 @@ from .exceptions import InvalidSession
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-_SESSION_KEY_EXPIRATION: Final[int] = 3600  # 1 hour
+SESSION_KEY_EXPIRATION: Final[int] = 3600  # 1 hour
 
 
 class ValkeyOpenIDClient:
@@ -93,7 +93,7 @@ class ValkeyOpenIDClient:
             await conn.set(
                 key,
                 verifier,
-                expiry=ExpirySet(ExpiryType.SEC, _SESSION_KEY_EXPIRATION),
+                expiry=ExpirySet(ExpiryType.SEC, SESSION_KEY_EXPIRATION),
             )
 
     async def get_openid_key(self, session_key: str) -> str:

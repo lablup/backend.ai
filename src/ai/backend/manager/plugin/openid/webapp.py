@@ -2,6 +2,7 @@ import base64
 import json
 import logging
 import random
+import secrets
 import string
 import time
 import urllib.parse
@@ -59,13 +60,22 @@ from .exceptions import (
     OpenIDProviderUnavailable,
     OpenIDRedirectError,
 )
-from .valkey_client import ValkeyOpenIDClient
+from .valkey_client import SESSION_KEY_EXPIRATION, ValkeyOpenIDClient
 
 log = StructuredLogger(logging.getLogger(__name__))
 
 scope = "openid profile email"
 _CALLBACK_PATH: Final[str] = "/func/openid/redirect"
 _RESULT_QUERY_KEYS: Final[tuple[str, ...]] = ("bai_error", "sToken")
+_PROVIDER_METADATA_KEYS: Final[tuple[str, ...]] = (
+    "issuer",
+    "authorization_endpoint",
+    "token_endpoint",
+    "jwks_uri",
+)
+# Binds the state of a sign-in to the browser that started it.
+_SESSION_COOKIE: Final[str] = "bai_openid_session"
+_SESSION_COOKIE_PATH: Final[str] = "/func/openid"
 
 
 async def ping(_request: web.Request) -> web.Response:
@@ -246,10 +256,10 @@ class OIDCWebAppPlugin(WebappPlugin):
             async with aiohttp.ClientSession() as sess:
                 async with sess.get(openid_config.well_known) as resp:
                     app["openid.well_known"] = await resp.json()
-                    for key in ("authorization_endpoint", "token_endpoint", "jwks_uri"):
+                    for key in _PROVIDER_METADATA_KEYS:
                         app[f"openid.{key}"] = app["openid.well_known"][key]
         else:
-            for key in ("authorization_endpoint", "token_endpoint", "jwks_uri"):
+            for key in _PROVIDER_METADATA_KEYS:
                 value = getattr(openid_config, key)
                 if value is None:
                     raise OpenIDEndpointNotConfigured(
@@ -331,12 +341,22 @@ class OIDCWebAppPlugin(WebappPlugin):
             redirect_uri=self._callback_uri(),
         )
 
-        return web.Response(
+        response = web.Response(
             status=HTTPStatus.FOUND,
             headers={"Location": uri},
             # Legacy body that aiohttp's HTTP*Redirect filled in.
             text=f"{HTTPStatus.FOUND.value}: {HTTPStatus.FOUND.phrase}",
         )
+        response.set_cookie(
+            _SESSION_COOKIE,
+            session_key,
+            max_age=SESSION_KEY_EXPIRATION,
+            path=_SESSION_COOKIE_PATH,
+            secure=yarl.URL(self._config.login_uri).scheme == "https",
+            httponly=True,
+            samesite="Lax",
+        )
+        return response
 
     async def redirect(self, request: web.Request) -> web.Response:
         state = urllib.parse.parse_qs(request.query.get("state", ""))
@@ -345,11 +365,14 @@ class OIDCWebAppPlugin(WebappPlugin):
             stoken = await self._authorize(request, state)
         except OpenIDRedirectError as e:
             self._log_authorization_failure(e)
-            return self._redirect_to(redirect_uri, {"bai_error": e.error_slug()})
+            response = self._redirect_to(redirect_uri, {"bai_error": e.error_slug()})
         except Exception:
             log.exception("openid authorization failed")
-            return self._redirect_to(redirect_uri, {"bai_error": "internal-server-error"})
-        return self._redirect_to(redirect_uri, {"sToken": stoken})
+            response = self._redirect_to(redirect_uri, {"bai_error": "internal-server-error"})
+        else:
+            response = self._redirect_to(redirect_uri, {"sToken": stoken})
+        response.del_cookie(_SESSION_COOKIE, path=_SESSION_COOKIE_PATH)
+        return response
 
     def _callback_uri(self) -> str:
         return str(yarl.URL(self._config.login_uri).with_path(_CALLBACK_PATH))
@@ -422,6 +445,12 @@ class OIDCWebAppPlugin(WebappPlugin):
             text=f"{HTTPStatus.FOUND.value}: {HTTPStatus.FOUND.phrase}",
         )
 
+    def _expected_issuer(self, issuer: str, claims: Mapping[str, Any]) -> str:
+        """Fill the ``{tenantid}`` placeholder of Azure multi-tenant discovery with the token's tid."""
+        if "{tenantid}" in issuer:
+            return issuer.replace("{tenantid}", str(claims.get("tid", "")))
+        return issuer
+
     async def _authorize(self, request: web.Request, state: Mapping[str, list[str]]) -> str:
         if "error" in request.query:
             callback_error = OAuthError(
@@ -431,6 +460,11 @@ class OIDCWebAppPlugin(WebappPlugin):
             raise self._provider_error(callback_error) from callback_error
         if "session" not in state:
             raise InvalidSession(reason="OpenID state carries no session")
+        session_cookie = request.cookies.get(_SESSION_COOKIE)
+        if session_cookie is None or not secrets.compare_digest(
+            session_cookie, state["session"][0]
+        ):
+            raise InvalidSession(reason="OpenID state was not issued to this browser")
 
         root_app = request.app["_root_app"]
         config_provider = root_app["_config_provider"]
@@ -459,7 +493,15 @@ class OIDCWebAppPlugin(WebappPlugin):
                 token["id_token"],
                 KeySet.import_key_set(request.app["openid.jwks"]),
             )
-            claims = CodeIDToken(id_token.claims, id_token.header)
+            expected_issuer = self._expected_issuer(request.app["openid.issuer"], id_token.claims)
+            claims = CodeIDToken(
+                id_token.claims,
+                id_token.header,
+                options={
+                    "iss": {"essential": True, "value": expected_issuer},
+                    "aud": {"essential": True, "value": openid_config.client_id},
+                },
+            )
             claims.validate()
         except Exception as e:
             raise OpenIDAuthenticationFailed from e

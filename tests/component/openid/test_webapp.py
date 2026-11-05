@@ -6,6 +6,7 @@ import base64
 import hashlib
 import urllib.parse
 import uuid
+from collections.abc import Callable
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -31,7 +32,7 @@ from ai.backend.manager.plugin.openid.webapp import (
 )
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 
-from .conftest import ClientCertificate
+from .conftest import IDP_ISSUER, ClientCertificate
 
 # ===========================================================================
 # TestGenerateUserData — pure function, no DB needed
@@ -300,6 +301,29 @@ class TestWebAppLogin:
 
         assert state["redirect"] == "https://app.example.com/login"
 
+    async def test_login_binds_session_to_browser_cookie(
+        self,
+        webapp_plugin: OIDCWebAppPlugin,
+        login_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+    ) -> None:
+        with patch(
+            "ai.backend.manager.plugin.openid.webapp.AsyncOAuth2Client",
+            return_value=mock_oauth2_client,
+        ):
+            response = await webapp_plugin.login(login_request)
+
+        state = dict(
+            urllib.parse.parse_qsl(
+                mock_oauth2_client.create_authorization_url.call_args.kwargs["state"]
+            )
+        )
+        cookie = response.cookies["bai_openid_session"]
+        assert cookie.value == state["session"]
+        assert cookie["path"] == "/func/openid"
+        assert cookie["httponly"]
+        assert cookie["samesite"] == "Lax"
+
 
 # ===========================================================================
 # TestWebAppRedirect — real DB + Valkey, mock OAuth2Client
@@ -324,12 +348,14 @@ class TestWebAppRedirect:
 
         request = MagicMock()
         request.query = {"state": state, "code": "auth-code-123"}
+        request.cookies = {"bai_openid_session": session_key}
         request.url = (
             f"https://app.example.com/func/openid/redirect"
             f"?state={urllib.parse.quote(state)}&code=auth-code-123"
         )
         request.app = {
             "_root_app": mock_root_app,
+            "openid.issuer": IDP_ISSUER,
             "openid.token_endpoint": "https://idp.example.com/token",
             "openid.jwks": oidc_jwks,
             "valkey_client": valkey_client,
@@ -528,13 +554,15 @@ class TestWebAppRedirect:
         redirect_request: MagicMock,
         mock_oauth2_client: MagicMock,
     ) -> None:
+        expired_session = str(uuid.uuid4())
         redirect_request.query = {
             "state": urllib.parse.urlencode({
                 "redirect": "https://app.example.com/dashboard",
-                "session": str(uuid.uuid4()),
+                "session": expired_session,
             }),
             "code": "auth-code-123",
         }
+        redirect_request.cookies = {"bai_openid_session": expired_session}
 
         location = await self._redirect(webapp_plugin, redirect_request, mock_oauth2_client)
 
@@ -554,6 +582,95 @@ class TestWebAppRedirect:
         assert str(location.with_query(None)) == "https://app.example.com/login"
         assert location.query["bai_error"] == "invalid-openid-session"
         mock_oauth2_client.fetch_token.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "cookies",
+        [{}, {"bai_openid_session": "session-of-another-sign-in"}],
+        ids=["missing", "mismatched"],
+    )
+    async def test_redirect_rejects_state_not_issued_to_browser(
+        self,
+        webapp_plugin: OIDCWebAppPlugin,
+        redirect_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+        cookies: dict[str, str],
+    ) -> None:
+        redirect_request.cookies = cookies
+
+        location = await self._redirect(webapp_plugin, redirect_request, mock_oauth2_client)
+
+        assert location.query["bai_error"] == "invalid-openid-session"
+        assert "sToken" not in location.query
+        mock_oauth2_client.fetch_token.assert_not_called()
+
+    @pytest.fixture
+    def respond_with_id_token(
+        self,
+        mock_oauth2_client: MagicMock,
+        oidc_token_response: dict[str, Any],
+        oidc_id_token_claims: dict[str, Any],
+        sign_id_token: Callable[..., str],
+    ) -> Callable[[dict[str, Any]], None]:
+        """Make the token endpoint return an id_token with ``overrides`` applied to its claims."""
+
+        def _respond(overrides: dict[str, Any]) -> None:
+            claims = {**oidc_id_token_claims, **overrides}
+            mock_oauth2_client.fetch_token = AsyncMock(
+                return_value={**oidc_token_response, "id_token": sign_id_token(claims)}
+            )
+
+        return _respond
+
+    @pytest.mark.parametrize(
+        "overrides",
+        [{"iss": "https://other-idp.example.com"}, {"aud": "other-client-id"}],
+        ids=["iss", "aud"],
+    )
+    async def test_redirect_rejects_id_token_for_other_issuer_or_client(
+        self,
+        webapp_plugin: OIDCWebAppPlugin,
+        redirect_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+        respond_with_id_token: Callable[[dict[str, Any]], None],
+        overrides: dict[str, Any],
+    ) -> None:
+        respond_with_id_token(overrides)
+
+        location = await self._redirect(webapp_plugin, redirect_request, mock_oauth2_client)
+
+        assert location.query["bai_error"] == "openid-not-authenticated"
+        assert "sToken" not in location.query
+
+    @pytest.mark.parametrize(
+        ("overrides", "accepted"),
+        [
+            (
+                {"iss": "https://login.microsoftonline.com/tenant-a/v2.0", "tid": "tenant-a"},
+                True,
+            ),
+            (
+                {"iss": "https://login.microsoftonline.com/tenant-b/v2.0", "tid": "tenant-a"},
+                False,
+            ),
+            ({"iss": "https://login.microsoftonline.com/tenant-a/v2.0"}, False),
+        ],
+        ids=["tid-matches-iss", "tid-differs-from-iss", "no-tid"],
+    )
+    async def test_redirect_fills_azure_tenant_placeholder_from_tid(
+        self,
+        webapp_plugin: OIDCWebAppPlugin,
+        redirect_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+        respond_with_id_token: Callable[[dict[str, Any]], None],
+        overrides: dict[str, Any],
+        accepted: bool,
+    ) -> None:
+        redirect_request.app["openid.issuer"] = "https://login.microsoftonline.com/{tenantid}/v2.0"
+        respond_with_id_token(overrides)
+
+        location = await self._redirect(webapp_plugin, redirect_request, mock_oauth2_client)
+
+        assert ("sToken" in location.query) is accepted
 
 
 # ===========================================================================
