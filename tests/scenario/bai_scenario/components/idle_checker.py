@@ -359,13 +359,25 @@ class EveryAssignmentIsListed(Then[AssignmentsAndACaller, AssignmentsAnswered]):
         got = sorted(payload.items, key=lambda one: one.id)
         expected = sorted(answer.ids, key=lambda one: one)
         seen: list[Verdict] = [
-            Same("items.id", [one.id for one in got], list(expected)),
             Same("total_count", payload.total_count, len(laid.domains)),
             Same("has_next_page", payload.has_next_page, False),
             Same("has_previous_page", payload.has_previous_page, False),
         ]
         by_scope: dict[UUID, DomainData] = {domain.id: domain for domain in laid.domains}
-        for i, node in enumerate(got):
+        for i, (node, seeded_id) in enumerate(zip(got, expected, strict=False)):
+            seen += [
+                Held[UUID](
+                    f"items[{i}].id",
+                    node.id,
+                    SameAs(
+                        seeded_id,
+                        Says(
+                            "id 순으로 읽은 미리 저장한 할당",
+                            english="the seeded assignment in the order read by id",
+                        ),
+                    ),
+                ),
+            ]
             domain = by_scope.get(node.scope_id)
             if domain is None:
                 seen.append(

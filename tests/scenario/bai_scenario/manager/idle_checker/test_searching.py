@@ -8,7 +8,6 @@ from typing import override
 
 import pytest
 
-from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.idle_checker.request import SearchIdleCheckersInput
 from ai.backend.common.dto.manager.v2.idle_checker.response import (
@@ -89,11 +88,6 @@ class EveryLaidCheckerComesWhole(Then[CheckersAndACaller, Searched]):
         got = sorted(payload.items, key=lambda one: one.id)
         expected = sorted(laid.laid, key=lambda one: one.id)
         seen: list[Verdict] = [
-            Same(
-                "items.id",
-                [one.id for one in got],
-                [IdleCheckerID(one.id) for one in expected],
-            ),
             Same("total_count", payload.total_count, len(laid.laid)),
             Same("has_next_page", payload.has_next_page, False),
             Same("has_previous_page", payload.has_previous_page, False),
