@@ -20,7 +20,8 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 프리셋 여럿과 없는 id 하나를 한 번에 읽으면, 요청한 순서대로 프리셋이 오고 없는 id 의 자리는 비어 있습니다](#reading-the-superadmin-reads-several-presets-by-id) | 성공 |
+| [superadmin 이 프리셋 여럿과 없는 id 하나를 한 번에 읽으면, 프리셋은 요청한 순서대로 오고 없는 id 의 자리는 비어 있습니다](#reading-a-superadmin-loading-an-unknown-preset-id-finds-it-empty) | 성공 |
+| [public 에서 프리셋을 읽을 수 있는 사용자가 프리셋 여럿을 id 로 한 번에 읽으면, 요청한 순서대로 프리셋이 옵니다](#reading-a-user-reading-presets-reads-several-presets-by-id) | 성공 |
 | [아무 권한도 받지 않은 사용자가 id 여럿으로 프리셋을 읽으면, 호출은 거부되지 않고 물은 자리마다 권한 부족 거부가 옵니다](#reading-a-user-granted-nothing-batch-loading-presets-is-refused-per-item) | 거부 |
 
 **get**
@@ -59,7 +60,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 프리셋을 자원 그룹에 묶으면, 그 그룹 이름을 가진 프리셋이 반환되고 나머지 값은 그대로입니다](#applying_resource_group-the-superadmin-binds-a-preset-to-a-resource-group) | 성공 |
+| [public 에서 프리셋과 public 스코프 자체를 고칠 수 있는 사용자가 프리셋을 자원 그룹에 묶으면, 그 그룹 이름을 가진 프리셋이 반환되고 나머지 값은 그대로입니다](#applying_resource_group-a-user-granted-update-binds-a-preset-to-a-resource-group) | 성공 |
 | [아무 권한도 받지 않은 사용자가 프리셋을 자원 그룹에 묶으려 하면 권한 부족으로 거부됩니다](#applying_resource_group-a-user-granted-nothing-may-not-bind-a-preset-to-a-resource-group) | 거부 |
 
 **create**
@@ -89,11 +90,11 @@
 
 ### batch_load_by_ids
 
-<a id="reading-the-superadmin-reads-several-presets-by-id"></a>
+<a id="reading-a-superadmin-loading-an-unknown-preset-id-finds-it-empty"></a>
 
-#### [the-superadmin-reads-several-presets-by-id](/tests/scenario/bai_scenario/manager/resource_preset/test_reading.py): pass
+#### [a-superadmin-loading-an-unknown-preset-id-finds-it-empty](/tests/scenario/bai_scenario/manager/resource_preset/test_reading.py): pass
 
-superadmin 이 프리셋 여럿과 없는 id 하나를 한 번에 읽으면, 요청한 순서대로 프리셋이 오고 없는 id 의 자리는 비어 있습니다
+superadmin 이 프리셋 여럿과 없는 id 하나를 한 번에 읽으면, 프리셋은 요청한 순서대로 오고 없는 id 의 자리는 비어 있습니다
 
 Given
 
@@ -128,6 +129,49 @@ Then
   - items[1].shared_memory = None
   - items[1].resource_group_name = None
   - items[2] = None
+
+<a id="reading-a-user-reading-presets-reads-several-presets-by-id"></a>
+
+#### [a-user-reading-presets-reads-several-presets-by-id](/tests/scenario/bai_scenario/manager/resource_preset/test_reading.py): pass
+
+public 에서 프리셋을 읽을 수 있는 사용자가 프리셋 여럿을 id 로 한 번에 읽으면, 요청한 순서대로 프리셋이 옵니다
+
+Given
+
+- 프리셋 2개와 public 에서 READ 권한을 받은 일반 사용자 한 명
+  - 자원 프리셋 preset-1: 자원 그룹에 묶이지 않아 public 에 속합니다
+  - 자원 프리셋 preset-2: 자원 그룹에 묶이지 않아 public 에 속합니다
+  - 도메인 home-1
+  - public 에서 리소스 프리셋 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 preset-writer-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 preset-writer-1: resource_preset 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 preset-writer-1 보유
+
+When
+
+- ResourcePresetAdapter.batch_load_by_ids: user-1이 프리셋 2개의 id 로 여럿을 읽습니다
+
+Then
+
+- 요청한 순서대로 프리셋 전체가 응답으로 옵니다
+  - len(items) = 2
+  - items[0].id: 미리 저장한 프리셋의 id 와 같다
+  - items[0].entity_id: 미리 저장한 프리셋의 id 와 같다
+  - items[0].name = 'preset-1'
+  - items[0].resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
+  - items[0].shared_memory = None
+  - items[0].resource_group_name = None
+  - items[1].id: 미리 저장한 프리셋의 id 와 같다
+  - items[1].entity_id: 미리 저장한 프리셋의 id 와 같다
+  - items[1].name = 'preset-2'
+  - items[1].resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
+  - items[1].shared_memory = None
+  - items[1].resource_group_name = None
 
 <a id="reading-a-user-granted-nothing-batch-loading-presets-is-refused-per-item"></a>
 
@@ -563,23 +607,28 @@ Then
 
 ### apply_resource_group
 
-<a id="applying_resource_group-the-superadmin-binds-a-preset-to-a-resource-group"></a>
+<a id="applying_resource_group-a-user-granted-update-binds-a-preset-to-a-resource-group"></a>
 
-#### [the-superadmin-binds-a-preset-to-a-resource-group](/tests/scenario/bai_scenario/manager/resource_preset/test_applying_resource_group.py): pass
+#### [a-user-granted-update-binds-a-preset-to-a-resource-group](/tests/scenario/bai_scenario/manager/resource_preset/test_applying_resource_group.py): pass
 
-superadmin 이 프리셋을 자원 그룹에 묶으면, 그 그룹 이름을 가진 프리셋이 반환되고 나머지 값은 그대로입니다
+public 에서 프리셋과 public 스코프 자체를 고칠 수 있는 사용자가 프리셋을 자원 그룹에 묶으면, 그 그룹 이름을 가진 프리셋이 반환되고 나머지 값은 그대로입니다
 
 Given
 
-- 프리셋 하나와 자원 그룹 하나, 그리고 superadmin 한 명
+- 프리셋 하나와 자원 그룹 하나, 그리고 public 에서 UPDATE 권한과 public 스코프 자체에 대한 UPDATE 권한을 받은 일반 사용자 한 명
   - 자원 프리셋 preset-1: 자원 그룹에 묶이지 않아 public 에 속합니다
   - 자원 그룹 group-1: fifo 스케줄러를 사용합니다
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - public 에서 리소스 프리셋 UPDATE 권한과 public 스코프 자체에 대한 UPDATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 preset-writer-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 preset-writer-1: resource_preset 전체에 UPDATE 허용
+    - 역할 preset-writer-1: global 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 preset-writer-1 보유
 
 When
 

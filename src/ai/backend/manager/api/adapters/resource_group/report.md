@@ -243,8 +243,8 @@ Scenario: incomplete 2 / 25
 
 | scenario | verdict |
 |---|---|
+| [when a user granted update in the group scope assigns a weight to one resource type, the whole group comes back. the returned node does not carry this config](#fair_share-a-user-granted-update-assigns-a-resource-weight) | answered |
 | [a user granted update through the role granted on the resource group changing the half-life gets the whole group](#fair_share-a-user-granted-update-on-the-group-changes-its-fair-share-spec) | answered |
-| [when the superadmin assigns a weight to one resource type, the whole group comes back. the returned node does not carry this config](#fair_share-the-superadmin-assigns-a-resource-weight) | answered |
 | [when the superadmin changes the half-life, the whole group comes back. the returned node does not carry this config](#fair_share-the-superadmin-changes-the-fair-share-half-life) | answered |
 | [a user granted nothing trying to change the half-life is rejected for not enough permission](#fair_share-a-user-granted-nothing-may-not-change-the-fair-share-spec) | rejected |
 | [assigning a weight to a resource type no agent reports is rejected as an invalid input](#fair_share-a-weight-on-a-resource-no-agent-reports-is-rejected) | rejected |
@@ -3058,6 +3058,56 @@ Then
 
 ### update_fair_share_spec
 
+<a id="fair_share-a-user-granted-update-assigns-a-resource-weight"></a>
+
+#### [a-user-granted-update-assigns-a-resource-weight](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
+
+when a user granted update in the group scope assigns a weight to one resource type, the whole group comes back. the returned node does not carry this config
+
+Given
+
+- one resource group and one regular user granted the UPDATE role in the group scope. the group's agent reports one resource slot type with its capacity
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Resource slot type slot-1: count type
+  - Agent agent-1: alive, and has not reported any slot yet
+  - Agent agent-1: slot-1 slot capacity 10 reported, 0 in use
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the UPDATE role in the resource group scope
+    - Role group-role-1: applies only within the scope it is granted in
+    - Role group-role-1: UPDATE allowed on every resource_group
+    - regular user user-1: holds Role group-role-1
+
+When
+
+- ResourceGroupAdapter.update_fair_share_spec: user-1 assigns a weight to slot-1 on resource-group-1
+
+Then
+
+- the whole resource group seeded in advance comes back
+  - id: skipped: the database generates it
+  - name = 'resource-group-1'
+  - status.is_active = True
+  - status.is_public = True
+  - status.is_default = False
+  - metadata.description = None
+  - metadata.created_at: the time this run wrote
+  - network.wsproxy_addr = None
+  - network.use_host_network = False
+  - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
+  - scheduler.preemption.enabled = False
+  - scheduler.preemption.preemptible_priority = 5
+  - scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
+  - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
+  - scheduler.preemption.preemption_min_runtime = 0.0
+  - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
+
 <a id="fair_share-a-user-granted-update-on-the-group-changes-its-fair-share-spec"></a>
 
 #### [a-user-granted-update-on-the-group-changes-its-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
@@ -3082,52 +3132,6 @@ Given
 When
 
 - ResourceGroupAdapter.update_fair_share_spec: user-1 changes the half-life in the fair share config of resource-group-1
-
-Then
-
-- the whole resource group seeded in advance comes back
-  - id: skipped: the database generates it
-  - name = 'resource-group-1'
-  - status.is_active = True
-  - status.is_public = True
-  - status.is_default = False
-  - metadata.description = None
-  - metadata.created_at: the time this run wrote
-  - network.wsproxy_addr = None
-  - network.use_host_network = False
-  - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
-  - scheduler.preemption.enabled = False
-  - scheduler.preemption.preemptible_priority = 5
-  - scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
-  - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
-  - scheduler.preemption.preemption_min_runtime = 0.0
-  - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: skipped: the default the installation sets
-  - default_session_options: skipped: the default the installation sets
-
-<a id="fair_share-the-superadmin-assigns-a-resource-weight"></a>
-
-#### [the-superadmin-assigns-a-resource-weight](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
-
-when the superadmin assigns a weight to one resource type, the whole group comes back. the returned node does not carry this config
-
-Given
-
-- one resource group and one superadmin. the group's agent reports one resource slot type with its capacity
-  - Domain home-1
-  - Resource group resource-group-1: uses the fifo scheduler
-  - Resource slot type slot-1: count type
-  - Agent agent-1: alive, and has not reported any slot yet
-  - Agent agent-1: slot-1 slot capacity 10 reported, 0 in use
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- ResourceGroupAdapter.update_fair_share_spec: user-1 assigns a weight to slot-1 on resource-group-1
 
 Then
 
@@ -3228,14 +3232,18 @@ assigning a weight to a resource type no agent reports is rejected as an invalid
 
 Given
 
-- one resource group and one superadmin
+- one resource group and one regular user granted the UPDATE role in the group scope
   - Domain home-1
   - Resource group resource-group-1: uses the fifo scheduler
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the UPDATE role in the resource group scope
+    - Role group-role-1: applies only within the scope it is granted in
+    - Role group-role-1: UPDATE allowed on every resource_group
+    - regular user user-1: holds Role group-role-1
 
 When
 

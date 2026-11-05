@@ -243,8 +243,8 @@
 
 | 시나리오 | 판정 |
 |---|---|
+| [그룹 범위에서 수정 권한을 받은 사용자가 슬롯 종류 하나의 가중치를 지정하면 그룹 전체가 반환됩니다. 반환되는 노드에는 이 설정이 담기지 않습니다](#fair_share-a-user-granted-update-assigns-a-resource-weight) | 성공 |
 | [그 자원 그룹에 부여된 역할로 수정 권한을 받은 사용자가 반감기를 바꾸면 그룹 전체가 반환됩니다](#fair_share-a-user-granted-update-on-the-group-changes-its-fair-share-spec) | 성공 |
-| [superadmin 이 슬롯 종류 하나의 가중치를 지정하면 그룹 전체가 반환됩니다. 반환되는 노드에는 이 설정이 담기지 않습니다](#fair_share-the-superadmin-assigns-a-resource-weight) | 성공 |
 | [superadmin 이 반감기를 바꾸면 그룹 전체가 반환됩니다. 반환되는 노드에는 이 설정이 담기지 않습니다](#fair_share-the-superadmin-changes-the-fair-share-half-life) | 성공 |
 | [아무 권한도 없는 사용자가 반감기를 바꾸려 하면 권한 부족으로 거부됩니다](#fair_share-a-user-granted-nothing-may-not-change-the-fair-share-spec) | 거부 |
 | [에이전트가 보고하지 않은 슬롯 종류에 가중치를 지정하면 입력이 잘못되었다는 것으로 거부됩니다](#fair_share-a-weight-on-a-resource-no-agent-reports-is-rejected) | 거부 |
@@ -3058,6 +3058,56 @@ Then
 
 ### update_fair_share_spec
 
+<a id="fair_share-a-user-granted-update-assigns-a-resource-weight"></a>
+
+#### [a-user-granted-update-assigns-a-resource-weight](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
+
+그룹 범위에서 수정 권한을 받은 사용자가 슬롯 종류 하나의 가중치를 지정하면 그룹 전체가 반환됩니다. 반환되는 노드에는 이 설정이 담기지 않습니다
+
+Given
+
+- 리소스 그룹 하나와, 그 그룹 범위의 UPDATE 역할을 받은 일반 사용자 한 명. 그 그룹의 에이전트가 슬롯 종류 하나를 용량과 함께 보고합니다
+  - 도메인 home-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 자원 슬롯 유형 slot-1: count 유형
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없습니다
+  - 에이전트 agent-1: slot-1 슬롯 용량 10 보고, 0 사용 중
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 리소스 그룹 범위의 UPDATE 역할을 받은 사용자 준비
+    - 역할 group-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 group-role-1: resource_group 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 group-role-1 보유
+
+When
+
+- ResourceGroupAdapter.update_fair_share_spec: user-1이 resource-group-1의 slot-1 가중치를 지정합니다
+
+Then
+
+- 미리 저장한 리소스 그룹 전체가 반환됩니다
+  - id: 건너뜀: 데이터베이스가 생성합니다
+  - name = 'resource-group-1'
+  - status.is_active = True
+  - status.is_public = True
+  - status.is_default = False
+  - metadata.description = None
+  - metadata.created_at: 이 실행이 쓴 시각
+  - network.wsproxy_addr = None
+  - network.use_host_network = False
+  - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
+  - scheduler.preemption.enabled = False
+  - scheduler.preemption.preemptible_priority = 5
+  - scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
+  - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
+  - scheduler.preemption.preemption_min_runtime = 0.0
+  - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - default_deployment_options: 건너뜀: 설치본이 정한 기본값입니다
+  - default_session_options: 건너뜀: 설치본이 정한 기본값입니다
+
 <a id="fair_share-a-user-granted-update-on-the-group-changes-its-fair-share-spec"></a>
 
 #### [a-user-granted-update-on-the-group-changes-its-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
@@ -3082,52 +3132,6 @@ Given
 When
 
 - ResourceGroupAdapter.update_fair_share_spec: user-1이 resource-group-1의 fair share 설정에서 반감기를 수정합니다
-
-Then
-
-- 미리 저장한 리소스 그룹 전체가 반환됩니다
-  - id: 건너뜀: 데이터베이스가 생성합니다
-  - name = 'resource-group-1'
-  - status.is_active = True
-  - status.is_public = True
-  - status.is_default = False
-  - metadata.description = None
-  - metadata.created_at: 이 실행이 쓴 시각
-  - network.wsproxy_addr = None
-  - network.use_host_network = False
-  - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
-  - scheduler.preemption.enabled = False
-  - scheduler.preemption.preemptible_priority = 5
-  - scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
-  - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
-  - scheduler.preemption.preemption_min_runtime = 0.0
-  - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 건너뜀: 설치본이 정한 기본값입니다
-  - default_session_options: 건너뜀: 설치본이 정한 기본값입니다
-
-<a id="fair_share-the-superadmin-assigns-a-resource-weight"></a>
-
-#### [the-superadmin-assigns-a-resource-weight](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
-
-superadmin 이 슬롯 종류 하나의 가중치를 지정하면 그룹 전체가 반환됩니다. 반환되는 노드에는 이 설정이 담기지 않습니다
-
-Given
-
-- 리소스 그룹 하나와, superadmin 한 명. 그 그룹의 에이전트가 슬롯 종류 하나를 용량과 함께 보고합니다
-  - 도메인 home-1
-  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
-  - 자원 슬롯 유형 slot-1: count 유형
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없습니다
-  - 에이전트 agent-1: slot-1 슬롯 용량 10 보고, 0 사용 중
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- ResourceGroupAdapter.update_fair_share_spec: user-1이 resource-group-1의 slot-1 가중치를 지정합니다
 
 Then
 
@@ -3228,14 +3232,18 @@ Then
 
 Given
 
-- 리소스 그룹 하나와, superadmin 한 명
+- 리소스 그룹 하나와, 그 그룹 범위의 UPDATE 역할을 받은 일반 사용자 한 명
   - 도메인 home-1
   - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 리소스 그룹 범위의 UPDATE 역할을 받은 사용자 준비
+    - 역할 group-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 group-role-1: resource_group 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 group-role-1 보유
 
 When
 

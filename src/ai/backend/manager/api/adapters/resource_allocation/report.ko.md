@@ -6,8 +6,8 @@
 
 - 직접 구현 (12)
   - admin_domain_usage: 성공 있음 1 · 거부 있음 1 (single_entity)
-  - admin_effective_allocation: 성공 없음 · 거부 있음 1 (scope): SCENARIO-GAP
-  - admin_effective_allocation_resolved: 성공 없음 · 거부 있음 1 (scope, single_entity): SCENARIO-GAP
+  - admin_effective_allocation: 성공 없음 · 거부 없음 (scope): SCENARIO-GAP
+  - admin_effective_allocation_resolved: 성공 없음 · 거부 없음 (scope, single_entity): SCENARIO-GAP
   - check_preset_availability: 성공 있음 1 · 거부 있음 1 (scope)
   - check_preset_availability_for_current_user: 성공 있음 1 · 거부 있음 1 (scope, single_entity)
   - effective_allocation: 성공 있음 3 · 거부 있음 1 (scope)
@@ -22,33 +22,21 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 도메인의 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 오고 사용량은 0 입니다](#usage-the-superadmin-reads-a-domains-usage) | 성공 |
-| [superadmin 이 없는 이름의 도메인 사용량을 읽으면 대상이 없다는 것으로 거부됩니다](#usage-reading-the-usage-of-a-domain-nothing-answers-to-is-not-found) | 거부 |
-
-**admin_effective_allocation**
-
-| 시나리오 | 판정 |
-|---|---|
-| [접근 키와 정책을 주어 관리자 경로의 유효 할당을 읽으면, 도메인 이름을 비운 채 조회하므로 도메인을 찾을 수 없다는 것으로 거부됩니다](#effective_allocation-the-admin-path-with-a-given-key-finds-no-domain) | 거부 |
-
-**admin_effective_allocation_resolved**
-
-| 시나리오 | 판정 |
-|---|---|
-| [대상 사용자 id 로 관리자 경로의 유효 할당을 읽으면, 도메인 이름을 비운 채 조회하므로 도메인을 찾을 수 없다는 것으로 거부됩니다](#effective_allocation-the-admin-path-reading-a-users-effective-allocation-finds-no-domain) | 거부 |
+| [도메인 범위에서 도메인을 읽을 수 있는 사용자가 그 도메인의 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 오고 사용량은 0 입니다](#usage-a-user-reading-the-domain-reads-its-usage) | 성공 |
+| [없는 이름으로 도메인 사용량을 읽으면 대상이 없다는 것으로 거부됩니다](#usage-reading-the-usage-of-a-domain-nothing-answers-to-is-not-found) | 거부 |
 
 **check_preset_availability**
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 주어진 접근 키와 정책으로 프리셋 가용성을 확인하면, 미리 저장한 프리셋이 모두 쓸 수 있는 것으로 반환됩니다](#checking_presets-the-superadmin-checks-available-presets-with-a-given-key) | 성공 |
+| [프로젝트 범위에서 리소스 프리셋을 읽을 수 있는 사용자가 주어진 접근 키와 정책으로 프리셋 가용성을 확인하면, 미리 저장한 프리셋이 모두 쓸 수 있는 것으로 반환됩니다](#checking_presets-a-user-reading-presets-checks-available-presets-with-a-given-key) | 성공 |
 | [아무 권한도 받지 않은 사용자가 주어진 키로 프리셋 가용성을 확인하려 하면 권한 부족으로 거부됩니다](#checking_presets-a-user-granted-nothing-may-not-check-preset-availability-with-a-given-key) | 거부 |
 
 **check_preset_availability_for_current_user**
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 자기 키페어로 프리셋 가용성을 확인하면, 미리 저장한 프리셋이 모두 쓸 수 있는 것으로 반환됩니다](#checking_presets-the-superadmin-checks-available-presets-for-themselves) | 성공 |
+| [프로젝트 범위에서 리소스 프리셋을 읽고 자기 사용자 범위에서 사용자를 읽을 수 있는 사용자가 자기 키페어로 프리셋 가용성을 확인하면, 미리 저장한 프리셋이 모두 쓸 수 있는 것으로 반환됩니다](#checking_presets-a-user-reading-presets-checks-available-presets-for-themselves) | 성공 |
 | [아무 권한도 받지 않은 사용자가 프리셋 가용성을 확인하려 하면 권한 부족으로 거부됩니다](#checking_presets-a-user-granted-nothing-may-not-check-preset-availability) | 거부 |
 
 **effective_allocation**
@@ -64,35 +52,35 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 자기 유효 할당을 읽으면, 프로젝트와 자원 그룹 범위가 모두 담겨 반환됩니다](#effective_allocation-the-superadmin-reads-their-own-effective-allocation) | 성공 |
+| [프로젝트 범위에서 세션을 읽고 자기 사용자 범위에서 사용자를 읽을 수 있는 사용자가 자기 유효 할당을 읽으면, 기본 설정에서는 자원 그룹 범위만 담겨 반환됩니다](#effective_allocation-a-user-reading-sessions-reads-their-own-effective-allocation) | 성공 |
 | [아무 권한도 받지 않은 사용자가 자기 유효 할당을 읽으려 하면 권한 부족으로 거부됩니다](#effective_allocation-a-user-granted-nothing-may-not-read-their-own-effective-allocation) | 거부 |
 
 **my_concurrency**
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 자기 동시 세션 수를 읽으면, 세션이 없으므로 모두 0 이 반환됩니다](#usage-the-superadmin-reads-their-own-concurrency) | 성공 |
+| [자기 사용자 범위에서 사용자를 읽을 수 있는 사용자가 자기 동시 세션 수를 읽으면, 세션이 없으므로 모두 0 이 반환됩니다](#usage-a-user-reading-their-own-user-reads-their-concurrency) | 성공 |
 | [아무 권한도 받지 않은 사용자가 자기 동시 세션 수를 읽으려 하면 권한 부족으로 거부됩니다](#usage-a-user-granted-nothing-may-not-read-their-own-concurrency) | 거부 |
 
 **my_keypair_usage**
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 자기 기본 키페어 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 오고 사용량은 0 입니다](#usage-the-superadmin-reads-their-own-keypair-usage) | 성공 |
+| [자기 사용자 범위에서 사용자를 읽을 수 있는 사용자가 자기 기본 키페어 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 오고 사용량은 0 입니다](#usage-a-user-reading-their-own-user-reads-their-keypair-usage) | 성공 |
 | [아무 권한도 받지 않은 사용자가 자기 키페어 사용량을 읽으려 하면 권한 부족으로 거부됩니다](#usage-a-user-granted-nothing-may-not-read-their-own-keypair-usage) | 거부 |
 
 **my_user_usage**
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 자기 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 오고 사용량은 0 입니다](#usage-the-superadmin-reads-their-own-user-usage) | 성공 |
+| [자기 사용자 범위에서 사용자를 읽을 수 있는 사용자가 자기 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 오고 사용량은 0 입니다](#usage-a-user-reading-their-own-user-reads-their-user-usage) | 성공 |
 | [아무 권한도 받지 않은 사용자가 자기 사용량을 읽으려 하면 권한 부족으로 거부됩니다](#usage-a-user-granted-nothing-may-not-read-their-own-user-usage) | 거부 |
 
 **project_usage**
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 프로젝트의 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 오고 사용량은 0 입니다](#usage-the-superadmin-reads-a-projects-usage) | 성공 |
+| [프로젝트 범위에서 프로젝트를 읽을 수 있는 사용자가 그 프로젝트의 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 오고 사용량은 0 입니다](#usage-a-user-reading-the-project-reads-its-usage) | 성공 |
 | [아무 권한도 받지 않은 사용자가 프로젝트 사용량을 읽으려 하면 권한 부족으로 거부됩니다](#usage-a-user-granted-nothing-may-not-read-a-projects-usage) | 거부 |
 
 **resource_group_usage**
@@ -104,15 +92,15 @@
 
 ### admin_domain_usage
 
-<a id="usage-the-superadmin-reads-a-domains-usage"></a>
+<a id="usage-a-user-reading-the-domain-reads-its-usage"></a>
 
-#### [the-superadmin-reads-a-domains-usage](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
+#### [a-user-reading-the-domain-reads-its-usage](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
 
-superadmin 이 도메인의 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 오고 사용량은 0 입니다
+도메인 범위에서 도메인을 읽을 수 있는 사용자가 그 도메인의 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 오고 사용량은 0 입니다
 
 Given
 
-- 자리 하나와 superadmin 한 명. 슬롯 종류 하나가 등록되어 있습니다
+- 자리 하나와 일반 사용자 한 명. 그 사용자는 도메인 범위에서 도메인을 읽을 수 있습니다. 슬롯 종류 하나가 등록되어 있습니다
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -121,9 +109,13 @@ Given
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - superadmin user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 도메인 범위의 도메인 조회 권한을 받은 사용자
+    - 역할 reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 reader-1: domain 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 reader-1 보유
 
 When
 
@@ -140,11 +132,11 @@ Then
 
 #### [reading-the-usage-of-a-domain-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
 
-superadmin 이 없는 이름의 도메인 사용량을 읽으면 대상이 없다는 것으로 거부됩니다
+없는 이름으로 도메인 사용량을 읽으면 대상이 없다는 것으로 거부됩니다
 
 Given
 
-- 자리 하나와 superadmin 한 명
+- 자리 하나와 일반 사용자 한 명
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -152,9 +144,9 @@ Given
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - superadmin user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
 
 When
 
@@ -165,81 +157,17 @@ Then
 - 거부됩니다
   - 거부: EntityNotFoundError
 
-### admin_effective_allocation
-
-<a id="effective_allocation-the-admin-path-with-a-given-key-finds-no-domain"></a>
-
-#### [the-admin-path-with-a-given-key-finds-no-domain](/tests/scenario/bai_scenario/manager/resource_allocation/test_effective_allocation.py): pass
-
-접근 키와 정책을 주어 관리자 경로의 유효 할당을 읽으면, 도메인 이름을 비운 채 조회하므로 도메인을 찾을 수 없다는 것으로 거부됩니다
-
-Given
-
-- 자리 하나와 superadmin 한 명. 슬롯 종류 하나가 등록되어 있습니다
-  - 도메인 home-1
-  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-  - 프로젝트 team-1
-  - 자원 그룹 group-1: fifo 스케줄러를 사용합니다
-  - 자원 슬롯 유형 slot-1: count 유형
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - superadmin user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
-
-When
-
-- ResourceAllocationAdapter.admin_effective_allocation: user-1이 관리자 경로로 유효 할당을 조회합니다
-
-Then
-
-- 거부됩니다
-  - 거부: DomainNotFound
-
-### admin_effective_allocation_resolved
-
-<a id="effective_allocation-the-admin-path-reading-a-users-effective-allocation-finds-no-domain"></a>
-
-#### [the-admin-path-reading-a-users-effective-allocation-finds-no-domain](/tests/scenario/bai_scenario/manager/resource_allocation/test_effective_allocation.py): pass
-
-대상 사용자 id 로 관리자 경로의 유효 할당을 읽으면, 도메인 이름을 비운 채 조회하므로 도메인을 찾을 수 없다는 것으로 거부됩니다
-
-Given
-
-- 자리 하나와 superadmin 한 명. 슬롯 종류 하나가 등록되어 있습니다
-  - 도메인 home-1
-  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-  - 프로젝트 team-1
-  - 자원 그룹 group-1: fifo 스케줄러를 사용합니다
-  - 자원 슬롯 유형 slot-1: count 유형
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - superadmin user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
-
-When
-
-- ResourceAllocationAdapter.admin_effective_allocation_resolved: user-1이 사용자 user-1의 유효 할당을 관리자 경로로 조회합니다
-
-Then
-
-- 거부됩니다
-  - 거부: DomainNotFound
-
 ### check_preset_availability
 
-<a id="checking_presets-the-superadmin-checks-available-presets-with-a-given-key"></a>
+<a id="checking_presets-a-user-reading-presets-checks-available-presets-with-a-given-key"></a>
 
-#### [the-superadmin-checks-available-presets-with-a-given-key](/tests/scenario/bai_scenario/manager/resource_allocation/test_checking_presets.py): pass
+#### [a-user-reading-presets-checks-available-presets-with-a-given-key](/tests/scenario/bai_scenario/manager/resource_allocation/test_checking_presets.py): pass
 
-superadmin 이 주어진 접근 키와 정책으로 프리셋 가용성을 확인하면, 미리 저장한 프리셋이 모두 쓸 수 있는 것으로 반환됩니다
+프로젝트 범위에서 리소스 프리셋을 읽을 수 있는 사용자가 주어진 접근 키와 정책으로 프리셋 가용성을 확인하면, 미리 저장한 프리셋이 모두 쓸 수 있는 것으로 반환됩니다
 
 Given
 
-- 자리 하나와 superadmin 한 명. 슬롯 종류 하나가 등록되어 있습니다. 프리셋 2개가 있습니다
+- 자리 하나와 일반 사용자 한 명. 그 사용자는 프로젝트 범위에서 리소스 프리셋을 읽을 수 있습니다. 슬롯 종류 하나가 등록되어 있습니다. 프리셋 2개가 있습니다
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -248,9 +176,13 @@ Given
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - superadmin user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 프로젝트 범위의 리소스 프리셋 조회 권한을 받은 사용자
+    - 역할 reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 reader-1: resource_preset 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 reader-1 보유
   - 자원 프리셋 preset-1: 자원 그룹에 묶이지 않아 public 에 속합니다
   - 자원 프리셋 preset-2: 자원 그룹에 묶이지 않아 public 에 속합니다
 
@@ -308,15 +240,15 @@ Then
 
 ### check_preset_availability_for_current_user
 
-<a id="checking_presets-the-superadmin-checks-available-presets-for-themselves"></a>
+<a id="checking_presets-a-user-reading-presets-checks-available-presets-for-themselves"></a>
 
-#### [the-superadmin-checks-available-presets-for-themselves](/tests/scenario/bai_scenario/manager/resource_allocation/test_checking_presets.py): pass
+#### [a-user-reading-presets-checks-available-presets-for-themselves](/tests/scenario/bai_scenario/manager/resource_allocation/test_checking_presets.py): pass
 
-superadmin 이 자기 키페어로 프리셋 가용성을 확인하면, 미리 저장한 프리셋이 모두 쓸 수 있는 것으로 반환됩니다
+프로젝트 범위에서 리소스 프리셋을 읽고 자기 사용자 범위에서 사용자를 읽을 수 있는 사용자가 자기 키페어로 프리셋 가용성을 확인하면, 미리 저장한 프리셋이 모두 쓸 수 있는 것으로 반환됩니다
 
 Given
 
-- 자리 하나와 superadmin 한 명. 슬롯 종류 하나가 등록되어 있습니다. 프리셋 2개가 있습니다
+- 자리 하나와 일반 사용자 한 명. 그 사용자는 자기 사용자 범위에서 사용자를 읽을 수 있습니다. 그 사용자는 프로젝트 범위에서 리소스 프리셋을 읽을 수 있습니다. 슬롯 종류 하나가 등록되어 있습니다. 프리셋 2개가 있습니다
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -325,9 +257,17 @@ Given
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - superadmin user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 자기 사용자 범위의 사용자 조회 권한을 받은 사용자
+    - 역할 reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 reader-1: user 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 reader-1 보유
+  - 프로젝트 범위의 리소스 프리셋 조회 권한을 받은 사용자
+    - 역할 reader-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 reader-2: resource_preset 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 reader-2 보유
   - 자원 프리셋 preset-1: 자원 그룹에 묶이지 않아 public 에 속합니다
   - 자원 프리셋 preset-2: 자원 그룹에 묶이지 않아 public 에 속합니다
 
@@ -406,9 +346,9 @@ Given
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
   - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
   - 프로젝트 범위의 세션 조회 권한을 받은 사용자
-    - 역할 session-reader-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 session-reader-1: session 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 session-reader-1 보유
+    - 역할 reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 reader-1: session 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 reader-1 보유
 
 When
 
@@ -451,9 +391,9 @@ Given
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
   - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
   - 프로젝트 범위의 세션 조회 권한을 받은 사용자
-    - 역할 session-reader-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 session-reader-1: session 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 session-reader-1 보유
+    - 역할 reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 reader-1: session 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 reader-1 보유
 
 When
 
@@ -493,9 +433,9 @@ Given
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
   - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
   - 프로젝트 범위의 세션 조회 권한을 받은 사용자
-    - 역할 session-reader-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 session-reader-1: session 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 session-reader-1 보유
+    - 역할 reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 reader-1: session 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 reader-1 보유
 
 When
 
@@ -551,15 +491,15 @@ Then
 
 ### effective_allocation_for_current_user
 
-<a id="effective_allocation-the-superadmin-reads-their-own-effective-allocation"></a>
+<a id="effective_allocation-a-user-reading-sessions-reads-their-own-effective-allocation"></a>
 
-#### [the-superadmin-reads-their-own-effective-allocation](/tests/scenario/bai_scenario/manager/resource_allocation/test_effective_allocation.py): pass
+#### [a-user-reading-sessions-reads-their-own-effective-allocation](/tests/scenario/bai_scenario/manager/resource_allocation/test_effective_allocation.py): pass
 
-superadmin 이 자기 유효 할당을 읽으면, 프로젝트와 자원 그룹 범위가 모두 담겨 반환됩니다
+프로젝트 범위에서 세션을 읽고 자기 사용자 범위에서 사용자를 읽을 수 있는 사용자가 자기 유효 할당을 읽으면, 기본 설정에서는 자원 그룹 범위만 담겨 반환됩니다
 
 Given
 
-- 자리 하나와 superadmin 한 명. 슬롯 종류 하나가 등록되어 있습니다
+- 자리 하나와 일반 사용자 한 명. 그 사용자는 프로젝트 범위에서 세션을 읽을 수 있습니다. 그 사용자는 자기 사용자 범위에서 사용자를 읽을 수 있습니다. 슬롯 종류 하나가 등록되어 있습니다
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -568,9 +508,17 @@ Given
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - superadmin user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 프로젝트 범위의 세션 조회 권한을 받은 사용자
+    - 역할 reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 reader-1: session 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 reader-1 보유
+  - 자기 사용자 범위의 사용자 조회 권한을 받은 사용자
+    - 역할 reader-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 reader-2: user 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 reader-2 보유
 
 When
 
@@ -578,7 +526,7 @@ When
 
 Then
 
-- 유효 할당 전체가 응답으로 옵니다. 프로젝트 범위가 담깁니다. 자원 그룹 범위가 담깁니다
+- 유효 할당 전체가 응답으로 옵니다. 프로젝트 범위는 담기지 않습니다. 자원 그룹 범위가 담깁니다
   - assignable = [ResourceLimitEntryInfo(resource_type='cpu', quantity=None, unlimited=True), ResourceLimitEntryInfo(resource_type='mem', quantity=None, unlimited=True)]
   - breakdown.keypair.limits = [ResourceLimitEntryInfo(resource_type='cpu', quantity=None, unlimited=True), ResourceLimitEntryInfo(resource_type='mem', quantity=None, unlimited=True)]
   - breakdown.keypair.used = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('0')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('0'))]
@@ -586,9 +534,7 @@ Then
   - breakdown.domain.limits = [ResourceLimitEntryInfo(resource_type='cpu', quantity=None, unlimited=True), ResourceLimitEntryInfo(resource_type='mem', quantity=None, unlimited=True)]
   - breakdown.domain.used = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('0')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('0'))]
   - breakdown.domain.assignable = [ResourceLimitEntryInfo(resource_type='cpu', quantity=None, unlimited=True), ResourceLimitEntryInfo(resource_type='mem', quantity=None, unlimited=True)]
-  - breakdown.project.limits = [ResourceLimitEntryInfo(resource_type='cpu', quantity=None, unlimited=True), ResourceLimitEntryInfo(resource_type='mem', quantity=None, unlimited=True)]
-  - breakdown.project.used = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('0')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('0'))]
-  - breakdown.project.assignable = [ResourceLimitEntryInfo(resource_type='cpu', quantity=None, unlimited=True), ResourceLimitEntryInfo(resource_type='mem', quantity=None, unlimited=True)]
+  - breakdown.project = None
   - breakdown.resource_group.capacity = []
   - breakdown.resource_group.used = []
   - breakdown.resource_group.free = []
@@ -626,15 +572,15 @@ Then
 
 ### my_concurrency
 
-<a id="usage-the-superadmin-reads-their-own-concurrency"></a>
+<a id="usage-a-user-reading-their-own-user-reads-their-concurrency"></a>
 
-#### [the-superadmin-reads-their-own-concurrency](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
+#### [a-user-reading-their-own-user-reads-their-concurrency](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
 
-superadmin 이 자기 동시 세션 수를 읽으면, 세션이 없으므로 모두 0 이 반환됩니다
+자기 사용자 범위에서 사용자를 읽을 수 있는 사용자가 자기 동시 세션 수를 읽으면, 세션이 없으므로 모두 0 이 반환됩니다
 
 Given
 
-- 자리 하나와 superadmin 한 명
+- 자리 하나와 일반 사용자 한 명. 그 사용자는 자기 사용자 범위에서 사용자를 읽을 수 있습니다
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -642,9 +588,13 @@ Given
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - superadmin user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 자기 사용자 범위의 사용자 조회 권한을 받은 사용자
+    - 역할 reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 reader-1: user 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 reader-1 보유
 
 When
 
@@ -688,15 +638,15 @@ Then
 
 ### my_keypair_usage
 
-<a id="usage-the-superadmin-reads-their-own-keypair-usage"></a>
+<a id="usage-a-user-reading-their-own-user-reads-their-keypair-usage"></a>
 
-#### [the-superadmin-reads-their-own-keypair-usage](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
+#### [a-user-reading-their-own-user-reads-their-keypair-usage](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
 
-superadmin 이 자기 기본 키페어 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 오고 사용량은 0 입니다
+자기 사용자 범위에서 사용자를 읽을 수 있는 사용자가 자기 기본 키페어 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 오고 사용량은 0 입니다
 
 Given
 
-- 자리 하나와 superadmin 한 명. 슬롯 종류 하나가 등록되어 있습니다
+- 자리 하나와 일반 사용자 한 명. 그 사용자는 자기 사용자 범위에서 사용자를 읽을 수 있습니다. 슬롯 종류 하나가 등록되어 있습니다
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -705,9 +655,13 @@ Given
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - superadmin user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 자기 사용자 범위의 사용자 조회 권한을 받은 사용자
+    - 역할 reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 reader-1: user 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 reader-1 보유
 
 When
 
@@ -752,15 +706,15 @@ Then
 
 ### my_user_usage
 
-<a id="usage-the-superadmin-reads-their-own-user-usage"></a>
+<a id="usage-a-user-reading-their-own-user-reads-their-user-usage"></a>
 
-#### [the-superadmin-reads-their-own-user-usage](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
+#### [a-user-reading-their-own-user-reads-their-user-usage](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
 
-superadmin 이 자기 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 오고 사용량은 0 입니다
+자기 사용자 범위에서 사용자를 읽을 수 있는 사용자가 자기 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 오고 사용량은 0 입니다
 
 Given
 
-- 자리 하나와 superadmin 한 명. 슬롯 종류 하나가 등록되어 있습니다
+- 자리 하나와 일반 사용자 한 명. 그 사용자는 자기 사용자 범위에서 사용자를 읽을 수 있습니다. 슬롯 종류 하나가 등록되어 있습니다
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -769,9 +723,13 @@ Given
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - superadmin user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 자기 사용자 범위의 사용자 조회 권한을 받은 사용자
+    - 역할 reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 reader-1: user 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 reader-1 보유
 
 When
 
@@ -816,15 +774,15 @@ Then
 
 ### project_usage
 
-<a id="usage-the-superadmin-reads-a-projects-usage"></a>
+<a id="usage-a-user-reading-the-project-reads-its-usage"></a>
 
-#### [the-superadmin-reads-a-projects-usage](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
+#### [a-user-reading-the-project-reads-its-usage](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
 
-superadmin 이 프로젝트의 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 오고 사용량은 0 입니다
+프로젝트 범위에서 프로젝트를 읽을 수 있는 사용자가 그 프로젝트의 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 오고 사용량은 0 입니다
 
 Given
 
-- 자리 하나와 superadmin 한 명. 슬롯 종류 하나가 등록되어 있습니다
+- 자리 하나와 일반 사용자 한 명. 그 사용자는 프로젝트 범위에서 프로젝트를 읽을 수 있습니다. 슬롯 종류 하나가 등록되어 있습니다
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -833,9 +791,13 @@ Given
   - 도메인에 속한 사용자 한 명 준비
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - superadmin user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 프로젝트 범위의 프로젝트 조회 권한을 받은 사용자
+    - 역할 reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 reader-1: project 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 reader-1 보유
 
 When
 

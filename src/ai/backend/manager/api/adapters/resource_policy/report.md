@@ -132,21 +132,21 @@ Scenario: incomplete 6 / 33
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reads one keypair-policy by id, the whole policy comes back for that item](#bulk_reading-the-superadmin-reads-a-keypair-policy-by-id) | answered |
+| [when a user who can read it in the global scope reads one keypair-policy by id, the whole policy comes back for that item](#bulk_reading-a-user-reading-policies-reads-a-keypair-policy-by-id) | answered |
 | [a user granted nothing reading one policy by id is not rejected as a call, and that item is rejected for not enough permission](#bulk_reading-a-user-granted-nothing-reading-a-keypair-policy-by-id-is-refused-per-item) | rejected |
 
 **bulk_get_project_resource_policy_ids**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reads one project-policy by id, the whole policy comes back for that item](#bulk_reading-the-superadmin-reads-a-project-policy-by-id) | answered |
+| [when a user who can read it in the global scope reads one project-policy by id, the whole policy comes back for that item](#bulk_reading-a-user-reading-policies-reads-a-project-policy-by-id) | answered |
 | [a user granted nothing reading one policy by id is not rejected as a call, and that item is rejected for not enough permission](#bulk_reading-a-user-granted-nothing-reading-a-project-policy-by-id-is-refused-per-item) | rejected |
 
 **bulk_get_user_resource_policy_ids**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reads one user-policy by id, the whole policy comes back for that item](#bulk_reading-the-superadmin-reads-a-user-policy-by-id) | answered |
+| [when a user who can read it in the global scope reads one user-policy by id, the whole policy comes back for that item](#bulk_reading-a-user-reading-policies-reads-a-user-policy-by-id) | answered |
 | [a user granted nothing reading one policy by id is not rejected as a call, and that item is rejected for not enough permission](#bulk_reading-a-user-granted-nothing-reading-a-user-policy-by-id-is-refused-per-item) | rejected |
 
 **bulk_lookup_keypair_resource_policy_names**
@@ -1617,22 +1617,26 @@ Then
 
 ### bulk_get_keypair_resource_policy_ids
 
-<a id="bulk_reading-the-superadmin-reads-a-keypair-policy-by-id"></a>
+<a id="bulk_reading-a-user-reading-policies-reads-a-keypair-policy-by-id"></a>
 
-#### [the-superadmin-reads-a-keypair-policy-by-id](/tests/scenario/bai_scenario/manager/resource_policy/test_bulk_reading.py): pass
+#### [a-user-reading-policies-reads-a-keypair-policy-by-id](/tests/scenario/bai_scenario/manager/resource_policy/test_bulk_reading.py): pass
 
-when the superadmin reads one keypair-policy by id, the whole policy comes back for that item
+when a user who can read it in the global scope reads one keypair-policy by id, the whole policy comes back for that item
 
 Given
 
-- one unused keypair policy and one superadmin
+- one unused keypair policy and one user who can read it in the global scope
   - Domain home-1
   - Prepare one user with policies assigned
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+    - regular user user-1: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - the role assignment granting read permission on keypair_resource_policy in the global scope
+    - Role policy-reader-1: applies only within the scope it is granted in
+    - Role policy-reader-1: READ allowed on every keypair_resource_policy
+    - regular user user-1: holds Role policy-reader-1
 
 When
 
@@ -1685,22 +1689,26 @@ Then
 
 ### bulk_get_project_resource_policy_ids
 
-<a id="bulk_reading-the-superadmin-reads-a-project-policy-by-id"></a>
+<a id="bulk_reading-a-user-reading-policies-reads-a-project-policy-by-id"></a>
 
-#### [the-superadmin-reads-a-project-policy-by-id](/tests/scenario/bai_scenario/manager/resource_policy/test_bulk_reading.py): pass
+#### [a-user-reading-policies-reads-a-project-policy-by-id](/tests/scenario/bai_scenario/manager/resource_policy/test_bulk_reading.py): pass
 
-when the superadmin reads one project-policy by id, the whole policy comes back for that item
+when a user who can read it in the global scope reads one project-policy by id, the whole policy comes back for that item
 
 Given
 
-- one unused project policy and one superadmin
+- one unused project policy and one user who can read it in the global scope
   - Domain home-1
   - Prepare one user with policies assigned
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+    - regular user user-1: has their own keypair and personal project
   - Project resource policy project-policy-1: up to 10 folders per project
+  - the role assignment granting read permission on project_resource_policy in the global scope
+    - Role policy-reader-1: applies only within the scope it is granted in
+    - Role policy-reader-1: READ allowed on every project_resource_policy
+    - regular user user-1: holds Role policy-reader-1
 
 When
 
@@ -1745,22 +1753,26 @@ Then
 
 ### bulk_get_user_resource_policy_ids
 
-<a id="bulk_reading-the-superadmin-reads-a-user-policy-by-id"></a>
+<a id="bulk_reading-a-user-reading-policies-reads-a-user-policy-by-id"></a>
 
-#### [the-superadmin-reads-a-user-policy-by-id](/tests/scenario/bai_scenario/manager/resource_policy/test_bulk_reading.py): pass
+#### [a-user-reading-policies-reads-a-user-policy-by-id](/tests/scenario/bai_scenario/manager/resource_policy/test_bulk_reading.py): pass
 
-when the superadmin reads one user-policy by id, the whole policy comes back for that item
+when a user who can read it in the global scope reads one user-policy by id, the whole policy comes back for that item
 
 Given
 
-- one unused user policy and one superadmin
+- one unused user policy and one user who can read it in the global scope
   - Domain home-1
   - Prepare one user with policies assigned
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+    - regular user user-1: has their own keypair and personal project
   - User resource policy user-policy-2: up to 10 folders per user
+  - the role assignment granting read permission on user_resource_policy in the global scope
+    - Role policy-reader-1: applies only within the scope it is granted in
+    - Role policy-reader-1: READ allowed on every user_resource_policy
+    - regular user user-1: holds Role policy-reader-1
 
 When
 

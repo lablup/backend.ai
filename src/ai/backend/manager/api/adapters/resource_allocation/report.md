@@ -6,8 +6,8 @@ Scenario: incomplete 2 / 12
 
 - direct implementation (12)
   - admin_domain_usage: success present 1 · rejection present 1 (single_entity)
-  - admin_effective_allocation: success absent · rejection present 1 (scope): SCENARIO-GAP
-  - admin_effective_allocation_resolved: success absent · rejection present 1 (scope, single_entity): SCENARIO-GAP
+  - admin_effective_allocation: success absent · rejection absent (scope): SCENARIO-GAP
+  - admin_effective_allocation_resolved: success absent · rejection absent (scope, single_entity): SCENARIO-GAP
   - check_preset_availability: success present 1 · rejection present 1 (scope)
   - check_preset_availability_for_current_user: success present 1 · rejection present 1 (scope, single_entity)
   - effective_allocation: success present 3 · rejection present 1 (scope)
@@ -22,33 +22,21 @@ Scenario: incomplete 2 / 12
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reads a domain's usage, the registered slot type's limit comes back unlimited and the usage is zero](#usage-the-superadmin-reads-a-domains-usage) | answered |
-| [when the superadmin reads the usage of a domain name nothing answers to, the call is rejected as no such target](#usage-reading-the-usage-of-a-domain-nothing-answers-to-is-not-found) | rejected |
-
-**admin_effective_allocation**
-
-| scenario | verdict |
-|---|---|
-| [reading the effective allocation by the admin path with a given key is rejected as no such domain, because the call reads with an empty domain name](#effective_allocation-the-admin-path-with-a-given-key-finds-no-domain) | rejected |
-
-**admin_effective_allocation_resolved**
-
-| scenario | verdict |
-|---|---|
-| [reading a user's effective allocation by the admin path is rejected as no such domain, because the call reads with an empty domain name](#effective_allocation-the-admin-path-reading-a-users-effective-allocation-finds-no-domain) | rejected |
+| [when a user who can read the domain in its scope reads that domain's usage, the registered slot type's limit comes back unlimited and the usage is zero](#usage-a-user-reading-the-domain-reads-its-usage) | answered |
+| [reading the usage of a domain name nothing answers to is rejected as no such target](#usage-reading-the-usage-of-a-domain-nothing-answers-to-is-not-found) | rejected |
 
 **check_preset_availability**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin checks preset availability with a given key and policy, every preset seeded in advance comes back marked as available](#checking_presets-the-superadmin-checks-available-presets-with-a-given-key) | answered |
+| [when a user who can read resource presets in the project scope checks preset availability with a given key and policy, every preset seeded in advance comes back marked as available](#checking_presets-a-user-reading-presets-checks-available-presets-with-a-given-key) | answered |
 | [a user granted nothing checking preset availability with a given key is rejected for not enough permission](#checking_presets-a-user-granted-nothing-may-not-check-preset-availability-with-a-given-key) | rejected |
 
 **check_preset_availability_for_current_user**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin checks preset availability with their own keypair, every preset seeded in advance comes back marked as available](#checking_presets-the-superadmin-checks-available-presets-for-themselves) | answered |
+| [when a user who can read resource presets in the project scope and users in their own user scope checks preset availability with their own keypair, every preset seeded in advance comes back marked as available](#checking_presets-a-user-reading-presets-checks-available-presets-for-themselves) | answered |
 | [a user granted nothing checking preset availability is rejected for not enough permission](#checking_presets-a-user-granted-nothing-may-not-check-preset-availability) | rejected |
 
 **effective_allocation**
@@ -64,35 +52,35 @@ Scenario: incomplete 2 / 12
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reads their own effective allocation, both the project and the resource group scopes are included](#effective_allocation-the-superadmin-reads-their-own-effective-allocation) | answered |
+| [when a user who can read sessions in the project scope and users in their own user scope reads their own effective allocation, only the resource group scope is included under the default settings](#effective_allocation-a-user-reading-sessions-reads-their-own-effective-allocation) | answered |
 | [a user granted nothing reading their own effective allocation is rejected for not enough permission](#effective_allocation-a-user-granted-nothing-may-not-read-their-own-effective-allocation) | rejected |
 
 **my_concurrency**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reads their own concurrent session counts, all zero comes back because no session exists](#usage-the-superadmin-reads-their-own-concurrency) | answered |
+| [when a user who can read users in their own user scope reads their own concurrent session counts, all zero comes back because no session exists](#usage-a-user-reading-their-own-user-reads-their-concurrency) | answered |
 | [a user granted nothing reading their own concurrent session counts is rejected for not enough permission](#usage-a-user-granted-nothing-may-not-read-their-own-concurrency) | rejected |
 
 **my_keypair_usage**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reads their default keypair's usage, the registered slot type's limit comes back unlimited and the usage is zero](#usage-the-superadmin-reads-their-own-keypair-usage) | answered |
+| [when a user who can read users in their own user scope reads their default keypair's usage, the registered slot type's limit comes back unlimited and the usage is zero](#usage-a-user-reading-their-own-user-reads-their-keypair-usage) | answered |
 | [a user granted nothing reading their own keypair usage is rejected for not enough permission](#usage-a-user-granted-nothing-may-not-read-their-own-keypair-usage) | rejected |
 
 **my_user_usage**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reads their own usage, the registered slot type's limit comes back unlimited and the usage is zero](#usage-the-superadmin-reads-their-own-user-usage) | answered |
+| [when a user who can read users in their own user scope reads their own usage, the registered slot type's limit comes back unlimited and the usage is zero](#usage-a-user-reading-their-own-user-reads-their-user-usage) | answered |
 | [a user granted nothing reading their own usage is rejected for not enough permission](#usage-a-user-granted-nothing-may-not-read-their-own-user-usage) | rejected |
 
 **project_usage**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reads a project's usage, the registered slot type's limit comes back unlimited and the usage is zero](#usage-the-superadmin-reads-a-projects-usage) | answered |
+| [when a user who can read the project in its scope reads that project's usage, the registered slot type's limit comes back unlimited and the usage is zero](#usage-a-user-reading-the-project-reads-its-usage) | answered |
 | [a user granted nothing reading a project's usage is rejected for not enough permission](#usage-a-user-granted-nothing-may-not-read-a-projects-usage) | rejected |
 
 **resource_group_usage**
@@ -104,15 +92,15 @@ Scenario: incomplete 2 / 12
 
 ### admin_domain_usage
 
-<a id="usage-the-superadmin-reads-a-domains-usage"></a>
+<a id="usage-a-user-reading-the-domain-reads-its-usage"></a>
 
-#### [the-superadmin-reads-a-domains-usage](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
+#### [a-user-reading-the-domain-reads-its-usage](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
 
-when the superadmin reads a domain's usage, the registered slot type's limit comes back unlimited and the usage is zero
+when a user who can read the domain in its scope reads that domain's usage, the registered slot type's limit comes back unlimited and the usage is zero
 
 Given
 
-- one place and one superadmin. one resource slot type is registered
+- one place and one regular user. that user can read the domain in the domain scope. one resource slot type is registered
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -121,9 +109,13 @@ Given
   - Prepare one user in the domain
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+    - regular user user-1: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-  - superadmin user-1: has one more active keypair besides the default one
+  - regular user user-1: has one more active keypair besides the default one
+  - a user granted permission to read the domain in its scope
+    - Role reader-1: applies only within the scope it is granted in
+    - Role reader-1: READ allowed on every domain
+    - regular user user-1: holds Role reader-1
 
 When
 
@@ -140,11 +132,11 @@ Then
 
 #### [reading-the-usage-of-a-domain-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
 
-when the superadmin reads the usage of a domain name nothing answers to, the call is rejected as no such target
+reading the usage of a domain name nothing answers to is rejected as no such target
 
 Given
 
-- one place and one superadmin
+- one place and one regular user
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -152,9 +144,9 @@ Given
   - Prepare one user in the domain
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+    - regular user user-1: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-  - superadmin user-1: has one more active keypair besides the default one
+  - regular user user-1: has one more active keypair besides the default one
 
 When
 
@@ -165,81 +157,17 @@ Then
 - the call is rejected
   - rejected: EntityNotFoundError
 
-### admin_effective_allocation
-
-<a id="effective_allocation-the-admin-path-with-a-given-key-finds-no-domain"></a>
-
-#### [the-admin-path-with-a-given-key-finds-no-domain](/tests/scenario/bai_scenario/manager/resource_allocation/test_effective_allocation.py): pass
-
-reading the effective allocation by the admin path with a given key is rejected as no such domain, because the call reads with an empty domain name
-
-Given
-
-- one place and one superadmin. one resource slot type is registered
-  - Domain home-1
-  - Project resource policy default: the personal project created along with a user looks it up by this name
-  - Project team-1
-  - Resource group group-1: uses the fifo scheduler
-  - Resource slot type slot-1: count type
-  - Prepare one user in the domain
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-  - superadmin user-1: has one more active keypair besides the default one
-
-When
-
-- ResourceAllocationAdapter.admin_effective_allocation: user-1 reads the effective allocation by the admin path
-
-Then
-
-- the call is rejected
-  - rejected: DomainNotFound
-
-### admin_effective_allocation_resolved
-
-<a id="effective_allocation-the-admin-path-reading-a-users-effective-allocation-finds-no-domain"></a>
-
-#### [the-admin-path-reading-a-users-effective-allocation-finds-no-domain](/tests/scenario/bai_scenario/manager/resource_allocation/test_effective_allocation.py): pass
-
-reading a user's effective allocation by the admin path is rejected as no such domain, because the call reads with an empty domain name
-
-Given
-
-- one place and one superadmin. one resource slot type is registered
-  - Domain home-1
-  - Project resource policy default: the personal project created along with a user looks it up by this name
-  - Project team-1
-  - Resource group group-1: uses the fifo scheduler
-  - Resource slot type slot-1: count type
-  - Prepare one user in the domain
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-  - superadmin user-1: has one more active keypair besides the default one
-
-When
-
-- ResourceAllocationAdapter.admin_effective_allocation_resolved: user-1 reads the effective allocation of user-1 by the admin path
-
-Then
-
-- the call is rejected
-  - rejected: DomainNotFound
-
 ### check_preset_availability
 
-<a id="checking_presets-the-superadmin-checks-available-presets-with-a-given-key"></a>
+<a id="checking_presets-a-user-reading-presets-checks-available-presets-with-a-given-key"></a>
 
-#### [the-superadmin-checks-available-presets-with-a-given-key](/tests/scenario/bai_scenario/manager/resource_allocation/test_checking_presets.py): pass
+#### [a-user-reading-presets-checks-available-presets-with-a-given-key](/tests/scenario/bai_scenario/manager/resource_allocation/test_checking_presets.py): pass
 
-when the superadmin checks preset availability with a given key and policy, every preset seeded in advance comes back marked as available
+when a user who can read resource presets in the project scope checks preset availability with a given key and policy, every preset seeded in advance comes back marked as available
 
 Given
 
-- one place and one superadmin. one resource slot type is registered. 2 presets exist
+- one place and one regular user. that user can read resource presets in the project scope. one resource slot type is registered. 2 presets exist
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -248,9 +176,13 @@ Given
   - Prepare one user in the domain
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+    - regular user user-1: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-  - superadmin user-1: has one more active keypair besides the default one
+  - regular user user-1: has one more active keypair besides the default one
+  - a user granted permission to read resource presets in the project scope
+    - Role reader-1: applies only within the scope it is granted in
+    - Role reader-1: READ allowed on every resource_preset
+    - regular user user-1: holds Role reader-1
   - Resource preset preset-1: belongs to public because it is bound to no resource group
   - Resource preset preset-2: belongs to public because it is bound to no resource group
 
@@ -308,15 +240,15 @@ Then
 
 ### check_preset_availability_for_current_user
 
-<a id="checking_presets-the-superadmin-checks-available-presets-for-themselves"></a>
+<a id="checking_presets-a-user-reading-presets-checks-available-presets-for-themselves"></a>
 
-#### [the-superadmin-checks-available-presets-for-themselves](/tests/scenario/bai_scenario/manager/resource_allocation/test_checking_presets.py): pass
+#### [a-user-reading-presets-checks-available-presets-for-themselves](/tests/scenario/bai_scenario/manager/resource_allocation/test_checking_presets.py): pass
 
-when the superadmin checks preset availability with their own keypair, every preset seeded in advance comes back marked as available
+when a user who can read resource presets in the project scope and users in their own user scope checks preset availability with their own keypair, every preset seeded in advance comes back marked as available
 
 Given
 
-- one place and one superadmin. one resource slot type is registered. 2 presets exist
+- one place and one regular user. that user can read users in their own user scope. that user can read resource presets in the project scope. one resource slot type is registered. 2 presets exist
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -325,9 +257,17 @@ Given
   - Prepare one user in the domain
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+    - regular user user-1: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-  - superadmin user-1: has one more active keypair besides the default one
+  - regular user user-1: has one more active keypair besides the default one
+  - a user granted permission to read users in their own user scope
+    - Role reader-1: applies only within the scope it is granted in
+    - Role reader-1: READ allowed on every user
+    - regular user user-1: holds Role reader-1
+  - a user granted permission to read resource presets in the project scope
+    - Role reader-2: applies only within the scope it is granted in
+    - Role reader-2: READ allowed on every resource_preset
+    - regular user user-1: holds Role reader-2
   - Resource preset preset-1: belongs to public because it is bound to no resource group
   - Resource preset preset-2: belongs to public because it is bound to no resource group
 
@@ -406,9 +346,9 @@ Given
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - a user granted permission to read sessions in the project scope
-    - Role session-reader-1: applies only within the scope it is granted in
-    - Role session-reader-1: READ allowed on every session
-    - regular user user-1: holds Role session-reader-1
+    - Role reader-1: applies only within the scope it is granted in
+    - Role reader-1: READ allowed on every session
+    - regular user user-1: holds Role reader-1
 
 When
 
@@ -451,9 +391,9 @@ Given
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - a user granted permission to read sessions in the project scope
-    - Role session-reader-1: applies only within the scope it is granted in
-    - Role session-reader-1: READ allowed on every session
-    - regular user user-1: holds Role session-reader-1
+    - Role reader-1: applies only within the scope it is granted in
+    - Role reader-1: READ allowed on every session
+    - regular user user-1: holds Role reader-1
 
 When
 
@@ -493,9 +433,9 @@ Given
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - a user granted permission to read sessions in the project scope
-    - Role session-reader-1: applies only within the scope it is granted in
-    - Role session-reader-1: READ allowed on every session
-    - regular user user-1: holds Role session-reader-1
+    - Role reader-1: applies only within the scope it is granted in
+    - Role reader-1: READ allowed on every session
+    - regular user user-1: holds Role reader-1
 
 When
 
@@ -551,15 +491,15 @@ Then
 
 ### effective_allocation_for_current_user
 
-<a id="effective_allocation-the-superadmin-reads-their-own-effective-allocation"></a>
+<a id="effective_allocation-a-user-reading-sessions-reads-their-own-effective-allocation"></a>
 
-#### [the-superadmin-reads-their-own-effective-allocation](/tests/scenario/bai_scenario/manager/resource_allocation/test_effective_allocation.py): pass
+#### [a-user-reading-sessions-reads-their-own-effective-allocation](/tests/scenario/bai_scenario/manager/resource_allocation/test_effective_allocation.py): pass
 
-when the superadmin reads their own effective allocation, both the project and the resource group scopes are included
+when a user who can read sessions in the project scope and users in their own user scope reads their own effective allocation, only the resource group scope is included under the default settings
 
 Given
 
-- one place and one superadmin. one resource slot type is registered
+- one place and one regular user. that user can read sessions in the project scope. that user can read users in their own user scope. one resource slot type is registered
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -568,9 +508,17 @@ Given
   - Prepare one user in the domain
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+    - regular user user-1: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-  - superadmin user-1: has one more active keypair besides the default one
+  - regular user user-1: has one more active keypair besides the default one
+  - a user granted permission to read sessions in the project scope
+    - Role reader-1: applies only within the scope it is granted in
+    - Role reader-1: READ allowed on every session
+    - regular user user-1: holds Role reader-1
+  - a user granted permission to read users in their own user scope
+    - Role reader-2: applies only within the scope it is granted in
+    - Role reader-2: READ allowed on every user
+    - regular user user-1: holds Role reader-2
 
 When
 
@@ -578,7 +526,7 @@ When
 
 Then
 
-- the whole effective allocation comes back. the project scope is included. the resource group scope is included
+- the whole effective allocation comes back. the project scope is absent. the resource group scope is included
   - assignable = [ResourceLimitEntryInfo(resource_type='cpu', quantity=None, unlimited=True), ResourceLimitEntryInfo(resource_type='mem', quantity=None, unlimited=True)]
   - breakdown.keypair.limits = [ResourceLimitEntryInfo(resource_type='cpu', quantity=None, unlimited=True), ResourceLimitEntryInfo(resource_type='mem', quantity=None, unlimited=True)]
   - breakdown.keypair.used = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('0')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('0'))]
@@ -586,9 +534,7 @@ Then
   - breakdown.domain.limits = [ResourceLimitEntryInfo(resource_type='cpu', quantity=None, unlimited=True), ResourceLimitEntryInfo(resource_type='mem', quantity=None, unlimited=True)]
   - breakdown.domain.used = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('0')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('0'))]
   - breakdown.domain.assignable = [ResourceLimitEntryInfo(resource_type='cpu', quantity=None, unlimited=True), ResourceLimitEntryInfo(resource_type='mem', quantity=None, unlimited=True)]
-  - breakdown.project.limits = [ResourceLimitEntryInfo(resource_type='cpu', quantity=None, unlimited=True), ResourceLimitEntryInfo(resource_type='mem', quantity=None, unlimited=True)]
-  - breakdown.project.used = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('0')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('0'))]
-  - breakdown.project.assignable = [ResourceLimitEntryInfo(resource_type='cpu', quantity=None, unlimited=True), ResourceLimitEntryInfo(resource_type='mem', quantity=None, unlimited=True)]
+  - breakdown.project = None
   - breakdown.resource_group.capacity = []
   - breakdown.resource_group.used = []
   - breakdown.resource_group.free = []
@@ -626,15 +572,15 @@ Then
 
 ### my_concurrency
 
-<a id="usage-the-superadmin-reads-their-own-concurrency"></a>
+<a id="usage-a-user-reading-their-own-user-reads-their-concurrency"></a>
 
-#### [the-superadmin-reads-their-own-concurrency](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
+#### [a-user-reading-their-own-user-reads-their-concurrency](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
 
-when the superadmin reads their own concurrent session counts, all zero comes back because no session exists
+when a user who can read users in their own user scope reads their own concurrent session counts, all zero comes back because no session exists
 
 Given
 
-- one place and one superadmin
+- one place and one regular user. that user can read users in their own user scope
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -642,9 +588,13 @@ Given
   - Prepare one user in the domain
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+    - regular user user-1: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-  - superadmin user-1: has one more active keypair besides the default one
+  - regular user user-1: has one more active keypair besides the default one
+  - a user granted permission to read users in their own user scope
+    - Role reader-1: applies only within the scope it is granted in
+    - Role reader-1: READ allowed on every user
+    - regular user user-1: holds Role reader-1
 
 When
 
@@ -688,15 +638,15 @@ Then
 
 ### my_keypair_usage
 
-<a id="usage-the-superadmin-reads-their-own-keypair-usage"></a>
+<a id="usage-a-user-reading-their-own-user-reads-their-keypair-usage"></a>
 
-#### [the-superadmin-reads-their-own-keypair-usage](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
+#### [a-user-reading-their-own-user-reads-their-keypair-usage](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
 
-when the superadmin reads their default keypair's usage, the registered slot type's limit comes back unlimited and the usage is zero
+when a user who can read users in their own user scope reads their default keypair's usage, the registered slot type's limit comes back unlimited and the usage is zero
 
 Given
 
-- one place and one superadmin. one resource slot type is registered
+- one place and one regular user. that user can read users in their own user scope. one resource slot type is registered
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -705,9 +655,13 @@ Given
   - Prepare one user in the domain
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+    - regular user user-1: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-  - superadmin user-1: has one more active keypair besides the default one
+  - regular user user-1: has one more active keypair besides the default one
+  - a user granted permission to read users in their own user scope
+    - Role reader-1: applies only within the scope it is granted in
+    - Role reader-1: READ allowed on every user
+    - regular user user-1: holds Role reader-1
 
 When
 
@@ -752,15 +706,15 @@ Then
 
 ### my_user_usage
 
-<a id="usage-the-superadmin-reads-their-own-user-usage"></a>
+<a id="usage-a-user-reading-their-own-user-reads-their-user-usage"></a>
 
-#### [the-superadmin-reads-their-own-user-usage](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
+#### [a-user-reading-their-own-user-reads-their-user-usage](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
 
-when the superadmin reads their own usage, the registered slot type's limit comes back unlimited and the usage is zero
+when a user who can read users in their own user scope reads their own usage, the registered slot type's limit comes back unlimited and the usage is zero
 
 Given
 
-- one place and one superadmin. one resource slot type is registered
+- one place and one regular user. that user can read users in their own user scope. one resource slot type is registered
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -769,9 +723,13 @@ Given
   - Prepare one user in the domain
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+    - regular user user-1: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-  - superadmin user-1: has one more active keypair besides the default one
+  - regular user user-1: has one more active keypair besides the default one
+  - a user granted permission to read users in their own user scope
+    - Role reader-1: applies only within the scope it is granted in
+    - Role reader-1: READ allowed on every user
+    - regular user user-1: holds Role reader-1
 
 When
 
@@ -816,15 +774,15 @@ Then
 
 ### project_usage
 
-<a id="usage-the-superadmin-reads-a-projects-usage"></a>
+<a id="usage-a-user-reading-the-project-reads-its-usage"></a>
 
-#### [the-superadmin-reads-a-projects-usage](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
+#### [a-user-reading-the-project-reads-its-usage](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
 
-when the superadmin reads a project's usage, the registered slot type's limit comes back unlimited and the usage is zero
+when a user who can read the project in its scope reads that project's usage, the registered slot type's limit comes back unlimited and the usage is zero
 
 Given
 
-- one place and one superadmin. one resource slot type is registered
+- one place and one regular user. that user can read the project in the project scope. one resource slot type is registered
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -833,9 +791,13 @@ Given
   - Prepare one user in the domain
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+    - regular user user-1: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-  - superadmin user-1: has one more active keypair besides the default one
+  - regular user user-1: has one more active keypair besides the default one
+  - a user granted permission to read the project in its scope
+    - Role reader-1: applies only within the scope it is granted in
+    - Role reader-1: READ allowed on every project
+    - regular user user-1: holds Role reader-1
 
 When
 

@@ -132,21 +132,21 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 id 로 키페어 정책 하나를 읽으면, 그 항목에 정책 전체가 응답으로 옵니다](#bulk_reading-the-superadmin-reads-a-keypair-policy-by-id) | 성공 |
+| [global 스코프에서 그 정책을 읽을 수 있는 사용자가 id 로 키페어 정책 하나를 읽으면, 그 항목에 정책 전체가 응답으로 옵니다](#bulk_reading-a-user-reading-policies-reads-a-keypair-policy-by-id) | 성공 |
 | [아무 권한도 받지 않은 사용자가 정책 하나를 id 로 읽으면, 호출은 거부되지 않고 그 항목이 권한 부족으로 거부됩니다](#bulk_reading-a-user-granted-nothing-reading-a-keypair-policy-by-id-is-refused-per-item) | 거부 |
 
 **bulk_get_project_resource_policy_ids**
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 id 로 프로젝트 정책 하나를 읽으면, 그 항목에 정책 전체가 응답으로 옵니다](#bulk_reading-the-superadmin-reads-a-project-policy-by-id) | 성공 |
+| [global 스코프에서 그 정책을 읽을 수 있는 사용자가 id 로 프로젝트 정책 하나를 읽으면, 그 항목에 정책 전체가 응답으로 옵니다](#bulk_reading-a-user-reading-policies-reads-a-project-policy-by-id) | 성공 |
 | [아무 권한도 받지 않은 사용자가 정책 하나를 id 로 읽으면, 호출은 거부되지 않고 그 항목이 권한 부족으로 거부됩니다](#bulk_reading-a-user-granted-nothing-reading-a-project-policy-by-id-is-refused-per-item) | 거부 |
 
 **bulk_get_user_resource_policy_ids**
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 id 로 사용자 정책 하나를 읽으면, 그 항목에 정책 전체가 응답으로 옵니다](#bulk_reading-the-superadmin-reads-a-user-policy-by-id) | 성공 |
+| [global 스코프에서 그 정책을 읽을 수 있는 사용자가 id 로 사용자 정책 하나를 읽으면, 그 항목에 정책 전체가 응답으로 옵니다](#bulk_reading-a-user-reading-policies-reads-a-user-policy-by-id) | 성공 |
 | [아무 권한도 받지 않은 사용자가 정책 하나를 id 로 읽으면, 호출은 거부되지 않고 그 항목이 권한 부족으로 거부됩니다](#bulk_reading-a-user-granted-nothing-reading-a-user-policy-by-id-is-refused-per-item) | 거부 |
 
 **bulk_lookup_keypair_resource_policy_names**
@@ -1617,22 +1617,26 @@ Then
 
 ### bulk_get_keypair_resource_policy_ids
 
-<a id="bulk_reading-the-superadmin-reads-a-keypair-policy-by-id"></a>
+<a id="bulk_reading-a-user-reading-policies-reads-a-keypair-policy-by-id"></a>
 
-#### [the-superadmin-reads-a-keypair-policy-by-id](/tests/scenario/bai_scenario/manager/resource_policy/test_bulk_reading.py): pass
+#### [a-user-reading-policies-reads-a-keypair-policy-by-id](/tests/scenario/bai_scenario/manager/resource_policy/test_bulk_reading.py): pass
 
-superadmin 이 id 로 키페어 정책 하나를 읽으면, 그 항목에 정책 전체가 응답으로 옵니다
+global 스코프에서 그 정책을 읽을 수 있는 사용자가 id 로 키페어 정책 하나를 읽으면, 그 항목에 정책 전체가 응답으로 옵니다
 
 Given
 
-- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
+- 아무도 사용하지 않는 키페어 정책 하나와, global 스코프에서 그 정책을 읽을 수 있는 user 한 명
   - 도메인 home-1
   - 정책이 할당된 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - global 스코프에서 keypair_resource_policy 읽기 권한을 주는 역할 부여
+    - 역할 policy-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 policy-reader-1: keypair_resource_policy 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 policy-reader-1 보유
 
 When
 
@@ -1685,22 +1689,26 @@ Then
 
 ### bulk_get_project_resource_policy_ids
 
-<a id="bulk_reading-the-superadmin-reads-a-project-policy-by-id"></a>
+<a id="bulk_reading-a-user-reading-policies-reads-a-project-policy-by-id"></a>
 
-#### [the-superadmin-reads-a-project-policy-by-id](/tests/scenario/bai_scenario/manager/resource_policy/test_bulk_reading.py): pass
+#### [a-user-reading-policies-reads-a-project-policy-by-id](/tests/scenario/bai_scenario/manager/resource_policy/test_bulk_reading.py): pass
 
-superadmin 이 id 로 프로젝트 정책 하나를 읽으면, 그 항목에 정책 전체가 응답으로 옵니다
+global 스코프에서 그 정책을 읽을 수 있는 사용자가 id 로 프로젝트 정책 하나를 읽으면, 그 항목에 정책 전체가 응답으로 옵니다
 
 Given
 
-- 아무도 사용하지 않는 프로젝트 정책 하나와, superadmin 한 명
+- 아무도 사용하지 않는 프로젝트 정책 하나와, global 스코프에서 그 정책을 읽을 수 있는 user 한 명
   - 도메인 home-1
   - 정책이 할당된 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 프로젝트 자원 정책 project-policy-1: 프로젝트 하나당 vfolder 10개까지
+  - global 스코프에서 project_resource_policy 읽기 권한을 주는 역할 부여
+    - 역할 policy-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 policy-reader-1: project_resource_policy 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 policy-reader-1 보유
 
 When
 
@@ -1745,22 +1753,26 @@ Then
 
 ### bulk_get_user_resource_policy_ids
 
-<a id="bulk_reading-the-superadmin-reads-a-user-policy-by-id"></a>
+<a id="bulk_reading-a-user-reading-policies-reads-a-user-policy-by-id"></a>
 
-#### [the-superadmin-reads-a-user-policy-by-id](/tests/scenario/bai_scenario/manager/resource_policy/test_bulk_reading.py): pass
+#### [a-user-reading-policies-reads-a-user-policy-by-id](/tests/scenario/bai_scenario/manager/resource_policy/test_bulk_reading.py): pass
 
-superadmin 이 id 로 사용자 정책 하나를 읽으면, 그 항목에 정책 전체가 응답으로 옵니다
+global 스코프에서 그 정책을 읽을 수 있는 사용자가 id 로 사용자 정책 하나를 읽으면, 그 항목에 정책 전체가 응답으로 옵니다
 
 Given
 
-- 아무도 사용하지 않는 사용자 정책 하나와, superadmin 한 명
+- 아무도 사용하지 않는 사용자 정책 하나와, global 스코프에서 그 정책을 읽을 수 있는 user 한 명
   - 도메인 home-1
   - 정책이 할당된 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+  - global 스코프에서 user_resource_policy 읽기 권한을 주는 역할 부여
+    - 역할 policy-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 policy-reader-1: user_resource_policy 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 policy-reader-1 보유
 
 When
 

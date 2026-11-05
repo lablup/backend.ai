@@ -20,7 +20,8 @@ Scenario: incomplete 1 / 9
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin batch loads several presets and one unknown id, every preset comes back in the order requested and the item for the unknown id is empty](#reading-the-superadmin-reads-several-presets-by-id) | answered |
+| [when the superadmin batch loads several presets and one unknown id, the presets come back in the order requested and the item for the unknown id is empty](#reading-a-superadmin-loading-an-unknown-preset-id-finds-it-empty) | answered |
+| [when a user who can read presets in public batch loads several presets by id, every preset comes back in the order requested](#reading-a-user-reading-presets-reads-several-presets-by-id) | answered |
 | [a user granted nothing batch loading presets by id is not rejected as a call, and every item asked carries a denial for not enough permission](#reading-a-user-granted-nothing-batch-loading-presets-is-refused-per-item) | rejected |
 
 **get**
@@ -59,7 +60,7 @@ Scenario: incomplete 1 / 9
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin binds a preset to a resource group, the preset comes back naming that group and the rest stays as it was](#applying_resource_group-the-superadmin-binds-a-preset-to-a-resource-group) | answered |
+| [when a user who can update presets and the public scope itself in public binds a preset to a resource group, the preset comes back naming that group and the rest stays as it was](#applying_resource_group-a-user-granted-update-binds-a-preset-to-a-resource-group) | answered |
 | [a user granted nothing binding a preset to a resource group is rejected for not enough permission](#applying_resource_group-a-user-granted-nothing-may-not-bind-a-preset-to-a-resource-group) | rejected |
 
 **create**
@@ -89,11 +90,11 @@ Scenario: incomplete 1 / 9
 
 ### batch_load_by_ids
 
-<a id="reading-the-superadmin-reads-several-presets-by-id"></a>
+<a id="reading-a-superadmin-loading-an-unknown-preset-id-finds-it-empty"></a>
 
-#### [the-superadmin-reads-several-presets-by-id](/tests/scenario/bai_scenario/manager/resource_preset/test_reading.py): pass
+#### [a-superadmin-loading-an-unknown-preset-id-finds-it-empty](/tests/scenario/bai_scenario/manager/resource_preset/test_reading.py): pass
 
-when the superadmin batch loads several presets and one unknown id, every preset comes back in the order requested and the item for the unknown id is empty
+when the superadmin batch loads several presets and one unknown id, the presets come back in the order requested and the item for the unknown id is empty
 
 Given
 
@@ -128,6 +129,49 @@ Then
   - items[1].shared_memory = None
   - items[1].resource_group_name = None
   - items[2] = None
+
+<a id="reading-a-user-reading-presets-reads-several-presets-by-id"></a>
+
+#### [a-user-reading-presets-reads-several-presets-by-id](/tests/scenario/bai_scenario/manager/resource_preset/test_reading.py): pass
+
+when a user who can read presets in public batch loads several presets by id, every preset comes back in the order requested
+
+Given
+
+- 2 presets and one regular user granted READ in public
+  - Resource preset preset-1: belongs to public because it is bound to no resource group
+  - Resource preset preset-2: belongs to public because it is bound to no resource group
+  - Domain home-1
+  - Prepare a user granted the READ permission on resource presets in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: READ allowed on every resource_preset
+    - regular user user-1: holds Role preset-writer-1
+
+When
+
+- ResourcePresetAdapter.batch_load_by_ids: user-1 reads several presets by the ids of 2
+
+Then
+
+- every preset comes back in the order requested
+  - len(items) = 2
+  - items[0].id: same as the id of the preset seeded in advance
+  - items[0].entity_id: same as the id of the preset seeded in advance
+  - items[0].name = 'preset-1'
+  - items[0].resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
+  - items[0].shared_memory = None
+  - items[0].resource_group_name = None
+  - items[1].id: same as the id of the preset seeded in advance
+  - items[1].entity_id: same as the id of the preset seeded in advance
+  - items[1].name = 'preset-2'
+  - items[1].resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
+  - items[1].shared_memory = None
+  - items[1].resource_group_name = None
 
 <a id="reading-a-user-granted-nothing-batch-loading-presets-is-refused-per-item"></a>
 
@@ -563,23 +607,28 @@ Then
 
 ### apply_resource_group
 
-<a id="applying_resource_group-the-superadmin-binds-a-preset-to-a-resource-group"></a>
+<a id="applying_resource_group-a-user-granted-update-binds-a-preset-to-a-resource-group"></a>
 
-#### [the-superadmin-binds-a-preset-to-a-resource-group](/tests/scenario/bai_scenario/manager/resource_preset/test_applying_resource_group.py): pass
+#### [a-user-granted-update-binds-a-preset-to-a-resource-group](/tests/scenario/bai_scenario/manager/resource_preset/test_applying_resource_group.py): pass
 
-when the superadmin binds a preset to a resource group, the preset comes back naming that group and the rest stays as it was
+when a user who can update presets and the public scope itself in public binds a preset to a resource group, the preset comes back naming that group and the rest stays as it was
 
 Given
 
-- one preset, one resource group and one superadmin
+- one preset, one resource group and one regular user granted the UPDATE permission in public and the UPDATE permission on the public scope itself
   - Resource preset preset-1: belongs to public because it is bound to no resource group
   - Resource group group-1: uses the fifo scheduler
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted the UPDATE permission on resource presets in public and the UPDATE permission on the public scope itself
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: UPDATE allowed on every resource_preset
+    - Role preset-writer-1: UPDATE allowed on every global
+    - regular user user-1: holds Role preset-writer-1
 
 When
 
