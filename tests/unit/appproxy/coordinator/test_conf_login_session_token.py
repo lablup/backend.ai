@@ -61,7 +61,7 @@ class TestConfLoginSessionToken:
         assert stored_token.kernel_host == "10.0.0.1"
         assert stored_token.session_id == _SESSION_ID
 
-    async def test_login_session_token_is_not_logged(
+    async def test_conf_v2_body_does_not_log_the_login_session_token(
         self,
         conf_request: web.Request,
         conf_params_of_an_older_manager: ConfRequestModel,
