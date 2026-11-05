@@ -238,8 +238,7 @@ async def what_is_left(engine: ExtendedAsyncSAEngine) -> WhatIsLeft:
 
     def held_by(entity_type: EntityType) -> sa.Select[tuple[int]]:
         return (
-            sa
-            .select(sa.func.count())
+            sa.select(sa.func.count())
             .select_from(EntityMembershipRow)
             .join(parent, parent.id == EntityMembershipRow.virtual_entity_id)
             .join(child, child.id == EntityMembershipRow.member_entity_id)
@@ -252,8 +251,7 @@ async def what_is_left(engine: ExtendedAsyncSAEngine) -> WhatIsLeft:
     async with engine.begin_readonly_session_read_committed() as sess:
         groups = await sess.scalar(sa.select(sa.func.count()).select_from(SessionGroupRow))
         group_nodes = await sess.scalar(
-            sa
-            .select(sa.func.count())
+            sa.select(sa.func.count())
             .select_from(VirtualEntityRow)
             .where(VirtualEntityRow.entity_type == SessionGroupEntityType())
         )

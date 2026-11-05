@@ -2,58 +2,58 @@
 
 [background](/src/ai/backend/manager/api/adapters/deployment/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/deployment/adapter.py)
 
-Scenario: incomplete 33 / 47
+Scenario: incomplete 12 / 47
 
 - built from ops (22)
   - admin_search: representative success ✓ · representative rejection ✓
-  - admin_search_replicas: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - admin_search_replicas: representative success ✓ · representative rejection ✓
   - admin_search_revisions: representative success ✓ · representative rejection ✓
-  - batch_load_access_tokens_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - batch_load_auto_scaling_rules_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_access_tokens_by_ids: representative success ✓ · representative rejection ✓
+  - batch_load_auto_scaling_rules_by_ids: representative success ✓ · representative rejection ✓
   - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
   - batch_load_policies_by_endpoint_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - batch_load_policies_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - batch_load_replicas_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_policies_by_ids: representative success ✓ · representative rejection ✓
+  - batch_load_replicas_by_ids: representative success ✓ · representative rejection ✓
   - batch_load_revisions_by_ids: representative success ✓ · representative rejection ✗: SCENARIO-GAP
-  - batch_load_routes_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - get_access_token: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - get_replica: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_routes_by_ids: representative success ✓ · representative rejection ✓
+  - get_access_token: representative success ✓ · representative rejection ✓
+  - get_replica: representative success ✓ · representative rejection ✓
   - get_revision: representative success ✓ · representative rejection ✓
   - project_search: representative success ✓ · representative rejection ✓
   - scoped_search: representative success ✓ · representative rejection ✓
-  - search_access_tokens: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - search_policies: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - search_replicas: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - search_access_tokens: representative success ✓ · representative rejection ✓
+  - search_policies: representative success ✓ · representative rejection ✓
+  - search_replicas: representative success ✓ · representative rejection ✓
   - search_revisions: representative success ✓ · representative rejection ✓
-  - search_routes: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - search_rules: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - search_routes: representative success ✓ · representative rejection ✓
+  - search_rules: representative success ✓ · representative rejection ✓
 - ops + direct implementation (1)
   - get_current_revision: success absent · rejection present 1 (get_ops, single_entity): SCENARIO-GAP
 - direct implementation (24)
   - activate_revision: success absent · rejection absent (single_entity): SCENARIO-GAP
   - add_revision: success present 4 · rejection present 7 (single_entity)
   - admin_refresh_deployment_revisions: success absent · rejection absent (global_scope): SCENARIO-GAP
-  - bulk_delete_access_tokens: success absent · rejection absent (partial_bulk_field): SCENARIO-GAP
+  - bulk_delete_access_tokens: success present 2 · rejection absent (partial_bulk_field): SCENARIO-GAP
   - bulk_delete_rules: success absent · rejection absent (partial_bulk): SCENARIO-GAP
   - create: success present 3 · rejection present 2 (scope)
-  - create_access_token: success absent · rejection absent (single_entity): SCENARIO-GAP
-  - create_rule: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - create_access_token: success absent · rejection present 1 (single_entity): SCENARIO-GAP
+  - create_rule: success present 1 · rejection present 1 (single_entity)
   - delete: success present 2 · rejection present 2 (single_entity)
   - get: success present 2 · rejection present 3 (single_entity)
-  - get_policy: success absent · rejection absent (single_entity): SCENARIO-GAP
-  - get_rule: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - get_policy: success present 1 · rejection present 1 (single_entity)
+  - get_rule: success present 1 · rejection present 1 (single_entity)
   - partial_bulk_purge_access_tokens: success present 2 · rejection absent (partial_bulk_field): SCENARIO-GAP
   - partial_bulk_purge_rules: success present 3 · rejection absent (partial_bulk_field): SCENARIO-GAP
   - partial_bulk_update_rules: success present 2 · rejection absent (partial_bulk_field): SCENARIO-GAP
-  - purge_access_token: success absent · rejection absent (single_field): SCENARIO-GAP
-  - purge_rule: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - purge_access_token: success present 1 · rejection present 1 (single_field)
+  - purge_rule: success present 1 · rejection present 1 (single_entity)
   - replace_options: success present 4 · rejection present 3 (single_entity)
   - search_revision_resource_slots: success present 1 · rejection present 1 (single_field)
   - sync_replicas: success present 1 · rejection present 1 (single_entity)
   - update: success present 5 · rejection present 2 (single_entity)
-  - update_route_traffic: success absent · rejection absent (single_field): SCENARIO-GAP
-  - update_rule: success absent · rejection absent (single_entity): SCENARIO-GAP
-  - upsert_policy: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - update_route_traffic: success present 1 · rejection present 1 (single_field)
+  - update_rule: success present 1 · rejection present 1 (single_entity)
+  - upsert_policy: success present 1 · rejection present 1 (single_entity)
 
 **admin_search**
 
@@ -62,6 +62,13 @@ Scenario: incomplete 33 / 47
 | [when three deployments exist and a superadmin searches everything without a filter, all three are counted](#searching-the-superadmin-counts-every-deployment) | answered |
 | [when a user granted deployment read but not a superadmin searches everything, the role rejects it; the role checks this operation, not the permission graph](#searching-a-user-granted-read-may-not-search-every-deployment) | rejected |
 
+**admin_search_replicas**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin searches every replica, the replicas seeded in advance come back. The requesting user of this row is the superadmin because the search is gated by the global role](#searching_replicas_admin-the-superadmin-searches-the-replicas) | answered |
+| [when a user granted nothing tries to search every replica, the search is rejected because the user lacks the global role](#searching_replicas_admin-a-user-granted-nothing-searches-no-replica) | rejected |
+
 **admin_search_revisions**
 
 | scenario | verdict |
@@ -69,11 +76,60 @@ Scenario: incomplete 33 / 47
 | [when revisions are split across deployments in two projects and a superadmin searches everything without a filter, the revisions of both are counted; the role checks this operation](#searching_revisions-the-superadmin-counts-every-revision) | answered |
 | [when a user granted read on every deployment but not a superadmin searches every revision, the role rejects it](#searching_revisions-a-user-granted-read-may-not-search-every-revision) | rejected |
 
+**batch_load_access_tokens_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read batch loads the access tokens the deployment holds by id, those tokens come back](#batch_loading_access_tokens-a-user-granted-deployment-read-loads-the-tokens-by-id) | answered |
+| [when a user granted nothing tries to batch load the access tokens the deployment holds by id, every entry is rejected because the user lacks permission](#batch_loading_access_tokens-a-user-granted-nothing-gets-a-refusal-for-each-token) | rejected |
+
+**batch_load_auto_scaling_rules_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read batch loads the auto-scaling rules the deployment holds by id, those rules come back](#batch_loading_rules-a-user-granted-deployment-read-loads-the-rules-by-id) | answered |
+| [when a user granted nothing tries to batch load the auto-scaling rules the deployment holds by id, every entry is rejected because the user lacks permission](#batch_loading_rules-a-user-granted-nothing-gets-a-refusal-for-each-rule) | rejected |
+
+**batch_load_policies_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read batch loads the policy the deployment holds by id, that policy comes back](#batch_loading_policies-a-user-granted-deployment-read-loads-the-policy-by-id) | answered |
+| [when a user granted nothing tries to batch load the policy the deployment holds by id, every entry is rejected because the user lacks permission](#batch_loading_policies-a-user-granted-nothing-gets-a-refusal-for-the-policy) | rejected |
+
+**batch_load_replicas_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read batch loads the replicas the deployment holds by id, those replicas come back](#batch_loading_replicas-a-user-granted-deployment-read-loads-the-replicas-by-id) | answered |
+| [when a user granted nothing tries to batch load the replicas the deployment holds by id, every entry is rejected because the user lacks permission](#batch_loading_replicas-a-user-granted-nothing-gets-a-refusal-for-the-replicas) | rejected |
+
 **batch_load_revisions_by_ids**
 
 | scenario | verdict |
 |---|---|
 | [when a user granted deployment read in only one project loads a readable revision, a revision of another project, and an id nothing answers to at once, a revision, a rejection, and an empty entry come back in the order given](#reading_revisions-loading-revisions-by-id-answers-each-id-on-its-own) | answered |
+
+**batch_load_routes_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read batch loads the routes the deployment holds by id, those routes come back](#batch_loading_routes-a-user-granted-deployment-read-loads-the-routes-by-id) | answered |
+| [when a user granted nothing tries to batch load the routes the deployment holds by id, every entry is rejected because the user lacks permission](#batch_loading_routes-a-user-granted-nothing-gets-a-refusal-for-the-routes) | rejected |
+
+**get_access_token**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read reads one of the access tokens the deployment holds, that token comes back](#reading_access_tokens-a-user-granted-deployment-read-reads-a-token) | answered |
+| [when a user granted nothing tries to read one of the access tokens the deployment holds, the lookup that finds the deployment holding the token is rejected](#reading_access_tokens-a-user-granted-nothing-reads-no-token) | rejected |
+
+**get_replica**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read reads a replica of the deployment, that replica comes back](#reading_replicas-a-user-granted-deployment-read-reads-the-replica) | answered |
+| [when a user granted nothing tries to read a replica of the deployment, the lookup that finds the deployment holding the replica is rejected](#reading_replicas-a-user-granted-nothing-reads-no-replica) | rejected |
 
 **get_revision**
 
@@ -98,6 +154,27 @@ Scenario: incomplete 33 / 47
 | [when two users each created a deployment in the same project and the one granted read in their own scope searches their own, only what they created comes back](#searching-searching-my-own-finds-only-what-i-made) | answered |
 | [when a user not granted read in their own scope searches their own, the call is rejected for lack of permission; here too the permission checks it rather than only narrowing the scope](#searching-a-user-granted-nothing-may-not-search-even-their-own) | rejected |
 
+**search_access_tokens**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read searches the access tokens the deployment holds, those tokens come back](#searching_access_tokens-a-user-granted-deployment-read-searches-the-tokens) | answered |
+| [when a user granted nothing tries to search the access tokens the deployment holds, the search is rejected because the user lacks permission](#searching_access_tokens-a-user-granted-nothing-searches-no-token) | rejected |
+
+**search_policies**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin searches the deployment policies, the policy seeded in advance comes back. The requesting user of this row is the superadmin because the search is gated by the global role](#searching_policies-the-superadmin-searches-the-policies) | answered |
+| [when a user granted nothing tries to search the deployment policies, the search is rejected because the user lacks the global role](#searching_policies-a-user-granted-nothing-searches-no-policy) | rejected |
+
+**search_replicas**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read searches the replicas of the deployment, the replicas seeded in advance come back](#searching_replicas-a-user-granted-deployment-read-searches-the-replicas) | answered |
+| [when a user granted nothing tries to search the replicas of the deployment, the search is rejected because the user lacks permission](#searching_replicas-a-user-granted-nothing-searches-no-replica) | rejected |
+
 **search_revisions**
 
 | scenario | verdict |
@@ -106,6 +183,20 @@ Scenario: incomplete 33 / 47
 | [when revisions are split across deployments in two projects and a user granted read on only one side searches that side's deployment revisions, only that side comes back](#searching_revisions-another-deployments-revisions-stay-out-of-a-deployment-search) | answered |
 | [searching the revisions of a deployment holding three revisions filtered by number leaves only the one with that number](#searching_revisions-filtering-revisions-by-number-leaves-only-that-one) | answered |
 | [when a user with no deployment grant searches a deployment's revisions, the call is rejected for lack of permission](#searching_revisions-a-user-granted-nothing-may-not-search-a-deployments-revisions) | rejected |
+
+**search_routes**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read searches the routes of the deployment, the routes seeded in advance come back](#searching_routes-a-user-granted-deployment-read-searches-the-routes) | answered |
+| [when a user granted nothing tries to search the routes of the deployment, the search is rejected because the user lacks permission](#searching_routes-a-user-granted-nothing-searches-no-route) | rejected |
+
+**search_rules**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read searches the auto-scaling rules the deployment holds, those rules come back](#searching_rules-a-user-granted-deployment-read-searches-the-rules) | answered |
+| [when a user granted nothing tries to search the auto-scaling rules the deployment holds, the search is rejected because the user lacks permission](#searching_rules-a-user-granted-nothing-searches-no-rule) | rejected |
 
 **get_current_revision**
 
@@ -129,6 +220,13 @@ Scenario: incomplete 33 / 47
 | [adding a revision without a runtime variant and without a preset is rejected because the input is wrong](#adding_revisions-a-revision-with-no-runtime-variant-from-any-layer-is-refused) | rejected |
 | [when a user granted only read on the deployment adds a revision, the call is rejected for lack of permission](#adding_revisions-a-user-granted-only-read-may-not-add-a-revision) | rejected |
 
+**bulk_delete_access_tokens**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment purge purges several access tokens the deployment holds at once, the ids of those tokens come back](#retiring_access_tokens-a-user-granted-deployment-purge-purges-tokens-at-once) | answered |
+| [when a user granted nothing tries to purge several access tokens the deployment holds at once, nothing is purged and the id list comes back empty](#retiring_access_tokens-a-user-granted-nothing-purges-no-token-at-once) | answered |
+
 **create**
 
 | scenario | verdict |
@@ -138,6 +236,19 @@ Scenario: incomplete 33 / 47
 | [turning entity permission enforcement off lets a user with no grant create a deployment, because the permission graph checks this operation, not the role](#creating-turning-enforcement-off-lets-a-user-create-a-deployment) | answered |
 | [creating a deployment in a project other than the one where the create grant was given is rejected for lack of permission](#creating-a-create-grant-in-another-project-does-not-reach-this-one) | rejected |
 | [when a user granted no deployment permission creates a deployment, the call is rejected for lack of permission](#creating-a-user-granted-nothing-may-not-create-a-deployment) | rejected |
+
+**create_access_token**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment create tries to make an access token of the deployment, the create is rejected because the deployment's scaling group has no proxy target configured](#creating_access_tokens-a-user-granted-deployment-create-makes-no-token) | rejected |
+
+**create_rule**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment create makes an auto-scaling rule of the deployment, the rule made comes back](#creating_rules-a-user-granted-deployment-create-makes-a-rule) | answered |
+| [when a user granted nothing tries to make an auto-scaling rule of the deployment, the create is rejected because the user lacks permission](#creating_rules-a-user-granted-nothing-makes-no-rule) | rejected |
 
 **delete**
 
@@ -157,6 +268,20 @@ Scenario: incomplete 33 / 47
 | [when the same deployment exists and a user with no grant reads it, the call is rejected for lack of permission](#reading-a-user-granted-nothing-may-not-read-a-deployment) | rejected |
 | [when a superadmin reads by an id nothing answers to, the call is rejected as not found; only someone who passes the permission check sees this response](#reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
 | [when a user granted read reads by an id nothing answers to, the call is rejected for lack of permission rather than as not found, because no permission is held on a row that does not exist](#reading-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | rejected |
+
+**get_policy**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read reads the policy the deployment holds, that policy comes back](#reading_policy-a-user-granted-deployment-read-reads-the-policy) | answered |
+| [when a user granted nothing tries to read the policy the deployment holds, the read is rejected because the user lacks permission](#reading_policy-a-user-granted-nothing-reads-no-policy) | rejected |
+
+**get_rule**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read reads one of the rules seeded in advance by id, that rule comes back](#reading_rules-a-user-granted-deployment-read-reads-a-rule) | answered |
+| [when a user granted nothing tries to read one of the rules seeded in advance by id, the lookup that finds the deployment holding the rule is rejected](#reading_rules-a-user-granted-nothing-reads-no-rule) | rejected |
 
 **partial_bulk_purge_access_tokens**
 
@@ -179,6 +304,20 @@ Scenario: incomplete 33 / 47
 |---|---|
 | [when a user granted deployment update changes the metric name of several auto-scaling rules at once, every rule comes back with the new name and nothing failed](#partial_bulk_auto_scaling_rules-a-deployment-editor-edits-several-rules-at-once) | answered |
 | [when a user with no grant tries to update several auto-scaling rules at once, nothing is updated and every rule comes back in the failed list because the user lacks permission](#partial_bulk_auto_scaling_rules-a-user-granted-nothing-edits-none-of-several-rules) | answered |
+
+**purge_access_token**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read and purge purges one of the access tokens the deployment holds, the id of that token comes back. The purge reads the deployment first, so read is also required](#retiring_access_tokens-a-user-granted-deployment-purge-purges-a-token) | answered |
+| [when a user granted nothing tries to purge one of the access tokens the deployment holds, the lookup that finds the deployment holding the token is rejected](#retiring_access_tokens-a-user-granted-nothing-purges-no-token) | rejected |
+
+**purge_rule**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read and purge purges one of the auto-scaling rules the deployment holds, the id of that rule comes back. The purge reads the deployment first, so read is also required](#retiring_rules-a-user-granted-deployment-purge-purges-a-rule) | answered |
+| [when a user granted nothing tries to purge one of the auto-scaling rules the deployment holds, the lookup that finds the deployment holding the rule is rejected](#retiring_rules-a-user-granted-nothing-purges-no-rule) | rejected |
 
 **replace_options**
 
@@ -217,6 +356,27 @@ Scenario: incomplete 33 / 47
 | [when a superadmin holding no grant changes the name of a deployment another user created, only the name becomes the new value; the role passes through the permission graph](#editing-the-superadmin-renames-anothers-deployment-without-a-grant) | answered |
 | [when a user granted only read updates a deployment, the call is rejected for lack of permission](#editing-a-user-granted-only-read-may-not-update-a-deployment) | rejected |
 | [when a superadmin updates an id nothing answers to, the call is rejected as not found](#editing-updating-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
+
+**update_route_traffic**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read and update turns the traffic of a route on, the route with its traffic turned on comes back. The traffic change reads the deployment first, so read is also required](#editing_route_traffic-a-user-granted-deployment-update-opens-the-traffic) | answered |
+| [when a user granted nothing tries to turn the traffic of a route, the lookup that finds the deployment holding the route is rejected](#editing_route_traffic-a-user-granted-nothing-changes-no-traffic) | rejected |
+
+**update_rule**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read and update edits one of the rules seeded in advance, the rule edited comes back. The edit reads the deployment first, so read is also required](#updating_rules-a-user-granted-deployment-update-edits-a-rule) | answered |
+| [when a user granted nothing tries to edit one of the rules seeded in advance, the lookup that finds the deployment holding the rule is rejected](#updating_rules-a-user-granted-nothing-edits-no-rule) | rejected |
+
+**upsert_policy**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment update puts a policy on the deployment, the policy put comes back. The upsert replaces an existing policy, so the call is gated by update](#upserting_policy-a-user-granted-deployment-update-puts-the-policy) | answered |
+| [when a user granted nothing tries to put a policy on the deployment, the upsert is rejected because the user lacks permission](#upserting_policy-a-user-granted-nothing-puts-no-policy) | rejected |
 
 ### admin_search
 
@@ -282,6 +442,110 @@ Given
 When
 
 - DeploymentAdapter.admin_search: user-1 searches everything without a filter
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+### admin_search_replicas
+
+<a id="searching_replicas_admin-the-superadmin-searches-the-replicas"></a>
+
+#### [the-superadmin-searches-the-replicas](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas_admin.py): pass
+
+when the superadmin searches every replica, the replicas seeded in advance come back. The requesting user of this row is the superadmin because the search is gated by the global role
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and the superadmin
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - superadmin user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.admin_search_replicas: user-1 searches every replica
+
+Then
+
+- the replicas seeded in advance come back with their count
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: same as the id of the route seeded in advance
+  - items[0].field_id: same as the id of the route seeded in advance
+  - items[0].deployment_id: same as the id of the deployment the replica serves
+  - items[0].revision_id: same as the id of the revision seeded in advance
+  - items[0].session_id = None
+  - items[0].readiness_status = 'NOT_CHECKED'
+  - items[0].liveness_status = 'NOT_CHECKED'
+  - items[0].activeness_status = 'INACTIVE'
+  - items[0].status = 'provisioning'
+  - items[0].traffic_status = 'inactive'
+  - items[0].health_status = 'not_checked'
+  - items[0].created_at: the time this run wrote
+
+<a id="searching_replicas_admin-a-user-granted-nothing-searches-no-replica"></a>
+
+#### [a-user-granted-nothing-searches-no-replica](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas_admin.py): pass
+
+when a user granted nothing tries to search every replica, the search is rejected because the user lacks the global role
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.admin_search_replicas: user-1 searches every replica
 
 Then
 
@@ -383,6 +647,358 @@ Then
 - the call is rejected
   - rejected: InsufficientPrivilege
 
+### batch_load_access_tokens_by_ids
+
+<a id="batch_loading_access_tokens-a-user-granted-deployment-read-loads-the-tokens-by-id"></a>
+
+#### [a-user-granted-deployment-read-loads-the-tokens-by-id](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_access_tokens.py): pass
+
+when a user granted deployment read batch loads the access tokens the deployment holds by id, those tokens come back
+
+Given
+
+- one deployment holding 2 access tokens, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.batch_load_access_tokens_by_ids: user-1 batch loads 2 tokens by id
+
+Then
+
+- the tokens come back in the order they were put in the request
+  - loaded count = 2
+  - [0].id: same as the id of the token seeded in advance
+  - [0].field_id: same as the id of the token seeded in advance
+  - [0].token = 'scenario-token'
+  - [0].expires_at = None
+  - [0].created_at: the time this run wrote
+  - [1].id: same as the id of the token seeded in advance
+  - [1].field_id: same as the id of the token seeded in advance
+  - [1].token = 'scenario-token'
+  - [1].expires_at = None
+  - [1].created_at: the time this run wrote
+
+<a id="batch_loading_access_tokens-a-user-granted-nothing-gets-a-refusal-for-each-token"></a>
+
+#### [a-user-granted-nothing-gets-a-refusal-for-each-token](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_access_tokens.py): pass
+
+when a user granted nothing tries to batch load the access tokens the deployment holds by id, every entry is rejected because the user lacks permission
+
+Given
+
+- one deployment holding 2 access tokens, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.batch_load_access_tokens_by_ids: user-1 batch loads 2 tokens by id
+
+Then
+
+- no token comes back and every entry is the exception the check raised
+  - loaded count = 2
+  - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
+
+### batch_load_auto_scaling_rules_by_ids
+
+<a id="batch_loading_rules-a-user-granted-deployment-read-loads-the-rules-by-id"></a>
+
+#### [a-user-granted-deployment-read-loads-the-rules-by-id](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_rules.py): pass
+
+when a user granted deployment read batch loads the auto-scaling rules the deployment holds by id, those rules come back
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.batch_load_auto_scaling_rules_by_ids: user-1 batch loads 2 rules by id
+
+Then
+
+- the rules come back in the order they were put in the request
+  - loaded count = 2
+  - [0].id: same as the id of the rule seeded in advance
+  - [0].field_id: same as the id of the rule seeded in advance
+  - [0].deployment_id: same as the id of the deployment the rule scales
+  - [0].metric_source = 'KERNEL'
+  - [0].metric_name = 'cpu_util'
+  - [0].min_threshold = None
+  - [0].max_threshold = None
+  - [0].step_size = 1
+  - [0].time_window = 60
+  - [0].min_replicas = None
+  - [0].max_replicas = None
+  - [0].prometheus_query_preset_id = None
+  - [0].created_at: the time this run wrote
+  - [0].last_triggered_at = None
+  - [1].id: same as the id of the rule seeded in advance
+  - [1].field_id: same as the id of the rule seeded in advance
+  - [1].deployment_id: same as the id of the deployment the rule scales
+  - [1].metric_source = 'KERNEL'
+  - [1].metric_name = 'cpu_util'
+  - [1].min_threshold = None
+  - [1].max_threshold = None
+  - [1].step_size = 1
+  - [1].time_window = 60
+  - [1].min_replicas = None
+  - [1].max_replicas = None
+  - [1].prometheus_query_preset_id = None
+  - [1].created_at: the time this run wrote
+  - [1].last_triggered_at = None
+
+<a id="batch_loading_rules-a-user-granted-nothing-gets-a-refusal-for-each-rule"></a>
+
+#### [a-user-granted-nothing-gets-a-refusal-for-each-rule](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_rules.py): pass
+
+when a user granted nothing tries to batch load the auto-scaling rules the deployment holds by id, every entry is rejected because the user lacks permission
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.batch_load_auto_scaling_rules_by_ids: user-1 batch loads 2 rules by id
+
+Then
+
+- no rule comes back and every entry is the exception the check raised
+  - loaded count = 2
+  - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
+
+### batch_load_policies_by_ids
+
+<a id="batch_loading_policies-a-user-granted-deployment-read-loads-the-policy-by-id"></a>
+
+#### [a-user-granted-deployment-read-loads-the-policy-by-id](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_policies.py): pass
+
+when a user granted deployment read batch loads the policy the deployment holds by id, that policy comes back
+
+Given
+
+- one deployment holding one policy, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment policy
+
+When
+
+- DeploymentAdapter.batch_load_policies_by_ids: user-1 batch loads the policy seeded in advance by id
+
+Then
+
+- the policy comes back in the order it was put in the request
+  - [0].id: same as the id of the policy seeded in advance
+  - [0].field_id: same as the id of the policy seeded in advance
+  - [0].deployment_id: same as the id of the deployment the policy sets
+  - [0].strategy_spec.strategy: same as the strategy of the policy seeded in advance
+  - [0].strategy_spec.max_surge = IntOrPercent(count=1, percent=None)
+  - [0].strategy_spec.max_unavailable = IntOrPercent(count=0, percent=None)
+  - [0].created_at: the time this run wrote
+  - [0].updated_at: the time this run wrote
+
+<a id="batch_loading_policies-a-user-granted-nothing-gets-a-refusal-for-the-policy"></a>
+
+#### [a-user-granted-nothing-gets-a-refusal-for-the-policy](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_policies.py): pass
+
+when a user granted nothing tries to batch load the policy the deployment holds by id, every entry is rejected because the user lacks permission
+
+Given
+
+- one deployment holding one policy, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment policy
+
+When
+
+- DeploymentAdapter.batch_load_policies_by_ids: user-1 batch loads the policy seeded in advance by id
+
+Then
+
+- no policy comes back and every entry is the exception the check raised
+  - rejected: NotEnoughPermission
+
+### batch_load_replicas_by_ids
+
+<a id="batch_loading_replicas-a-user-granted-deployment-read-loads-the-replicas-by-id"></a>
+
+#### [a-user-granted-deployment-read-loads-the-replicas-by-id](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_replicas.py): pass
+
+when a user granted deployment read batch loads the replicas the deployment holds by id, those replicas come back
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.batch_load_replicas_by_ids: user-1 batch loads the replicas seeded in advance by id
+
+Then
+
+- the replicas come back in the order they were put in the request
+  - [0].id: same as the id of the route seeded in advance
+  - [0].field_id: same as the id of the route seeded in advance
+  - [0].deployment_id: same as the id of the deployment the replica serves
+  - [0].revision_id: same as the id of the revision seeded in advance
+  - [0].session_id = None
+  - [0].readiness_status = 'NOT_CHECKED'
+  - [0].liveness_status = 'NOT_CHECKED'
+  - [0].activeness_status = 'INACTIVE'
+  - [0].status = 'provisioning'
+  - [0].traffic_status = 'inactive'
+  - [0].health_status = 'not_checked'
+  - [0].created_at: the time this run wrote
+
+<a id="batch_loading_replicas-a-user-granted-nothing-gets-a-refusal-for-the-replicas"></a>
+
+#### [a-user-granted-nothing-gets-a-refusal-for-the-replicas](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_replicas.py): pass
+
+when a user granted nothing tries to batch load the replicas the deployment holds by id, every entry is rejected because the user lacks permission
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.batch_load_replicas_by_ids: user-1 batch loads the replicas seeded in advance by id
+
+Then
+
+- no replica comes back and every entry is the exception the check raised
+  - rejected: NotEnoughPermission
+
 ### batch_load_revisions_by_ids
 
 <a id="reading_revisions-loading-revisions-by-id-answers-each-id-on-its-own"></a>
@@ -453,6 +1069,284 @@ Then
   - [0].revision_preset_id = None
   - [1] = 'NotEnoughPermission'
   - [2] = None
+
+### batch_load_routes_by_ids
+
+<a id="batch_loading_routes-a-user-granted-deployment-read-loads-the-routes-by-id"></a>
+
+#### [a-user-granted-deployment-read-loads-the-routes-by-id](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_routes.py): pass
+
+when a user granted deployment read batch loads the routes the deployment holds by id, those routes come back
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.batch_load_routes_by_ids: user-1 batch loads the routes seeded in advance by id
+
+Then
+
+- the routes come back in the order they were put in the request
+  - [0].id: same as the id of the route seeded in advance
+  - [0].field_id: same as the id of the route seeded in advance
+  - [0].deployment_id: same as the id of the deployment the route serves
+  - [0].session_id = None
+  - [0].status = 'provisioning'
+  - [0].health_status = 'not_checked'
+  - [0].traffic_ratio = 1.0
+  - [0].created_at: the time this run wrote
+  - [0].revision_id: same as the id of the revision seeded in advance
+  - [0].traffic_status = 'inactive'
+  - [0].error_data = {}
+
+<a id="batch_loading_routes-a-user-granted-nothing-gets-a-refusal-for-the-routes"></a>
+
+#### [a-user-granted-nothing-gets-a-refusal-for-the-routes](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_routes.py): pass
+
+when a user granted nothing tries to batch load the routes the deployment holds by id, every entry is rejected because the user lacks permission
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.batch_load_routes_by_ids: user-1 batch loads the routes seeded in advance by id
+
+Then
+
+- no route comes back and every entry is the exception the check raised
+  - rejected: NotEnoughPermission
+
+### get_access_token
+
+<a id="reading_access_tokens-a-user-granted-deployment-read-reads-a-token"></a>
+
+#### [a-user-granted-deployment-read-reads-a-token](/tests/scenario/bai_scenario/manager/deployment/test_reading_access_tokens.py): pass
+
+when a user granted deployment read reads one of the access tokens the deployment holds, that token comes back
+
+Given
+
+- one deployment holding 2 access tokens, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.get_access_token: user-1 reads one of the tokens seeded in advance
+
+Then
+
+- the token read comes back
+  - id: same as the id of the token seeded in advance
+  - field_id: same as the id of the token seeded in advance
+  - token = 'scenario-token'
+  - expires_at = None
+  - created_at: the time this run wrote
+
+<a id="reading_access_tokens-a-user-granted-nothing-reads-no-token"></a>
+
+#### [a-user-granted-nothing-reads-no-token](/tests/scenario/bai_scenario/manager/deployment/test_reading_access_tokens.py): pass
+
+when a user granted nothing tries to read one of the access tokens the deployment holds, the lookup that finds the deployment holding the token is rejected
+
+Given
+
+- one deployment holding 2 access tokens, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.get_access_token: user-1 reads one of the tokens seeded in advance
+
+Then
+
+- the call is rejected
+  - rejected: GenericBadRequest
+
+### get_replica
+
+<a id="reading_replicas-a-user-granted-deployment-read-reads-the-replica"></a>
+
+#### [a-user-granted-deployment-read-reads-the-replica](/tests/scenario/bai_scenario/manager/deployment/test_reading_replicas.py): pass
+
+when a user granted deployment read reads a replica of the deployment, that replica comes back
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.get_replica: user-1 reads one replica seeded in advance
+
+Then
+
+- the replica seeded in advance comes back whole
+  - id: same as the id of the route seeded in advance
+  - field_id: same as the id of the route seeded in advance
+  - deployment_id: same as the id of the deployment the replica serves
+  - revision_id: same as the id of the revision seeded in advance
+  - session_id = None
+  - readiness_status = 'NOT_CHECKED'
+  - liveness_status = 'NOT_CHECKED'
+  - activeness_status = 'INACTIVE'
+  - status = 'provisioning'
+  - traffic_status = 'inactive'
+  - health_status = 'not_checked'
+  - created_at: the time this run wrote
+
+<a id="reading_replicas-a-user-granted-nothing-reads-no-replica"></a>
+
+#### [a-user-granted-nothing-reads-no-replica](/tests/scenario/bai_scenario/manager/deployment/test_reading_replicas.py): pass
+
+when a user granted nothing tries to read a replica of the deployment, the lookup that finds the deployment holding the replica is rejected
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.get_replica: user-1 reads one replica seeded in advance
+
+Then
+
+- the call is rejected
+  - rejected: GenericBadRequest
 
 ### get_revision
 
@@ -790,6 +1684,264 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
+### search_access_tokens
+
+<a id="searching_access_tokens-a-user-granted-deployment-read-searches-the-tokens"></a>
+
+#### [a-user-granted-deployment-read-searches-the-tokens](/tests/scenario/bai_scenario/manager/deployment/test_searching_access_tokens.py): pass
+
+when a user granted deployment read searches the access tokens the deployment holds, those tokens come back
+
+Given
+
+- one deployment holding 2 access tokens, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.search_access_tokens: user-1 searches the access tokens the deployment holds
+
+Then
+
+- the tokens the deployment holds come back with their count
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: same as the id of the token seeded in advance
+  - items[0].field_id: same as the id of the token seeded in advance
+  - items[0].token = 'scenario-token'
+  - items[0].expires_at = None
+  - items[0].created_at: the time this run wrote
+  - items[1].id: same as the id of the token seeded in advance
+  - items[1].field_id: same as the id of the token seeded in advance
+  - items[1].token = 'scenario-token'
+  - items[1].expires_at = None
+  - items[1].created_at: the time this run wrote
+
+<a id="searching_access_tokens-a-user-granted-nothing-searches-no-token"></a>
+
+#### [a-user-granted-nothing-searches-no-token](/tests/scenario/bai_scenario/manager/deployment/test_searching_access_tokens.py): pass
+
+when a user granted nothing tries to search the access tokens the deployment holds, the search is rejected because the user lacks permission
+
+Given
+
+- one deployment holding 2 access tokens, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.search_access_tokens: user-1 searches the access tokens the deployment holds
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### search_policies
+
+<a id="searching_policies-the-superadmin-searches-the-policies"></a>
+
+#### [the-superadmin-searches-the-policies](/tests/scenario/bai_scenario/manager/deployment/test_searching_policies.py): pass
+
+when the superadmin searches the deployment policies, the policy seeded in advance comes back. The requesting user of this row is the superadmin because the search is gated by the global role
+
+Given
+
+- one deployment holding one policy, and the superadmin
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment policy
+
+When
+
+- DeploymentAdapter.search_policies: user-1 searches the deployment policies
+
+Then
+
+- the policy seeded in advance comes back with its count
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: same as the id of the policy seeded in advance
+  - items[0].field_id: same as the id of the policy seeded in advance
+  - items[0].deployment_id: same as the id of the deployment the policy sets
+  - items[0].strategy_spec.strategy: same as the strategy of the policy seeded in advance
+  - items[0].strategy_spec.max_surge = IntOrPercent(count=1, percent=None)
+  - items[0].strategy_spec.max_unavailable = IntOrPercent(count=0, percent=None)
+  - items[0].created_at: the time this run wrote
+  - items[0].updated_at: the time this run wrote
+
+<a id="searching_policies-a-user-granted-nothing-searches-no-policy"></a>
+
+#### [a-user-granted-nothing-searches-no-policy](/tests/scenario/bai_scenario/manager/deployment/test_searching_policies.py): pass
+
+when a user granted nothing tries to search the deployment policies, the search is rejected because the user lacks the global role
+
+Given
+
+- one deployment holding one policy, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment policy
+
+When
+
+- DeploymentAdapter.search_policies: user-1 searches the deployment policies
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+### search_replicas
+
+<a id="searching_replicas-a-user-granted-deployment-read-searches-the-replicas"></a>
+
+#### [a-user-granted-deployment-read-searches-the-replicas](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas.py): pass
+
+when a user granted deployment read searches the replicas of the deployment, the replicas seeded in advance come back
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.search_replicas: user-1 searches the replicas of deployment-1
+
+Then
+
+- the replicas seeded in advance come back with their count
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: same as the id of the route seeded in advance
+  - items[0].field_id: same as the id of the route seeded in advance
+  - items[0].deployment_id: same as the id of the deployment the replica serves
+  - items[0].revision_id: same as the id of the revision seeded in advance
+  - items[0].session_id = None
+  - items[0].readiness_status = 'NOT_CHECKED'
+  - items[0].liveness_status = 'NOT_CHECKED'
+  - items[0].activeness_status = 'INACTIVE'
+  - items[0].status = 'provisioning'
+  - items[0].traffic_status = 'inactive'
+  - items[0].health_status = 'not_checked'
+  - items[0].created_at: the time this run wrote
+
+<a id="searching_replicas-a-user-granted-nothing-searches-no-replica"></a>
+
+#### [a-user-granted-nothing-searches-no-replica](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas.py): pass
+
+when a user granted nothing tries to search the replicas of the deployment, the search is rejected because the user lacks permission
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.search_replicas: user-1 searches the replicas of deployment-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
 ### search_revisions
 
 <a id="searching_revisions-a-user-granted-read-counts-every-revision-of-a-deployment"></a>
@@ -979,6 +2131,209 @@ Given
 When
 
 - DeploymentAdapter.search_revisions: user-1 searches the revisions of deployment-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### search_routes
+
+<a id="searching_routes-a-user-granted-deployment-read-searches-the-routes"></a>
+
+#### [a-user-granted-deployment-read-searches-the-routes](/tests/scenario/bai_scenario/manager/deployment/test_searching_routes.py): pass
+
+when a user granted deployment read searches the routes of the deployment, the routes seeded in advance come back
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.search_routes: user-1 searches the routes of deployment-1
+
+Then
+
+- the routes seeded in advance come back with their count
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: same as the id of the route seeded in advance
+  - items[0].field_id: same as the id of the route seeded in advance
+  - items[0].deployment_id: same as the id of the deployment the route serves
+  - items[0].session_id = None
+  - items[0].status = 'provisioning'
+  - items[0].health_status = 'not_checked'
+  - items[0].traffic_ratio = 1.0
+  - items[0].created_at: the time this run wrote
+  - items[0].revision_id: same as the id of the revision seeded in advance
+  - items[0].traffic_status = 'inactive'
+  - items[0].error_data = {}
+
+<a id="searching_routes-a-user-granted-nothing-searches-no-route"></a>
+
+#### [a-user-granted-nothing-searches-no-route](/tests/scenario/bai_scenario/manager/deployment/test_searching_routes.py): pass
+
+when a user granted nothing tries to search the routes of the deployment, the search is rejected because the user lacks permission
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.search_routes: user-1 searches the routes of deployment-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### search_rules
+
+<a id="searching_rules-a-user-granted-deployment-read-searches-the-rules"></a>
+
+#### [a-user-granted-deployment-read-searches-the-rules](/tests/scenario/bai_scenario/manager/deployment/test_searching_rules.py): pass
+
+when a user granted deployment read searches the auto-scaling rules the deployment holds, those rules come back
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.search_rules: user-1 searches the auto-scaling rules the deployment holds
+
+Then
+
+- the auto-scaling rules the deployment holds come back with their count
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: same as the id of the rule seeded in advance
+  - items[0].field_id: same as the id of the rule seeded in advance
+  - items[0].deployment_id: same as the id of the deployment the rule scales
+  - items[0].metric_source = 'KERNEL'
+  - items[0].metric_name = 'cpu_util'
+  - items[0].min_threshold = None
+  - items[0].max_threshold = None
+  - items[0].step_size = 1
+  - items[0].time_window = 60
+  - items[0].min_replicas = None
+  - items[0].max_replicas = None
+  - items[0].prometheus_query_preset_id = None
+  - items[0].created_at: the time this run wrote
+  - items[0].last_triggered_at = None
+  - items[1].id: same as the id of the rule seeded in advance
+  - items[1].field_id: same as the id of the rule seeded in advance
+  - items[1].deployment_id: same as the id of the deployment the rule scales
+  - items[1].metric_source = 'KERNEL'
+  - items[1].metric_name = 'cpu_util'
+  - items[1].min_threshold = None
+  - items[1].max_threshold = None
+  - items[1].step_size = 1
+  - items[1].time_window = 60
+  - items[1].min_replicas = None
+  - items[1].max_replicas = None
+  - items[1].prometheus_query_preset_id = None
+  - items[1].created_at: the time this run wrote
+  - items[1].last_triggered_at = None
+
+<a id="searching_rules-a-user-granted-nothing-searches-no-rule"></a>
+
+#### [a-user-granted-nothing-searches-no-rule](/tests/scenario/bai_scenario/manager/deployment/test_searching_rules.py): pass
+
+when a user granted nothing tries to search the auto-scaling rules the deployment holds, the search is rejected because the user lacks permission
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.search_rules: user-1 searches the auto-scaling rules the deployment holds
 
 Then
 
@@ -1570,6 +2925,75 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
+### bulk_delete_access_tokens
+
+<a id="retiring_access_tokens-a-user-granted-deployment-purge-purges-tokens-at-once"></a>
+
+#### [a-user-granted-deployment-purge-purges-tokens-at-once](/tests/scenario/bai_scenario/manager/deployment/test_retiring_access_tokens.py): pass
+
+when a user granted deployment purge purges several access tokens the deployment holds at once, the ids of those tokens come back
+
+Given
+
+- one deployment holding 2 access tokens, and a user granted the HARD_DELETE permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted HARD_DELETE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: HARD_DELETE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.bulk_delete_access_tokens: user-1 purges 2 tokens at once
+
+Then
+
+- the ids of the purged tokens come back
+  - ids count = 2
+  - ids[0]: same as the id of the token seeded in advance
+  - ids[1]: same as the id of the token seeded in advance
+
+<a id="retiring_access_tokens-a-user-granted-nothing-purges-no-token-at-once"></a>
+
+#### [a-user-granted-nothing-purges-no-token-at-once](/tests/scenario/bai_scenario/manager/deployment/test_retiring_access_tokens.py): pass
+
+when a user granted nothing tries to purge several access tokens the deployment holds at once, nothing is purged and the id list comes back empty
+
+Given
+
+- one deployment holding 2 access tokens, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.bulk_delete_access_tokens: user-1 purges 2 tokens at once
+
+Then
+
+- nothing is purged and the id list comes back empty
+  - ids = []
+
 ### create
 
 <a id="creating-a-deployment-made-without-a-name-is-named-after-its-maker"></a>
@@ -1776,6 +3200,122 @@ Given
 When
 
 - DeploymentAdapter.create: user-1 creates a deployment named serving in team-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### create_access_token
+
+<a id="creating_access_tokens-a-user-granted-deployment-create-makes-no-token"></a>
+
+#### [a-user-granted-deployment-create-makes-no-token](/tests/scenario/bai_scenario/manager/deployment/test_creating_access_tokens.py): pass
+
+when a user granted deployment create tries to make an access token of the deployment, the create is rejected because the deployment's scaling group has no proxy target configured
+
+Given
+
+- one deployment holding 2 access tokens, and a user granted the CREATE permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted CREATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: CREATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.create_access_token: user-1 makes one access token of the deployment
+
+Then
+
+- the call is rejected
+  - rejected: InvalidAPIParameters
+
+### create_rule
+
+<a id="creating_rules-a-user-granted-deployment-create-makes-a-rule"></a>
+
+#### [a-user-granted-deployment-create-makes-a-rule](/tests/scenario/bai_scenario/manager/deployment/test_creating_rules.py): pass
+
+when a user granted deployment create makes an auto-scaling rule of the deployment, the rule made comes back
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user granted the CREATE permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted CREATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: CREATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.create_rule: user-1 makes one auto-scaling rule of the deployment
+
+Then
+
+- the whole rule made comes back
+  - id: skipped: the database generates it
+  - field_id: skipped: the database generates it
+  - deployment_id: same as the id of the deployment the rule scales
+  - metric_source = 'KERNEL'
+  - metric_name = 'made-rule'
+  - min_threshold = None
+  - max_threshold = None
+  - step_size = 1
+  - time_window = 60
+  - min_replicas = None
+  - max_replicas = None
+  - prometheus_query_preset_id = None
+  - created_at: the time this run wrote
+  - last_triggered_at = None
+
+<a id="creating_rules-a-user-granted-nothing-makes-no-rule"></a>
+
+#### [a-user-granted-nothing-makes-no-rule](/tests/scenario/bai_scenario/manager/deployment/test_creating_rules.py): pass
+
+when a user granted nothing tries to make an auto-scaling rule of the deployment, the create is rejected because the user lacks permission
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.create_rule: user-1 makes one auto-scaling rule of the deployment
 
 Then
 
@@ -2107,6 +3647,158 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
+### get_policy
+
+<a id="reading_policy-a-user-granted-deployment-read-reads-the-policy"></a>
+
+#### [a-user-granted-deployment-read-reads-the-policy](/tests/scenario/bai_scenario/manager/deployment/test_reading_policy.py): pass
+
+when a user granted deployment read reads the policy the deployment holds, that policy comes back
+
+Given
+
+- one deployment holding one policy, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment policy
+
+When
+
+- DeploymentAdapter.get_policy: user-1 reads the policy the deployment holds
+
+Then
+
+- the policy the deployment holds comes back whole
+  - id: same as the id of the policy seeded in advance
+  - field_id: same as the id of the policy seeded in advance
+  - deployment_id: same as the id of the deployment the policy sets
+  - strategy_spec.strategy: same as the strategy of the policy seeded in advance
+  - strategy_spec.max_surge = IntOrPercent(count=1, percent=None)
+  - strategy_spec.max_unavailable = IntOrPercent(count=0, percent=None)
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+
+<a id="reading_policy-a-user-granted-nothing-reads-no-policy"></a>
+
+#### [a-user-granted-nothing-reads-no-policy](/tests/scenario/bai_scenario/manager/deployment/test_reading_policy.py): pass
+
+when a user granted nothing tries to read the policy the deployment holds, the read is rejected because the user lacks permission
+
+Given
+
+- one deployment holding one policy, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment policy
+
+When
+
+- DeploymentAdapter.get_policy: user-1 reads the policy the deployment holds
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### get_rule
+
+<a id="reading_rules-a-user-granted-deployment-read-reads-a-rule"></a>
+
+#### [a-user-granted-deployment-read-reads-a-rule](/tests/scenario/bai_scenario/manager/deployment/test_reading_rules.py): pass
+
+when a user granted deployment read reads one of the rules seeded in advance by id, that rule comes back
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.get_rule: user-1 reads one of the rules seeded in advance by id
+
+Then
+
+- the whole rule read comes back
+  - id: same as the id of the rule seeded in advance
+  - field_id: same as the id of the rule seeded in advance
+  - deployment_id: same as the id of the deployment the rule scales
+  - metric_source = 'KERNEL'
+  - metric_name = 'cpu_util'
+  - min_threshold = None
+  - max_threshold = None
+  - step_size = 1
+  - time_window = 60
+  - min_replicas = None
+  - max_replicas = None
+  - prometheus_query_preset_id = None
+  - created_at: the time this run wrote
+  - last_triggered_at = None
+
+<a id="reading_rules-a-user-granted-nothing-reads-no-rule"></a>
+
+#### [a-user-granted-nothing-reads-no-rule](/tests/scenario/bai_scenario/manager/deployment/test_reading_rules.py): pass
+
+when a user granted nothing tries to read one of the rules seeded in advance by id, the lookup that finds the deployment holding the rule is rejected
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.get_rule: user-1 reads one of the rules seeded in advance by id
+
+Then
+
+- the call is rejected
+  - rejected: GenericBadRequest
+
 ### partial_bulk_purge_access_tokens
 
 <a id="partial_bulk_access_tokens-a-user-granted-nothing-purges-none-of-several-tokens"></a>
@@ -2378,6 +4070,144 @@ Then
   - failed[0].message: a reason containing 'Insufficient permission'
   - failed[1].id: same as the id of the rule seeded in advance
   - failed[1].message: a reason containing 'Insufficient permission'
+
+### purge_access_token
+
+<a id="retiring_access_tokens-a-user-granted-deployment-purge-purges-a-token"></a>
+
+#### [a-user-granted-deployment-purge-purges-a-token](/tests/scenario/bai_scenario/manager/deployment/test_retiring_access_tokens.py): pass
+
+when a user granted deployment read and purge purges one of the access tokens the deployment holds, the id of that token comes back. The purge reads the deployment first, so read is also required
+
+Given
+
+- one deployment holding 2 access tokens, and a user granted the READ, HARD_DELETE permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ, HARD_DELETE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - Role deployment-user-1: HARD_DELETE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.purge_access_token: user-1 purges one of the tokens seeded in advance
+
+Then
+
+- the id of the purged token comes back
+  - id: same as the id of the token seeded in advance
+  - field_id: same as the id of the token seeded in advance
+
+<a id="retiring_access_tokens-a-user-granted-nothing-purges-no-token"></a>
+
+#### [a-user-granted-nothing-purges-no-token](/tests/scenario/bai_scenario/manager/deployment/test_retiring_access_tokens.py): pass
+
+when a user granted nothing tries to purge one of the access tokens the deployment holds, the lookup that finds the deployment holding the token is rejected
+
+Given
+
+- one deployment holding 2 access tokens, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.purge_access_token: user-1 purges one of the tokens seeded in advance
+
+Then
+
+- the call is rejected
+  - rejected: GenericBadRequest
+
+### purge_rule
+
+<a id="retiring_rules-a-user-granted-deployment-purge-purges-a-rule"></a>
+
+#### [a-user-granted-deployment-purge-purges-a-rule](/tests/scenario/bai_scenario/manager/deployment/test_retiring_rules.py): pass
+
+when a user granted deployment read and purge purges one of the auto-scaling rules the deployment holds, the id of that rule comes back. The purge reads the deployment first, so read is also required
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user granted the READ, HARD_DELETE permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ, HARD_DELETE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - Role deployment-user-1: HARD_DELETE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.purge_rule: user-1 purges one of the rules seeded in advance
+
+Then
+
+- the id of the purged rule comes back
+  - id: same as the id of the rule seeded in advance
+  - field_id: same as the id of the rule seeded in advance
+
+<a id="retiring_rules-a-user-granted-nothing-purges-no-rule"></a>
+
+#### [a-user-granted-nothing-purges-no-rule](/tests/scenario/bai_scenario/manager/deployment/test_retiring_rules.py): pass
+
+when a user granted nothing tries to purge one of the auto-scaling rules the deployment holds, the lookup that finds the deployment holding the rule is rejected
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.purge_rule: user-1 purges one of the rules seeded in advance
+
+Then
+
+- the call is rejected
+  - rejected: GenericBadRequest
 
 ### replace_options
 
@@ -3100,4 +4930,259 @@ Then
 
 - the call is rejected
   - rejected: EndpointNotFound
+
+### update_route_traffic
+
+<a id="editing_route_traffic-a-user-granted-deployment-update-opens-the-traffic"></a>
+
+#### [a-user-granted-deployment-update-opens-the-traffic](/tests/scenario/bai_scenario/manager/deployment/test_editing_route_traffic.py): pass
+
+when a user granted deployment read and update turns the traffic of a route on, the route with its traffic turned on comes back. The traffic change reads the deployment first, so read is also required
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user granted the READ, UPDATE permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ, UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.update_route_traffic: user-1 turns the traffic of a route of deployment-1 to active
+
+Then
+
+- the route with its traffic turned on comes back whole
+  - id: same as the id of the route seeded in advance
+  - field_id: same as the id of the route seeded in advance
+  - deployment_id: same as the id of the deployment the route serves
+  - session_id = None
+  - status = 'provisioning'
+  - health_status = 'not_checked'
+  - traffic_ratio = 1.0
+  - created_at: the time this run wrote
+  - revision_id: same as the id of the revision seeded in advance
+  - traffic_status = 'active'
+  - error_data = {}
+
+<a id="editing_route_traffic-a-user-granted-nothing-changes-no-traffic"></a>
+
+#### [a-user-granted-nothing-changes-no-traffic](/tests/scenario/bai_scenario/manager/deployment/test_editing_route_traffic.py): pass
+
+when a user granted nothing tries to turn the traffic of a route, the lookup that finds the deployment holding the route is rejected
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.update_route_traffic: user-1 turns the traffic of a route of deployment-1 to active
+
+Then
+
+- the call is rejected
+  - rejected: GenericBadRequest
+
+### update_rule
+
+<a id="updating_rules-a-user-granted-deployment-update-edits-a-rule"></a>
+
+#### [a-user-granted-deployment-update-edits-a-rule](/tests/scenario/bai_scenario/manager/deployment/test_updating_rules.py): pass
+
+when a user granted deployment read and update edits one of the rules seeded in advance, the rule edited comes back. The edit reads the deployment first, so read is also required
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user granted the READ, UPDATE permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ, UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.update_rule: user-1 edits the step size and time window of one of the rules seeded in advance
+
+Then
+
+- the whole rule edited comes back
+  - id: same as the id of the rule seeded in advance
+  - field_id: same as the id of the rule seeded in advance
+  - deployment_id: same as the id of the deployment the rule scales
+  - metric_source = 'KERNEL'
+  - metric_name = 'cpu_util'
+  - min_threshold = None
+  - max_threshold = None
+  - step_size = 2
+  - time_window = 120
+  - min_replicas = None
+  - max_replicas = None
+  - prometheus_query_preset_id = None
+  - created_at: the time this run wrote
+  - last_triggered_at = None
+
+<a id="updating_rules-a-user-granted-nothing-edits-no-rule"></a>
+
+#### [a-user-granted-nothing-edits-no-rule](/tests/scenario/bai_scenario/manager/deployment/test_updating_rules.py): pass
+
+when a user granted nothing tries to edit one of the rules seeded in advance, the lookup that finds the deployment holding the rule is rejected
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.update_rule: user-1 edits the step size and time window of one of the rules seeded in advance
+
+Then
+
+- the call is rejected
+  - rejected: GenericBadRequest
+
+### upsert_policy
+
+<a id="upserting_policy-a-user-granted-deployment-update-puts-the-policy"></a>
+
+#### [a-user-granted-deployment-update-puts-the-policy](/tests/scenario/bai_scenario/manager/deployment/test_upserting_policy.py): pass
+
+when a user granted deployment update puts a policy on the deployment, the policy put comes back. The upsert replaces an existing policy, so the call is gated by update
+
+Given
+
+- one existing deployment and one user granted UPDATE on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+
+When
+
+- DeploymentAdapter.upsert_policy: user-1 puts a rolling-update policy on the deployment
+
+Then
+
+- the whole policy put comes back
+  - id: skipped: the database generates it
+  - field_id: skipped: the database generates it
+  - deployment_id: same as the id of the deployment the policy was put on
+  - strategy_spec.strategy = <DeploymentStrategy.ROLLING: 'ROLLING'>
+  - strategy_spec.max_surge = IntOrPercent(count=None, percent=0.5)
+  - strategy_spec.max_unavailable = IntOrPercent(count=None, percent=0.0)
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+
+<a id="upserting_policy-a-user-granted-nothing-puts-no-policy"></a>
+
+#### [a-user-granted-nothing-puts-no-policy](/tests/scenario/bai_scenario/manager/deployment/test_upserting_policy.py): pass
+
+when a user granted nothing tries to put a policy on the deployment, the upsert is rejected because the user lacks permission
+
+Given
+
+- one existing deployment and one user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+
+When
+
+- DeploymentAdapter.upsert_policy: user-1 puts a rolling-update policy on the deployment
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
 

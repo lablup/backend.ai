@@ -279,20 +279,17 @@ async def what_is_left(engine: ExtendedAsyncSAEngine) -> WhatIsLeft:
     async with engine.begin_readonly_session_read_committed() as sess:
         groups = await sess.scalar(sa.select(sa.func.count()).select_from(SessionGroupRow))
         group_nodes = await sess.scalar(
-            sa
-            .select(sa.func.count())
+            sa.select(sa.func.count())
             .select_from(VirtualEntityRow)
             .where(VirtualEntityRow.entity_type == SessionGroupEntityType())
         )
         in_a_group = await sess.scalar(
-            sa
-            .select(sa.func.count())
+            sa.select(sa.func.count())
             .select_from(SessionRow)
             .where(SessionRow.session_group_id.is_not(None))
         )
         without_a_group = await sess.scalar(
-            sa
-            .select(sa.func.count())
+            sa.select(sa.func.count())
             .select_from(SessionRow)
             .where(SessionRow.session_group_id.is_(None))
         )

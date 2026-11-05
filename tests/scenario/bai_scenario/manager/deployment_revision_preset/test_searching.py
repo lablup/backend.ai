@@ -8,6 +8,7 @@ from typing import override
 
 import pytest
 
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     SearchDeploymentRevisionPresetsInput,
@@ -96,7 +97,7 @@ class TheSeededPresetsComeBack(Then[PresetsAndACaller, Answer]):
         ]
         by_id = {preset.id: preset for preset in laid.presets}
         for i, node in enumerate(page.items):
-            preset = by_id.get(node.id)
+            preset = by_id.get(DeploymentPresetID(node.id))
             if preset is None:
                 verdicts.append(Same(f"items[{i}].id", node.id, "a preset seeded in advance"))
             else:
