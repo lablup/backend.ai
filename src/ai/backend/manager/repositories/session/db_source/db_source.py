@@ -421,11 +421,13 @@ class SessionDBSource:
             resource_group = result.first()
             if resource_group is None:
                 return None
-            if not resource_group.wsproxy_addr or not resource_group.wsproxy_api_token:
+            if not resource_group.wsproxy_addr:
                 return None
+            # Only the coordinator knows `allow_unauthorized_configure_request`, under which
+            # `/v2/conf` accepts a request without the token, so a missing token is not refused here.
             return ResourceGroupProxyTarget(
                 addr=resource_group.wsproxy_addr,
-                api_token=resource_group.wsproxy_api_token,
+                api_token=resource_group.wsproxy_api_token or "",
             )
 
     async def get_session_by_id(
