@@ -362,6 +362,7 @@ class TestTemplateRepository:
         assert result["name"] == "my-template"
         assert result["user_uuid"] == test_user
         assert result["group_id"] == group_id
+        assert result["domain_name"] == test_domain
         assert result["template"] == template_data
 
     async def test_get_task_template_not_found(

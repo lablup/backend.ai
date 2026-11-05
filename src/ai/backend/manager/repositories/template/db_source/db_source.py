@@ -182,6 +182,7 @@ class TemplateDBSource:
                     session_templates.c.name,
                     session_templates.c.user_uuid,
                     session_templates.c.group_id,
+                    session_templates.c.domain_name,
                 )
                 .select_from(session_templates)
                 .where(
@@ -199,6 +200,7 @@ class TemplateDBSource:
                 "name": row.name,
                 "user_uuid": row.user_uuid,
                 "group_id": row.group_id,
+                "domain_name": row.domain_name,
             }
 
     async def task_template_exists(self, template_id: str) -> bool:

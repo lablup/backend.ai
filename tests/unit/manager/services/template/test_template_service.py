@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.identifier.project import ProjectID
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource import DBOperationFailed, TaskTemplateNotFound
 from ai.backend.manager.exceptions import InvalidArgument
 from ai.backend.manager.models.session_template import TemplateType
@@ -273,51 +274,102 @@ class TestGetTaskTemplateAction:
     def service(self, mock_repo: MagicMock) -> TemplateService:
         return TemplateService(repository=mock_repo)
 
-    async def test_returns_full_data(
+    @pytest.fixture
+    def owner_uuid(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def stored_template(self, mock_repo: MagicMock, owner_uuid: uuid.UUID) -> dict[str, Any]:
+        row = {
+            "template": _make_valid_task_template(),
+            "name": "test-template",
+            "user_uuid": owner_uuid,
+            "group_id": uuid.uuid4(),
+            "domain_name": "default",
+        }
+        mock_repo.get_task_template = AsyncMock(return_value=row)
+        return row
+
+    async def test_returns_full_data_to_the_owner(
         self,
         service: TemplateService,
-        mock_repo: MagicMock,
+        owner_uuid: uuid.UUID,
+        stored_template: dict[str, Any],
     ) -> None:
-        user_uuid = uuid.uuid4()
-        group_id = uuid.uuid4()
-        template_data = _make_valid_task_template()
-        mock_repo.get_task_template = AsyncMock(
-            return_value={
-                "template": template_data,
-                "name": "test-template",
-                "user_uuid": user_uuid,
-                "group_id": group_id,
-            }
+        action = GetTaskTemplateAction(
+            template_id="tmpl-123",
+            requester_uuid=owner_uuid,
+            requester_role=UserRole.USER,
+            requester_domain="default",
         )
-
-        action = GetTaskTemplateAction(template_id="tmpl-123")
         result = await service.get_task_template(action)
 
-        assert result.template == template_data
+        assert result.template == stored_template["template"]
         assert result.name == "test-template"
-        assert result.user_uuid == user_uuid
-        assert result.group_id == group_id
+        assert result.user_uuid == owner_uuid
+        assert result.group_id == stored_template["group_id"]
 
     async def test_json_string_template_parsed(
         self,
         service: TemplateService,
-        mock_repo: MagicMock,
+        owner_uuid: uuid.UUID,
+        stored_template: dict[str, Any],
     ) -> None:
-        template_data = _make_valid_task_template()
-        mock_repo.get_task_template = AsyncMock(
-            return_value={
-                "template": json.dumps(template_data),
-                "name": "test",
-                "user_uuid": uuid.uuid4(),
-                "group_id": uuid.uuid4(),
-            }
-        )
+        stored_template["template"] = json.dumps(stored_template["template"])
 
-        action = GetTaskTemplateAction(template_id="tmpl-123")
+        action = GetTaskTemplateAction(
+            template_id="tmpl-123",
+            requester_uuid=owner_uuid,
+            requester_role=UserRole.USER,
+            requester_domain="default",
+        )
         result = await service.get_task_template(action)
 
         assert isinstance(result.template, dict)
         assert result.template["kind"] == "taskTemplate"
+
+    @pytest.mark.parametrize(
+        ("role", "domain"),
+        [(UserRole.SUPERADMIN, "other"), (UserRole.ADMIN, "default")],
+        ids=["superadmin", "admin_of_the_template_domain"],
+    )
+    async def test_an_admin_in_scope_reads_another_users_template(
+        self,
+        service: TemplateService,
+        stored_template: dict[str, Any],
+        role: UserRole,
+        domain: str,
+    ) -> None:
+        action = GetTaskTemplateAction(
+            template_id="tmpl-123",
+            requester_uuid=uuid.uuid4(),
+            requester_role=role,
+            requester_domain=domain,
+        )
+        result = await service.get_task_template(action)
+
+        assert result.name == "test-template"
+
+    @pytest.mark.parametrize(
+        ("role", "domain"),
+        [(UserRole.USER, "default"), (UserRole.ADMIN, "other")],
+        ids=["another_user", "admin_of_another_domain"],
+    )
+    async def test_rejects_a_requester_outside_the_owner_scope(
+        self,
+        service: TemplateService,
+        stored_template: dict[str, Any],
+        role: UserRole,
+        domain: str,
+    ) -> None:
+        action = GetTaskTemplateAction(
+            template_id="tmpl-123",
+            requester_uuid=uuid.uuid4(),
+            requester_role=role,
+            requester_domain=domain,
+        )
+        with pytest.raises(NotEnoughPermission):
+            await service.get_task_template(action)
 
     async def test_nonexistent_id_raises_not_found(
         self,
@@ -326,7 +378,12 @@ class TestGetTaskTemplateAction:
     ) -> None:
         mock_repo.get_task_template = AsyncMock(return_value=None)
 
-        action = GetTaskTemplateAction(template_id="nonexistent")
+        action = GetTaskTemplateAction(
+            template_id="nonexistent",
+            requester_uuid=uuid.uuid4(),
+            requester_role=UserRole.USER,
+            requester_domain="default",
+        )
         with pytest.raises(TaskTemplateNotFound):
             await service.get_task_template(action)
 

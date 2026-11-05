@@ -6,12 +6,14 @@ from typing import Any, Final
 
 from ai.backend.common.json import load_json
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.resource import DBOperationFailed, TaskTemplateNotFound
 from ai.backend.manager.models.session_template import (
     TemplateType,
     check_cluster_template,
     check_task_template,
 )
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.template.repository import TemplateRepository
 
 from .actions.create_cluster_template import (
@@ -120,6 +122,17 @@ class TemplateService:
         row = await self._repository.get_task_template(action.template_id)
         if row is None:
             raise TaskTemplateNotFound
+        match action.requester_role:
+            case UserRole.SUPERADMIN:
+                pass
+            case UserRole.ADMIN if row["domain_name"] == action.requester_domain:
+                pass
+            case _ if row["user_uuid"] == action.requester_uuid:
+                pass
+            case _:
+                raise NotEnoughPermission(
+                    f"User {action.requester_uuid} may not read session template {action.template_id}"
+                )
         raw_template = row["template"]
         template: dict[str, Any] = (
             raw_template if isinstance(raw_template, dict) else dict(load_json(raw_template))
