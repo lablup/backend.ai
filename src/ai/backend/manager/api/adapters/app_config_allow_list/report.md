@@ -2,17 +2,17 @@
 
 [background](/src/ai/backend/manager/api/adapters/app_config_allow_list/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/app_config_allow_list/adapter.py)
 
-Scenario: incomplete 2 / 8
+Scenario: complete
 
 - built from ops (6)
   - admin_create: representative success ✓ · representative rejection ✓
   - admin_get: representative success ✓ · representative rejection ✓
   - admin_search: representative success ✓ · representative rejection ✓
   - batch_load_by_ids: representative success ✓ · representative rejection ✓
-  - partial_bulk_update: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_update: representative success ✓ · representative rejection ✓
   - update: representative success ✓ · representative rejection ✓
 - direct implementation (2)
-  - partial_bulk_purge: success present 2 · rejection absent (partial_bulk): SCENARIO-GAP
+  - partial_bulk_purge: success present 2 · rejection present 1 (partial_bulk)
   - purge: success present 2 · rejection present 2 (single_entity)
 
 **admin_create**
@@ -60,6 +60,7 @@ Scenario: incomplete 2 / 8
 |---|---|
 | [when a plain user without permission tries to change the rank of both allow_lists in one call, none is changed and both come back in the failed list for lack of permission](#partial_bulk_editing-a-user-granted-nothing-reranks-none-of-several-entries) | answered |
 | [when the superadmin changes the rank of both allow_lists in one call, both come back with the new rank and none failed](#partial_bulk_editing-the-superadmin-reranks-several-entries-at-once) | answered |
+| [when two allow_lists exist and their ranks are changed in one call without a user context, it is rejected because the caller cannot be known](#partial_bulk_editing-an-allow-list-update-carrying-no-user-is-refused) | rejected |
 
 **update**
 
@@ -76,6 +77,7 @@ Scenario: incomplete 2 / 8
 |---|---|
 | [when a plain user without permission tries to purge both allow_lists in one call, none is deleted and both come back in the failed list for lack of permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-entries) | answered |
 | [when the superadmin purges both allow_lists and a missing ID in one call, the two come back in the processed list and the missing ID comes back in the failed list because there is no such target](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | answered |
+| [when two allow_lists exist and are purged in one call without a user context, it is rejected because the caller cannot be known](#partial_bulk_purging-an-allow-list-purge-carrying-no-user-is-refused) | rejected |
 
 **purge**
 
@@ -733,6 +735,34 @@ Then
   - successes[1].rank = 150
   - successes[1].updated_at: the time this run wrote
 
+<a id="partial_bulk_editing-an-allow-list-update-carrying-no-user-is-refused"></a>
+
+#### [an-allow-list-update-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_editing.py): pass
+
+when two allow_lists exist and their ranks are changed in one call without a user context, it is rejected because the caller cannot be known
+
+Given
+
+- the PUBLIC and USER allow-list entries of one config name, and one Regular user with no permission
+  - Domain home-1
+  - Config definition config-1: the config of this name is registered
+  - Allow-list entry first-1: the config of this name can be set in the public scope, rank is the default of the scope kind
+  - Allow-list entry second-1: the config of this name can be set in the user scope, rank is the default of the scope kind
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- AppConfigAllowListAdapter.partial_bulk_update: changes the rank of both allow_lists in one call without a user context
+
+Then
+
+- the call is rejected
+  - rejected: UnreachableError
+
 ### update
 
 <a id="editing-an-edit-carrying-no-value-changes-nothing"></a>
@@ -918,6 +948,34 @@ Then
   - failed count = 1
   - failed[0].id: same as the missing ID in the request
   - failed[0].message: a reason containing 'not found'
+
+<a id="partial_bulk_purging-an-allow-list-purge-carrying-no-user-is-refused"></a>
+
+#### [an-allow-list-purge-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_purging.py): pass
+
+when two allow_lists exist and are purged in one call without a user context, it is rejected because the caller cannot be known
+
+Given
+
+- the PUBLIC and USER allow-list entries of one config name, and one Regular user with no permission
+  - Domain home-1
+  - Config definition config-1: the config of this name is registered
+  - Allow-list entry first-1: the config of this name can be set in the public scope, rank is the default of the scope kind
+  - Allow-list entry second-1: the config of this name can be set in the user scope, rank is the default of the scope kind
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- AppConfigAllowListAdapter.partial_bulk_purge: purges both allow_lists in one call without a user context
+
+Then
+
+- the call is rejected
+  - rejected: UnreachableError
 
 ### purge
 

@@ -2,12 +2,12 @@
 
 [background](/src/ai/backend/manager/api/adapters/client_ip_masking/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/client_ip_masking/adapter.py)
 
-Scenario: incomplete 2 / 5
+Scenario: complete
 
 - built from ops (5)
   - admin_search: representative success ✓ · representative rejection ✓
-  - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_by_ids: representative success ✓ · representative rejection ✓
+  - partial_bulk_purge: representative success ✓ · representative rejection ✓
   - purge: representative success ✓ · representative rejection ✓
   - upsert: representative success ✓ · representative rejection ✓
 
@@ -19,12 +19,20 @@ Scenario: incomplete 2 / 5
 | [when two policies of different targets exist and the superadmin reads without a filter, both are counted](#searching-the-superadmin-counts-every-masking-policy-laid) | answered |
 | [when a user who is not the superadmin requests a read of everything, it is rejected because the role is insufficient](#searching-a-user-who-is-not-the-superadmin-may-not-search-masking-policies) | rejected |
 
+**batch_load_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin batch-loads two policies created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | answered |
+| [when two policies exist and they are batch-loaded without a user context, it is rejected because the caller cannot be known](#reading-a-batch-load-carrying-no-user-is-refused) | rejected |
+
 **partial_bulk_purge**
 
 | scenario | verdict |
 |---|---|
 | [when a user granted nothing tries to purge several policies at once, nothing is purged and every one comes back in the failed list because there is no permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-masking-policies) | answered |
 | [when the superadmin purges two policies and an unknown id at once, the two come back in the processed list and the unknown id comes back in the failed list because no target answers to it](#partial_bulk_purging-purging-several-masking-policies-answers-for-the-missing-one) | answered |
+| [when two policies exist and are purged at once without a user context, it is rejected because the caller cannot be known](#partial_bulk_purging-a-policy-purge-carrying-no-user-is-refused) | rejected |
 
 **purge**
 
@@ -137,6 +145,79 @@ Then
 - the call is rejected
   - rejected: InsufficientPrivilege
 
+### batch_load_by_ids
+
+<a id="reading-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
+
+#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/client_ip_masking/test_reading.py): pass
+
+when the superadmin batch-loads two policies created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty
+
+Given
+
+- two client IP masking policies of different targets and one superadmin
+  - client IP masking policy default: truncate mode, prefix length v4 24, v6 48
+  - client IP masking policy login_history: truncate mode, prefix length v4 24, v6 48
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ClientIPMaskingAdapter.batch_load_by_ids: user-1 batch-loads the 2 policies created in advance and one unknown id
+
+Then
+
+- they come back in the order asked and the item for an unknown id is empty
+  - len(items) = 3
+  - items[0].id: same as the policy created in advance
+  - items[0].entity_id: same as the policy created in advance
+  - items[0].target_type = 'default'
+  - items[0].mode = 'truncate'
+  - items[0].ipv4_prefix = 24
+  - items[0].ipv6_prefix = 48
+  - items[0].created_at: the time this run wrote
+  - items[0].updated_at: the time this run wrote
+  - items[1].id: same as the policy created in advance
+  - items[1].entity_id: same as the policy created in advance
+  - items[1].target_type = 'login_history'
+  - items[1].mode = 'truncate'
+  - items[1].ipv4_prefix = 24
+  - items[1].ipv6_prefix = 48
+  - items[1].created_at: the time this run wrote
+  - items[1].updated_at: the time this run wrote
+  - items[2] = None
+
+<a id="reading-a-batch-load-carrying-no-user-is-refused"></a>
+
+#### [a-batch-load-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/client_ip_masking/test_reading.py): pass
+
+when two policies exist and they are batch-loaded without a user context, it is rejected because the caller cannot be known
+
+Given
+
+- two client IP masking policies of different targets and one regular user
+  - client IP masking policy default: truncate mode, prefix length v4 24, v6 48
+  - client IP masking policy login_history: truncate mode, prefix length v4 24, v6 48
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- ClientIPMaskingAdapter.batch_load_by_ids: batch-loads 2 policies without a user context
+
+Then
+
+- the call is rejected
+  - rejected: UnreachableError
+
 ### partial_bulk_purge
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-masking-policies"></a>
@@ -214,6 +295,33 @@ Then
   - failed count = 1
   - failed[0].id: same as the unknown id put in the request
   - failed[0].message: a reason containing 'not found'
+
+<a id="partial_bulk_purging-a-policy-purge-carrying-no-user-is-refused"></a>
+
+#### [a-policy-purge-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/client_ip_masking/test_partial_bulk_purging.py): pass
+
+when two policies exist and are purged at once without a user context, it is rejected because the caller cannot be known
+
+Given
+
+- two client IP masking policies of different targets and one regular user
+  - client IP masking policy default: truncate mode, prefix length v4 24, v6 48
+  - client IP masking policy login_history: truncate mode, prefix length v4 24, v6 48
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- ClientIPMaskingAdapter.partial_bulk_purge: purges 2 policies at once without a user context
+
+Then
+
+- the call is rejected
+  - rejected: UnreachableError
 
 ### purge
 

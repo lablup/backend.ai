@@ -2,17 +2,17 @@
 
 [배경](/src/ai/backend/manager/api/adapters/app_config_allow_list/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/app_config_allow_list/adapter.py)
 
-시나리오: 미완성 2 / 8
+시나리오: 완성
 
 - ops 구성 (6)
   - admin_create: 대표 성공 ✓ · 대표 거부 ✓
   - admin_get: 대표 성공 ✓ · 대표 거부 ✓
   - admin_search: 대표 성공 ✓ · 대표 거부 ✓
   - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
-  - partial_bulk_update: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - partial_bulk_update: 대표 성공 ✓ · 대표 거부 ✓
   - update: 대표 성공 ✓ · 대표 거부 ✓
 - 직접 구현 (2)
-  - partial_bulk_purge: 성공 있음 2 · 거부 없음 (partial_bulk): SCENARIO-GAP
+  - partial_bulk_purge: 성공 있음 2 · 거부 있음 1 (partial_bulk)
   - purge: 성공 있음 2 · 거부 있음 2 (single_entity)
 
 **admin_create**
@@ -60,6 +60,7 @@
 |---|---|
 | [권한이 없는 일반 사용자가 allow_list 둘의 순위를 한 번에 변경하려 하면, 변경된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_editing-a-user-granted-nothing-reranks-none-of-several-entries) | 성공 |
 | [superadmin 이 allow_list 둘의 순위를 한 번에 변경하면, 둘 다 새 순위로 오고 실패한 것은 없습니다](#partial_bulk_editing-the-superadmin-reranks-several-entries-at-once) | 성공 |
+| [allow_list 둘이 있고 사용자 컨텍스트 없이 순위를 한 번에 바꾸면, 호출자를 알 수 없어 거부됩니다](#partial_bulk_editing-an-allow-list-update-carrying-no-user-is-refused) | 거부 |
 
 **update**
 
@@ -76,6 +77,7 @@
 |---|---|
 | [권한이 없는 일반 사용자가 allow_list 둘을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-entries) | 성공 |
 | [superadmin 이 allow_list 둘과 존재하지 않는 ID 를 한 번에 영구 삭제하면, 둘은 처리된 목록에 오고 없는 ID 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | 성공 |
+| [allow_list 둘이 있고 사용자 컨텍스트 없이 한 번에 영구 삭제하면, 호출자를 알 수 없어 거부됩니다](#partial_bulk_purging-an-allow-list-purge-carrying-no-user-is-refused) | 거부 |
 
 **purge**
 
@@ -733,6 +735,34 @@ Then
   - successes[1].rank = 150
   - successes[1].updated_at: 이 실행이 쓴 시각
 
+<a id="partial_bulk_editing-an-allow-list-update-carrying-no-user-is-refused"></a>
+
+#### [an-allow-list-update-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_editing.py): pass
+
+allow_list 둘이 있고 사용자 컨텍스트 없이 순위를 한 번에 바꾸면, 호출자를 알 수 없어 거부됩니다
+
+Given
+
+- 한 설정 이름의 PUBLIC, USER allow_list 와 권한이 없는 일반 사용자 한 명
+  - 도메인 home-1
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- AppConfigAllowListAdapter.partial_bulk_update: 사용자 컨텍스트 없이 allow_list 둘의 순위를 한 번에 변경합니다
+
+Then
+
+- 거부됩니다
+  - 거부: UnreachableError
+
 ### update
 
 <a id="editing-an-edit-carrying-no-value-changes-nothing"></a>
@@ -918,6 +948,34 @@ Then
   - failed count = 1
   - failed[0].id: 요청에 넣은 없는 ID 와 같다
   - failed[0].message: 'not found'를 담은 이유
+
+<a id="partial_bulk_purging-an-allow-list-purge-carrying-no-user-is-refused"></a>
+
+#### [an-allow-list-purge-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_purging.py): pass
+
+allow_list 둘이 있고 사용자 컨텍스트 없이 한 번에 영구 삭제하면, 호출자를 알 수 없어 거부됩니다
+
+Given
+
+- 한 설정 이름의 PUBLIC, USER allow_list 와 권한이 없는 일반 사용자 한 명
+  - 도메인 home-1
+  - 설정 정의 config-1: 이 이름의 설정을 등록했습니다
+  - 허용 목록 항목 first-1: 공개 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 허용 목록 항목 second-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- AppConfigAllowListAdapter.partial_bulk_purge: 사용자 컨텍스트 없이 allow_list 둘을 한 번에 영구 삭제합니다
+
+Then
+
+- 거부됩니다
+  - 거부: UnreachableError
 
 ### purge
 

@@ -2,16 +2,16 @@
 
 [배경](/src/ai/backend/manager/api/adapters/login_client_type/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/login_client_type/adapter.py)
 
-시나리오: 미완성 4 / 8
+시나리오: 완성
 
 - ops 구성 (8)
   - admin_create: 대표 성공 ✓ · 대표 거부 ✓
-  - batch_load_by_ids: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
+  - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
   - get: 대표 성공 ✓ · 대표 거부 ✓
-  - partial_bulk_purge: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
-  - partial_bulk_update: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - partial_bulk_purge: 대표 성공 ✓ · 대표 거부 ✓
+  - partial_bulk_update: 대표 성공 ✓ · 대표 거부 ✓
   - purge: 대표 성공 ✓ · 대표 거부 ✓
-  - search: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - search: 대표 성공 ✓ · 대표 거부 ✓
   - update: 대표 성공 ✓ · 대표 거부 ✓
 
 **admin_create**
@@ -23,6 +23,13 @@
 | [같은 이름의 로그인 클라이언트 유형이 이미 있을 때 그 이름으로 다시 생성하면 이름 중복으로 거부됩니다](#creating-a-login-client-type-name-already-taken-is-refused) | 거부 |
 | [superadmin 이 아닌 사용자가 로그인 클라이언트 유형을 생성하면 역할 부족으로 거부됩니다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-login-client-type) | 거부 |
 | [권한 검사를 꺼도 superadmin 이 아니면 로그인 클라이언트 유형을 생성하지 못합니다](#creating-turning-enforcement-off-does-not-let-a-user-create-a-login-client-type) | 거부 |
+
+**batch_load_by_ids**
+
+| 시나리오 | 판정 |
+|---|---|
+| [superadmin 이 미리 저장한 종류 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 에 해당하는 항목은 비어 있습니다](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | 성공 |
+| [종류 둘이 있고 사용자 컨텍스트 없이 한 번에 조회하면, 호출자를 알 수 없어 거부됩니다](#reading-a-batch-load-carrying-no-user-is-refused) | 거부 |
 
 **get**
 
@@ -37,6 +44,7 @@
 |---|---|
 | [아무 권한도 없는 사용자가 로그인 클라이언트 유형 여럿을 한 번에 purge 하려 하면 purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-login-client-types) | 성공 |
 | [superadmin 이 로그인 클라이언트 유형 둘과 없는 id 하나를 한 번에 purge 하면 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-purging-several-login-client-types-answers-for-the-missing-one) | 성공 |
+| [종류 둘이 있고 사용자 컨텍스트 없이 한 번에 purge 하면, 호출자를 알 수 없어 거부됩니다](#partial_bulk_purging-a-type-purge-carrying-no-user-is-refused) | 거부 |
 
 **partial_bulk_update**
 
@@ -44,6 +52,7 @@
 |---|---|
 | [아무 권한도 없는 사용자가 로그인 클라이언트 유형 여럿을 한 번에 수정하려 하면 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-login-client-types) | 성공 |
 | [superadmin 이 로그인 클라이언트 유형 여럿의 설명을 한 번에 변경하면 모두 새 설명으로 오고 실패한 것은 없습니다](#partial_bulk_editing-the-superadmin-edits-several-login-client-types-at-once) | 성공 |
+| [종류 둘이 있고 사용자 컨텍스트 없이 설명을 한 번에 바꾸면, 호출자를 알 수 없어 거부됩니다](#partial_bulk_editing-a-type-update-carrying-no-user-is-refused) | 거부 |
 
 **purge**
 
@@ -59,6 +68,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [로그인 클라이언트 유형 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계됩니다](#searching-a-user-granted-nothing-counts-every-login-client-type-laid) | 성공 |
+| [종류 둘이 있고 사용자 컨텍스트 없이 검색하면, 호출자를 알 수 없어 거부됩니다](#searching-a-search-carrying-no-user-is-refused) | 거부 |
 
 **update**
 
@@ -213,6 +223,81 @@ Then
 - 거부됩니다
   - 거부: InsufficientPrivilege
 
+### batch_load_by_ids
+
+<a id="reading-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
+
+#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/login_client_type/test_reading.py): pass
+
+superadmin 이 미리 저장한 종류 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 에 해당하는 항목은 비어 있습니다
+
+Given
+
+- 로그인 클라이언트 종류 2개와, superadmin 한 명
+  - 로그인 클라이언트 종류 wanted-1
+  - 로그인 클라이언트 종류 other-1
+  - 도메인 home-1
+  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 public-reader-1: login_client_type 전체에 READ 허용
+    - superadmin user-1: 역할 public-reader-1 보유
+
+When
+
+- LoginClientTypeAdapter.batch_load_by_ids: user-1이 미리 저장한 종류 2개와 없는 id 하나를 한 번에 조회합니다
+
+Then
+
+- 요청한 순서대로 반환되고, 없는 id 에 해당하는 항목은 비어 있습니다
+  - len(items) = 3
+  - id: 건너뜀: 데이터베이스가 생성합니다
+  - name = 'wanted-1'
+  - description = '미리 생성한 로그인 클라이언트 종류'
+  - created_at: 이 실행이 쓴 시각
+  - modified_at: 이 실행이 쓴 시각
+  - id: 건너뜀: 데이터베이스가 생성합니다
+  - name = 'other-1'
+  - description = '미리 생성한 로그인 클라이언트 종류'
+  - created_at: 이 실행이 쓴 시각
+  - modified_at: 이 실행이 쓴 시각
+  - items[2] = None
+
+<a id="reading-a-batch-load-carrying-no-user-is-refused"></a>
+
+#### [a-batch-load-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/login_client_type/test_reading.py): pass
+
+종류 둘이 있고 사용자 컨텍스트 없이 한 번에 조회하면, 호출자를 알 수 없어 거부됩니다
+
+Given
+
+- 로그인 클라이언트 종류 2개와, 일반 사용자 한 명
+  - 로그인 클라이언트 종류 wanted-1
+  - 로그인 클라이언트 종류 other-1
+  - 도메인 home-1
+  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 public-reader-1: login_client_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- LoginClientTypeAdapter.batch_load_by_ids: 사용자 컨텍스트 없이 종류 2개를 한 번에 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: UnreachableError
+
 ### get
 
 <a id="reading-a-user-granted-nothing-reads-a-login-client-type-by-id"></a>
@@ -361,6 +446,37 @@ Then
   - failed[0].id: 요청에 넣은 없는 id 와 같다
   - failed[0].message: 'not found'를 담은 이유
 
+<a id="partial_bulk_purging-a-type-purge-carrying-no-user-is-refused"></a>
+
+#### [a-type-purge-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/login_client_type/test_partial_bulk_purging.py): pass
+
+종류 둘이 있고 사용자 컨텍스트 없이 한 번에 purge 하면, 호출자를 알 수 없어 거부됩니다
+
+Given
+
+- 로그인 클라이언트 종류 2개와, 일반 사용자 한 명
+  - 로그인 클라이언트 종류 wanted-1
+  - 로그인 클라이언트 종류 other-1
+  - 도메인 home-1
+  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 public-reader-1: login_client_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- LoginClientTypeAdapter.partial_bulk_purge: 사용자 컨텍스트 없이 종류 2개를 한 번에 purge 합니다
+
+Then
+
+- 거부됩니다
+  - 거부: UnreachableError
+
 ### partial_bulk_update
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-login-client-types"></a>
@@ -440,6 +556,37 @@ Then
   - description = '한 번에 수정한 설명'
   - created_at: 이 실행이 쓴 시각
   - modified_at: 이 실행이 쓴 시각
+
+<a id="partial_bulk_editing-a-type-update-carrying-no-user-is-refused"></a>
+
+#### [a-type-update-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/login_client_type/test_partial_bulk_editing.py): pass
+
+종류 둘이 있고 사용자 컨텍스트 없이 설명을 한 번에 바꾸면, 호출자를 알 수 없어 거부됩니다
+
+Given
+
+- 로그인 클라이언트 종류 2개와, 일반 사용자 한 명
+  - 로그인 클라이언트 종류 wanted-1
+  - 로그인 클라이언트 종류 other-1
+  - 도메인 home-1
+  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 public-reader-1: login_client_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- LoginClientTypeAdapter.partial_bulk_update: 사용자 컨텍스트 없이 종류 2개의 설명을 한 번에 수정합니다
+
+Then
+
+- 거부됩니다
+  - 거부: UnreachableError
 
 ### purge
 
@@ -598,6 +745,37 @@ Then
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
+
+<a id="searching-a-search-carrying-no-user-is-refused"></a>
+
+#### [a-search-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/login_client_type/test_searching.py): pass
+
+종류 둘이 있고 사용자 컨텍스트 없이 검색하면, 호출자를 알 수 없어 거부됩니다
+
+Given
+
+- 로그인 클라이언트 종류 2개와, 일반 사용자 한 명
+  - 로그인 클라이언트 종류 wanted-1
+  - 로그인 클라이언트 종류 other-1
+  - 도메인 home-1
+  - public 에서 login_client_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 public-reader-1: login_client_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- LoginClientTypeAdapter.search: 사용자 컨텍스트 없이 전체를 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: UnreachableError
 
 ### update
 

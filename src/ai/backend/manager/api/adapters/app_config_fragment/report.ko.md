@@ -2,7 +2,7 @@
 
 [배경](/src/ai/backend/manager/api/adapters/app_config_fragment/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/app_config_fragment/adapter.py)
 
-시나리오: 미완성 1 / 10
+시나리오: 완성
 
 - ops 구성 (10)
   - admin_search: 대표 성공 ✓ · 대표 거부 ✓
@@ -10,7 +10,7 @@
   - get: 대표 성공 ✓ · 대표 거부 ✓
   - my_app_config_fragments_by_names: 대표 성공 ✓ · 대표 거부 ✓
   - my_atomic_bulk_upsert: 대표 성공 ✓ · 대표 거부 ✓
-  - partial_bulk_purge: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - partial_bulk_purge: 대표 성공 ✓ · 대표 거부 ✓
   - purge: 대표 성공 ✓ · 대표 거부 ✓
   - scoped_app_config_fragments_by_names: 대표 성공 ✓ · 대표 거부 ✓
   - scoped_atomic_bulk_upsert: 대표 성공 ✓ · 대표 거부 ✓
@@ -69,6 +69,7 @@
 |---|---|
 | [자기 스코프에만 삭제 권한을 받은 사용자가 자기 조각 둘, 다른 사용자의 조각, 없는 id 를 한 번에 삭제하면, 자기 둘은 삭제된 목록에, 남의 것과 없는 id 는 실패 목록에 이유와 함께 반환됩니다](#purging-mine-anothers-and-a-missing-id-are-each-answered-for-a-plain-user) | 성공 |
 | [superadmin 이 조각 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 삭제된 목록에, 없는 id 는 실패 목록에 반환됩니다](#purging-the-superadmin-purges-both-and-a-missing-id-fails-alone) | 성공 |
+| [조각들이 있고 사용자 컨텍스트 없이 한 번에 삭제하면, 호출자를 알 수 없어 거부됩니다](#purging-a-fragment-purge-carrying-no-user-is-refused) | 거부 |
 
 **purge**
 
@@ -1017,6 +1018,43 @@ Then
   - successes: 미리 저장한 조각들와 같다
   - failed = 1
   - failed[*].message: 건너뜀: 이유는 문자열로 오고, 문자열은 변경되어도 되는 값입니다
+
+<a id="purging-a-fragment-purge-carrying-no-user-is-refused"></a>
+
+#### [a-fragment-purge-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/app_config_fragment/test_purging.py): pass
+
+조각들이 있고 사용자 컨텍스트 없이 한 번에 삭제하면, 호출자를 알 수 없어 거부됩니다
+
+Given
+
+- 자기 조각 1개와 다른 사용자의 조각 하나, 그리고 설정 조각 권한이 하나도 없는 사용자 한 명
+  - 도메인 home-1
+  - 설정 조각 권한이 하나도 없는 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 사용자 스코프에 허용된 설정 이름 준비
+    - 설정 정의 mine-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-1: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+    - 설정 정의 theirs-1: 이 이름의 설정을 등록했습니다
+    - 허용 목록 항목 entry-2: 사용자 스코프에서 이 이름의 설정을 지정할 수 있습니다, 순위는 그 스코프 종류의 기본값
+  - 스코프별 앱 설정 own-fragment-1: 값 {'mine': 0}
+  - 스코프별 앱 설정 anothers-fragment-1: 값 {'theirs': 0}
+
+When
+
+- AppConfigFragmentAdapter.partial_bulk_purge: 사용자 컨텍스트 없이 조각 2개를 한 번에 삭제합니다
+
+Then
+
+- 거부됩니다
+  - 거부: UnreachableError
 
 ### purge
 

@@ -2,22 +2,37 @@
 
 [background](/src/ai/backend/manager/api/adapters/idle_checker_assignment/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/idle_checker_assignment/adapter.py)
 
-Scenario: incomplete 7 / 7
+Scenario: incomplete 2 / 7
 
 - direct implementation (7)
-  - admin_create: success absent · rejection absent (relation): SCENARIO-GAP
-  - admin_search: success absent · rejection absent (global_scope): SCENARIO-GAP
-  - partial_bulk_purge: success present 2 · rejection absent (relation): SCENARIO-GAP
-  - partial_bulk_update: success present 2 · rejection absent (relation): SCENARIO-GAP
-  - purge: success absent · rejection absent (relation): SCENARIO-GAP
-  - scoped_search: success absent · rejection absent (scope): SCENARIO-GAP
-  - update: success absent · rejection absent (relation): SCENARIO-GAP
+  - admin_create: success present 1 · rejection present 1 (relation)
+  - admin_search: success present 1 · rejection present 1 (global_scope)
+  - partial_bulk_purge: success present 3 · rejection absent (relation): SCENARIO-GAP
+  - partial_bulk_update: success present 3 · rejection absent (relation): SCENARIO-GAP
+  - purge: success present 1 · rejection present 1 (relation)
+  - scoped_search: success present 1 · rejection present 1 (scope)
+  - update: success present 1 · rejection present 1 (relation)
+
+**admin_create**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin enables a checker on a domain, the assignment between the checker and the domain the request named comes back enabled](#creating-the-superadmin-enables-an-idle-checker-on-a-domain) | answered |
+| [when a checker and a domain exist and the checker is enabled on the domain without a user context, it is rejected for lack of permission](#creating-an-assignment-created-without-a-user-is-refused) | rejected |
+
+**admin_search**
+
+| scenario | verdict |
+|---|---|
+| [the operation is gated by the global role, so when the superadmin searches, every assignment seeded in advance is counted once and comes back whole](#searching-the-superadmin-searches-idle-checker-assignments) | answered |
+| [when two assignments exist and they are searched without a user context, it is rejected for lack of role](#searching-an-assignment-search-carrying-no-user-is-refused) | rejected |
 
 **partial_bulk_purge**
 
 | scenario | verdict |
 |---|---|
 | [when a user granted nothing tries to purge several assignments in one call, none is deleted and all come back in the failed list because they cannot be found](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-assignments) | answered |
+| [when two assignments exist and are purged at once without a user context, the call answers and every assignment comes back in the failed list because the caller cannot be known](#partial_bulk_purging-an-assignment-purge-carrying-no-user-fails-every-item) | answered |
 | [when the superadmin purges two assignments and a missing id in one call, the two come back as they were before the purge and the missing id comes back in the failed list because no target answers to it](#partial_bulk_purging-the-superadmin-purges-several-assignments-and-is-answered-for-the-missing-one) | answered |
 
 **partial_bulk_update**
@@ -25,7 +40,172 @@ Scenario: incomplete 7 / 7
 | scenario | verdict |
 |---|---|
 | [when a user granted nothing tries to disable several assignments in one call, none is disabled and all come back in the failed list because they cannot be found](#partial_bulk_editing-a-user-granted-nothing-disables-none-of-several-assignments) | answered |
+| [when two assignments exist and are disabled at once without a user context, the call answers and every assignment comes back in the failed list because the caller cannot be known](#partial_bulk_editing-an-assignment-update-carrying-no-user-fails-every-item) | answered |
 | [when the superadmin disables several assignments in one call, all come back as disabled assignments and nothing failed](#partial_bulk_editing-the-superadmin-disables-several-assignments-at-once) | answered |
+
+**purge**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin purges one assignment, the purge is answered with the id of the assignment put in the request](#retiring-the-superadmin-purges-an-idle-checker-assignment) | answered |
+| [when two assignments exist and one is purged without a user context, it is rejected because the target cannot be resolved](#retiring-an-assignment-purge-carrying-no-user-is-refused) | rejected |
+
+**scoped_search**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin searches scoped to two domains, the assignments of those domains are all counted once and come back whole](#scoped_searching-the-superadmin-scoped-searches-idle-checker-assignments) | answered |
+| [when two assignments exist and they are searched with a scope without a user context, it is rejected for lack of permission](#scoped_searching-a-scoped-assignment-search-carrying-no-user-is-refused) | rejected |
+
+**update**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin disables an assignment, it comes back disabled](#updating-the-superadmin-disables-an-idle-checker-assignment) | answered |
+| [when two assignments exist and one is disabled without a user context, it is rejected because the target cannot be resolved](#updating-an-assignment-update-carrying-no-user-is-refused) | rejected |
+
+### admin_create
+
+<a id="creating-the-superadmin-enables-an-idle-checker-on-a-domain"></a>
+
+#### [the-superadmin-enables-an-idle-checker-on-a-domain](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_creating.py): pass
+
+when the superadmin enables a checker on a domain, the assignment between the checker and the domain the request named comes back enabled
+
+Given
+
+- one idle checker, one domain and one superadmin
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Domain scope-1
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- IdleCheckerAssignmentAdapter.admin_create: user-1 enables the checker on the domain scope-1
+
+Then
+
+- the assignment between the checker and the domain the request named comes back enabled
+  - id: skipped: the database generates it
+  - scope_type = <IdleCheckerScopeTypeDTO.DOMAIN: 'domain'>
+  - scope_id: same as the domain seeded in advance
+  - idle_checker_id: same as the checker seeded in advance
+  - enabled = True
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+
+<a id="creating-an-assignment-created-without-a-user-is-refused"></a>
+
+#### [an-assignment-created-without-a-user-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_creating.py): pass
+
+when a checker and a domain exist and the checker is enabled on the domain without a user context, it is rejected for lack of permission
+
+Given
+
+- one idle checker, one domain and one regular user
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Domain scope-1
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- IdleCheckerAssignmentAdapter.admin_create: user-1 enables the checker on the domain scope-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### admin_search
+
+<a id="searching-the-superadmin-searches-idle-checker-assignments"></a>
+
+#### [the-superadmin-searches-idle-checker-assignments](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_searching.py): pass
+
+the operation is gated by the global role, so when the superadmin searches, every assignment seeded in advance is counted once and comes back whole
+
+Given
+
+- one idle checker enabled on 2 domains and one superadmin
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Domain scope-1
+  - Domain scope-2
+  - Domain scope-1 has enabled Idle checker idle-checker-1
+  - Domain scope-2 has enabled Idle checker idle-checker-1
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- IdleCheckerAssignmentAdapter.admin_search: user-1 reads filtered by the checker
+
+Then
+
+- every assignment seeded in advance is counted once and each comes back whole
+  - items.id = [UUID('01a1acbf-8ba0-709f-8a94-8ca2981485e8'), UUID('01a1acbf-8bb2-75f7-aee1-77f8f789ffe5')]
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].scope_type = <IdleCheckerScopeTypeDTO.DOMAIN: 'domain'>
+  - items[0].scope_id: same as the domain seeded in advance
+  - items[0].idle_checker_id: same as the checker seeded in advance
+  - items[0].enabled = True
+  - items[0].created_at: the time this run wrote
+  - items[0].updated_at: the time this run wrote
+  - items[1].scope_type = <IdleCheckerScopeTypeDTO.DOMAIN: 'domain'>
+  - items[1].scope_id: same as the domain seeded in advance
+  - items[1].idle_checker_id: same as the checker seeded in advance
+  - items[1].enabled = True
+  - items[1].created_at: the time this run wrote
+  - items[1].updated_at: the time this run wrote
+
+<a id="searching-an-assignment-search-carrying-no-user-is-refused"></a>
+
+#### [an-assignment-search-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_searching.py): pass
+
+when two assignments exist and they are searched without a user context, it is rejected for lack of role
+
+Given
+
+- one idle checker enabled on 2 domains and one regular user
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Domain scope-1
+  - Domain scope-2
+  - Domain scope-1 has enabled Idle checker idle-checker-1
+  - Domain scope-2 has enabled Idle checker idle-checker-1
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Domain home-2
+
+When
+
+- IdleCheckerAssignmentAdapter.admin_search: user-2 reads filtered by the checker
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### partial_bulk_purge
 
@@ -67,6 +247,45 @@ Then
   - failed[0].message: a reason containing 'Cannot resolve the given idle_checker key'
   - failed[1].id: same as the id put in the request number 2
   - failed[1].message: a reason containing 'Cannot resolve the given idle_checker key'
+
+<a id="partial_bulk_purging-an-assignment-purge-carrying-no-user-fails-every-item"></a>
+
+#### [an-assignment-purge-carrying-no-user-fails-every-item](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_partial_bulk_purging.py): pass
+
+when two assignments exist and are purged at once without a user context, the call answers and every assignment comes back in the failed list because the caller cannot be known
+
+Given
+
+- one idle checker enabled on 2 domains and one regular user
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Domain scope-1
+  - Domain scope-2
+  - Domain scope-1 has enabled Idle checker idle-checker-1
+  - Domain scope-2 has enabled Idle checker idle-checker-1
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Domain home-2
+
+When
+
+- IdleCheckerAssignmentAdapter.partial_bulk_purge: purges 2 assignments at once without a user context
+
+Then
+
+- no assignment is processed and every requested assignment comes back in the failed list
+  - successes = []
+  - failed count = 2
+  - failed[0].id: same as the id put in the request number 1
+  - failed[0].message: a reason containing 'User not found in context'
+  - failed[1].id: same as the id put in the request number 2
+  - failed[1].message: a reason containing 'User not found in context'
 
 <a id="partial_bulk_purging-the-superadmin-purges-several-assignments-and-is-answered-for-the-missing-one"></a>
 
@@ -156,6 +375,45 @@ Then
   - failed[1].id: same as the id put in the request number 2
   - failed[1].message: a reason containing 'Cannot resolve the given idle_checker key'
 
+<a id="partial_bulk_editing-an-assignment-update-carrying-no-user-fails-every-item"></a>
+
+#### [an-assignment-update-carrying-no-user-fails-every-item](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_partial_bulk_editing.py): pass
+
+when two assignments exist and are disabled at once without a user context, the call answers and every assignment comes back in the failed list because the caller cannot be known
+
+Given
+
+- one idle checker enabled on 2 domains and one regular user
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Domain scope-1
+  - Domain scope-2
+  - Domain scope-1 has enabled Idle checker idle-checker-1
+  - Domain scope-2 has enabled Idle checker idle-checker-1
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Domain home-2
+
+When
+
+- IdleCheckerAssignmentAdapter.partial_bulk_update: disables 2 assignments in one call without a user context
+
+Then
+
+- no assignment is processed and every requested assignment comes back in the failed list
+  - successes = []
+  - failed count = 2
+  - failed[0].id: same as the id put in the request number 1
+  - failed[0].message: a reason containing 'User not found in context'
+  - failed[1].id: same as the id put in the request number 2
+  - failed[1].message: a reason containing 'User not found in context'
+
 <a id="partial_bulk_editing-the-superadmin-disables-several-assignments-at-once"></a>
 
 #### [the-superadmin-disables-several-assignments-at-once](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_partial_bulk_editing.py): pass
@@ -200,4 +458,222 @@ Then
   - successes[1].created_at: the time this run wrote
   - successes[1].updated_at: the time this run wrote
   - failed = []
+
+### purge
+
+<a id="retiring-the-superadmin-purges-an-idle-checker-assignment"></a>
+
+#### [the-superadmin-purges-an-idle-checker-assignment](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_retiring.py): pass
+
+when the superadmin purges one assignment, the purge is answered with the id of the assignment put in the request
+
+Given
+
+- one idle checker enabled on 2 domains and one superadmin
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Domain scope-1
+  - Domain scope-2
+  - Domain scope-1 has enabled Idle checker idle-checker-1
+  - Domain scope-2 has enabled Idle checker idle-checker-1
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- IdleCheckerAssignmentAdapter.purge: user-1 purges the assignment of the domain scope-1
+
+Then
+
+- the purge is answered with the id of the assignment put in the request
+  - id: same as the assignment put in the request
+
+<a id="retiring-an-assignment-purge-carrying-no-user-is-refused"></a>
+
+#### [an-assignment-purge-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_retiring.py): pass
+
+when two assignments exist and one is purged without a user context, it is rejected because the target cannot be resolved
+
+Given
+
+- one idle checker enabled on 2 domains and one regular user
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Domain scope-1
+  - Domain scope-2
+  - Domain scope-1 has enabled Idle checker idle-checker-1
+  - Domain scope-2 has enabled Idle checker idle-checker-1
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Domain home-2
+
+When
+
+- IdleCheckerAssignmentAdapter.purge: user-2 purges the assignment of the domain scope-1
+
+Then
+
+- the call is rejected
+  - rejected: GenericBadRequest
+
+### scoped_search
+
+<a id="scoped_searching-the-superadmin-scoped-searches-idle-checker-assignments"></a>
+
+#### [the-superadmin-scoped-searches-idle-checker-assignments](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_scoped_searching.py): pass
+
+when the superadmin searches scoped to two domains, the assignments of those domains are all counted once and come back whole
+
+Given
+
+- one idle checker enabled on 2 domains and one superadmin
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Domain scope-1
+  - Domain scope-2
+  - Domain scope-1 has enabled Idle checker idle-checker-1
+  - Domain scope-2 has enabled Idle checker idle-checker-1
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- IdleCheckerAssignmentAdapter.scoped_search: user-1 reads scoped to the domains scope-1 and scope-2
+
+Then
+
+- every assignment seeded in advance is counted once and each comes back whole
+  - items.id = [UUID('01a1acbf-a6ef-710e-997b-169522a12af6'), UUID('01a1acbf-a700-7fe7-8c64-add4d28912af')]
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].scope_type = <IdleCheckerScopeTypeDTO.DOMAIN: 'domain'>
+  - items[0].scope_id: same as the domain seeded in advance
+  - items[0].idle_checker_id: same as the checker seeded in advance
+  - items[0].enabled = True
+  - items[0].created_at: the time this run wrote
+  - items[0].updated_at: the time this run wrote
+  - items[1].scope_type = <IdleCheckerScopeTypeDTO.DOMAIN: 'domain'>
+  - items[1].scope_id: same as the domain seeded in advance
+  - items[1].idle_checker_id: same as the checker seeded in advance
+  - items[1].enabled = True
+  - items[1].created_at: the time this run wrote
+  - items[1].updated_at: the time this run wrote
+
+<a id="scoped_searching-a-scoped-assignment-search-carrying-no-user-is-refused"></a>
+
+#### [a-scoped-assignment-search-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_scoped_searching.py): pass
+
+when two assignments exist and they are searched with a scope without a user context, it is rejected for lack of permission
+
+Given
+
+- one idle checker enabled on 2 domains and one regular user
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Domain scope-1
+  - Domain scope-2
+  - Domain scope-1 has enabled Idle checker idle-checker-1
+  - Domain scope-2 has enabled Idle checker idle-checker-1
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Domain home-2
+
+When
+
+- IdleCheckerAssignmentAdapter.scoped_search: user-2 reads scoped to the domains scope-1 and scope-2
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### update
+
+<a id="updating-the-superadmin-disables-an-idle-checker-assignment"></a>
+
+#### [the-superadmin-disables-an-idle-checker-assignment](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_updating.py): pass
+
+when the superadmin disables an assignment, it comes back disabled
+
+Given
+
+- one idle checker enabled on 2 domains and one superadmin
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Domain scope-1
+  - Domain scope-2
+  - Domain scope-1 has enabled Idle checker idle-checker-1
+  - Domain scope-2 has enabled Idle checker idle-checker-1
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- IdleCheckerAssignmentAdapter.update: user-1 disables the assignment of the domain scope-1
+
+Then
+
+- the whole assignment updated comes back disabled
+  - scope_type = <IdleCheckerScopeTypeDTO.DOMAIN: 'domain'>
+  - scope_id: same as the domain seeded in advance
+  - idle_checker_id: same as the checker seeded in advance
+  - enabled = False
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+
+<a id="updating-an-assignment-update-carrying-no-user-is-refused"></a>
+
+#### [an-assignment-update-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_updating.py): pass
+
+when two assignments exist and one is disabled without a user context, it is rejected because the target cannot be resolved
+
+Given
+
+- one idle checker enabled on 2 domains and one regular user
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Domain scope-1
+  - Domain scope-2
+  - Domain scope-1 has enabled Idle checker idle-checker-1
+  - Domain scope-2 has enabled Idle checker idle-checker-1
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Domain home-2
+
+When
+
+- IdleCheckerAssignmentAdapter.update: user-2 disables the assignment of the domain scope-1
+
+Then
+
+- the call is rejected
+  - rejected: GenericBadRequest
 

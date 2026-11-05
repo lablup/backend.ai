@@ -2,12 +2,12 @@
 
 [background](/src/ai/backend/manager/api/adapters/service_catalog/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/service_catalog/adapter.py)
 
-Scenario: incomplete 1 / 2
+Scenario: complete
 
 - built from ops (1)
   - admin_search: representative success ✓ · representative rejection ✓
 - direct implementation (1)
-  - batch_load_by_ids: success absent · rejection absent (partial_bulk): SCENARIO-GAP
+  - batch_load_by_ids: success present 1 · rejection present 1 (partial_bulk)
 
 **admin_search**
 
@@ -22,6 +22,13 @@ Scenario: incomplete 1 / 2
 | [when the monitor role reads without a filter, it gets the same answer as the superadmin. This search is a read operation, so the monitor role passes the global role check](#searching-the-monitor-role-counts-every-service-as-the-superadmin-does) | answered |
 | [when one of two services holds an endpoint and the superadmin reads without a filter, both are counted once](#searching-the-superadmin-counts-every-service-laid-once) | answered |
 | [when a user who is not the superadmin requests a global read, it is rejected for lack of role](#searching-a-user-who-is-not-the-superadmin-may-not-search-services) | rejected |
+
+**batch_load_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin batch-loads two services created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | answered |
+| [when two services exist and they are batch-loaded without a user context, it is rejected because the caller cannot be known](#reading-a-batch-load-carrying-no-user-is-refused) | rejected |
 
 ### admin_search
 
@@ -361,4 +368,87 @@ Then
 
 - the call is rejected
   - rejected: InsufficientPrivilege
+
+### batch_load_by_ids
+
+<a id="reading-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
+
+#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/service_catalog/test_reading.py): pass
+
+when the superadmin batch-loads two services created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty
+
+Given
+
+- 2 services and one superadmin
+  - Service wanted-1: registered as healthy in the manager group
+  - Service wanted-1: has one endpoint at http://127.0.0.1:8080
+  - Service other-1: registered as healthy in the manager group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ServiceCatalogAdapter.batch_load_by_ids: user-1 batch-loads the 2 services created in advance and one unknown id
+
+Then
+
+- they come back in the order asked and the item for an unknown id is empty
+  - len(items) = 3
+  - items[0].entity_id: same as the service created in advance
+  - items[0].id: same as the service seeded in advance
+  - items[0].service_group = 'manager'
+  - items[0].instance_id = 'wanted-1'
+  - items[0].display_name = 'wanted-1'
+  - items[0].version = '26.9.0'
+  - items[0].labels = {}
+  - items[0].status = <ServiceCatalogStatus.HEALTHY: 'healthy'>
+  - items[0].startup_time = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
+  - items[0].registered_at: the time this run wrote
+  - items[0].last_heartbeat: the time this run wrote
+  - items[0].config_hash = ''
+  - items[1].entity_id: same as the service created in advance
+  - items[1].id: same as the service seeded in advance
+  - items[1].service_group = 'manager'
+  - items[1].instance_id = 'other-1'
+  - items[1].display_name = 'other-1'
+  - items[1].version = '26.9.0'
+  - items[1].labels = {}
+  - items[1].status = <ServiceCatalogStatus.HEALTHY: 'healthy'>
+  - items[1].startup_time = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
+  - items[1].registered_at: the time this run wrote
+  - items[1].last_heartbeat: the time this run wrote
+  - items[1].config_hash = ''
+  - items[2] = None
+
+<a id="reading-a-batch-load-carrying-no-user-is-refused"></a>
+
+#### [a-batch-load-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/service_catalog/test_reading.py): pass
+
+when two services exist and they are batch-loaded without a user context, it is rejected because the caller cannot be known
+
+Given
+
+- 2 services and one regular user
+  - Service wanted-1: registered as healthy in the manager group
+  - Service wanted-1: has one endpoint at http://127.0.0.1:8080
+  - Service other-1: registered as healthy in the manager group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- ServiceCatalogAdapter.batch_load_by_ids: batch-loads 2 services without a user context
+
+Then
+
+- the call is rejected
+  - rejected: UnreachableError
 

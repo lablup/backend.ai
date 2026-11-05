@@ -2,12 +2,12 @@
 
 [배경](/src/ai/backend/manager/api/adapters/client_ip_masking/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/client_ip_masking/adapter.py)
 
-시나리오: 미완성 2 / 5
+시나리오: 완성
 
 - ops 구성 (5)
   - admin_search: 대표 성공 ✓ · 대표 거부 ✓
-  - batch_load_by_ids: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
-  - partial_bulk_purge: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
+  - partial_bulk_purge: 대표 성공 ✓ · 대표 거부 ✓
   - purge: 대표 성공 ✓ · 대표 거부 ✓
   - upsert: 대표 성공 ✓ · 대표 거부 ✓
 
@@ -19,12 +19,20 @@
 | [대상이 다른 정책 둘이 있을 때 superadmin 이 필터 없이 조회하면 둘 다 집계됩니다](#searching-the-superadmin-counts-every-masking-policy-laid) | 성공 |
 | [superadmin 이 아닌 사용자가 전체를 조회하도록 요청하면 역할 부족으로 거부됩니다](#searching-a-user-who-is-not-the-superadmin-may-not-search-masking-policies) | 거부 |
 
+**batch_load_by_ids**
+
+| 시나리오 | 판정 |
+|---|---|
+| [superadmin 이 미리 저장한 정책 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 에 해당하는 항목은 비어 있습니다](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | 성공 |
+| [정책 둘이 있고 사용자 컨텍스트 없이 한 번에 조회하면, 호출자를 알 수 없어 거부됩니다](#reading-a-batch-load-carrying-no-user-is-refused) | 거부 |
+
 **partial_bulk_purge**
 
 | 시나리오 | 판정 |
 |---|---|
 | [아무 권한도 없는 사용자가 정책 여럿을 한 번에 purge 하려 하면 purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-masking-policies) | 성공 |
 | [superadmin 이 정책 둘과 없는 id 하나를 한 번에 purge 하면 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-purging-several-masking-policies-answers-for-the-missing-one) | 성공 |
+| [정책 둘이 있고 사용자 컨텍스트 없이 한 번에 purge 하면, 호출자를 알 수 없어 거부됩니다](#partial_bulk_purging-a-policy-purge-carrying-no-user-is-refused) | 거부 |
 
 **purge**
 
@@ -137,6 +145,79 @@ Then
 - 거부됩니다
   - 거부: InsufficientPrivilege
 
+### batch_load_by_ids
+
+<a id="reading-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
+
+#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/client_ip_masking/test_reading.py): pass
+
+superadmin 이 미리 저장한 정책 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 에 해당하는 항목은 비어 있습니다
+
+Given
+
+- 대상이 다른 클라이언트 IP 마스킹 정책 둘과, superadmin 한 명
+  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
+  - 클라이언트 IP 마스킹 정책 login_history: truncate 모드, 접두 길이 v4 24, v6 48
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- ClientIPMaskingAdapter.batch_load_by_ids: user-1이 미리 저장한 정책 2개와 없는 id 하나를 한 번에 조회합니다
+
+Then
+
+- 요청한 순서대로 반환되고, 없는 id 에 해당하는 항목은 비어 있습니다
+  - len(items) = 3
+  - items[0].id: 미리 저장한 정책와 같다
+  - items[0].entity_id: 미리 저장한 정책와 같다
+  - items[0].target_type = 'default'
+  - items[0].mode = 'truncate'
+  - items[0].ipv4_prefix = 24
+  - items[0].ipv6_prefix = 48
+  - items[0].created_at: 이 실행이 쓴 시각
+  - items[0].updated_at: 이 실행이 쓴 시각
+  - items[1].id: 미리 저장한 정책와 같다
+  - items[1].entity_id: 미리 저장한 정책와 같다
+  - items[1].target_type = 'login_history'
+  - items[1].mode = 'truncate'
+  - items[1].ipv4_prefix = 24
+  - items[1].ipv6_prefix = 48
+  - items[1].created_at: 이 실행이 쓴 시각
+  - items[1].updated_at: 이 실행이 쓴 시각
+  - items[2] = None
+
+<a id="reading-a-batch-load-carrying-no-user-is-refused"></a>
+
+#### [a-batch-load-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/client_ip_masking/test_reading.py): pass
+
+정책 둘이 있고 사용자 컨텍스트 없이 한 번에 조회하면, 호출자를 알 수 없어 거부됩니다
+
+Given
+
+- 대상이 다른 클라이언트 IP 마스킹 정책 둘과, 일반 사용자 한 명
+  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
+  - 클라이언트 IP 마스킹 정책 login_history: truncate 모드, 접두 길이 v4 24, v6 48
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- ClientIPMaskingAdapter.batch_load_by_ids: 사용자 컨텍스트 없이 정책 2개를 한 번에 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: UnreachableError
+
 ### partial_bulk_purge
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-masking-policies"></a>
@@ -214,6 +295,33 @@ Then
   - failed count = 1
   - failed[0].id: 요청에 넣은 없는 id 와 같다
   - failed[0].message: 'not found'를 담은 이유
+
+<a id="partial_bulk_purging-a-policy-purge-carrying-no-user-is-refused"></a>
+
+#### [a-policy-purge-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/client_ip_masking/test_partial_bulk_purging.py): pass
+
+정책 둘이 있고 사용자 컨텍스트 없이 한 번에 purge 하면, 호출자를 알 수 없어 거부됩니다
+
+Given
+
+- 대상이 다른 클라이언트 IP 마스킹 정책 둘과, 일반 사용자 한 명
+  - 클라이언트 IP 마스킹 정책 default: truncate 모드, 접두 길이 v4 24, v6 48
+  - 클라이언트 IP 마스킹 정책 login_history: truncate 모드, 접두 길이 v4 24, v6 48
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- ClientIPMaskingAdapter.partial_bulk_purge: 사용자 컨텍스트 없이 정책 2개를 한 번에 purge 합니다
+
+Then
+
+- 거부됩니다
+  - 거부: UnreachableError
 
 ### purge
 

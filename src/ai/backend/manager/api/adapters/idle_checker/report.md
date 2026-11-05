@@ -2,16 +2,16 @@
 
 [background](/src/ai/backend/manager/api/adapters/idle_checker/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/idle_checker/adapter.py)
 
-Scenario: incomplete 6 / 6
+Scenario: complete
 
 - built from ops (4)
-  - admin_partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
-  - admin_purge: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - admin_search: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - admin_partial_bulk_purge: representative success ✓ · representative rejection ✓
+  - admin_purge: representative success ✓ · representative rejection ✓
+  - admin_search: representative success ✓ · representative rejection ✓
+  - batch_load_by_ids: representative success ✓ · representative rejection ✓
 - direct implementation (2)
-  - admin_create: success absent · rejection absent (global_scope): SCENARIO-GAP
-  - admin_update: success absent · rejection absent (global_scope): SCENARIO-GAP
+  - admin_create: success present 1 · rejection present 1 (global_scope)
+  - admin_update: success present 1 · rejection present 1 (global_scope)
 
 **admin_partial_bulk_purge**
 
@@ -19,6 +19,42 @@ Scenario: incomplete 6 / 6
 |---|---|
 | [when a user granted nothing tries to purge several idle checkers in one call, none is deleted and all come back in the failed list for lack of permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-checkers) | answered |
 | [when the superadmin purges two idle checkers and a missing id in one call, the two come back as deleted idle checkers and the missing id comes back in the failed list because no target answers to it](#partial_bulk_purging-the-superadmin-purges-several-and-is-answered-for-the-missing-one) | answered |
+| [when two checkers exist and are purged at once without a user context, it is rejected because the caller cannot be known](#partial_bulk_purging-a-checker-purge-carrying-no-user-is-refused) | rejected |
+
+**admin_purge**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin purges one idle checker, the purge is answered with the id of the checker put in the request](#retiring-the-superadmin-purges-an-idle-checker) | answered |
+| [when a user granted nothing tries to purge one idle checker, it is rejected for lack of permission](#retiring-a-user-granted-nothing-may-not-purge-an-idle-checker) | rejected |
+
+**admin_search**
+
+| scenario | verdict |
+|---|---|
+| [the operation is gated by the global role, so when the superadmin searches without a filter, every checker seeded in advance is counted once and comes back](#searching-the-superadmin-searches-idle-checkers-without-a-filter) | answered |
+| [the operation is gated by the global role, so when a user who is not the superadmin searches, it is rejected for lack of role](#searching-a-user-who-is-not-the-superadmin-may-not-search-idle-checkers) | rejected |
+
+**batch_load_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin batch-loads two checkers created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | answered |
+| [when two checkers exist and they are batch-loaded without a user context, it is rejected because the caller cannot be known](#reading-a-batch-load-carrying-no-user-is-refused) | rejected |
+
+**admin_create**
+
+| scenario | verdict |
+|---|---|
+| [the operation is gated by the global role, so when the superadmin creates a session lifetime checker, it comes back with the values the request named](#creating-the-superadmin-makes-an-idle-checker) | answered |
+| [the operation is gated by the global role, so when a user who is not the superadmin creates a checker, it is rejected for lack of role](#creating-a-user-who-is-not-the-superadmin-may-not-make-an-idle-checker) | rejected |
+
+**admin_update**
+
+| scenario | verdict |
+|---|---|
+| [the operation is gated by the global role, so when the superadmin changes a checker, it comes back with the changed spec](#editing-the-superadmin-edits-an-idle-checker) | answered |
+| [the operation is gated by the global role, so when a user who is not the superadmin edits a checker, it is rejected for lack of role](#editing-a-user-who-is-not-the-superadmin-may-not-edit-an-idle-checker) | rejected |
 
 ### admin_partial_bulk_purge
 
@@ -85,4 +121,336 @@ Then
   - successes[1]: same as the whole checker seeded in advance number 2
   - failed[0].id: same as the unknown id put in the request
   - failed[0].message: a reason containing 'not found'
+
+<a id="partial_bulk_purging-a-checker-purge-carrying-no-user-is-refused"></a>
+
+#### [a-checker-purge-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/idle_checker/test_partial_bulk_purging.py): pass
+
+when two checkers exist and are purged at once without a user context, it is rejected because the caller cannot be known
+
+Given
+
+- 2 idle checkers and one regular user
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Idle checker idle-checker-2: ends interactive sessions after 3600 seconds
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- IdleCheckerAdapter.admin_partial_bulk_purge: purges 2 idle checkers at once without a user context
+
+Then
+
+- the call is rejected
+  - rejected: UnreachableError
+
+### admin_purge
+
+<a id="retiring-the-superadmin-purges-an-idle-checker"></a>
+
+#### [the-superadmin-purges-an-idle-checker](/tests/scenario/bai_scenario/manager/idle_checker/test_retiring.py): pass
+
+when the superadmin purges one idle checker, the purge is answered with the id of the checker put in the request
+
+Given
+
+- 2 idle checkers and one superadmin
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Idle checker idle-checker-2: ends interactive sessions after 3600 seconds
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- IdleCheckerAdapter.admin_purge: user-1 purges the checker idle-checker-1
+
+Then
+
+- the purge is answered with the id of the checker put in the request
+  - id: same as the checker put in the request
+  - entity_id: same as the checker put in the request
+
+<a id="retiring-a-user-granted-nothing-may-not-purge-an-idle-checker"></a>
+
+#### [a-user-granted-nothing-may-not-purge-an-idle-checker](/tests/scenario/bai_scenario/manager/idle_checker/test_retiring.py): pass
+
+when a user granted nothing tries to purge one idle checker, it is rejected for lack of permission
+
+Given
+
+- 2 idle checkers and one regular user
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Idle checker idle-checker-2: ends interactive sessions after 3600 seconds
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- IdleCheckerAdapter.admin_purge: user-1 purges the checker idle-checker-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### admin_search
+
+<a id="searching-the-superadmin-searches-idle-checkers-without-a-filter"></a>
+
+#### [the-superadmin-searches-idle-checkers-without-a-filter](/tests/scenario/bai_scenario/manager/idle_checker/test_searching.py): pass
+
+the operation is gated by the global role, so when the superadmin searches without a filter, every checker seeded in advance is counted once and comes back
+
+Given
+
+- 2 idle checkers and one superadmin
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Idle checker idle-checker-2: ends interactive sessions after 3600 seconds
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- IdleCheckerAdapter.admin_search: user-1 reads everything without a filter
+
+Then
+
+- every checker seeded in advance is counted once, and each whole checker comes back
+  - items.id = [IdleCheckerID('01a1acc0-0159-7195-8ff3-0ddd44ce1147'), IdleCheckerID('01a1acc0-016f-754f-875b-c255724bb08e')]
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0]: same as the whole checker seeded in advance number 1
+  - items[1]: same as the whole checker seeded in advance number 2
+
+<a id="searching-a-user-who-is-not-the-superadmin-may-not-search-idle-checkers"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-search-idle-checkers](/tests/scenario/bai_scenario/manager/idle_checker/test_searching.py): pass
+
+the operation is gated by the global role, so when a user who is not the superadmin searches, it is rejected for lack of role
+
+Given
+
+- 2 idle checkers and one regular user
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Idle checker idle-checker-2: ends interactive sessions after 3600 seconds
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- IdleCheckerAdapter.admin_search: user-1 reads everything without a filter
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+### batch_load_by_ids
+
+<a id="reading-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
+
+#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/idle_checker/test_reading.py): pass
+
+when the superadmin batch-loads two checkers created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty
+
+Given
+
+- 2 idle checkers and one superadmin
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Idle checker idle-checker-2: ends interactive sessions after 3600 seconds
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- IdleCheckerAdapter.batch_load_by_ids: user-1 batch-loads the 2 checkers created in advance and one unknown id
+
+Then
+
+- they come back in the order asked and the item for an unknown id is empty
+  - len(items) = 3
+  - items[0]: same as the whole checker seeded in advance number 1
+  - items[1]: same as the whole checker seeded in advance number 2
+  - items[2] = None
+
+<a id="reading-a-batch-load-carrying-no-user-is-refused"></a>
+
+#### [a-batch-load-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/idle_checker/test_reading.py): pass
+
+when two checkers exist and they are batch-loaded without a user context, it is rejected because the caller cannot be known
+
+Given
+
+- 2 idle checkers and one regular user
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Idle checker idle-checker-2: ends interactive sessions after 3600 seconds
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- IdleCheckerAdapter.batch_load_by_ids: batch-loads 2 checkers without a user context
+
+Then
+
+- the call is rejected
+  - rejected: UnreachableError
+
+### admin_create
+
+<a id="creating-the-superadmin-makes-an-idle-checker"></a>
+
+#### [the-superadmin-makes-an-idle-checker](/tests/scenario/bai_scenario/manager/idle_checker/test_creating.py): pass
+
+the operation is gated by the global role, so when the superadmin creates a session lifetime checker, it comes back with the values the request named
+
+Given
+
+- no idle checker and one caller
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- IdleCheckerAdapter.admin_create: user-1 creates a checker ending sessions after 7200 seconds
+
+Then
+
+- the whole checker just created comes back
+  - id: skipped: the database generates it
+  - entity_id: skipped: the database generates it
+  - name = 'created-checker'
+  - description = None
+  - checker_type = 'session_lifetime'
+  - target_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>]
+  - initial_grace_period_seconds = 0
+  - spec.type = 'session_lifetime'
+  - spec.session_lifetime.max_lifetime_seconds = 7200
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+
+<a id="creating-a-user-who-is-not-the-superadmin-may-not-make-an-idle-checker"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-make-an-idle-checker](/tests/scenario/bai_scenario/manager/idle_checker/test_creating.py): pass
+
+the operation is gated by the global role, so when a user who is not the superadmin creates a checker, it is rejected for lack of role
+
+Given
+
+- no idle checker and one caller
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- IdleCheckerAdapter.admin_create: user-1 creates a checker ending sessions after 7200 seconds
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+### admin_update
+
+<a id="editing-the-superadmin-edits-an-idle-checker"></a>
+
+#### [the-superadmin-edits-an-idle-checker](/tests/scenario/bai_scenario/manager/idle_checker/test_editing.py): pass
+
+the operation is gated by the global role, so when the superadmin changes a checker, it comes back with the changed spec
+
+Given
+
+- 2 idle checkers and one superadmin
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Idle checker idle-checker-2: ends interactive sessions after 3600 seconds
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- IdleCheckerAdapter.admin_update: user-1 changes the checker idle-checker-1 to the network timeout checker of 5400 seconds
+
+Then
+
+- the whole checker edited comes back
+  - id: same as the checker laid
+  - entity_id: same as the checker laid
+  - name = 'idle-checker-1'
+  - description = None
+  - checker_type = 'network_timeout'
+  - target_session_types = [<SessionTypes.INTERACTIVE: 'interactive'>]
+  - initial_grace_period_seconds = 0
+  - spec.type = 'network_timeout'
+  - spec.network.max_network_inactivity_seconds = 5400
+  - created_at: skipped: the time written before the edit
+  - updated_at: the time this run wrote
+
+<a id="editing-a-user-who-is-not-the-superadmin-may-not-edit-an-idle-checker"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-edit-an-idle-checker](/tests/scenario/bai_scenario/manager/idle_checker/test_editing.py): pass
+
+the operation is gated by the global role, so when a user who is not the superadmin edits a checker, it is rejected for lack of role
+
+Given
+
+- 2 idle checkers and one regular user
+  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
+  - Idle checker idle-checker-2: ends interactive sessions after 3600 seconds
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- IdleCheckerAdapter.admin_update: user-1 changes the checker idle-checker-1 to the network timeout checker of 5400 seconds
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
 

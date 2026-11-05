@@ -2,17 +2,24 @@
 
 [background](/src/ai/backend/manager/api/adapters/retention_policy/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/retention_policy/adapter.py)
 
-Scenario: incomplete 3 / 8
+Scenario: complete
 
 - built from ops (8)
-  - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_by_ids: representative success ✓ · representative rejection ✓
   - create: representative success ✓ · representative rejection ✓
   - get: representative success ✓ · representative rejection ✓
-  - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
-  - partial_bulk_update: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_purge: representative success ✓ · representative rejection ✓
+  - partial_bulk_update: representative success ✓ · representative rejection ✓
   - purge: representative success ✓ · representative rejection ✓
   - search: representative success ✓ · representative rejection ✓
   - update: representative success ✓ · representative rejection ✓
+
+**batch_load_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when one policy exists and the superadmin batch-loads it and one unknown id, they come back in the order asked and the item for the unknown id is empty](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | answered |
+| [when one policy exists and is batch-loaded without a user context, it is rejected because the caller cannot be known](#reading-a-policy-batch-load-carrying-no-user-is-refused) | rejected |
 
 **create**
 
@@ -50,6 +57,7 @@ Scenario: incomplete 3 / 8
 |---|---|
 | [when a user granted nothing tries to purge several policies at once, none is deleted and every one comes back in the failed list because the user has no permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-policies) | answered |
 | [when the superadmin purges two policies and one missing id at once, the two come back in the processed list and the missing id comes back in the failed list because nothing answers to it](#partial_bulk_purging-purging-several-policies-answers-for-the-missing-one) | answered |
+| [when two policies exist and are purged at once without a user context, it is rejected because the caller cannot be known](#partial_bulk_purging-a-policy-purge-carrying-no-user-is-refused) | rejected |
 
 **partial_bulk_update**
 
@@ -57,6 +65,7 @@ Scenario: incomplete 3 / 8
 |---|---|
 | [when a user granted nothing tries to edit several policies at once, none is edited and every one comes back in the failed list because the user has no permission](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-policies) | answered |
 | [when the superadmin changes the retention days of several policies at once, all of them come back with the new days and nothing failed](#partial_bulk_editing-the-superadmin-edits-several-policies-at-once) | answered |
+| [when two policies exist and their retention days are changed at once without a user context, it is rejected because the caller cannot be known](#partial_bulk_editing-a-policy-update-carrying-no-user-is-refused) | rejected |
 
 **purge**
 
@@ -88,6 +97,81 @@ Scenario: incomplete 3 / 8
 | [when a user granted nothing edits a policy, the call is rejected for lack of permission](#editing-a-user-granted-nothing-may-not-edit-a-policy) | rejected |
 | [when the category of one of two policies is changed to the category of the other, the call is rejected as a duplicate. Unlike at creation, the constraint violation from the repository propagates as it is](#editing-moving-a-policy-to-a-category-already-taken-is-refused) | rejected |
 | [when the superadmin edits an id nothing answers to, the call is rejected as not found](#editing-the-superadmin-editing-a-policy-id-nothing-answers-to-is-not-found) | rejected |
+
+### batch_load_by_ids
+
+<a id="reading-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
+
+#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py): pass
+
+when one policy exists and the superadmin batch-loads it and one unknown id, they come back in the order asked and the item for the unknown id is empty
+
+Given
+
+- two retention policies of different categories and one superadmin
+  - Retention policy logs: kept for 30 days
+  - Retention policy login: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- RetentionPolicyAdapter.batch_load_by_ids: user-1 batch-loads the policy created in advance and one unknown id
+
+Then
+
+- they come back in the order asked and the item for an unknown id is empty
+  - len(items) = 3
+  - items[0].id: same as the id of the policy laid
+  - items[0].entity_id: same as the id of the policy laid
+  - id: skipped: the database generates it
+  - category = <RetentionCategory.LOGS: 'logs'>
+  - retention_period_days = 30
+  - enabled = True
+  - last_swept_at = None
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+  - items[1].id: same as the id of the policy laid
+  - items[1].entity_id: same as the id of the policy laid
+  - id: skipped: the database generates it
+  - category = <RetentionCategory.LOGIN: 'login'>
+  - retention_period_days = 30
+  - enabled = True
+  - last_swept_at = None
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+  - items[2] = None
+
+<a id="reading-a-policy-batch-load-carrying-no-user-is-refused"></a>
+
+#### [a-policy-batch-load-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py): pass
+
+when one policy exists and is batch-loaded without a user context, it is rejected because the caller cannot be known
+
+Given
+
+- two retention policies of different categories and one regular user
+  - Retention policy logs: kept for 30 days
+  - Retention policy login: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- RetentionPolicyAdapter.batch_load_by_ids: batch-loads 2 policies without a user context
+
+Then
+
+- the call is rejected
+  - rejected: UnreachableError
 
 ### create
 
@@ -755,6 +839,33 @@ Then
   - failed[0].id: same as the missing id put in the request
   - failed[0].message: a reason containing 'not found'
 
+<a id="partial_bulk_purging-a-policy-purge-carrying-no-user-is-refused"></a>
+
+#### [a-policy-purge-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/retention_policy/test_partial_bulk_purging.py): pass
+
+when two policies exist and are purged at once without a user context, it is rejected because the caller cannot be known
+
+Given
+
+- two retention policies of different categories and one regular user
+  - Retention policy logs: kept for 30 days
+  - Retention policy login: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- RetentionPolicyAdapter.partial_bulk_purge: purges 2 policies at once without a user context
+
+Then
+
+- the call is rejected
+  - rejected: UnreachableError
+
 ### partial_bulk_update
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-policies"></a>
@@ -830,6 +941,33 @@ Then
   - last_swept_at = None
   - created_at: the time this run wrote
   - updated_at: the time this run wrote
+
+<a id="partial_bulk_editing-a-policy-update-carrying-no-user-is-refused"></a>
+
+#### [a-policy-update-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/retention_policy/test_partial_bulk_editing.py): pass
+
+when two policies exist and their retention days are changed at once without a user context, it is rejected because the caller cannot be known
+
+Given
+
+- two retention policies of different categories and one regular user
+  - Retention policy logs: kept for 30 days
+  - Retention policy login: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- RetentionPolicyAdapter.partial_bulk_update: edits the retention days of 2 policies at once without a user context
+
+Then
+
+- the call is rejected
+  - rejected: UnreachableError
 
 ### purge
 
