@@ -11,7 +11,12 @@ from typing import override
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderMountPolicy
+from ai.backend.common.types import (
+    QuotaScopeID,
+    QuotaScopeType,
+    VFolderMountPolicy,
+    VFolderUsageMode,
+)
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import VFolderData, VFolderOperationStatus
@@ -25,11 +30,14 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom, TestSeedRowFromTw
 
 @dataclass(frozen=True)
 class TestSeedPersonalVFolder(TestSeedRowFrom[UserData, VFolderData]):
-    """A ready folder of the given person's own, on the given host."""
+    """A folder of the given person's own, on the given host, in the given state."""
 
     host: str
     name_hint: str = "folder"
     default_mount_permission: VFolderMountPolicy | None = None
+    usage_mode: VFolderUsageMode = VFolderUsageMode.GENERAL
+    cloneable: bool = False
+    status: VFolderOperationStatus = VFolderOperationStatus.READY
 
     @override
     def kind(self) -> str:
@@ -39,10 +47,23 @@ class TestSeedPersonalVFolder(TestSeedRowFrom[UserData, VFolderData]):
     def detail(self) -> str:
         parts: list[str] = [
             Says(
-                "그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다",
-                english="is placed in that person's personal project and is ready to use",
+                "그 사람의 개인 프로젝트에 놓입니다",
+                english="is placed in that person's personal project",
             )
         ]
+        if self.status is VFolderOperationStatus.READY:
+            parts.append(Says("사용할 수 있는 상태입니다", english="is ready to use"))
+        else:
+            parts.append(Says(f"{self.status.value} 상태입니다", english=f"is {self.status.value}"))
+        if self.usage_mode is not VFolderUsageMode.GENERAL:
+            parts.append(
+                Says(
+                    f"{self.usage_mode.value} 용도입니다",
+                    english=f"is used as {self.usage_mode.value}",
+                )
+            )
+        if self.cloneable:
+            parts.append(Says("복제할 수 있습니다", english="may be cloned"))
         if self.default_mount_permission is not None:
             permission = self.default_mount_permission.value
             parts.append(
@@ -65,18 +86,23 @@ class TestSeedPersonalVFolder(TestSeedRowFrom[UserData, VFolderData]):
             quota_scope_id=str(QuotaScopeID(QuotaScopeType.USER, source.id)),
             host=self.host,
             creator_id=source.id,
-            status=VFolderOperationStatus.READY,
+            status=self.status,
             user=UserID(source.id),
+            usage_mode=self.usage_mode,
+            cloneable=self.cloneable,
             default_mount_permission=self.default_mount_permission,
         )
 
 
 @dataclass(frozen=True)
 class TestSeedProjectVFolder(TestSeedRowFromTwo[ProjectData, UserData, VFolderData]):
-    """A ready folder of the given project, made by the given person, on the given host."""
+    """A folder of the given project, made by the given person, on the given host."""
 
     host: str
     name_hint: str = "folder"
+    usage_mode: VFolderUsageMode = VFolderUsageMode.GENERAL
+    cloneable: bool = False
+    status: VFolderOperationStatus = VFolderOperationStatus.READY
 
     @override
     def kind(self) -> str:
@@ -84,10 +110,21 @@ class TestSeedProjectVFolder(TestSeedRowFromTwo[ProjectData, UserData, VFolderDa
 
     @override
     def detail(self) -> str:
-        return Says(
-            "프로젝트에 놓이고, 사용할 수 있는 상태입니다",
-            english="is placed in the project and is ready to use",
-        )
+        parts: list[str] = [Says("프로젝트에 놓입니다", english="is placed in the project")]
+        if self.status is VFolderOperationStatus.READY:
+            parts.append(Says("사용할 수 있는 상태입니다", english="is ready to use"))
+        else:
+            parts.append(Says(f"{self.status.value} 상태입니다", english=f"is {self.status.value}"))
+        if self.usage_mode is not VFolderUsageMode.GENERAL:
+            parts.append(
+                Says(
+                    f"{self.usage_mode.value} 용도입니다",
+                    english=f"is used as {self.usage_mode.value}",
+                )
+            )
+        if self.cloneable:
+            parts.append(Says("복제할 수 있습니다", english="may be cloned"))
+        return joined(parts)
 
     @override
     def name(self, naming: Naming) -> str:
@@ -101,6 +138,8 @@ class TestSeedProjectVFolder(TestSeedRowFromTwo[ProjectData, UserData, VFolderDa
             quota_scope_id=str(QuotaScopeID(QuotaScopeType.PROJECT, first.id)),
             host=self.host,
             creator_id=second.id,
-            status=VFolderOperationStatus.READY,
+            status=self.status,
             project=ProjectID(first.id),
+            usage_mode=self.usage_mode,
+            cloneable=self.cloneable,
         )
