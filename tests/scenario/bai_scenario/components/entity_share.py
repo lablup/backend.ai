@@ -186,26 +186,18 @@ class ASharedFolderAndSomeone(Given[Any, ASharedFolderAndACaller]):
     async def lay(self, seeding: Any) -> ASharedFolderAndACaller:
         domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         policy = await seeding.once(TestSeedProjectPolicy())
-        project = await seeding.creating_from_two(
-            TestSeedProject(name_hint="team"), domain, policy
-        )
+        project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
         sharer = (
             await seeding.within(SomeoneGrantedOnTheProject(domain, project, self.sharer_granted))
             if self.sharer_granted
             else await seeding.within(SomeoneOf(domain))
         )
         if self.sharer_granted:
-            await seeding.within(
-                SomeoneAnsweringInTheirOwnScope(sharer, (Permission.READ,))
-            )
-        folder = await seeding.creating_from_two(
-            TestSeedProjectVFolder(host=HOST), project, sharer
-        )
+            await seeding.within(SomeoneAnsweringInTheirOwnScope(sharer, (Permission.READ,)))
+        folder = await seeding.creating_from_two(TestSeedProjectVFolder(host=HOST), project, sharer)
         recipient = await seeding.within(SomeoneOf(domain))
         if self.recipient_granted:
-            await seeding.within(
-                SomeoneAnsweringInTheirOwnScope(recipient, self.recipient_granted)
-            )
+            await seeding.within(SomeoneAnsweringInTheirOwnScope(recipient, self.recipient_granted))
         share: Laid[EntityShareData] | None = None
         if self.offered or self.taken:
             share = await seeding.creating_from_three(
@@ -253,10 +245,10 @@ class ShareLook:
     ) -> list[Verdict]:
         written = WrittenByThisRun(self.started)
         verdicts: list[Verdict] = [
-            Held[UUID](
+            Held[UUID | None](
                 f"{prefix}sharer_user_id",
                 node.sharer_user_id,
-                SameAs(
+                SameAs[UUID | None](
                     sharer.id,
                     Says(
                         "미리 만든 빌려준 사람의 id",
@@ -269,10 +261,10 @@ class ShareLook:
                 node.recipient_entity_type.name() if node.recipient_entity_type else None,
                 "user",
             ),
-            Held[UUID](
+            Held[UUID | None](
                 f"{prefix}recipient_entity_id",
                 node.recipient_entity_id,
-                SameAs(
+                SameAs[UUID | None](
                     recipient.id,
                     Says(
                         "미리 만든 빌린 사람의 id",
@@ -468,7 +460,9 @@ class TheSearchedShares(Then[ASharedFolderAndACaller, SearchEntitySharesPayload]
 
 
 @dataclass(frozen=True)
-class TheShareEntryIsRefused(Then[ASharedFolderAndACaller, list[EntityShareNode | Exception | None]]):
+class TheShareEntryIsRefused(
+    Then[ASharedFolderAndACaller, list[EntityShareNode | Exception | None]]
+):
     """한 자리가 권한 부족으로 거부된다."""
 
     @override
@@ -490,9 +484,7 @@ class TheShareEntryIsRefused(Then[ASharedFolderAndACaller, list[EntityShareNode 
         first = loaded[0] if loaded else None
         return [
             Same("length", len(loaded), 1),
-            Refused(
-                NotEnoughPermission, first if isinstance(first, Exception) else None
-            ),
+            Refused(NotEnoughPermission, first if isinstance(first, Exception) else None),
         ]
 
 

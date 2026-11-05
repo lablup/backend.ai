@@ -168,13 +168,9 @@ class HistoriesAndSomeone(Given[Any, HistoriesAndACaller]):
             TestSeedDeployment(), place.project, place.group, place.owner
         )
         deployment_value = seeding.made(deployment)
-        session_group = await seeding.creating_from(
-            TestSeedDeploymentSessionGroup(), deployment
-        )
+        session_group = await seeding.creating_from(TestSeedDeploymentSessionGroup(), deployment)
         replica_group = await seeding.adding(
-            TestSeedPrimaryReplicaGroupOf(
-                SessionGroupID(seeding.made(session_group).id)
-            ),
+            TestSeedPrimaryReplicaGroupOf(SessionGroupID(seeding.made(session_group).id)),
             deployment,
         )
         replica = await seeding.adding(
@@ -241,9 +237,11 @@ def _verdicts(
         Held(f"{prefix}created_at", node.created_at, written),
         Held(f"{prefix}updated_at", node.updated_at, written),
     ]
+
     def with_sub_steps() -> list[Verdict]:
         # The kernel history table carries no sub-steps column.
         return [*tail[:3], Same(f"{prefix}sub_steps", node.sub_steps, []), *tail[3:]]
+
     match kind:
         case "session":
             return [
@@ -271,9 +269,7 @@ def _verdicts(
                     node.field_id,
                     SameAs(laid.kernel_history.id, HISTORY_ID),
                 ),
-                Held[UUID](
-                    f"{prefix}kernel_id", node.kernel_id, SameAs(laid.kernel.id, KERNEL_ID)
-                ),
+                Held[UUID](f"{prefix}kernel_id", node.kernel_id, SameAs(laid.kernel.id, KERNEL_ID)),
                 Held[UUID](
                     f"{prefix}session_id",
                     node.session_id,
@@ -302,17 +298,13 @@ def _verdicts(
             ]
         case _:
             return [
-                Held[UUID](
-                    f"{prefix}id", node.id, SameAs(laid.route_history.id, HISTORY_ID)
-                ),
+                Held[UUID](f"{prefix}id", node.id, SameAs(laid.route_history.id, HISTORY_ID)),
                 Held[UUID](
                     f"{prefix}field_id",
                     node.field_id,
                     SameAs(laid.route_history.id, HISTORY_ID),
                 ),
-                Held[UUID](
-                    f"{prefix}route_id", node.route_id, SameAs(laid.replica.id, REPLICA_ID)
-                ),
+                Held[UUID](f"{prefix}route_id", node.route_id, SameAs(laid.replica.id, REPLICA_ID)),
                 Held[UUID](
                     f"{prefix}deployment_id",
                     node.deployment_id,
@@ -375,9 +367,7 @@ class TheHistoryComesBack(Then[HistoriesAndACaller, list[Any]]):
         )
 
     @override
-    def look(
-        self, laid: HistoriesAndACaller, answered: Answered[list[Any]]
-    ) -> list[Verdict]:
+    def look(self, laid: HistoriesAndACaller, answered: Answered[list[Any]]) -> list[Verdict]:
         loaded = answered.response
         if loaded is None:
             return [MissingResponse(answered.raised)]
@@ -403,9 +393,7 @@ class TheHistoryLoadIsRefused(Then[HistoriesAndACaller, list[Any]]):
         )
 
     @override
-    def look(
-        self, laid: HistoriesAndACaller, answered: Answered[list[Any]]
-    ) -> list[Verdict]:
+    def look(self, laid: HistoriesAndACaller, answered: Answered[list[Any]]) -> list[Verdict]:
         loaded = answered.response
         if loaded is None:
             return [MissingResponse(answered.raised)]
@@ -431,9 +419,7 @@ class TheHistoriesAreFound(Then[HistoriesAndACaller, Any]):
         )
 
     @override
-    def look(
-        self, laid: HistoriesAndACaller, answered: Answered[Any]
-    ) -> list[Verdict]:
+    def look(self, laid: HistoriesAndACaller, answered: Answered[Any]) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [MissingResponse(answered.raised)]

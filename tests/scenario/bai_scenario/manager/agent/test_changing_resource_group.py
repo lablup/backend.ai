@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.agent.request import (
 )
 from ai.backend.common.dto.manager.v2.agent.response import UpdateAgentResourceGroupPayload
 from ai.backend.common.dto.manager.v2.agent.types import ConflictingSessionCleanupPolicyEnum
+from ai.backend.common.types import AgentId
 from ai.backend.manager.api.adapters.agent.adapter import AgentAdapter
 from ai.backend.manager.errors.agent import (
     AgentHasConflictingSessions,
@@ -68,16 +69,13 @@ class MovingTheAgent(When[AnAgentToMoveAndACaller, AgentAdapter, Moved]):
         return Says(ko, english=en)
 
     @override
-    async def call(
-        self, adapter: AgentAdapter, laid: AnAgentToMoveAndACaller
-    ) -> Moved:
-        policy = (
-            ConflictingSessionCleanupPolicyEnum.RESCHEDULE if self.reschedule else None
-        )
+    async def call(self, adapter: AgentAdapter, laid: AnAgentToMoveAndACaller) -> Moved:
+        policy = ConflictingSessionCleanupPolicyEnum.RESCHEDULE if self.reschedule else None
+        agent_id = AgentId(laid.agent.agent_id)
         with ActingAs(laid.caller):
             if self.from_body:
                 return await adapter.update_resource_group_from_body(
-                    laid.agent.agent_id,
+                    agent_id,
                     UpdateAgentResourceGroupBody(
                         resource_group_id=laid.target.id,
                         policy=policy,
@@ -86,7 +84,7 @@ class MovingTheAgent(When[AnAgentToMoveAndACaller, AgentAdapter, Moved]):
                 )
             return await adapter.update_resource_group(
                 UpdateAgentResourceGroupInput(
-                    agent_id=laid.agent.agent_id,
+                    agent_id=agent_id,
                     resource_group_id=laid.target.id,
                     policy=policy,
                     force=self.force,
@@ -124,9 +122,7 @@ class MovingRow(Scenario[TestSeedingSession, AnAgentToMoveAndACaller, AgentAdapt
 
 
 @dataclass(frozen=True)
-class ReschedulingRow(
-    Scenario[TestSeedingSession, AnAgentToMoveAndACaller, AgentAdapter, Moved]
-):
+class ReschedulingRow(Scenario[TestSeedingSession, AnAgentToMoveAndACaller, AgentAdapter, Moved]):
     @override
     def summary(self) -> str:
         return "asking-to-reschedule-the-conflicting-sessions-is-not-supported"
@@ -156,9 +152,7 @@ class ReschedulingRow(
 
 
 @dataclass(frozen=True)
-class RefusedRow(
-    Scenario[TestSeedingSession, AnAgentToMoveAndACaller, AgentAdapter, Moved]
-):
+class RefusedRow(Scenario[TestSeedingSession, AnAgentToMoveAndACaller, AgentAdapter, Moved]):
     named: str
     guarantees: str
     expected: type[BaseException]

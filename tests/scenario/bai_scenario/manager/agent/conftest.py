@@ -58,9 +58,7 @@ async def adapter(
             repository=OpsRepository(provider),
         )
     )
-    permission_check = RbacPermissionCheckRepository(
-        PermissionOpsProvider(engine), config
-    )
+    permission_check = RbacPermissionCheckRepository(PermissionOpsProvider(engine), config)
     return AgentAdapter(
         AgentProcessors(
             registry.group(GroupMeta(AgentEntityType())),

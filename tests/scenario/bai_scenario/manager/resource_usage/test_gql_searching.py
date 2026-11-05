@@ -22,9 +22,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type GqlStep = Scenario[
-    TestSeedingSession, AUsageScopeAndACaller, ResourceUsageAdapter, Any
-]
+type GqlStep = Scenario[TestSeedingSession, AUsageScopeAndACaller, ResourceUsageAdapter, Any]
 
 LABELS: dict[str, tuple[str, str]] = {
     "gql_search_domain_scoped": ("도메인", "domain"),
@@ -92,9 +90,7 @@ class GqlSearchingTheBuckets(When[AUsageScopeAndACaller, ResourceUsageAdapter, A
 
 
 @dataclass(frozen=True)
-class GqlRow(
-    Scenario[TestSeedingSession, AUsageScopeAndACaller, ResourceUsageAdapter, Any]
-):
+class GqlRow(Scenario[TestSeedingSession, AUsageScopeAndACaller, ResourceUsageAdapter, Any]):
     named: str
     guarantees: str
     how: str
@@ -120,9 +116,7 @@ class GqlRow(
     def then(self) -> Then[AUsageScopeAndACaller, Any]:
         if self.refused:
             expected = (
-                NotEnoughPermission
-                if self.how.endswith("_scoped")
-                else InsufficientPrivilege
+                NotEnoughPermission if self.how.endswith("_scoped") else InsufficientPrivilege
             )
             return TheCallIsRefused(expected)
         return NothingIsFound()

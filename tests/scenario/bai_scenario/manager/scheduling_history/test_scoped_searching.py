@@ -45,9 +45,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type ScopedStep = Scenario[
-    TestSeedingSession, HistoriesAndACaller, SchedulingHistoryAdapter, Any
-]
+type ScopedStep = Scenario[TestSeedingSession, HistoriesAndACaller, SchedulingHistoryAdapter, Any]
 
 LABELS: dict[str, tuple[str, str]] = {
     SESSION: ("세션", "session"),
@@ -59,9 +57,7 @@ LABELS: dict[str, tuple[str, str]] = {
 
 
 @dataclass(frozen=True)
-class SearchingWithinTheScope(
-    When[HistoriesAndACaller, SchedulingHistoryAdapter, Any]
-):
+class SearchingWithinTheScope(When[HistoriesAndACaller, SchedulingHistoryAdapter, Any]):
     """``kind`` 가 가리키는 대상을 범위로 그 이력을 훑는다."""
 
     kind: str
@@ -138,9 +134,7 @@ class SearchingWithinTheScope(
 
 
 @dataclass(frozen=True)
-class ScopedRow(
-    Scenario[TestSeedingSession, HistoriesAndACaller, SchedulingHistoryAdapter, Any]
-):
+class ScopedRow(Scenario[TestSeedingSession, HistoriesAndACaller, SchedulingHistoryAdapter, Any]):
     named: str
     guarantees: str
     kind: str

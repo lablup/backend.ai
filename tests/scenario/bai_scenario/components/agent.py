@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, override
+from uuid import UUID
 
 from ai.backend.common.data.entity.agent import AgentEntityType, AgentUUID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
@@ -185,8 +186,10 @@ class AgentsAndSomeone(Given[Any, AgentsAndACaller]):
             for slot in slots:
                 await seeding.adding(
                     TestSeedReportedSlot(
-                        agent_id=agent.name, slot_name=slot.name,
-                        capacity=slot.capacity, used=slot.used,
+                        agent_id=agent.name,
+                        slot_name=slot.name,
+                        capacity=slot.capacity,
+                        used=slot.used,
                     ),
                     agent,
                 )
@@ -270,9 +273,7 @@ class AnAgentToMoveAndSomeone(Given[Any, AnAgentToMoveAndACaller]):
                 place.owner,
                 group,
             )
-            await seeding.adding(
-                TestSeedDesignatedAgentOf(agent_uuid=seeding.made(agent)), session
-            )
+            await seeding.adding(TestSeedDesignatedAgentOf(agent_uuid=seeding.made(agent)), session)
             conflicting = seeding.made(session)
         return AnAgentToMoveAndACaller(
             agent=AnAgent(agent_id=agent.name, uuid=seeding.made(agent), group=seeding.made(group)),
@@ -289,27 +290,33 @@ class AgentLook:
     started: datetime
     permissions: tuple[str, ...]
 
-    def verdicts(self, prefix: str, node: AgentNode, agent: AnAgent, slots: tuple[ASlot, ...]) -> list[Verdict]:
+    def verdicts(
+        self, prefix: str, node: AgentNode, agent: AnAgent, slots: tuple[ASlot, ...]
+    ) -> list[Verdict]:
         written = WrittenByThisRun(self.started)
         capacity = {slot.name: str(slot.capacity) for slot in slots}
         used = {slot.name: str(slot.used) for slot in slots}
         free = {slot.name: str(slot.capacity - slot.used) for slot in slots}
         return [
             Same(f"{prefix}id", node.id, agent.agent_id),
-            Held(
+            Held[UUID](
                 f"{prefix}entity_id",
                 node.entity_id,
-                SameAs(
+                SameAs[UUID](
                     agent.uuid,
-                    Says("미리 등록한 에이전트의 id", english="the id of the agent laid in advance"),
+                    Says(
+                        "미리 등록한 에이전트의 id", english="the id of the agent laid in advance"
+                    ),
                 ),
             ),
-            Held(
+            Held[AgentUUID](
                 f"{prefix}uuid",
                 node.uuid,
-                SameAs(
+                SameAs[AgentUUID](
                     agent.uuid,
-                    Says("미리 등록한 에이전트의 id", english="the id of the agent laid in advance"),
+                    Says(
+                        "미리 등록한 에이전트의 id", english="the id of the agent laid in advance"
+                    ),
                 ),
             ),
             Same(f"{prefix}capacity", node.resource_info.capacity, capacity),
@@ -425,9 +432,7 @@ class TheAgentsComeBackInOrder(Then[AgentsAndACaller, list[AgentNode | Exception
             item = loaded[i]
             if self.denied_after is not None and i >= self.denied_after:
                 verdicts.append(
-                    Refused(
-                        NotEnoughPermission, item if isinstance(item, Exception) else None
-                    )
+                    Refused(NotEnoughPermission, item if isinstance(item, Exception) else None)
                 )
                 continue
             if isinstance(item, AgentNode):
@@ -440,9 +445,7 @@ class TheAgentsComeBackInOrder(Then[AgentsAndACaller, list[AgentNode | Exception
             if self.unknown_denied:
                 last = loaded[-1]
                 verdicts.append(
-                    Refused(
-                        NotEnoughPermission, last if isinstance(last, Exception) else None
-                    )
+                    Refused(NotEnoughPermission, last if isinstance(last, Exception) else None)
                 )
             else:
                 verdicts.append(Same(f"[{len(laid_agents)}]", loaded[-1], None))
@@ -490,9 +493,7 @@ class TheContainerCountsComeBack(Then[AgentsAndACaller, list[int | Exception]]):
             first = loaded[0] if loaded else None
             return [
                 Same("length", len(loaded), 1),
-                Refused(
-                    NotEnoughPermission, first if isinstance(first, Exception) else None
-                ),
+                Refused(NotEnoughPermission, first if isinstance(first, Exception) else None),
             ]
         expected = len(laid.agents) + (1 if self.unknown else 0)
         verdicts: list[Verdict] = [Same("length", len(loaded), expected)]

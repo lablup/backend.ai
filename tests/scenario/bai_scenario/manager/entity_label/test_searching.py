@@ -8,6 +8,7 @@ from typing import override
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.entity.types import EntityTarget
@@ -44,9 +45,7 @@ from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Found = SearchEntityLabelsPayload
-type SearchStep = Scenario[
-    TestSeedingSession, LabeledDomainsAndACaller, EntityLabelAdapter, Found
-]
+type SearchStep = Scenario[TestSeedingSession, LabeledDomainsAndACaller, EntityLabelAdapter, Found]
 
 
 @dataclass(frozen=True)
@@ -106,10 +105,8 @@ class SearchingOneHeldScope(When[LabeledDomainsAndACaller, EntityLabelAdapter, F
         target = laid.targets[0]
         with ActingAs(laid.caller):
             return await adapter.search_on(
-                RuntimeEntityID(LABELED, target.id),
-                EntityLabelPageInput(
-                    filter=EntityLabelFilter(key=StringFilter(equals=self.key))
-                ),
+                RuntimeEntityID(DomainEntityType(), target.id),
+                EntityLabelPageInput(filter=EntityLabelFilter(key=StringFilter(equals=self.key))),
             )
 
 
@@ -125,15 +122,12 @@ class ThePickedLabels(Then[LabeledDomainsAndACaller, Found]):
         return Says(
             f"미리 붙인 라벨 {len(self.picked)}개가 빠짐없이 통째로 옵니다",
             english=(
-                f"every one of the {len(self.picked)} labels attached in advance comes back "
-                "whole"
+                f"every one of the {len(self.picked)} labels attached in advance comes back whole"
             ),
         )
 
     @override
-    def look(
-        self, laid: LabeledDomainsAndACaller, answered: Answered[Found]
-    ) -> list[Verdict]:
+    def look(self, laid: LabeledDomainsAndACaller, answered: Answered[Found]) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [MissingResponse(answered.raised)]
@@ -158,9 +152,7 @@ class ThePickedLabels(Then[LabeledDomainsAndACaller, Found]):
 
 
 @dataclass(frozen=True)
-class SearchRow(
-    Scenario[TestSeedingSession, LabeledDomainsAndACaller, EntityLabelAdapter, Found]
-):
+class SearchRow(Scenario[TestSeedingSession, LabeledDomainsAndACaller, EntityLabelAdapter, Found]):
     """한 행. 어떤 상황에서 어느 범위를 훑는지만 다르다."""
 
     named: str

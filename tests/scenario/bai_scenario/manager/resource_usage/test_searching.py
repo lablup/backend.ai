@@ -33,9 +33,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type SearchStep = Scenario[
-    TestSeedingSession, AUsageScopeAndACaller, ResourceUsageAdapter, Any
-]
+type SearchStep = Scenario[TestSeedingSession, AUsageScopeAndACaller, ResourceUsageAdapter, Any]
 
 LABELS: dict[str, tuple[str, str]] = {
     "admin_search_domain": ("도메인", "domain"),
@@ -133,9 +131,7 @@ class SearchingTheBuckets(When[AUsageScopeAndACaller, ResourceUsageAdapter, Any]
 
 
 @dataclass(frozen=True)
-class UsageRow(
-    Scenario[TestSeedingSession, AUsageScopeAndACaller, ResourceUsageAdapter, Any]
-):
+class UsageRow(Scenario[TestSeedingSession, AUsageScopeAndACaller, ResourceUsageAdapter, Any]):
     named: str
     guarantees: str
     how: str
@@ -161,9 +157,7 @@ class UsageRow(
     def then(self) -> Then[AUsageScopeAndACaller, Any]:
         if self.refused:
             expected = (
-                InsufficientPrivilege
-                if self.how.startswith("admin_")
-                else NotEnoughPermission
+                InsufficientPrivilege if self.how.startswith("admin_") else NotEnoughPermission
             )
             return TheCallIsRefused(expected)
         return NothingIsFound()
@@ -188,8 +182,12 @@ def _row(how: str, *, refused: bool = False) -> UsageRow:
             how=how,
             refused=True,
         )
-    caller = "슈퍼관리자가" if how.startswith("admin_") else "리소스 그룹에서 읽을 수 있는 슈퍼관리자가"
-    caller_en = "the superadmin" if how.startswith("admin_") else "the superadmin reading in the group"
+    caller = (
+        "슈퍼관리자가" if how.startswith("admin_") else "리소스 그룹에서 읽을 수 있는 슈퍼관리자가"
+    )
+    caller_en = (
+        "the superadmin" if how.startswith("admin_") else "the superadmin reading in the group"
+    )
     return UsageRow(
         named=f"{slug}-returns-an-empty-page",
         guarantees=Says(

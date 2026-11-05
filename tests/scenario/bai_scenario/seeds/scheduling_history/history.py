@@ -8,6 +8,7 @@ from typing import override
 
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session import SessionID
@@ -50,9 +51,7 @@ MESSAGE = "the transition finished"
 
 
 @dataclass(frozen=True)
-class TestSeedSessionHistory(
-    TestSeedFieldCreator[SessionEntityData, SessionSchedulingHistoryData]
-):
+class TestSeedSessionHistory(TestSeedFieldCreator[SessionEntityData, SessionSchedulingHistoryData]):
     """One transition the session went through."""
 
     @override
@@ -60,13 +59,6 @@ class TestSeedSessionHistory(
         return Says(
             "스케줄링 시도 하나를 남깁니다",
             english="has one scheduling attempt recorded",
-        )
-
-    @override
-    def detail(self) -> str:
-        return Says(
-            "PENDING 에서 SCHEDULED 로 성공한 전이 하나",
-            english="one transition from PENDING to SCHEDULED that succeeded",
         )
 
     @override
@@ -98,20 +90,13 @@ class TestSeedKernelHistory(TestSeedFieldCreator[SessionEntityData, KernelSchedu
         )
 
     @override
-    def detail(self) -> str:
-        return Says(
-            "PREPARING 에서 PULLING 으로 성공한 전이 하나",
-            english="one transition from PREPARING to PULLING that succeeded",
-        )
-
-    @override
     def owner_id(self, owner: SessionEntityData) -> SessionID:
         return SessionID(owner.id)
 
     @override
     def seed(self) -> KernelSchedulingHistoryCreator:
         return KernelSchedulingHistoryCreator(
-            kernel_id=self.kernel_id,
+            kernel_id=KernelID(self.kernel_id),
             phase="scheduling",
             result=SchedulingResult.SUCCESS,
             message=MESSAGE,
@@ -129,13 +114,6 @@ class TestSeedDeploymentHistory(TestSeedFieldCreator[DeploymentInfo, DeploymentH
         return Says(
             "배포의 스케줄링 시도 하나를 남깁니다",
             english="has one scheduling attempt of the deployment recorded",
-        )
-
-    @override
-    def detail(self) -> str:
-        return Says(
-            "lifecycle 처리기가 남긴 성공한 전이 하나",
-            english="one transition recorded by a lifecycle handler that succeeded",
         )
 
     @override
@@ -169,13 +147,6 @@ class TestSeedReplicaOf(TestSeedFieldCreator[DeploymentInfo, RoutingData]):
         return Says("복제본 하나를 갖습니다", english="has one replica")
 
     @override
-    def detail(self) -> str:
-        return Says(
-            "아직 트래픽을 받지 않는, 배포의 기본 복제본 그룹에 속한 복제본",
-            english="a replica of the deployment's primary replica group taking no traffic yet",
-        )
-
-    @override
     def owner_id(self, owner: DeploymentInfo) -> DeploymentID:
         return DeploymentID(owner.id)
 
@@ -206,13 +177,6 @@ class TestSeedRouteHistory(TestSeedFieldCreator[DeploymentInfo, RouteHistoryData
         )
 
     @override
-    def detail(self) -> str:
-        return Says(
-            "PROVISIONING 에서 RUNNING 으로 가는 lifecycle 전이 하나",
-            english="one lifecycle transition from PROVISIONING to RUNNING",
-        )
-
-    @override
     def owner_id(self, owner: DeploymentInfo) -> DeploymentID:
         return DeploymentID(owner.id)
 
@@ -232,9 +196,7 @@ class TestSeedRouteHistory(TestSeedFieldCreator[DeploymentInfo, RouteHistoryData
 
 
 @dataclass(frozen=True)
-class TestSeedReplicaGroupHistory(
-    TestSeedFieldCreator[DeploymentInfo, ReplicaGroupHistoryData]
-):
+class TestSeedReplicaGroupHistory(TestSeedFieldCreator[DeploymentInfo, ReplicaGroupHistoryData]):
     """One transition the replica group of the deployment went through."""
 
     replica_group_id: ReplicaGroupID
@@ -244,13 +206,6 @@ class TestSeedReplicaGroupHistory(
         return Says(
             "복제본 그룹의 스케줄링 시도 하나를 남깁니다",
             english="has one scheduling attempt of the replica group recorded",
-        )
-
-    @override
-    def detail(self) -> str:
-        return Says(
-            "lifecycle 처리기가 남긴 성공한 전이 하나",
-            english="one transition recorded by a lifecycle handler that succeeded",
         )
 
     @override

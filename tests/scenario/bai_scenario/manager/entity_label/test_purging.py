@@ -36,9 +36,7 @@ from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Purged = PurgeEntityLabelPayload
-type PurgeStep = Scenario[
-    TestSeedingSession, LabeledDomainsAndACaller, EntityLabelAdapter, Purged
-]
+type PurgeStep = Scenario[TestSeedingSession, LabeledDomainsAndACaller, EntityLabelAdapter, Purged]
 
 MISSING = UUID(int=9)
 """어떤 라벨도 갖지 않은 id."""
@@ -63,9 +61,7 @@ class PurgingOneLabel(When[LabeledDomainsAndACaller, EntityLabelAdapter, Purged]
             )
         return Says(
             f"{laid.caller.username}이 붙은 키 {laid.labels[0].key}의 라벨을 영구 삭제합니다",
-            english=(
-                f"{laid.caller.username} purges the label under key {laid.labels[0].key}"
-            ),
+            english=(f"{laid.caller.username} purges the label under key {laid.labels[0].key}"),
         )
 
     @override
@@ -213,8 +209,7 @@ SCENARIOS: list[PurgeStep] = [
         guarantees=Says(
             "수정 권한을 받은 사용자가 라벨 하나를 영구 삭제하면 그 라벨이 통째로 옵니다",
             english=(
-                "when a user granted update permission purges one label, the whole label "
-                "comes back"
+                "when a user granted update permission purges one label, the whole label comes back"
             ),
         ),
         situation=LabeledDomainsAndSomeone(targets=1, writable=1, keys=("team",)),

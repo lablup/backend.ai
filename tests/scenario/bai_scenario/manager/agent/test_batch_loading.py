@@ -152,9 +152,7 @@ class CountingContainers(When[AgentsAndACaller, AgentAdapter, Counted]):
 
 
 @dataclass(frozen=True)
-class LoadingRow(
-    Scenario[TestSeedingSession, AgentsAndACaller, AgentAdapter, Loaded]
-):
+class LoadingRow(Scenario[TestSeedingSession, AgentsAndACaller, AgentAdapter, Loaded]):
     named: str
     guarantees: str
     situation: AgentsAndSomeone
@@ -193,9 +191,7 @@ class LoadingRow(
 
 
 @dataclass(frozen=True)
-class CountingRow(
-    Scenario[TestSeedingSession, AgentsAndACaller, AgentAdapter, Counted]
-):
+class CountingRow(Scenario[TestSeedingSession, AgentsAndACaller, AgentAdapter, Counted]):
     named: str
     guarantees: str
     situation: AgentsAndSomeone
