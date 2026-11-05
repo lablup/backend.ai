@@ -94,9 +94,12 @@ async def _lay_caller(
     seeding: Any, domain: Laid[Any], role: UserRole, granted: tuple[Permission, ...]
 ) -> Laid[UserData]:
     """The caller a row asks for, with the permissions the row names."""
+    caller: Laid[UserData]
     if not granted:
-        return await seeding.within(SomeoneOf(domain, role=role))
-    return await seeding.within(SomeoneGrantedOnRegistries(domain, granted, role=role))
+        caller = await seeding.within(SomeoneOf(domain, role=role))
+    else:
+        caller = await seeding.within(SomeoneGrantedOnRegistries(domain, granted, role=role))
+    return caller
 
 
 @dataclass(frozen=True)

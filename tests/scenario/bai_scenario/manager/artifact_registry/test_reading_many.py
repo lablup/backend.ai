@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
 from uuid import UUID
 
 import pytest
@@ -404,7 +404,7 @@ class AUserGrantedNothingIsRefusedOnEveryPosition(
         return EveryPositionIsRefused()
 
 
-SCENARIOS: list[Scenario[TestSeedingSession, object, ArtifactRegistryAdapter, object]] = [
+SCENARIOS: list[Scenario[TestSeedingSession, Any, ArtifactRegistryAdapter, Any]] = [
     ReadingManyLeavesOutTheMissingOne(),
     AUserGrantedNothingReadsNoRegistry(),
     LoadingKeepsThePositions(),
@@ -415,7 +415,7 @@ SCENARIOS: list[Scenario[TestSeedingSession, object, ArtifactRegistryAdapter, ob
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_reading_many(
-    scenario: Scenario[TestSeedingSession, object, ArtifactRegistryAdapter, object],
+    scenario: Scenario[TestSeedingSession, Any, ArtifactRegistryAdapter, Any],
     adapter: ArtifactRegistryAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

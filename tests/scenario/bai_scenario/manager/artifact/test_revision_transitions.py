@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
 from uuid import UUID
 
 import pytest
@@ -899,7 +899,7 @@ class AUserGrantedNothingMayNotDelegateAnImport(
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-SCENARIOS: list[Scenario[TestSeedingSession, object, ArtifactAdapter, object]] = [
+SCENARIOS: list[Scenario[TestSeedingSession, Any, ArtifactAdapter, Any]] = [
     ApprovingVerifiesTheRevision(),
     ARevisionNotWaitingIsNotApproved(),
     AnAlreadyAvailableRevisionIsNotApprovedAgain(),
@@ -920,7 +920,7 @@ SCENARIOS: list[Scenario[TestSeedingSession, object, ArtifactAdapter, object]] =
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_revision_transitions(
-    scenario: Scenario[TestSeedingSession, object, ArtifactAdapter, object],
+    scenario: Scenario[TestSeedingSession, Any, ArtifactAdapter, Any],
     adapter: ArtifactAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:
