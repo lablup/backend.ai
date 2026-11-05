@@ -92,30 +92,22 @@ class LoadingTheHistories(When[HistoriesAndACaller, SchedulingHistoryAdapter, li
         )
 
     @override
-    async def call(
-        self, adapter: SchedulingHistoryAdapter, laid: HistoriesAndACaller
-    ) -> list[Any]:
+    async def call(self, adapter: SchedulingHistoryAdapter, laid: HistoriesAndACaller) -> list[Any]:
         ids = [laid.history_id(self.kind)]
         if self.missing:
             ids.append(UNKNOWN)
         with ActingAs(laid.caller):
             match self.kind:
                 case "session":
-                    return await adapter.batch_load_session_histories_by_ids(
-                        _ids(self.kind, ids)
-                    )
+                    return await adapter.batch_load_session_histories_by_ids(_ids(self.kind, ids))
                 case "kernel":
-                    return await adapter.batch_load_kernel_histories_by_ids(
-                        _ids(self.kind, ids)
-                    )
+                    return await adapter.batch_load_kernel_histories_by_ids(_ids(self.kind, ids))
                 case "deployment":
                     return await adapter.batch_load_deployment_histories_by_ids(
                         _ids(self.kind, ids)
                     )
                 case "route":
-                    return await adapter.batch_load_route_histories_by_ids(
-                        _ids(self.kind, ids)
-                    )
+                    return await adapter.batch_load_route_histories_by_ids(_ids(self.kind, ids))
                 case _:
                     return await adapter.batch_load_replica_group_histories_by_ids(
                         _ids(self.kind, ids)
@@ -178,9 +170,7 @@ def _row(kind: str, *, missing: bool = False, refused: bool = False) -> LoadRow:
         )
     if missing:
         return LoadRow(
-            named=(
-                f"the-superadmin-loads-the-{kind.replace('_', '-')}-history-with-an-unknown-id"
-            ),
+            named=(f"the-superadmin-loads-the-{kind.replace('_', '-')}-history-with-an-unknown-id"),
             guarantees=Says(
                 f"슈퍼관리자가 있는 id 와 없는 id 로 {where} 이력을 읽으면, 있는 것은 노드로 "
                 "오고 없는 자리는 빈 값입니다",

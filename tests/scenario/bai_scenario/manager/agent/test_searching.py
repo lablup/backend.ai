@@ -86,9 +86,7 @@ class SearchingAgents(When[AgentsAndACaller, AgentAdapter, Found]):
                 )
             case "group":
                 given = AdminSearchAgentsInput(
-                    filter=AgentFilter(
-                        scaling_group=StringFilter(equals=laid.agents[0].group.name)
-                    )
+                    filter=AgentFilter(scaling_group=StringFilter(equals=laid.agents[0].group.name))
                 )
             case "ordered":
                 given = AdminSearchAgentsInput(

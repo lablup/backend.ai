@@ -75,9 +75,7 @@ class WritingDomains(TestSeedNest[Laid[None]]):
             TestSeedRole(lambda d: d.id, name_hint="domain-writer"), self.domain
         )
         for one in (Permission.READ, Permission.UPDATE):
-            seed.adding(
-                TestSeedPermission(entity_type=DomainEntityType(), permission=one), role
-            )
+            seed.adding(TestSeedPermission(entity_type=DomainEntityType(), permission=one), role)
         return seed.granting(
             role, self.user, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
         )

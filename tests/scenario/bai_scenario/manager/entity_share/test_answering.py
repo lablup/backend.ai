@@ -50,9 +50,7 @@ class AnsweringTheOffer(When[ASharedFolderAndACaller, EntityShareAdapter, Answer
         answer_en = "accepts" if self.accepting else "rejects"
         return Says(
             f"{laid.caller.username}이 폴더 {laid.folder.name}의 공유 제안을 {answer}",
-            english=(
-                f"{laid.caller.username} {answer_en} the offer of folder {laid.folder.name}"
-            ),
+            english=(f"{laid.caller.username} {answer_en} the offer of folder {laid.folder.name}"),
         )
 
     @override
@@ -99,9 +97,7 @@ class AnswerRow(
     def then(self) -> Then[ASharedFolderAndACaller, Answered]:
         if self.refused:
             return TheCallIsRefused(NotEnoughPermission)
-        status = (
-            EntityShareStatusDTO.ACCEPTED if self.accepting else EntityShareStatusDTO.REJECTED
-        )
+        status = EntityShareStatusDTO.ACCEPTED if self.accepting else EntityShareStatusDTO.REJECTED
         return TheShareNode(started=STARTED, status=status)
 
 

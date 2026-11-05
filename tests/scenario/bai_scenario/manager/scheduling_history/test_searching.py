@@ -37,9 +37,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type SearchStep = Scenario[
-    TestSeedingSession, HistoriesAndACaller, SchedulingHistoryAdapter, Any
-]
+type SearchStep = Scenario[TestSeedingSession, HistoriesAndACaller, SchedulingHistoryAdapter, Any]
 
 LABELS: dict[str, tuple[str, str]] = {
     SESSION: ("세션", "session"),
@@ -95,9 +93,7 @@ class SearchingTheHistories(When[HistoriesAndACaller, SchedulingHistoryAdapter, 
 
 
 @dataclass(frozen=True)
-class SearchRow(
-    Scenario[TestSeedingSession, HistoriesAndACaller, SchedulingHistoryAdapter, Any]
-):
+class SearchRow(Scenario[TestSeedingSession, HistoriesAndACaller, SchedulingHistoryAdapter, Any]):
     named: str
     guarantees: str
     kind: str

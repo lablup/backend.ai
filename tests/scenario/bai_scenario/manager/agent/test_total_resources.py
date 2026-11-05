@@ -41,9 +41,7 @@ class ReadingTheTotal(When[AgentsAndACaller, AgentAdapter, TotalResourceData]):
         )
 
     @override
-    async def call(
-        self, adapter: AgentAdapter, laid: AgentsAndACaller
-    ) -> TotalResourceData:
+    async def call(self, adapter: AgentAdapter, laid: AgentsAndACaller) -> TotalResourceData:
         with ActingAs(laid.caller):
             return await adapter.get_total_resources()
 

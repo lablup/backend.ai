@@ -102,9 +102,7 @@ class TheLabelIsWritten(Then[LabeledDomainsAndACaller, Upserted]):
         )
 
     @override
-    def look(
-        self, laid: LabeledDomainsAndACaller, answered: Answered[Upserted]
-    ) -> list[Verdict]:
+    def look(self, laid: LabeledDomainsAndACaller, answered: Answered[Upserted]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]
@@ -146,9 +144,7 @@ class UpsertingRow(
 
     @override
     def then(self) -> Then[LabeledDomainsAndACaller, Upserted]:
-        return TheLabelIsWritten(
-            started=self.started, key=self.key, replaced=self.replaced
-        )
+        return TheLabelIsWritten(started=self.started, key=self.key, replaced=self.replaced)
 
 
 @dataclass(frozen=True)

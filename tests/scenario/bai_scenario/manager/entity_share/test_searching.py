@@ -9,6 +9,7 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.dto.manager.v2.entity_share.request import (
     EntityShareScope,
     EntityShareTargetScope,
@@ -59,9 +60,7 @@ class SearchingTheShares(When[ASharedFolderAndACaller, EntityShareAdapter, Found
         )
 
     @override
-    async def call(
-        self, adapter: EntityShareAdapter, laid: ASharedFolderAndACaller
-    ) -> Found:
+    async def call(self, adapter: EntityShareAdapter, laid: ASharedFolderAndACaller) -> Found:
         with ActingAs(laid.caller):
             if self.how == "my_search":
                 return await adapter.my_search(
@@ -72,7 +71,7 @@ class SearchingTheShares(When[ASharedFolderAndACaller, EntityShareAdapter, Found
                     scope=EntityShareScope(
                         target=[
                             EntityShareTargetScope(
-                                entity_type="vfolder",
+                                entity_type=VFolderEntityType(),
                                 entity_id=UUID(str(laid.folder.id)),
                             )
                         ]
@@ -82,9 +81,7 @@ class SearchingTheShares(When[ASharedFolderAndACaller, EntityShareAdapter, Found
 
 
 @dataclass(frozen=True)
-class SearchRow(
-    Scenario[TestSeedingSession, ASharedFolderAndACaller, EntityShareAdapter, Found]
-):
+class SearchRow(Scenario[TestSeedingSession, ASharedFolderAndACaller, EntityShareAdapter, Found]):
     named: str
     guarantees: str
     situation: ASharedFolderAndSomeone

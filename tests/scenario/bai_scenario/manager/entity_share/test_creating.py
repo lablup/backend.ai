@@ -8,6 +8,7 @@ from typing import override
 
 import pytest
 
+from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.dto.manager.v2.entity_share.request import (
     CreateEntityShareInput,
     EntityShareRecipientInput,
@@ -57,7 +58,7 @@ class OfferingTheFolder(When[ASharedFolderAndACaller, EntityShareAdapter, Offere
         with ActingAs(laid.caller):
             payload = await adapter.create(
                 CreateEntityShareInput(
-                    target_entity_type="vfolder",
+                    target_entity_type=VFolderEntityType(),
                     target_entity_id=laid.folder.id,
                     recipient=EntityShareRecipientInput(user_id=laid.recipient.id),
                 )
@@ -94,9 +95,7 @@ class TheOfferStands(
 
     @override
     def then(self) -> Then[ASharedFolderAndACaller, Offered]:
-        return TheShareNode(
-            started=STARTED, status=EntityShareStatusDTO.PENDING, fresh=True
-        )
+        return TheShareNode(started=STARTED, status=EntityShareStatusDTO.PENDING, fresh=True)
 
 
 @dataclass(frozen=True)
