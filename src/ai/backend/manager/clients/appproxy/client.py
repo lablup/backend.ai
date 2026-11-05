@@ -29,7 +29,7 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.response import (
     MintEndpointTokenResponse,
 )
 from ai.backend.common.dto.appproxy_coordinator.v2.status.types import AppProxyStatusResponse
-from ai.backend.common.exception import BackendAIError
+from ai.backend.common.exception import BackendAIError, BackendAISchemaValidationFailed
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -37,7 +37,11 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.appproxy import AppProxyConnectionError, AppProxyResponseError
 
-from .types import CreateEndpointRequestBody
+from .types import (
+    CreateEndpointRequestBody,
+    CreateSessionAppTokenRequestBody,
+    CreateSessionAppTokenResponseBody,
+)
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -101,6 +105,38 @@ class AppProxyClient:
         except (aiohttp.ContentTypeError, json.JSONDecodeError) as e:
             raise AppProxyResponseError(
                 extra_msg=f"Invalid response from AppProxy at {self._address}"
+            ) from e
+
+    @appproxy_client_resilience.apply()
+    async def create_session_app_token(
+        self,
+        body: CreateSessionAppTokenRequestBody,
+    ) -> str:
+        """Ask the coordinator to issue the token an interactive session app is opened with."""
+        try:
+            async with self._client_session.post(
+                "/v2/conf",
+                json=body.model_dump(mode="json"),
+                headers={
+                    "Accept": "application/json",
+                    "X-BackendAI-Token": self._token,
+                },
+            ) as resp:
+                if not resp.ok:
+                    raise AppProxyResponseError(
+                        extra_msg=f"AppProxy answered /v2/conf with status {resp.status}"
+                    )
+                payload = await resp.json()
+                return CreateSessionAppTokenResponseBody.model_validate(payload).token
+        except aiohttp.ClientConnectorError as e:
+            raise AppProxyConnectionError(extra_msg="Failed to connect to AppProxy") from e
+        except (
+            aiohttp.ContentTypeError,
+            json.JSONDecodeError,
+            BackendAISchemaValidationFailed,
+        ) as e:
+            raise AppProxyResponseError(
+                extra_msg="AppProxy answered /v2/conf without a token"
             ) from e
 
     @appproxy_client_resilience.apply()
