@@ -50,6 +50,8 @@ from bai_scenario.components.domain import WAS_HERE, GrantedUser, SomeoneOf, Wri
 from bai_scenario.seeds.deployment.revision_preset import TestSeedDeploymentRevisionPreset
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.entity_share.share import TestSeedShareTaken, TestSeedVFolderShare
+from bai_scenario.seeds.image.image import TestSeedImage
+from bai_scenario.seeds.image.registry import TestSeedContainerRegistry
 from bai_scenario.seeds.project.project import TestSeedProject
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
 from bai_scenario.seeds.resource_group.resource_group import TestSeedResourceGroup
@@ -795,13 +797,16 @@ class AModelFolderForDeployment(Given[Any, AModelFolderPlace]):
                 role, caller, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
             )
         variant = await seeding.creating(TestSeedRuntimeVariant())
+        registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
+        image = await seeding.creating_from(TestSeedImage(), registry)
         preset = await seeding.creating_from(
             TestSeedDeploymentRevisionPreset(
+                image_id=seeding.made(image).id,
                 model_definition=PresetModelDefinition(
                     models=[
                         PresetModelConfig(name="model", service=PresetModelServiceConfig(port=8000))
                     ]
-                )
+                ),
             ),
             variant,
         )
