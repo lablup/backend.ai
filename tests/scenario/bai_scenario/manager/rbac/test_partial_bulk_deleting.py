@@ -169,7 +169,7 @@ class EveryRoleComesBack(Then[RolesAndACaller, Deleted]):
         look = RoleLook(self.started, status=self.status)
         verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(laid.roles))]
         for i, (node, role) in enumerate(zip(payload.successes, laid.roles, strict=False)):
-            verdicts += look.verdicts(f"successes[{i}].", node, role, laid.domain)
+            verdicts += look.verdicts(f"successes[{i}].", node, role, laid.domain.id)
         if self.missing is None:
             return [*verdicts, Same("failed", payload.failed, [])]
         verdicts.append(Same("failed count", len(payload.failed), 1))
