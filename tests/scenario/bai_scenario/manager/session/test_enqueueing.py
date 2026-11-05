@@ -20,6 +20,7 @@ from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.session.request import EnqueueSessionInput
 from ai.backend.common.dto.manager.v2.session.response import EnqueueSessionPayload
 from ai.backend.common.dto.manager.v2.session.types import CreateSessionTypeEnum
+from ai.backend.common.types import IntrinsicSlotNames
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.image.types import ImageData
@@ -53,6 +54,7 @@ from bai_scenario.seeds.agent.agent import TestSeedAgent
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
 from bai_scenario.seeds.resource_group.resource_group import LinkToProject
 from bai_scenario.seeds.resource_slot.agent_resource import TestSeedReportedSlot
+from bai_scenario.seeds.resource_slot.slot_type import TestSeedSlotType
 from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 
 type Enqueued = EnqueueSessionPayload
@@ -130,6 +132,8 @@ class APlaceAndSomeone(Given[Any, LaidPlaceAndCaller]):
     async def lay(self, seeding: Any) -> LaidPlaceAndCaller:
         place = await lay_a_place(seeding, slots=0)
         await seeding.linking(LinkToProject(), place.project, place.group)
+        for intrinsic in IntrinsicSlotNames:
+            await seeding.creating(TestSeedSlotType(intrinsic))
         agent = await seeding.creating_from(TestSeedAgent(), place.group)
         for slot_name, capacity in CAPACITY.items():
             await seeding.adding(

@@ -25,6 +25,9 @@ from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
+    NoAgentsInResourceGroupError,
+)
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
@@ -190,19 +193,6 @@ class TheKernelFits(Then[LaidGroupAndAgent, Schedule]):
 
 
 @dataclass(frozen=True)
-class WhatItRaised(Then[Any, Any]):
-    """임시 진단: 던진 것을 그대로 적는다."""
-
-    @override
-    def says(self) -> str:
-        return Says("던진 것", english="what it raised")
-
-    @override
-    def look(self, laid: Any, answered: Answered[Any]) -> list[Verdict]:
-        return [Same("raised", repr(answered.raised), None)]
-
-
-@dataclass(frozen=True)
 class ComputingASchedule(Scenario[TestSeedingSession, LaidGroupAndAgent, SessionAdapter, Schedule]):
     with_agent: bool = True
     granted: bool = True
@@ -254,7 +244,9 @@ class ComputingASchedule(Scenario[TestSeedingSession, LaidGroupAndAgent, Session
     def then(self) -> Then[LaidGroupAndAgent, Schedule]:
         if not self.granted:
             return TheCallIsRefused(NotEnoughPermission)
-        return WhatItRaised()
+        if not self.with_agent:
+            return TheCallIsRefused(NoAgentsInResourceGroupError)
+        return TheKernelFits()
 
 
 SCENARIOS: list[Scenario[Any, Any, Any, Any]] = [

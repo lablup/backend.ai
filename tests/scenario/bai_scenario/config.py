@@ -16,16 +16,23 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.data.manager_status.types import ManagerStatus
 from ai.backend.manager.defs import INTRINSIC_SLOTS
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.testutils.bootstrap import POSTGRES_PASSWORD, POSTGRES_USER
 
 VFOLDER_HOST = "local:volume1"
 
 
 class _KitLegacyEtcdLoader:
-    """The two legacy-etcd reads the code under test still makes, answered from memory."""
+    """The legacy-etcd reads the code under test still makes, answered from memory."""
 
     def __init__(self, vfolder_types: Sequence[str]) -> None:
         self._vfolder_types = list(vfolder_types)
+
+    async def get_raw(self, key: str, allow_null: bool = True) -> str | None:
+        """The kit's etcd holds no value, as a fresh one does."""
+        if not allow_null:
+            raise ServerMisconfiguredError("A required etcd config is missing.", key)
+        return None
 
     async def get_vfolder_types(self) -> list[str]:
         return list(self._vfolder_types)
