@@ -18,17 +18,8 @@ from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.config.provider import ManagerConfigProvider
-<<<<<<< HEAD
 from ai.backend.manager.data.agent.types import AgentHeartbeatUpsert, UpsertResult
-=======
-from ai.backend.manager.data.permission.permission_defs import AgentPermission
-from ai.backend.manager.errors.agent import (
-    AgentHasConflictingSessions,
-    AgentNotFound,
-    ConflictingSessionRescheduleNotSupported,
-)
 from ai.backend.manager.errors.watcher import WatcherTokenNotConfigured
->>>>>>> 2f97c66b3 (feat(BA-8229): require a configured agent watcher token (#16488))
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.services.agent.actions.get_watcher_status import (

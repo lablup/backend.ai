@@ -9,13 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from aiohttp import web
 
-<<<<<<< HEAD
-=======
-from ai.backend.agent.errors.watcher import (
-    InvalidWatcherTokenError,
-    WatcherTokenNotConfiguredError,
-)
->>>>>>> 2f97c66b3 (feat(BA-8229): require a configured agent watcher token (#16488))
+from ai.backend.agent.errors.watcher import WatcherTokenNotConfiguredError
 from ai.backend.agent.watcher import auth_middleware, watcher_server
 
 _TOKEN_HEADER = "X-BackendAI-Watcher-Token"
@@ -70,31 +64,10 @@ class TestAuthMiddleware:
         handler.assert_not_called()
 
 
-<<<<<<< HEAD
-class TestStartupTokenLog:
-    @pytest.mark.parametrize(
-        "stored_token",
-        ["watcher-secret-value", None],
-        ids=["configured", "not-configured"],
-    )
-    async def test_logs_whether_token_is_configured_without_its_value(
-        self,
-        caplog: pytest.LogCaptureFixture,
-        stored_token: str | None,
-    ) -> None:
-        etcd = AsyncMock()
-        etcd.get.return_value = stored_token
-        etcd.__aenter__.return_value = etcd
-        cfg: dict[str, Any] = {
-            "logging": MagicMock(),
-            "etcd": {"user": None, "addr": None, "namespace": "test"},
-            "watcher": {"ssl-enabled": False, "service-addr": MagicMock()},
-        }
-=======
 def _watcher_cfg() -> dict[str, Any]:
     return {
         "logging": MagicMock(),
-        "etcd": {"user": None, "addrs": [], "namespace": "test"},
+        "etcd": {"user": None, "addr": None, "namespace": "test"},
         "watcher": {"ssl-enabled": False, "service-addr": MagicMock()},
     }
 
@@ -110,7 +83,6 @@ class TestStartupToken:
     async def test_starts_without_logging_token_value(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
->>>>>>> 2f97c66b3 (feat(BA-8229): require a configured agent watcher token (#16488))
         with (
             patch("ai.backend.agent.watcher.AsyncEtcd", return_value=_mock_etcd("watcher-secret")),
             patch("ai.backend.agent.watcher.Logger"),
@@ -123,14 +95,6 @@ class TestStartupToken:
             ):
                 pass
 
-<<<<<<< HEAD
-        records = [vars(record) for record in caplog.records]
-        assert all("watcher-secret-value" not in str(record) for record in records)
-        assert any(
-            "watcher authentication token loaded" in record.getMessage()
-            for record in caplog.records
-        )
-=======
         tcp_site.return_value.start.assert_awaited_once()
         assert all("watcher-secret" not in str(vars(record)) for record in caplog.records)
 
@@ -149,4 +113,3 @@ class TestStartupToken:
                 pass
 
         tcp_site.return_value.start.assert_not_awaited()
->>>>>>> 2f97c66b3 (feat(BA-8229): require a configured agent watcher token (#16488))

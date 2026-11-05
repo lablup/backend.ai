@@ -55,8 +55,8 @@ from ai.backend.manager.errors.storage import (
     VFolderNotFound,
     VFolderOperationFailed,
 )
-<<<<<<< HEAD
 from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.errors.watcher import WatcherTokenNotConfigured
 from ai.backend.manager.models.group import ProjectType
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole
@@ -70,16 +70,6 @@ from ai.backend.manager.models.vfolder import (
     is_unmanaged,
     verify_vfolder_name,
     vfolder_status_map,
-=======
-from ai.backend.manager.errors.watcher import WatcherTokenNotConfigured
-from ai.backend.manager.models.project.row import ProjectType
-from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.models.user.row import UserRole
-from ai.backend.manager.models.vfolder.creators import (
-    PersonalVFolderCreator,
-    UnmanagedVFolderMixin,
-    VFolderBaseCreator,
->>>>>>> 2f97c66b3 (feat(BA-8229): require a configured agent watcher token (#16488))
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository

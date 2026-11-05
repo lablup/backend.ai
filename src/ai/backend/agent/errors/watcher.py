@@ -13,21 +13,6 @@ from ai.backend.common.exception import (
 )
 
 
-<<<<<<< HEAD
-=======
-class InvalidWatcherTokenError(BackendAIError, web.HTTPForbidden):
-    error_type = "https://api.backend.ai/probs/agent/invalid-watcher-token"
-    error_title = "Invalid watcher token."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.WATCHER,
-            operation=ErrorOperation.AUTH,
-            error_detail=ErrorDetail.FORBIDDEN,
-        )
-
-
 class WatcherTokenNotConfiguredError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/agent/watcher-token-not-configured"
     error_title = "The watcher token is not configured."
@@ -41,7 +26,6 @@ class WatcherTokenNotConfiguredError(BackendAIError, web.HTTPInternalServerError
         )
 
 
->>>>>>> 2f97c66b3 (feat(BA-8229): require a configured agent watcher token (#16488))
 class InvalidMountNameError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/invalid-mount-name"
     error_title = "The volume name must point to a directory under the mount prefix."
