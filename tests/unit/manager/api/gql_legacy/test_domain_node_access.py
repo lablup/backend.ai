@@ -8,16 +8,17 @@ from unittest.mock import MagicMock
 import graphene
 import pytest
 
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.api.gql_legacy.domain import DomainNode
 from ai.backend.manager.api.gql_legacy.scaling_group import ScalingGroupNode
-from ai.backend.manager.data.permission.permission_defs import DomainPermission
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.rbac.permission_defs import DomainPermission
 from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
+from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 from ai.backend.manager.models.user.row import UserRole
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, create_async_engine
 from ai.backend.testutils.db import with_tables
 
 # Reachable only through string relationships of the rows the legacy GQL modules import.
@@ -37,6 +38,17 @@ class _DomainNodeReadCase:
 
 
 class TestDomainNodeGetNodeByName:
+    @pytest.fixture
+    async def database_connection(
+        self,
+        postgres_container: tuple[str, HostPortPairModel],
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        _, addr = postgres_container
+        url = f"postgresql+asyncpg://postgres:develove@{addr.host}:{addr.port}/testing"
+        engine = create_async_engine(url, pool_size=8, pool_pre_ping=False, max_overflow=64)
+        yield engine
+        await engine.dispose()
+
     @pytest.fixture
     async def db_holding_caller_and_other_domains(
         self,
@@ -123,16 +135,16 @@ class TestDomainNodeGetNodeByName:
 
 class TestScalingGroupNodeFromRow:
     @pytest.fixture
-    def resource_group_row_holding_wsproxy_token(self) -> MagicMock:
-        return MagicMock(spec=ResourceGroupRow, wsproxy_api_token="wsproxy-secret")
+    def scaling_group_row_holding_wsproxy_token(self) -> MagicMock:
+        return MagicMock(spec=ScalingGroupRow, wsproxy_api_token="wsproxy-secret")
 
     def test_does_not_expose_wsproxy_api_token(
         self,
-        resource_group_row_holding_wsproxy_token: MagicMock,
+        scaling_group_row_holding_wsproxy_token: MagicMock,
     ) -> None:
         scaling_group_node = ScalingGroupNode.from_row(
             MagicMock(),
-            resource_group_row_holding_wsproxy_token,
+            scaling_group_row_holding_wsproxy_token,
         )
 
         assert "wsproxy_api_token" not in ScalingGroupNode._meta.fields
