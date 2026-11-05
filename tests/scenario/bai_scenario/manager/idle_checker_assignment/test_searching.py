@@ -54,9 +54,9 @@ class SearchingByTheChecker(When[AssignmentsAndACaller, IdleCheckerAssignmentAda
         )
 
     @override
-    async def call(self, adapter: IdleCheckerAssignmentAdapter, laid: AssignmentsAndACaller) -> (
-        Searched
-    ):
+    async def call(
+        self, adapter: IdleCheckerAssignmentAdapter, laid: AssignmentsAndACaller
+    ) -> Searched:
         ids = await assignment_ids(adapter, laid)
         with ActingAs(laid.caller):
             payload = await adapter.admin_search(
@@ -142,7 +142,6 @@ SCENARIOS: list[SearchingStep] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_searching(
-    scenario: SearchingStep, adapter: IdleCheckerAssignmentAdapter,
-    engine: ExtendedAsyncSAEngine
+    scenario: SearchingStep, adapter: IdleCheckerAssignmentAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:
     await run_scenario(scenario, adapter, engine)

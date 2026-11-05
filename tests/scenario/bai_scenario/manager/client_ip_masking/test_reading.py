@@ -66,9 +66,9 @@ class LoadingTheLaidAndAMissingOne(
         )
 
     @override
-    async def call(self, adapter: ClientIPMaskingAdapter, laid: ManyMaskingPoliciesAndACaller) -> (
-        Loaded
-    ):
+    async def call(
+        self, adapter: ClientIPMaskingAdapter, laid: ManyMaskingPoliciesAndACaller
+    ) -> Loaded:
         ids: list[ClientIPMaskingPolicyID] = [
             *(one.id for one in laid.laid),
             ClientIPMaskingPolicyID(uuid4()),
@@ -93,9 +93,9 @@ class LoadingAsNobody(When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter
         )
 
     @override
-    async def call(self, adapter: ClientIPMaskingAdapter, laid: ManyMaskingPoliciesAndACaller) -> (
-        Loaded
-    ):
+    async def call(
+        self, adapter: ClientIPMaskingAdapter, laid: ManyMaskingPoliciesAndACaller
+    ) -> Loaded:
         return await adapter.batch_load_by_ids([one.id for one in laid.laid])
 
 
@@ -155,9 +155,7 @@ class TheyComeBackInTheOrderAsked(Then[ManyMaskingPoliciesAndACaller, Loaded]):
 
 @dataclass(frozen=True)
 class TheSuperadminLoadsLaidAndMissing(
-    Scenario[
-        TestSeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Loaded
-    ]
+    Scenario[TestSeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Loaded]
 ):
     started: datetime
 

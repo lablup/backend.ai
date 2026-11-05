@@ -18,6 +18,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Held,
     Refused,
     Same,
     SameAs,
@@ -107,9 +108,7 @@ class TheyComeBackInTheOrderAsked(Then[ManyServicesAndACaller, Loaded]):
         )
 
     @override
-    def look(
-        self, laid: ManyServicesAndACaller, answered: Answered[Loaded]
-    ) -> list[Verdict]:
+    def look(self, laid: ManyServicesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
         items = answered.response
         if items is None:
             return [Refused(UnreachableError, answered.raised)]
@@ -130,8 +129,11 @@ class TheyComeBackInTheOrderAsked(Then[ManyServicesAndACaller, Loaded]):
                     ),
                 )
             )
-            seen.extend(service_verdicts(f"items[{i}].", got, laid=service,
-                                         written=WrittenByThisRun(self.started)))
+            seen.extend(
+                service_verdicts(
+                    f"items[{i}].", got, laid=service, written=WrittenByThisRun(self.started)
+                )
+            )
         last = items[asked - 1] if len(items) >= asked else "none"
         seen.append(Same(f"items[{asked - 1}]", last, None))
         return seen

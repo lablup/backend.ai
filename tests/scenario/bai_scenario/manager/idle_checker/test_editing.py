@@ -66,9 +66,7 @@ class EditingTheLaidChecker(When[CheckersAndACaller, IdleCheckerAdapter, IdleChe
         )
 
     @override
-    async def call(
-        self, adapter: IdleCheckerAdapter, laid: CheckersAndACaller
-    ) -> IdleCheckerNode:
+    async def call(self, adapter: IdleCheckerAdapter, laid: CheckersAndACaller) -> IdleCheckerNode:
         request = UpdateIdleCheckerInput(
             id=laid.laid[0].id,
             checker_spec=IdleCheckerSpecInputDTO(
@@ -96,9 +94,7 @@ class TheEditedCheckerNode(Then[CheckersAndACaller, IdleCheckerNode]):
         )
 
     @override
-    def look(
-        self, laid: CheckersAndACaller, answered: Answered[IdleCheckerNode]
-    ) -> list[Verdict]:
+    def look(self, laid: CheckersAndACaller, answered: Answered[IdleCheckerNode]) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(InsufficientPrivilege, answered.raised)]
@@ -122,7 +118,9 @@ class TheEditedCheckerNode(Then[CheckersAndACaller, IdleCheckerNode]):
             Same("name", node.name, laid.laid[0].name),
             Same("description", node.description, laid.laid[0].description),
             Same("checker_type", node.checker_type.value, "network_timeout"),
-            Same("target_session_types", node.target_session_types, laid.laid[0].target_session_types),
+            Same(
+                "target_session_types", node.target_session_types, laid.laid[0].target_session_types
+            ),
             Same("initial_grace_period_seconds", node.initial_grace_period_seconds, 0),
             Same("spec.type", node.spec.type.value, "network_timeout"),
             Same(

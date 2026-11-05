@@ -168,8 +168,9 @@ class TheSuperadminEnablesTheCheckerOnTheDomain(
     @override
     def when(
         self,
-    ) -> When[ACheckerAndADomainAndACaller, IdleCheckerAssignmentAdapter,
-              IdleCheckerAssignmentNode]:
+    ) -> When[
+        ACheckerAndADomainAndACaller, IdleCheckerAssignmentAdapter, IdleCheckerAssignmentNode
+    ]:
         return EnablingTheCheckerOnTheDomain()
 
     @override
@@ -208,8 +209,9 @@ class AnAssignmentCreatedWithoutAUserIsRefused(
     @override
     def when(
         self,
-    ) -> When[ACheckerAndADomainAndACaller, IdleCheckerAssignmentAdapter,
-              IdleCheckerAssignmentNode]:
+    ) -> When[
+        ACheckerAndADomainAndACaller, IdleCheckerAssignmentAdapter, IdleCheckerAssignmentNode
+    ]:
         return EnablingTheCheckerOnTheDomain()
 
     @override

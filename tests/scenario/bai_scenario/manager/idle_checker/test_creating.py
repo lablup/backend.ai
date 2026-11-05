@@ -67,9 +67,7 @@ class CreatingAChecker(When[CheckersAndACaller, IdleCheckerAdapter, IdleCheckerN
         )
 
     @override
-    async def call(
-        self, adapter: IdleCheckerAdapter, laid: CheckersAndACaller
-    ) -> IdleCheckerNode:
+    async def call(self, adapter: IdleCheckerAdapter, laid: CheckersAndACaller) -> IdleCheckerNode:
         request = CreateIdleCheckerInput(
             name="created-checker",
             target_session_types=[SessionTypes.INTERACTIVE],
@@ -98,9 +96,7 @@ class TheCreatedCheckerNode(Then[CheckersAndACaller, IdleCheckerNode]):
         )
 
     @override
-    def look(
-        self, laid: CheckersAndACaller, answered: Answered[IdleCheckerNode]
-    ) -> list[Verdict]:
+    def look(self, laid: CheckersAndACaller, answered: Answered[IdleCheckerNode]) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(InsufficientPrivilege, answered.raised)]
@@ -202,9 +198,7 @@ class SomeoneAlone(Given[Any, CheckersAndACaller]):
 
     @override
     def describe(self) -> str:
-        return Says(
-            "유휴 검사기 없이 호출자 한 명", english="no idle checker and one caller"
-        )
+        return Says("유휴 검사기 없이 호출자 한 명", english="no idle checker and one caller")
 
     @override
     async def lay(self, seeding: Any) -> CheckersAndACaller:

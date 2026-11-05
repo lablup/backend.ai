@@ -108,9 +108,7 @@ class ACheckerAndADomain(Given[Any, ACheckerAndADomainAndACaller]):
         who = role_named(self.role)
         return Says(
             f"유휴 검사기 하나와 도메인 하나, {who} 한 명",
-            english=(
-                f"one idle checker, one domain and one {in_language(who, Language.ENGLISH)}"
-            ),
+            english=(f"one idle checker, one domain and one {in_language(who, Language.ENGLISH)}"),
         )
 
     @override

@@ -74,8 +74,7 @@ class EveryLaidCheckerComesWhole(Then[CheckersAndACaller, Searched]):
         return Says(
             "미리 저장한 검사기가 모두 한 번씩 집계되어 전체가 반환됩니다",
             english=(
-                "every checker seeded in advance is counted once, and each whole checker "
-                "comes back"
+                "every checker seeded in advance is counted once, and each whole checker comes back"
             ),
         )
 

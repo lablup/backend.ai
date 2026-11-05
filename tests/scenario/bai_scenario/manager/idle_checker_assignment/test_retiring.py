@@ -57,7 +57,9 @@ class PurgedOne:
 
 
 @dataclass(frozen=True)
-class PurgingTheLaidAssignment(When[AssignmentsAndACaller, IdleCheckerAssignmentAdapter, PurgedOne]):
+class PurgingTheLaidAssignment(
+    When[AssignmentsAndACaller, IdleCheckerAssignmentAdapter, PurgedOne]
+):
     """미리 저장한 할당 하나를 purge 한다."""
 
     @override
@@ -69,8 +71,7 @@ class PurgingTheLaidAssignment(When[AssignmentsAndACaller, IdleCheckerAssignment
         return Says(
             f"{laid.caller.username}이 도메인 {laid.domains[0].name}의 할당을 purge 합니다",
             english=(
-                f"{laid.caller.username} purges the assignment of the domain "
-                f"{laid.domains[0].name}"
+                f"{laid.caller.username} purges the assignment of the domain {laid.domains[0].name}"
             ),
         )
 
@@ -96,9 +97,7 @@ class ThePurgedAssignmentAnswers(Then[AssignmentsAndACaller, PurgedOne]):
         )
 
     @override
-    def look(
-        self, laid: AssignmentsAndACaller, answered: Answered[PurgedOne]
-    ) -> list[Verdict]:
+    def look(self, laid: AssignmentsAndACaller, answered: Answered[PurgedOne]) -> list[Verdict]:
         answer = answered.response
         if answer is None:
             return [Refused(UnreachableError, answered.raised)]
@@ -116,9 +115,7 @@ class ThePurgedAssignmentAnswers(Then[AssignmentsAndACaller, PurgedOne]):
 
 @dataclass(frozen=True)
 class TheSuperadminPurgesAnAssignment(
-    Scenario[
-        TestSeedingSession, AssignmentsAndACaller, IdleCheckerAssignmentAdapter, PurgedOne
-    ]
+    Scenario[TestSeedingSession, AssignmentsAndACaller, IdleCheckerAssignmentAdapter, PurgedOne]
 ):
     @override
     def summary(self) -> str:
@@ -149,9 +146,7 @@ class TheSuperadminPurgesAnAssignment(
 
 @dataclass(frozen=True)
 class APurgeCarryingNoUserIsRefused(
-    Scenario[
-        TestSeedingSession, AssignmentsAndACaller, IdleCheckerAssignmentAdapter, PurgedOne
-    ]
+    Scenario[TestSeedingSession, AssignmentsAndACaller, IdleCheckerAssignmentAdapter, PurgedOne]
 ):
     @override
     def summary(self) -> str:
@@ -189,7 +184,6 @@ SCENARIOS: list[RetiringStep] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_retiring(
-    scenario: RetiringStep, adapter: IdleCheckerAssignmentAdapter,
-    engine: ExtendedAsyncSAEngine
+    scenario: RetiringStep, adapter: IdleCheckerAssignmentAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:
     await run_scenario(scenario, adapter, engine)

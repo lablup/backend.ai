@@ -46,8 +46,10 @@ from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type UpdatingStep = Scenario[
-    TestSeedingSession, AssignmentsAndACaller, IdleCheckerAssignmentAdapter,
-    IdleCheckerAssignmentNode
+    TestSeedingSession,
+    AssignmentsAndACaller,
+    IdleCheckerAssignmentAdapter,
+    IdleCheckerAssignmentNode,
 ]
 
 
@@ -77,7 +79,9 @@ class DisablingTheLaidAssignment(
     ) -> IdleCheckerAssignmentNode:
         ids = await assignment_ids(adapter, laid)
         with ActingAs(laid.caller):
-            payload = await adapter.update(UpdateIdleCheckerAssignmentInput(id=ids[0], enabled=False))
+            payload = await adapter.update(
+                UpdateIdleCheckerAssignmentInput(id=ids[0], enabled=False)
+            )
         return payload.idle_checker_assignment
 
 
@@ -145,9 +149,7 @@ class TheSuperadminDisablesAnAssignment(
     def describe(self) -> str:
         return Says(
             "superadmin 이 할당을 끄면, 요청한 할당이 꺼진 상태로 반환됩니다",
-            english=(
-                "when the superadmin disables an assignment, it comes back disabled"
-            ),
+            english=("when the superadmin disables an assignment, it comes back disabled"),
         )
 
     @override
@@ -211,7 +213,6 @@ SCENARIOS: list[UpdatingStep] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_updating(
-    scenario: UpdatingStep, adapter: IdleCheckerAssignmentAdapter,
-    engine: ExtendedAsyncSAEngine
+    scenario: UpdatingStep, adapter: IdleCheckerAssignmentAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:
     await run_scenario(scenario, adapter, engine)

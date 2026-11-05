@@ -60,8 +60,7 @@ class LoadingTheScopesAndAMissingOne(When[ScopesToSearch, AuditLogAdapter, Scope
         return Says(
             f"{laid.caller.username}이 기록 하나의 범위와 없는 id 하나를 한 번에 조회합니다",
             english=(
-                f"{laid.caller.username} reads the scopes of one record and one unknown id "
-                "at once"
+                f"{laid.caller.username} reads the scopes of one record and one unknown id at once"
             ),
         )
 
@@ -117,9 +116,7 @@ class TheScopesComeBackInTheOrderAsked(Then[ScopesToSearch, ScopeSlotsAnswered])
         )
 
     @override
-    def look(
-        self, laid: ScopesToSearch, answered: Answered[ScopeSlotsAnswered]
-    ) -> list[Verdict]:
+    def look(self, laid: ScopesToSearch, answered: Answered[ScopeSlotsAnswered]) -> list[Verdict]:
         answer = answered.response
         if answer is None:
             return [Refused(UnreachableError, answered.raised)]
@@ -245,7 +242,9 @@ class AScopeLoadCarryingNoUserIsRefused(
         return TheCallIsRefused(UnreachableError)
 
 
-SCENARIOS: list[Scenario[TestSeedingSession, ScopesToSearch, AuditLogAdapter, ScopeSlotsAnswered]] = [
+SCENARIOS: list[
+    Scenario[TestSeedingSession, ScopesToSearch, AuditLogAdapter, ScopeSlotsAnswered]
+] = [
     TheSuperadminLoadsTheScopesAndMissing(),
     AScopeLoadCarryingNoUserIsRefused(),
 ]

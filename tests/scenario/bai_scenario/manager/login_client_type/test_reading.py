@@ -44,9 +44,7 @@ type ReadingStep = Scenario[
     TestSeedingSession, ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode
 ]
 type Loaded = list[LoginClientTypeNode | Exception | None]
-type LoadingStep = Scenario[
-    TestSeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Loaded
-]
+type LoadingStep = Scenario[TestSeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Loaded]
 
 
 @dataclass(frozen=True)

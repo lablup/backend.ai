@@ -461,9 +461,7 @@ class PurgingManyAsNobody(When[SomeFragmentsAndACaller, AppConfigFragmentAdapter
         self, adapter: AppConfigFragmentAdapter, laid: SomeFragmentsAndACaller
     ) -> BulkPurged:
         asked = [*(one.id for one in laid.mine), laid.theirs.id]
-        return await adapter.partial_bulk_purge(
-            PartialBulkPurgeAppConfigFragmentsInput(ids=asked)
-        )
+        return await adapter.partial_bulk_purge(PartialBulkPurgeAppConfigFragmentsInput(ids=asked))
 
 
 @dataclass(frozen=True)
