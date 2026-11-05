@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.dto.manager.v2.group.request import UpdateProjectInput
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
 from ai.backend.manager.data.project.types import ProjectData, ProjectType
+from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.common import GenericForbidden
 
 READABLE = ProjectID(uuid4())
@@ -78,3 +80,44 @@ async def test_batch_load_answers_per_id(
 async def test_no_ids_read_nothing(adapter: ProjectAdapter, processors: MagicMock) -> None:
     assert await adapter.batch_load_by_ids([]) == []
     processors.bulk_get.run.assert_not_awaited()
+
+
+class TestResourcePolicyReassignment:
+    """The resource policy of a project is reassigned by a superadmin only."""
+
+    @pytest.fixture
+    def processors(self, readable: ProjectData) -> MagicMock:
+        processors = MagicMock()
+        processors.update_project.run = AsyncMock(return_value=MagicMock(data=readable))
+        return processors
+
+    @pytest.fixture
+    def adapter(self, processors: MagicMock) -> ProjectAdapter:
+        return ProjectAdapter(processors, MagicMock(), MagicMock(), MagicMock())
+
+    async def test_a_non_superadmin_may_not_reassign_it(
+        self, adapter: ProjectAdapter, processors: MagicMock
+    ) -> None:
+        me = MagicMock(is_superadmin=False)
+        with (
+            patch("ai.backend.manager.api.adapters.project.adapter.current_user", return_value=me),
+            pytest.raises(InsufficientPrivilege),
+        ):
+            await adapter.update(READABLE, UpdateProjectInput(resource_policy="tier-2"))
+        processors.update_project.run.assert_not_called()
+
+    async def test_a_non_superadmin_updates_the_other_fields(
+        self, adapter: ProjectAdapter, processors: MagicMock
+    ) -> None:
+        me = MagicMock(is_superadmin=False)
+        with patch("ai.backend.manager.api.adapters.project.adapter.current_user", return_value=me):
+            await adapter.update(READABLE, UpdateProjectInput(name="renamed"))
+        processors.update_project.run.assert_awaited_once()
+
+    async def test_a_superadmin_reassigns_it(
+        self, adapter: ProjectAdapter, processors: MagicMock
+    ) -> None:
+        me = MagicMock(is_superadmin=True)
+        with patch("ai.backend.manager.api.adapters.project.adapter.current_user", return_value=me):
+            await adapter.update(READABLE, UpdateProjectInput(resource_policy="tier-2"))
+        processors.update_project.run.assert_awaited_once()
