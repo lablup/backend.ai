@@ -1,9 +1,32 @@
+// Removals decided deliberately. graphql-inspector reports every removal as BREAKING,
+// so an element taken out on purpose needs an entry here naming why it went.
+// Drop an entry once the removal is on this branch: the base schema no longer carries it.
+const ACCEPTED_REMOVALS = {
+  "ScalingGroupNode.wsproxy_api_token":
+    "The token is the App Proxy API credential, and every domain member could read it through `domain_nodes { scaling_groups }`. Superadmins still read it on `ScalingGroup`.",
+};
+
+const REMOVAL_CHANGES = [
+  "INPUT_FIELD_REMOVED",
+  "FIELD_REMOVED",
+  "FIELD_ARGUMENT_REMOVED",
+  "TYPE_REMOVED",
+  "ENUM_VALUE_REMOVED",
+];
+
 module.exports = (props) => {
   const { changes, newSchema, oldSchema } = props;
   return changes.map((change) => {
     // Allowed version notations: 'XX.XX.X', 'XX.X.X'
     const deprecateNotationRegex = /Deprecated since (\d{2}\.\d{1,2}\.\d{1})/;
     const addNotationRegex = /Added in (\d{2}\.\d{1,2}\.\d{1})/;
+    const acceptedRemovalReason = ACCEPTED_REMOVALS[change.path];
+    if (REMOVAL_CHANGES.includes(change.type) && acceptedRemovalReason !== undefined) {
+      change.criticality.level = "DANGEROUS";
+      change.criticality.reason = acceptedRemovalReason;
+      change.message = `${change.message} (accepted: ${acceptedRemovalReason})`;
+      return change;
+    }
     if (
       [
         "FIELD_DEPRECATION_REASON_ADDED",
