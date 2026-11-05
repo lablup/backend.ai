@@ -137,13 +137,14 @@ class TestSessionStartService:
         appproxy_client_pool: AsyncMock,
     ) -> None:
         wsproxy_addr = "http://127.0.0.1:5050"
+        wsproxy_api_token = "coordinator-api-token"
 
         # Set wsproxy_addr on scaling group
         async with db_engine.begin() as conn:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=wsproxy_addr)
+                .values(wsproxy_addr=wsproxy_addr, wsproxy_api_token=wsproxy_api_token)
             )
 
         # Add service_ports and agent_addr to the kernel

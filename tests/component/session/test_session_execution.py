@@ -407,7 +407,7 @@ class TestSessionStartService:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR)
+                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=_WSPROXY_API_TOKEN)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
@@ -455,7 +455,7 @@ class TestSessionStartService:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR)
+                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=_WSPROXY_API_TOKEN)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
@@ -511,7 +511,7 @@ class TestSessionStartService:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR)
+                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=_WSPROXY_API_TOKEN)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
@@ -571,7 +571,7 @@ class TestSessionStartService:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR)
+                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=_WSPROXY_API_TOKEN)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
@@ -628,7 +628,7 @@ class TestSessionStartServiceFailures:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR)
+                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=_WSPROXY_API_TOKEN)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
@@ -676,7 +676,7 @@ class TestSessionStartServiceFailures:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR)
+                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=_WSPROXY_API_TOKEN)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
@@ -714,7 +714,7 @@ class TestSessionStartServiceFailures:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR)
+                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=_WSPROXY_API_TOKEN)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
@@ -775,7 +775,7 @@ class TestSessionStartServiceFailures:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR)
+                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=_WSPROXY_API_TOKEN)
             )
         async with db_engine.begin() as conn:
             await conn.execute(

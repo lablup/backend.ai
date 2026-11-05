@@ -421,11 +421,11 @@ class SessionDBSource:
             resource_group = result.first()
             if resource_group is None:
                 return None
-            if not resource_group.wsproxy_addr:
+            if not resource_group.wsproxy_addr or not resource_group.wsproxy_api_token:
                 return None
             return ResourceGroupProxyTarget(
                 addr=resource_group.wsproxy_addr,
-                api_token=resource_group.wsproxy_api_token or "",
+                api_token=resource_group.wsproxy_api_token,
             )
 
     async def get_session_by_id(
