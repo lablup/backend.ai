@@ -241,7 +241,6 @@ class TestPredefinedRolesInProjectScope:
 
         assert roles == frozenset()
 
-
     async def test_a_monitor_reads_its_own_domain_as_monitor(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
