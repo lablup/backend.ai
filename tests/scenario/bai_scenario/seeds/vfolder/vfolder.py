@@ -45,16 +45,33 @@ class TestSeedPersonalVFolder(TestSeedRowFrom[UserData, VFolderData]):
 
     @override
     def detail(self) -> str:
-        parts: list[str] = [
+        if (
+            self.status is VFolderOperationStatus.READY
+            and self.usage_mode is VFolderUsageMode.GENERAL
+            and not self.cloneable
+        ):
+            parts: list[str] = [
+                Says(
+                    "그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다",
+                    english="is placed in that person's personal project and is ready to use",
+                )
+            ]
+            if self.default_mount_permission is not None:
+                permission = self.default_mount_permission.value
+                parts.append(
+                    Says(
+                        f"남에게는 {permission}로 마운트됩니다",
+                        english=f"is mounted for others as {permission}",
+                    )
+                )
+            return joined(parts)
+        parts = [
             Says(
                 "그 사람의 개인 프로젝트에 놓입니다",
                 english="is placed in that person's personal project",
-            )
+            ),
+            Says(f"{self.status.value} 상태입니다", english=f"is {self.status.value}"),
         ]
-        if self.status is VFolderOperationStatus.READY:
-            parts.append(Says("사용할 수 있는 상태입니다", english="is ready to use"))
-        else:
-            parts.append(Says(f"{self.status.value} 상태입니다", english=f"is {self.status.value}"))
         if self.usage_mode is not VFolderUsageMode.GENERAL:
             parts.append(
                 Says(
@@ -110,11 +127,19 @@ class TestSeedProjectVFolder(TestSeedRowFromTwo[ProjectData, UserData, VFolderDa
 
     @override
     def detail(self) -> str:
-        parts: list[str] = [Says("프로젝트에 놓입니다", english="is placed in the project")]
-        if self.status is VFolderOperationStatus.READY:
-            parts.append(Says("사용할 수 있는 상태입니다", english="is ready to use"))
-        else:
-            parts.append(Says(f"{self.status.value} 상태입니다", english=f"is {self.status.value}"))
+        if (
+            self.status is VFolderOperationStatus.READY
+            and self.usage_mode is VFolderUsageMode.GENERAL
+            and not self.cloneable
+        ):
+            return Says(
+                "프로젝트에 놓이고, 사용할 수 있는 상태입니다",
+                english="is placed in the project and is ready to use",
+            )
+        parts: list[str] = [
+            Says("프로젝트에 놓입니다", english="is placed in the project"),
+            Says(f"{self.status.value} 상태입니다", english=f"is {self.status.value}"),
+        ]
         if self.usage_mode is not VFolderUsageMode.GENERAL:
             parts.append(
                 Says(
