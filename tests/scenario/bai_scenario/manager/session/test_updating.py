@@ -89,7 +89,10 @@ class TheSessionComesBack(Then[LaidSessionAndCaller, Updated]):
                 payload.session.model_dump(),
                 SameAs(
                     session_dump(laid),
-                    Says("저장된 세션의 전체 정보", english="the whole information of the stored session"),
+                    Says(
+                        "저장된 세션의 전체 정보",
+                        english="the whole information of the stored session",
+                    ),
                 ),
             )
         ]

@@ -8,7 +8,6 @@ from typing import Any, override
 import pytest
 
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
 from ai.backend.common.dto.manager.v2.kernel.response import AdminSearchKernelsPayload
@@ -34,6 +33,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
 )
 from ai.backend.common.dto.manager.v2.session.response import AdminSearchSessionsPayload
 from ai.backend.common.dto.manager.v2.session.types import SessionScope
+from ai.backend.common.types import SessionId
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -108,7 +108,7 @@ class SearchingTheSessionKernels(When[LaidSessionAndCaller, SessionAdapter, Kern
     async def call(self, adapter: SessionAdapter, laid: LaidSessionAndCaller) -> Kernels:
         with ActingAs(laid.caller):
             return await adapter.search_kernels_by_session(
-                SessionID(laid.session.id), AdminSearchKernelsInput()
+                SessionId(laid.session.id), AdminSearchKernelsInput()
             )
 
 
@@ -138,8 +138,7 @@ class SearchingTheProject(When[LaidSessionAndCaller, SessionAdapter, Sessions]):
         return Says(
             f"{laid.caller.username}이 {laid.project.name} 프로젝트 스코프에서 세션을 조회합니다",
             english=(
-                f"{laid.caller.username} searches sessions in the scope of "
-                f"{laid.project.name}"
+                f"{laid.caller.username} searches sessions in the scope of {laid.project.name}"
             ),
         )
 
@@ -151,9 +150,7 @@ class SearchingTheProject(When[LaidSessionAndCaller, SessionAdapter, Sessions]):
                     ProjectID(laid.project.id), AdminSearchSessionsInput()
                 )
             if self.operation_name == "project_search":
-                return await adapter.project_search(
-                    laid.project.id, AdminSearchSessionsInput()
-                )
+                return await adapter.project_search(laid.project.id, AdminSearchSessionsInput())
             return await adapter.scoped_search(
                 ScopedSearchSessionsInput(
                     scope=SessionScope(project=[UUIDScope(value=laid.project.id)])
@@ -236,9 +233,7 @@ class SearchingTheGroupSlots(When[LaidSessionAndCaller, SessionAdapter, Slots]):
             )
 
 
-def _page_verdicts(
-    loaded: Any, dumped: list[dict[str, Any]], named: Says
-) -> list[Verdict]:
+def _page_verdicts(loaded: Any, dumped: list[dict[str, Any]], named: Says) -> list[Verdict]:
     return [
         Held("items", [node.model_dump() for node in loaded.items], SameAs(dumped, named)),
         Same("total_count", loaded.total_count, len(dumped)),
@@ -394,9 +389,7 @@ class SearchingEveryKernelAsTheSuperadmin(
     @override
     def given(self) -> Given[TestSeedingSession, LaidSessionAndCaller]:
         if self.superadmin:
-            return ASessionWithAKernelAndSomeone(
-                granted=Granted.NOTHING, role=UserRole.SUPERADMIN
-            )
+            return ASessionWithAKernelAndSomeone(granted=Granted.NOTHING, role=UserRole.SUPERADMIN)
         return ASessionWithAKernelAndSomeone(granted=Granted.NOTHING)
 
     @override

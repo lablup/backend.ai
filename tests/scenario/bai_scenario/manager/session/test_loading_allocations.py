@@ -61,9 +61,7 @@ class LoadingTheSessionAllocation(When[LaidSessionAndCaller, SessionAdapter, ByS
     @override
     async def call(self, adapter: SessionAdapter, laid: LaidSessionAndCaller) -> BySession:
         with ActingAs(laid.caller):
-            return await adapter.batch_resource_allocation_by_session([
-                SessionID(laid.session.id)
-            ])
+            return await adapter.batch_resource_allocation_by_session([SessionID(laid.session.id)])
 
 
 @dataclass(frozen=True)
@@ -86,9 +84,7 @@ class LoadingTheKernelAllocation(When[LaidSessionAndCaller, SessionAdapter, ByKe
     @override
     async def call(self, adapter: SessionAdapter, laid: LaidSessionAndCaller) -> ByKernel:
         with ActingAs(laid.caller):
-            return await adapter.batch_resource_allocation_by_kernel([
-                KernelID(laid.kernel.id)
-            ])
+            return await adapter.batch_resource_allocation_by_kernel([KernelID(laid.kernel.id)])
 
 
 @dataclass(frozen=True)
