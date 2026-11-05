@@ -327,23 +327,17 @@ class TestUpdatePasswordNoAuthEligibility:
 
         mock_auth_repository.update_user_password_by_uuid.assert_not_called()
 
-    @pytest.mark.parametrize(
-        "password_changed_at",
-        [_NOW - timedelta(days=1), None],
-        ids=["changed_yesterday", "never_recorded"],
-    )
     async def test_refuses_a_password_that_has_not_expired(
         self,
         auth_service: AuthService,
         mock_auth_repository: AsyncMock,
         no_auth_action: UpdatePasswordNoAuthAction,
-        password_changed_at: datetime | None,
     ) -> None:
         mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
             user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
             hashed_password="hashed_current_pass",
             status=UserStatus.ACTIVE,
-            password_changed_at=password_changed_at,
+            password_changed_at=_NOW - timedelta(days=1),
         )
 
         with pytest.raises(PasswordNotExpired):

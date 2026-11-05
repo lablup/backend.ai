@@ -18,4 +18,4 @@ class UserCredential:
     user_id: UserID
     hashed_password: str
     status: UserStatus
-    password_changed_at: datetime | None
+    password_changed_at: datetime
