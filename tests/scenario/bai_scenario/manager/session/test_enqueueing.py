@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -45,7 +46,6 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.domain import SomeoneOf, WrittenByThisRun
 from bai_scenario.components.resource_allocation import lay_a_place
-from bai_scenario.components.session_reads import allocation_dump
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
@@ -58,8 +58,10 @@ from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 type Enqueued = EnqueueSessionPayload
 
 SESSION_NAME = "created-session"
-CAPACITY = Decimal(8)
-"""The agent reports this much of the slot the session asks for."""
+ASKED_FOR: dict[str, Decimal] = {"cpu": Decimal(1), "mem": Decimal(1073741824)}
+"""The slots the session asks for. The slot type table requires both of them."""
+CAPACITY: dict[str, Decimal] = {"cpu": Decimal(8), "mem": Decimal(34359738368)}
+"""What the agent reports in each slot, more than the session asks for."""
 
 
 @dataclass(frozen=True)
@@ -99,7 +101,6 @@ class LaidPlaceAndCaller:
     project: ProjectData
     resource_group: ResourceGroupData
     image: ImageData
-    slot_name: str
     caller: UserData
     access_key: str
     started: datetime
@@ -113,8 +114,8 @@ class APlaceAndSomeone(Given[Any, LaidPlaceAndCaller]):
 
     @override
     def describe(self) -> str:
-        laid_ko = "슬롯 하나를 요구하는 세션을 받을 수 있는 자원 그룹과 이미지"
-        laid_en = "a resource group whose agent serves the slot a session asks for"
+        laid_ko = "요구할 슬롯을 감당하는 에이전트가 있는 자원 그룹과 이미지"
+        laid_en = "a resource group whose agent holds the slots a session asks for"
         if self.granted:
             return Says(
                 f"{laid_ko}, 그리고 그 프로젝트에서 세션을 만들 수 있는 사용자 한 명",
@@ -127,19 +128,19 @@ class APlaceAndSomeone(Given[Any, LaidPlaceAndCaller]):
 
     @override
     async def lay(self, seeding: Any) -> LaidPlaceAndCaller:
-        place = await lay_a_place(seeding, slots=1)
+        place = await lay_a_place(seeding, slots=0)
         await seeding.linking(LinkToProject(), place.project, place.group)
-        slot_name = seeding.made(place.slot_types[0]).slot_name
         agent = await seeding.creating_from(TestSeedAgent(), place.group)
-        await seeding.adding(
-            TestSeedReportedSlot(
-                agent_id=agent.name,
-                slot_name=slot_name,
-                capacity=CAPACITY,
-                used=Decimal(0),
-            ),
-            agent,
-        )
+        for slot_name, capacity in CAPACITY.items():
+            await seeding.adding(
+                TestSeedReportedSlot(
+                    agent_id=agent.name,
+                    slot_name=slot_name,
+                    capacity=capacity,
+                    used=Decimal(0),
+                ),
+                agent,
+            )
         caller = await seeding.within(SomeoneOf(place.domain))
         if self.granted:
             await seeding.within(SomeoneWhoMayCreateSessionsIn(place.project, caller))
@@ -148,7 +149,6 @@ class APlaceAndSomeone(Given[Any, LaidPlaceAndCaller]):
             project=seeding.made(place.project),
             resource_group=seeding.made(place.group),
             image=seeding.made(place.image),
-            slot_name=slot_name,
             caller=seeding.made(caller),
             access_key=str(place.access_key),
             started=datetime.now(UTC),
@@ -177,9 +177,8 @@ class CreatingTheSession(When[LaidPlaceAndCaller, SessionAdapter, Enqueued]):
                     session_type=CreateSessionTypeEnum.INTERACTIVE,
                     image_id=laid.image.id,
                     resource_entries=[
-                        ResourceSlotEntryInput(
-                            resource_type=laid.slot_name, quantity=str(Decimal(1))
-                        )
+                        ResourceSlotEntryInput(resource_type=slot_name, quantity=str(amount))
+                        for slot_name, amount in ASKED_FOR.items()
                     ],
                     resource_group_id=ResourceGroupID(laid.resource_group.id),
                     project_id=laid.project.id,
@@ -204,6 +203,32 @@ class ANonEmptyId(Condition[str | None]):
     @override
     def holds(self, got: str | None) -> bool:
         return bool(got)
+
+
+@dataclass(frozen=True)
+class TheAllocationAskingFor(Condition[dict[str, Any]]):
+    """세션의 할당이 요구한 슬롯 모두를 그 양만큼 차 있고, 아직 실제로 잡힌 것은 없다."""
+
+    asked: Mapping[str, Decimal]
+
+    @override
+    def says(self) -> str:
+        asked = ", ".join(f"{name} {amount}" for name, amount in sorted(self.asked.items()))
+        return Says(f"{asked} 만큼의 할당", english=f"the allocation of {asked}")
+
+    @override
+    def holds(self, got: dict[str, Any]) -> bool:
+        def per_slot(info: dict[str, Any]) -> dict[str, Decimal]:
+            return {
+                str(entry["resource_type"]): Decimal(str(entry["quantity"]))
+                for entry in info["entries"]
+            }
+
+        return (
+            per_slot(got["requested"]) == self.asked
+            and per_slot(got["used"]) == self.asked
+            and not got["allocated"]["entries"]
+        )
 
 
 @dataclass(frozen=True)
@@ -267,13 +292,7 @@ class TheSessionIsCreated(Then[LaidPlaceAndCaller, Enqueued]):
             Held(
                 "resource.allocation",
                 resource.allocation.model_dump(),
-                SameAs(
-                    allocation_dump(laid.slot_name, Decimal(1)),
-                    Says(
-                        "요청한 슬롯만큼의 할당",
-                        english="the allocation of the slots asked for",
-                    ),
-                ),
+                TheAllocationAskingFor(ASKED_FOR),
             ),
             Same(
                 "resource.resource_group_name",
