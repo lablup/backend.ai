@@ -6,15 +6,22 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.types import ClusterMode
-from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
+from ai.backend.manager.data.deployment_revision_preset.types import (
+    DeploymentRevisionPresetData,
+    ResourceSlotEntryData,
+)
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
-from ai.backend.manager.models.deployment_revision_preset.creators import DeploymentPresetCreator
+from ai.backend.manager.models.deployment_revision_preset.creators import (
+    DeploymentPresetCreator,
+    PresetResourceSlotCreator,
+)
 from ai.backend.testutils.scenario_steps import Says
-from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom, joined
+from bai_scenario.seeds.seeder import Naming, TestSeedFieldCreator, TestSeedRowFrom, joined
 
 
 @dataclass(frozen=True)
@@ -67,4 +74,31 @@ class TestSeedDeploymentRevisionPreset(
             replica_count=1,
             deployment_strategy=DeploymentStrategy.ROLLING,
             deployment_strategy_spec={},
+        )
+
+
+@dataclass(frozen=True)
+class TestSeedPresetSlotOf(
+    TestSeedFieldCreator[DeploymentRevisionPresetData, ResourceSlotEntryData]
+):
+    """One slot quantity the preset declares."""
+
+    resource_type: str = "cpu"
+    quantity: str = "4"
+
+    @override
+    def kind(self) -> str:
+        return Says(
+            f"{self.resource_type} 슬롯 하나를 두려 한다",
+            english=f"declares one {self.resource_type} slot",
+        )
+
+    @override
+    def owner_id(self, owner: DeploymentRevisionPresetData) -> DeploymentPresetID:
+        return owner.id
+
+    @override
+    def seed(self) -> PresetResourceSlotCreator:
+        return PresetResourceSlotCreator(
+            entry=ResourceSlotEntryData(resource_type=self.resource_type, quantity=self.quantity)
         )

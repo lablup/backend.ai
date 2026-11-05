@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
     DeploymentRevisionPresetNode,
 )
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
+from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
@@ -122,20 +123,54 @@ class PresetsAndAnOutsider(Given[Any, PresetsAndACaller]):
 
 
 @dataclass(frozen=True)
+class AVariantAndACaller:
+    """변형 하나와, 그것으로 프리셋을 만들 사람."""
+
+    variant: RuntimeVariantData
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class AVariantAndSomeoneToCreate(Given[Any, AVariantAndACaller]):
+    """변형 하나와, 그것으로 프리셋을 만들 사용자 한 명."""
+
+    role: UserRole = UserRole.USER
+
+    @override
+    def describe(self) -> str:
+        who = role_named(self.role)
+        return Says(
+            f"변형 하나와 그것으로 프리셋을 만들 {who} 한 명",
+            english=f"one runtime variant and one {in_language(who, Language.ENGLISH)} to make a preset of it",
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> AVariantAndACaller:
+        variant = await seeding.creating(TestSeedRuntimeVariant())
+        caller = await lay_a_public_reader(seeding, DeploymentPresetEntityType(), self.role)
+        return AVariantAndACaller(
+            variant=seeding.made(variant),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
 class ThePresetNode:
     """미리 저장한 프리셋의 노드가 어떤 값으로 와야 하는지. 이름은 미리 저장한 것에서 읽는다."""
 
     started: datetime
+    described: str | None = None
 
     def verdicts(
         self, node: DeploymentRevisionPresetNode, laid: DeploymentRevisionPresetData, at: str = ""
     ) -> list[Verdict]:
+        described = self.described if self.described is not None else laid.description
         return [
             Held(f"{at}id", node.id, SameAs(laid.id, PRESET_ID)),
             Held(f"{at}entity_id", node.entity_id, SameAs(laid.id, PRESET_ID)),
             Held(f"{at}runtime_variant_id", node.runtime_variant_id, SameAs(laid.runtime_variant_id, VARIANT_ID)),
             Same(f"{at}name", node.name, laid.name),
-            Same(f"{at}description", node.description, laid.description),
+            Same(f"{at}description", node.description, described),
             Same(f"{at}rank", node.rank, laid.rank),
             Same(f"{at}cluster.cluster_mode", node.cluster.cluster_mode, laid.cluster_mode),
             Same(f"{at}cluster.cluster_size", node.cluster.cluster_size, laid.cluster_size),
