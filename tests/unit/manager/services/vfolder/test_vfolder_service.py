@@ -447,12 +447,14 @@ class TestVFolderServiceWatcherInfo:
             own_check=MagicMock(),
         )
 
-        watcher_info = await vfolder_service._get_watcher_info(agent_id)
+        watcher_addr = await vfolder_service._get_watcher_addr(agent_id)
 
-        assert watcher_info["addr"].port == 6009
+        assert watcher_addr.port == 6009
 
     @pytest.mark.parametrize("token", [None, ""], ids=["missing", "empty"])
-    async def test_watcher_info_rejects_unconfigured_token(self, token: str | None) -> None:
+    async def test_validate_watcher_token_rejects_unconfigured_token(
+        self, token: str | None
+    ) -> None:
         config_provider = MagicMock()
         config_provider.config.watcher.token = token
         vfolder_service = VFolderService(
@@ -467,7 +469,7 @@ class TestVFolderServiceWatcherInfo:
         )
 
         with pytest.raises(WatcherTokenNotConfigured):
-            await vfolder_service._get_watcher_info("test-agent-watcher")
+            vfolder_service._validate_watcher_token()
 
 
 class TestVFolderServiceBulkLoadMountLevels:
