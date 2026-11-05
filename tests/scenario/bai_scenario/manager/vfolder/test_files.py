@@ -583,22 +583,22 @@ class AGrantedWriterOpensAnUploadSession(
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-folder-create-opens-an-upload-session"
+        return "a-user-granted-folder-update-opens-an-upload-session"
 
     @override
     def describe(self) -> str:
         return Says(
-            "vfolder 생성 권한을 받은 사용자가 폴더에 올릴 세션을 열면, 올리기에 쓸 token 과 "
+            "vfolder 수정 권한을 받은 사용자가 폴더에 올릴 세션을 열면, 올리기에 쓸 token 과 "
             "주소가 응답으로 옵니다",
             english=(
-                "when a user granted vfolder create opens an upload session for the folder, the "
+                "when a user granted vfolder update opens an upload session for the folder, the "
                 "token and address to upload to come back"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AFolderAndPeople]:
-        return SomeoneWithAFolder(permissions=(Permission.CREATE,))
+        return SomeoneWithAFolder(permissions=(Permission.UPDATE,))
 
     @override
     def when(self) -> When[AFolderAndPeople, VFolderAdapter, CreateUploadSessionPayload]:
