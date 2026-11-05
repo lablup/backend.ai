@@ -112,7 +112,7 @@ class APlaceAndSomeone(Given[Any, AUsagePlace]):
     프리셋을 둔다.
     """
 
-    role: UserRole = UserRole.SUPERADMIN
+    role: UserRole = UserRole.USER
     sessions_read: bool = False
     slot_type: bool = True
     presets: int = 0

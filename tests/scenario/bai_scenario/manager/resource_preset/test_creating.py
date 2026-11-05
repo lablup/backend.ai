@@ -110,10 +110,7 @@ class ThePresetJustCreated(Then[AGroupAndACaller, Created]):
                 "resource_slots",
                 sorted(node.resource_slots, key=lambda entry: entry.resource_type),
                 sorted(
-                    (
-                        ResourceSlotEntryInfo(resource_type=k, quantity=v)
-                        for k, v in SLOTS.items()
-                    ),
+                    (ResourceSlotEntryInfo(resource_type=k, quantity=v) for k, v in SLOTS.items()),
                     key=lambda entry: entry.resource_type,
                 ),
             ),

@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
@@ -34,7 +35,7 @@ from bai_scenario.runner.steps import run_scenario
 NOBODY = "nobody"
 
 type LookedUp = UUID
-type LookedUpSeveral = list[UUID | None]
+type LookedUpSeveral = Sequence[UUID | None]
 type LookingUpStep = Scenario[
     TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any
 ]

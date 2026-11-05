@@ -9,7 +9,7 @@ policy, and a row names the one it runs against.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
@@ -262,7 +262,7 @@ class Family[PolicyData, PolicyNode](ABC):
     @abstractmethod
     async def bulk_lookup(
         self, adapter: ResourcePolicyAdapter, names: list[str]
-    ) -> list[UUID | None]:
+    ) -> Sequence[UUID | None]:
         """이름 여럿을 id 로 한 번에 바꾼다. 없는 이름의 자리는 비어 있다."""
         raise NotImplementedError
 
@@ -468,7 +468,7 @@ class ProjectPolicies(Family[ProjectResourcePolicyData, ProjectResourcePolicyNod
     @override
     async def bulk_lookup(
         self, adapter: ResourcePolicyAdapter, names: list[str]
-    ) -> list[UUID | None]:
+    ) -> Sequence[UUID | None]:
         return await adapter.bulk_lookup_project_resource_policy_names(names)
 
     @override
@@ -794,7 +794,7 @@ class KeypairPolicies(OwnFamily[KeyPairResourcePolicyData, KeypairResourcePolicy
     @override
     async def bulk_lookup(
         self, adapter: ResourcePolicyAdapter, names: list[str]
-    ) -> list[UUID | None]:
+    ) -> Sequence[UUID | None]:
         return await adapter.bulk_lookup_keypair_resource_policy_names(names)
 
     async def search_held_by(
@@ -1031,7 +1031,7 @@ class UserPolicies(OwnFamily[UserResourcePolicyData, UserResourcePolicyNode]):
     @override
     async def bulk_lookup(
         self, adapter: ResourcePolicyAdapter, names: list[str]
-    ) -> list[UUID | None]:
+    ) -> Sequence[UUID | None]:
         return await adapter.bulk_lookup_user_resource_policy_names(names)
 
     @override
@@ -1781,7 +1781,7 @@ class TheOnlyTargetIsRefused(Then[APolicyAndACaller[Any], list[Any]]):
 
 
 @dataclass(frozen=True)
-class TheKnownNameHasAnId(Then[APolicyAndACaller[Any], list[UUID | None]]):
+class TheKnownNameHasAnId(Then[APolicyAndACaller[Any], Sequence[UUID | None]]):
     """있는 이름의 자리에 그 정책의 id 가, 없는 이름의 자리에 빈 값이 온다."""
 
     @override
@@ -1796,7 +1796,7 @@ class TheKnownNameHasAnId(Then[APolicyAndACaller[Any], list[UUID | None]]):
 
     @override
     def look(
-        self, laid: APolicyAndACaller[Any], answered: Answered[list[UUID | None]]
+        self, laid: APolicyAndACaller[Any], answered: Answered[Sequence[UUID | None]]
     ) -> list[Verdict]:
         found = answered.response
         if found is None:
