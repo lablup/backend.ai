@@ -6,6 +6,13 @@ Backend.AI Migration Guide
 * The migration should be done while the managers and agents are shut down.
 * This guide only describes additional steps to follow other than the code/package upgrades.
 
+# 26.9 to 26.10
+* The agent watcher and the manager no longer fall back to the token `insecure` when the etcd key `config/watcher/token` is not set.
+  - The agent watcher fails to start, and manager requests to the agent watcher fail with `WatcherTokenNotConfigured`.
+  - Set a random token before the upgrade: `./backend.ai mgr etcd put config/watcher/token "$(openssl rand -hex 32)"`.
+  - The agent watcher reads the token only at startup. Restart it after you change the token.
+  - The 26.9 and 26.4 patch releases that include this change require the same step.
+
 # 24.09 to 24.12
 * `endpoints.desired_session_count` is renamed to `endpoints.replicas`. External components locating the database column directly should be updated accordingly.
 * Etcd config `config/network/overlay` must be moved to `config/plugins/network/overlay`.

@@ -24,6 +24,7 @@ from ai.backend.agent.errors.watcher import (
     InvalidWatcherTokenError,
     VolumeMountFailedError,
     VolumeUnmountFailedError,
+    WatcherTokenNotConfiguredError,
 )
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
@@ -41,6 +42,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 shutdown_enabled = False
 
 _SECRET_KEY_WORDS = ("password", "passwd", "secret", "token")
+
+WATCHER_TOKEN_ETCD_KEY = "config/watcher/token"
 
 
 @web.middleware
@@ -327,10 +330,11 @@ async def watcher_server(
         ) as etcd:
             app["config_server"] = etcd
 
-            token = await etcd.get("config/watcher/token")
-            log.debug("watcher authentication token loaded", token_configured=token is not None)
-            if token is None:
-                token = "insecure"
+            token = await etcd.get(WATCHER_TOKEN_ETCD_KEY)
+            if not token:
+                log.error("watcher token not configured", etcd_key=WATCHER_TOKEN_ETCD_KEY)
+                raise WatcherTokenNotConfiguredError()
+            log.debug("watcher authentication token loaded")
             app["token"] = token
 
             app.middlewares.append(auth_middleware)
