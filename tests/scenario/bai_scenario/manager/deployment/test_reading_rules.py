@@ -54,9 +54,7 @@ class ReadingTheFirstRule(When[RulesOfADeploymentAndACaller, DeploymentAdapter, 
         )
 
     @override
-    async def call(
-        self, adapter: DeploymentAdapter, laid: RulesOfADeploymentAndACaller
-    ) -> Answer:
+    async def call(self, adapter: DeploymentAdapter, laid: RulesOfADeploymentAndACaller) -> Answer:
         with ActingAs(laid.caller):
             return await adapter.get_rule(laid.rules[0].id)
 
@@ -69,14 +67,10 @@ class TheRuleReadComesBack(Then[RulesOfADeploymentAndACaller, Answer]):
 
     @override
     def says(self) -> str:
-        return Says(
-            "읽은 규칙이 전체가 응답으로 옵니다", english="the whole rule read comes back"
-        )
+        return Says("읽은 규칙이 전체가 응답으로 옵니다", english="the whole rule read comes back")
 
     @override
-    def look(
-        self, laid: RulesOfADeploymentAndACaller, answered: Answered[Answer]
-    ) -> list[Verdict]:
+    def look(self, laid: RulesOfADeploymentAndACaller, answered: Answered[Answer]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]

@@ -37,9 +37,7 @@ from bai_scenario.seeds.deployment.auto_scaling_rule import TestSeedAutoScalingR
 
 LAID_METRIC = "cpu_util"
 
-RULE_ID = Says(
-    "미리 저장한 규칙의 id", english="the id of the rule seeded in advance"
-)
+RULE_ID = Says("미리 저장한 규칙의 id", english="the id of the rule seeded in advance")
 
 
 @dataclass(frozen=True)
@@ -59,7 +57,9 @@ class TheRuleNode:
                 node.deployment_id,
                 SameAs(
                     laid.model_deployment_id,
-                    Says("규칙이 걸린 배포의 id", english="the id of the deployment the rule scales"),
+                    Says(
+                        "규칙이 걸린 배포의 id", english="the id of the deployment the rule scales"
+                    ),
                 ),
             ),
             Same(f"{at}metric_source", node.metric_source, laid.metric_source.name),

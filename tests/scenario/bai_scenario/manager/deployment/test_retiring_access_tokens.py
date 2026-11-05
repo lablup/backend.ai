@@ -142,9 +142,7 @@ class ThePurgedTokenIdsComeBack(Then[TokensOfADeploymentAndACaller, BulkAnswer])
         verdicts: list[Verdict] = [Same("ids count", len(payload.ids), len(laid.tokens))]
         wanted: list[UUID] = [token.id for token in laid.tokens]
         for i, token_id in enumerate(payload.ids):
-            verdicts.append(
-                Held[UUID](f"ids[{i}]", token_id, SameAs(wanted[i], TOKEN_ID))
-            )
+            verdicts.append(Held[UUID](f"ids[{i}]", token_id, SameAs(wanted[i], TOKEN_ID)))
         return verdicts
 
 

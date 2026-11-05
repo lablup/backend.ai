@@ -46,9 +46,7 @@ type RuleStep = Scenario[
 
 
 @dataclass(frozen=True)
-class MakingARuleOfTheDeployment(
-    When[RulesOfADeploymentAndACaller, DeploymentAdapter, Answer]
-):
+class MakingARuleOfTheDeployment(When[RulesOfADeploymentAndACaller, DeploymentAdapter, Answer]):
     """심은 배포 하나의 id 와 규칙 값을 준다."""
 
     @override
@@ -63,9 +61,7 @@ class MakingARuleOfTheDeployment(
         )
 
     @override
-    async def call(
-        self, adapter: DeploymentAdapter, laid: RulesOfADeploymentAndACaller
-    ) -> Answer:
+    async def call(self, adapter: DeploymentAdapter, laid: RulesOfADeploymentAndACaller) -> Answer:
         with ActingAs(laid.caller):
             return await adapter.create_rule(
                 CreateAutoScalingRuleInput(
@@ -86,14 +82,10 @@ class TheMadeRuleComesBack(Then[RulesOfADeploymentAndACaller, Answer]):
 
     @override
     def says(self) -> str:
-        return Says(
-            "만든 규칙이 전체가 응답으로 옵니다", english="the whole rule made comes back"
-        )
+        return Says("만든 규칙이 전체가 응답으로 옵니다", english="the whole rule made comes back")
 
     @override
-    def look(
-        self, laid: RulesOfADeploymentAndACaller, answered: Answered[Answer]
-    ) -> list[Verdict]:
+    def look(self, laid: RulesOfADeploymentAndACaller, answered: Answered[Answer]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]
@@ -106,10 +98,12 @@ class TheMadeRuleComesBack(Then[RulesOfADeploymentAndACaller, Answer]):
                 node.deployment_id,
                 SameAs(
                     laid.deployment.id,
-                    Says("규칙이 걸린 배포의 id", english="the id of the deployment the rule scales"),
+                    Says(
+                        "규칙이 걸린 배포의 id", english="the id of the deployment the rule scales"
+                    ),
                 ),
             ),
-            Same("metric_source", node.metric_source, "kernel"),
+            Same("metric_source", node.metric_source, "KERNEL"),
             Same("metric_name", node.metric_name, "made-rule"),
             Same("min_threshold", node.min_threshold, None),
             Same("max_threshold", node.max_threshold, None),
@@ -136,8 +130,7 @@ class AUserGrantedDeploymentCreateMakesARule(
     @override
     def describe(self) -> str:
         return Says(
-            "배포 생성 권한을 받은 사용자가 배포에 자동 스케일링 규칙을 만들면, "
-            "만든 규칙이 옵니다",
+            "배포 생성 권한을 받은 사용자가 배포에 자동 스케일링 규칙을 만들면, 만든 규칙이 옵니다",
             english=(
                 "when a user granted deployment create makes an auto-scaling rule of the "
                 "deployment, the rule made comes back"

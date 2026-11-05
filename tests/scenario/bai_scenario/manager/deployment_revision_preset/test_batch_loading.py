@@ -56,8 +56,7 @@ class LoadingTheSeededPresets(When[PresetsAndACaller, DeploymentRevisionPresetAd
     @override
     def describe(self, laid: PresetsAndACaller) -> str:
         return Says(
-            f"{laid.caller.username} 이 심은 프리셋 {len(laid.presets)}개를 id 로 "
-            "일괄 조회합니다",
+            f"{laid.caller.username} 이 심은 프리셋 {len(laid.presets)}개를 id 로 일괄 조회합니다",
             english=(
                 f"{laid.caller.username} loads {len(laid.presets)} of the presets seeded "
                 "in advance by id in one call"
@@ -93,13 +92,9 @@ class ThePresetsComeBackInOrder(Then[PresetsAndACaller, Answer]):
         verdicts: list[Verdict] = [Same("length", len(loaded), len(laid.presets))]
         for i, (item, preset) in enumerate(zip(loaded, laid.presets, strict=False)):
             if isinstance(item, DeploymentRevisionPresetNode):
-                verdicts.extend(
-                    ThePresetNode(self.started).verdicts(item, preset, at=f"[{i}].")
-                )
+                verdicts.extend(ThePresetNode(self.started).verdicts(item, preset, at=f"[{i}]."))
             else:
-                verdicts.append(
-                    Same(f"[{i}]", type(item).__name__, "DeploymentRevisionPresetNode")
-                )
+                verdicts.append(Same(f"[{i}]", type(item).__name__, "DeploymentRevisionPresetNode"))
         return verdicts
 
 

@@ -98,9 +98,7 @@ class CreatingAPreset(When[AVariantAndACaller, DeploymentRevisionPresetAdapter, 
                     cluster_mode="single-node",
                     cluster_size=1,
                     replica_count=1,
-                    deployment_strategy=DeploymentStrategyInput(
-                        type=DeploymentStrategy.ROLLING
-                    ),
+                    deployment_strategy=DeploymentStrategyInput(type=DeploymentStrategy.ROLLING),
                 )
             )
 
@@ -149,8 +147,16 @@ class TheCreatedPresetComesBack(Then[AVariantAndACaller, Answer]):
             Same("preset.execution.startup_command", node.execution.startup_command, None),
             Same("preset.execution.bootstrap_script", node.execution.bootstrap_script, None),
             Same("preset.execution.environ", node.execution.environ, []),
-            Same("preset.deployment_defaults.open_to_public", node.deployment_defaults.open_to_public, None),
-            Same("preset.deployment_defaults.replica_count", node.deployment_defaults.replica_count, 1),
+            Same(
+                "preset.deployment_defaults.open_to_public",
+                node.deployment_defaults.open_to_public,
+                None,
+            ),
+            Same(
+                "preset.deployment_defaults.replica_count",
+                node.deployment_defaults.replica_count,
+                1,
+            ),
             Same(
                 "preset.deployment_defaults.revision_history_limit",
                 node.deployment_defaults.revision_history_limit,

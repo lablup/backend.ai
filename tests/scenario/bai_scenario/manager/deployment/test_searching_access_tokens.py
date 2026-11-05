@@ -59,9 +59,7 @@ class SearchingTheTokensOfTheDeployment(
         )
 
     @override
-    async def call(
-        self, adapter: DeploymentAdapter, laid: TokensOfADeploymentAndACaller
-    ) -> Answer:
+    async def call(self, adapter: DeploymentAdapter, laid: TokensOfADeploymentAndACaller) -> Answer:
         with ActingAs(laid.caller):
             return await adapter.search_access_tokens(
                 AccessTokenOperationScope(deployment_id=laid.deployment.id),

@@ -55,13 +55,9 @@ class LoadingTheSeededRoutes(When[ARoutedDeploymentAndACaller, DeploymentAdapter
         )
 
     @override
-    async def call(
-        self, adapter: DeploymentAdapter, laid: ARoutedDeploymentAndACaller
-    ) -> Answer:
+    async def call(self, adapter: DeploymentAdapter, laid: ARoutedDeploymentAndACaller) -> Answer:
         with ActingAs(laid.caller):
-            return await adapter.batch_load_routes_by_ids(
-                [route.id for route in laid.routes]
-            )
+            return await adapter.batch_load_routes_by_ids([route.id for route in laid.routes])
 
 
 @dataclass(frozen=True)
@@ -78,18 +74,16 @@ class TheRoutesComeBackInOrder(Then[ARoutedDeploymentAndACaller, Answer]):
         )
 
     @override
-    def look(
-        self, laid: ARoutedDeploymentAndACaller, answered: Answered[Answer]
-    ) -> list[Verdict]:
+    def look(self, laid: ARoutedDeploymentAndACaller, answered: Answered[Answer]) -> list[Verdict]:
         routes = answered.response
         if routes is None:
             return [Refused(NotEnoughPermission, answered.raised)]
         verdicts: list[Verdict] = []
         for i, entry in enumerate(routes):
             if isinstance(entry, RouteNode):
-                verdicts += TheRouteNode(
-                    self.started, revision_id=laid.revision_id
-                ).verdicts(entry, laid.routes[i], f"[{i}].")
+                verdicts += TheRouteNode(self.started, revision_id=laid.revision_id).verdicts(
+                    entry, laid.routes[i], f"[{i}]."
+                )
             else:
                 verdicts.append(Same(f"[{i}]", type(entry).__name__, "RouteNode"))
         return verdicts
@@ -107,9 +101,7 @@ class EveryEntryIsRefused(Then[ARoutedDeploymentAndACaller, Answer]):
         )
 
     @override
-    def look(
-        self, laid: ARoutedDeploymentAndACaller, answered: Answered[Answer]
-    ) -> list[Verdict]:
+    def look(self, laid: ARoutedDeploymentAndACaller, answered: Answered[Answer]) -> list[Verdict]:
         routes = answered.response
         if routes is None:
             return [Refused(NotEnoughPermission, answered.raised)]

@@ -80,7 +80,8 @@ class TheSeededPresetsComeBack(Then[PresetsAndACaller, Answer]):
     @override
     def says(self) -> str:
         return Says(
-            "심은 프리셋이 전체가 응답으로 옵니다", english="the presets seeded in advance come back"
+            "심은 프리셋이 전체가 응답으로 옵니다",
+            english="the presets seeded in advance come back",
         )
 
     @override
@@ -94,9 +95,7 @@ class TheSeededPresetsComeBack(Then[PresetsAndACaller, Answer]):
             Same("has_previous_page", page.has_previous_page, False),
         ]
         for i, (node, preset) in enumerate(zip(page.items, laid.presets, strict=False)):
-            verdicts.extend(
-                ThePresetNode(self.started).verdicts(node, preset, at=f"items[{i}].")
-            )
+            verdicts.extend(ThePresetNode(self.started).verdicts(node, preset, at=f"items[{i}]."))
         return verdicts
 
 

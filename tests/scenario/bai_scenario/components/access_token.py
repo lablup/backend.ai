@@ -37,9 +37,7 @@ from bai_scenario.components.deployment import lay_a_deployment, lay_a_place
 from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.seeds.deployment.access_token import TestSeedAccessTokenOf
 
-TOKEN_ID = Says(
-    "미리 저장한 토큰의 id", english="the id of the token seeded in advance"
-)
+TOKEN_ID = Says("미리 저장한 토큰의 id", english="the id of the token seeded in advance")
 
 
 @dataclass(frozen=True)

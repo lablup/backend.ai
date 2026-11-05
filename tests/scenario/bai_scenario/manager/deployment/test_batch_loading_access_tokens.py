@@ -56,13 +56,11 @@ class LoadingTheSeededTokens(When[TokensOfADeploymentAndACaller, DeploymentAdapt
         )
 
     @override
-    async def call(
-        self, adapter: DeploymentAdapter, laid: TokensOfADeploymentAndACaller
-    ) -> Answer:
+    async def call(self, adapter: DeploymentAdapter, laid: TokensOfADeploymentAndACaller) -> Answer:
         with ActingAs(laid.caller):
-            return await adapter.batch_load_access_tokens_by_ids(
-                [DeploymentTokenID(token.id) for token in laid.tokens]
-            )
+            return await adapter.batch_load_access_tokens_by_ids([
+                DeploymentTokenID(token.id) for token in laid.tokens
+            ])
 
 
 @dataclass(frozen=True)

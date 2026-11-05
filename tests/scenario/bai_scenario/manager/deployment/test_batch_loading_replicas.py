@@ -56,13 +56,11 @@ class LoadingTheSeededReplicas(When[ARoutedDeploymentAndACaller, DeploymentAdapt
         )
 
     @override
-    async def call(
-        self, adapter: DeploymentAdapter, laid: ARoutedDeploymentAndACaller
-    ) -> Answer:
+    async def call(self, adapter: DeploymentAdapter, laid: ARoutedDeploymentAndACaller) -> Answer:
         with ActingAs(laid.caller):
-            return await adapter.batch_load_replicas_by_ids(
-                [ReplicaID(route.id) for route in laid.routes]
-            )
+            return await adapter.batch_load_replicas_by_ids([
+                ReplicaID(route.id) for route in laid.routes
+            ])
 
 
 @dataclass(frozen=True)
@@ -79,18 +77,16 @@ class TheReplicasComeBackInOrder(Then[ARoutedDeploymentAndACaller, Answer]):
         )
 
     @override
-    def look(
-        self, laid: ARoutedDeploymentAndACaller, answered: Answered[Answer]
-    ) -> list[Verdict]:
+    def look(self, laid: ARoutedDeploymentAndACaller, answered: Answered[Answer]) -> list[Verdict]:
         replicas = answered.response
         if replicas is None:
             return [Refused(NotEnoughPermission, answered.raised)]
         verdicts: list[Verdict] = []
         for i, entry in enumerate(replicas):
             if isinstance(entry, ReplicaNode):
-                verdicts += TheReplicaNode(
-                    self.started, revision_id=laid.revision_id
-                ).verdicts(entry, laid.routes[i], f"[{i}].")
+                verdicts += TheReplicaNode(self.started, revision_id=laid.revision_id).verdicts(
+                    entry, laid.routes[i], f"[{i}]."
+                )
             else:
                 verdicts.append(Same(f"[{i}]", type(entry).__name__, "ReplicaNode"))
         return verdicts
@@ -108,9 +104,7 @@ class EveryEntryIsRefused(Then[ARoutedDeploymentAndACaller, Answer]):
         )
 
     @override
-    def look(
-        self, laid: ARoutedDeploymentAndACaller, answered: Answered[Answer]
-    ) -> list[Verdict]:
+    def look(self, laid: ARoutedDeploymentAndACaller, answered: Answered[Answer]) -> list[Verdict]:
         replicas = answered.response
         if replicas is None:
             return [Refused(NotEnoughPermission, answered.raised)]

@@ -15,9 +15,7 @@ from bai_scenario.seeds.seeder import TestSeedFieldUpserter
 
 
 @dataclass(frozen=True)
-class TestSeedDeploymentPolicyOf(
-    TestSeedFieldUpserter[DeploymentInfo, DeploymentPolicyData]
-):
+class TestSeedDeploymentPolicyOf(TestSeedFieldUpserter[DeploymentInfo, DeploymentPolicyData]):
     """A rolling-update policy with a surge of one replica and nothing unavailable."""
 
     @override

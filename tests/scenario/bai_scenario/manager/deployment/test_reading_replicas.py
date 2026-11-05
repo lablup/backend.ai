@@ -56,9 +56,7 @@ class ReadingTheReplicaOfTheDeployment(
         )
 
     @override
-    async def call(
-        self, adapter: DeploymentAdapter, laid: ARoutedDeploymentAndACaller
-    ) -> Answer:
+    async def call(self, adapter: DeploymentAdapter, laid: ARoutedDeploymentAndACaller) -> Answer:
         with ActingAs(laid.caller):
             return await adapter.get_replica(laid.routes[0].id)
 
@@ -77,9 +75,7 @@ class TheReplicaComesBack(Then[ARoutedDeploymentAndACaller, Answer]):
         )
 
     @override
-    def look(
-        self, laid: ARoutedDeploymentAndACaller, answered: Answered[Answer]
-    ) -> list[Verdict]:
+    def look(self, laid: ARoutedDeploymentAndACaller, answered: Answered[Answer]) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [MissingResponse(answered.raised)]

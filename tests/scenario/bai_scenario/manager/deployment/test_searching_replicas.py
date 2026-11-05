@@ -56,15 +56,12 @@ class SearchingTheReplicasOfTheDeployment(
         return Says(
             f"{laid.caller.username} 이 {laid.deployment.metadata.name}의 복제본을 조회합니다",
             english=(
-                f"{laid.caller.username} searches the replicas of "
-                f"{laid.deployment.metadata.name}"
+                f"{laid.caller.username} searches the replicas of {laid.deployment.metadata.name}"
             ),
         )
 
     @override
-    async def call(
-        self, adapter: DeploymentAdapter, laid: ARoutedDeploymentAndACaller
-    ) -> Answer:
+    async def call(self, adapter: DeploymentAdapter, laid: ARoutedDeploymentAndACaller) -> Answer:
         with ActingAs(laid.caller):
             return await adapter.search_replicas(
                 ReplicaOperationScope(deployment_id=laid.deployment.id), SearchReplicasInput()
@@ -85,9 +82,7 @@ class TheReplicaPageComesBack(Then[ARoutedDeploymentAndACaller, Answer]):
         )
 
     @override
-    def look(
-        self, laid: ARoutedDeploymentAndACaller, answered: Answered[Answer]
-    ) -> list[Verdict]:
+    def look(self, laid: ARoutedDeploymentAndACaller, answered: Answered[Answer]) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [MissingResponse(answered.raised)]
@@ -97,9 +92,9 @@ class TheReplicaPageComesBack(Then[ARoutedDeploymentAndACaller, Answer]):
             Same("has_previous_page", page.has_previous_page, False),
         ]
         for i, node in enumerate(page.items):
-            verdicts += TheReplicaNode(
-                self.started, revision_id=laid.revision_id
-            ).verdicts(node, laid.routes[i], f"items[{i}].")
+            verdicts += TheReplicaNode(self.started, revision_id=laid.revision_id).verdicts(
+                node, laid.routes[i], f"items[{i}]."
+            )
         return verdicts
 
 

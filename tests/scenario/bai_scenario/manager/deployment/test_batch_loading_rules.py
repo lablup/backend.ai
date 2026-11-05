@@ -55,13 +55,11 @@ class LoadingTheSeededRules(When[RulesOfADeploymentAndACaller, DeploymentAdapter
         )
 
     @override
-    async def call(
-        self, adapter: DeploymentAdapter, laid: RulesOfADeploymentAndACaller
-    ) -> Answer:
+    async def call(self, adapter: DeploymentAdapter, laid: RulesOfADeploymentAndACaller) -> Answer:
         with ActingAs(laid.caller):
-            return await adapter.batch_load_auto_scaling_rules_by_ids(
-                [rule.id for rule in laid.rules]
-            )
+            return await adapter.batch_load_auto_scaling_rules_by_ids([
+                rule.id for rule in laid.rules
+            ])
 
 
 @dataclass(frozen=True)
@@ -78,9 +76,7 @@ class TheRulesComeBackInOrder(Then[RulesOfADeploymentAndACaller, Answer]):
         )
 
     @override
-    def look(
-        self, laid: RulesOfADeploymentAndACaller, answered: Answered[Answer]
-    ) -> list[Verdict]:
+    def look(self, laid: RulesOfADeploymentAndACaller, answered: Answered[Answer]) -> list[Verdict]:
         rules = answered.response
         if rules is None:
             return [Refused(NotEnoughPermission, answered.raised)]
@@ -105,9 +101,7 @@ class EveryEntryIsRefused(Then[RulesOfADeploymentAndACaller, Answer]):
         )
 
     @override
-    def look(
-        self, laid: RulesOfADeploymentAndACaller, answered: Answered[Answer]
-    ) -> list[Verdict]:
+    def look(self, laid: RulesOfADeploymentAndACaller, answered: Answered[Answer]) -> list[Verdict]:
         rules = answered.response
         if rules is None:
             return [Refused(NotEnoughPermission, answered.raised)]

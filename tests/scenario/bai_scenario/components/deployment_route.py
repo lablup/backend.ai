@@ -43,12 +43,8 @@ from bai_scenario.seeds.session_group.session_group import (
     TestSeedPrimaryReplicaGroupOf,
 )
 
-ROUTE_ID = Says(
-    "미리 저장한 라우트의 id", english="the id of the route seeded in advance"
-)
-REVISION_ID = Says(
-    "미리 저장한 리비전의 id", english="the id of the revision seeded in advance"
-)
+ROUTE_ID = Says("미리 저장한 라우트의 id", english="the id of the route seeded in advance")
+REVISION_ID = Says("미리 저장한 리비전의 id", english="the id of the revision seeded in advance")
 
 
 @dataclass(frozen=True)
@@ -145,7 +141,10 @@ class TheRouteNode:
                 node.deployment_id,
                 SameAs(
                     laid.endpoint,
-                    Says("라우트가 받쳐주는 배포의 id", english="the id of the deployment the route serves"),
+                    Says(
+                        "라우트가 받쳐주는 배포의 id",
+                        english="the id of the deployment the route serves",
+                    ),
                 ),
             ),
             Same(f"{at}session_id", node.session_id, None),
@@ -187,7 +186,10 @@ class TheReplicaNode:
                 node.deployment_id,
                 SameAs(
                     laid.endpoint,
-                    Says("복제본이 받쳐주는 배포의 id", english="the id of the deployment the replica serves"),
+                    Says(
+                        "복제본이 받쳐주는 배포의 id",
+                        english="the id of the deployment the replica serves",
+                    ),
                 ),
             ),
             Held[UUID](f"{at}revision_id", node.revision_id, SameAs(self.revision_id, REVISION_ID)),

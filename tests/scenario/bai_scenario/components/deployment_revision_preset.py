@@ -177,19 +177,25 @@ class ThePresetNode:
 
     started: datetime
     described: str | None = None
-    updated_at: Condition[datetime] | None = None
+    updated_at: Condition[Any] | None = None
 
     def verdicts(
         self, node: DeploymentRevisionPresetNode, laid: DeploymentRevisionPresetData, at: str = ""
     ) -> list[Verdict]:
         described = self.described if self.described is not None else laid.description
         updated_at = (
-            self.updated_at if self.updated_at is not None else SameAs(laid.updated_at, PRESET_CREATED_AT)
+            self.updated_at
+            if self.updated_at is not None
+            else SameAs(laid.updated_at, PRESET_CREATED_AT)
         )
         return [
             Held[UUID](f"{at}id", node.id, SameAs(laid.id, PRESET_ID)),
             Held[UUID](f"{at}entity_id", node.entity_id, SameAs(laid.id, PRESET_ID)),
-            Held(f"{at}runtime_variant_id", node.runtime_variant_id, SameAs(laid.runtime_variant_id, VARIANT_ID)),
+            Held(
+                f"{at}runtime_variant_id",
+                node.runtime_variant_id,
+                SameAs(laid.runtime_variant_id, VARIANT_ID),
+            ),
             Same(f"{at}name", node.name, laid.name),
             Same(f"{at}description", node.description, described),
             Same(f"{at}rank", node.rank, laid.rank),
@@ -201,8 +207,16 @@ class ThePresetNode:
                 node.execution.image_id,
                 TheImageIdThePresetKept(image_id=laid.image_id),
             ),
-            Same(f"{at}execution.startup_command", node.execution.startup_command, laid.startup_command),
-            Same(f"{at}execution.bootstrap_script", node.execution.bootstrap_script, laid.bootstrap_script),
+            Same(
+                f"{at}execution.startup_command",
+                node.execution.startup_command,
+                laid.startup_command,
+            ),
+            Same(
+                f"{at}execution.bootstrap_script",
+                node.execution.bootstrap_script,
+                laid.bootstrap_script,
+            ),
             Same(f"{at}execution.environ", node.execution.environ, laid.environ),
             Same(
                 f"{at}deployment_defaults.open_to_public",

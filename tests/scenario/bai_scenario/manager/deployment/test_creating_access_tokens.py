@@ -38,9 +38,7 @@ type TokenStep = Scenario[
 
 
 @dataclass(frozen=True)
-class MakingATokenOfTheDeployment(
-    When[TokensOfADeploymentAndACaller, DeploymentAdapter, Answer]
-):
+class MakingATokenOfTheDeployment(When[TokensOfADeploymentAndACaller, DeploymentAdapter, Answer]):
     """심은 배포의 id 와 만기 시각만 준다."""
 
     @override
@@ -55,9 +53,7 @@ class MakingATokenOfTheDeployment(
         )
 
     @override
-    async def call(
-        self, adapter: DeploymentAdapter, laid: TokensOfADeploymentAndACaller
-    ) -> Answer:
+    async def call(self, adapter: DeploymentAdapter, laid: TokensOfADeploymentAndACaller) -> Answer:
         with ActingAs(laid.caller):
             return await adapter.create_access_token(
                 CreateAccessTokenInput(

@@ -54,9 +54,7 @@ class ReadingTheFirstToken(When[TokensOfADeploymentAndACaller, DeploymentAdapter
         )
 
     @override
-    async def call(
-        self, adapter: DeploymentAdapter, laid: TokensOfADeploymentAndACaller
-    ) -> Answer:
+    async def call(self, adapter: DeploymentAdapter, laid: TokensOfADeploymentAndACaller) -> Answer:
         with ActingAs(laid.caller):
             return await adapter.get_access_token(laid.tokens[0].id)
 
@@ -69,9 +67,7 @@ class TheTokenReadComesBack(Then[TokensOfADeploymentAndACaller, Answer]):
 
     @override
     def says(self) -> str:
-        return Says(
-            "읽은 토큰이 옵니다", english="the token read comes back"
-        )
+        return Says("읽은 토큰이 옵니다", english="the token read comes back")
 
     @override
     def look(

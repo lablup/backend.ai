@@ -56,9 +56,7 @@ class SearchingEveryReplica(When[ARoutedDeploymentAndACaller, DeploymentAdapter,
         )
 
     @override
-    async def call(
-        self, adapter: DeploymentAdapter, laid: ARoutedDeploymentAndACaller
-    ) -> Answer:
+    async def call(self, adapter: DeploymentAdapter, laid: ARoutedDeploymentAndACaller) -> Answer:
         with ActingAs(laid.caller):
             return await adapter.admin_search_replicas(SearchReplicasInput())
 
@@ -77,9 +75,7 @@ class TheReplicaPageComesBack(Then[ARoutedDeploymentAndACaller, Answer]):
         )
 
     @override
-    def look(
-        self, laid: ARoutedDeploymentAndACaller, answered: Answered[Answer]
-    ) -> list[Verdict]:
+    def look(self, laid: ARoutedDeploymentAndACaller, answered: Answered[Answer]) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [MissingResponse(answered.raised)]
@@ -89,9 +85,9 @@ class TheReplicaPageComesBack(Then[ARoutedDeploymentAndACaller, Answer]):
             Same("has_previous_page", page.has_previous_page, False),
         ]
         for i, node in enumerate(page.items):
-            verdicts += TheReplicaNode(
-                self.started, revision_id=laid.revision_id
-            ).verdicts(node, laid.routes[i], f"items[{i}].")
+            verdicts += TheReplicaNode(self.started, revision_id=laid.revision_id).verdicts(
+                node, laid.routes[i], f"items[{i}]."
+            )
         return verdicts
 
 

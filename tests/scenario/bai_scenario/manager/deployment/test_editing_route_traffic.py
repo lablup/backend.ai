@@ -40,9 +40,7 @@ type RouteStep = Scenario[
 
 
 @dataclass(frozen=True)
-class OpeningTheTrafficOfTheRoute(
-    When[ARoutedDeploymentAndACaller, DeploymentAdapter, Answer]
-):
+class OpeningTheTrafficOfTheRoute(When[ARoutedDeploymentAndACaller, DeploymentAdapter, Answer]):
     """심은 라우트 하나의 id 와 트래픽 상태를 준다."""
 
     @override
@@ -61,13 +59,9 @@ class OpeningTheTrafficOfTheRoute(
         )
 
     @override
-    async def call(
-        self, adapter: DeploymentAdapter, laid: ARoutedDeploymentAndACaller
-    ) -> Answer:
+    async def call(self, adapter: DeploymentAdapter, laid: ARoutedDeploymentAndACaller) -> Answer:
         with ActingAs(laid.caller):
-            return await adapter.update_route_traffic(
-                laid.routes[0].id, RouteTrafficStatus.ACTIVE
-            )
+            return await adapter.update_route_traffic(laid.routes[0].id, RouteTrafficStatus.ACTIVE)
 
 
 @dataclass(frozen=True)
@@ -84,9 +78,7 @@ class TheRouteWithTrafficOpenComesBack(Then[ARoutedDeploymentAndACaller, Answer]
         )
 
     @override
-    def look(
-        self, laid: ARoutedDeploymentAndACaller, answered: Answered[Answer]
-    ) -> list[Verdict]:
+    def look(self, laid: ARoutedDeploymentAndACaller, answered: Answered[Answer]) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [MissingResponse(answered.raised)]

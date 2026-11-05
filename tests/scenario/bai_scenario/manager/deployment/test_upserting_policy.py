@@ -39,15 +39,11 @@ from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Answer = UpsertDeploymentPolicyPayload
-type PolicyStep = Scenario[
-    TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, Answer
-]
+type PolicyStep = Scenario[TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, Answer]
 
 
 @dataclass(frozen=True)
-class UpsertingThePolicyOfTheDeployment(
-    When[ADeploymentAndACaller, DeploymentAdapter, Answer]
-):
+class UpsertingThePolicyOfTheDeployment(When[ADeploymentAndACaller, DeploymentAdapter, Answer]):
     """심은 배포 하나의 id 와 정책 값을 준다."""
 
     @override
@@ -62,9 +58,7 @@ class UpsertingThePolicyOfTheDeployment(
         )
 
     @override
-    async def call(
-        self, adapter: DeploymentAdapter, laid: ADeploymentAndACaller
-    ) -> Answer:
+    async def call(self, adapter: DeploymentAdapter, laid: ADeploymentAndACaller) -> Answer:
         with ActingAs(laid.caller):
             return await adapter.upsert_policy(
                 UpsertDeploymentPolicyInput(
@@ -88,9 +82,7 @@ class ThePolicyPutComesBack(Then[ADeploymentAndACaller, Answer]):
         )
 
     @override
-    def look(
-        self, laid: ADeploymentAndACaller, answered: Answered[Answer]
-    ) -> list[Verdict]:
+    def look(self, laid: ADeploymentAndACaller, answered: Answered[Answer]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]
@@ -104,7 +96,10 @@ class ThePolicyPutComesBack(Then[ADeploymentAndACaller, Answer]):
                 node.deployment_id,
                 SameAs(
                     laid.deployment.id,
-                    Says("정책을 올린 배포의 id", english="the id of the deployment the policy was put on"),
+                    Says(
+                        "정책을 올린 배포의 id",
+                        english="the id of the deployment the policy was put on",
+                    ),
                 ),
             ),
             Same("strategy_spec.strategy", spec.strategy, DeploymentStrategy.ROLLING),

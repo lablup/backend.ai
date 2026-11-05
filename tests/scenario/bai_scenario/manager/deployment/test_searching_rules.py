@@ -59,9 +59,7 @@ class SearchingTheRulesOfTheDeployment(
         )
 
     @override
-    async def call(
-        self, adapter: DeploymentAdapter, laid: RulesOfADeploymentAndACaller
-    ) -> Answer:
+    async def call(self, adapter: DeploymentAdapter, laid: RulesOfADeploymentAndACaller) -> Answer:
         with ActingAs(laid.caller):
             return await adapter.search_rules(
                 AutoScalingRuleOperationScope(deployment_id=laid.deployment.id),
@@ -83,9 +81,7 @@ class TheRulePageComesBack(Then[RulesOfADeploymentAndACaller, Answer]):
         )
 
     @override
-    def look(
-        self, laid: RulesOfADeploymentAndACaller, answered: Answered[Answer]
-    ) -> list[Verdict]:
+    def look(self, laid: RulesOfADeploymentAndACaller, answered: Answered[Answer]) -> list[Verdict]:
         page = answered.response
         if page is None:
             return [MissingResponse(answered.raised)]

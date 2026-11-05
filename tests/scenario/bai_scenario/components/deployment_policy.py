@@ -33,12 +33,8 @@ from bai_scenario.components.deployment import lay_a_deployment, lay_a_place
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.seeds.deployment.policy import TestSeedDeploymentPolicyOf
 
-POLICY_ID = Says(
-    "미리 저장한 정책의 id", english="the id of the policy seeded in advance"
-)
-STRATEGY = Says(
-    "미리 저장한 정책의 전략", english="the strategy of the policy seeded in advance"
-)
+POLICY_ID = Says("미리 저장한 정책의 id", english="the id of the policy seeded in advance")
+STRATEGY = Says("미리 저장한 정책의 전략", english="the strategy of the policy seeded in advance")
 
 
 @dataclass(frozen=True)
@@ -47,7 +43,8 @@ class ThePolicyNode:
 
     started: datetime
 
-    def verdicts(        self, node: DeploymentPolicyNode, laid: DeploymentPolicyData, at: str = ""
+    def verdicts(
+        self, node: DeploymentPolicyNode, laid: DeploymentPolicyData, at: str = ""
     ) -> list[Verdict]:
         spec = node.strategy_spec
         spec_verdicts: list[Verdict] = [
@@ -85,7 +82,9 @@ class ThePolicyNode:
                 node.deployment_id,
                 SameAs(
                     laid.endpoint,
-                    Says("정책이 걸린 배포의 id", english="the id of the deployment the policy sets"),
+                    Says(
+                        "정책이 걸린 배포의 id", english="the id of the deployment the policy sets"
+                    ),
                 ),
             ),
             *spec_verdicts,

@@ -302,7 +302,8 @@ async def allowed_project_count(engine: ExtendedAsyncSAEngine) -> int:
 async def default_link_count(engine: ExtendedAsyncSAEngine) -> int:
     async with engine.begin_readonly_session() as session:
         query = (
-            sa.select(sa.func.count())
+            sa
+            .select(sa.func.count())
             .select_from(AssociationContainerRegistriesGroupsRow)
             .where(AssociationContainerRegistriesGroupsRow.is_default.is_(True))
         )

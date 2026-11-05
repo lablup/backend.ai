@@ -56,9 +56,7 @@ class PurgingTheFirstRule(When[RulesOfADeploymentAndACaller, DeploymentAdapter, 
         )
 
     @override
-    async def call(
-        self, adapter: DeploymentAdapter, laid: RulesOfADeploymentAndACaller
-    ) -> Answer:
+    async def call(self, adapter: DeploymentAdapter, laid: RulesOfADeploymentAndACaller) -> Answer:
         with ActingAs(laid.caller):
             return await adapter.purge_rule(laid.rules[0].id)
 
@@ -75,9 +73,7 @@ class TheRuleIsGone(Then[RulesOfADeploymentAndACaller, Answer]):
         )
 
     @override
-    def look(
-        self, laid: RulesOfADeploymentAndACaller, answered: Answered[Answer]
-    ) -> list[Verdict]:
+    def look(self, laid: RulesOfADeploymentAndACaller, answered: Answered[Answer]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]
