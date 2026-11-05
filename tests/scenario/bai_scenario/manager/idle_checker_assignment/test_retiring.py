@@ -151,16 +151,16 @@ class APurgeCarryingNoUserIsRefused(
 ):
     @override
     def summary(self) -> str:
-        return "an-assignment-purge-carrying-no-user-is-refused"
+        return "an-assignment-purge-by-a-user-granted-nothing-is-refused"
 
     @override
     def describe(self) -> str:
         return Says(
-            "할당 둘이 있고 사용자 컨텍스트 없이 하나를 purge 하려 하면, 대상을 찾을 수 없다는 "
-            "이유로 거부됩니다",
+            "할당 둘이 있고 아무 권한도 받지 않은 사용자가 하나를 purge 하려 하면, 대상을 찾을 "
+            "수 없다는 이유로 거부됩니다",
             english=(
-                "when two assignments exist and one is purged without a user context, "
-                "it is rejected because the target cannot be resolved"
+                "when two assignments exist and a user granted nothing tries to purge one, it is "
+                "rejected because the target cannot be resolved"
             ),
         )
 

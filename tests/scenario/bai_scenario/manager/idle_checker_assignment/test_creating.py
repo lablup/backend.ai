@@ -191,16 +191,16 @@ class AnAssignmentCreatedWithoutAUserIsRefused(
 ):
     @override
     def summary(self) -> str:
-        return "an-assignment-created-without-a-user-is-refused"
+        return "an-assignment-created-by-a-user-granted-nothing-is-refused"
 
     @override
     def describe(self) -> str:
         return Says(
-            "검사기와 도메인이 있고 사용자 컨텍스트 없이 검사기를 도메인에 켜려 하면, "
-            "권한 부족으로 거부됩니다",
+            "검사기와 도메인이 있고 아무 권한도 받지 않은 사용자가 검사기를 도메인에 켜려 "
+            "하면, 권한 부족으로 거부됩니다",
             english=(
-                "when a checker and a domain exist and the checker is enabled on the domain "
-                "without a user context, it is rejected for lack of permission"
+                "when a checker and a domain exist and a user granted nothing enables the "
+                "checker on the domain, it is rejected for lack of permission"
             ),
         )
 

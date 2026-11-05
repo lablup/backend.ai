@@ -119,15 +119,16 @@ class AScopedSearchCarryingNoUserIsRefused(
 ):
     @override
     def summary(self) -> str:
-        return "a-scoped-assignment-search-carrying-no-user-is-refused"
+        return "a-scoped-assignment-search-by-a-user-granted-nothing-is-refused"
 
     @override
     def describe(self) -> str:
         return Says(
-            "할당 둘이 있고 사용자 컨텍스트 없이 스코프 검색하면, 권한 부족으로 거부됩니다",
+            "할당 둘이 있고 아무 권한도 받지 않은 사용자가 스코프 검색하면, 권한 부족으로 "
+            "거부됩니다",
             english=(
-                "when two assignments exist and they are searched with a scope without a user "
-                "context, it is rejected for lack of permission"
+                "when two assignments exist and a user granted nothing searches with a scope, it "
+                "is rejected for lack of permission"
             ),
         )
 
