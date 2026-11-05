@@ -47,6 +47,7 @@ from ai.backend.manager.models.specs.creator import (
     GlobalEntityCreator,
     GuardedEntityCreator,
     NestedFieldCreator,
+    NestedFieldToCreate,
     RoleManagedEntityCreator,
     RoleManagedGlobalEntityCreator,
 )
@@ -270,6 +271,26 @@ class TestSeedDanglingFieldUpserter[A, D: FieldData](TestSeedField[A, D]):
     @override
     async def write(self, ops: TestSeedOps, owner_id: Any) -> D:
         return await ops.upsert_dangling_field(self.seed(owner_id))
+
+
+class TestSeedNestedFieldCreator[A, D: FieldData](TestSeedField[A, D]):
+    """A field row another field row owns, such as a kernel group's environ rows.
+
+    The manager writes these under the owner's settled id with
+    ``atomic_create_nested_fields``; laying one takes that same write.
+    """
+
+    @abstractmethod
+    def seed(self) -> NestedFieldCreator[Any, Any, D]:
+        raise NotImplementedError
+
+    @override
+    async def write(self, ops: TestSeedOps, owner_id: Any) -> D:
+        return (
+            await ops.atomic_create_nested_fields([
+                NestedFieldToCreate(owner_id=owner_id, creator=self.seed())
+            ])
+        )[0]
 
 
 class TestSeedLink[S, T](ABC):
