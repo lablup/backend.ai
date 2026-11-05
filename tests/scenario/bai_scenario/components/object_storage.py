@@ -33,6 +33,7 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     in_language,
 )
+from bai_scenario.components.answers import TheFailedItemIsRefused
 from bai_scenario.components.domain import Mentions
 from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
 from bai_scenario.seeds.object_storage.object_storage import TestSeedObjectStorage
@@ -271,6 +272,6 @@ class NothingIsProcessed(Then[ManyStoragesAndACaller, PartialBulkPayload[ObjectS
                         ),
                     ),
                 ),
-                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+                TheFailedItemIsRefused(f"failed[{i}]", failure.message, self.reason),
             ]
         return verdicts

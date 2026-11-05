@@ -1,0 +1,380 @@
+"""What a storage namespace scenario table says besides the call.
+
+A namespace is registered under an object storage and reached afterwards by the pair
+of that storage and its name. A table needs the caller and the rows the call names.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Any, override
+from uuid import UUID
+
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.storage_namespace.response import (
+    AdminSearchStorageNamespacesPayload,
+    StorageNamespaceNode,
+    UnregisterStorageNamespacePayload,
+)
+from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
+from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.testutils.scenario_steps import (
+    Answered,
+    Given,
+    Held,
+    Language,
+    Refused,
+    Same,
+    SameAs,
+    Says,
+    Then,
+    Verdict,
+    in_language,
+)
+from bai_scenario.components.answers import MissingResponse
+from bai_scenario.components.system import lay_a_caller, role_named
+from bai_scenario.seeds.object_storage.object_storage import TestSeedObjectStorage
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
+from bai_scenario.seeds.storage_namespace.storage_namespace import (
+    SEEDED_NAMESPACE,
+    TestSeedStorageNamespace,
+)
+
+
+@dataclass(frozen=True)
+class AStorageAndACaller:
+    """object storage 하나와, 그것에 네임스페이스를 등록할 사용자."""
+
+    storage: ObjectStorageData
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class ANamespaceAndACaller:
+    """등록된 네임스페이스 하나와, 그것을 부를 사용자."""
+
+    namespace: StorageNamespaceData
+    storage: ObjectStorageData
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class ManyNamespacesAndACaller:
+    """등록된 네임스페이스 둘과, 그것들을 한 번에 부를 사용자."""
+
+    laid: tuple[StorageNamespaceData, ...]
+    storage: ObjectStorageData
+    caller: UserData
+
+
+def lay_namespaces(
+    seed: TestSeeder, storage: Laid[ObjectStorageData]
+) -> list[Laid[StorageNamespaceData]]:
+    """Two namespaces on one storage, the premise of every list and search row."""
+    return [
+        seed.creating_from(TestSeedStorageNamespace(namespace=SEEDED_NAMESPACE), storage),
+        seed.creating_from(TestSeedStorageNamespace(namespace="second-bucket"), storage),
+    ]
+
+
+@dataclass(frozen=True)
+class AStorageAndSomeone(Given[Any, AStorageAndACaller]):
+    """object storage 하나와 사용자 한 명."""
+
+    role: UserRole = UserRole.USER
+
+    @override
+    def describe(self) -> str:
+        who = role_named(self.role)
+        return Says(
+            f"object storage 하나와, {who} 한 명",
+            english=f"one object storage and one {in_language(who, Language.ENGLISH)}",
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> AStorageAndACaller:
+        storage = await seeding.creating(TestSeedObjectStorage())
+        caller = await lay_a_caller(seeding, self.role)
+        return AStorageAndACaller(seeding.made(storage), seeding.made(caller))
+
+
+@dataclass(frozen=True)
+class ANamespaceAndSomeone(Given[Any, ANamespaceAndACaller]):
+    """한 object storage 아래 등록된 네임스페이스 하나와 사용자 한 명."""
+
+    role: UserRole = UserRole.USER
+
+    @override
+    def describe(self) -> str:
+        who = role_named(self.role)
+        return Says(
+            f"object storage 하나와 그 아래 등록된 네임스페이스 하나, {who} 한 명",
+            english=(
+                "one object storage with one namespace registered on it and one "
+                f"{in_language(who, Language.ENGLISH)}"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> ANamespaceAndACaller:
+        storage = await seeding.creating(TestSeedObjectStorage())
+        namespace = await seeding.creating_from(TestSeedStorageNamespace(), storage)
+        caller = await lay_a_caller(seeding, self.role)
+        return ANamespaceAndACaller(
+            seeding.made(namespace), seeding.made(storage), seeding.made(caller)
+        )
+
+
+@dataclass(frozen=True)
+class ManyNamespacesOnAStorage(TestSeedNest[list[Laid[StorageNamespaceData]]]):
+    """한 object storage 아래 네임스페이스 둘."""
+
+    storage: Laid[ObjectStorageData]
+
+    @override
+    def kind(self) -> str:
+        return Says(
+            "네임스페이스 둘을 등록한 object storage 준비",
+            english="Prepare an object storage with two namespaces registered",
+        )
+
+    @override
+    def lay(self, seed: TestSeeder) -> list[Laid[StorageNamespaceData]]:
+        return lay_namespaces(seed, self.storage)
+
+
+@dataclass(frozen=True)
+class ManyNamespacesAndSomeone(Given[Any, ManyNamespacesAndACaller]):
+    """object storage 하나와 그 아래 네임스페이스 둘, 사용자 한 명."""
+
+    role: UserRole = UserRole.USER
+
+    @override
+    def describe(self) -> str:
+        who = role_named(self.role)
+        return Says(
+            f"object storage 하나와 그 아래 등록된 네임스페이스 둘, {who} 한 명",
+            english=(
+                "one object storage with two namespaces registered on it and one "
+                f"{in_language(who, Language.ENGLISH)}"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> ManyNamespacesAndACaller:
+        storage = await seeding.creating(TestSeedObjectStorage())
+        namespaces = await seeding.within(ManyNamespacesOnAStorage(storage))
+        caller = await lay_a_caller(seeding, self.role)
+        return ManyNamespacesAndACaller(
+            laid=tuple(seeding.made(one) for one in namespaces),
+            storage=seeding.made(storage),
+            caller=seeding.made(caller),
+        )
+
+
+def namespace_verdicts(
+    at: str, node: StorageNamespaceNode, namespace: StorageNamespaceData
+) -> list[Verdict]:
+    """Every place of one namespace node, prefixed for a node inside a list."""
+    seeded = Says("미리 저장한 네임스페이스", english="the namespace seeded in advance")
+    return [
+        Held[UUID](f"{at}id", node.id, SameAs[UUID](namespace.id, seeded)),
+        Held[UUID](f"{at}entity_id", node.entity_id, SameAs[UUID](namespace.id, seeded)),
+        Held[UUID](
+            f"{at}storage_id",
+            node.storage_id,
+            SameAs[UUID](
+                namespace.storage_id,
+                Says(
+                    "그 네임스페이스가 등록된 object storage 의 id",
+                    english="the id of the object storage it is registered on",
+                ),
+            ),
+        ),
+        Same(f"{at}namespace", node.namespace, namespace.namespace),
+    ]
+
+
+@dataclass(frozen=True)
+class TheNamespaceNode(Then[ANamespaceAndACaller, StorageNamespaceNode]):
+    @override
+    def says(self) -> str:
+        return Says(
+            "미리 저장한 네임스페이스 전체가 반환됩니다",
+            english="the whole namespace seeded in advance comes back",
+        )
+
+    @override
+    def look(
+        self, laid: ANamespaceAndACaller, answered: Answered[StorageNamespaceNode]
+    ) -> list[Verdict]:
+        node = answered.response
+        if node is None:
+            return [MissingResponse(answered.raised)]
+        return namespace_verdicts("", node, laid.namespace)
+
+
+@dataclass(frozen=True)
+class TheUnregisteredStorageId(Then[ANamespaceAndACaller, UnregisterStorageNamespacePayload]):
+    @override
+    def says(self) -> str:
+        return Says(
+            "네임스페이스를 빼낸 object storage 의 id 가 반환됩니다",
+            english="the id of the object storage the namespace left comes back",
+        )
+
+    @override
+    def look(
+        self, laid: ANamespaceAndACaller, answered: Answered[UnregisterStorageNamespacePayload]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [MissingResponse(answered.raised)]
+        return [
+            Held[UUID](
+                "id",
+                payload.id,
+                SameAs[UUID](
+                    laid.storage.id,
+                    Says(
+                        "미리 저장한 object storage",
+                        english="the object storage seeded in advance",
+                    ),
+                ),
+            )
+        ]
+
+
+def the_namespaces(
+    got: Sequence[StorageNamespaceNode], laid: ManyNamespacesAndACaller
+) -> list[Verdict]:
+    wanted = sorted((one.namespace, one.id.int) for one in laid.laid)
+    return [
+        Held(
+            "items",
+            sorted((one.namespace, one.id.int) for one in got),
+            SameAs(
+                wanted,
+                Says("미리 저장한 네임스페이스", english="the namespaces seeded in advance"),
+            ),
+        )
+    ]
+
+
+@dataclass(frozen=True)
+class TheNamespacesAreListed(Then[ManyNamespacesAndACaller, list[StorageNamespaceNode]]):
+    @override
+    def says(self) -> str:
+        return Says(
+            "그 object storage 에 등록된 네임스페이스가 모두 반환됩니다",
+            english="every namespace registered on the object storage comes back",
+        )
+
+    @override
+    def look(
+        self, laid: ManyNamespacesAndACaller, answered: Answered[list[StorageNamespaceNode]]
+    ) -> list[Verdict]:
+        items = answered.response
+        if items is None:
+            return [MissingResponse(answered.raised)]
+        return the_namespaces(items, laid)
+
+
+@dataclass(frozen=True)
+class EveryNamespaceIsSearched(Then[ManyNamespacesAndACaller, AdminSearchStorageNamespacesPayload]):
+    @override
+    def says(self) -> str:
+        return Says(
+            "미리 저장한 네임스페이스가 모두 반환됩니다",
+            english="every namespace seeded in advance comes back",
+        )
+
+    @override
+    def look(
+        self,
+        laid: ManyNamespacesAndACaller,
+        answered: Answered[AdminSearchStorageNamespacesPayload],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [MissingResponse(answered.raised)]
+        return [
+            *the_namespaces(payload.items, laid),
+            Same("total_count", payload.total_count, len(laid.laid)),
+            Same("has_next_page", payload.has_next_page, False),
+            Same("has_previous_page", payload.has_previous_page, False),
+        ]
+
+
+type Loaded = list[StorageNamespaceNode | Exception | None]
+
+
+def loaded_verdicts(
+    got: Sequence[StorageNamespaceNode | Exception | None],
+    laid: ManyNamespacesAndACaller,
+) -> list[Verdict]:
+    """Two seeded namespaces in the requested order around one empty entry."""
+    first, middle, last = got
+    return [
+        Same("length", len(got), 3),
+        *(
+            namespace_verdicts("[0].", first, laid.laid[0])
+            if isinstance(first, StorageNamespaceNode)
+            else [Same("[0]", first, None)]
+        ),
+        Same("[1]", middle, None),
+        *(
+            namespace_verdicts("[2].", last, laid.laid[1])
+            if isinstance(last, StorageNamespaceNode)
+            else [Same("[2]", last, None)]
+        ),
+    ]
+
+
+@dataclass(frozen=True)
+class TheOrderIsKept(Then[ManyNamespacesAndACaller, Loaded]):
+    @override
+    def says(self) -> str:
+        return Says(
+            "미리 저장한 네임스페이스는 요청한 순서대로 반환되고, 존재하지 않는 id 의 항목은 "
+            "비어 있습니다",
+            english=(
+                "the namespaces seeded in advance come back in the requested order, and the "
+                "entry for the id that does not exist is empty"
+            ),
+        )
+
+    @override
+    def look(self, laid: ManyNamespacesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
+        got = answered.response
+        if got is None:
+            return [MissingResponse(answered.raised)]
+        if len(got) != 3:
+            return [Same("length", len(got), 3)]
+        return loaded_verdicts(got, laid)
+
+
+@dataclass(frozen=True)
+class EveryIdIsRefused(Then[ManyNamespacesAndACaller, Loaded]):
+    @override
+    def says(self) -> str:
+        return Says(
+            "항목마다 권한 부족 거부가 담겨 반환됩니다",
+            english="every entry comes back holding a rejection for lack of permission",
+        )
+
+    @override
+    def look(self, laid: ManyNamespacesAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
+        got = answered.response
+        if got is None:
+            return [MissingResponse(answered.raised)]
+        return [
+            Same("length", len(got), 3),
+            *[
+                Refused(NotEnoughPermission, one if isinstance(one, Exception) else None)
+                for one in got
+            ],
+        ]

@@ -15,6 +15,7 @@ from ai.backend.common.data.entity.container_registry import (
     ContainerRegistryEntityType,
     ContainerRegistryID,
 )
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
@@ -22,6 +23,7 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.container_registry.request import AllowedGroupsInput
 from ai.backend.common.dto.manager.v2.container_registry.response import ContainerRegistryNode
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
@@ -111,6 +113,7 @@ class ARegistryAndSomeone(Given[TestSeedingSession, ARegistryAndACaller]):
     name_hint: str = "host"
     with_project: bool = False
     allowed: bool = False
+    keeping: bool = False
 
     @override
     def describe(self) -> str:
@@ -118,9 +121,13 @@ class ARegistryAndSomeone(Given[TestSeedingSession, ARegistryAndACaller]):
         project_en = ", one project" if self.with_project or self.allowed else ""
         allowed_ko = "가 이미 허용돼 있음" if self.allowed else ""
         allowed_en = " already allowed to it" if self.allowed else ""
+        keeping_ko = ", 레지스트리와 public 두 범위에 수정 권한을 받은" if self.keeping else ""
+        keeping_en = ", granted update on the registry and on public" if self.keeping else ""
         return Says(
-            f"레지스트리 하나{project_ko}{allowed_ko}, {self.role.value} 한 명",
-            english=f"one registry{project_en}{allowed_en}, and one {self.role.value}",
+            f"레지스트리 하나{project_ko}{allowed_ko}, {self.role.value} 한 명{keeping_ko}",
+            english=(
+                f"one registry{project_en}{allowed_en}, and one {self.role.value}{keeping_en}"
+            ),
         )
 
     @override
@@ -135,10 +142,59 @@ class ARegistryAndSomeone(Given[TestSeedingSession, ARegistryAndACaller]):
             if self.allowed:
                 await seeding.linking(AllowProject(), project, registry)
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
+        if self.keeping:
+            await seeding.within(SomeoneKeepingRegistries(registry, caller))
         return ARegistryAndACaller(
             registry=seeding.made(registry),
             caller=seeding.made(caller),
             project=project_data,
+        )
+
+
+@dataclass(frozen=True)
+class SomeoneKeepingRegistries(TestSeedNest[Laid[None]]):
+    """그 사용자에게 레지스트리와 public 두 범위에서 수정 권한을 준다."""
+
+    registry: Laid[ContainerRegistryData]
+    someone: Laid[UserData]
+
+    @override
+    def kind(self) -> str:
+        return Says(
+            "레지스트리와 public 두 범위에 수정 권한을 받은 사용자 준비",
+            english="Prepare a user granted update permission on the registry and on public",
+        )
+
+    @override
+    def lay(self, seed: TestSeeder) -> Laid[None]:
+        on_registry = seed.creating_from(
+            TestSeedRole(lambda one: ContainerRegistryID(one.id), name_hint="registry-keeper"),
+            self.registry,
+        )
+        seed.adding(
+            TestSeedPermission(
+                entity_type=ContainerRegistryEntityType(), permission=Permission.UPDATE
+            ),
+            on_registry,
+        )
+        seed.granting(
+            on_registry, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
+        )
+        in_public = seed.creating_from(
+            TestSeedRole(
+                lambda _: global_entity_id(GlobalEntityName.PUBLIC),
+                name_hint="public-registry-keeper",
+            ),
+            self.someone,
+        )
+        seed.adding(
+            TestSeedPermission(
+                entity_type=ContainerRegistryEntityType(), permission=Permission.UPDATE
+            ),
+            in_public,
+        )
+        return seed.granting(
+            in_public, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
         )
 
 

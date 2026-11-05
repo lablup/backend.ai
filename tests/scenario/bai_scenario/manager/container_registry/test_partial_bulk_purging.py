@@ -28,7 +28,7 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
-from bai_scenario.components.answers import MissingResponse
+from bai_scenario.components.answers import MissingResponse, TheFailedItemIsRefused
 from bai_scenario.components.container_registry import (
     MISSING_ENTITY_ID,
     ManyRegistriesAndACaller,
@@ -184,7 +184,7 @@ class NoRegistryIsPurged(Then[ManyRegistriesAndACaller, Purged]):
                         ),
                     ),
                 ),
-                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+                TheFailedItemIsRefused(f"failed[{i}]", failure.message, self.reason),
             ]
         return verdicts
 

@@ -18,6 +18,8 @@ class TestSeedObjectStorage(TestSeedRow[ObjectStorageData]):
     """An object storage registration, created in global alone."""
 
     name_hint: str = "object-storage"
+    fixed_name: str | None = None
+    """The name the reservoir config points at, for a row the call reaches by name."""
 
     @override
     def kind(self) -> str:
@@ -29,6 +31,8 @@ class TestSeedObjectStorage(TestSeedRow[ObjectStorageData]):
 
     @override
     def name(self, naming: Naming) -> str:
+        if self.fixed_name is not None:
+            return self.fixed_name
         return naming(self.name_hint)
 
     @override
