@@ -599,15 +599,37 @@ class TestDeleteTaskTemplateAction:
     def service(self, mock_repo: MagicMock) -> TemplateService:
         return TemplateService(repository=mock_repo)
 
+    @pytest.fixture
+    def owner_uuid(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def stored_template(self, mock_repo: MagicMock, owner_uuid: uuid.UUID) -> dict[str, Any]:
+        row = {
+            "template": _make_valid_task_template(),
+            "name": "test-template",
+            "user_uuid": owner_uuid,
+            "group_id": uuid.uuid4(),
+            "domain_name": "default",
+        }
+        mock_repo.get_task_template = AsyncMock(return_value=row)
+        return row
+
     async def test_soft_delete_success(
         self,
         service: TemplateService,
         mock_repo: MagicMock,
+        owner_uuid: uuid.UUID,
+        stored_template: dict[str, Any],
     ) -> None:
-        mock_repo.task_template_exists = AsyncMock(return_value=True)
         mock_repo.soft_delete_template = AsyncMock(return_value=1)
 
-        action = DeleteTaskTemplateAction(template_id="tmpl-to-delete")
+        action = DeleteTaskTemplateAction(
+            template_id="tmpl-to-delete",
+            requester_uuid=owner_uuid,
+            requester_role=UserRole.USER,
+            requester_domain="default",
+        )
         result = await service.delete_task_template(action)
 
         assert result is not None
@@ -618,9 +640,14 @@ class TestDeleteTaskTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        mock_repo.task_template_exists = AsyncMock(return_value=False)
+        mock_repo.get_task_template = AsyncMock(return_value=None)
 
-        action = DeleteTaskTemplateAction(template_id="nonexistent")
+        action = DeleteTaskTemplateAction(
+            template_id="nonexistent",
+            requester_uuid=uuid.uuid4(),
+            requester_role=UserRole.USER,
+            requester_domain="default",
+        )
         with pytest.raises(TaskTemplateNotFound):
             await service.delete_task_template(action)
 
@@ -628,13 +655,69 @@ class TestDeleteTaskTemplateAction:
         self,
         service: TemplateService,
         mock_repo: MagicMock,
+        owner_uuid: uuid.UUID,
+        stored_template: dict[str, Any],
     ) -> None:
-        mock_repo.task_template_exists = AsyncMock(return_value=True)
         mock_repo.soft_delete_template = AsyncMock(return_value=0)
 
-        action = DeleteTaskTemplateAction(template_id="tmpl-x")
+        action = DeleteTaskTemplateAction(
+            template_id="tmpl-x",
+            requester_uuid=owner_uuid,
+            requester_role=UserRole.USER,
+            requester_domain="default",
+        )
         with pytest.raises(DBOperationFailed):
             await service.delete_task_template(action)
+
+    @pytest.mark.parametrize(
+        ("role", "domain"),
+        [(UserRole.USER, "default"), (UserRole.ADMIN, "other")],
+        ids=["another_user", "admin_of_another_domain"],
+    )
+    async def test_rejects_a_requester_outside_the_owner_scope(
+        self,
+        service: TemplateService,
+        mock_repo: MagicMock,
+        stored_template: dict[str, Any],
+        role: UserRole,
+        domain: str,
+    ) -> None:
+        mock_repo.soft_delete_template = AsyncMock(return_value=1)
+
+        action = DeleteTaskTemplateAction(
+            template_id="tmpl-x",
+            requester_uuid=uuid.uuid4(),
+            requester_role=role,
+            requester_domain=domain,
+        )
+        with pytest.raises(NotEnoughPermission):
+            await service.delete_task_template(action)
+        mock_repo.soft_delete_template.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("role", "domain"),
+        [(UserRole.SUPERADMIN, "other"), (UserRole.ADMIN, "default")],
+        ids=["superadmin", "admin_of_the_template_domain"],
+    )
+    async def test_an_admin_in_scope_deletes_another_users_template(
+        self,
+        service: TemplateService,
+        mock_repo: MagicMock,
+        stored_template: dict[str, Any],
+        role: UserRole,
+        domain: str,
+    ) -> None:
+        mock_repo.soft_delete_template = AsyncMock(return_value=1)
+
+        action = DeleteTaskTemplateAction(
+            template_id="tmpl-x",
+            requester_uuid=uuid.uuid4(),
+            requester_role=role,
+            requester_domain=domain,
+        )
+        await service.delete_task_template(action)
+
+        mock_repo.soft_delete_template.assert_called_once_with("tmpl-x", TemplateType.TASK)
 
 
 class TestCreateClusterTemplateAction:

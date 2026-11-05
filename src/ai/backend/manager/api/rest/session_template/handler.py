@@ -282,7 +282,12 @@ class SessionTemplateHandler:
             else "*",
         )
 
-        action = DeleteTaskTemplateAction(template_id=template_id)
+        action = DeleteTaskTemplateAction(
+            template_id=template_id,
+            requester_uuid=ctx.user_uuid,
+            requester_role=req.request["user"]["role"],
+            requester_domain=ctx.user_domain,
+        )
         await self._template.delete_task.wait_for_complete(action)
         return APIResponse.build(
             HTTPStatus.OK,

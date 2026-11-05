@@ -198,9 +198,12 @@ class TemplateService:
         self, action: DeleteTaskTemplateAction
     ) -> DeleteTaskTemplateActionResult:
         """Soft-delete a task template."""
-        exists = await self._repository.task_template_exists(action.template_id)
-        if not exists:
+        row = await self._repository.get_task_template(action.template_id)
+        if row is None:
             raise TaskTemplateNotFound
+        self._check_task_template_access(
+            row, action.requester_uuid, action.requester_role, action.requester_domain
+        )
         rowcount = await self._repository.soft_delete_template(
             action.template_id, TemplateType.TASK
         )
