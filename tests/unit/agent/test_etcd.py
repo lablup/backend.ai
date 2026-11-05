@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -12,7 +13,7 @@ from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 
 
 @pytest.fixture
-def agent_config() -> AgentUnifiedConfig:
+def agent_config(rpc_auth_key_config: dict[str, Path]) -> AgentUnifiedConfig:
     raw_config = {
         "agent": {
             "id": "test-agent-id",
@@ -24,6 +25,7 @@ def agent_config() -> AgentUnifiedConfig:
             "backend": "docker",
             "rpc-listen-addr": "127.0.0.1:6001",
             "agent-sock-port": 6002,
+            **rpc_auth_key_config,
         },
         "container": {
             "scratch-type": "hostdir",
