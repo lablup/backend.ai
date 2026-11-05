@@ -57,12 +57,8 @@ from ai.backend.manager.errors.storage import (
     VFolderNotFound,
     VFolderOperationFailed,
 )
-<<<<<<< HEAD
-from ai.backend.manager.models.project import ProjectType
-=======
 from ai.backend.manager.errors.watcher import WatcherTokenNotConfigured
-from ai.backend.manager.models.project.row import ProjectType
->>>>>>> 2f97c66b (feat(BA-8229): require a configured agent watcher token (#16488))
+from ai.backend.manager.models.project import ProjectType
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import (

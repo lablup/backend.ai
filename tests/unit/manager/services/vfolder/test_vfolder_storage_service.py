@@ -20,12 +20,8 @@ from ai.backend.manager.errors.storage import (
     VFolderOperationFailed,
 )
 from ai.backend.manager.errors.user import UserNotFound
-<<<<<<< HEAD
-from ai.backend.manager.models.user import UserRole
-=======
 from ai.backend.manager.errors.watcher import WatcherTokenNotConfigured
-from ai.backend.manager.models.user.row import UserRole
->>>>>>> 2f97c66b (feat(BA-8229): require a configured agent watcher token (#16488))
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ChangeVFolderOwnershipAction,

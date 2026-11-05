@@ -14,7 +14,6 @@ from ai.backend.agent.errors.watcher import (
     WatcherTokenNotConfiguredError,
 )
 from ai.backend.agent.watcher import auth_middleware, watcher_server
-from ai.backend.logging.utils import BraceMessage
 
 _TOKEN_HEADER = "X-BackendAI-Watcher-Token"
 
@@ -71,7 +70,7 @@ class TestAuthMiddleware:
 def _watcher_cfg() -> dict[str, Any]:
     return {
         "logging": MagicMock(),
-        "etcd": {"user": None, "addrs": [], "namespace": "test"},
+        "etcd": {"user": None, "addr": MagicMock(), "namespace": "test"},
         "watcher": {"ssl-enabled": False, "service-addr": MagicMock()},
     }
 
@@ -87,17 +86,6 @@ class TestStartupToken:
     async def test_starts_without_logging_token_value(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
-<<<<<<< HEAD
-        etcd = AsyncMock()
-        etcd.get.return_value = stored_token
-        etcd.__aenter__.return_value = etcd
-        cfg: dict[str, Any] = {
-            "logging": MagicMock(),
-            "etcd": {"user": None, "addr": MagicMock(), "namespace": "test"},
-            "watcher": {"ssl-enabled": False, "service-addr": MagicMock()},
-        }
-=======
->>>>>>> 2f97c66b (feat(BA-8229): require a configured agent watcher token (#16488))
         with (
             patch("ai.backend.agent.watcher.AsyncEtcd", return_value=_mock_etcd("watcher-secret")),
             patch("ai.backend.agent.watcher.Logger"),
@@ -110,15 +98,6 @@ class TestStartupToken:
             ):
                 pass
 
-<<<<<<< HEAD
-        records = [vars(record) for record in caplog.records]
-        assert all("watcher-secret-value" not in str(record) for record in records)
-        assert any(
-            isinstance(record["msg"], BraceMessage)
-            and record["msg"].kwargs.get("token_configured") is token_configured
-            for record in records
-        )
-=======
         tcp_site.return_value.start.assert_awaited_once()
         assert all("watcher-secret" not in str(vars(record)) for record in caplog.records)
 
@@ -137,4 +116,3 @@ class TestStartupToken:
                 pass
 
         tcp_site.return_value.start.assert_not_awaited()
->>>>>>> 2f97c66b (feat(BA-8229): require a configured agent watcher token (#16488))
