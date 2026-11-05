@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 from uuid import UUID
 
@@ -16,6 +17,8 @@ from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.services.auth.actions.signout import SignoutAction
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.views.auth import UserCredential
+
+_PASSWORD_CHANGED_AT = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -65,7 +68,7 @@ async def test_signout_successful_with_valid_credentials(
         hashed_password="hashed_password",
         username="test-user",
         status=UserStatus.ACTIVE,
-        password_changed_at=None,
+        password_changed_at=_PASSWORD_CHANGED_AT,
     )
     mock_auth_repository.deactivate_user_and_keypairs.return_value = None
 
