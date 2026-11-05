@@ -259,9 +259,11 @@ class RetentionDBSource:
                 # replica_groups) in the same tick rather than the next one.
                 # Nothing else clears them: the application never hard-deletes a
                 # replica group, and the FK points the wrong way for a DB cascade.
+                # The boundary is deleted_at, set when the owning replica group is
+                # drained, so an active group is never collected for its age alone.
                 RetentionDrain(
                     SessionGroupRow,
-                    SessionGroupRow.created_at,
+                    SessionGroupRow.deleted_at,
                     threshold,
                     conditions=(~group_has_replica_group,),
                     entity=SessionGroupEntityType(),

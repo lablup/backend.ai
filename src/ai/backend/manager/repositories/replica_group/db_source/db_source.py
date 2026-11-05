@@ -42,6 +42,7 @@ from ai.backend.manager.models.routing.creators import ReplicaCreator
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater
 from ai.backend.manager.models.session_group.creators import SessionGroupCreator
+from ai.backend.manager.models.session_group.updaters import SessionGroupRetentionUpdater
 from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
@@ -363,6 +364,16 @@ class ReplicaGroupDBSource:
             await w.apply_transitions([
                 self._to_ops_transition(transition) for transition in apply.transitions
             ])
+            if apply.terminal_group_ids:
+                # The group is no longer served, so its session group starts aging from
+                # this moment; the retention sweep collects it once it is old enough and
+                # the replica group row is gone.
+                await w.batch_update_in_global(
+                    SessionGroupRetentionUpdater(
+                        replica_group_ids=apply.terminal_group_ids,
+                        deleted_at=await w.current_time(),
+                    )
+                )
 
     def _to_ops_transition(
         self,
