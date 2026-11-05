@@ -10,6 +10,7 @@ import graphene
 import pytest
 import sqlalchemy as sa
 from graphql_relay import to_global_id
+from sqlalchemy.sql import visitors
 
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.models.endpoint.row import EndpointRow
@@ -80,3 +81,66 @@ class TestComputeSessionNodeGetNode:
     ) -> None:
         where = await self._read_condition(make_info, db_session, UserRole.MONITOR)
         assert "false" in where.lower()
+
+
+class TestComputeSessionNodeGraph:
+    """The dependency graph reads only the sessions the requester may read."""
+
+    @pytest.fixture
+    def db_session(self) -> MagicMock:
+        session = MagicMock()
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = []
+        session.execute = AsyncMock(return_value=result)
+        return session
+
+    @pytest.fixture
+    def make_info(self, db_session: MagicMock) -> Callable[[UserRole], graphene.ResolveInfo]:
+        def _make(role: UserRole) -> graphene.ResolveInfo:
+            ctx = MagicMock()
+            ctx.user = {"role": role, "domain_name": "default", "uuid": uuid.uuid4()}
+            ctx.db.begin_readonly_session = MagicMock(
+                return_value=AsyncMock(
+                    __aenter__=AsyncMock(return_value=db_session),
+                    __aexit__=AsyncMock(return_value=None),
+                )
+            )
+            info = MagicMock(spec=graphene.ResolveInfo)
+            info.context = ctx
+            return info
+
+        return _make
+
+    async def _graph_condition_columns(
+        self,
+        make_info: Callable[[UserRole], graphene.ResolveInfo],
+        db_session: MagicMock,
+        role: UserRole,
+    ) -> set[str]:
+        """The session columns the graph's row query is bounded by."""
+        node = ComputeSessionNode(row_id=uuid.uuid4())
+        await node.resolve_graph(make_info(role))
+        stmt: sa.Select[tuple[object]] = db_session.execute.await_args_list[1].args[0]
+        return {
+            element.name
+            for element in visitors.iterate(stmt.whereclause)
+            if isinstance(element, sa.Column)
+        }
+
+    async def test_a_superadmin_reads_the_whole_graph(
+        self, make_info: Callable[[UserRole], graphene.ResolveInfo], db_session: MagicMock
+    ) -> None:
+        columns = await self._graph_condition_columns(make_info, db_session, UserRole.SUPERADMIN)
+        assert columns == {"id"}
+
+    async def test_an_admin_reads_the_graph_within_their_domain(
+        self, make_info: Callable[[UserRole], graphene.ResolveInfo], db_session: MagicMock
+    ) -> None:
+        columns = await self._graph_condition_columns(make_info, db_session, UserRole.ADMIN)
+        assert columns == {"id", "domain_name"}
+
+    async def test_a_user_reads_only_their_own_sessions_of_the_graph(
+        self, make_info: Callable[[UserRole], graphene.ResolveInfo], db_session: MagicMock
+    ) -> None:
+        columns = await self._graph_condition_columns(make_info, db_session, UserRole.USER)
+        assert columns == {"id", "user_uuid"}
