@@ -16,6 +16,7 @@ from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
@@ -24,6 +25,7 @@ from ai.backend.testutils.db import with_tables
 _ORM_CLUSTER = (
     AgentRow,
     DeploymentRevisionResourceSlotRow,
+    RoutingRow,
 )
 
 _CALLER_DOMAIN_NAME = "caller-domain"
