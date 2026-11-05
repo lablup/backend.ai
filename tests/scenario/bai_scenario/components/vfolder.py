@@ -8,6 +8,11 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.config import (
+    PresetModelConfig,
+    PresetModelDefinition,
+    PresetModelServiceConfig,
+)
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
@@ -16,7 +21,11 @@ from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
-from ai.backend.common.types import VFolderUsageMode
+from ai.backend.common.types import (
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
+    VFolderUsageMode,
+)
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.project.types import ProjectData
@@ -694,7 +703,15 @@ class AProjectWhereSomeoneMayMakeFolders(Given[Any, AProjectAndMaker]):
         )
         caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
         policy = await seeding.once(TestSeedProjectPolicy())
-        project = await seeding.creating_from_two(TestSeedProject(), domain, policy)
+        project = await seeding.creating_from_two(
+            TestSeedProject(
+                allowed_vfolder_hosts=VFolderHostPermissionMap({
+                    STORAGE_HOST: set(VFolderHostPermission),
+                })
+            ),
+            domain,
+            policy,
+        )
         if self.granted:
             role = await seeding.creating_from(
                 TestSeedRole(lambda p: ProjectID(p.id), name_hint="folder-maker"), project
@@ -778,7 +795,16 @@ class AModelFolderForDeployment(Given[Any, AModelFolderPlace]):
                 role, caller, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
             )
         variant = await seeding.creating(TestSeedRuntimeVariant())
-        preset = await seeding.creating_from(TestSeedDeploymentRevisionPreset(), variant)
+        preset = await seeding.creating_from(
+            TestSeedDeploymentRevisionPreset(
+                model_definition=PresetModelDefinition(
+                    models=[
+                        PresetModelConfig(name="model", service=PresetModelServiceConfig(port=8000))
+                    ]
+                )
+            ),
+            variant,
+        )
         return AModelFolderPlace(
             domain=seeding.made(domain),
             project=seeding.made(project),

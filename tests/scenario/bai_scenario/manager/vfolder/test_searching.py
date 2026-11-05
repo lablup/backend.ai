@@ -24,6 +24,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
 )
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -342,7 +343,7 @@ class ARegularUserMayNotSearchEveryFolder(
 
     @override
     def then(self) -> Then[AFolderAndItsReader, SearchVFoldersPayload]:
-        return TheCallIsRefused(NotEnoughPermission)
+        return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)
