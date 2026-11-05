@@ -8,6 +8,7 @@ connectionMode = "SESSION"
 {% toml_field "allowSignupWithoutConfirmation" config["service"]["allow-signup-without-confirmation"] %}
 {% toml_strlist_field "singleSignOnVendors" config["service"]["single-sign-on-vendors"] %}
 {% toml_field "ssoRealmName" config["service"]["sso-realm-name"] %}
+{% toml_field "enableInteractiveLoginAccountSwitch" config["service"]["enable-interactive-login-account-switch"] %}
 {% if authenticated %}
 {% toml_field "defaultSessionEnvironment" config["ui"]["default-environment"] %}
 {% toml_field "defaultImportEnvironment" config["ui"]["default-import-environment"] %}
@@ -27,7 +28,6 @@ connectionMode = "SESSION"
 {% toml_field "isDirectorySizeVisible" config["service"]["is-directory-size-visible"] %}
 {% toml_field "eduAppNamePrefix" config["service"]["edu-appname-prefix"] %}
 {% toml_field "enableExtendLoginSession" config["service"]["enable-extend-login-session"] %}
-{% toml_field "enableInteractiveLoginAccountSwitch" config["service"]["enable-interactive-login-account-switch"] %}
 {% toml_field "defaultFileBrowserImage" config["service"]["default-file-browser-image"] %}
 {% toml_field "enableReservoir" config["service"]["enable-reservoir"] %}
 

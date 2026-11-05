@@ -324,6 +324,7 @@ LOGIN_SCREEN_FIELDS = {
     "allowSignupWithoutConfirmation",
     "singleSignOnVendors",
     "ssoRealmName",
+    "enableInteractiveLoginAccountSwitch",
 }
 
 
@@ -339,7 +340,11 @@ class TestConfigTomlHandler:
         app = web.Application()
         setup_session(app, SimpleCookieStorage())
         app["config"] = WebServerUnifiedConfig.model_validate({
-            "service": {"sso-realm-name": "corp", "hide-agents": False},
+            "service": {
+                "sso-realm-name": "corp",
+                "single-sign-on-vendors": "saml",
+                "hide-agents": False,
+            },
             "ui": {"menu-blocklist": "agent"},
         })
         app["j2env"] = build_template_environment()
@@ -356,7 +361,7 @@ class TestConfigTomlHandler:
         assert resp.headers["Cache-Control"] == "no-store"
         config = tomli.loads(await resp.text())
         assert set(config) == {"general"}
-        assert set(config["general"]) <= LOGIN_SCREEN_FIELDS
+        assert set(config["general"]) == LOGIN_SCREEN_FIELDS
         assert config["general"]["ssoRealmName"] == "corp"
 
     async def test_after_login_the_whole_config_is_served(
