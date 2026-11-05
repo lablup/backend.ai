@@ -99,22 +99,22 @@ Run every check inside the worktree.
    ```bash
    git grep -n -E '^(<<<<<<<|=======$|>>>>>>>)' -- src tests
    ```
-2. Check every Python file the backport changed:
+2. Check every Python file the backport changed or added:
    ```bash
-   git diff --name-only "bp/base-${ver}" -- '*.py' | xargs pants fmt fix lint check
+   git diff --name-only --diff-filter=d "bp/base-${ver}" -- '*.py' | xargs -r pants fmt fix lint
    ```
-3. Check that each fixture and constructor argument the new tests use exists on the release branch (`grep`). Do not run `pants test` locally. CI runs it.
+3. Check that each fixture and constructor argument the new tests use exists on the release branch (`grep`). Do not run `pants check` or `pants test` locally. CI runs them.
 4. Compare `git diff --stat "bp/base-${ver}"` with the change on `main`. A backport much larger than the original pulled in `main`-only code.
 
 ## Phase 5: Commit and push
 
-1. Add a commit on top of the workflow's commit. Do not amend it.
+1. Add a commit on top of the workflow's commit. Do not amend it. Phase 4 already ran the checks, so skip the pre-commit hook:
    ```bash
    git add <files>
-   git commit -m "fix(BA-XXXX): resolve backport conflicts for <ver>"
+   git commit --no-verify -m "fix(BA-XXXX): resolve backport conflicts for <ver>"
    ```
    - The body states what was kept from the release branch and what `main`-only code was dropped.
-2. Push. Phase 4 already ran the checks, so skip the pre-push hook:
+2. Push, skipping the pre-push hook for the same reason:
    ```bash
    git push --no-verify origin "backport/<PR>-to-${ver}"
    ```
