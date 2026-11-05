@@ -2,7 +2,7 @@
 
 [background](/src/ai/backend/manager/api/adapters/domain/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/domain/adapter.py)
 
-Scenario: incomplete 3 / 14
+Scenario: complete
 
 - built from ops (12)
   - bulk_get_ids: representative success ✓ · representative rejection ✓
@@ -11,9 +11,9 @@ Scenario: incomplete 3 / 14
   - get: representative success ✓ · representative rejection ✓
   - global_search: representative success ✓ · representative rejection ✓
   - lookup_name: representative success ✓ · representative rejection ✓
-  - partial_bulk_delete: representative success ✓ · representative rejection ✗: SCENARIO-GAP
-  - partial_bulk_restore: representative success ✓ · representative rejection ✗: SCENARIO-GAP
-  - partial_bulk_update: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_delete: representative success ✓ · representative rejection ✓
+  - partial_bulk_restore: representative success ✓ · representative rejection ✓
+  - partial_bulk_update: representative success ✓ · representative rejection ✓
   - restore: representative success ✓ · representative rejection ✓
   - scoped_search: representative success ✓ · representative rejection ✓
   - update: representative success ✓ · representative rejection ✓
@@ -40,8 +40,8 @@ Scenario: incomplete 3 / 14
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin soft deletes an already soft-deleted domain again, the answer says it was done](#deleting-soft-deleting-a-domain-already-soft-deleted) | answered |
-| [when the superadmin soft deletes a domain, the answer says it was done](#deleting-the-superadmin-soft-deletes-a-domain) | answered |
+| [when the superadmin soft deletes an already soft-deleted domain again, the answer says it was done and the domain comes back inactive](#deleting-soft-deleting-a-domain-already-soft-deleted) | answered |
+| [when the superadmin soft deletes a domain, the answer says it was done and the domain comes back inactive](#deleting-the-superadmin-soft-deletes-a-domain) | answered |
 | [a user granted nothing cannot soft delete a domain](#deleting-a-user-granted-nothing-may-not-soft-delete-a-domain) | rejected |
 | [soft-deleting a name no domain answers to is rejected as not found](#deleting-soft-deleting-a-name-nothing-answers-to-is-not-found) | rejected |
 
@@ -59,6 +59,13 @@ Scenario: incomplete 3 / 14
 | scenario | verdict |
 |---|---|
 | [when several domains are searched with a filter on the name of one, only the domain of that name is left in the answer](#searching-a-name-filter-narrows-the-answer-to-the-domain-it-names) | answered |
+| [when domains are searched with a filter on the name of a project one of them holds, only the domain holding that project is left](#nested_searching-a-project-name-filter-narrows-the-answer-to-the-domain-holding-it) | answered |
+| [when domains are searched with a filter on the username of a user living in one of them, only the domain that user lives in is left](#nested_searching-a-username-filter-narrows-the-answer-to-the-domain-the-user-lives-in) | answered |
+| [when domains are searched with a filter on the email of a user living in one of them, only the domain that user lives in is left](#nested_searching-an-email-filter-narrows-the-answer-to-the-domain-the-user-lives-in) | answered |
+| [when domains are searched with a filter on inactive users, only the domain such a user lives in is left](#nested_searching-an-inactive-user-filter-narrows-the-answer-to-the-domain-they-live-in) | answered |
+| [when every domain is searched ordered by the email of its users, the domain whose user's email comes first comes first](#nested_searching-ordering-by-the-email-puts-the-domains-in-that-order) | answered |
+| [when every domain is searched ordered by the name of the project it holds, the domain holding the project whose name comes first comes first](#nested_searching-ordering-by-the-project-name-puts-the-domains-in-that-order) | answered |
+| [when every domain is searched ordered by the username of its users, the domain whose user's name comes first comes first](#nested_searching-ordering-by-the-username-puts-the-domains-in-that-order) | answered |
 | [when this scenario seeded four domains, a search without a filter brings back all four](#searching-the-answer-counts-every-domain-the-scenario-laid) | answered |
 | [when one of the domains seeded in advance is soft-deleted and every domain is searched without a filter, that one comes back too](#searching-the-answer-includes-soft-deleted-domains-too) | answered |
 | [when a user who is not the superadmin asks to search every domain, the role rejects it](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-domain) | rejected |
@@ -77,12 +84,14 @@ Scenario: incomplete 3 / 14
 |---|---|
 | [when a user granted nothing soft-deletes several domains at once, none is soft-deleted and every one comes back in the failed list for lack of permission](#partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-domains) | answered |
 | [when two active domains and one missing id are soft-deleted at once, the two come back inactive and the missing id comes back in the failed list because there is no such target](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | answered |
+| [soft-deleting several domains at once without a login context is rejected with the error saying no user is in the context](#partial_bulk_deleting-soft-deleting-domains-without-login-is-refused) | rejected |
 
 **partial_bulk_restore**
 
 | scenario | verdict |
 |---|---|
 | [when several soft-deleted domains are restored at once, all of them come back active](#partial_bulk_deleting-restoring-several-brings-them-back) | answered |
+| [restoring several domains at once without a login context is rejected with the error saying no user is in the context](#partial_bulk_deleting-restoring-domains-without-login-is-refused) | rejected |
 
 **partial_bulk_update**
 
@@ -91,13 +100,14 @@ Scenario: incomplete 3 / 14
 | [when a user granted nothing edits several domains at once, none is edited and every one comes back in the failed list for lack of permission](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-domains) | answered |
 | [when several domains are edited at once with a mix of active flags and descriptions, the one deactivated is soft-deleted and the one activated is restored, both come back with the new description, and the missing id comes back in the failed list because there is no such target](#partial_bulk_editing-the-active-flag-soft-deletes-or-restores-each-of-several-domains) | answered |
 | [when the superadmin changes the description of several domains at once, all of them come back with the new description and none failed](#partial_bulk_editing-the-superadmin-edits-several-domains-at-once) | answered |
+| [editing several domains at once without a login context is rejected with the error saying no user is in the context](#partial_bulk_editing-editing-domains-without-login-is-refused) | rejected |
 
 **restore**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin restores a domain that is not soft-deleted, the answer says it was restored](#deleting-restoring-a-domain-that-is-not-soft-deleted) | answered |
-| [when a soft-deleted domain is restored, the answer says it was restored](#deleting-restoring-answers-that-it-restored) | answered |
+| [when the superadmin restores a domain that is not soft-deleted, the answer says it was restored and the domain comes back active](#deleting-restoring-a-domain-that-is-not-soft-deleted) | answered |
+| [when a soft-deleted domain is restored, the answer says it was restored and the domain comes back active](#deleting-restoring-answers-that-it-restored) | answered |
 | [a user granted nothing cannot restore a domain](#deleting-a-user-granted-nothing-may-not-restore-a-domain) | rejected |
 
 **scoped_search**
@@ -291,7 +301,7 @@ Then
 
 #### [soft-deleting-a-domain-already-soft-deleted](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-when the superadmin soft deletes an already soft-deleted domain again, the answer says it was done
+when the superadmin soft deletes an already soft-deleted domain again, the answer says it was done and the domain comes back inactive
 
 Given
 
@@ -310,14 +320,24 @@ When
 
 Then
 
-- the answer says it was done
+- the answer says it was done and the domain comes back inactive
   - deleted = True
+  - domain.name = 'twice-1'
+  - domain.description = 'a domain that already existed'
+  - domain.integration_name = None
+  - domain.allowed_docker_registries = []
+  - domain.is_active = False
+  - domain.is_default = False
+  - domain.id: skipped: the database generates it
+  - domain.entity_id: same as the id of the domain seeded in advance
+  - domain.created_at: the time this run wrote
+  - domain.modified_at: the time this run wrote
 
 <a id="deleting-the-superadmin-soft-deletes-a-domain"></a>
 
 #### [the-superadmin-soft-deletes-a-domain](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-when the superadmin soft deletes a domain, the answer says it was done
+when the superadmin soft deletes a domain, the answer says it was done and the domain comes back inactive
 
 Given
 
@@ -336,8 +356,18 @@ When
 
 Then
 
-- the answer says it was done
+- the answer says it was done and the domain comes back inactive
   - deleted = True
+  - domain.name = 'to-delete-1'
+  - domain.description = 'a domain that already existed'
+  - domain.integration_name = None
+  - domain.allowed_docker_registries = []
+  - domain.is_active = False
+  - domain.is_default = False
+  - domain.id: skipped: the database generates it
+  - domain.entity_id: same as the id of the domain seeded in advance
+  - domain.created_at: the time this run wrote
+  - domain.modified_at: the time this run wrote
 
 <a id="deleting-a-user-granted-nothing-may-not-soft-delete-a-domain"></a>
 
@@ -542,6 +572,266 @@ Then
 - only the domain that the filter named is left
   - items = ['wanted-1']
   - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="nested_searching-a-project-name-filter-narrows-the-answer-to-the-domain-holding-it"></a>
+
+#### [a-project-name-filter-narrows-the-answer-to-the-domain-holding-it](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
+
+when domains are searched with a filter on the name of a project one of them holds, only the domain holding that project is left
+
+Given
+
+- two domains, each holding one project of a different name and one user, and the first holds one more superadmin
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Domain first-1
+  - Domain second-1
+  - Project alpha-team-1
+  - Project beta-team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - superadmin user-3: has their own keypair and personal project
+
+When
+
+- DomainAdapter.global_search: user-3 searches for the domain holding the project named alpha-team-1
+
+Then
+
+- only the first domain is left
+  - items = ['first-1']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="nested_searching-a-username-filter-narrows-the-answer-to-the-domain-the-user-lives-in"></a>
+
+#### [a-username-filter-narrows-the-answer-to-the-domain-the-user-lives-in](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
+
+when domains are searched with a filter on the username of a user living in one of them, only the domain that user lives in is left
+
+Given
+
+- two domains, each holding one project of a different name and one user, and the first holds one more superadmin
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Domain first-1
+  - Domain second-1
+  - Project alpha-team-1
+  - Project beta-team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - superadmin user-3: has their own keypair and personal project
+
+When
+
+- DomainAdapter.global_search: user-3 searches for the domain where user-1 lives
+
+Then
+
+- only the first domain is left
+  - items = ['first-1']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="nested_searching-an-email-filter-narrows-the-answer-to-the-domain-the-user-lives-in"></a>
+
+#### [an-email-filter-narrows-the-answer-to-the-domain-the-user-lives-in](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
+
+when domains are searched with a filter on the email of a user living in one of them, only the domain that user lives in is left
+
+Given
+
+- two domains, each holding one project of a different name and one user, and the first holds one more superadmin
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Domain first-1
+  - Domain second-1
+  - Project alpha-team-1
+  - Project beta-team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - superadmin user-3: has their own keypair and personal project
+
+When
+
+- DomainAdapter.global_search: user-3 searches for the domain where the user with the email user-1@scenario.local lives
+
+Then
+
+- only the first domain is left
+  - items = ['first-1']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="nested_searching-an-inactive-user-filter-narrows-the-answer-to-the-domain-they-live-in"></a>
+
+#### [an-inactive-user-filter-narrows-the-answer-to-the-domain-they-live-in](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
+
+when domains are searched with a filter on inactive users, only the domain such a user lives in is left
+
+Given
+
+- two domains, each holding one project of a different name and one user, the user of the second is inactive, and the first holds one more superadmin
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Domain first-1
+  - Domain second-1
+  - Project alpha-team-1
+  - Project beta-team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - superadmin user-3: has their own keypair and personal project
+  - Prepare one inactive user in the domain
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: status inactive, has their own keypair and personal project
+
+When
+
+- DomainAdapter.global_search: user-3 searches for the domain where an inactive user lives
+
+Then
+
+- only the second domain is left
+  - items = ['second-1']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="nested_searching-ordering-by-the-email-puts-the-domains-in-that-order"></a>
+
+#### [ordering-by-the-email-puts-the-domains-in-that-order](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
+
+when every domain is searched ordered by the email of its users, the domain whose user's email comes first comes first
+
+Given
+
+- two domains, each holding one project of a different name and one user, and the first holds one more superadmin
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Domain first-1
+  - Domain second-1
+  - Project alpha-team-1
+  - Project beta-team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - superadmin user-3: has their own keypair and personal project
+
+When
+
+- DomainAdapter.global_search: user-3 searches every domain ordered by the email of its users
+
+Then
+
+- the domains come back in name order
+  - items = ['first-1', 'second-1']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="nested_searching-ordering-by-the-project-name-puts-the-domains-in-that-order"></a>
+
+#### [ordering-by-the-project-name-puts-the-domains-in-that-order](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
+
+when every domain is searched ordered by the name of the project it holds, the domain holding the project whose name comes first comes first
+
+Given
+
+- two domains, each holding one project of a different name and one user, and the first holds one more superadmin
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Domain first-1
+  - Domain second-1
+  - Project alpha-team-1
+  - Project beta-team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - superadmin user-3: has their own keypair and personal project
+
+When
+
+- DomainAdapter.global_search: user-3 searches every domain ordered by project name
+
+Then
+
+- the domains come back in name order
+  - items = ['first-1', 'second-1']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="nested_searching-ordering-by-the-username-puts-the-domains-in-that-order"></a>
+
+#### [ordering-by-the-username-puts-the-domains-in-that-order](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
+
+when every domain is searched ordered by the username of its users, the domain whose user's name comes first comes first
+
+Given
+
+- two domains, each holding one project of a different name and one user, and the first holds one more superadmin
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Domain first-1
+  - Domain second-1
+  - Project alpha-team-1
+  - Project beta-team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - superadmin user-3: has their own keypair and personal project
+
+When
+
+- DomainAdapter.global_search: user-3 searches every domain ordered by the username of its users
+
+Then
+
+- the domains come back in name order
+  - items = ['first-1', 'second-1']
+  - total_count = 2
   - has_next_page = False
   - has_previous_page = False
 
@@ -799,6 +1089,33 @@ Then
   - failed[0].id: same as the missing id in the request
   - failed[0].message: a reason containing 'not found'
 
+<a id="partial_bulk_deleting-soft-deleting-domains-without-login-is-refused"></a>
+
+#### [soft-deleting-domains-without-login-is-refused](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py): pass
+
+soft-deleting several domains at once without a login context is rejected with the error saying no user is in the context
+
+Given
+
+- 3 domains and one user in one of them
+  - Domain home-1
+  - Domain wanted-1
+  - Domain other-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- DomainAdapter.partial_bulk_delete: without a login context, soft deletes 2 domains at once
+
+Then
+
+- the call is rejected
+  - rejected: UnreachableError
+
 ### partial_bulk_restore
 
 <a id="partial_bulk_deleting-restoring-several-brings-them-back"></a>
@@ -848,6 +1165,33 @@ Then
   - successes[1].created_at: the time this run wrote
   - successes[1].modified_at: the time this run wrote
   - failed = []
+
+<a id="partial_bulk_deleting-restoring-domains-without-login-is-refused"></a>
+
+#### [restoring-domains-without-login-is-refused](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py): pass
+
+restoring several domains at once without a login context is rejected with the error saying no user is in the context
+
+Given
+
+- 3 domains and one user in one of them
+  - Domain home-1
+  - Domain wanted-1
+  - Domain other-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- DomainAdapter.partial_bulk_restore: without a login context, restores 2 domains at once
+
+Then
+
+- the call is rejected
+  - rejected: UnreachableError
 
 ### partial_bulk_update
 
@@ -981,13 +1325,40 @@ Then
   - successes[1].created_at: the time this run wrote
   - successes[1].modified_at: the time this run wrote
 
+<a id="partial_bulk_editing-editing-domains-without-login-is-refused"></a>
+
+#### [editing-domains-without-login-is-refused](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_editing.py): pass
+
+editing several domains at once without a login context is rejected with the error saying no user is in the context
+
+Given
+
+- 3 domains and one user in one of them
+  - Domain home-1
+  - Domain wanted-1
+  - Domain other-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- DomainAdapter.partial_bulk_update: without a login context, edits the description of 2 domains at once
+
+Then
+
+- the call is rejected
+  - rejected: UnreachableError
+
 ### restore
 
 <a id="deleting-restoring-a-domain-that-is-not-soft-deleted"></a>
 
 #### [restoring-a-domain-that-is-not-soft-deleted](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-when the superadmin restores a domain that is not soft-deleted, the answer says it was restored
+when the superadmin restores a domain that is not soft-deleted, the answer says it was restored and the domain comes back active
 
 Given
 
@@ -1006,14 +1377,24 @@ When
 
 Then
 
-- the answer says it was done
+- the answer says it was done and the domain comes back active
   - restored = True
+  - domain.name = 'active-1'
+  - domain.description = 'a domain that already existed'
+  - domain.integration_name = None
+  - domain.allowed_docker_registries = []
+  - domain.is_active = True
+  - domain.is_default = False
+  - domain.id: skipped: the database generates it
+  - domain.entity_id: same as the id of the domain seeded in advance
+  - domain.created_at: the time this run wrote
+  - domain.modified_at: the time this run wrote
 
 <a id="deleting-restoring-answers-that-it-restored"></a>
 
 #### [restoring-answers-that-it-restored](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-when a soft-deleted domain is restored, the answer says it was restored
+when a soft-deleted domain is restored, the answer says it was restored and the domain comes back active
 
 Given
 
@@ -1032,8 +1413,18 @@ When
 
 Then
 
-- the answer says it was done
+- the answer says it was done and the domain comes back active
   - restored = True
+  - domain.name = 'to-restore-1'
+  - domain.description = 'a domain that already existed'
+  - domain.integration_name = None
+  - domain.allowed_docker_registries = []
+  - domain.is_active = True
+  - domain.is_default = False
+  - domain.id: skipped: the database generates it
+  - domain.entity_id: same as the id of the domain seeded in advance
+  - domain.created_at: the time this run wrote
+  - domain.modified_at: the time this run wrote
 
 <a id="deleting-a-user-granted-nothing-may-not-restore-a-domain"></a>
 
