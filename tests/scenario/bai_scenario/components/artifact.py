@@ -123,9 +123,12 @@ async def _lay_caller(
     seeding: Any, domain: Laid[Any], role: UserRole, granted: tuple[Permission, ...]
 ) -> Laid[UserData]:
     """The caller a row asks for, with the permissions the row names."""
+    caller: Laid[UserData]
     if not granted:
-        return await seeding.within(SomeoneOf(domain, role=role))
-    return await seeding.within(SomeoneGrantedOnArtifacts(domain, granted, role=role))
+        caller = await seeding.within(SomeoneOf(domain, role=role))
+    else:
+        caller = await seeding.within(SomeoneGrantedOnArtifacts(domain, granted, role=role))
+    return caller
 
 
 @dataclass(frozen=True)
@@ -562,7 +565,7 @@ def revision_verdicts(
 ) -> list[Verdict]:
     """Every place of one revision node, prefixed for a node inside a list."""
     return [
-        Held(
+        Held[UUID](
             f"{prefix}id",
             node.id,
             SameAs(
@@ -573,7 +576,7 @@ def revision_verdicts(
                 ),
             ),
         ),
-        Held(
+        Held[UUID](
             f"{prefix}field_id",
             node.field_id,
             SameAs(
@@ -584,7 +587,7 @@ def revision_verdicts(
                 ),
             ),
         ),
-        Held(
+        Held[UUID](
             f"{prefix}artifact_id",
             node.artifact_id,
             SameAs(
