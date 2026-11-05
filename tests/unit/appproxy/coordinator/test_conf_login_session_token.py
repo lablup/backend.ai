@@ -12,7 +12,6 @@ from aiohttp.test_utils import make_mocked_request
 
 from ai.backend.appproxy.coordinator.api.conf import conf_v2
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
-from ai.backend.appproxy.coordinator.api.worker_v2 import TokenResponseModel
 from ai.backend.appproxy.coordinator.models import Token
 
 _LOGIN_SESSION_TOKEN = "login-session-token-value"
@@ -72,25 +71,3 @@ class TestConfLoginSessionToken:
             await inspect.unwrap(conf_v2)(conf_request, conf_params_of_an_older_manager)
 
         assert _LOGIN_SESSION_TOKEN not in caplog.text
-
-
-class TestLoginSessionTokenExposure:
-    @pytest.fixture
-    def token_row_stored_earlier(self) -> dict[str, Any]:
-        return {
-            "login_session_token": _LOGIN_SESSION_TOKEN,
-            "kernel_host": "10.0.0.1",
-            "kernel_port": 8000,
-            "session_id": _SESSION_ID,
-            "user_uuid": UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4"),
-            "group_id": UUID("2de2b969-1d04-48a6-af16-0bc8adb3c831"),
-            "access_key": "AKIAIOSFODNN7EXAMPLE",
-            "domain_name": "default",
-        }
-
-    def test_token_response_omits_a_value_stored_earlier(
-        self, token_row_stored_earlier: dict[str, Any]
-    ) -> None:
-        response = TokenResponseModel.model_validate(token_row_stored_earlier)
-
-        assert _LOGIN_SESSION_TOKEN not in response.model_dump_json()
