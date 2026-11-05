@@ -438,12 +438,28 @@ class TestUpdateTaskTemplateAction:
         return TemplateService(repository=mock_repo)
 
     @pytest.fixture
-    def base_action_kwargs(self) -> dict[str, Any]:
+    def owner_uuid(self) -> uuid.UUID:
+        return uuid.uuid4()
+
+    @pytest.fixture
+    def stored_template(self, mock_repo: MagicMock, owner_uuid: uuid.UUID) -> dict[str, Any]:
+        row = {
+            "template": _make_valid_task_template(),
+            "name": "test-template",
+            "user_uuid": owner_uuid,
+            "group_id": uuid.uuid4(),
+            "domain_name": "default",
+        }
+        mock_repo.get_task_template = AsyncMock(return_value=row)
+        return row
+
+    @pytest.fixture
+    def base_action_kwargs(self, owner_uuid: uuid.UUID) -> dict[str, Any]:
         return {
             "template_id": "tmpl-existing",
             "domain_name": "default",
             "requesting_project": ProjectID(uuid.uuid4()),
-            "requester_uuid": uuid.uuid4(),
+            "requester_uuid": owner_uuid,
             "requester_access_key": "AKIAIOSFODNN7EXAMPLE",
             "requester_role": UserRole.USER,
             "requester_domain": "default",
@@ -455,8 +471,8 @@ class TestUpdateTaskTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
         base_action_kwargs: dict[str, Any],
+        stored_template: dict[str, Any],
     ) -> None:
-        mock_repo.task_template_exists = AsyncMock(return_value=True)
         mock_repo.resolve_owner = AsyncMock(return_value=(uuid.uuid4(), uuid.uuid4()))
         mock_repo.update_task_template = AsyncMock(return_value=1)
 
@@ -475,7 +491,7 @@ class TestUpdateTaskTemplateAction:
         mock_repo: MagicMock,
         base_action_kwargs: dict[str, Any],
     ) -> None:
-        mock_repo.task_template_exists = AsyncMock(return_value=False)
+        mock_repo.get_task_template = AsyncMock(return_value=None)
 
         action = UpdateTaskTemplateAction(
             **base_action_kwargs,
@@ -489,8 +505,8 @@ class TestUpdateTaskTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
         base_action_kwargs: dict[str, Any],
+        stored_template: dict[str, Any],
     ) -> None:
-        mock_repo.task_template_exists = AsyncMock(return_value=True)
         mock_repo.resolve_owner = AsyncMock(return_value=(uuid.uuid4(), uuid.uuid4()))
 
         bad_template = _make_valid_task_template()
@@ -508,8 +524,8 @@ class TestUpdateTaskTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
         base_action_kwargs: dict[str, Any],
+        stored_template: dict[str, Any],
     ) -> None:
-        mock_repo.task_template_exists = AsyncMock(return_value=True)
         mock_repo.resolve_owner = AsyncMock(return_value=(uuid.uuid4(), uuid.uuid4()))
         mock_repo.update_task_template = AsyncMock(return_value=0)
 
@@ -519,6 +535,59 @@ class TestUpdateTaskTemplateAction:
         )
         with pytest.raises(DBOperationFailed):
             await service.update_task_template(action)
+
+    @pytest.mark.parametrize(
+        ("role", "domain"),
+        [(UserRole.USER, "default"), (UserRole.ADMIN, "other")],
+        ids=["another_user", "admin_of_another_domain"],
+    )
+    async def test_rejects_a_requester_outside_the_owner_scope(
+        self,
+        service: TemplateService,
+        mock_repo: MagicMock,
+        base_action_kwargs: dict[str, Any],
+        stored_template: dict[str, Any],
+        role: UserRole,
+        domain: str,
+    ) -> None:
+        mock_repo.update_task_template = AsyncMock(return_value=1)
+        kwargs = {
+            **base_action_kwargs,
+            "requester_uuid": uuid.uuid4(),
+            "requester_role": role,
+            "requester_domain": domain,
+        }
+
+        action = UpdateTaskTemplateAction(
+            **kwargs,
+            items=[TaskTemplateItemInput(template=_make_valid_task_template())],
+        )
+        with pytest.raises(NotEnoughPermission):
+            await service.update_task_template(action)
+        mock_repo.update_task_template.assert_not_called()
+
+    async def test_an_admin_of_the_template_domain_updates_it(
+        self,
+        service: TemplateService,
+        mock_repo: MagicMock,
+        base_action_kwargs: dict[str, Any],
+        stored_template: dict[str, Any],
+    ) -> None:
+        mock_repo.resolve_owner = AsyncMock(return_value=(uuid.uuid4(), uuid.uuid4()))
+        mock_repo.update_task_template = AsyncMock(return_value=1)
+        kwargs = {
+            **base_action_kwargs,
+            "requester_uuid": uuid.uuid4(),
+            "requester_role": UserRole.ADMIN,
+        }
+
+        action = UpdateTaskTemplateAction(
+            **kwargs,
+            items=[TaskTemplateItemInput(template=_make_valid_task_template())],
+        )
+        await service.update_task_template(action)
+
+        mock_repo.update_task_template.assert_called_once()
 
 
 class TestDeleteTaskTemplateAction:

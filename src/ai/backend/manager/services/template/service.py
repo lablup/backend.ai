@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Mapping
 from typing import Any, Final
 
 from ai.backend.common.json import load_json
@@ -117,22 +118,31 @@ class TemplateService:
         entries = await self._repository.list_task_templates(action.user_uuid)
         return ListTaskTemplatesActionResult(entries=entries)
 
+    @staticmethod
+    def _check_task_template_access(
+        row: Mapping[str, Any],
+        requester_uuid: uuid.UUID,
+        requester_role: UserRole,
+        requester_domain: str,
+    ) -> None:
+        """Pass the owner, an admin of the template's domain and a superadmin."""
+        match requester_role:
+            case UserRole.SUPERADMIN:
+                return
+            case UserRole.ADMIN if row["domain_name"] == requester_domain:
+                return
+            case _ if row["user_uuid"] == requester_uuid:
+                return
+        raise NotEnoughPermission(f"User {requester_uuid} may not access this session template")
+
     async def get_task_template(self, action: GetTaskTemplateAction) -> GetTaskTemplateActionResult:
         """Get a single task template by ID."""
         row = await self._repository.get_task_template(action.template_id)
         if row is None:
             raise TaskTemplateNotFound
-        match action.requester_role:
-            case UserRole.SUPERADMIN:
-                pass
-            case UserRole.ADMIN if row["domain_name"] == action.requester_domain:
-                pass
-            case _ if row["user_uuid"] == action.requester_uuid:
-                pass
-            case _:
-                raise NotEnoughPermission(
-                    f"User {action.requester_uuid} may not read session template {action.template_id}"
-                )
+        self._check_task_template_access(
+            row, action.requester_uuid, action.requester_role, action.requester_domain
+        )
         raw_template = row["template"]
         template: dict[str, Any] = (
             raw_template if isinstance(raw_template, dict) else dict(load_json(raw_template))
@@ -148,9 +158,12 @@ class TemplateService:
         self, action: UpdateTaskTemplateAction
     ) -> UpdateTaskTemplateActionResult:
         """Validate and update an existing task template."""
-        exists = await self._repository.task_template_exists(action.template_id)
-        if not exists:
+        row = await self._repository.get_task_template(action.template_id)
+        if row is None:
             raise TaskTemplateNotFound
+        self._check_task_template_access(
+            row, action.requester_uuid, action.requester_role, action.requester_domain
+        )
 
         # Authorize owner against the pre-resolved project
         default_user_uuid, default_group_id = await self._repository.resolve_owner(
