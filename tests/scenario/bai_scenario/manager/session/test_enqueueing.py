@@ -285,7 +285,14 @@ class TheSessionIsCreated(Then[LaidPlaceAndCaller, Enqueued]):
             Held("metadata.creation_id", metadata.creation_id, ANonEmptyId()),
             Same("metadata.name", metadata.name, SESSION_NAME),
             Same("metadata.session_type", metadata.session_type, "interactive"),
-            Same("metadata.access_key", metadata.access_key, laid.access_key),
+            Held(
+                "metadata.access_key",
+                metadata.access_key,
+                SameAs(
+                    laid.access_key,
+                    Says("세션을 요청한 키", english="the key the session was requested with"),
+                ),
+            ),
             Same("metadata.cluster_mode", metadata.cluster_mode, "SINGLE_NODE"),
             Same("metadata.cluster_size", metadata.cluster_size, 1),
             Same("metadata.tier", metadata.tier, SESSION_PRIORITY_DEFAULT),
