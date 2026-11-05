@@ -32,7 +32,11 @@ from ai.backend.testutils.scenario_steps import (
     When,
 )
 from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
-from bai_scenario.components.deployment_revision_preset import LAID_DESCRIPTION, PresetsAndACaller
+from bai_scenario.components.deployment_revision_preset import (
+    LAID_DESCRIPTION,
+    PresetsAndACaller,
+    PresetsAndAnOutsider,
+)
 from bai_scenario.components.system import lay_a_public_reader
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
@@ -69,7 +73,7 @@ class PresetsAndSlotsAndSomeone(Given[Any, PresetsAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> PresetsAndACaller:
-        slot_type = await seeding.creating(TestSeedSlotType(slot=IntrinsicSlotNames.CPU))
+        await seeding.creating(TestSeedSlotType(slot=IntrinsicSlotNames.CPU))
         variant = await seeding.creating(TestSeedRuntimeVariant())
         preset = await seeding.creating_from(TestSeedDeploymentRevisionPreset(), variant)
         await seeding.adding(TestSeedPresetSlotOf(), preset)
@@ -188,7 +192,7 @@ class AUserGrantedNothingSearchesNoSlots(
 
     @override
     def given(self) -> Given[TestSeedingSession, PresetsAndACaller]:
-        return PresetsAndSlotsAndSomeone()
+        return PresetsAndAnOutsider()
 
     @override
     def when(self) -> When[PresetsAndACaller, DeploymentRevisionPresetAdapter, Answer]:

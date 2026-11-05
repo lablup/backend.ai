@@ -69,7 +69,7 @@ class MakingARuleOfTheDeployment(
         with ActingAs(laid.caller):
             return await adapter.create_rule(
                 CreateAutoScalingRuleInput(
-                    deployment_id=laid.deployment.id,
+                    model_deployment_id=laid.deployment.id,
                     metric_source=AutoScalingMetricSource.KERNEL,
                     metric_name="made-rule",
                     step_size=1,

@@ -44,7 +44,7 @@ type RuleStep = Scenario[
 
 @dataclass(frozen=True)
 class EditingTheFirstRule(When[RulesOfADeploymentAndACaller, DeploymentAdapter, Answer]):
-    """심은 규칙 하나의 id 와 고칠 값을 준다. id 는 REST 핸들러처럼 응답 모양에 얹는다."""
+    """심은 규칙 하나의 id 와 고칠 값을 준다."""
 
     @override
     def operation(self) -> str:
@@ -64,9 +64,10 @@ class EditingTheFirstRule(When[RulesOfADeploymentAndACaller, DeploymentAdapter, 
         with ActingAs(laid.caller):
             return await adapter.update_rule(
                 UpdateAutoScalingRuleInput(
+                    id=laid.rules[0].id,
                     step_size=EDITED_STEP_SIZE,
                     time_window=EDITED_TIME_WINDOW,
-                ).model_copy(update={"id": laid.rules[0].id})
+                )
             )
 
 

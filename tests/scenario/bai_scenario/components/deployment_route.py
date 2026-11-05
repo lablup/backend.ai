@@ -153,7 +153,11 @@ class TheRouteNode:
             Same(f"{at}health_status", node.health_status.value, laid.health_status.value),
             Same(f"{at}traffic_ratio", node.traffic_ratio, laid.traffic_ratio),
             Held(f"{at}created_at", node.created_at, WrittenByThisRun(self.started)),
-            Held[UUID](f"{at}revision_id", node.revision_id, SameAs(self.revision_id, REVISION_ID)),
+            Held[UUID | None](
+                f"{at}revision_id",
+                node.revision_id,
+                SameAs[UUID | None](self.revision_id, REVISION_ID),
+            ),
             Same(f"{at}traffic_status", node.traffic_status.value, self.traffic_status),
             Same(f"{at}error_data", node.error_data, laid.error_data),
         ]

@@ -17,14 +17,13 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
-    MissingResponse,
     Says,
     Scenario,
     Then,
     Verdict,
     When,
 )
-from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.deployment_route import (
     ADeploymentWithRoutes,
     ARoutedDeploymentAndACaller,

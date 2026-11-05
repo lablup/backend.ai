@@ -11,6 +11,7 @@ from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
@@ -156,12 +157,27 @@ class AVariantAndSomeoneToCreate(Given[Any, AVariantAndACaller]):
 
 
 @dataclass(frozen=True)
+class TheImageIdThePresetKept(Condition[ImageID | None]):
+    """미리 정한 이미지 id 이다."""
+
+    image_id: ImageID
+
+    @override
+    def says(self) -> str:
+        return Says("미리 정한 이미지 id", english="the image id fixed in advance")
+
+    @override
+    def holds(self, got: ImageID | None) -> bool:
+        return got == self.image_id
+
+
+@dataclass(frozen=True)
 class ThePresetNode:
     """미리 저장한 프리셋의 노드가 어떤 값으로 와야 하는지. 이름은 미리 저장한 것에서 읽는다."""
 
     started: datetime
     described: str | None = None
-    updated_at: Condition | None = None
+    updated_at: Condition[datetime] | None = None
 
     def verdicts(
         self, node: DeploymentRevisionPresetNode, laid: DeploymentRevisionPresetData, at: str = ""
@@ -180,16 +196,10 @@ class ThePresetNode:
             Same(f"{at}cluster.cluster_mode", node.cluster.cluster_mode, laid.cluster_mode),
             Same(f"{at}cluster.cluster_size", node.cluster.cluster_size, laid.cluster_size),
             Same(f"{at}resource.resource_opts", node.resource.resource_opts, laid.resource_opts),
-            Held[UUID](
+            Held(
                 f"{at}execution.image_id",
                 node.execution.image_id,
-                SameAs(
-                    laid.image_id,
-                    Says(
-                        "미리 정한 이미지 id",
-                        english="the image id fixed in advance",
-                    ),
-                ),
+                TheImageIdThePresetKept(image_id=laid.image_id),
             ),
             Same(f"{at}execution.startup_command", node.execution.startup_command, laid.startup_command),
             Same(f"{at}execution.bootstrap_script", node.execution.bootstrap_script, laid.bootstrap_script),

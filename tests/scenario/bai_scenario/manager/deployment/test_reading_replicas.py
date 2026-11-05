@@ -32,7 +32,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type Answer = ReplicaNode
+type Answer = ReplicaNode | None
 type ReplicaStep = Scenario[
     TestSeedingSession, ARoutedDeploymentAndACaller, DeploymentAdapter, Answer
 ]
