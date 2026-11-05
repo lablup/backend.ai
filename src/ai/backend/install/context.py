@@ -903,10 +903,22 @@ class Context(metaclass=ABCMeta):
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
         accelerator = self.install_info.accelerator
+        base_path = self.install_info.base_path
         toml_path = self.copy_config("agent.toml")
+        (base_path / "fixtures" / "agent").mkdir(parents=True, exist_ok=True)
+        await self.run_manager_cli(["mgr", "generate-rpc-keypair", "fixtures/agent", "agent"])
         self.sed_in_place_multi(
             toml_path,
             [
+                (
+                    re.compile("^rpc-auth-manager-public-key = .*", flags=re.MULTILINE),
+                    "rpc-auth-manager-public-key = "
+                    f'"{base_path / "fixtures" / "manager" / "manager.key"}"',
+                ),
+                (
+                    re.compile("^rpc-auth-agent-keypair = .*", flags=re.MULTILINE),
+                    f'rpc-auth-agent-keypair = "{base_path / "fixtures" / "agent" / "agent.key_secret"}"',
+                ),
                 ("port = 8120", f"port = {halfstack.etcd_addr[0].face.port}"),
                 ("port = 6001", f"port = {service.agent_rpc_addr.bind.port}"),
                 ("port = 6009", f"port = {service.agent_watcher_addr.bind.port}"),

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, Mock
 
@@ -50,6 +51,7 @@ def create_test_config(
     allocated_mem: str | None = None,
     allocated_devices: Mapping[SlotName, Decimal] | None = None,
     num_agents: int = 1,
+    rpc_auth_key_config: Mapping[str, Path],
 ) -> AgentUnifiedConfig:
     """Helper to create AgentUnifiedConfig for testing."""
     base_config: dict[str, Any] = {
@@ -59,6 +61,7 @@ def create_test_config(
             "initial_resource_group_name": "default",
             "backend": "dummy",
             "rpc_listen_addr": "127.0.0.1:6001",
+            **rpc_auth_key_config,
         },
         "container": {
             "scratch_type": "hostdir",
@@ -224,10 +227,12 @@ def setup_mock_resources(
 class TestSharedMode:
     async def test_no_restrictions(
         self,
+        rpc_auth_key_config: dict[str, Path],
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         config = create_test_config(
+            rpc_auth_key_config=rpc_auth_key_config,
             allocation_mode=ResourceAllocationMode.SHARED,
             num_agents=2,
         )
@@ -274,10 +279,12 @@ class TestSharedMode:
 
     async def test_with_reserved_resources(
         self,
+        rpc_auth_key_config: dict[str, Path],
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         config = create_test_config(
+            rpc_auth_key_config=rpc_auth_key_config,
             allocation_mode=ResourceAllocationMode.SHARED,
             reserved_cpu=2,
             reserved_mem="4G",
@@ -321,10 +328,12 @@ class TestSharedMode:
 class TestAutoSplitMode:
     async def test_fraction_alloc_map(
         self,
+        rpc_auth_key_config: dict[str, Path],
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         config = create_test_config(
+            rpc_auth_key_config=rpc_auth_key_config,
             allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
             num_agents=2,
         )
@@ -362,10 +371,12 @@ class TestAutoSplitMode:
 
     async def test_discrete_alloc_map_even(
         self,
+        rpc_auth_key_config: dict[str, Path],
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         config = create_test_config(
+            rpc_auth_key_config=rpc_auth_key_config,
             allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
             num_agents=2,
         )
@@ -403,10 +414,12 @@ class TestAutoSplitMode:
 
     async def test_discrete_alloc_map_uneven(
         self,
+        rpc_auth_key_config: dict[str, Path],
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         config = create_test_config(
+            rpc_auth_key_config=rpc_auth_key_config,
             allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
             num_agents=3,
         )
@@ -451,10 +464,12 @@ class TestAutoSplitMode:
 
     async def test_with_reserved_resources(
         self,
+        rpc_auth_key_config: dict[str, Path],
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         config = create_test_config(
+            rpc_auth_key_config=rpc_auth_key_config,
             allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
             reserved_cpu=4,
             num_agents=2,
@@ -497,10 +512,12 @@ class TestAutoSplitMode:
 class TestManualMode:
     async def test_cpu_mem(
         self,
+        rpc_auth_key_config: dict[str, Path],
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         config = create_test_config(
+            rpc_auth_key_config=rpc_auth_key_config,
             allocation_mode=ResourceAllocationMode.MANUAL,
             allocated_cpu=4,
             allocated_mem="8G",
@@ -553,10 +570,12 @@ class TestManualMode:
 
     async def test_with_allocated_devices(
         self,
+        rpc_auth_key_config: dict[str, Path],
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         config = create_test_config(
+            rpc_auth_key_config=rpc_auth_key_config,
             allocation_mode=ResourceAllocationMode.MANUAL,
             allocated_cpu=8,
             allocated_mem="16G",
@@ -610,11 +629,13 @@ class TestMultiDeviceScenarios:
 
     async def test_multiple_cpu_cores_auto_split(
         self,
+        rpc_auth_key_config: dict[str, Path],
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test AUTO_SPLIT with an 8-core CPU (realistic scenario)."""
         config = create_test_config(
+            rpc_auth_key_config=rpc_auth_key_config,
             allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
             num_agents=2,
         )
@@ -661,11 +682,13 @@ class TestMultiDeviceScenarios:
 
     async def test_multiple_cpu_cores_manual_mode(
         self,
+        rpc_auth_key_config: dict[str, Path],
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test MANUAL mode with an 8-core CPU and memory."""
         config = create_test_config(
+            rpc_auth_key_config=rpc_auth_key_config,
             allocation_mode=ResourceAllocationMode.MANUAL,
             allocated_cpu=3,
             allocated_mem="8G",
@@ -707,11 +730,13 @@ class TestMultiDeviceScenarios:
 
     async def test_calculate_total_slots_sums_all_devices(
         self,
+        rpc_auth_key_config: dict[str, Path],
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Verify that total_slots correctly sums across multiple GPU devices."""
         config = create_test_config(
+            rpc_auth_key_config=rpc_auth_key_config,
             allocation_mode=ResourceAllocationMode.SHARED,
         )
 
@@ -740,11 +765,13 @@ class TestMultiDeviceScenarios:
 
     async def test_multi_device_shared_mode(
         self,
+        rpc_auth_key_config: dict[str, Path],
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test SHARED mode with multiple GPU devices - all agents share all resources."""
         config = create_test_config(
+            rpc_auth_key_config=rpc_auth_key_config,
             allocation_mode=ResourceAllocationMode.SHARED,
             num_agents=3,
         )
@@ -781,6 +808,7 @@ class TestMultiDeviceScenarios:
 
     async def test_mixed_devices_with_different_slot_types(
         self,
+        rpc_auth_key_config: dict[str, Path],
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
@@ -789,6 +817,7 @@ class TestMultiDeviceScenarios:
         CPUs use DiscretePropertyAllocMap, and GPUs with shares use FractionAllocMap.
         """
         config = create_test_config(
+            rpc_auth_key_config=rpc_auth_key_config,
             allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
             num_agents=2,
         )
@@ -855,11 +884,13 @@ class TestMultiDeviceScenarios:
 
     async def test_multi_gpu_auto_split(
         self,
+        rpc_auth_key_config: dict[str, Path],
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test AUTO_SPLIT with multiple GPU devices sharing the same slot type."""
         config = create_test_config(
+            rpc_auth_key_config=rpc_auth_key_config,
             allocation_mode=ResourceAllocationMode.AUTO_SPLIT,
             num_agents=2,
         )
@@ -898,11 +929,13 @@ class TestMultiDeviceScenarios:
 
     async def test_multi_gpu_shared_mode_with_reservation(
         self,
+        rpc_auth_key_config: dict[str, Path],
         mock_etcd: AsyncEtcd,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test SHARED mode with multiple GPU devices and system reservation."""
         config = create_test_config(
+            rpc_auth_key_config=rpc_auth_key_config,
             allocation_mode=ResourceAllocationMode.SHARED,
             num_agents=2,
         )
