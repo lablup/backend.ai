@@ -745,7 +745,6 @@ type ScalingGroupNode implements Node @key(fields: "id") {
   is_public: Boolean
   created_at: DateTime
   wsproxy_addr: String
-  wsproxy_api_token: String
   driver: String
   driver_opts: JSONString
   scheduler: String
