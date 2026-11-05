@@ -23,6 +23,7 @@ from ai.backend.manager.data.vfolder.types import VFolderData, VFolderOperationS
 from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     ProjectVFolderCreator,
+    UnmanagedPersonalVFolderCreator,
 )
 from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom, TestSeedRowFromTwo, joined
@@ -108,6 +109,45 @@ class TestSeedPersonalVFolder(TestSeedRowFrom[UserData, VFolderData]):
             usage_mode=self.usage_mode,
             cloneable=self.cloneable,
             default_mount_permission=self.default_mount_permission,
+        )
+
+
+@dataclass(frozen=True)
+class TestSeedUnmanagedPersonalVFolder(TestSeedRowFrom[UserData, VFolderData]):
+    """A folder of the given person's own that names a path the manager does not own."""
+
+    host: str
+    name_hint: str = "unmanaged"
+    unmanaged_path: str = "/mnt/unmanaged"
+    status: VFolderOperationStatus = VFolderOperationStatus.READY
+
+    @override
+    def kind(self) -> str:
+        return Says("개인 vfolder", english="Personal vfolder")
+
+    @override
+    def detail(self) -> str:
+        return Says(
+            "그 사람의 개인 프로젝트에 놓이고, 관리하지 않는 경로를 가리킵니다",
+            english="is placed in that person's personal project and points at a path"
+            " the manager does not own",
+        )
+
+    @override
+    def name(self, naming: Naming) -> str:
+        return naming(self.name_hint)
+
+    @override
+    def seed(self, name: str, source: UserData) -> UnmanagedPersonalVFolderCreator:
+        return UnmanagedPersonalVFolderCreator(
+            name=name,
+            domain_name=source.domain_name,
+            quota_scope_id=str(QuotaScopeID(QuotaScopeType.USER, source.id)),
+            host=self.host,
+            creator_id=source.id,
+            status=self.status,
+            user=UserID(source.id),
+            unmanaged_path=self.unmanaged_path,
         )
 
 

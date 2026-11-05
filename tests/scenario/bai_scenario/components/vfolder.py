@@ -58,7 +58,11 @@ from bai_scenario.seeds.resource_group.resource_group import TestSeedResourceGro
 from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
 from bai_scenario.seeds.runtime_variant.runtime_variant import TestSeedRuntimeVariant
 from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest, TestSeedRow
-from bai_scenario.seeds.vfolder.vfolder import TestSeedPersonalVFolder, TestSeedProjectVFolder
+from bai_scenario.seeds.vfolder.vfolder import (
+    TestSeedPersonalVFolder,
+    TestSeedProjectVFolder,
+    TestSeedUnmanagedPersonalVFolder,
+)
 
 STORAGE_HOST = "local:volume1"
 """The one host the faked storage manager answers for."""
@@ -591,6 +595,49 @@ class SomeoneWithAFolder(Given[Any, AFolderAndPeople]):
             seeding.made(caller),
             seeding.made(other) if other is not None else None,
         )
+
+
+@dataclass(frozen=True)
+class SomeoneWithAnUnmanagedFolder(Given[Any, AFolderAndPeople]):
+    """자기 개인 폴더 하나를 가진 사용자. 그 폴더는 관리하지 않는 경로를 가리킨다.
+
+    그 폴더에 받은 권한은 행이 정한다.
+    """
+
+    permissions: tuple[Permission, ...] = ()
+
+    @override
+    def describe(self) -> str:
+        if self.permissions:
+            names = ", ".join(permission.name or "" for permission in self.permissions)
+            grant_ko = f"자기 개인 폴더에 {names} 권한을 받은"
+            grant_en = f"granted the {names} permission on their personal folder"
+        else:
+            grant_ko = "아무 권한도 받지 않은"
+            grant_en = "holding no permission"
+        return Says(
+            f"관리하지 않는 경로를 가리키는 개인 vfolder 하나를 가진, {grant_ko} 사용자 한 명",
+            english=(
+                f"one user with one personal vfolder pointing at a path the manager does not "
+                f"own, {grant_en}"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> AFolderAndPeople:
+        domain = await seeding.creating(
+            TestSeedDomain(name_hint="home", description=WAS_HERE, vfolder_hosts=[STORAGE_HOST])
+        )
+        caller = await seeding.within(SomeoneOf(domain, vfolder_hosts=[STORAGE_HOST]))
+        folder = await seeding.creating_from(
+            TestSeedUnmanagedPersonalVFolder(host=STORAGE_HOST), caller
+        )
+        if self.permissions:
+            own = await seeding.personal_project_of(caller)
+            await seeding.within(
+                SomeoneGrantedOnFoldersIn(own, lambda p: ProjectID(p.id), caller, self.permissions)
+            )
+        return AFolderAndPeople(seeding.made(folder), seeding.made(caller), None)
 
 
 @dataclass(frozen=True)
