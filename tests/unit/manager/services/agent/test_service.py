@@ -19,6 +19,7 @@ from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName,
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentHeartbeatUpsert, UpsertResult
+from ai.backend.manager.errors.watcher import WatcherTokenNotConfigured
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.services.agent.actions.get_watcher_status import (
@@ -494,6 +495,19 @@ class TestWatcher:
         watcher_info = await agent_service._get_watcher_info(agent_id)
 
         assert watcher_info["addr"].port == 6009
+
+    @pytest.mark.parametrize("token", [None, ""], ids=["missing", "empty"])
+    async def test_watcher_info_rejects_unconfigured_token(
+        self,
+        agent_service: AgentService,
+        agent_id: AgentId,
+        mock_config_provider: MagicMock,
+        token: str | None,
+    ) -> None:
+        mock_config_provider.config.watcher.token = token
+
+        with pytest.raises(WatcherTokenNotConfigured):
+            await agent_service._get_watcher_info(agent_id)
 
     async def test_agent_start_success(
         self, watcher_service_ok: AgentService, agent_id: AgentId

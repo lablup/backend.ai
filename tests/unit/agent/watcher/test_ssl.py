@@ -31,7 +31,7 @@ class TestWatcherSSL:
         }
         etcd_context = MagicMock()
         etcd_context.__aenter__ = AsyncMock(
-            return_value=AsyncMock(get=AsyncMock(return_value=None))
+            return_value=AsyncMock(get=AsyncMock(return_value="watcher-token"))
         )
         etcd_context.__aexit__ = AsyncMock(return_value=None)
         ssl_context = MagicMock()
