@@ -9,7 +9,6 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
@@ -56,7 +55,7 @@ class ReadingTheId(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Loaded]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminReadsById(
+class AUserReadingPoliciesReadsById(
     Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Loaded]
 ):
     family: Family[Any, Any]
@@ -64,22 +63,22 @@ class TheSuperadminReadsById(
 
     @override
     def summary(self) -> str:
-        return f"the-superadmin-reads-a-{self.family.label}-by-id"
+        return f"a-user-reading-policies-reads-a-{self.family.label}-by-id"
 
     @override
     def describe(self) -> str:
         return Says(
-            f"superadmin 이 id 로 {self.family.kind} 하나를 읽으면, 그 항목에 정책 전체가 "
-            "응답으로 옵니다",
+            f"public 에서 그 정책을 읽을 수 있는 사용자가 id 로 {self.family.kind} 하나를 "
+            "읽으면, 그 항목에 정책 전체가 응답으로 옵니다",
             english=(
-                f"when the superadmin reads one {self.family.label} by id, the whole policy comes "
-                "back for that item"
+                f"when a user who can read it in public reads one {self.family.label} by id, the "
+                "whole policy comes back for that item"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
-        return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
+        return APolicyAndSomeone(self.family, granted=True)
 
     @override
     def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, Loaded]:
@@ -125,7 +124,7 @@ class AUserGrantedNothingIsRefusedPerId(
 
 
 SCENARIOS: list[ReadingStep] = [
-    *(TheSuperadminReadsById(family, started=datetime.now(UTC)) for family in FAMILIES),
+    *(AUserReadingPoliciesReadsById(family, started=datetime.now(UTC)) for family in FAMILIES),
     *(AUserGrantedNothingIsRefusedPerId(family) for family in FAMILIES),
 ]
 

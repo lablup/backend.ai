@@ -16,6 +16,7 @@ from decimal import Decimal
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_policy import (
     KeyPairResourcePolicyEntityType,
@@ -75,6 +76,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
 from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.resource.types import (
@@ -1201,16 +1203,61 @@ async def lay_a_holder(seeding: Any, *, role: UserRole, active: bool = True) -> 
 
 
 @dataclass(frozen=True)
+class ReadingPoliciesInPublic(TestSeedNest[Laid[None]]):
+    """public 스코프에서 그 정책을 읽을 수 있게 하는 역할과, 그 역할의 부여."""
+
+    user: Laid[UserData]
+    entity_type: EntityType
+
+    @override
+    def kind(self) -> str:
+        return Says(
+            f"public 에서 {self.entity_type} 읽기 권한을 주는 역할 부여",
+            english=(
+                f"the role assignment granting read permission on {self.entity_type} in public"
+            ),
+        )
+
+    @override
+    def lay(self, seed: TestSeeder) -> Laid[None]:
+        role = seed.creating_from(
+            TestSeedRole(
+                lambda _: global_entity_id(GlobalEntityName.PUBLIC), name_hint="policy-reader"
+            ),
+            self.user,
+        )
+        seed.adding(
+            TestSeedPermission(entity_type=self.entity_type, permission=Permission.READ), role
+        )
+        return seed.granting(
+            role, self.user, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
+        )
+
+
+@dataclass(frozen=True)
 class APolicyAndSomeone(Given[Any, APolicyAndACaller[Any]]):
-    """정책 하나와, 다른 정책이 할당된 사용자 한 명. 대상 정책은 아무도 사용하지 않는다."""
+    """정책 하나와, 다른 정책이 할당된 사용자 한 명. 대상 정책은 아무도 사용하지 않는다.
+
+    ``granted`` 면 그 사용자가 public 에서 그 정책을 읽을 수 있다.
+    """
 
     family: Family[Any, Any]
     role: UserRole = UserRole.USER
     holding_optional: bool = False
+    granted: bool = False
 
     @override
     def describe(self) -> str:
         kind = self.family.kind
+        if self.granted:
+            return Says(
+                f"아무도 사용하지 않는 {kind} 하나와, public 에서 그 정책을 읽을 수 있는 "
+                f"{self.role.value} 한 명",
+                english=(
+                    f"one unused {in_language(kind, Language.ENGLISH)} and one {self.role.value} "
+                    "who can read it in public"
+                ),
+            )
         return Says(
             f"아무도 사용하지 않는 {kind} 하나와, {self.role.value} 한 명",
             english=(f"one unused {in_language(kind, Language.ENGLISH)} and one {self.role.value}"),
@@ -1220,6 +1267,8 @@ class APolicyAndSomeone(Given[Any, APolicyAndACaller[Any]]):
     async def lay(self, seeding: Any) -> APolicyAndACaller[Any]:
         holder = await lay_a_holder(seeding, role=self.role)
         target = await seeding.creating(self.family.seed(holding_optional=self.holding_optional))
+        if self.granted:
+            await seeding.within(ReadingPoliciesInPublic(holder.user, self.family.entity_type))
         return APolicyAndACaller(seeding.made(target), seeding.made(holder.user))
 
 

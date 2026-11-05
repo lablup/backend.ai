@@ -285,28 +285,28 @@ class AnIdNothingAnswersToIsNotFound(
 
 
 @dataclass(frozen=True)
-class TheSuperadminReadsSeveralIds(
+class AUserReadingPresetsReadsSeveralIds(
     Scenario[TestSeedingSession, ManyPresetsAndACaller, ResourcePresetAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-reads-several-presets-by-id"
+        return "a-user-reading-presets-reads-several-presets-by-id"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 프리셋 여럿과 없는 id 하나를 한 번에 읽으면, 요청한 순서대로 "
-            "프리셋이 오고 없는 id 의 자리는 비어 있습니다",
+            "public 에서 프리셋을 읽을 수 있는 사용자가 프리셋 여럿과 없는 id 하나를 한 번에 "
+            "읽으면, 요청한 순서대로 프리셋이 오고 없는 id 의 자리는 비어 있습니다",
             english=(
-                "when the superadmin batch loads several presets and one unknown id, every "
-                "preset comes back in the order requested and the item for the unknown id is "
-                "empty"
+                "when a user who can read presets in public batch loads several presets and one "
+                "unknown id, every preset comes back in the order requested and the item for the "
+                "unknown id is empty"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
-        return ManyPresetsAndSomeone(role=UserRole.SUPERADMIN)
+        return ManyPresetsAndSomeone(granted=Permission.READ)
 
     @override
     def when(self) -> When[ManyPresetsAndACaller, ResourcePresetAdapter, Loaded]:
@@ -354,7 +354,7 @@ SCENARIOS: list[ReadingStep | LoadingStep] = [
     AUserGrantedReadReadsAPreset(),
     AUserGrantedNothingMayNotReadAPreset(),
     AnIdNothingAnswersToIsNotFound(),
-    TheSuperadminReadsSeveralIds(),
+    AUserReadingPresetsReadsSeveralIds(),
     AUserGrantedNothingIsRefusedPerId(),
 ]
 

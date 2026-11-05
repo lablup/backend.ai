@@ -142,23 +142,24 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
 
 @dataclass(frozen=True)
 class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
-    """프리셋 여럿과 사용자 한 명."""
+    """프리셋 여럿과 사용자 한 명. `granted`가 있으면 public 에서 그 권한을 받는다."""
 
     role: UserRole = UserRole.USER
     count: int = 2
+    granted: Permission | None = None
 
     @override
     def describe(self) -> str:
-        named = role_named(self.role)
+        caller = _caller_named(self.role, self.granted)
         return Says(
-            f"프리셋 {self.count}개와 {named} 한 명",
-            english=f"{self.count} presets and one {in_language(named, Language.ENGLISH)}",
+            f"프리셋 {self.count}개와 {caller} 한 명",
+            english=f"{self.count} presets and one {in_language(caller, Language.ENGLISH)}",
         )
 
     @override
     async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
         presets = [await seeding.creating(TestSeedResourcePreset()) for _ in range(self.count)]
-        caller = await _lay_caller(seeding, self.role, None)
+        caller = await _lay_caller(seeding, self.role, self.granted)
         return ManyPresetsAndACaller(
             laid=tuple(seeding.made(one) for one in presets),
             caller=seeding.made(caller),

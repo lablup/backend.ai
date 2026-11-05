@@ -409,29 +409,29 @@ class ChangingTheSpecOfAnUnknownNameIsNotFound(
 
 
 @dataclass(frozen=True)
-class TheSuperadminAssignsAResourceWeight(
+class AUserGrantedUpdateAssignsAResourceWeight(
     Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
     started: datetime
 
     @override
     def summary(self) -> str:
-        return "the-superadmin-assigns-a-resource-weight"
+        return "a-user-granted-update-assigns-a-resource-weight"
 
     @override
     def describe(self) -> Says:
         return Says(
-            "superadmin 이 슬롯 종류 하나의 가중치를 지정하면 그룹 전체가 반환됩니다. 반환되는 "
-            "노드에는 이 설정이 담기지 않습니다",
+            "그룹 범위에서 수정 권한을 받은 사용자가 슬롯 종류 하나의 가중치를 지정하면 그룹 "
+            "전체가 반환됩니다. 반환되는 노드에는 이 설정이 담기지 않습니다",
             english=(
-                "when the superadmin assigns a weight to one resource type, the whole group comes "
-                "back. the returned node does not carry this config"
+                "when a user granted update in the group scope assigns a weight to one resource "
+                "type, the whole group comes back. the returned node does not carry this config"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
-        return AGroupAndSomeone(role=UserRole.SUPERADMIN, reports_a_slot=True)
+        return AGroupAndSomeone(granted=Permission.UPDATE, reports_a_slot=True)
 
     @override
     def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
@@ -463,7 +463,7 @@ class AWeightOnAnUnreportedResourceIsRejected(
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
-        return AGroupAndSomeone(role=UserRole.SUPERADMIN)
+        return AGroupAndSomeone(granted=Permission.UPDATE)
 
     @override
     def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
@@ -480,7 +480,7 @@ SCENARIOS: list[FairShareStep] = [
     AUserGrantedNothingMayNotReadTheSpec(),
     ReadingTheSpecOfAnUnknownNameIsNotFound(),
     TheSuperadminChangesTheHalfLife(started=datetime.now(UTC)),
-    TheSuperadminAssignsAResourceWeight(started=datetime.now(UTC)),
+    AUserGrantedUpdateAssignsAResourceWeight(started=datetime.now(UTC)),
     AWeightOnAnUnreportedResourceIsRejected(),
     AUserGrantedUpdateOnTheGroupChangesTheSpec(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotChangeTheSpec(),

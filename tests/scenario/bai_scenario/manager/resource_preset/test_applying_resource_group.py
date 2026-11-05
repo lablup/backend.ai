@@ -11,6 +11,7 @@ import pytest
 from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.resource_preset.adapter import ResourcePresetAdapter
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -108,27 +109,27 @@ class ThePresetInThatGroup(Then[APresetAGroupAndACaller, ResourcePresetData]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminBindsAPreset(
+class AUserGrantedUpdateBindsAPreset(
     Scenario[TestSeedingSession, APresetAGroupAndACaller, ResourcePresetAdapter, ResourcePresetData]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-binds-a-preset-to-a-resource-group"
+        return "a-user-granted-update-binds-a-preset-to-a-resource-group"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 프리셋을 자원 그룹에 묶으면, 그 그룹 이름을 가진 프리셋이 반환되고 "
-            "나머지 값은 그대로입니다",
+            "public 에서 프리셋을 고칠 수 있는 사용자가 프리셋을 자원 그룹에 묶으면, 그 그룹 "
+            "이름을 가진 프리셋이 반환되고 나머지 값은 그대로입니다",
             english=(
-                "when the superadmin binds a preset to a resource group, the preset comes back "
-                "naming that group and the rest stays as it was"
+                "when a user who can update presets in public binds a preset to a resource group, "
+                "the preset comes back naming that group and the rest stays as it was"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAGroupAndACaller]:
-        return APresetAndAGroupAndSomeone()
+        return APresetAndAGroupAndSomeone(granted=Permission.UPDATE)
 
     @override
     def when(self) -> When[APresetAGroupAndACaller, ResourcePresetAdapter, ResourcePresetData]:
@@ -172,7 +173,7 @@ class AUserGrantedNothingMayNotBind(
 
 
 SCENARIOS: list[ApplyingStep] = [
-    TheSuperadminBindsAPreset(),
+    AUserGrantedUpdateBindsAPreset(),
     AUserGrantedNothingMayNotBind(),
 ]
 
