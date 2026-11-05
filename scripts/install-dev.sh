@@ -1190,6 +1190,10 @@ configure_backendai() {
 
   # configure agent
   cp configs/agent/halfstack.toml ./agent.toml
+  if [ ! -f fixtures/agent/agent.key_secret ]; then
+    mkdir -p fixtures/agent
+    ./backend.ai mgr generate-rpc-keypair fixtures/agent agent
+  fi
   mkdir -p "$VAR_BASE_PATH"
   sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
   sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
