@@ -11,6 +11,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.login_session_types import (
     LoginAttemptResult,
@@ -390,7 +391,7 @@ class TestLoginSessionForce:
 
         # Logout (invalidate session by token)
         await auth_db_source.delete_session_by_token(
-            result1.session_token, LoginAttemptResult.LOGOUT
+            result1.session_token, UserID(sample_user.user_id), LoginAttemptResult.LOGOUT
         )
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 0
 
@@ -410,3 +411,39 @@ class TestLoginSessionForce:
         )
         assert result2.session_token != result1.session_token
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1
+
+    async def test_logout_with_another_users_token_keeps_session(
+        self,
+        auth_db_source: AuthDBSource,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_user: SampleUserData,
+    ) -> None:
+        created = await auth_db_source.create_login_session(
+            user_id=sample_user.user_id,
+            access_key=sample_user.access_key,
+            domain_name=sample_user.domain_name,
+        )
+
+        is_deleted = await auth_db_source.delete_session_by_token(
+            created.session_token, UserID(uuid.uuid4()), LoginAttemptResult.LOGOUT
+        )
+
+        assert is_deleted is False
+        assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1
+
+    async def test_invalidate_returns_tokens_of_active_sessions(
+        self,
+        auth_db_source: AuthDBSource,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_user: SampleUserData,
+    ) -> None:
+        created = await auth_db_source.create_login_session(
+            user_id=sample_user.user_id,
+            access_key=sample_user.access_key,
+            domain_name=sample_user.domain_name,
+        )
+
+        tokens = await auth_db_source.invalidate_active_login_sessions(UserID(sample_user.user_id))
+
+        assert tokens == [created.session_token]
+        assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 0

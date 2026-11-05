@@ -105,6 +105,10 @@ async def test_update_password_no_auth_successful(
 
     assert result.user_id == UUID("12345678-1234-5678-1234-567812345678")
     assert result.password_changed_at == datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
+    assert mock_auth_repository.delete_user_login_sessions.call_args.args[:2] == (
+        result.user_id,
+        "default",
+    )
 
 
 async def test_update_password_no_auth_fails_when_max_password_age_is_none(

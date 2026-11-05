@@ -86,6 +86,10 @@ async def test_update_password_successful(
     assert result.message == "Password updated successfully"
     mock_auth_repository.check_credential_without_migration.assert_called_once()
     mock_auth_repository.update_user_password.assert_called_once()
+    assert mock_auth_repository.delete_user_login_sessions.call_args.args[:2] == (
+        action.user_id,
+        "default",
+    )
 
 
 async def test_update_password_fails_when_new_passwords_dont_match(

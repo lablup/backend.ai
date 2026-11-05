@@ -683,20 +683,20 @@ class AuthDBSource:
     async def delete_session_by_token(
         self,
         session_token: str,
+        user_id: UserID,
         result: LoginAttemptResult,
         client_ip: str | None = None,
-    ) -> None:
-        """Delete a single login session by its token and record history.
+    ) -> bool:
+        """Delete the user's login session by its token and record history.
 
-        Uses a CTE to atomically DELETE + INSERT into login_history with a
-        JOIN on users to obtain domain_name. No-op if the session is not found.
+        Returns False, deleting nothing, if the token is missing or owned by another user.
         """
         ls = LoginSessionRow.__table__
         lh = LoginHistoryRow.__table__
         async with self._db.connect() as conn:
             deleted = (
                 sa.delete(ls)
-                .where(ls.c.session_token == session_token)
+                .where((ls.c.session_token == session_token) & (ls.c.user_id == user_id))
                 .returning(ls.c.user_id)
                 .cte("deleted")
             )
@@ -709,8 +709,10 @@ class AuthDBSource:
                     sa.literal(client_ip, type_=pgsql.INET).label("client_ip"),
                 ).select_from(deleted.join(users, deleted.c.user_id == users.c.uuid)),
             )
-            await conn.execute(insert_query)
+            inserted = await conn.execute(insert_query.returning(lh.c.id))
+            is_deleted = inserted.first() is not None
             await conn.commit()
+            return is_deleted
 
     @auth_db_source_resilience.apply()
     async def delete_sessions_by_user(
@@ -794,12 +796,16 @@ class AuthDBSource:
             return session_token
 
     @auth_db_source_resilience.apply()
-    async def invalidate_active_login_sessions(self, user_id: UserID) -> None:
-        """Mark every active login session of a user invalidated."""
-        ls = LoginSessionRow.__table__
-        async with self._db.begin() as conn:
-            await conn.execute(
-                sa.update(ls)
-                .where((ls.c.user_id == user_id) & (ls.c.status == LoginSessionStatus.ACTIVE))
+    async def invalidate_active_login_sessions(self, user_id: UserID) -> list[str]:
+        """Mark every active login session of a user invalidated and return their tokens."""
+        async with self._db.begin_session() as db_session:
+            result = await db_session.execute(
+                sa.update(LoginSessionRow)
+                .where(
+                    (LoginSessionRow.user_id == user_id)
+                    & (LoginSessionRow.status == LoginSessionStatus.ACTIVE)
+                )
                 .values(status=LoginSessionStatus.INVALIDATED, invalidated_at=sa.func.now())
+                .returning(LoginSessionRow.session_token)
             )
+            return list(result.scalars())
