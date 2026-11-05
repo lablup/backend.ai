@@ -22,6 +22,7 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Condition,
     Given,
     Held,
     Language,
@@ -160,11 +161,15 @@ class ThePresetNode:
 
     started: datetime
     described: str | None = None
+    updated_at: Condition | None = None
 
     def verdicts(
         self, node: DeploymentRevisionPresetNode, laid: DeploymentRevisionPresetData, at: str = ""
     ) -> list[Verdict]:
         described = self.described if self.described is not None else laid.description
+        updated_at = (
+            self.updated_at if self.updated_at is not None else SameAs(laid.updated_at, PRESET_CREATED_AT)
+        )
         return [
             Held[UUID](f"{at}id", node.id, SameAs(laid.id, PRESET_ID)),
             Held[UUID](f"{at}entity_id", node.entity_id, SameAs(laid.id, PRESET_ID)),
@@ -175,7 +180,7 @@ class ThePresetNode:
             Same(f"{at}cluster.cluster_mode", node.cluster.cluster_mode, laid.cluster_mode),
             Same(f"{at}cluster.cluster_size", node.cluster.cluster_size, laid.cluster_size),
             Same(f"{at}resource.resource_opts", node.resource.resource_opts, laid.resource_opts),
-            Held(
+            Held[UUID](
                 f"{at}execution.image_id",
                 node.execution.image_id,
                 SameAs(
@@ -217,7 +222,7 @@ class ThePresetNode:
             Same(f"{at}model_definition", node.model_definition, laid.model_definition),
             Same(f"{at}preset_values", node.preset_values, laid.runtime_variant_preset_values),
             Held(f"{at}created_at", node.created_at, SameAs(laid.created_at, PRESET_CREATED_AT)),
-            Held(f"{at}updated_at", node.updated_at, SameAs(laid.updated_at, PRESET_CREATED_AT)),
+            Held(f"{at}updated_at", node.updated_at, updated_at),
         ]
 
 

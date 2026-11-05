@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import override
 
 import pytest
 
-from ai.backend.common.dto.manager.v2.deployment.request import UpdateAutoScalingRuleInput
+from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import UpdateAutoScalingRuleInput
 from ai.backend.common.dto.manager.v2.deployment.response import UpdateAutoScalingRulePayload
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.permission.types import Permission
-from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -106,16 +106,18 @@ class AUserGrantedDeploymentUpdateEditsARule(
     @override
     def describe(self) -> str:
         return Says(
-            "배포 수정 권한을 받은 사용자가 심은 규칙 하나를 고치면, 고친 규칙이 옵니다",
+            "배포 조회와 수정 권한을 받은 사용자가 심은 규칙 하나를 고치면, 고친 규칙이 "
+            "옵니다. 규칙 읽기와 고치기는 배포를 먼저 찾는 호출이라 조회 권한도 필요합니다",
             english=(
-                "when a user granted deployment update edits one of the rules seeded in "
-                "advance, the rule edited comes back"
+                "when a user granted deployment read and update edits one of the rules "
+                "seeded in advance, the rule edited comes back. The edit reads the "
+                "deployment first, so read is also required"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, RulesOfADeploymentAndACaller]:
-        return RulesOfADeployment(granted=(Permission.UPDATE,))
+        return RulesOfADeployment(granted=(Permission.READ, Permission.UPDATE))
 
     @override
     def when(self) -> When[RulesOfADeploymentAndACaller, DeploymentAdapter, Answer]:
@@ -137,11 +139,11 @@ class AUserGrantedNothingEditsNoRule(
     @override
     def describe(self) -> str:
         return Says(
-            "아무 권한도 받지 않은 사용자가 심은 규칙 하나를 고치려 하면, 권한이 없다는 "
-            "이유로 거부됩니다",
+            "아무 권한도 받지 않은 사용자가 심은 규칙 하나를 고치려 하면, 규칙이 걸린 "
+            "배포를 찾는 조회가 거부됩니다",
             english=(
                 "when a user granted nothing tries to edit one of the rules seeded in "
-                "advance, the edit is rejected because the user lacks permission"
+                "advance, the lookup that finds the deployment holding the rule is rejected"
             ),
         )
 
@@ -155,10 +157,10 @@ class AUserGrantedNothingEditsNoRule(
 
     @override
     def then(self) -> Then[RulesOfADeploymentAndACaller, Answer]:
-        return TheCallIsRefused(NotEnoughPermission)
+        return TheCallIsRefused(GenericBadRequest)
 
 
-STARTED = datetime.now()
+STARTED = datetime.now(UTC)
 
 SCENARIOS: list[RuleStep] = [
     AUserGrantedDeploymentUpdateEditsARule(started=STARTED),

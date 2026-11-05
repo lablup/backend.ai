@@ -35,6 +35,7 @@ from bai_scenario.components.deployment_revision_preset import (
     PresetsAndSomeone,
     ThePresetNode,
 )
+from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
@@ -89,7 +90,11 @@ class TheEditedPresetComesBack(Then[PresetsAndACaller, Answer]):
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]
-        return ThePresetNode(self.started, described=EDITED).verdicts(payload.preset, laid.presets[0])
+        return ThePresetNode(
+            self.started,
+            described=EDITED,
+            updated_at=WrittenByThisRun(self.started),
+        ).verdicts(payload.preset, laid.presets[0])
 
 
 @dataclass(frozen=True)

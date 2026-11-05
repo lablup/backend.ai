@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import override
 
 import pytest
@@ -162,7 +162,7 @@ class AUserGrantedNothingSearchesNoPolicy(
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-STARTED = datetime.now()
+STARTED = datetime.now(UTC)
 
 SCENARIOS: list[PolicyStep] = [
     TheSuperadminSearchesThePolicies(started=STARTED),

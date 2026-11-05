@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import override
 
 import pytest
@@ -31,7 +31,6 @@ from bai_scenario.components.access_token import (
     TokensOfADeploymentAndACaller,
 )
 from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
-from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
@@ -165,7 +164,7 @@ class AUserGrantedNothingSearchesNoToken(
         return TheCallIsRefused(NotEnoughPermission)
 
 
-STARTED = datetime.now()
+STARTED = datetime.now(UTC)
 
 SCENARIOS: list[TokenStep] = [
     AUserGrantedDeploymentReadSearchesTheTokens(started=STARTED),

@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import override
 from uuid import UUID
 
 import pytest
 
-from ai.backend.common.types import AutoScalingMetricSource
-from ai.backend.common.dto.manager.v2.deployment.request import CreateAutoScalingRuleInput
+from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import CreateAutoScalingRuleInput
 from ai.backend.common.dto.manager.v2.deployment.response import CreateAutoScalingRulePayload
+from ai.backend.common.types import AutoScalingMetricSource
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -30,7 +30,10 @@ from ai.backend.testutils.scenario_steps import (
     When,
 )
 from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
-from bai_scenario.components.auto_scaling_rule import RulesOfADeployment, RulesOfADeploymentAndACaller
+from bai_scenario.components.auto_scaling_rule import (
+    RulesOfADeployment,
+    RulesOfADeploymentAndACaller,
+)
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
@@ -186,7 +189,7 @@ class AUserGrantedNothingMakesNoRule(
         return TheCallIsRefused(NotEnoughPermission)
 
 
-STARTED = datetime.now()
+STARTED = datetime.now(UTC)
 
 SCENARIOS: list[RuleStep] = [
     AUserGrantedDeploymentCreateMakesARule(started=STARTED),

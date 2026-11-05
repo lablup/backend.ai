@@ -15,14 +15,14 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 )
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.permission.types import Permission
-from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
-    SameAs,
     Same,
+    SameAs,
     Says,
     Scenario,
     Then,
@@ -41,6 +41,12 @@ from bai_scenario.runner.steps import run_scenario
 
 type PurgeAnswer = DeleteAccessTokenPayload
 type BulkAnswer = BulkDeleteAccessTokensPayload
+type PurgeStep = Scenario[
+    TestSeedingSession, TokensOfADeploymentAndACaller, DeploymentAdapter, PurgeAnswer
+]
+type BulkStep = Scenario[
+    TestSeedingSession, TokensOfADeploymentAndACaller, DeploymentAdapter, BulkAnswer
+]
 
 
 @dataclass(frozen=True)
@@ -174,17 +180,19 @@ class AUserGrantedDeploymentPurgePurgesAToken(
     @override
     def describe(self) -> str:
         return Says(
-            "배포 영구 삭제 권한을 받은 사용자가 배포가 걸린 접근 토큰 하나를 purge 하면, "
-            "그 토큰의 id 가 옵니다",
+            "배포 조회와 영구 삭제 권한을 받은 사용자가 배포가 걸린 접근 토큰 하나를 purge 하면, "
+            "그 토큰의 id 가 옵니다. 토큰 purge 는 토큰이 걸린 배포를 먼저 찾는 호출이라 "
+            "조회 권한도 필요합니다",
             english=(
-                "when a user granted deployment purge purges one of the access tokens the "
-                "deployment holds, the id of that token comes back"
+                "when a user granted deployment read and purge purges one of the access "
+                "tokens the deployment holds, the id of that token comes back. The purge "
+                "reads the deployment first, so read is also required"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, TokensOfADeploymentAndACaller]:
-        return TokensOfADeployment(granted=(Permission.HARD_DELETE,))
+        return TokensOfADeployment(granted=(Permission.READ, Permission.HARD_DELETE))
 
     @override
     def when(self) -> When[TokensOfADeploymentAndACaller, DeploymentAdapter, PurgeAnswer]:
@@ -207,10 +215,11 @@ class AUserGrantedNothingPurgesNoToken(
     def describe(self) -> str:
         return Says(
             "아무 권한도 받지 않은 사용자가 배포가 걸린 접근 토큰 하나를 purge 하려 하면, "
-            "권한이 없다는 이유로 거부됩니다",
+            "토큰이 걸린 배포를 찾는 조회가 거부됩니다",
             english=(
                 "when a user granted nothing tries to purge one of the access tokens the "
-                "deployment holds, the purge is rejected because the user lacks permission"
+                "deployment holds, the lookup that finds the deployment holding the "
+                "token is rejected"
             ),
         )
 
@@ -224,7 +233,7 @@ class AUserGrantedNothingPurgesNoToken(
 
     @override
     def then(self) -> Then[TokensOfADeploymentAndACaller, PurgeAnswer]:
-        return TheCallIsRefused(NotEnoughPermission)
+        return TheCallIsRefused(GenericBadRequest)
 
 
 @dataclass(frozen=True)
@@ -291,7 +300,7 @@ class AUserGrantedNothingPurgesNoTokenAtOnce(
         return NoTokenIdComesBack()
 
 
-SCENARIOS: list[Scenario] = [
+SCENARIOS: list[PurgeStep | BulkStep] = [
     AUserGrantedDeploymentPurgePurgesAToken(),
     AUserGrantedNothingPurgesNoToken(),
     AUserGrantedDeploymentPurgePurgesTokensAtOnce(),
@@ -301,7 +310,7 @@ SCENARIOS: list[Scenario] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_retiring_access_tokens(
-    scenario: Scenario,
+    scenario: PurgeStep | BulkStep,
     adapter: DeploymentAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

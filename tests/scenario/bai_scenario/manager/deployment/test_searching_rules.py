@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import override
 
 import pytest
@@ -165,7 +165,7 @@ class AUserGrantedNothingSearchesNoRule(
         return TheCallIsRefused(NotEnoughPermission)
 
 
-STARTED = datetime.now()
+STARTED = datetime.now(UTC)
 
 SCENARIOS: list[RuleStep] = [
     AUserGrantedDeploymentReadSearchesTheRules(started=STARTED),

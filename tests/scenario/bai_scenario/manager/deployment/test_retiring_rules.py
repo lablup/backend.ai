@@ -11,7 +11,7 @@ import pytest
 from ai.backend.common.dto.manager.v2.deployment.response import DeleteAutoScalingRulePayload
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.permission.types import Permission
-from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -98,17 +98,19 @@ class AUserGrantedDeploymentPurgePurgesARule(
     @override
     def describe(self) -> str:
         return Says(
-            "배포 영구 삭제 권한을 받은 사용자가 배포가 걸린 자동 스케일링 규칙 하나를 purge 하면, "
-            "그 규칙의 id 가 옵니다",
+            "배포 조회와 영구 삭제 권한을 받은 사용자가 배포가 걸린 자동 스케일링 규칙 하나를 "
+            "purge 하면, 그 규칙의 id 가 옵니다. 규칙 purge 는 배포를 먼저 찾는 호출이라 "
+            "조회 권한도 필요합니다",
             english=(
-                "when a user granted deployment purge purges one of the auto-scaling rules "
-                "the deployment holds, the id of that rule comes back"
+                "when a user granted deployment read and purge purges one of the "
+                "auto-scaling rules the deployment holds, the id of that rule comes back. "
+                "The purge reads the deployment first, so read is also required"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, RulesOfADeploymentAndACaller]:
-        return RulesOfADeployment(granted=(Permission.HARD_DELETE,))
+        return RulesOfADeployment(granted=(Permission.READ, Permission.HARD_DELETE))
 
     @override
     def when(self) -> When[RulesOfADeploymentAndACaller, DeploymentAdapter, Answer]:
@@ -131,10 +133,11 @@ class AUserGrantedNothingPurgesNoRule(
     def describe(self) -> str:
         return Says(
             "아무 권한도 받지 않은 사용자가 배포가 걸린 자동 스케일링 규칙 하나를 purge 하려 하면, "
-            "권한이 없다는 이유로 거부됩니다",
+            "규칙이 걸린 배포를 찾는 조회가 거부됩니다",
             english=(
                 "when a user granted nothing tries to purge one of the auto-scaling rules "
-                "the deployment holds, the purge is rejected because the user lacks permission"
+                "the deployment holds, the lookup that finds the deployment holding the "
+                "rule is rejected"
             ),
         )
 
@@ -148,7 +151,7 @@ class AUserGrantedNothingPurgesNoRule(
 
     @override
     def then(self) -> Then[RulesOfADeploymentAndACaller, Answer]:
-        return TheCallIsRefused(NotEnoughPermission)
+        return TheCallIsRefused(GenericBadRequest)
 
 
 SCENARIOS: list[RuleStep] = [

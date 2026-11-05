@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import override
 
 import pytest
 
+from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
 from ai.backend.common.dto.manager.v2.deployment.response import DeploymentPolicyNode
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.permission.types import Permission
@@ -59,7 +60,7 @@ class LoadingTheSeededPolicies(When[APolicyOfADeploymentAndACaller, DeploymentAd
         self, adapter: DeploymentAdapter, laid: APolicyOfADeploymentAndACaller
     ) -> Answer:
         with ActingAs(laid.caller):
-            return await adapter.batch_load_policies_by_ids([laid.policy.id])
+            return await adapter.batch_load_policies_by_ids([DeploymentPolicyID(laid.policy.id)])
 
 
 @dataclass(frozen=True)
@@ -179,7 +180,7 @@ class AUserGrantedNothingGetsARefusalForThePolicy(
         return EveryEntryIsRefused()
 
 
-STARTED = datetime.now()
+STARTED = datetime.now(UTC)
 
 SCENARIOS: list[PolicyStep] = [
     AUserGrantedDeploymentReadLoadsThePolicyById(started=STARTED),

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import override
 from uuid import UUID
 
@@ -12,6 +12,7 @@ import pytest
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import UpsertDeploymentPolicyInput
 from ai.backend.common.dto.manager.v2.deployment.response import UpsertDeploymentPolicyPayload
+from ai.backend.common.dto.manager.v2.deployment.types import RollingUpdateStrategySpecInfo
 from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.permission.types import Permission
@@ -95,7 +96,7 @@ class ThePolicyPutComesBack(Then[ADeploymentAndACaller, Answer]):
             return [MissingResponse(answered.raised)]
         node = payload.policy
         spec = node.strategy_spec
-        return [
+        verdicts: list[Verdict] = [
             Skipped("id", "the database generates it"),
             Skipped("field_id", "the database generates it"),
             Held[UUID](
@@ -107,11 +108,21 @@ class ThePolicyPutComesBack(Then[ADeploymentAndACaller, Answer]):
                 ),
             ),
             Same("strategy_spec.strategy", spec.strategy, DeploymentStrategy.ROLLING),
-            Same("strategy_spec.max_surge", spec.max_surge, IntOrPercent(percent=0.5)),
-            Same("strategy_spec.max_unavailable", spec.max_unavailable, IntOrPercent(percent=0.0)),
+        ]
+        if isinstance(spec, RollingUpdateStrategySpecInfo):
+            verdicts += [
+                Same("strategy_spec.max_surge", spec.max_surge, IntOrPercent(percent=0.5)),
+                Same(
+                    "strategy_spec.max_unavailable",
+                    spec.max_unavailable,
+                    IntOrPercent(percent=0.0),
+                ),
+            ]
+        verdicts += [
             Held("created_at", node.created_at, WrittenByThisRun(self.started)),
             Held("updated_at", node.updated_at, WrittenByThisRun(self.started)),
         ]
+        return verdicts
 
 
 @dataclass(frozen=True)
@@ -122,21 +133,23 @@ class AUserGrantedDeploymentCreatePutsThePolicy(
 
     @override
     def summary(self) -> str:
-        return "a-user-granted-deployment-create-puts-the-policy"
+        return "a-user-granted-deployment-update-puts-the-policy"
 
     @override
     def describe(self) -> str:
         return Says(
-            "배포 생성 권한을 받은 사용자가 배포에 정책을 올리면, 올린 정책이 옵니다",
+            "배포 수정 권한을 받은 사용자가 배포에 정책을 올리면, 올린 정책이 옵니다. "
+            "정책 upsert 는 갈아끼우기라 수정 권한으로 거는 호출입니다",
             english=(
-                "when a user granted deployment create puts a policy on the deployment, "
-                "the policy put comes back"
+                "when a user granted deployment update puts a policy on the deployment, "
+                "the policy put comes back. The upsert replaces an existing policy, "
+                "so the call is gated by update"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
-        return ADeploymentInThatPlace(granted=(Permission.CREATE,))
+        return ADeploymentInThatPlace(granted=(Permission.UPDATE,))
 
     @override
     def when(self) -> When[ADeploymentAndACaller, DeploymentAdapter, Answer]:
@@ -179,7 +192,7 @@ class AUserGrantedNothingPutsNoPolicy(
         return TheCallIsRefused(NotEnoughPermission)
 
 
-STARTED = datetime.now()
+STARTED = datetime.now(UTC)
 
 SCENARIOS: list[PolicyStep] = [
     AUserGrantedDeploymentCreatePutsThePolicy(started=STARTED),

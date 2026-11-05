@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
@@ -10,7 +9,6 @@ from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.schema.deployment import IntOrPercent, RollingUpdateSpec
 from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentPolicyData
-from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import TestSeedFieldUpserter

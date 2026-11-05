@@ -11,7 +11,10 @@ import pytest
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.resource_slot.request import SearchAllocatedResourceSlotsInput
-from ai.backend.common.dto.manager.v2.resource_slot.response import SearchAllocatedResourceSlotsPayload
+from ai.backend.common.dto.manager.v2.resource_slot.response import (
+    SearchAllocatedResourceSlotsPayload,
+)
+from ai.backend.common.types import IntrinsicSlotNames
 from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
     DeploymentRevisionPresetAdapter,
 )
@@ -20,6 +23,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Language,
     Same,
     Says,
     Scenario,
@@ -30,14 +34,15 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.deployment_revision_preset import LAID_DESCRIPTION, PresetsAndACaller
 from bai_scenario.components.system import lay_a_public_reader
+from bai_scenario.runner.acting import ActingAs
+from bai_scenario.runner.planting import TestSeedingSession
+from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.deployment.revision_preset import (
     TestSeedDeploymentRevisionPreset,
     TestSeedPresetSlotOf,
 )
+from bai_scenario.seeds.resource_slot.slot_type import TestSeedSlotType
 from bai_scenario.seeds.runtime_variant.runtime_variant import TestSeedRuntimeVariant
-from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import TestSeedingSession
-from bai_scenario.runner.steps import run_scenario
 
 type Answer = SearchAllocatedResourceSlotsPayload
 type SlotStep = Scenario[
@@ -47,22 +52,24 @@ type SlotStep = Scenario[
 
 @dataclass(frozen=True)
 class PresetsAndSlotsAndSomeone(Given[Any, PresetsAndACaller]):
-    """슬롯 하나를 두는 프리셋 하나와, 그것을 읽을 수 있는 사용자."""
+    """슬롯 유형 하나와, 그 슬롯을 두는 프리셋 하나와, 그것을 읽을 수 있는 사용자."""
 
     role: UserRole = UserRole.USER
 
     @override
     def describe(self) -> str:
         return Says(
-            f"슬롯 하나를 두는 프리셋 하나 ({LAID_DESCRIPTION}), 그것을 읽을 수 있는 사용자 한 명",
+            f"슬롯 유형 하나와 그 슬롯을 두는 프리셋 하나 ({LAID_DESCRIPTION}), "
+            "그것을 읽을 수 있는 사용자 한 명",
             english=(
-                f"one preset declaring one slot ({LAID_DESCRIPTION.in_("english")}) and one "
-                "user who can read it"
+                f"one slot type and one preset declaring it ({LAID_DESCRIPTION.in_(Language.ENGLISH)}) "
+                "and one user who can read it"
             ),
         )
 
     @override
     async def lay(self, seeding: Any) -> PresetsAndACaller:
+        slot_type = await seeding.creating(TestSeedSlotType(slot=IntrinsicSlotNames.CPU))
         variant = await seeding.creating(TestSeedRuntimeVariant())
         preset = await seeding.creating_from(TestSeedDeploymentRevisionPreset(), variant)
         await seeding.adding(TestSeedPresetSlotOf(), preset)

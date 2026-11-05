@@ -11,10 +11,10 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.deployment.response import DeploymentPolicyNode
 from ai.backend.common.dto.manager.v2.deployment.types import BlueGreenStrategySpecInfo
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentPolicyData,

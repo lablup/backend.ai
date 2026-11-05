@@ -9,8 +9,8 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
@@ -140,7 +140,7 @@ class TheCreatedPresetComesBack(Then[AVariantAndACaller, Answer]):
             Same("preset.cluster.cluster_mode", node.cluster.cluster_mode, "single-node"),
             Same("preset.cluster.cluster_size", node.cluster.cluster_size, 1),
             Same("preset.resource.resource_opts", node.resource.resource_opts, []),
-            Held(
+            Held[UUID](
                 "preset.execution.image_id",
                 node.execution.image_id,
                 SameAs(
@@ -150,7 +150,7 @@ class TheCreatedPresetComesBack(Then[AVariantAndACaller, Answer]):
             ),
             Same("preset.execution.startup_command", node.execution.startup_command, None),
             Same("preset.execution.bootstrap_script", node.execution.bootstrap_script, None),
-            Same("preset.execution.environ", node.execution.environ, {}),
+            Same("preset.execution.environ", node.execution.environ, []),
             Same("preset.deployment_defaults.open_to_public", node.deployment_defaults.open_to_public, None),
             Same("preset.deployment_defaults.replica_count", node.deployment_defaults.replica_count, 1),
             Same(

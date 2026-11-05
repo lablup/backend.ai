@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import override
 
 import pytest
@@ -11,7 +11,7 @@ import pytest
 from ai.backend.common.dto.manager.v2.deployment.response import GetAutoScalingRulePayload
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.permission.types import Permission
-from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -127,11 +127,12 @@ class AUserGrantedNothingReadsNoRule(
     @override
     def describe(self) -> str:
         return Says(
-            "아무 권한도 받지 않은 사용자가 심은 규칙 하나를 id 로 읽으려 하면, "
-            "권한이 없다는 이유로 거부됩니다",
+            "아무 권한도 받지 않은 사용자가 심은 규칙 하나를 id 로 읽으려 하면, 규칙이 "
+            "걸린 배포를 찾는 조회가 거부됩니다",
             english=(
                 "when a user granted nothing tries to read one of the rules seeded in "
-                "advance by id, the read is rejected because the user lacks permission"
+                "advance by id, the lookup that finds the deployment holding the rule "
+                "is rejected"
             ),
         )
 
@@ -145,10 +146,10 @@ class AUserGrantedNothingReadsNoRule(
 
     @override
     def then(self) -> Then[RulesOfADeploymentAndACaller, Answer]:
-        return TheCallIsRefused(NotEnoughPermission)
+        return TheCallIsRefused(GenericBadRequest)
 
 
-STARTED = datetime.now()
+STARTED = datetime.now(UTC)
 
 SCENARIOS: list[RuleStep] = [
     AUserGrantedDeploymentReadReadsARule(started=STARTED),
