@@ -23,7 +23,7 @@ Scenario: incomplete 5 / 30
   - delete_files: success present 1 · rejection present 1 (single_entity)
   - deploy: success present 1 · rejection present 2 (scope, single_entity)
   - get: success present 2 · rejection present 2 (single_entity)
-  - get_folder_usage: success present 1 · rejection present 1 (single_entity)
+  - get_folder_usage: success present 2 · rejection present 1 (single_entity)
   - list_files: success present 1 · rejection present 1 (single_entity)
   - list_mount_policies: success present 1 · rejection present 1 (single_entity)
   - mkdir: success present 1 · rejection present 1 (single_entity)
@@ -157,6 +157,7 @@ Scenario: incomplete 5 / 30
 
 | scenario | verdict |
 |---|---|
+| [when a user granted vfolder read reads the usage of a folder pointing at a path the manager does not own, the call answers no usage](#usage-a-user-granted-folder-read-reads-no-usage-for-an-unmanaged-folder) | answered |
 | [when a user granted vfolder read in their personal project reads their folder's usage, the usage the storage answered comes back](#usage-a-user-granted-folder-read-reads-the-folder-usage) | answered |
 | [when a user granted nothing tries to read a folder's usage, it is rejected for lack of permission](#usage-a-user-granted-nothing-may-not-read-the-folder-usage) | rejected |
 
@@ -1779,6 +1780,36 @@ Then
   - rejected: NotEnoughPermission
 
 ### get_folder_usage
+
+<a id="usage-a-user-granted-folder-read-reads-no-usage-for-an-unmanaged-folder"></a>
+
+#### [a-user-granted-folder-read-reads-no-usage-for-an-unmanaged-folder](/tests/scenario/bai_scenario/manager/vfolder/test_usage.py): pass
+
+when a user granted vfolder read reads the usage of a folder pointing at a path the manager does not own, the call answers no usage
+
+Given
+
+- one user with one personal vfolder pointing at a path the manager does not own, granted the READ permission on their personal folder
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+  - Personal vfolder unmanaged-1: is placed in that person's personal project and points at a path the manager does not own
+  - Grant vfolder permissions
+    - Role folder-writer-1: applies only within the scope it is granted in
+    - Role folder-writer-1: READ allowed on every vfolder
+    - regular user user-1: holds Role folder-writer-1
+
+When
+
+- VFolderAdapter.get_folder_usage: user-1 reads the usage of the unmanaged-1 vfolder
+
+Then
+
+- the call answers no usage, as the folder is not managed
+  - the call answers nothing
 
 <a id="usage-a-user-granted-folder-read-reads-the-folder-usage"></a>
 

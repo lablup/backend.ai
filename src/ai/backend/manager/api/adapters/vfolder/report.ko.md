@@ -23,7 +23,7 @@
   - delete_files: 성공 있음 1 · 거부 있음 1 (single_entity)
   - deploy: 성공 있음 1 · 거부 있음 2 (scope, single_entity)
   - get: 성공 있음 2 · 거부 있음 2 (single_entity)
-  - get_folder_usage: 성공 있음 1 · 거부 있음 1 (single_entity)
+  - get_folder_usage: 성공 있음 2 · 거부 있음 1 (single_entity)
   - list_files: 성공 있음 1 · 거부 있음 1 (single_entity)
   - list_mount_policies: 성공 있음 1 · 거부 있음 1 (single_entity)
   - mkdir: 성공 있음 1 · 거부 있음 1 (single_entity)
@@ -157,6 +157,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
+| [자기 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 관리하지 않는 경로를 가리키는 vfolder 의 사용량을 조회하면, 사용량 없이 응답이 끝납니다](#usage-a-user-granted-folder-read-reads-no-usage-for-an-unmanaged-folder) | 성공 |
 | [자기 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 자기 vfolder 의 사용량을 조회하면, 저장소가 답한 사용량이 응답으로 옵니다](#usage-a-user-granted-folder-read-reads-the-folder-usage) | 성공 |
 | [아무 권한도 받지 않은 사용자가 vfolder 의 사용량을 조회하려 하면 권한 부족으로 거부됩니다](#usage-a-user-granted-nothing-may-not-read-the-folder-usage) | 거부 |
 
@@ -1779,6 +1780,36 @@ Then
   - 거부: NotEnoughPermission
 
 ### get_folder_usage
+
+<a id="usage-a-user-granted-folder-read-reads-no-usage-for-an-unmanaged-folder"></a>
+
+#### [a-user-granted-folder-read-reads-no-usage-for-an-unmanaged-folder](/tests/scenario/bai_scenario/manager/vfolder/test_usage.py): pass
+
+자기 개인 프로젝트에서 vfolder 읽기 권한을 받은 사용자가 관리하지 않는 경로를 가리키는 vfolder 의 사용량을 조회하면, 사용량 없이 응답이 끝납니다
+
+Given
+
+- 관리하지 않는 경로를 가리키는 개인 vfolder 하나를 가진, 자기 개인 폴더에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 개인 vfolder unmanaged-1: 그 사람의 개인 프로젝트에 놓이고, 관리하지 않는 경로를 가리킵니다
+  - vfolder 권한 부여
+    - 역할 folder-writer-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 folder-writer-1: vfolder 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 folder-writer-1 보유
+
+When
+
+- VFolderAdapter.get_folder_usage: user-1이 unmanaged-1 vfolder 의 사용량을 조회합니다
+
+Then
+
+- 관리하지 않는 폴더라 사용량 없이 응답이 끝납니다
+  - 응답 없이 끝납니다
 
 <a id="usage-a-user-granted-folder-read-reads-the-folder-usage"></a>
 
