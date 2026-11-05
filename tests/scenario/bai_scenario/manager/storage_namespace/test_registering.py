@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
+from uuid import UUID
 
 import pytest
 
@@ -21,7 +22,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Held,
     Same,
+    SameAs,
     Says,
     Scenario,
     Skipped,
@@ -93,7 +96,17 @@ class TheRegisteredNamespaceNode(Then[AStorageAndACaller, RegisterStorageNamespa
                 "entity_id",
                 Says("데이터베이스가 생성합니다", english="the database generates it"),
             ),
-            Same("storage_id", node.storage_id, laid.storage.id),
+            Held[UUID](
+                "storage_id",
+                node.storage_id,
+                SameAs[UUID](
+                    laid.storage.id,
+                    Says(
+                        "미리 저장한 object storage",
+                        english="the object storage seeded in advance",
+                    ),
+                ),
+            ),
             Same("namespace", node.namespace, REGISTERED),
         ]
 

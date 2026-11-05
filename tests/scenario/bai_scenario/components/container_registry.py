@@ -17,7 +17,7 @@ from ai.backend.common.data.entity.container_registry import (
 )
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, GlobalEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.container_registry.request import AllowedGroupsInput
@@ -188,9 +188,7 @@ class SomeoneKeepingRegistries(TestSeedNest[Laid[None]]):
             self.someone,
         )
         seed.adding(
-            TestSeedPermission(
-                entity_type=ContainerRegistryEntityType(), permission=Permission.UPDATE
-            ),
+            TestSeedPermission(entity_type=GlobalEntityType(), permission=Permission.UPDATE),
             in_public,
         )
         return seed.granting(
