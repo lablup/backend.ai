@@ -71,7 +71,7 @@ class HTTP2AccessControlNotSupportedError(BackendAIError, web.HTTPBadRequest):
     @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
-            domain=ErrorDomain.KERNEL,
+            domain=ErrorDomain.APPPROXY,
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
