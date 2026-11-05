@@ -18,14 +18,14 @@ Scenario: incomplete 2 / 7
 | scenario | verdict |
 |---|---|
 | [when the superadmin enables a checker on a domain, the assignment between the checker and the domain the request named comes back enabled](#creating-the-superadmin-enables-an-idle-checker-on-a-domain) | answered |
-| [when a checker and a domain exist and the checker is enabled on the domain without a user context, it is rejected for lack of permission](#creating-an-assignment-created-without-a-user-is-refused) | rejected |
+| [when a checker and a domain exist and a user granted nothing enables the checker on the domain, it is rejected for lack of permission](#creating-an-assignment-created-by-a-user-granted-nothing-is-refused) | rejected |
 
 **admin_search**
 
 | scenario | verdict |
 |---|---|
 | [the operation is gated by the global role, so when the superadmin searches, every assignment seeded in advance is counted once and comes back whole](#searching-the-superadmin-searches-idle-checker-assignments) | answered |
-| [when two assignments exist and they are searched without a user context, it is rejected for lack of role](#searching-an-assignment-search-carrying-no-user-is-refused) | rejected |
+| [when two assignments exist and a user granted nothing searches, it is rejected for lack of role](#searching-an-assignment-search-by-a-user-granted-nothing-is-refused) | rejected |
 
 **partial_bulk_purge**
 
@@ -48,21 +48,21 @@ Scenario: incomplete 2 / 7
 | scenario | verdict |
 |---|---|
 | [when the superadmin purges one assignment, the purge is answered with the id of the assignment put in the request](#retiring-the-superadmin-purges-an-idle-checker-assignment) | answered |
-| [when two assignments exist and one is purged without a user context, it is rejected because the target cannot be resolved](#retiring-an-assignment-purge-carrying-no-user-is-refused) | rejected |
+| [when two assignments exist and a user granted nothing tries to purge one, it is rejected because the target cannot be resolved](#retiring-an-assignment-purge-by-a-user-granted-nothing-is-refused) | rejected |
 
 **scoped_search**
 
 | scenario | verdict |
 |---|---|
 | [when the superadmin searches scoped to two domains, the assignments of those domains are all counted once and come back whole](#scoped_searching-the-superadmin-scoped-searches-idle-checker-assignments) | answered |
-| [when two assignments exist and they are searched with a scope without a user context, it is rejected for lack of permission](#scoped_searching-a-scoped-assignment-search-carrying-no-user-is-refused) | rejected |
+| [when two assignments exist and a user granted nothing searches with a scope, it is rejected for lack of permission](#scoped_searching-a-scoped-assignment-search-by-a-user-granted-nothing-is-refused) | rejected |
 
 **update**
 
 | scenario | verdict |
 |---|---|
 | [when the superadmin disables an assignment, it comes back disabled](#updating-the-superadmin-disables-an-idle-checker-assignment) | answered |
-| [when two assignments exist and one is disabled without a user context, it is rejected because the target cannot be resolved](#updating-an-assignment-update-carrying-no-user-is-refused) | rejected |
+| [when two assignments exist and a user granted nothing tries to disable one, it is rejected because the target cannot be resolved](#updating-an-assignment-update-by-a-user-granted-nothing-is-refused) | rejected |
 
 ### admin_create
 
@@ -99,11 +99,11 @@ Then
   - created_at: the time this run wrote
   - updated_at: the time this run wrote
 
-<a id="creating-an-assignment-created-without-a-user-is-refused"></a>
+<a id="creating-an-assignment-created-by-a-user-granted-nothing-is-refused"></a>
 
-#### [an-assignment-created-without-a-user-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_creating.py): pass
+#### [an-assignment-created-by-a-user-granted-nothing-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_creating.py): pass
 
-when a checker and a domain exist and the checker is enabled on the domain without a user context, it is rejected for lack of permission
+when a checker and a domain exist and a user granted nothing enables the checker on the domain, it is rejected for lack of permission
 
 Given
 
@@ -174,11 +174,11 @@ Then
   - items[1].created_at: the time this run wrote
   - items[1].updated_at: the time this run wrote
 
-<a id="searching-an-assignment-search-carrying-no-user-is-refused"></a>
+<a id="searching-an-assignment-search-by-a-user-granted-nothing-is-refused"></a>
 
-#### [an-assignment-search-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_searching.py): pass
+#### [an-assignment-search-by-a-user-granted-nothing-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_searching.py): pass
 
-when two assignments exist and they are searched without a user context, it is rejected for lack of role
+when two assignments exist and a user granted nothing searches, it is rejected for lack of role
 
 Given
 
@@ -492,11 +492,11 @@ Then
 - the purge is answered with the id of the assignment put in the request
   - id: same as the assignment put in the request
 
-<a id="retiring-an-assignment-purge-carrying-no-user-is-refused"></a>
+<a id="retiring-an-assignment-purge-by-a-user-granted-nothing-is-refused"></a>
 
-#### [an-assignment-purge-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_retiring.py): pass
+#### [an-assignment-purge-by-a-user-granted-nothing-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_retiring.py): pass
 
-when two assignments exist and one is purged without a user context, it is rejected because the target cannot be resolved
+when two assignments exist and a user granted nothing tries to purge one, it is rejected because the target cannot be resolved
 
 Given
 
@@ -574,11 +574,11 @@ Then
   - items[1].created_at: the time this run wrote
   - items[1].updated_at: the time this run wrote
 
-<a id="scoped_searching-a-scoped-assignment-search-carrying-no-user-is-refused"></a>
+<a id="scoped_searching-a-scoped-assignment-search-by-a-user-granted-nothing-is-refused"></a>
 
-#### [a-scoped-assignment-search-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_scoped_searching.py): pass
+#### [a-scoped-assignment-search-by-a-user-granted-nothing-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_scoped_searching.py): pass
 
-when two assignments exist and they are searched with a scope without a user context, it is rejected for lack of permission
+when two assignments exist and a user granted nothing searches with a scope, it is rejected for lack of permission
 
 Given
 
@@ -645,11 +645,11 @@ Then
   - created_at: the time this run wrote
   - updated_at: the time this run wrote
 
-<a id="updating-an-assignment-update-carrying-no-user-is-refused"></a>
+<a id="updating-an-assignment-update-by-a-user-granted-nothing-is-refused"></a>
 
-#### [an-assignment-update-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_updating.py): pass
+#### [an-assignment-update-by-a-user-granted-nothing-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_updating.py): pass
 
-when two assignments exist and one is disabled without a user context, it is rejected because the target cannot be resolved
+when two assignments exist and a user granted nothing tries to disable one, it is rejected because the target cannot be resolved
 
 Given
 

@@ -18,14 +18,14 @@
 | 시나리오 | 판정 |
 |---|---|
 | [superadmin 이 검사기를 도메인에 켜면, 요청에서 지정한 검사기와 도메인을 잇는 할당이 활성 상태로 반환됩니다](#creating-the-superadmin-enables-an-idle-checker-on-a-domain) | 성공 |
-| [검사기와 도메인이 있고 사용자 컨텍스트 없이 검사기를 도메인에 켜려 하면, 권한 부족으로 거부됩니다](#creating-an-assignment-created-without-a-user-is-refused) | 거부 |
+| [검사기와 도메인이 있고 아무 권한도 받지 않은 사용자가 검사기를 도메인에 켜려 하면, 권한 부족으로 거부됩니다](#creating-an-assignment-created-by-a-user-granted-nothing-is-refused) | 거부 |
 
 **admin_search**
 
 | 시나리오 | 판정 |
 |---|---|
 | [global 역할로 검사하는 연산이므로 superadmin 이 검색하면, 심은 할당이 모두 한 번씩 집계되어 반환됩니다](#searching-the-superadmin-searches-idle-checker-assignments) | 성공 |
-| [할당 둘이 있고 사용자 컨텍스트 없이 검색하면, 역할 부족으로 거부됩니다](#searching-an-assignment-search-carrying-no-user-is-refused) | 거부 |
+| [할당 둘이 있고 아무 권한도 받지 않은 사용자가 검색하면, 역할 부족으로 거부됩니다](#searching-an-assignment-search-by-a-user-granted-nothing-is-refused) | 거부 |
 
 **partial_bulk_purge**
 
@@ -48,21 +48,21 @@
 | 시나리오 | 판정 |
 |---|---|
 | [superadmin 이 할당 하나를 purge 하면, 요청에 넣은 할당의 id 로 반환됩니다](#retiring-the-superadmin-purges-an-idle-checker-assignment) | 성공 |
-| [할당 둘이 있고 사용자 컨텍스트 없이 하나를 purge 하려 하면, 대상을 찾을 수 없다는 이유로 거부됩니다](#retiring-an-assignment-purge-carrying-no-user-is-refused) | 거부 |
+| [할당 둘이 있고 아무 권한도 받지 않은 사용자가 하나를 purge 하려 하면, 대상을 찾을 수 없다는 이유로 거부됩니다](#retiring-an-assignment-purge-by-a-user-granted-nothing-is-refused) | 거부 |
 
 **scoped_search**
 
 | 시나리오 | 판정 |
 |---|---|
 | [superadmin 이 도메인 둘을 스코프로 검색하면, 그 도메인들의 할당이 모두 한 번씩 집계되어 반환됩니다](#scoped_searching-the-superadmin-scoped-searches-idle-checker-assignments) | 성공 |
-| [할당 둘이 있고 사용자 컨텍스트 없이 스코프 검색하면, 권한 부족으로 거부됩니다](#scoped_searching-a-scoped-assignment-search-carrying-no-user-is-refused) | 거부 |
+| [할당 둘이 있고 아무 권한도 받지 않은 사용자가 스코프 검색하면, 권한 부족으로 거부됩니다](#scoped_searching-a-scoped-assignment-search-by-a-user-granted-nothing-is-refused) | 거부 |
 
 **update**
 
 | 시나리오 | 판정 |
 |---|---|
 | [superadmin 이 할당을 끄면, 요청한 할당이 꺼진 상태로 반환됩니다](#updating-the-superadmin-disables-an-idle-checker-assignment) | 성공 |
-| [할당 둘이 있고 사용자 컨텍스트 없이 하나를 끄려 하면, 대상을 찾을 수 없다는 이유로 거부됩니다](#updating-an-assignment-update-carrying-no-user-is-refused) | 거부 |
+| [할당 둘이 있고 아무 권한도 받지 않은 사용자가 하나를 끄려 하면, 대상을 찾을 수 없다는 이유로 거부됩니다](#updating-an-assignment-update-by-a-user-granted-nothing-is-refused) | 거부 |
 
 ### admin_create
 
@@ -99,11 +99,11 @@ Then
   - created_at: 이 실행이 쓴 시각
   - updated_at: 이 실행이 쓴 시각
 
-<a id="creating-an-assignment-created-without-a-user-is-refused"></a>
+<a id="creating-an-assignment-created-by-a-user-granted-nothing-is-refused"></a>
 
-#### [an-assignment-created-without-a-user-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_creating.py): pass
+#### [an-assignment-created-by-a-user-granted-nothing-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_creating.py): pass
 
-검사기와 도메인이 있고 사용자 컨텍스트 없이 검사기를 도메인에 켜려 하면, 권한 부족으로 거부됩니다
+검사기와 도메인이 있고 아무 권한도 받지 않은 사용자가 검사기를 도메인에 켜려 하면, 권한 부족으로 거부됩니다
 
 Given
 
@@ -174,11 +174,11 @@ Then
   - items[1].created_at: 이 실행이 쓴 시각
   - items[1].updated_at: 이 실행이 쓴 시각
 
-<a id="searching-an-assignment-search-carrying-no-user-is-refused"></a>
+<a id="searching-an-assignment-search-by-a-user-granted-nothing-is-refused"></a>
 
-#### [an-assignment-search-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_searching.py): pass
+#### [an-assignment-search-by-a-user-granted-nothing-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_searching.py): pass
 
-할당 둘이 있고 사용자 컨텍스트 없이 검색하면, 역할 부족으로 거부됩니다
+할당 둘이 있고 아무 권한도 받지 않은 사용자가 검색하면, 역할 부족으로 거부됩니다
 
 Given
 
@@ -492,11 +492,11 @@ Then
 - 요청에 넣은 할당의 id 로 반환됩니다
   - id: 요청에 넣은 할당와 같다
 
-<a id="retiring-an-assignment-purge-carrying-no-user-is-refused"></a>
+<a id="retiring-an-assignment-purge-by-a-user-granted-nothing-is-refused"></a>
 
-#### [an-assignment-purge-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_retiring.py): pass
+#### [an-assignment-purge-by-a-user-granted-nothing-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_retiring.py): pass
 
-할당 둘이 있고 사용자 컨텍스트 없이 하나를 purge 하려 하면, 대상을 찾을 수 없다는 이유로 거부됩니다
+할당 둘이 있고 아무 권한도 받지 않은 사용자가 하나를 purge 하려 하면, 대상을 찾을 수 없다는 이유로 거부됩니다
 
 Given
 
@@ -574,11 +574,11 @@ Then
   - items[1].created_at: 이 실행이 쓴 시각
   - items[1].updated_at: 이 실행이 쓴 시각
 
-<a id="scoped_searching-a-scoped-assignment-search-carrying-no-user-is-refused"></a>
+<a id="scoped_searching-a-scoped-assignment-search-by-a-user-granted-nothing-is-refused"></a>
 
-#### [a-scoped-assignment-search-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_scoped_searching.py): pass
+#### [a-scoped-assignment-search-by-a-user-granted-nothing-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_scoped_searching.py): pass
 
-할당 둘이 있고 사용자 컨텍스트 없이 스코프 검색하면, 권한 부족으로 거부됩니다
+할당 둘이 있고 아무 권한도 받지 않은 사용자가 스코프 검색하면, 권한 부족으로 거부됩니다
 
 Given
 
@@ -645,11 +645,11 @@ Then
   - created_at: 이 실행이 쓴 시각
   - updated_at: 이 실행이 쓴 시각
 
-<a id="updating-an-assignment-update-carrying-no-user-is-refused"></a>
+<a id="updating-an-assignment-update-by-a-user-granted-nothing-is-refused"></a>
 
-#### [an-assignment-update-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_updating.py): pass
+#### [an-assignment-update-by-a-user-granted-nothing-is-refused](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_updating.py): pass
 
-할당 둘이 있고 사용자 컨텍스트 없이 하나를 끄려 하면, 대상을 찾을 수 없다는 이유로 거부됩니다
+할당 둘이 있고 아무 권한도 받지 않은 사용자가 하나를 끄려 하면, 대상을 찾을 수 없다는 이유로 거부됩니다
 
 Given
 
