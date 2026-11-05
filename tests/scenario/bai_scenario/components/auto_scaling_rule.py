@@ -7,6 +7,7 @@ permissions.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
@@ -31,10 +32,52 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
 )
 from bai_scenario.components.deployment import lay_a_deployment, lay_a_place
-from bai_scenario.components.domain import Mentions
+from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.seeds.deployment.auto_scaling_rule import TestSeedAutoScalingRuleOf
 
 LAID_METRIC = "cpu_util"
+
+RULE_ID = Says(
+    "미리 저장한 규칙의 id", english="the id of the rule seeded in advance"
+)
+
+
+@dataclass(frozen=True)
+class TheRuleNode:
+    """미리 저장한 규칙의 노드가 어떤 값으로 와야 하는지. 값은 심은 것에서 읽는다."""
+
+    started: datetime
+
+    def verdicts(
+        self, node: AutoScalingRuleNode, laid: ModelDeploymentAutoScalingRuleData, at: str = ""
+    ) -> list[Verdict]:
+        return [
+            Held[UUID](f"{at}id", node.id, SameAs(laid.id, RULE_ID)),
+            Held[UUID](f"{at}field_id", node.field_id, SameAs(laid.id, RULE_ID)),
+            Held[UUID](
+                f"{at}deployment_id",
+                node.deployment_id,
+                SameAs(
+                    laid.model_deployment_id,
+                    Says("규칙이 걸린 배포의 id", english="the id of the deployment the rule scales"),
+                ),
+            ),
+            Same(f"{at}metric_source", node.metric_source, laid.metric_source.name),
+            Same(f"{at}metric_name", node.metric_name, laid.metric_name),
+            Same(f"{at}min_threshold", node.min_threshold, laid.min_threshold),
+            Same(f"{at}max_threshold", node.max_threshold, laid.max_threshold),
+            Same(f"{at}step_size", node.step_size, laid.step_size),
+            Same(f"{at}time_window", node.time_window, laid.time_window),
+            Same(f"{at}min_replicas", node.min_replicas, laid.min_replicas),
+            Same(f"{at}max_replicas", node.max_replicas, laid.max_replicas),
+            Same(
+                f"{at}prometheus_query_preset_id",
+                node.prometheus_query_preset_id,
+                laid.prometheus_query_preset_id,
+            ),
+            Held(f"{at}created_at", node.created_at, WrittenByThisRun(self.started)),
+            Same(f"{at}last_triggered_at", node.last_triggered_at, laid.last_triggered_at),
+        ]
 
 
 @dataclass(frozen=True)
