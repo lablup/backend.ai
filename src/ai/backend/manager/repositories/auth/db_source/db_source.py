@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import secrets
 import uuid as uuid_mod
 from collections.abc import Collection
@@ -387,7 +388,7 @@ class AuthDBSource:
         async with self._v2_ops.read_ops() as r:
             return await r.query_data(querier)
 
-    def _check_password(
+    async def _check_password(
         self,
         row: sa.Row[Any],
         target_password_info: PasswordInfo,
@@ -396,7 +397,9 @@ class AuthDBSource:
         if row.password is None:
             raise AuthorizationFailed("User credential mismatch.")
         try:
-            if not compare_to_hashed_password(target_password_info.password, row.password):
+            if not await asyncio.to_thread(
+                compare_to_hashed_password, target_password_info.password, row.password
+            ):
                 raise AuthorizationFailed("User credential mismatch.")
         except ValueError:
             raise AuthorizationFailed("User credential mismatch.") from None
@@ -488,7 +491,7 @@ class AuthDBSource:
             if row is None:
                 raise AuthorizationFailed("User credential mismatch.")
 
-            self._check_password(row, target_password_info)
+            await self._check_password(row, target_password_info)
             await self._migrate_password_hash(conn, row, domain_name, email, target_password_info)
 
             # Fetch active sessions for the user within the same connection
@@ -612,7 +615,7 @@ class AuthDBSource:
             row = result.first()
             if row is None:
                 raise AuthorizationFailed("User credential mismatch.")
-            self._check_password(row, target_password_info)
+            await self._check_password(row, target_password_info)
         return UserCredential(user_id=UserID(row.uuid), hashed_password=row.password)
 
     @auth_db_source_resilience.apply()
