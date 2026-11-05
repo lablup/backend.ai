@@ -2,7 +2,7 @@
 
 [배경](/src/ai/backend/manager/api/adapters/domain/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/domain/adapter.py)
 
-시나리오: 미완성 3 / 14
+시나리오: 완성
 
 - ops 구성 (12)
   - bulk_get_ids: 대표 성공 ✓ · 대표 거부 ✓
@@ -11,9 +11,9 @@
   - get: 대표 성공 ✓ · 대표 거부 ✓
   - global_search: 대표 성공 ✓ · 대표 거부 ✓
   - lookup_name: 대표 성공 ✓ · 대표 거부 ✓
-  - partial_bulk_delete: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
-  - partial_bulk_restore: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
-  - partial_bulk_update: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - partial_bulk_delete: 대표 성공 ✓ · 대표 거부 ✓
+  - partial_bulk_restore: 대표 성공 ✓ · 대표 거부 ✓
+  - partial_bulk_update: 대표 성공 ✓ · 대표 거부 ✓
   - restore: 대표 성공 ✓ · 대표 거부 ✓
   - scoped_search: 대표 성공 ✓ · 대표 거부 ✓
   - update: 대표 성공 ✓ · 대표 거부 ✓
@@ -40,8 +40,8 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [이미 soft delete 된 도메인을 superadmin 이 다시 soft delete 하면, soft delete 했다는 응답이 옵니다](#deleting-soft-deleting-a-domain-already-soft-deleted) | 성공 |
-| [superadmin 이 도메인을 soft delete 하면, soft delete 했다는 응답이 옵니다](#deleting-the-superadmin-soft-deletes-a-domain) | 성공 |
+| [이미 soft delete 된 도메인을 superadmin 이 다시 soft delete 하면, soft delete 했다는 응답과 함께 그 도메인이 비활성 상태로 옵니다](#deleting-soft-deleting-a-domain-already-soft-deleted) | 성공 |
+| [superadmin 이 도메인을 soft delete 하면, soft delete 했다는 응답과 함께 그 도메인이 비활성 상태로 옵니다](#deleting-the-superadmin-soft-deletes-a-domain) | 성공 |
 | [아무 권한도 받지 않은 사용자는 도메인을 soft delete 할 수 없습니다](#deleting-a-user-granted-nothing-may-not-soft-delete-a-domain) | 거부 |
 | [아무 도메인도 갖지 않은 이름을 soft delete 하려 하면 대상이 없다는 것으로 거부됩니다](#deleting-soft-deleting-a-name-nothing-answers-to-is-not-found) | 거부 |
 
@@ -59,6 +59,13 @@
 | 시나리오 | 판정 |
 |---|---|
 | [도메인 여럿 중 하나의 이름으로 필터 기반 조회하면, 응답에는 그 이름의 도메인만 남습니다](#searching-a-name-filter-narrows-the-answer-to-the-domain-it-names) | 성공 |
+| [도메인 둘 중 하나가 가진 프로젝트의 이름으로 걸러 조회하면, 그 프로젝트를 가진 도메인만 남습니다](#nested_searching-a-project-name-filter-narrows-the-answer-to-the-domain-holding-it) | 성공 |
+| [도메인 둘 중 하나에 사는 사용자의 이름으로 걸러 조회하면, 그 사용자가 사는 도메인만 남습니다](#nested_searching-a-username-filter-narrows-the-answer-to-the-domain-the-user-lives-in) | 성공 |
+| [도메인 둘 중 하나에 사는 사용자의 이메일로 걸러 조회하면, 그 사용자가 사는 도메인만 남습니다](#nested_searching-an-email-filter-narrows-the-answer-to-the-domain-the-user-lives-in) | 성공 |
+| [비활성 사용자로 걸러 조회하면, 그 사용자가 사는 도메인만 남습니다](#nested_searching-an-inactive-user-filter-narrows-the-answer-to-the-domain-they-live-in) | 성공 |
+| [도메인 전체를 사용자 이메일순으로 세워 조회하면, 이메일이 앞서는 사용자가 사는 도메인이 먼저 옵니다](#nested_searching-ordering-by-the-email-puts-the-domains-in-that-order) | 성공 |
+| [도메인 전체를 가진 프로젝트의 이름순으로 세워 조회하면, 이름이 앞서는 프로젝트를 가진 도메인이 먼저 옵니다](#nested_searching-ordering-by-the-project-name-puts-the-domains-in-that-order) | 성공 |
+| [도메인 전체를 사용자 이름순으로 세워 조회하면, 이름이 앞서는 사용자가 사는 도메인이 먼저 옵니다](#nested_searching-ordering-by-the-username-puts-the-domains-in-that-order) | 성공 |
 | [이 시나리오가 미리 저장한 도메인이 넷일 때, 필터 없는 조회는 그 넷이 모두 나옵니다](#searching-the-answer-counts-every-domain-the-scenario-laid) | 성공 |
 | [미리 저장한 도메인 중 하나를 soft delete 한 뒤 필터 없이 search 하면, 그것까지 모두 나옵니다](#searching-the-answer-includes-soft-deleted-domains-too) | 성공 |
 | [superadmin 이 아닌 사용자가 전체 도메인 조회를 요청하면 역할로 거부됩니다](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-domain) | 거부 |
@@ -77,12 +84,14 @@
 |---|---|
 | [아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-domains) | 성공 |
 | [활성 도메인 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 비활성 상태로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | 성공 |
+| [로그인 문맥 없이 도메인 여럿을 한 번에 soft delete 하면, 문맥에 사용자가 없다는 오류로 거부됩니다](#partial_bulk_deleting-soft-deleting-domains-without-login-is-refused) | 거부 |
 
 **partial_bulk_restore**
 
 | 시나리오 | 판정 |
 |---|---|
 | [soft delete 된 도메인 여럿을 한 번에 restore 하면, 모두 활성 상태로 옵니다](#partial_bulk_deleting-restoring-several-brings-them-back) | 성공 |
+| [로그인 문맥 없이 도메인 여럿을 한 번에 restore 하면, 문맥에 사용자가 없다는 오류로 거부됩니다](#partial_bulk_deleting-restoring-domains-without-login-is-refused) | 거부 |
 
 **partial_bulk_update**
 
@@ -91,13 +100,14 @@
 | [아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-domains) | 성공 |
 | [활성 플래그와 설명을 섞어 도메인 여럿을 한 번에 수정하면, 플래그를 비활성화한 것은 soft delete 되고 활성화한 것은 restore 되며 둘 다 새 설명으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_editing-the-active-flag-soft-deletes-or-restores-each-of-several-domains) | 성공 |
 | [superadmin 이 도메인 여럿의 설명을 한 번에 변경하면, 모두 새 설명으로 오고 실패한 것은 없습니다](#partial_bulk_editing-the-superadmin-edits-several-domains-at-once) | 성공 |
+| [로그인 문맥 없이 도메인 여럿을 한 번에 수정하면, 문맥에 사용자가 없다는 오류로 거부됩니다](#partial_bulk_editing-editing-domains-without-login-is-refused) | 거부 |
 
 **restore**
 
 | 시나리오 | 판정 |
 |---|---|
-| [soft delete 되지 않은 도메인을 superadmin 이 restore 하면, restore 했다는 응답이 옵니다](#deleting-restoring-a-domain-that-is-not-soft-deleted) | 성공 |
-| [soft delete 된 도메인을 restore 하면, restore 했다는 응답이 옵니다](#deleting-restoring-answers-that-it-restored) | 성공 |
+| [soft delete 되지 않은 도메인을 superadmin 이 restore 하면, restore 했다는 응답과 함께 그 도메인이 활성 상태로 옵니다](#deleting-restoring-a-domain-that-is-not-soft-deleted) | 성공 |
+| [soft delete 된 도메인을 restore 하면, restore 했다는 응답과 함께 그 도메인이 활성 상태로 옵니다](#deleting-restoring-answers-that-it-restored) | 성공 |
 | [아무 권한도 받지 않은 사용자는 도메인을 restore 할 수 없습니다](#deleting-a-user-granted-nothing-may-not-restore-a-domain) | 거부 |
 
 **scoped_search**
@@ -291,7 +301,7 @@ Then
 
 #### [soft-deleting-a-domain-already-soft-deleted](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-이미 soft delete 된 도메인을 superadmin 이 다시 soft delete 하면, soft delete 했다는 응답이 옵니다
+이미 soft delete 된 도메인을 superadmin 이 다시 soft delete 하면, soft delete 했다는 응답과 함께 그 도메인이 비활성 상태로 옵니다
 
 Given
 
@@ -310,14 +320,24 @@ When
 
 Then
 
-- 했다는 응답이 옵니다
+- 했다는 응답과 함께 그 도메인이 비활성 상태로 옵니다
   - deleted = True
+  - domain.name = 'twice-1'
+  - domain.description = '이미 있던 도메인'
+  - domain.integration_name = None
+  - domain.allowed_docker_registries = []
+  - domain.is_active = False
+  - domain.is_default = False
+  - domain.id: 건너뜀: 데이터베이스가 생성합니다
+  - domain.entity_id: 미리 저장한 도메인의 id 와 같다
+  - domain.created_at: 이 실행이 쓴 시각
+  - domain.modified_at: 이 실행이 쓴 시각
 
 <a id="deleting-the-superadmin-soft-deletes-a-domain"></a>
 
 #### [the-superadmin-soft-deletes-a-domain](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-superadmin 이 도메인을 soft delete 하면, soft delete 했다는 응답이 옵니다
+superadmin 이 도메인을 soft delete 하면, soft delete 했다는 응답과 함께 그 도메인이 비활성 상태로 옵니다
 
 Given
 
@@ -336,8 +356,18 @@ When
 
 Then
 
-- 했다는 응답이 옵니다
+- 했다는 응답과 함께 그 도메인이 비활성 상태로 옵니다
   - deleted = True
+  - domain.name = 'to-delete-1'
+  - domain.description = '이미 있던 도메인'
+  - domain.integration_name = None
+  - domain.allowed_docker_registries = []
+  - domain.is_active = False
+  - domain.is_default = False
+  - domain.id: 건너뜀: 데이터베이스가 생성합니다
+  - domain.entity_id: 미리 저장한 도메인의 id 와 같다
+  - domain.created_at: 이 실행이 쓴 시각
+  - domain.modified_at: 이 실행이 쓴 시각
 
 <a id="deleting-a-user-granted-nothing-may-not-soft-delete-a-domain"></a>
 
@@ -542,6 +572,266 @@ Then
 - 필터로 걸러낸 그 도메인 하나만 남습니다
   - items = ['wanted-1']
   - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="nested_searching-a-project-name-filter-narrows-the-answer-to-the-domain-holding-it"></a>
+
+#### [a-project-name-filter-narrows-the-answer-to-the-domain-holding-it](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
+
+도메인 둘 중 하나가 가진 프로젝트의 이름으로 걸러 조회하면, 그 프로젝트를 가진 도메인만 남습니다
+
+Given
+
+- 도메인 둘, 각각 이름이 다른 프로젝트 하나와 사용자 하나, 첫째 도메인에 superadmin 이 한 명 더 있습니다
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 도메인 first-1
+  - 도메인 second-1
+  - 프로젝트 alpha-team-1
+  - 프로젝트 beta-team-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - superadmin user-3: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- DomainAdapter.global_search: user-3이 alpha-team-1이라는 프로젝트를 가진 도메인을 찾습니다
+
+Then
+
+- 첫째 도메인 하나만 남습니다
+  - items = ['first-1']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="nested_searching-a-username-filter-narrows-the-answer-to-the-domain-the-user-lives-in"></a>
+
+#### [a-username-filter-narrows-the-answer-to-the-domain-the-user-lives-in](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
+
+도메인 둘 중 하나에 사는 사용자의 이름으로 걸러 조회하면, 그 사용자가 사는 도메인만 남습니다
+
+Given
+
+- 도메인 둘, 각각 이름이 다른 프로젝트 하나와 사용자 하나, 첫째 도메인에 superadmin 이 한 명 더 있습니다
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 도메인 first-1
+  - 도메인 second-1
+  - 프로젝트 alpha-team-1
+  - 프로젝트 beta-team-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - superadmin user-3: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- DomainAdapter.global_search: user-3이 user-1이 사는 도메인을 찾습니다
+
+Then
+
+- 첫째 도메인 하나만 남습니다
+  - items = ['first-1']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="nested_searching-an-email-filter-narrows-the-answer-to-the-domain-the-user-lives-in"></a>
+
+#### [an-email-filter-narrows-the-answer-to-the-domain-the-user-lives-in](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
+
+도메인 둘 중 하나에 사는 사용자의 이메일로 걸러 조회하면, 그 사용자가 사는 도메인만 남습니다
+
+Given
+
+- 도메인 둘, 각각 이름이 다른 프로젝트 하나와 사용자 하나, 첫째 도메인에 superadmin 이 한 명 더 있습니다
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 도메인 first-1
+  - 도메인 second-1
+  - 프로젝트 alpha-team-1
+  - 프로젝트 beta-team-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - superadmin user-3: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- DomainAdapter.global_search: user-3이 user-1@scenario.local 을 쓰는 사용자가 사는 도메인을 찾습니다
+
+Then
+
+- 첫째 도메인 하나만 남습니다
+  - items = ['first-1']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="nested_searching-an-inactive-user-filter-narrows-the-answer-to-the-domain-they-live-in"></a>
+
+#### [an-inactive-user-filter-narrows-the-answer-to-the-domain-they-live-in](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
+
+비활성 사용자로 걸러 조회하면, 그 사용자가 사는 도메인만 남습니다
+
+Given
+
+- 도메인 둘, 각각 이름이 다른 프로젝트 하나와 사용자 하나, 둘째 도메인의 사용자는 비활성 상태이고 첫째 도메인에 superadmin 이 한 명 더 있습니다
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 도메인 first-1
+  - 도메인 second-1
+  - 프로젝트 alpha-team-1
+  - 프로젝트 beta-team-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - superadmin user-3: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 도메인에 속한 비활성 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 상태 inactive, 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- DomainAdapter.global_search: user-3이 비활성 사용자가 사는 도메인을 찾습니다
+
+Then
+
+- 둘째 도메인 하나만 남습니다
+  - items = ['second-1']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="nested_searching-ordering-by-the-email-puts-the-domains-in-that-order"></a>
+
+#### [ordering-by-the-email-puts-the-domains-in-that-order](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
+
+도메인 전체를 사용자 이메일순으로 세워 조회하면, 이메일이 앞서는 사용자가 사는 도메인이 먼저 옵니다
+
+Given
+
+- 도메인 둘, 각각 이름이 다른 프로젝트 하나와 사용자 하나, 첫째 도메인에 superadmin 이 한 명 더 있습니다
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 도메인 first-1
+  - 도메인 second-1
+  - 프로젝트 alpha-team-1
+  - 프로젝트 beta-team-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - superadmin user-3: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- DomainAdapter.global_search: user-3이 사용자 이메일순으로 세워 전체를 조회합니다
+
+Then
+
+- 도메인이 이름순으로 옵니다
+  - items = ['first-1', 'second-1']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="nested_searching-ordering-by-the-project-name-puts-the-domains-in-that-order"></a>
+
+#### [ordering-by-the-project-name-puts-the-domains-in-that-order](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
+
+도메인 전체를 가진 프로젝트의 이름순으로 세워 조회하면, 이름이 앞서는 프로젝트를 가진 도메인이 먼저 옵니다
+
+Given
+
+- 도메인 둘, 각각 이름이 다른 프로젝트 하나와 사용자 하나, 첫째 도메인에 superadmin 이 한 명 더 있습니다
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 도메인 first-1
+  - 도메인 second-1
+  - 프로젝트 alpha-team-1
+  - 프로젝트 beta-team-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - superadmin user-3: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- DomainAdapter.global_search: user-3이 프로젝트 이름순으로 세워 전체를 조회합니다
+
+Then
+
+- 도메인이 이름순으로 옵니다
+  - items = ['first-1', 'second-1']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="nested_searching-ordering-by-the-username-puts-the-domains-in-that-order"></a>
+
+#### [ordering-by-the-username-puts-the-domains-in-that-order](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
+
+도메인 전체를 사용자 이름순으로 세워 조회하면, 이름이 앞서는 사용자가 사는 도메인이 먼저 옵니다
+
+Given
+
+- 도메인 둘, 각각 이름이 다른 프로젝트 하나와 사용자 하나, 첫째 도메인에 superadmin 이 한 명 더 있습니다
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 도메인 first-1
+  - 도메인 second-1
+  - 프로젝트 alpha-team-1
+  - 프로젝트 beta-team-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - superadmin user-3: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- DomainAdapter.global_search: user-3이 사용자 이름순으로 세워 전체를 조회합니다
+
+Then
+
+- 도메인이 이름순으로 옵니다
+  - items = ['first-1', 'second-1']
+  - total_count = 2
   - has_next_page = False
   - has_previous_page = False
 
@@ -799,6 +1089,33 @@ Then
   - failed[0].id: 요청에 넣은 없는 id 와 같다
   - failed[0].message: 'not found'를 담은 이유
 
+<a id="partial_bulk_deleting-soft-deleting-domains-without-login-is-refused"></a>
+
+#### [soft-deleting-domains-without-login-is-refused](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py): pass
+
+로그인 문맥 없이 도메인 여럿을 한 번에 soft delete 하면, 문맥에 사용자가 없다는 오류로 거부됩니다
+
+Given
+
+- 도메인 3개와, 그중 하나에 속한 user 한 명
+  - 도메인 home-1
+  - 도메인 wanted-1
+  - 도메인 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- DomainAdapter.partial_bulk_delete: 로그인 문맥 없이 도메인 2개를 한 번에 soft delete 합니다
+
+Then
+
+- 거부됩니다
+  - 거부: UnreachableError
+
 ### partial_bulk_restore
 
 <a id="partial_bulk_deleting-restoring-several-brings-them-back"></a>
@@ -848,6 +1165,33 @@ Then
   - successes[1].created_at: 이 실행이 쓴 시각
   - successes[1].modified_at: 이 실행이 쓴 시각
   - failed = []
+
+<a id="partial_bulk_deleting-restoring-domains-without-login-is-refused"></a>
+
+#### [restoring-domains-without-login-is-refused](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py): pass
+
+로그인 문맥 없이 도메인 여럿을 한 번에 restore 하면, 문맥에 사용자가 없다는 오류로 거부됩니다
+
+Given
+
+- 도메인 3개와, 그중 하나에 속한 user 한 명
+  - 도메인 home-1
+  - 도메인 wanted-1
+  - 도메인 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- DomainAdapter.partial_bulk_restore: 로그인 문맥 없이 도메인 2개를 한 번에 restore 합니다
+
+Then
+
+- 거부됩니다
+  - 거부: UnreachableError
 
 ### partial_bulk_update
 
@@ -981,13 +1325,40 @@ Then
   - successes[1].created_at: 이 실행이 쓴 시각
   - successes[1].modified_at: 이 실행이 쓴 시각
 
+<a id="partial_bulk_editing-editing-domains-without-login-is-refused"></a>
+
+#### [editing-domains-without-login-is-refused](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_editing.py): pass
+
+로그인 문맥 없이 도메인 여럿을 한 번에 수정하면, 문맥에 사용자가 없다는 오류로 거부됩니다
+
+Given
+
+- 도메인 3개와, 그중 하나에 속한 user 한 명
+  - 도메인 home-1
+  - 도메인 wanted-1
+  - 도메인 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- DomainAdapter.partial_bulk_update: 로그인 문맥 없이 도메인 2개의 설명을 한 번에 수정합니다
+
+Then
+
+- 거부됩니다
+  - 거부: UnreachableError
+
 ### restore
 
 <a id="deleting-restoring-a-domain-that-is-not-soft-deleted"></a>
 
 #### [restoring-a-domain-that-is-not-soft-deleted](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-soft delete 되지 않은 도메인을 superadmin 이 restore 하면, restore 했다는 응답이 옵니다
+soft delete 되지 않은 도메인을 superadmin 이 restore 하면, restore 했다는 응답과 함께 그 도메인이 활성 상태로 옵니다
 
 Given
 
@@ -1006,14 +1377,24 @@ When
 
 Then
 
-- 했다는 응답이 옵니다
+- 했다는 응답과 함께 그 도메인이 활성 상태로 옵니다
   - restored = True
+  - domain.name = 'active-1'
+  - domain.description = '이미 있던 도메인'
+  - domain.integration_name = None
+  - domain.allowed_docker_registries = []
+  - domain.is_active = True
+  - domain.is_default = False
+  - domain.id: 건너뜀: 데이터베이스가 생성합니다
+  - domain.entity_id: 미리 저장한 도메인의 id 와 같다
+  - domain.created_at: 이 실행이 쓴 시각
+  - domain.modified_at: 이 실행이 쓴 시각
 
 <a id="deleting-restoring-answers-that-it-restored"></a>
 
 #### [restoring-answers-that-it-restored](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-soft delete 된 도메인을 restore 하면, restore 했다는 응답이 옵니다
+soft delete 된 도메인을 restore 하면, restore 했다는 응답과 함께 그 도메인이 활성 상태로 옵니다
 
 Given
 
@@ -1032,8 +1413,18 @@ When
 
 Then
 
-- 했다는 응답이 옵니다
+- 했다는 응답과 함께 그 도메인이 활성 상태로 옵니다
   - restored = True
+  - domain.name = 'to-restore-1'
+  - domain.description = '이미 있던 도메인'
+  - domain.integration_name = None
+  - domain.allowed_docker_registries = []
+  - domain.is_active = True
+  - domain.is_default = False
+  - domain.id: 건너뜀: 데이터베이스가 생성합니다
+  - domain.entity_id: 미리 저장한 도메인의 id 와 같다
+  - domain.created_at: 이 실행이 쓴 시각
+  - domain.modified_at: 이 실행이 쓴 시각
 
 <a id="deleting-a-user-granted-nothing-may-not-restore-a-domain"></a>
 
