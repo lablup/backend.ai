@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import secrets
 import signal
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
 from http import HTTPStatus
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import pytest_asyncio
+from aiodocker import Docker
 from aiodocker.exceptions import DockerError
 
 from ai.backend.agent.agent import AgentClass
@@ -23,6 +25,25 @@ from ai.backend.common.types import AutoPullBehavior
 class DummyEtcd:
     async def get_prefix(self, key: str) -> Mapping[str, Any]:
         return {}
+
+
+async def _remove_test_socket_relay(agent_id: str) -> None:
+    docker = Docker()
+    try:
+        container = docker.containers.container(f"backendai-socket-relay.{agent_id}")
+        await container.delete(force=True)
+    except DockerError as e:
+        if e.status != 404:
+            raise
+    finally:
+        await docker.close()
+
+
+@pytest_asyncio.fixture(scope="module", loop_scope="module", autouse=True)
+async def remove_test_socket_relay(test_id: str) -> AsyncIterator[None]:
+    # Every agent shares one relay because the agent id is fixed per session.
+    yield
+    await _remove_test_socket_relay(f"i-{test_id}")
 
 
 @pytest.fixture
