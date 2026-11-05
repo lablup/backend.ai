@@ -906,6 +906,30 @@ class TestApplyLifecycleReconcileSessionGroupBoundary:
             await db_sess.commit()
         return group_id, session_group_id
 
+    async def _add_live_group(
+        self,
+        db: ExtendedAsyncSAEngine,
+        endpoint_id: DeploymentID,
+        session_group_id: SessionGroupID,
+    ) -> ReplicaGroupID:
+        group_id = ReplicaGroupID(uuid.uuid4())
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                ReplicaGroupRow(
+                    id=group_id,
+                    deployment_id=endpoint_id,
+                    session_group_id=session_group_id,
+                    lifecycle=ReplicaGroupLifecycle.STABLE,
+                    scaling_status=ReplicaGroupScalingStatus.STABLE,
+                    rollout=ReplicaGroupRolloutSpec(
+                        max_surge=IntOrPercent(count=1),
+                        max_unavailable=IntOrPercent(count=0),
+                    ),
+                )
+            )
+            await db_sess.commit()
+        return group_id
+
     def _drained_apply(
         self,
         endpoint_id: DeploymentID,
@@ -956,6 +980,23 @@ class TestApplyLifecycleReconcileSessionGroupBoundary:
         )
 
         assert await self._deleted_at(db_with_cleanup, session_group_id) is not None
+
+    async def test_live_replica_group_holding_the_same_session_group_keeps_no_boundary(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        replica_group_repository: ReplicaGroupRepository,
+        test_endpoint_id: DeploymentID,
+    ) -> None:
+        group_id, session_group_id = await self._add_draining_group(
+            db_with_cleanup, test_endpoint_id
+        )
+        await self._add_live_group(db_with_cleanup, test_endpoint_id, session_group_id)
+
+        await replica_group_repository.apply_lifecycle_reconcile(
+            self._drained_apply(test_endpoint_id, group_id)
+        )
+
+        assert await self._deleted_at(db_with_cleanup, session_group_id) is None
 
     async def test_existing_boundary_is_kept(
         self,

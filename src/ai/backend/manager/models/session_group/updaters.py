@@ -12,6 +12,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.manager.data.deployment.types import ReplicaGroupLifecycle
 from ai.backend.manager.data.session_group.types import (
     SessionGroupData,
     SessionGroupPlacementDirection,
@@ -90,7 +91,8 @@ class SessionGroupRetentionUpdater(DataBatchUpdater[SessionGroupRow, SessionGrou
     """Stamps the retention boundary on the groups the given replica groups own.
 
     A group whose ``deleted_at`` is already set keeps it, so the first stamp fixes
-    the age the retention sweep measures.
+    the age the retention sweep measures. A group a live replica group still holds
+    keeps a NULL boundary, as the migration does.
     """
 
     replica_group_ids: Collection[ReplicaGroupID]
@@ -106,9 +108,19 @@ class SessionGroupRetentionUpdater(DataBatchUpdater[SessionGroupRow, SessionGrou
         group_ids = sa.select(ReplicaGroupRow.session_group_id).where(
             ReplicaGroupRow.id.in_(self.replica_group_ids)
         )
+        live_replica_group = (
+            sa.select(sa.literal(1))
+            .where(
+                ReplicaGroupRow.session_group_id == SessionGroupRow.id,
+                ReplicaGroupRow.lifecycle.not_in(list(ReplicaGroupLifecycle.terminal_statuses())),
+            )
+            .correlate(SessionGroupRow)
+            .exists()
+        )
         return [
             lambda: SessionGroupRow.id.in_(group_ids),
             lambda: SessionGroupRow.deleted_at.is_(None),
+            lambda: ~live_replica_group,
         ]
 
     @override
