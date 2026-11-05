@@ -36,7 +36,7 @@
   - UserAdapter.bulk_create_users: 성공 있음 1 · 거부 있음 1 (atomic_bulk_get_ops, global_scope)
   - UserAdapter.bulk_create_users_with_keypair: 성공 있음 1 · 거부 있음 1 (atomic_bulk_get_ops, global_scope)
   - UserAdapter.bulk_update_users: 성공 있음 3 · 거부 있음 1 (atomic_bulk_get_ops, global_scope, partial_bulk_get_ops, single_entity)
-  - UserAdapter.create_user: 성공 있음 1 · 거부 있음 4 (atomic_bulk_get_ops, scope)
+  - UserAdapter.create_user: 성공 있음 1 · 거부 있음 3 (atomic_bulk_get_ops, scope)
   - UserAdapter.delete_user_by_id: 성공 있음 1 · 거부 있음 1 (atomic_bulk_get_ops, single_entity)
   - UserAdapter.get: 성공 있음 1 · 거부 있음 1 (atomic_bulk_get_ops, single_entity)
   - UserAdapter.update_user_by_id: 성공 있음 7 · 거부 있음 6 (atomic_bulk_get_ops, single_entity)
@@ -284,7 +284,6 @@
 | 시나리오 | 판정 |
 |---|---|
 | [도메인 스코프에서 사용자 읽기와 생성 권한을 받은 사용자가 그 도메인에 사용자를 만들면, 만든 사용자 전체와 기본 키가 비밀 키와 함께 옵니다](#creating-a-user-granted-create-on-a-domain-makes-a-user-in-it) | 성공 |
-| [읽기 권한 없이 생성 권한만 받은 사용자가 사용자를 만들면 호출이 거부됩니다](#creating-a-user-granted-create-but-not-read-is-refused) | 거부 |
 | [역할을 받지 않은 사용자가 생성하려 하면, 도메인 스코프 권한 문이 막습니다](#creating-a-user-granted-nothing-may-not-create-a-user) | 거부 |
 | [권한을 받지 않은 사용자가 사용자를 만들려 하면, 도메인 스코프 권한 문이 막습니다](#creating-a-user-granted-nothing-may-not-create-a-user-even-with-the-policies-laid) | 거부 |
 | [권한 받은 사용자가 어떤 도메인도 아닌 이름을 주면, 도메인 이름 조회 단계가 대상 없음으로 막습니다](#creating-a-user-may-not-be-created-in-a-domain-name-nothing-answers-to) | 거부 |
@@ -3181,37 +3180,6 @@ Then
   - keypair.created_at: 이 실행이 쓴 시각
   - keypair.modified_at: 이 실행이 쓴 시각
   - secret_key: 매니저가 만든 비밀 키가 채워져 있습니다
-
-<a id="creating-a-user-granted-create-but-not-read-is-refused"></a>
-
-#### [a-user-granted-create-but-not-read-is-refused](/tests/scenario/bai_scenario/manager/user/test_creating.py): pass
-
-읽기 권한 없이 생성 권한만 받은 사용자가 사용자를 만들면 호출이 거부됩니다
-
-Given
-
-- 도메인 하나와 user 한 명, 호출자는 도메인 스코프에서 사용자 CREATE 권한을 받았습니다
-  - 도메인 home-1
-  - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-  - 기본 키페어 정책 default-keypair-policy-1: 키페어가 정책을 대지 않으면 이 정책을 받습니다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 사용자 CREATE 권한을 부여한 역할 배정
-    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 user-role-1: user 전체에 CREATE 허용
-    - 일반 사용자 user-1: 역할 user-role-1 보유
-
-When
-
-- UserAdapter.create_user: user-1이 home-1에 made 을 생성합니다
-
-Then
-
-- 거부됩니다
-  - 거부: NotEnoughPermission
 
 <a id="creating-a-user-granted-nothing-may-not-create-a-user"></a>
 

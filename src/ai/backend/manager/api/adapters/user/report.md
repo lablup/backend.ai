@@ -36,7 +36,7 @@ Scenario: incomplete 3 / 53
   - UserAdapter.bulk_create_users: success present 1 · rejection present 1 (atomic_bulk_get_ops, global_scope)
   - UserAdapter.bulk_create_users_with_keypair: success present 1 · rejection present 1 (atomic_bulk_get_ops, global_scope)
   - UserAdapter.bulk_update_users: success present 3 · rejection present 1 (atomic_bulk_get_ops, global_scope, partial_bulk_get_ops, single_entity)
-  - UserAdapter.create_user: success present 1 · rejection present 4 (atomic_bulk_get_ops, scope)
+  - UserAdapter.create_user: success present 1 · rejection present 3 (atomic_bulk_get_ops, scope)
   - UserAdapter.delete_user_by_id: success present 1 · rejection present 1 (atomic_bulk_get_ops, single_entity)
   - UserAdapter.get: success present 1 · rejection present 1 (atomic_bulk_get_ops, single_entity)
   - UserAdapter.update_user_by_id: success present 7 · rejection present 6 (atomic_bulk_get_ops, single_entity)
@@ -284,7 +284,6 @@ Scenario: incomplete 3 / 53
 | scenario | verdict |
 |---|---|
 | [when a user granted the read and create permissions on users in the domain scope creates a user in that domain, the whole user just created and its default keypair with the secret key come back](#creating-a-user-granted-create-on-a-domain-makes-a-user-in-it) | answered |
-| [a call by a user granted the create permission but not the read permission is refused](#creating-a-user-granted-create-but-not-read-is-refused) | rejected |
 | [a user holding no role who tries to create a user is rejected by the domain scope permission gate](#creating-a-user-granted-nothing-may-not-create-a-user) | rejected |
 | [a user holding no permission who tries to create a user is rejected by the domain scope permission gate](#creating-a-user-granted-nothing-may-not-create-a-user-even-with-the-policies-laid) | rejected |
 | [when a user holding the permission gives a domain name nothing answers to, the domain name lookup step rejects it as not found](#creating-a-user-may-not-be-created-in-a-domain-name-nothing-answers-to) | rejected |
@@ -3181,37 +3180,6 @@ Then
   - keypair.created_at: the time this run wrote
   - keypair.modified_at: the time this run wrote
   - secret_key: the secret key the manager made is filled
-
-<a id="creating-a-user-granted-create-but-not-read-is-refused"></a>
-
-#### [a-user-granted-create-but-not-read-is-refused](/tests/scenario/bai_scenario/manager/user/test_creating.py): pass
-
-a call by a user granted the create permission but not the read permission is refused
-
-Given
-
-- one domain and one user, and the caller holds the CREATE permissions on users in the domain scope
-  - Domain home-1
-  - User resource policy user-policy-1: up to 10 folders per user
-  - Default keypair policy default-keypair-policy-1: a keypair that names no policy gets this one
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - a role assignment granting the user the CREATE permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: CREATE allowed on every user
-    - regular user user-1: holds Role user-role-1
-
-When
-
-- UserAdapter.create_user: user-1 creates made in home-1
-
-Then
-
-- the call is rejected
-  - rejected: NotEnoughPermission
 
 <a id="creating-a-user-granted-nothing-may-not-create-a-user"></a>
 
