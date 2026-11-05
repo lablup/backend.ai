@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import override
+from uuid import UUID
 
 import pytest
 
@@ -114,7 +115,7 @@ class TheCreatedAssignmentNode(Then[ACheckerAndADomainAndACaller, IdleCheckerAss
         return [
             Skipped("id", Says("데이터베이스가 생성합니다", english="the database generates it")),
             Same("scope_type", node.scope_type, IdleCheckerScopeTypeDTO.DOMAIN),
-            Held(
+            Held[UUID](
                 "scope_id",
                 node.scope_id,
                 SameAs(
@@ -122,7 +123,7 @@ class TheCreatedAssignmentNode(Then[ACheckerAndADomainAndACaller, IdleCheckerAss
                     Says("미리 저장한 도메인", english="the domain seeded in advance"),
                 ),
             ),
-            Held(
+            Held[UUID](
                 "idle_checker_id",
                 node.idle_checker_id,
                 SameAs(

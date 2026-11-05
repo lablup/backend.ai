@@ -20,10 +20,10 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.idle_checker import (
     AssignmentsAndACaller,
-    AssignmentsAnswered,
     EveryAssignmentComesBack,
     NoAssignmentIsProcessed,
     OneCheckerOnSomeDomains,
+    PartialBulkAnswered,
     assignment_ids,
 )
 from bai_scenario.runner.acting import ActingAs
@@ -31,11 +31,11 @@ from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Adapter = IdleCheckerAssignmentAdapter
-type EditingStep = Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, AssignmentsAnswered]
+type EditingStep = Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, PartialBulkAnswered]
 
 
 @dataclass(frozen=True)
-class DisablingEveryAssignment(When[AssignmentsAndACaller, Adapter, AssignmentsAnswered]):
+class DisablingEveryAssignment(When[AssignmentsAndACaller, Adapter, PartialBulkAnswered]):
     """심은 할당들을 한 번에 끈다."""
 
     @override
@@ -50,7 +50,7 @@ class DisablingEveryAssignment(When[AssignmentsAndACaller, Adapter, AssignmentsA
         )
 
     @override
-    async def call(self, adapter: Adapter, laid: AssignmentsAndACaller) -> AssignmentsAnswered:
+    async def call(self, adapter: Adapter, laid: AssignmentsAndACaller) -> PartialBulkAnswered:
         ids = await assignment_ids(adapter, laid)
         with ActingAs(laid.caller):
             payload = await adapter.partial_bulk_update(
@@ -61,12 +61,12 @@ class DisablingEveryAssignment(When[AssignmentsAndACaller, Adapter, AssignmentsA
                     ]
                 )
             )
-        return AssignmentsAnswered(ids=ids, payload=payload)
+        return PartialBulkAnswered(ids=ids, payload=payload)
 
 
 @dataclass(frozen=True)
 class TheSuperadminDisablesSeveral(
-    Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, AssignmentsAnswered]
+    Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, PartialBulkAnswered]
 ):
     started: datetime
 
@@ -90,17 +90,17 @@ class TheSuperadminDisablesSeveral(
         return OneCheckerOnSomeDomains(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AssignmentsAndACaller, Adapter, AssignmentsAnswered]:
+    def when(self) -> When[AssignmentsAndACaller, Adapter, PartialBulkAnswered]:
         return DisablingEveryAssignment()
 
     @override
-    def then(self) -> Then[AssignmentsAndACaller, AssignmentsAnswered]:
+    def then(self) -> Then[AssignmentsAndACaller, PartialBulkAnswered]:
         return EveryAssignmentComesBack(started=self.started, enabled=False)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingDisablesNone(
-    Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, AssignmentsAnswered]
+    Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, PartialBulkAnswered]
 ):
     @override
     def summary(self) -> str:
@@ -123,16 +123,16 @@ class AUserGrantedNothingDisablesNone(
         return OneCheckerOnSomeDomains()
 
     @override
-    def when(self) -> When[AssignmentsAndACaller, Adapter, AssignmentsAnswered]:
+    def when(self) -> When[AssignmentsAndACaller, Adapter, PartialBulkAnswered]:
         return DisablingEveryAssignment()
 
     @override
-    def then(self) -> Then[AssignmentsAndACaller, AssignmentsAnswered]:
+    def then(self) -> Then[AssignmentsAndACaller, PartialBulkAnswered]:
         return NoAssignmentIsProcessed(reason="Cannot resolve the given idle_checker key")
 
 
 @dataclass(frozen=True)
-class DisablingAssignmentsAsNobody(When[AssignmentsAndACaller, Adapter, AssignmentsAnswered]):
+class DisablingAssignmentsAsNobody(When[AssignmentsAndACaller, Adapter, PartialBulkAnswered]):
     """사용자 컨텍스트 없이 한 번에 끈다."""
 
     @override
@@ -147,7 +147,7 @@ class DisablingAssignmentsAsNobody(When[AssignmentsAndACaller, Adapter, Assignme
         )
 
     @override
-    async def call(self, adapter: Adapter, laid: AssignmentsAndACaller) -> AssignmentsAnswered:
+    async def call(self, adapter: Adapter, laid: AssignmentsAndACaller) -> PartialBulkAnswered:
         ids = await assignment_ids(adapter, laid)
         payload = await adapter.partial_bulk_update(
             PartialBulkUpdateIdleCheckerAssignmentsInput(
@@ -157,12 +157,12 @@ class DisablingAssignmentsAsNobody(When[AssignmentsAndACaller, Adapter, Assignme
                 ]
             )
         )
-        return AssignmentsAnswered(ids=ids, payload=payload)
+        return PartialBulkAnswered(ids=ids, payload=payload)
 
 
 @dataclass(frozen=True)
 class AnUpdateCarryingNoUserIsRefused(
-    Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, AssignmentsAnswered]
+    Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, PartialBulkAnswered]
 ):
     @override
     def summary(self) -> str:
@@ -185,11 +185,11 @@ class AnUpdateCarryingNoUserIsRefused(
         return OneCheckerOnSomeDomains()
 
     @override
-    def when(self) -> When[AssignmentsAndACaller, Adapter, AssignmentsAnswered]:
+    def when(self) -> When[AssignmentsAndACaller, Adapter, PartialBulkAnswered]:
         return DisablingAssignmentsAsNobody()
 
     @override
-    def then(self) -> Then[AssignmentsAndACaller, AssignmentsAnswered]:
+    def then(self) -> Then[AssignmentsAndACaller, PartialBulkAnswered]:
         return NoAssignmentIsProcessed(reason="User not found in context")
 
 

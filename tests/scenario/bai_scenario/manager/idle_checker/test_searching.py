@@ -11,7 +11,10 @@ import pytest
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.idle_checker.request import SearchIdleCheckersInput
-from ai.backend.common.dto.manager.v2.idle_checker.response import SearchIdleCheckerPayload
+from ai.backend.common.dto.manager.v2.idle_checker.response import (
+    IdleCheckerNode,
+    SearchIdleCheckerPayload,
+)
 from ai.backend.manager.api.adapters.idle_checker.adapter import IdleCheckerAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -97,7 +100,7 @@ class EveryLaidCheckerComesWhole(Then[CheckersAndACaller, Searched]):
         ]
         for i, (node, checker) in enumerate(zip(got, expected, strict=False)):
             seen.append(
-                Held[IdleCheckerID](
+                Held[IdleCheckerNode](
                     f"items[{i}]",
                     node,
                     SameAs(

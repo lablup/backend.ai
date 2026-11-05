@@ -29,10 +29,10 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.idle_checker import (
     AssignmentsAndACaller,
-    AssignmentsAnswered,
     EveryAssignmentComesBack,
     NoAssignmentIsProcessed,
     OneCheckerOnSomeDomains,
+    PartialBulkAnswered,
     assignment_ids,
 )
 from bai_scenario.runner.acting import ActingAs
@@ -40,11 +40,11 @@ from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Adapter = IdleCheckerAssignmentAdapter
-type PurgingStep = Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, AssignmentsAnswered]
+type PurgingStep = Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, PartialBulkAnswered]
 
 
 @dataclass(frozen=True)
-class PurgingEveryAssignment(When[AssignmentsAndACaller, Adapter, AssignmentsAnswered]):
+class PurgingEveryAssignment(When[AssignmentsAndACaller, Adapter, PartialBulkAnswered]):
     """심은 할당들을 한 번에 purge 한다. `missing`이 있으면 그 id 도 함께 넣는다."""
 
     missing: UUID | None = None
@@ -69,7 +69,7 @@ class PurgingEveryAssignment(When[AssignmentsAndACaller, Adapter, AssignmentsAns
         )
 
     @override
-    async def call(self, adapter: Adapter, laid: AssignmentsAndACaller) -> AssignmentsAnswered:
+    async def call(self, adapter: Adapter, laid: AssignmentsAndACaller) -> PartialBulkAnswered:
         ids = await assignment_ids(adapter, laid)
         named = [*ids]
         if self.missing is not None:
@@ -78,12 +78,12 @@ class PurgingEveryAssignment(When[AssignmentsAndACaller, Adapter, AssignmentsAns
             payload = await adapter.partial_bulk_purge(
                 PartialBulkPurgeIdleCheckerAssignmentsInput(ids=named)
             )
-        return AssignmentsAnswered(ids=ids, payload=payload)
+        return PartialBulkAnswered(ids=ids, payload=payload)
 
 
 @dataclass(frozen=True)
 class TheSuperadminPurgesSeveral(
-    Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, AssignmentsAnswered]
+    Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, PartialBulkAnswered]
 ):
     started: datetime
     missing: UUID = UUID(int=1)
@@ -109,17 +109,17 @@ class TheSuperadminPurgesSeveral(
         return OneCheckerOnSomeDomains(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AssignmentsAndACaller, Adapter, AssignmentsAnswered]:
+    def when(self) -> When[AssignmentsAndACaller, Adapter, PartialBulkAnswered]:
         return PurgingEveryAssignment(missing=self.missing)
 
     @override
-    def then(self) -> Then[AssignmentsAndACaller, AssignmentsAnswered]:
+    def then(self) -> Then[AssignmentsAndACaller, PartialBulkAnswered]:
         return EveryAssignmentComesBack(started=self.started, enabled=True, missing=self.missing)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingPurgesNone(
-    Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, AssignmentsAnswered]
+    Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, PartialBulkAnswered]
 ):
     @override
     def summary(self) -> str:
@@ -142,16 +142,16 @@ class AUserGrantedNothingPurgesNone(
         return OneCheckerOnSomeDomains()
 
     @override
-    def when(self) -> When[AssignmentsAndACaller, Adapter, AssignmentsAnswered]:
+    def when(self) -> When[AssignmentsAndACaller, Adapter, PartialBulkAnswered]:
         return PurgingEveryAssignment()
 
     @override
-    def then(self) -> Then[AssignmentsAndACaller, AssignmentsAnswered]:
+    def then(self) -> Then[AssignmentsAndACaller, PartialBulkAnswered]:
         return NoAssignmentIsProcessed(reason="Cannot resolve the given idle_checker key")
 
 
 @dataclass(frozen=True)
-class PurgingAssignmentsAsNobody(When[AssignmentsAndACaller, Adapter, AssignmentsAnswered]):
+class PurgingAssignmentsAsNobody(When[AssignmentsAndACaller, Adapter, PartialBulkAnswered]):
     """사용자 컨텍스트 없이 한 번에 purge 한다."""
 
     @override
@@ -166,17 +166,17 @@ class PurgingAssignmentsAsNobody(When[AssignmentsAndACaller, Adapter, Assignment
         )
 
     @override
-    async def call(self, adapter: Adapter, laid: AssignmentsAndACaller) -> AssignmentsAnswered:
+    async def call(self, adapter: Adapter, laid: AssignmentsAndACaller) -> PartialBulkAnswered:
         ids = await assignment_ids(adapter, laid)
         payload = await adapter.partial_bulk_purge(
             PartialBulkPurgeIdleCheckerAssignmentsInput(ids=[*ids])
         )
-        return AssignmentsAnswered(ids=ids, payload=payload)
+        return PartialBulkAnswered(ids=ids, payload=payload)
 
 
 @dataclass(frozen=True)
 class APurgeCarryingNoUserIsRefused(
-    Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, AssignmentsAnswered]
+    Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, PartialBulkAnswered]
 ):
     @override
     def summary(self) -> str:
@@ -199,11 +199,11 @@ class APurgeCarryingNoUserIsRefused(
         return OneCheckerOnSomeDomains()
 
     @override
-    def when(self) -> When[AssignmentsAndACaller, Adapter, AssignmentsAnswered]:
+    def when(self) -> When[AssignmentsAndACaller, Adapter, PartialBulkAnswered]:
         return PurgingAssignmentsAsNobody()
 
     @override
-    def then(self) -> Then[AssignmentsAndACaller, AssignmentsAnswered]:
+    def then(self) -> Then[AssignmentsAndACaller, PartialBulkAnswered]:
         return NoAssignmentIsProcessed(reason="User not found in context")
 
 

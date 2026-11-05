@@ -103,6 +103,8 @@ class LoadingAsNobody(When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter
 class TheyComeBackInTheOrderAsked(Then[ManyMaskingPoliciesAndACaller, Loaded]):
     """요청한 순서대로 한 항목씩 반환되고, 없는 id 에 해당하는 항목은 비어 있습니다."""
 
+    started: datetime
+
     @override
     def says(self) -> str:
         return Says(

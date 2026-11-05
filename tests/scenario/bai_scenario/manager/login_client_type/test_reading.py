@@ -167,7 +167,7 @@ class LoadingTheLaidAndAMissingOne(When[ManyTypesAndACaller, LoginClientTypeAdap
 
     @override
     async def call(self, adapter: LoginClientTypeAdapter, laid: ManyTypesAndACaller) -> Loaded:
-        ids: list = [*(one.id for one in laid.laid), LoginClientTypeID(uuid4())]
+        ids: list[LoginClientTypeID] = [*(one.id for one in laid.laid), LoginClientTypeID(uuid4())]
         with ActingAs(laid.caller):
             return await adapter.batch_load_by_ids(ids)
 

@@ -27,6 +27,7 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
 )
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.response import (
     IdleCheckerAssignmentNode,
+    SearchIdleCheckerAssignmentPayload,
 )
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import IdleCheckerScopeTypeDTO
 from ai.backend.manager.api.adapters.idle_checker_assignment.adapter import (
@@ -175,6 +176,13 @@ class OneCheckerOnSomeDomains(Given[Any, AssignmentsAndACaller]):
 @dataclass(frozen=True)
 class AssignmentsAnswered:
     """요청에 넣은 할당 id 와, 그 요청의 답."""
+
+    ids: tuple[IdleCheckerAssignmentID, ...]
+    payload: SearchIdleCheckerAssignmentPayload
+
+
+class PartialBulkAnswered:
+    """partial bulk 호출에 넣은 할당 id 와, 그 호출의 답."""
 
     ids: tuple[IdleCheckerAssignmentID, ...]
     payload: PartialBulkPayload[IdleCheckerAssignmentNode]
@@ -393,7 +401,7 @@ class EveryAssignmentIsListed(Then[AssignmentsAndACaller, AssignmentsAnswered]):
 
 
 @dataclass(frozen=True)
-class EveryAssignmentComesBack(Then[AssignmentsAndACaller, AssignmentsAnswered]):
+class EveryAssignmentComesBack(Then[AssignmentsAndACaller, PartialBulkAnswered]):
     """요청한 할당이 모두 처리된 목록에 온다. `missing`이 있으면 그 id 만 실패 목록에 온다."""
 
     started: datetime
@@ -420,7 +428,7 @@ class EveryAssignmentComesBack(Then[AssignmentsAndACaller, AssignmentsAnswered])
 
     @override
     def look(
-        self, laid: AssignmentsAndACaller, answered: Answered[AssignmentsAnswered]
+        self, laid: AssignmentsAndACaller, answered: Answered[PartialBulkAnswered]
     ) -> list[Verdict]:
         answer = answered.response
         if answer is None:
@@ -490,7 +498,7 @@ class EveryAssignmentComesBack(Then[AssignmentsAndACaller, AssignmentsAnswered])
 
 
 @dataclass(frozen=True)
-class NoAssignmentIsProcessed(Then[AssignmentsAndACaller, AssignmentsAnswered]):
+class NoAssignmentIsProcessed(Then[AssignmentsAndACaller, PartialBulkAnswered]):
     """처리된 할당 없이, 요청한 할당이 모두 같은 이유로 실패 목록에 온다."""
 
     reason: str
@@ -507,7 +515,7 @@ class NoAssignmentIsProcessed(Then[AssignmentsAndACaller, AssignmentsAnswered]):
 
     @override
     def look(
-        self, laid: AssignmentsAndACaller, answered: Answered[AssignmentsAnswered]
+        self, laid: AssignmentsAndACaller, answered: Answered[PartialBulkAnswered]
     ) -> list[Verdict]:
         answer = answered.response
         if answer is None:

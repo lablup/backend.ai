@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import override
+from uuid import UUID
 
 import pytest
 
@@ -109,7 +110,7 @@ class TheDisabledAssignmentNode(Then[AssignmentsAndACaller, IdleCheckerAssignmen
         written = WrittenByThisRun(self.started)
         return [
             Same("scope_type", node.scope_type, IdleCheckerScopeTypeDTO.DOMAIN),
-            Held(
+            Held[UUID](
                 "scope_id",
                 node.scope_id,
                 SameAs(
@@ -117,7 +118,7 @@ class TheDisabledAssignmentNode(Then[AssignmentsAndACaller, IdleCheckerAssignmen
                     Says("미리 저장한 도메인", english="the domain seeded in advance"),
                 ),
             ),
-            Held(
+            Held[UUID](
                 "idle_checker_id",
                 node.idle_checker_id,
                 SameAs(
