@@ -108,9 +108,7 @@ class AGroupWithAnAgent(Given[Any, LaidGroupAndAgent]):
             )
         caller = await seeding.within(SomeoneOf(place.domain))
         if self.granted:
-            await seeding.within(
-                SomeoneGrantedOnTheGroup(place.group, caller, Permission.READ)
-            )
+            await seeding.within(SomeoneGrantedOnTheGroup(place.group, caller, Permission.READ))
         return LaidGroupAndAgent(
             domain=seeding.made(place.domain),
             group=seeding.made(place.group),
@@ -195,9 +193,7 @@ class TheKernelFits(Then[LaidGroupAndAgent, Schedule]):
 
 
 @dataclass(frozen=True)
-class ComputingASchedule(
-    Scenario[TestSeedingSession, LaidGroupAndAgent, SessionAdapter, Schedule]
-):
+class ComputingASchedule(Scenario[TestSeedingSession, LaidGroupAndAgent, SessionAdapter, Schedule]):
     with_agent: bool = True
     granted: bool = True
 

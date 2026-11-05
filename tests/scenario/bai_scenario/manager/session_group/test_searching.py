@@ -4,16 +4,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
+from uuid import UUID
 
 import pytest
 
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.query import EnumFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.session_group.request import (
     AdminSearchSessionGroupsInput,
     SessionGroupFilter,
     SessionGroupOrder,
+    SessionGroupPlacementDirectionFilter,
 )
 from ai.backend.common.dto.manager.v2.session_group.response import (
     AdminSearchSessionGroupsPayload,
@@ -150,7 +152,9 @@ class SearchingTheProjectByDirection(When[Laid, SessionGroupAdapter, Searched]):
                 AdminSearchSessionGroupsInput(
                     filter=SessionGroupFilter(
                         project_id=UUIDFilter(equals=laid.project.id),
-                        placement_direction=EnumFilter(equals=self.direction),
+                        placement_direction=SessionGroupPlacementDirectionFilter(
+                            equals=self.direction
+                        ),
                     )
                 )
             )
@@ -214,7 +218,7 @@ class OnlyThePackedGroup(Then[Laid, Searched]):
                 "items",
                 [one.entity_id for one in payload.items],
                 SameAs(
-                    [laid.users_group.id],
+                    [UUID(str(laid.users_group.id))],
                     Says(
                         "사용자가 만든 세션 그룹",
                         english="the session group the user made",
@@ -251,7 +255,7 @@ class ThePacksComeFirst(Then[Laid, Searched]):
                 "items",
                 [one.entity_id for one in payload.items],
                 SameAs(
-                    [laid.users_group.id, laid.deployment_group.id],
+                    [UUID(str(laid.users_group.id)), UUID(str(laid.deployment_group.id))],
                     Says(
                         "사용자가 만든 세션 그룹, 그리고 배포의 replica group 이 가진 세션 그룹",
                         english=(

@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.kernel_group.response import (
     KernelGroupResourceSlotNode,
 )
 from ai.backend.common.dto.manager.v2.session.response import SessionNode
+from ai.backend.common.types import SessionId
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -73,11 +74,9 @@ class ReadingTheSession(When[LaidSessionAndCaller, SessionAdapter, OneSession]):
         )
 
     @override
-    async def call(
-        self, adapter: SessionAdapter, laid: LaidSessionAndCaller
-    ) -> OneSession:
+    async def call(self, adapter: SessionAdapter, laid: LaidSessionAndCaller) -> OneSession:
         with ActingAs(laid.caller):
-            return await adapter.get(SessionID(laid.session.id))
+            return await adapter.get(SessionId(laid.session.id))
 
 
 @dataclass(frozen=True)
@@ -110,8 +109,7 @@ class LoadingTheKernel(When[LaidSessionAndCaller, SessionAdapter, Kernels]):
         return Says(
             f"{laid.caller.username}이 {laid.session.name} 세션의 커널을 id 로 일괄 조회합니다",
             english=(
-                f"{laid.caller.username} loads the kernel of the session "
-                f"{laid.session.name} by id"
+                f"{laid.caller.username} loads the kernel of the session {laid.session.name} by id"
             ),
         )
 
@@ -241,9 +239,7 @@ class TheWholeSession(Then[LaidSessionAndCaller, OneSession]):
         )
 
     @override
-    def look(
-        self, laid: LaidSessionAndCaller, answered: Answered[OneSession]
-    ) -> list[Verdict]:
+    def look(self, laid: LaidSessionAndCaller, answered: Answered[OneSession]) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [MissingResponse(answered.raised)]
@@ -253,7 +249,10 @@ class TheWholeSession(Then[LaidSessionAndCaller, OneSession]):
                 node.model_dump(),
                 SameAs(
                     session_dump(laid),
-                    Says("저장된 세션의 전체 정보", english="the whole information of the stored session"),
+                    Says(
+                        "저장된 세션의 전체 정보",
+                        english="the whole information of the stored session",
+                    ),
                 ),
             )
         ]
@@ -429,8 +428,7 @@ def _granted_description(korean: str, english: str, granted: Granted) -> Says:
             ),
         )
     return Says(
-        f"그 프로젝트에서 세션 읽기 권한을 받은 사용자가 {korean}하면, 저장된 그대로 "
-        "반환됩니다",
+        f"그 프로젝트에서 세션 읽기 권한을 받은 사용자가 {korean}하면, 저장된 그대로 반환됩니다",
         english=(
             f"when a user granted session read in the project {english}, it comes back exactly "
             "as it was stored"
@@ -468,9 +466,7 @@ class ReadingASession(
 
 
 @dataclass(frozen=True)
-class LoadingASession(
-    Scenario[TestSeedingSession, LaidSessionAndCaller, SessionAdapter, Sessions]
-):
+class LoadingASession(Scenario[TestSeedingSession, LaidSessionAndCaller, SessionAdapter, Sessions]):
     granted: Granted = Granted.THE_PROJECT
 
     @override
@@ -497,9 +493,7 @@ class LoadingASession(
 
 
 @dataclass(frozen=True)
-class LoadingAKernel(
-    Scenario[TestSeedingSession, LaidSessionAndCaller, SessionAdapter, Kernels]
-):
+class LoadingAKernel(Scenario[TestSeedingSession, LaidSessionAndCaller, SessionAdapter, Kernels]):
     granted: Granted = Granted.THE_PROJECT
 
     @override
@@ -559,9 +553,7 @@ class LoadingAMainGroup(
 
 
 @dataclass(frozen=True)
-class LoadingAGroup(
-    Scenario[TestSeedingSession, LaidSessionAndCaller, SessionAdapter, Groups]
-):
+class LoadingAGroup(Scenario[TestSeedingSession, LaidSessionAndCaller, SessionAdapter, Groups]):
     granted: Granted = Granted.THE_PROJECT
 
     @override
@@ -570,7 +562,9 @@ class LoadingAGroup(
 
     @override
     def describe(self) -> str:
-        return _granted_description("커널 그룹을 id 로 일괄 조회", "loads a kernel group by id", self.granted)
+        return _granted_description(
+            "커널 그룹을 id 로 일괄 조회", "loads a kernel group by id", self.granted
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, LaidSessionAndCaller]:
@@ -621,9 +615,7 @@ class LoadingAnEnviron(
 
 
 @dataclass(frozen=True)
-class LoadingAGroupSlot(
-    Scenario[TestSeedingSession, LaidSessionAndCaller, SessionAdapter, Slots]
-):
+class LoadingAGroupSlot(Scenario[TestSeedingSession, LaidSessionAndCaller, SessionAdapter, Slots]):
     granted: Granted = Granted.THE_PROJECT
 
     @override

@@ -163,9 +163,7 @@ class ExcludingThePair(When[ASessionAndAChecker, SessionAdapter, Excluded]):
 
 
 @dataclass(frozen=True)
-class IncludingThePair(
-    When[ASessionAndAChecker, SessionAdapter, IncludeSessionIdleChecksPayload]
-):
+class IncludingThePair(When[ASessionAndAChecker, SessionAdapter, IncludeSessionIdleChecksPayload]):
     target: Target = Target.THE_LAID_PAIR
 
     @override
@@ -200,9 +198,7 @@ class IncludingThePair(
             )
 
 
-def _pair_verdicts(
-    laid: ASessionAndAChecker, items: list[Any], failed: list[Any]
-) -> list[Verdict]:
+def _pair_verdicts(laid: ASessionAndAChecker, items: list[Any], failed: list[Any]) -> list[Verdict]:
     """The one pair the caller named went through and nothing failed."""
     if not items:
         return [Same("items count", len(items), 1), Same("failed count", len(failed), 0)]

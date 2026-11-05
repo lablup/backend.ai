@@ -117,9 +117,7 @@ class SearchingTheKernelsOfAnAgentScenario(
     @override
     def given(self) -> Given[TestSeedingSession, LaidSessionAndCaller]:
         if self.superadmin:
-            return ASessionWithAKernelAndSomeone(
-                granted=Granted.NOTHING, role=UserRole.SUPERADMIN
-            )
+            return ASessionWithAKernelAndSomeone(granted=Granted.NOTHING, role=UserRole.SUPERADMIN)
         return ASessionWithAKernelAndSomeone(granted=Granted.THE_PROJECT)
 
     @override
@@ -166,9 +164,7 @@ class SearchingTheSessionsOfAnAgentScenario(
     @override
     def given(self) -> Given[TestSeedingSession, LaidSessionAndCaller]:
         if self.superadmin:
-            return ASessionWithAKernelAndSomeone(
-                granted=Granted.NOTHING, role=UserRole.SUPERADMIN
-            )
+            return ASessionWithAKernelAndSomeone(granted=Granted.NOTHING, role=UserRole.SUPERADMIN)
         return ASessionWithAKernelAndSomeone(granted=Granted.THE_PROJECT)
 
     @override

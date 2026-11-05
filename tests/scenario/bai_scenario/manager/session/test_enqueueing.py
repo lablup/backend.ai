@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, override
+from uuid import UUID
 
 import pytest
 
@@ -43,7 +43,7 @@ from ai.backend.testutils.scenario_steps import (
     When,
 )
 from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
-from bai_scenario.components.domain import SomeoneOf
+from bai_scenario.components.domain import SomeoneOf, WrittenByThisRun
 from bai_scenario.components.resource_allocation import lay_a_place
 from bai_scenario.components.session_reads import allocation_dump
 from bai_scenario.runner.acting import ActingAs
@@ -102,7 +102,7 @@ class LaidPlaceAndCaller:
     slot_name: str
     caller: UserData
     access_key: str
-    started: Callable[[datetime], bool]
+    started: datetime
 
 
 @dataclass(frozen=True)
@@ -151,7 +151,7 @@ class APlaceAndSomeone(Given[Any, LaidPlaceAndCaller]):
             slot_name=slot_name,
             caller=seeding.made(caller),
             access_key=str(place.access_key),
-            started=seeding.since_started(),
+            started=datetime.now(UTC),
         )
 
 
@@ -207,21 +207,6 @@ class ANonEmptyId(Condition[str | None]):
 
 
 @dataclass(frozen=True)
-class WrittenDuringThisRun(Condition[datetime | None]):
-    """이 실행이 쓰기 시작한 뒤에 찍힌 시각."""
-
-    since: Callable[[datetime], bool]
-
-    @override
-    def says(self) -> str:
-        return Says("이 실행이 쓴 시각", english="the time this run wrote")
-
-    @override
-    def holds(self, got: datetime | None) -> bool:
-        return got is not None and self.since(got)
-
-
-@dataclass(frozen=True)
 class TheSessionIsCreated(Then[LaidPlaceAndCaller, Enqueued]):
     @override
     def says(self) -> str:
@@ -251,7 +236,7 @@ class TheSessionIsCreated(Then[LaidPlaceAndCaller, Enqueued]):
             Held(
                 "image_ids",
                 node.image_ids,
-                SameAs(
+                SameAs[list[UUID] | None](
                     [laid.image.id], Says("그 세션의 이미지", english="the image of the session")
                 ),
             ),
@@ -259,7 +244,9 @@ class TheSessionIsCreated(Then[LaidPlaceAndCaller, Enqueued]):
             Held(
                 "user_id",
                 node.user_id,
-                SameAs(laid.caller.id, Says("요청한 사용자의 id", english="the caller's id")),
+                SameAs[UUID | None](
+                    laid.caller.id, Says("요청한 사용자의 id", english="the caller's id")
+                ),
             ),
             Held(
                 "project_id",
@@ -300,7 +287,7 @@ class TheSessionIsCreated(Then[LaidPlaceAndCaller, Enqueued]):
             Held(
                 "lifecycle.created_at",
                 lifecycle.created_at,
-                WrittenDuringThisRun(laid.started),
+                WrittenByThisRun(laid.started),
             ),
             Same("lifecycle.terminated_at", lifecycle.terminated_at, None),
             Same("lifecycle.starts_at", lifecycle.starts_at, None),
@@ -318,9 +305,7 @@ class TheSessionIsCreated(Then[LaidPlaceAndCaller, Enqueued]):
 
 
 @dataclass(frozen=True)
-class CreatingASession(
-    Scenario[TestSeedingSession, LaidPlaceAndCaller, SessionAdapter, Enqueued]
-):
+class CreatingASession(Scenario[TestSeedingSession, LaidPlaceAndCaller, SessionAdapter, Enqueued]):
     granted: bool = True
 
     @override

@@ -90,7 +90,9 @@ class SomeoneGrantedSessionIn(TestSeedNest[Laid[UserData]]):
         role = seed.creating_from(
             TestSeedRole(lambda p: ProjectID(p.id), name_hint=self.role_hint), self.project
         )
-        seed.adding(TestSeedPermission(entity_type=SessionEntityType(), permission=self.permission), role)
+        seed.adding(
+            TestSeedPermission(entity_type=SessionEntityType(), permission=self.permission), role
+        )
         seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
         return someone
 
@@ -113,8 +115,7 @@ class ASessionWithAKernelAndSomeone(Given[Any, LaidSessionAndCaller]):
         return Says(
             "커널 하나와 그 커널 그룹을 가진 대기 세션, 그리고 그것을 읽을 사용자 한 명",
             english=(
-                "one pending session with a kernel and its kernel group, and one user who "
-                "reads it"
+                "one pending session with a kernel and its kernel group, and one user who reads it"
             ),
         )
 
@@ -131,9 +132,7 @@ class ASessionWithAKernelAndSomeone(Given[Any, LaidSessionAndCaller]):
             place.owner,
             place.group,
         )
-        group = await seeding.adding(
-            TestSeedMainKernelGroupOf(image=image, slots=slots), session
-        )
+        group = await seeding.adding(TestSeedMainKernelGroupOf(image=image, slots=slots), session)
         environ = await seeding.adding(
             TestSeedKernelGroupEnvironOf(key=ENVIRON_KEY, value=ENVIRON_VALUE), group
         )
@@ -157,9 +156,7 @@ class ASessionWithAKernelAndSomeone(Given[Any, LaidSessionAndCaller]):
                 )
             )
         else:
-            caller = await lay_a_caller_of(
-                seeding, place, role=self.role, granted=self.granted
-            )
+            caller = await lay_a_caller_of(seeding, place, role=self.role, granted=self.granted)
         return LaidSessionAndCaller(
             domain=seeding.made(place.domain),
             project=seeding.made(place.project),
@@ -240,12 +237,12 @@ def session_dump(laid: LaidSessionAndCaller) -> dict[str, Any]:
 
 
 def _folded_kernel_status(status: Any) -> str:
-    name = getattr(status, "name", "")
+    name = str(getattr(status, "name", ""))
     if name in ("PREPARING", "PULLING"):
         return "PREPARING"
     if name in ("CANCELLED", "BUILDING", "RESTARTING", "RESIZING", "SUSPENDED", "ERROR"):
         return "CANCELLED"
-    return status.value
+    return str(status.value)
 
 
 def kernel_dump(kernel: KernelInfo, slot_name: str, quantity: Decimal) -> dict[str, Any]:

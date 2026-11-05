@@ -57,9 +57,7 @@ class ReadingTheLogs(When[LaidSessionAndCaller, SessionAdapter, Logs]):
     @override
     async def call(self, adapter: SessionAdapter, laid: LaidSessionAndCaller) -> Logs:
         with ActingAs(laid.caller):
-            return await adapter.get_logs(
-                laid.session.id, str(laid.session.access_key or "")
-            )
+            return await adapter.get_logs(laid.session.id, str(laid.session.access_key or ""))
 
 
 @dataclass(frozen=True)
@@ -237,9 +235,7 @@ class ShuttingDownAService(
 
 
 @dataclass(frozen=True)
-class StartingAService(
-    Scenario[TestSeedingSession, LaidSessionAndCaller, SessionAdapter, Any]
-):
+class StartingAService(Scenario[TestSeedingSession, LaidSessionAndCaller, SessionAdapter, Any]):
     granted: bool = True
 
     @override
