@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import override
+from uuid import UUID
 
 import pytest
 
@@ -22,7 +23,9 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Refused,
     Same,
+    SameAs,
     Says,
     Scenario,
     Skipped,
@@ -100,8 +103,22 @@ class TheEditedCheckerNode(Then[CheckersAndACaller, IdleCheckerNode]):
         if node is None:
             return [Refused(InsufficientPrivilege, answered.raised)]
         return [
-            Same("id", node.id, laid.laid[0].id),
-            Same("entity_id", node.entity_id, laid.laid[0].id),
+            Held[UUID](
+                "id",
+                node.id,
+                SameAs(
+                    laid.laid[0].id,
+                    Says("준비한 검사기", english="the checker laid"),
+                ),
+            ),
+            Held[UUID](
+                "entity_id",
+                node.entity_id,
+                SameAs(
+                    laid.laid[0].id,
+                    Says("준비한 검사기", english="the checker laid"),
+                ),
+            ),
             Same("name", node.name, laid.laid[0].name),
             Same("description", node.description, laid.laid[0].description),
             Same("checker_type", node.checker_type.value, "network_timeout"),

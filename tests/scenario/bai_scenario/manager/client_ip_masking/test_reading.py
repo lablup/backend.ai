@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from ai.backend.common.data.entity.client_ip_masking import ClientIPMaskingPolicyID
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.client_ip_masking.response import ClientIPMaskingPolicyNode
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.client_ip_masking.adapter import ClientIPMaskingAdapter
@@ -20,6 +21,7 @@ from ai.backend.testutils.scenario_steps import (
     Held,
     Refused,
     Same,
+    SameAs,
     Says,
     Scenario,
     Then,
@@ -27,7 +29,11 @@ from ai.backend.testutils.scenario_steps import (
     When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.client_ip_masking import TwoMaskingPoliciesAndSomeone
+from bai_scenario.components.client_ip_masking import (
+    ManyMaskingPoliciesAndACaller,
+    TwoMaskingPoliciesAndSomeone,
+)
+from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
@@ -119,8 +125,22 @@ class TheyComeBackInTheOrderAsked(Then[ManyMaskingPoliciesAndACaller, Loaded]):
                 seen.append(Same(f"items[{i}]", got, Says("노드", english="a node")))
                 continue
             seen += [
-                Same(f"items[{i}].id", got.id, policy.id),
-                Same(f"items[{i}].entity_id", got.entity_id, policy.id),
+                Held[UUID](
+                    f"items[{i}].id",
+                    got.id,
+                    SameAs(
+                        policy.id,
+                        Says("미리 저장한 정책", english="the policy created in advance"),
+                    ),
+                ),
+                Held[UUID](
+                    f"items[{i}].entity_id",
+                    got.entity_id,
+                    SameAs(
+                        policy.id,
+                        Says("미리 저장한 정책", english="the policy created in advance"),
+                    ),
+                ),
                 Same(f"items[{i}].target_type", got.target_type.value, policy.target_type.value),
                 Same(f"items[{i}].mode", got.mode.value, policy.mode.value),
                 Same(f"items[{i}].ipv4_prefix", got.ipv4_prefix, policy.ipv4_prefix),

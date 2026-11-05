@@ -23,6 +23,7 @@ from ai.backend.testutils.scenario_steps import (
     Configured,
     Given,
     Held,
+    Refused,
     Same,
     SameAs,
     Says,

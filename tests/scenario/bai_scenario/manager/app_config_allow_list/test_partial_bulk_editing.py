@@ -37,11 +37,11 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.app_config_allow_list import (
     TwoEntriesAndACaller,
     TwoEntriesAndSomeone,
 )
-from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession

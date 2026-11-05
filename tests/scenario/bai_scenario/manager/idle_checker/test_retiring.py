@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
+from uuid import UUID
 
 import pytest
 
@@ -17,7 +18,7 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Refused,
-    Same,
+    SameAs,
     Says,
     Scenario,
     Then,
@@ -77,8 +78,22 @@ class ThePurgedCheckerAnswers(Then[CheckersAndACaller, PurgeIdleCheckerPayload])
         if payload is None:
             return [Refused(NotEnoughPermission, answered.raised)]
         return [
-            Same("id", payload.id, laid.laid[0].id),
-            Same("entity_id", payload.entity_id, laid.laid[0].id),
+            Held[UUID](
+                "id",
+                payload.id,
+                SameAs(
+                    laid.laid[0].id,
+                    Says("요청에 넣은 검사기", english="the checker put in the request"),
+                ),
+            ),
+            Held[UUID](
+                "entity_id",
+                payload.entity_id,
+                SameAs(
+                    laid.laid[0].id,
+                    Says("요청에 넣은 검사기", english="the checker put in the request"),
+                ),
+            ),
         ]
 
 

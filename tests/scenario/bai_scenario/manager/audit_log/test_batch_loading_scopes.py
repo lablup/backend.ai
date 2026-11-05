@@ -7,12 +7,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
 from ai.backend.common.data.entity.audit_log import AuditLogID, AuditLogScopeID
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.audit_log.request import SearchAuditLogScopesInput
 from ai.backend.common.dto.manager.v2.audit_log.response import AuditLogScopeEntryNode
 from ai.backend.common.exception import UnreachableError
@@ -21,8 +20,10 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Held,
     Refused,
     Same,
+    SameAs,
     Says,
     Scenario,
     Then,
@@ -130,11 +131,51 @@ class TheScopesComeBackInTheOrderAsked(Then[ScopesToSearch, ScopeSlotsAnswered])
                 seen.append(Same(f"items[{i}]", got, Says("노드", english="a node")))
                 continue
             seen += [
-                Same(f"items[{i}].id", got.id, entry.id),
-                Same(f"items[{i}].field_id", got.field_id, entry.field_id),
-                Same(f"items[{i}].audit_log_id", got.audit_log_id, entry.audit_log_id),
+                Held[UUID](
+                    f"items[{i}].id",
+                    got.id,
+                    SameAs(
+                        entry.id,
+                        Says(
+                            "검색에서 읽은 범위 항목",
+                            english="the scope entry the search read",
+                        ),
+                    ),
+                ),
+                Held[UUID](
+                    f"items[{i}].field_id",
+                    got.field_id,
+                    SameAs(
+                        entry.field_id,
+                        Says(
+                            "검색에서 읽은 범위 항목",
+                            english="the scope entry the search read",
+                        ),
+                    ),
+                ),
+                Held[UUID](
+                    f"items[{i}].audit_log_id",
+                    got.audit_log_id,
+                    SameAs(
+                        entry.audit_log_id,
+                        Says(
+                            "검색에서 읽은 범위 항목",
+                            english="the scope entry the search read",
+                        ),
+                    ),
+                ),
                 Same(f"items[{i}].scope_type", got.scope_type, entry.scope_type),
-                Same(f"items[{i}].scope_id", got.scope_id, entry.scope_id),
+                Held[UUID](
+                    f"items[{i}].scope_id",
+                    got.scope_id,
+                    SameAs(
+                        entry.scope_id,
+                        Says(
+                            "검색에서 읽은 범위 항목",
+                            english="the scope entry the search read",
+                        ),
+                    ),
+                ),
             ]
         last = loaded[len(answer.entries)] if len(loaded) > len(answer.entries) else "none"
         seen.append(Same(f"items[{len(answer.entries)}]", last, None))

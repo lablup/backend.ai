@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from typing import override
 from uuid import UUID
 
@@ -29,8 +28,11 @@ from ai.backend.testutils.scenario_steps import (
     When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
-from bai_scenario.components.idle_checker import CheckersAndACaller, SomeCheckersAndSomeone
-from bai_scenario.components.idle_checker import checker_node_of
+from bai_scenario.components.idle_checker import (
+    CheckersAndACaller,
+    SomeCheckersAndSomeone,
+    checker_node_of,
+)
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
+from uuid import UUID
 
 import pytest
 
@@ -23,8 +24,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Held,
     Refused,
-    Same,
+    SameAs,
     Says,
     Scenario,
     Then,
@@ -100,7 +102,16 @@ class ThePurgedAssignmentAnswers(Then[AssignmentsAndACaller, PurgedOne]):
         answer = answered.response
         if answer is None:
             return [Refused(UnreachableError, answered.raised)]
-        return [Same("id", answer.payload.id, answer.id)]
+        return [
+            Held[UUID](
+                "id",
+                answer.payload.id,
+                SameAs(
+                    answer.id,
+                    Says("요청에 넣은 할당", english="the assignment put in the request"),
+                ),
+            )
+        ]
 
 
 @dataclass(frozen=True)

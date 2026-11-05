@@ -18,9 +18,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
-    Held,
     Refused,
     Same,
+    SameAs,
     Says,
     Scenario,
     Then,
@@ -120,7 +120,16 @@ class TheyComeBackInTheOrderAsked(Then[ManyServicesAndACaller, Loaded]):
             if not isinstance(got, ServiceCatalogNode):
                 seen.append(Same(f"items[{i}]", got, Says("노드", english="a node")))
                 continue
-            seen.append(Same(f"items[{i}].entity_id", got.entity_id, service.id))
+            seen.append(
+                Held[UUID](
+                    f"items[{i}].entity_id",
+                    got.entity_id,
+                    SameAs(
+                        service.id,
+                        Says("미리 저장한 서비스", english="the service created in advance"),
+                    ),
+                )
+            )
             seen.extend(service_verdicts(f"items[{i}].", got, laid=service,
                                          written=WrittenByThisRun(self.started)))
         last = items[asked - 1] if len(items) >= asked else "none"

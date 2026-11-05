@@ -11,6 +11,7 @@ import pytest
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     CreateIdleCheckerAssignmentInput,
+    IdleCheckerScopeRefDTO,
 )
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.response import (
     IdleCheckerAssignmentNode,

@@ -32,6 +32,7 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.components.login_client_type import (
     ManyTypesAndACaller,
