@@ -19,13 +19,19 @@ from ai.backend.manager.errors.storage import (
     VFolderOperationFailed,
 )
 from ai.backend.manager.errors.user import UserNotFound
+<<<<<<< HEAD
 from ai.backend.manager.models.user import UserRole
+=======
+from ai.backend.manager.errors.watcher import WatcherTokenNotConfigured
+from ai.backend.manager.models.user.row import UserRole
+>>>>>>> 2f97c66b3 (feat(BA-8229): require a configured agent watcher token (#16488))
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ChangeVFolderOwnershipAction,
     ChangeVFolderOwnershipActionResult,
     GetQuotaAction,
     GetQuotaActionResult,
+<<<<<<< HEAD
     ListAllHostsAction,
     ListAllHostsActionResult,
     ListHostsAction,
@@ -34,6 +40,17 @@ from ai.backend.manager.services.vfolder.actions.storage_ops import (
     MountHostActionResult,
     UmountHostAction,
     UmountHostActionResult,
+=======
+    GlobalListAllHostsAction,
+    GlobalListAllHostsActionResult,
+    GlobalListMountsAction,
+    GlobalMountHostAction,
+    GlobalMountHostActionResult,
+    GlobalUmountHostAction,
+    GlobalUmountHostActionResult,
+    SearchHostsAction,
+    SearchHostsActionResult,
+>>>>>>> 2f97c66b3 (feat(BA-8229): require a configured agent watcher token (#16488))
     UpdateQuotaAction,
     UpdateQuotaActionResult,
 )
@@ -584,3 +601,32 @@ class TestUmountHostAction:
 
         assert isinstance(result, UmountHostActionResult)
         assert result.manager.success is True
+
+
+class TestWatcherTokenNotConfigured:
+    @pytest.fixture
+    def unconfigured_vfolder_service(
+        self,
+        vfolder_service: VFolderService,
+        mock_config_provider: MagicMock,
+        mock_vfolder_repository: MagicMock,
+    ) -> VFolderService:
+        mock_config_provider.config.watcher.token = None
+        mock_vfolder_repository.get_alive_agent_ids = AsyncMock(return_value=["agent-1"])
+        mock_vfolder_repository.get_active_kernel_mount_names = AsyncMock(return_value=[])
+        return vfolder_service
+
+    async def test_list_mounts_raises(self, unconfigured_vfolder_service: VFolderService) -> None:
+        with pytest.raises(WatcherTokenNotConfigured):
+            await unconfigured_vfolder_service.list_mounts(GlobalListMountsAction())
+
+    async def test_mount_host_raises(self, unconfigured_vfolder_service: VFolderService) -> None:
+        action = GlobalMountHostAction(name="test-volume", fs_location="/dev/sda1")
+        with pytest.raises(WatcherTokenNotConfigured):
+            await unconfigured_vfolder_service.mount_host(action)
+
+    async def test_umount_host_raises(self, unconfigured_vfolder_service: VFolderService) -> None:
+        with pytest.raises(WatcherTokenNotConfigured):
+            await unconfigured_vfolder_service.umount_host(
+                GlobalUmountHostAction(name="test-volume")
+            )

@@ -55,6 +55,7 @@ from ai.backend.manager.errors.storage import (
     VFolderNotFound,
     VFolderOperationFailed,
 )
+<<<<<<< HEAD
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.group import ProjectType
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -69,6 +70,16 @@ from ai.backend.manager.models.vfolder import (
     is_unmanaged,
     verify_vfolder_name,
     vfolder_status_map,
+=======
+from ai.backend.manager.errors.watcher import WatcherTokenNotConfigured
+from ai.backend.manager.models.project.row import ProjectType
+from ai.backend.manager.models.scopes import OperationScope
+from ai.backend.manager.models.user.row import UserRole
+from ai.backend.manager.models.vfolder.creators import (
+    PersonalVFolderCreator,
+    UnmanagedVFolderMixin,
+    VFolderBaseCreator,
+>>>>>>> 2f97c66b3 (feat(BA-8229): require a configured agent watcher token (#16488))
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
@@ -1205,21 +1216,19 @@ class VFolderService:
     # Mount operations (superadmin-only, agent watcher orchestration)
     # ------------------------------------------------------------------
 
-    async def _get_watcher_info(self, agent_id: str) -> dict[str, Any]:
-        """Get watcher connection info for an agent."""
+    def _validate_watcher_token(self) -> str:
         token = self._config_provider.config.watcher.token
-        if token is None:
-            token = "insecure"
+        if not token:
+            raise WatcherTokenNotConfigured()
+        return token
+
+    async def _get_watcher_addr(self, agent_id: str) -> yarl.URL:
         agent_ip = await self._etcd.get(f"nodes/agents/{agent_id}/ip")
         raw_watcher_port = await self._etcd.get(
             f"nodes/agents/{agent_id}/watcher_port",
         )
         watcher_port = 6009 if raw_watcher_port is None else int(raw_watcher_port)
-        addr = yarl.URL(f"http://{agent_ip}:{watcher_port}")
-        return {
-            "addr": addr,
-            "token": token,
-        }
+        return yarl.URL(f"http://{agent_ip}:{watcher_port}")
 
     async def _get_mount_prefix(self) -> str:
         mount_prefix = await self._config_provider.legacy_etcd_config_loader.get_raw(
@@ -1231,6 +1240,7 @@ class VFolderService:
 
     async def list_mounts(self, action: ListMountsAction) -> ListMountsActionResult:
         """List mount points from manager, storage proxy, and agents."""
+        token = self._validate_watcher_token()
         mount_prefix = await self._get_mount_prefix()
         _ = mount_prefix  # mount_prefix used contextually by caller if needed
 
@@ -1259,9 +1269,8 @@ class VFolderService:
             agent_id: str,
         ) -> tuple[str, MountResultData]:
             async with sema:
-                watcher_info = await self._get_watcher_info(agent_id)
-                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-                url = watcher_info["addr"] / "mounts"
+                headers = {"X-BackendAI-Watcher-Token": token}
+                url = await self._get_watcher_addr(agent_id) / "mounts"
                 async with sess.get(url, headers=headers) as watcher_resp:
                     if watcher_resp.status == 200:
                         data = MountResultData(
@@ -1298,6 +1307,7 @@ class VFolderService:
 
     async def mount_host(self, action: MountHostAction) -> MountHostActionResult:
         """Mount a filesystem on agents via agent watchers."""
+        token = self._validate_watcher_token()
         manager_result = MountResultData(
             success=True,
             message="Managers do not have mountpoints since v20.09.",
@@ -1321,9 +1331,8 @@ class VFolderService:
             agent_id: str,
         ) -> tuple[str, MountResultData]:
             async with sema:
-                watcher_info = await self._get_watcher_info(agent_id)
-                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-                url = watcher_info["addr"] / "mounts"
+                headers = {"X-BackendAI-Watcher-Token": token}
+                url = await self._get_watcher_addr(agent_id) / "mounts"
                 async with sess.post(url, json=mount_params, headers=headers) as resp:
                     if resp.status == 200:
                         data = MountResultData(
@@ -1357,6 +1366,7 @@ class VFolderService:
 
     async def umount_host(self, action: UmountHostAction) -> UmountHostActionResult:
         """Unmount a filesystem from agents via agent watchers."""
+        token = self._validate_watcher_token()
         mount_prefix = await self._get_mount_prefix()
         mountpoint = Path(mount_prefix) / action.name
         if Path(mount_prefix) == mountpoint:
@@ -1387,9 +1397,8 @@ class VFolderService:
             agent_id: str,
         ) -> tuple[str, MountResultData]:
             async with sema:
-                watcher_info = await self._get_watcher_info(agent_id)
-                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-                url = watcher_info["addr"] / "mounts"
+                headers = {"X-BackendAI-Watcher-Token": token}
+                url = await self._get_watcher_addr(agent_id) / "mounts"
                 async with sess.delete(url, json=umount_params, headers=headers) as resp:
                     if resp.status == 200:
                         data = MountResultData(
@@ -1435,12 +1444,13 @@ class VFolderService:
                 node_id="manager",
             )
 
-        watcher_info = await self._get_watcher_info(action.agent_id)
+        token = self._validate_watcher_token()
+        watcher_addr = await self._get_watcher_addr(action.agent_id)
         try:
             client_timeout = aiohttp.ClientTimeout(total=10.0)
             async with aiohttp.ClientSession(timeout=client_timeout) as sess:
-                headers = {"X-BackendAI-Watcher-Token": watcher_info["token"]}
-                url = watcher_info["addr"] / "fstab"
+                headers = {"X-BackendAI-Watcher-Token": token}
+                url = watcher_addr / "fstab"
                 params = {"fstab_path": fstab_path}
                 async with sess.get(url, headers=headers, params=params) as resp:
                     if resp.status == 200:

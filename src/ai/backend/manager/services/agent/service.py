@@ -24,10 +24,16 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.config.provider import ManagerConfigProvider
+<<<<<<< HEAD
 from ai.backend.manager.data.agent.types import (
     AgentHeartbeatUpsert,
     UpsertResult,
 )
+=======
+from ai.backend.manager.data.permission.permission_defs import AgentPermission
+from ai.backend.manager.errors.agent import AgentNotFound, ConflictingSessionRescheduleNotSupported
+from ai.backend.manager.errors.watcher import WatcherTokenNotConfigured
+>>>>>>> 2f97c66b3 (feat(BA-8229): require a configured agent watcher token (#16488))
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
@@ -127,11 +133,11 @@ class AgentService:
         """
         Get watcher information.
         :return addr: address of agent watcher (eg: http://127.0.0.1:6009)
-        :return token: agent watcher token ("insecure" if not set in config server)
+        :return token: agent watcher token
         """
         token = self._config_provider.config.watcher.token
-        if token is None:
-            token = "insecure"
+        if not token:
+            raise WatcherTokenNotConfigured()
         agent_ip = await self._etcd.get(f"nodes/agents/{agent_id}/ip")
         raw_watcher_port = await self._etcd.get(
             f"nodes/agents/{agent_id}/watcher_port",

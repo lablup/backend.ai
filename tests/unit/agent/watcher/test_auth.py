@@ -9,6 +9,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from aiohttp import web
 
+<<<<<<< HEAD
+=======
+from ai.backend.agent.errors.watcher import (
+    InvalidWatcherTokenError,
+    WatcherTokenNotConfiguredError,
+)
+>>>>>>> 2f97c66b3 (feat(BA-8229): require a configured agent watcher token (#16488))
 from ai.backend.agent.watcher import auth_middleware, watcher_server
 
 _TOKEN_HEADER = "X-BackendAI-Watcher-Token"
@@ -63,6 +70,7 @@ class TestAuthMiddleware:
         handler.assert_not_called()
 
 
+<<<<<<< HEAD
 class TestStartupTokenLog:
     @pytest.mark.parametrize(
         "stored_token",
@@ -82,19 +90,63 @@ class TestStartupTokenLog:
             "etcd": {"user": None, "addr": None, "namespace": "test"},
             "watcher": {"ssl-enabled": False, "service-addr": MagicMock()},
         }
+=======
+def _watcher_cfg() -> dict[str, Any]:
+    return {
+        "logging": MagicMock(),
+        "etcd": {"user": None, "addrs": [], "namespace": "test"},
+        "watcher": {"ssl-enabled": False, "service-addr": MagicMock()},
+    }
+
+
+def _mock_etcd(stored_token: str | None) -> AsyncMock:
+    etcd = AsyncMock()
+    etcd.get.return_value = stored_token
+    etcd.__aenter__.return_value = etcd
+    return etcd
+
+
+class TestStartupToken:
+    async def test_starts_without_logging_token_value(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+>>>>>>> 2f97c66b3 (feat(BA-8229): require a configured agent watcher token (#16488))
         with (
-            patch("ai.backend.agent.watcher.AsyncEtcd", return_value=etcd),
+            patch("ai.backend.agent.watcher.AsyncEtcd", return_value=_mock_etcd("watcher-secret")),
             patch("ai.backend.agent.watcher.Logger"),
             patch("ai.backend.agent.watcher.web.AppRunner", return_value=AsyncMock()),
-            patch("ai.backend.agent.watcher.web.TCPSite", return_value=AsyncMock()),
+            patch("ai.backend.agent.watcher.web.TCPSite", return_value=AsyncMock()) as tcp_site,
             caplog.at_level(logging.DEBUG, logger="ai.backend.agent.watcher"),
         ):
-            async with watcher_server(asyncio.get_running_loop(), 0, (cfg, "ipc://test")):
+            async with watcher_server(
+                asyncio.get_running_loop(), 0, (_watcher_cfg(), "ipc://test")
+            ):
                 pass
 
+<<<<<<< HEAD
         records = [vars(record) for record in caplog.records]
         assert all("watcher-secret-value" not in str(record) for record in records)
         assert any(
             "watcher authentication token loaded" in record.getMessage()
             for record in caplog.records
         )
+=======
+        tcp_site.return_value.start.assert_awaited_once()
+        assert all("watcher-secret" not in str(vars(record)) for record in caplog.records)
+
+    @pytest.mark.parametrize("stored_token", [None, ""], ids=["missing", "empty"])
+    async def test_refuses_to_start_without_token(self, stored_token: str | None) -> None:
+        with (
+            patch("ai.backend.agent.watcher.AsyncEtcd", return_value=_mock_etcd(stored_token)),
+            patch("ai.backend.agent.watcher.Logger"),
+            patch("ai.backend.agent.watcher.web.AppRunner", return_value=AsyncMock()),
+            patch("ai.backend.agent.watcher.web.TCPSite", return_value=AsyncMock()) as tcp_site,
+            pytest.raises(WatcherTokenNotConfiguredError),
+        ):
+            async with watcher_server(
+                asyncio.get_running_loop(), 0, (_watcher_cfg(), "ipc://test")
+            ):
+                pass
+
+        tcp_site.return_value.start.assert_not_awaited()
+>>>>>>> 2f97c66b3 (feat(BA-8229): require a configured agent watcher token (#16488))
