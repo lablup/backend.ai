@@ -142,6 +142,7 @@ from ai.backend.manager.models.image.row import (
     ImageLoadFilter,
     PublicImageLoadFilter,
 )
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac import ProjectScope, ScopeType, SystemScope
 from ai.backend.manager.models.resource_group.row import (
     ResourceGroupRow,
@@ -2323,6 +2324,27 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         owner = await ctx.processors.user.lookup_keypair_owner.run(
             LookupKeypairOwnerByAccessKeyAction(access_key=access_key)
         )
+        # `scoped_query()` pins the domain and the access key but not the project.
+        reach: sa.sql.Select[Any] | None
+        match ctx.user["role"]:
+            case UserRole.SUPERADMIN:
+                reach = None
+            case UserRole.ADMIN:
+                reach = sa.select(ProjectRow.id).where(
+                    ProjectRow.id == project_id, ProjectRow.domain_name == domain_name
+                )
+            case UserRole.USER:
+                reach = sa.select(
+                    user_scope_membership_exists(
+                        ProjectEntityType(), project_id, UserID(owner.owner_entity_id)
+                    )
+                )
+            case _:
+                raise InvalidAPIParameters("Unknown client role")
+        if reach is not None:
+            async with ctx.db.begin_readonly_session_read_committed() as db_session:
+                if not await db_session.scalar(reach):
+                    raise InsufficientPrivilege
         domain_id = await ctx.scheduler_repository.get_domain_id_by_name(DomainName(domain_name))
         allowed = await ctx.scheduler_repository.query_allowed_resource_groups(
             domain_id=domain_id,
