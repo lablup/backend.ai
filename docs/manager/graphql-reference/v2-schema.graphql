@@ -18082,6 +18082,7 @@ enum RetentionCategory {
   SESSIONS
   USAGE_RECORDS
   USAGE_BUCKETS
+  PROJECTS
 }
 
 """

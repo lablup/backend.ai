@@ -307,6 +307,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 fair_share_repository=domain.repositories.fair_share.repository,
                 resource_usage_repository=domain.repositories.resource_usage_history.repository,
                 retention_repository=domain.repositories.retention.repository,
+                project_repository=domain.repositories.project.repository,
                 system_session_environ_repository=domain.repositories.system_session_environ.repository,
                 agent_client_pool=agents.agent_client_pool,
                 appproxy_client_pool=agents.appproxy_client_pool,

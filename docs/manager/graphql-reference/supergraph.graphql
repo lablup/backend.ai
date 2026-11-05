@@ -23983,6 +23983,7 @@ enum RetentionCategory
   SESSIONS @join__enumValue(graph: STRAWBERRY)
   USAGE_RECORDS @join__enumValue(graph: STRAWBERRY)
   USAGE_BUCKETS @join__enumValue(graph: STRAWBERRY)
+  PROJECTS @join__enumValue(graph: STRAWBERRY)
 }
 
 """

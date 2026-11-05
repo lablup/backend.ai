@@ -52,6 +52,7 @@ from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
 from ai.backend.manager.repositories.project.db_source.db_source import ProjectDBSource
+from ai.backend.manager.repositories.project.types import DanglingPersonalProjectPurgeResult
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -235,6 +236,35 @@ class ProjectRepository:
     async def purge_group(self, group_id: uuid.UUID) -> bool:
         """Completely remove a group and all its associated data."""
         return await self._db_source.purge_group(group_id, self._storage_manager)
+
+    @project_repository_resilience.apply()
+    async def purge_dangling_personal_projects(
+        self,
+        threshold: datetime,
+        batch_size: int,
+    ) -> DanglingPersonalProjectPurgeResult:
+        """Purge personal projects whose creator is gone and whose deletion aged past
+        ``threshold``, at most ``batch_size`` of them.
+
+        A project that cannot be removed is counted as failed and left for the next
+        tick; the rest of the batch still runs.
+        """
+        project_ids = await self._db_source.dangling_personal_project_ids(threshold, batch_size)
+        purged = 0
+        failed = 0
+        for project_id in project_ids:
+            try:
+                await self._db_source.purge_group(project_id, self._storage_manager)
+            except Exception:
+                log.warning(
+                    "dangling personal project purge failed",
+                    project_id=project_id,
+                    exc_info=True,
+                )
+                failed += 1
+                continue
+            purged += 1
+        return DanglingPersonalProjectPurgeResult(purged_count=purged, failed_count=failed)
 
     @project_repository_resilience.apply()
     async def get_project(self, project_id: UUID) -> ProjectData:

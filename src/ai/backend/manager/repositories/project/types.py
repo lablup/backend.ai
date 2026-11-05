@@ -6,7 +6,16 @@ from dataclasses import dataclass
 
 from ai.backend.manager.data.project.types import ProjectData
 
-__all__ = ("ProjectSearchResult",)
+__all__ = ("DanglingPersonalProjectPurgeResult", "ProjectSearchResult")
+
+
+@dataclass(frozen=True)
+class DanglingPersonalProjectPurgeResult:
+    """How a batch of dangling personal projects went: what was removed and what
+    was left for the next tick."""
+
+    purged_count: int
+    failed_count: int
 
 
 @dataclass

@@ -21,6 +21,7 @@ Scenario: incomplete 3 / 8
 | [when the superadmin creates a policy of the deployments category, the node comes back with that category](#creating-a-policy-for-the-deployments-category-is-made) | answered |
 | [when the superadmin creates a policy of the login category, the node comes back with that category](#creating-a-policy-for-the-login-category-is-made) | answered |
 | [when the superadmin creates a policy of the logs category, the node comes back with that category](#creating-a-policy-for-the-logs-category-is-made) | answered |
+| [when the superadmin creates a policy of the projects category, the node comes back with that category](#creating-a-policy-for-the-projects-category-is-made) | answered |
 | [when the superadmin creates a policy of the reconcile_history category, the node comes back with that category](#creating-a-policy-for-the-reconcile-history-category-is-made) | answered |
 | [when the superadmin creates a policy of the roles_invitations category, the node comes back with that category](#creating-a-policy-for-the-roles-invitations-category-is-made) | answered |
 | [when the superadmin creates a policy of the sessions category, the node comes back with that category](#creating-a-policy-for-the-sessions-category-is-made) | answered |
@@ -177,6 +178,37 @@ Then
 - the whole policy just created comes back
   - id: skipped: the database generates it
   - category = <RetentionCategory.LOGS: 'logs'>
+  - retention_period_days = 90
+  - enabled = True
+  - last_swept_at = None
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+
+<a id="creating-a-policy-for-the-projects-category-is-made"></a>
+
+#### [a-policy-for-the-projects-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
+
+when the superadmin creates a policy of the projects category, the node comes back with that category
+
+Given
+
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- RetentionPolicyAdapter.create: user-1 creates a policy for the projects category
+
+Then
+
+- the whole policy just created comes back
+  - id: skipped: the database generates it
+  - category = <RetentionCategory.PROJECTS: 'projects'>
   - retention_period_days = 90
   - enabled = True
   - last_swept_at = None

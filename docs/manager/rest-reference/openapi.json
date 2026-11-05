@@ -29390,7 +29390,8 @@
           "deployments",
           "sessions",
           "usage_records",
-          "usage_buckets"
+          "usage_buckets",
+          "projects"
         ],
         "title": "RetentionCategory",
         "type": "string"

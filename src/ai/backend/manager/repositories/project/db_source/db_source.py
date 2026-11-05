@@ -23,7 +23,7 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
-from ai.backend.manager.data.project.types import ProjectData, ProjectType
+from ai.backend.manager.data.project.types import ProjectData, ProjectStatus, ProjectType
 from ai.backend.manager.data.vfolder.types import (
     VFolderStatusSet,
     VFolderStorageTarget,
@@ -293,13 +293,25 @@ class ProjectDBSource:
         group_id: uuid.UUID,
         storage_manager: StorageSessionManager,
     ) -> bool:
-        """Completely remove a group and all its associated data."""
+        """Completely remove a group and all its associated data.
+
+        A personal project is refused while its creator is there: it goes with the
+        user. One left dangling by a purged creator is collectable.
+        """
         project_id = ProjectID(group_id)
         async with self._db.begin_readonly_session_read_committed() as sess:
-            project_type = await sess.scalar(
-                sa.select(ProjectRow.type).where(ProjectRow.id == project_id)
-            )
-            if project_type is ProjectType.PERSONAL:
+            project = (
+                await sess.execute(
+                    sa.select(ProjectRow.type, ProjectRow.creator_id).where(
+                        ProjectRow.id == project_id
+                    )
+                )
+            ).first()
+            if (
+                project is not None
+                and project.type is ProjectType.PERSONAL
+                and project.creator_id is not None
+            ):
                 raise PersonalProjectDeletionError(
                     f"Personal project is purged with its user: {project_id}"
                 )
@@ -421,6 +433,27 @@ class ProjectDBSource:
             storage_manager,
             storage_ptask_group,
         )
+
+    async def dangling_personal_project_ids(
+        self,
+        threshold: datetime,
+        limit: int,
+    ) -> list[ProjectID]:
+        """The personal projects whose creator is gone and whose deletion aged past
+        ``threshold``, oldest first."""
+        async with self._db.begin_readonly_session_read_committed() as sess:
+            ids = await sess.scalars(
+                sa.select(ProjectRow.id)
+                .where(
+                    ProjectRow.type == ProjectType.PERSONAL,
+                    ProjectRow.creator_id.is_(None),
+                    ProjectRow.status == ProjectStatus.DELETED,
+                    ProjectRow.updated_at < threshold,
+                )
+                .order_by(ProjectRow.updated_at)
+                .limit(limit)
+            )
+            return [ProjectID(project_id) for project_id in ids]
 
     async def get_project(self, project_id: UUID) -> ProjectData:
         """Get a single project by UUID.
