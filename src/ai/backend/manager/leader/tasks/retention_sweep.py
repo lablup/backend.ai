@@ -19,6 +19,7 @@ from ai.backend.common.cron.base import PeriodicTask
 from ai.backend.common.data.retention.types import RetentionCategory
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.retention.types import RetentionPurgeResult
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.retention.repository import RetentionRepository
 
@@ -51,11 +52,15 @@ class RetentionSweepTask(PeriodicTask):
     @override
     async def run(self) -> None:
         """Run one sweep. All orchestration lives in the repositories."""
-        await self._repository.sweep()
-        await self._sweep_dangling_personal_projects()
+        results = await self._repository.sweep()
+        await self._sweep_dangling_personal_projects(results)
 
-    async def _sweep_dangling_personal_projects(self) -> None:
+    async def _sweep_dangling_personal_projects(self, drained: list[RetentionPurgeResult]) -> None:
         """Purge personal projects whose creator is gone, after the policy period."""
+        budget = self._config_provider.config.retention.per_tick_budget
+        if budget is not None and sum(result.deleted_count for result in drained) >= budget:
+            log.debug("retention sweep per-tick budget exhausted, projects deferred")
+            return
         try:
             policy = await self._repository.enabled_policy(RetentionCategory.PROJECTS)
             if policy is None:

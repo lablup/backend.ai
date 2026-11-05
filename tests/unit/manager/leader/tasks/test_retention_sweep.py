@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.common.data.retention.types import RetentionCategory
-from ai.backend.manager.data.retention.types import RetentionPolicyData
+from ai.backend.manager.data.retention.types import RetentionPolicyData, RetentionPurgeResult
 from ai.backend.manager.leader.tasks.retention_sweep import RetentionSweepTask
 from ai.backend.manager.repositories.project.types import DanglingPersonalProjectPurgeResult
 
@@ -25,9 +25,10 @@ def _policy(category: RetentionCategory) -> RetentionPolicyData:
     )
 
 
-def _config_provider(batch_size: int = 100) -> MagicMock:
+def _config_provider(batch_size: int = 100, per_tick_budget: int | None = None) -> MagicMock:
     provider = MagicMock()
     provider.config.retention.batch_size = batch_size
+    provider.config.retention.per_tick_budget = per_tick_budget
     return provider
 
 
@@ -48,6 +49,9 @@ async def test_run_sweeps_the_retention_repository() -> None:
 
 async def test_run_purges_dangling_personal_projects_past_the_policy_period() -> None:
     repo = AsyncMock()
+    repo.sweep.return_value = [
+        RetentionPurgeResult(category=RetentionCategory.LOGS, deleted_count=4)
+    ]
     policy = _policy(RetentionCategory.PROJECTS)
     repo.enabled_policy.return_value = policy
     repo.current_time.return_value = now = _NOW
@@ -58,7 +62,7 @@ async def test_run_purges_dangling_personal_projects_past_the_policy_period() ->
     task = RetentionSweepTask(
         repository=repo,
         project_repository=project_repo,
-        config_provider=_config_provider(batch_size=5),
+        config_provider=_config_provider(batch_size=5, per_tick_budget=10),
         interval=3600.0,
     )
 
@@ -69,6 +73,26 @@ async def test_run_purges_dangling_personal_projects_past_the_policy_period() ->
         now - policy.retention_period, 5
     )
     repo.record_sweep.assert_awaited_once_with(policy.id, now)
+
+
+async def test_run_defers_projects_when_the_per_tick_budget_is_spent() -> None:
+    repo = AsyncMock()
+    repo.sweep.return_value = [
+        RetentionPurgeResult(category=RetentionCategory.LOGS, deleted_count=10)
+    ]
+    project_repo = AsyncMock()
+    task = RetentionSweepTask(
+        repository=repo,
+        project_repository=project_repo,
+        config_provider=_config_provider(per_tick_budget=10),
+        interval=3600.0,
+    )
+
+    await task.run()
+
+    repo.enabled_policy.assert_not_awaited()
+    project_repo.purge_dangling_personal_projects.assert_not_awaited()
+    repo.record_sweep.assert_not_awaited()
 
 
 async def test_run_skips_projects_when_the_policy_is_disabled() -> None:

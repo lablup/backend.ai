@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from datetime import timedelta
+from uuid import UUID
 
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.manager.data.retention.types import RetentionCategory
 from ai.backend.manager.models.alembic.versions.b7d2a91c4e58_seed_projects_retention_policy import (
     seed,
@@ -48,6 +50,7 @@ class TestProjectsRetentionPolicySeed:
 
         policies = await self._projects_policies(db)
         assert len(policies) == 1
+        assert policies[0].id == RetentionPolicyID(UUID("b1e5f4a0-0009-4c10-8a01-000000000009"))
         assert policies[0].retention_period == timedelta(days=30)
         assert policies[0].enabled is False
 
