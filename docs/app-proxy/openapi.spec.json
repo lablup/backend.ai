@@ -540,13 +540,10 @@
             "title": "Login Session Token"
           },
           "kernel_host": {
-            "maxLength": 255,
             "title": "Kernel Host",
             "type": "string"
           },
           "kernel_port": {
-            "maximum": 65535,
-            "minimum": 1,
             "title": "Kernel Port",
             "type": "integer"
           },

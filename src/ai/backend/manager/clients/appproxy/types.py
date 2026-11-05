@@ -1,4 +1,4 @@
-"""Manager-side request and response bodies for the AppProxy coordinator API.
+"""Manager-side request body for the single-endpoint AppProxy coordinator API.
 
 Shared tag models (``SessionTagsModel`` / ``EndpointTagsModel`` / ``TagsModel``)
 live in :mod:`ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types` —
@@ -9,13 +9,9 @@ from __future__ import annotations
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
+from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.config import ModelHealthCheck
-from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.session import SessionID
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types import TagsModel
-from ai.backend.common.types import AccessKey
 
 
 class CreateEndpointRequestBody(BaseRequestModel):
@@ -58,31 +54,3 @@ class CreateEndpointRequestBody(BaseRequestModel):
             "service replicas using this path / interval / timeout."
         ),
     )
-
-
-class AppTokenSessionIdentity(BaseRequestModel):
-    """Session identity sent with ``POST /v2/conf``."""
-
-    id: SessionID = Field(..., description="Session ID.")
-    user_uuid: UserID = Field(..., description="Session owner's user ID.")
-    group_id: ProjectID = Field(
-        ...,
-        description="Session's project ID. Coordinators predating 26.4 read only this key.",
-    )
-    access_key: AccessKey | None = Field(..., description="Session owner's access key.")
-    domain_name: str = Field(..., description="Session's domain name.")
-
-
-class CreateSessionAppTokenRequestBody(BaseRequestModel):
-    """Request body for ``POST /v2/conf``, which issues a token for an interactive session app."""
-
-    login_session_token: str | None = Field(..., description="Webserver login session token.")
-    kernel_host: str = Field(..., description="Host the app port is reachable on.")
-    kernel_port: int = Field(..., description="Host port of the app.")
-    session: AppTokenSessionIdentity = Field(..., description="Session the token is issued for.")
-
-
-class CreateSessionAppTokenResponseBody(BaseResponseModel):
-    """Response body of ``POST /v2/conf``."""
-
-    token: str = Field(..., description="Token to open the session app with.")

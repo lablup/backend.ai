@@ -58,10 +58,6 @@ from ai.backend.manager.actions.v2.bulk.result import (
 from ai.backend.manager.bgtask.tasks.commit_session import CommitSessionManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
-from ai.backend.manager.clients.appproxy.types import (
-    AppTokenSessionIdentity,
-    CreateSessionAppTokenRequestBody,
-)
 from ai.backend.manager.data.common.sentinel import undefined
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.draft import (
@@ -1294,25 +1290,22 @@ class SessionService:
 
         if session_data.resource_group_name is None:
             raise ServiceUnavailable("Session has no scaling group assigned")
-        if session_data.user_uuid is None:
-            raise InternalServerError(f"Session {session_id} has no owner")
         proxy_target = await self._session_repository.resource_group_proxy_target(
             session_data.resource_group_name
         )
         if proxy_target is None:
             raise ServiceUnavailable("No coordinator configured for this resource group")
-        client = self._appproxy_client_pool.load_client(proxy_target.addr, proxy_target.api_token)
+        client = self._appproxy_client_pool.load_client(proxy_target.addr, "")
         wsproxy_status = await client.fetch_status()
         if wsproxy_status.advertise_address:
             wsproxy_advertise_addr = wsproxy_status.advertise_address
         else:
             wsproxy_advertise_addr = proxy_target.addr
 
-        kernel_host = info.kernel_host
-        if kernel_host is None and info.agent_addr is not None:
+        if info.kernel_host is None:
             kernel_host = urlparse(info.agent_addr).hostname
-        if kernel_host is None:
-            raise InternalServerError(f"Session {session_id} main kernel has no reachable host")
+        else:
+            kernel_host = info.kernel_host
         service_ports: list[dict[str, Any]] = info.service_ports
         sport: dict[str, Any] = {}
         host_port: int
@@ -1362,26 +1355,35 @@ class SessionService:
                 "Failed to launch the app service", extra_data=result["error"]
             )
 
-        token = await client.create_session_app_token(
-            CreateSessionAppTokenRequestBody(
-                login_session_token=login_session_token,
-                kernel_host=kernel_host,
-                kernel_port=host_port,
-                session=AppTokenSessionIdentity(
-                    id=SessionID(session_data.id),
-                    user_uuid=UserID(session_data.user_uuid),
-                    group_id=ProjectID(session_data.group_id),
-                    access_key=session_data.access_key,
-                    domain_name=session_data.domain_name,
-                ),
+        body = {
+            "login_session_token": login_session_token,
+            "kernel_host": kernel_host,
+            "kernel_port": host_port,
+            "session": {
+                "id": str(session_data.id),
+                "user_uuid": str(session_data.user_uuid),
+                "group_id": str(session_data.group_id),
+                "access_key": session_data.access_key,
+                "domain_name": session_data.domain_name,
+            },
+        }
+
+        async with (
+            aiohttp.ClientSession() as req,
+            req.post(
+                f"{proxy_target.addr}/v2/conf",
+                json=body,
+                headers={"X-BackendAI-Token": proxy_target.api_token},
+            ) as resp,
+        ):
+            token_json = await resp.json()
+
+            return StartServiceActionResult(
+                result=None,
+                session_data=session_data,
+                token=token_json["token"],
+                wsproxy_addr=wsproxy_advertise_addr,
             )
-        )
-        return StartServiceActionResult(
-            result=None,
-            session_data=session_data,
-            token=token,
-            wsproxy_addr=wsproxy_advertise_addr,
-        )
 
     async def upload_files(self, action: UploadFilesAction) -> UploadFilesActionResult:
         reader = action.reader

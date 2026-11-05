@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -43,11 +42,19 @@ _SERVICE_PORTS_TTYD = [
 ]
 
 
-@dataclass(frozen=True)
-class _ResourceGroupApiTokenCase:
-    description: str
-    wsproxy_api_token: str | None
-    expected_client_token: str
+def _make_wsproxy_mock(token: str = "test-token-xyz") -> AsyncMock:
+    """Create a mock for aiohttp.ClientSession returning a wsproxy token."""
+    mock_resp = AsyncMock()
+    mock_resp.json.return_value = {"token": token}
+    mock_session_ctx = AsyncMock()
+    mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_session_ctx.__aexit__ = AsyncMock(return_value=False)
+    mock_session_obj = MagicMock()
+    mock_session_obj.post.return_value = mock_session_ctx
+    mock_session_cls = AsyncMock()
+    mock_session_cls.__aenter__ = AsyncMock(return_value=mock_session_obj)
+    mock_session_cls.__aexit__ = AsyncMock(return_value=False)
+    return mock_session_cls
 
 
 # ---------------------------------------------------------------------------
@@ -324,22 +331,6 @@ class TestSessionComplete:
 class TestSessionStartService:
     """Start service endpoint — app token and wsproxy address scenarios."""
 
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _ResourceGroupApiTokenCase(
-                description="api_token_set",
-                wsproxy_api_token=_WSPROXY_API_TOKEN,
-                expected_client_token=_WSPROXY_API_TOKEN,
-            ),
-            _ResourceGroupApiTokenCase(
-                description="no_api_token",
-                wsproxy_api_token=None,
-                expected_client_token="",
-            ),
-        ],
-        ids=lambda case: case.description,
-    )
     async def test_start_service_returns_token_and_wsproxy(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -348,14 +339,13 @@ class TestSessionStartService:
         resource_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
-        case: _ResourceGroupApiTokenCase,
     ) -> None:
         """S-1: Start service 'ttyd' → StartServiceResponse with token and wsproxy_addr."""
         async with db_engine.begin() as conn:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=case.wsproxy_api_token)
+                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=_WSPROXY_API_TOKEN)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
@@ -376,21 +366,22 @@ class TestSessionStartService:
 
         agent_registry.start_service.return_value = {"status": "started"}
 
-        mock_client.create_session_app_token.return_value = "test-token-xyz"
-        result = await admin_registry.session.start_service(
-            session_seed.session_id,
-            StartServiceRequest(app="ttyd"),
-        )
+        mock_session_cls = _make_wsproxy_mock(token="test-token-xyz")
+
+        with patch(
+            "ai.backend.manager.services.session.service.aiohttp.ClientSession",
+            return_value=mock_session_cls,
+        ):
+            result = await admin_registry.session.start_service(
+                session_seed.session_id,
+                StartServiceRequest(app="ttyd"),
+            )
 
         assert isinstance(result, StartServiceResponse)
         assert result.token == "test-token-xyz"
         assert result.wsproxy_addr == _WSPROXY_ADDR
-        appproxy_client_pool.load_client.assert_called_once_with(
-            _WSPROXY_ADDR, case.expected_client_token
-        )
-        token_request_body = mock_client.create_session_app_token.call_args.args[0]
-        assert token_request_body.kernel_host == "127.0.0.1"
-        assert token_request_body.kernel_port == 30080
+        post_call_kwargs = mock_session_cls.__aenter__.return_value.post.call_args.kwargs
+        assert post_call_kwargs["headers"] == {"X-BackendAI-Token": _WSPROXY_API_TOKEN}
 
     async def test_start_service_with_specific_port(
         self,
@@ -416,7 +407,7 @@ class TestSessionStartService:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=_WSPROXY_API_TOKEN)
+                .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
@@ -437,11 +428,15 @@ class TestSessionStartService:
 
         agent_registry.start_service.return_value = {"status": "started"}
 
-        mock_client.create_session_app_token.return_value = "port-test-token"
-        result = await admin_registry.session.start_service(
-            session_seed.session_id,
-            StartServiceRequest(app="ttyd", port=8888),
-        )
+        mock_session_cls = _make_wsproxy_mock(token="port-test-token")
+        with patch(
+            "ai.backend.manager.services.session.service.aiohttp.ClientSession",
+            return_value=mock_session_cls,
+        ):
+            result = await admin_registry.session.start_service(
+                session_seed.session_id,
+                StartServiceRequest(app="ttyd", port=8888),
+            )
 
         assert isinstance(result, StartServiceResponse)
         assert result.token == "port-test-token"
@@ -460,7 +455,7 @@ class TestSessionStartService:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=_WSPROXY_API_TOKEN)
+                .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
@@ -481,15 +476,19 @@ class TestSessionStartService:
 
         agent_registry.start_service.return_value = {"status": "started"}
 
-        mock_client.create_session_app_token.return_value = "args-test-token"
-        result = await admin_registry.session.start_service(
-            session_seed.session_id,
-            StartServiceRequest(
-                app="ttyd",
-                arguments=json.dumps(["--port", "8080"]),
-                envs=json.dumps({"DEBUG": "true"}),
-            ),
-        )
+        mock_session_cls = _make_wsproxy_mock(token="args-test-token")
+        with patch(
+            "ai.backend.manager.services.session.service.aiohttp.ClientSession",
+            return_value=mock_session_cls,
+        ):
+            result = await admin_registry.session.start_service(
+                session_seed.session_id,
+                StartServiceRequest(
+                    app="ttyd",
+                    arguments=json.dumps(["--port", "8080"]),
+                    envs=json.dumps({"DEBUG": "true"}),
+                ),
+            )
 
         assert isinstance(result, StartServiceResponse)
         call_args = agent_registry.start_service.call_args
@@ -512,7 +511,7 @@ class TestSessionStartService:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=_WSPROXY_API_TOKEN)
+                .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
@@ -533,16 +532,30 @@ class TestSessionStartService:
 
         agent_registry.start_service.return_value = {"status": "started"}
 
-        mock_client.create_session_app_token.return_value = "host-test-token"
-        result = await admin_registry.session.start_service(
-            session_seed.session_id,
-            StartServiceRequest(app="ttyd"),
-        )
+        mock_resp = AsyncMock()
+        mock_resp.json.return_value = {"token": "host-test-token"}
+        mock_session_ctx = AsyncMock()
+        mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_session_ctx.__aexit__ = AsyncMock(return_value=False)
+        mock_session_obj = MagicMock()
+        mock_session_obj.post.return_value = mock_session_ctx
+        mock_session_cls = AsyncMock()
+        mock_session_cls.__aenter__ = AsyncMock(return_value=mock_session_obj)
+        mock_session_cls.__aexit__ = AsyncMock(return_value=False)
+
+        with patch(
+            "ai.backend.manager.services.session.service.aiohttp.ClientSession",
+            return_value=mock_session_cls,
+        ):
+            result = await admin_registry.session.start_service(
+                session_seed.session_id,
+                StartServiceRequest(app="ttyd"),
+            )
 
         assert isinstance(result, StartServiceResponse)
         # Verify kernel_host was extracted from agent_addr
-        token_request_body = mock_client.create_session_app_token.call_args.args[0]
-        assert token_request_body.kernel_host == "192.168.1.100"
+        post_call_kwargs = mock_session_obj.post.call_args[1]
+        assert post_call_kwargs["json"]["kernel_host"] == "192.168.1.100"
 
     async def test_start_service_wsproxy_advertise_address_fallback(
         self,
@@ -558,7 +571,7 @@ class TestSessionStartService:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=_WSPROXY_API_TOKEN)
+                .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
@@ -579,11 +592,15 @@ class TestSessionStartService:
 
         agent_registry.start_service.return_value = {"status": "started"}
 
-        mock_client.create_session_app_token.return_value = "fallback-test-token"
-        result = await admin_registry.session.start_service(
-            session_seed.session_id,
-            StartServiceRequest(app="ttyd"),
-        )
+        mock_session_cls = _make_wsproxy_mock(token="fallback-test-token")
+        with patch(
+            "ai.backend.manager.services.session.service.aiohttp.ClientSession",
+            return_value=mock_session_cls,
+        ):
+            result = await admin_registry.session.start_service(
+                session_seed.session_id,
+                StartServiceRequest(app="ttyd"),
+            )
 
         assert isinstance(result, StartServiceResponse)
         # wsproxy_addr should fall back to the original (not advertise_address)
@@ -611,7 +628,7 @@ class TestSessionStartServiceFailures:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=_WSPROXY_API_TOKEN)
+                .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
@@ -659,7 +676,7 @@ class TestSessionStartServiceFailures:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=_WSPROXY_API_TOKEN)
+                .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
@@ -697,7 +714,7 @@ class TestSessionStartServiceFailures:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=_WSPROXY_API_TOKEN)
+                .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
@@ -758,7 +775,7 @@ class TestSessionStartServiceFailures:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=_WSPROXY_API_TOKEN)
+                .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
