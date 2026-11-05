@@ -2,7 +2,6 @@ import base64
 import json
 import logging
 import random
-import secrets
 import string
 import time
 import urllib.parse
@@ -73,9 +72,14 @@ _PROVIDER_METADATA_KEYS: Final[tuple[str, ...]] = (
     "token_endpoint",
     "jwks_uri",
 )
-# Binds the state of a sign-in to the browser that started it.
-_SESSION_COOKIE: Final[str] = "bai_openid_session"
+# Binds the state of a sign-in to the browser that started it. One cookie per sign-in,
+# so concurrent sign-ins in the same browser do not overwrite each other.
+_SESSION_COOKIE_PREFIX: Final[str] = "bai_openid_session_"
 _SESSION_COOKIE_PATH: Final[str] = "/func/openid"
+
+
+def _session_cookie_name(session_key: str) -> str:
+    return f"{_SESSION_COOKIE_PREFIX}{session_key}"
 
 
 async def ping(_request: web.Request) -> web.Response:
@@ -348,7 +352,7 @@ class OIDCWebAppPlugin(WebappPlugin):
             text=f"{HTTPStatus.FOUND.value}: {HTTPStatus.FOUND.phrase}",
         )
         response.set_cookie(
-            _SESSION_COOKIE,
+            _session_cookie_name(session_key),
             session_key,
             max_age=SESSION_KEY_EXPIRATION,
             path=_SESSION_COOKIE_PATH,
@@ -371,7 +375,10 @@ class OIDCWebAppPlugin(WebappPlugin):
             response = self._redirect_to(redirect_uri, {"bai_error": "internal-server-error"})
         else:
             response = self._redirect_to(redirect_uri, {"sToken": stoken})
-        response.del_cookie(_SESSION_COOKIE, path=_SESSION_COOKIE_PATH)
+        if "session" in state:
+            response.del_cookie(
+                _session_cookie_name(state["session"][0]), path=_SESSION_COOKIE_PATH
+            )
         return response
 
     def _callback_uri(self) -> str:
@@ -460,10 +467,8 @@ class OIDCWebAppPlugin(WebappPlugin):
             raise self._provider_error(callback_error) from callback_error
         if "session" not in state:
             raise InvalidSession(reason="OpenID state carries no session")
-        session_cookie = request.cookies.get(_SESSION_COOKIE)
-        if session_cookie is None or not secrets.compare_digest(
-            session_cookie, state["session"][0]
-        ):
+        session_key = state["session"][0]
+        if request.cookies.get(_session_cookie_name(session_key)) != session_key:
             raise InvalidSession(reason="OpenID state was not issued to this browser")
 
         root_app = request.app["_root_app"]

@@ -318,7 +318,7 @@ class TestWebAppLogin:
                 mock_oauth2_client.create_authorization_url.call_args.kwargs["state"]
             )
         )
-        cookie = response.cookies["bai_openid_session"]
+        cookie = response.cookies[f"bai_openid_session_{state['session']}"]
         assert cookie.value == state["session"]
         assert cookie["path"] == "/func/openid"
         assert cookie["httponly"]
@@ -348,7 +348,7 @@ class TestWebAppRedirect:
 
         request = MagicMock()
         request.query = {"state": state, "code": "auth-code-123"}
-        request.cookies = {"bai_openid_session": session_key}
+        request.cookies = {f"bai_openid_session_{session_key}": session_key}
         request.url = (
             f"https://app.example.com/func/openid/redirect"
             f"?state={urllib.parse.quote(state)}&code=auth-code-123"
@@ -562,7 +562,7 @@ class TestWebAppRedirect:
             }),
             "code": "auth-code-123",
         }
-        redirect_request.cookies = {"bai_openid_session": expired_session}
+        redirect_request.cookies = {f"bai_openid_session_{expired_session}": expired_session}
 
         location = await self._redirect(webapp_plugin, redirect_request, mock_oauth2_client)
 
@@ -585,8 +585,8 @@ class TestWebAppRedirect:
 
     @pytest.mark.parametrize(
         "cookies",
-        [{}, {"bai_openid_session": "session-of-another-sign-in"}],
-        ids=["missing", "mismatched"],
+        [{}, {"bai_openid_session_another-sign-in": "another-sign-in"}],
+        ids=["missing", "another-sign-in-only"],
     )
     async def test_redirect_rejects_state_not_issued_to_browser(
         self,
@@ -602,6 +602,21 @@ class TestWebAppRedirect:
         assert location.query["bai_error"] == "invalid-openid-session"
         assert "sToken" not in location.query
         mock_oauth2_client.fetch_token.assert_not_called()
+
+    async def test_redirect_accepts_sign_in_alongside_a_later_one(
+        self,
+        webapp_plugin: OIDCWebAppPlugin,
+        redirect_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+    ) -> None:
+        redirect_request.cookies = {
+            **redirect_request.cookies,
+            "bai_openid_session_later-sign-in": "later-sign-in",
+        }
+
+        location = await self._redirect(webapp_plugin, redirect_request, mock_oauth2_client)
+
+        assert "sToken" in location.query
 
     @pytest.fixture
     def respond_with_id_token(
