@@ -39,11 +39,13 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Same,
     SameAs,
     Says,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
@@ -120,7 +122,8 @@ class APlaceAndSomeone(Given[Any, AUsagePlace]):
     @override
     def describe(self) -> str:
         named = role_named(self.role)
-        parts = [Says(f"자리 하나와 {named} 한 명", english=f"one place and one {named}")]
+        named_en = in_language(named, Language.ENGLISH)
+        parts = [Says(f"자리 하나와 {named} 한 명", english=f"one place and one {named_en}")]
         if self.sessions_read:
             parts.append(
                 Says(
@@ -139,7 +142,11 @@ class APlaceAndSomeone(Given[Any, AUsagePlace]):
             parts.append(
                 Says(
                     f"프리셋 {self.presets}개가 있습니다",
-                    english=f"{self.presets} presets exist",
+                    english=(
+                        "one preset exists"
+                        if self.presets == 1
+                        else f"{self.presets} presets exist"
+                    ),
                 )
             )
         return joined(parts, ". ")
