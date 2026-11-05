@@ -1,4 +1,4 @@
-"""유효 자원 할당 — 호출자 경로와 관리자 경로, 그리고 표시 설정이 무엇을 담는가."""
+"""유효 자원 할당 — 호출자 경로와 표시 설정이 무엇을 담는가."""
 
 from __future__ import annotations
 
@@ -8,9 +8,7 @@ from typing import Any, override
 
 import pytest
 
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.resource_allocation.request import (
-    AdminEffectiveResourceAllocationInput,
     EffectiveResourceAllocationInput,
 )
 from ai.backend.common.dto.manager.v2.resource_allocation.response import (
@@ -20,7 +18,6 @@ from ai.backend.manager.api.adapters.resource_allocation.adapter import (
     ResourceAllocationAdapter,
 )
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Configured,
@@ -112,75 +109,7 @@ class AskingForTheEffectiveAllocation(
 
 
 @dataclass(frozen=True)
-class AskingAsAdminResolved(
-    When[AUsagePlace, ResourceAllocationAdapter, EffectiveResourceAllocationPayload]
-):
-    """대상 사용자 id 로 관리자 경로의 유효 할당을 읽는다."""
-
-    @override
-    def operation(self) -> str:
-        return "admin_effective_allocation_resolved"
-
-    @override
-    def describe(self, laid: AUsagePlace) -> str:
-        return Says(
-            f"{laid.caller.username}이 사용자 {laid.caller.username}의 유효 할당을 관리자 "
-            "경로로 조회합니다",
-            english=(
-                f"{laid.caller.username} reads the effective allocation of "
-                f"{laid.caller.username} by the admin path"
-            ),
-        )
-
-    @override
-    async def call(
-        self, adapter: ResourceAllocationAdapter, laid: AUsagePlace
-    ) -> EffectiveResourceAllocationPayload:
-        with ActingAs(laid.caller):
-            return await adapter.admin_effective_allocation_resolved(
-                AdminEffectiveResourceAllocationInput(
-                    user_id=laid.caller.id,
-                    project_id=laid.project.id,
-                    resource_group_name=laid.group.name,
-                )
-            )
-
-
-@dataclass(frozen=True)
-class AskingAsAdmin(
-    When[AUsagePlace, ResourceAllocationAdapter, EffectiveResourceAllocationPayload]
-):
-    """대상 사용자의 접근 키와 정책을 직접 주어 관리자 경로의 유효 할당을 읽는다."""
-
-    @override
-    def operation(self) -> str:
-        return "admin_effective_allocation"
-
-    @override
-    def describe(self, laid: AUsagePlace) -> str:
-        return Says(
-            f"{laid.caller.username}이 관리자 경로로 유효 할당을 조회합니다",
-            english=f"{laid.caller.username} reads the effective allocation by the admin path",
-        )
-
-    @override
-    async def call(
-        self, adapter: ResourceAllocationAdapter, laid: AUsagePlace
-    ) -> EffectiveResourceAllocationPayload:
-        with ActingAs(laid.caller):
-            return await adapter.admin_effective_allocation(
-                input=AdminEffectiveResourceAllocationInput(
-                    user_id=laid.caller.id,
-                    project_id=laid.project.id,
-                    resource_group_name=laid.group.name,
-                ),
-                access_key=str(laid.access_key),
-                resource_policy=laid.resource_policy,
-            )
-
-
-@dataclass(frozen=True)
-class TheSuperadminReadsTheirEffectiveAllocation(
+class AUserReadingSessionsReadsTheirEffectiveAllocation(
     Scenario[
         TestSeedingSession,
         AUsagePlace,
@@ -190,22 +119,22 @@ class TheSuperadminReadsTheirEffectiveAllocation(
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-reads-their-own-effective-allocation"
+        return "a-user-reading-sessions-reads-their-own-effective-allocation"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 자기 유효 할당을 읽으면, 프로젝트와 자원 그룹 범위가 모두 담겨 "
-            "반환됩니다",
+            "프로젝트 범위에서 세션을 읽을 수 있는 사용자가 자기 유효 할당을 읽으면, 기본 "
+            "설정에서는 자원 그룹 범위만 담겨 반환됩니다",
             english=(
-                "when the superadmin reads their own effective allocation, both the project and "
-                "the resource group scopes are included"
+                "when a user who can read sessions in the project scope reads their own effective "
+                "allocation, only the resource group scope is included under the default settings"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AUsagePlace]:
-        return APlaceAndSomeone(role=UserRole.SUPERADMIN)
+        return APlaceAndSomeone(sessions_read=True)
 
     @override
     def when(
@@ -217,7 +146,7 @@ class TheSuperadminReadsTheirEffectiveAllocation(
     def then(
         self,
     ) -> Then[AUsagePlace, EffectiveResourceAllocationPayload]:
-        return TheEffectiveAllocation(project=True, resource_group=True)
+        return TheEffectiveAllocation(project=False, resource_group=True)
 
 
 @dataclass(frozen=True)
@@ -425,93 +354,13 @@ class AUserGrantedNothingMayNotReadTheEffectiveAllocation(
         return TheCallIsRefused(NotEnoughPermission)
 
 
-@dataclass(frozen=True)
-class TheAdminPathCannotReadWithoutADomain(
-    Scenario[
-        TestSeedingSession,
-        AUsagePlace,
-        ResourceAllocationAdapter,
-        EffectiveResourceAllocationPayload,
-    ]
-):
-    @override
-    def summary(self) -> str:
-        return "the-admin-path-reading-a-users-effective-allocation-finds-no-domain"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "대상 사용자 id 로 관리자 경로의 유효 할당을 읽으면, 도메인 이름을 비운 채 조회하므로 "
-            "도메인을 찾을 수 없다는 것으로 거부됩니다",
-            english=(
-                "reading a user's effective allocation by the admin path is rejected as no such "
-                "domain, because the call reads with an empty domain name"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, AUsagePlace]:
-        return APlaceAndSomeone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(
-        self,
-    ) -> When[AUsagePlace, ResourceAllocationAdapter, EffectiveResourceAllocationPayload]:
-        return AskingAsAdminResolved()
-
-    @override
-    def then(self) -> Then[AUsagePlace, EffectiveResourceAllocationPayload]:
-        return TheCallIsRefused(DomainNotFound)
-
-
-@dataclass(frozen=True)
-class TheAdminPathWithAGivenKeyFindsNoDomain(
-    Scenario[
-        TestSeedingSession,
-        AUsagePlace,
-        ResourceAllocationAdapter,
-        EffectiveResourceAllocationPayload,
-    ]
-):
-    @override
-    def summary(self) -> str:
-        return "the-admin-path-with-a-given-key-finds-no-domain"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "접근 키와 정책을 주어 관리자 경로의 유효 할당을 읽으면, 도메인 이름을 비운 채 "
-            "조회하므로 도메인을 찾을 수 없다는 것으로 거부됩니다",
-            english=(
-                "reading the effective allocation by the admin path with a given key is rejected "
-                "as no such domain, because the call reads with an empty domain name"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, AUsagePlace]:
-        return APlaceAndSomeone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(
-        self,
-    ) -> When[AUsagePlace, ResourceAllocationAdapter, EffectiveResourceAllocationPayload]:
-        return AskingAsAdmin()
-
-    @override
-    def then(self) -> Then[AUsagePlace, EffectiveResourceAllocationPayload]:
-        return TheCallIsRefused(DomainNotFound)
-
-
 SCENARIOS: list[AskingStep] = [
-    TheSuperadminReadsTheirEffectiveAllocation(),
+    AUserReadingSessionsReadsTheirEffectiveAllocation(),
     AUserGrantedNothingMayNotReadTheirEffectiveAllocation(),
     AUserReadingSessionsReadsTheEffectiveAllocation(),
     TurningVisibilityOnShowsTheProject(),
     HidingAgentsDropsTheResourceGroup(),
     AUserGrantedNothingMayNotReadTheEffectiveAllocation(),
-    TheAdminPathCannotReadWithoutADomain(),
-    TheAdminPathWithAGivenKeyFindsNoDomain(),
 ]
 
 

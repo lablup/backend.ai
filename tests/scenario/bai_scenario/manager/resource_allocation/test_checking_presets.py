@@ -7,7 +7,6 @@ from typing import override
 
 import pytest
 
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.resource_allocation.request import (
     CheckPresetAvailabilityInput,
 )
@@ -104,29 +103,30 @@ class CheckingWithAGivenKey(
 
 
 @dataclass(frozen=True)
-class TheSuperadminChecksForThemselves(
+class AUserReadingPresetsChecksForThemselves(
     Scenario[
         TestSeedingSession, AUsagePlace, ResourceAllocationAdapter, CheckPresetAvailabilityPayload
     ]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-checks-available-presets-for-themselves"
+        return "a-user-reading-presets-checks-available-presets-for-themselves"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 자기 키페어로 프리셋 가용성을 확인하면, 미리 저장한 프리셋이 모두 "
-            "쓸 수 있는 것으로 반환됩니다",
+            "프로젝트 범위에서 리소스 프리셋을 읽을 수 있는 사용자가 자기 키페어로 프리셋 "
+            "가용성을 확인하면, 미리 저장한 프리셋이 모두 쓸 수 있는 것으로 반환됩니다",
             english=(
-                "when the superadmin checks preset availability with their own keypair, every "
-                "preset seeded in advance comes back marked as available"
+                "when a user who can read resource presets in the project scope checks preset "
+                "availability with their own keypair, every preset seeded in advance comes back "
+                "marked as available"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AUsagePlace]:
-        return APlaceAndSomeone(role=UserRole.SUPERADMIN, presets=2)
+        return APlaceAndSomeone(preset_read=True, presets=2)
 
     @override
     def when(
@@ -175,29 +175,30 @@ class AUserGrantedNothingMayNotCheckForThemselves(
 
 
 @dataclass(frozen=True)
-class TheSuperadminChecksWithAGivenKey(
+class AUserReadingPresetsChecksWithAGivenKey(
     Scenario[
         TestSeedingSession, AUsagePlace, ResourceAllocationAdapter, CheckPresetAvailabilityPayload
     ]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-checks-available-presets-with-a-given-key"
+        return "a-user-reading-presets-checks-available-presets-with-a-given-key"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 주어진 접근 키와 정책으로 프리셋 가용성을 확인하면, 미리 저장한 "
-            "프리셋이 모두 쓸 수 있는 것으로 반환됩니다",
+            "프로젝트 범위에서 리소스 프리셋을 읽을 수 있는 사용자가 주어진 접근 키와 정책으로 "
+            "프리셋 가용성을 확인하면, 미리 저장한 프리셋이 모두 쓸 수 있는 것으로 반환됩니다",
             english=(
-                "when the superadmin checks preset availability with a given key and policy, "
-                "every preset seeded in advance comes back marked as available"
+                "when a user who can read resource presets in the project scope checks preset "
+                "availability with a given key and policy, every preset seeded in advance comes "
+                "back marked as available"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AUsagePlace]:
-        return APlaceAndSomeone(role=UserRole.SUPERADMIN, presets=2)
+        return APlaceAndSomeone(preset_read=True, presets=2)
 
     @override
     def when(
@@ -247,9 +248,9 @@ class AUserGrantedNothingMayNotCheckWithAGivenKey(
 
 
 SCENARIOS: list[CheckingStep] = [
-    TheSuperadminChecksForThemselves(),
+    AUserReadingPresetsChecksForThemselves(),
     AUserGrantedNothingMayNotCheckForThemselves(),
-    TheSuperadminChecksWithAGivenKey(),
+    AUserReadingPresetsChecksWithAGivenKey(),
     AUserGrantedNothingMayNotCheckWithAGivenKey(),
 ]
 

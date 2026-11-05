@@ -7,14 +7,17 @@ hold resources, so a table lays the place a caller asks about and the caller the
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, override
 
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import (
     ResourceLimitEntryInfo,
@@ -79,26 +82,24 @@ class AUsagePlace:
 
 
 @dataclass(frozen=True)
-class SomeoneReadingSessionsInTheProject(TestSeedNest[Laid[None]]):
-    """그 프로젝트 범위에서 세션을 읽을 수 있는 역할을 사용자에게 준다."""
+class SomeoneGrantedReadInAScope(TestSeedNest[Laid[None]]):
+    """스코프 하나에서 엔티티 하나를 읽을 수 있는 역할을 사용자에게 준다."""
 
-    project: Laid[ProjectData]
+    scope: Laid[Any]
+    scope_of: Callable[[Any], EntityIdentifier]
+    entity_type: EntityType
     holder: Laid[UserData]
+    reading: Says
 
     @override
     def kind(self) -> str:
-        return Says(
-            "프로젝트 범위의 세션 조회 권한을 받은 사용자",
-            english="a user granted permission to read sessions in the project scope",
-        )
+        return self.reading
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[None]:
-        role = seed.creating_from(
-            TestSeedRole(lambda one: ProjectID(one.id), name_hint="session-reader"), self.project
-        )
+        role = seed.creating_from(TestSeedRole(self.scope_of, name_hint="reader"), self.scope)
         seed.adding(
-            TestSeedPermission(entity_type=SessionEntityType(), permission=Permission.READ), role
+            TestSeedPermission(entity_type=self.entity_type, permission=Permission.READ), role
         )
         return seed.granting(
             role, self.holder, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
@@ -109,13 +110,17 @@ class SomeoneReadingSessionsInTheProject(TestSeedNest[Laid[None]]):
 class APlaceAndSomeone(Given[Any, AUsagePlace]):
     """자리 하나와 사용자 한 명.
 
-    ``sessions_read`` 면 그 사용자가 프로젝트 범위에서 세션을 읽을 수 있다. ``slot_type``
-    이면 슬롯 종류를 하나 두어 한도가 무한대로 채워지고, ``presets`` 가 0 보다 크면 그만큼
-    프리셋을 둔다.
+    ``sessions_read``, ``self_read``, ``project_read``, ``preset_read``, ``domain_read`` 는
+    그 사용자에게 어느 범위에서 무엇을 읽을 권한이 있는지다. ``slot_type`` 이면 슬롯 종류를
+    하나 두어 한도가 무한대로 채워지고, ``presets`` 가 0 보다 크면 그만큼 프리셋을 둔다.
     """
 
     role: UserRole = UserRole.USER
     sessions_read: bool = False
+    self_read: bool = False
+    project_read: bool = False
+    preset_read: bool = False
+    domain_read: bool = False
     slot_type: bool = True
     presets: int = 0
 
@@ -124,13 +129,7 @@ class APlaceAndSomeone(Given[Any, AUsagePlace]):
         named = role_named(self.role)
         named_en = in_language(named, Language.ENGLISH)
         parts = [Says(f"자리 하나와 {named} 한 명", english=f"one place and one {named_en}")]
-        if self.sessions_read:
-            parts.append(
-                Says(
-                    "그 사용자는 프로젝트 범위에서 세션을 읽을 수 있습니다",
-                    english="that user can read sessions in the project scope",
-                )
-            )
+        parts.extend(self._readings())
         if self.slot_type:
             parts.append(
                 Says(
@@ -151,6 +150,119 @@ class APlaceAndSomeone(Given[Any, AUsagePlace]):
             )
         return joined(parts, ". ")
 
+    def _readings(self) -> list[Says]:
+        said: list[Says] = []
+        if self.sessions_read:
+            said.append(
+                Says(
+                    "그 사용자는 프로젝트 범위에서 세션을 읽을 수 있습니다",
+                    english="that user can read sessions in the project scope",
+                )
+            )
+        if self.self_read:
+            said.append(
+                Says(
+                    "그 사용자는 자기 사용자 범위에서 사용자를 읽을 수 있습니다",
+                    english="that user can read users in their own user scope",
+                )
+            )
+        if self.project_read:
+            said.append(
+                Says(
+                    "그 사용자는 프로젝트 범위에서 프로젝트를 읽을 수 있습니다",
+                    english="that user can read the project in the project scope",
+                )
+            )
+        if self.preset_read:
+            said.append(
+                Says(
+                    "그 사용자는 프로젝트 범위에서 리소스 프리셋을 읽을 수 있습니다",
+                    english="that user can read resource presets in the project scope",
+                )
+            )
+        if self.domain_read:
+            said.append(
+                Says(
+                    "그 사용자는 도메인 범위에서 도메인을 읽을 수 있습니다",
+                    english="that user can read the domain in the domain scope",
+                )
+            )
+        return said
+
+    def _grants(
+        self, project: Laid[ProjectData], domain: Laid[DomainData], holder: Laid[UserData]
+    ) -> list[SomeoneGrantedReadInAScope]:
+        grants: list[SomeoneGrantedReadInAScope] = []
+        if self.sessions_read:
+            grants.append(
+                SomeoneGrantedReadInAScope(
+                    project,
+                    lambda one: ProjectID(one.id),
+                    SessionEntityType(),
+                    holder,
+                    Says(
+                        "프로젝트 범위의 세션 조회 권한을 받은 사용자",
+                        english="a user granted permission to read sessions in the project scope",
+                    ),
+                )
+            )
+        if self.self_read:
+            grants.append(
+                SomeoneGrantedReadInAScope(
+                    holder,
+                    lambda one: UserID(one.id),
+                    UserEntityType(),
+                    holder,
+                    Says(
+                        "자기 사용자 범위의 사용자 조회 권한을 받은 사용자",
+                        english="a user granted permission to read users in their own user scope",
+                    ),
+                )
+            )
+        if self.project_read:
+            grants.append(
+                SomeoneGrantedReadInAScope(
+                    project,
+                    lambda one: ProjectID(one.id),
+                    ProjectEntityType(),
+                    holder,
+                    Says(
+                        "프로젝트 범위의 프로젝트 조회 권한을 받은 사용자",
+                        english="a user granted permission to read the project in its scope",
+                    ),
+                )
+            )
+        if self.preset_read:
+            grants.append(
+                SomeoneGrantedReadInAScope(
+                    project,
+                    lambda one: ProjectID(one.id),
+                    ResourcePresetEntityType(),
+                    holder,
+                    Says(
+                        "프로젝트 범위의 리소스 프리셋 조회 권한을 받은 사용자",
+                        english=(
+                            "a user granted permission to read resource presets in the project "
+                            "scope"
+                        ),
+                    ),
+                )
+            )
+        if self.domain_read:
+            grants.append(
+                SomeoneGrantedReadInAScope(
+                    domain,
+                    lambda one: one.id,
+                    DomainEntityType(),
+                    holder,
+                    Says(
+                        "도메인 범위의 도메인 조회 권한을 받은 사용자",
+                        english="a user granted permission to read the domain in its scope",
+                    ),
+                )
+            )
+        return grants
+
     @override
     async def lay(self, seeding: Any) -> AUsagePlace:
         domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
@@ -168,8 +280,8 @@ class APlaceAndSomeone(Given[Any, AUsagePlace]):
         key = await seeding.adding(
             TestSeedKeypairOf(resource_policy=seeding.made(key_policy).name), holder
         )
-        if self.sessions_read:
-            await seeding.within(SomeoneReadingSessionsInTheProject(project, holder))
+        for read in self._grants(project, domain, holder):
+            await seeding.within(read)
         presets = [await seeding.creating(TestSeedResourcePreset()) for _ in range(self.presets)]
         policy = seeding.made(key_policy)
         return AUsagePlace(

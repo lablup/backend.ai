@@ -237,26 +237,27 @@ class TheConcurrency(Then[AUsagePlace, UserConcurrencyPayload]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminReadsTheirConcurrency(
+class AUserReadingTheirOwnUserReadsTheirConcurrency(
     Scenario[TestSeedingSession, AUsagePlace, ResourceAllocationAdapter, UserConcurrencyPayload]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-reads-their-own-concurrency"
+        return "a-user-reading-their-own-user-reads-their-concurrency"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 자기 동시 세션 수를 읽으면, 세션이 없으므로 모두 0 이 반환됩니다",
+            "자기 사용자 범위에서 사용자를 읽을 수 있는 사용자가 자기 동시 세션 수를 읽으면, "
+            "세션이 없으므로 모두 0 이 반환됩니다",
             english=(
-                "when the superadmin reads their own concurrent session counts, all zero comes "
-                "back because no session exists"
+                "when a user who can read users in their own user scope reads their own "
+                "concurrent session counts, all zero comes back because no session exists"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AUsagePlace]:
-        return APlaceAndSomeone(role=UserRole.SUPERADMIN, slot_type=False)
+        return APlaceAndSomeone(self_read=True, slot_type=False)
 
     @override
     def when(self) -> When[AUsagePlace, ResourceAllocationAdapter, UserConcurrencyPayload]:
@@ -300,29 +301,29 @@ class AUserGrantedNothingMayNotReadTheirConcurrency(
 
 
 @dataclass(frozen=True)
-class TheSuperadminReadsTheirUserUsage(
+class AUserReadingTheirOwnUserReadsTheirUserUsage(
     Scenario[
         TestSeedingSession, AUsagePlace, ResourceAllocationAdapter, UserResourceAllocationPayload
     ]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-reads-their-own-user-usage"
+        return "a-user-reading-their-own-user-reads-their-user-usage"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 자기 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 오고 사용량은 "
-            "0 입니다",
+            "자기 사용자 범위에서 사용자를 읽을 수 있는 사용자가 자기 사용량을 읽으면, 등록된 슬롯 "
+            "종류의 한도가 무한대로 오고 사용량은 0 입니다",
             english=(
-                "when the superadmin reads their own usage, the registered slot type's limit "
-                "comes back unlimited and the usage is zero"
+                "when a user who can read users in their own user scope reads their own usage, "
+                "the registered slot type's limit comes back unlimited and the usage is zero"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AUsagePlace]:
-        return APlaceAndSomeone(role=UserRole.SUPERADMIN)
+        return APlaceAndSomeone(self_read=True)
 
     @override
     def when(self) -> When[AUsagePlace, ResourceAllocationAdapter, UserResourceAllocationPayload]:
@@ -409,29 +410,30 @@ class TheKeypairUsage(Then[AUsagePlace, KeypairResourceAllocationPayload]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminReadsTheirKeypairUsage(
+class AUserReadingTheirOwnUserReadsTheirKeypairUsage(
     Scenario[
         TestSeedingSession, AUsagePlace, ResourceAllocationAdapter, KeypairResourceAllocationPayload
     ]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-reads-their-own-keypair-usage"
+        return "a-user-reading-their-own-user-reads-their-keypair-usage"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 자기 기본 키페어 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 "
-            "오고 사용량은 0 입니다",
+            "자기 사용자 범위에서 사용자를 읽을 수 있는 사용자가 자기 기본 키페어 사용량을 읽으면, "
+            "등록된 슬롯 종류의 한도가 무한대로 오고 사용량은 0 입니다",
             english=(
-                "when the superadmin reads their default keypair's usage, the registered slot "
-                "type's limit comes back unlimited and the usage is zero"
+                "when a user who can read users in their own user scope reads their default "
+                "keypair's usage, the registered slot type's limit comes back unlimited and the "
+                "usage is zero"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AUsagePlace]:
-        return APlaceAndSomeone(role=UserRole.SUPERADMIN)
+        return APlaceAndSomeone(self_read=True)
 
     @override
     def when(
@@ -502,29 +504,29 @@ class TheProjectUsage(Then[AUsagePlace, ProjectResourceAllocationPayload]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminReadsTheProjectUsage(
+class AUserReadingTheProjectReadsItsUsage(
     Scenario[
         TestSeedingSession, AUsagePlace, ResourceAllocationAdapter, ProjectResourceAllocationPayload
     ]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-reads-a-projects-usage"
+        return "a-user-reading-the-project-reads-its-usage"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 프로젝트의 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 오고 "
-            "사용량은 0 입니다",
+            "프로젝트 범위에서 프로젝트를 읽을 수 있는 사용자가 그 프로젝트의 사용량을 읽으면, "
+            "등록된 슬롯 종류의 한도가 무한대로 오고 사용량은 0 입니다",
             english=(
-                "when the superadmin reads a project's usage, the registered slot type's limit "
-                "comes back unlimited and the usage is zero"
+                "when a user who can read the project in its scope reads that project's usage, "
+                "the registered slot type's limit comes back unlimited and the usage is zero"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AUsagePlace]:
-        return APlaceAndSomeone(role=UserRole.SUPERADMIN)
+        return APlaceAndSomeone(project_read=True)
 
     @override
     def when(
@@ -594,29 +596,29 @@ class TheDomainUsage(Then[AUsagePlace, DomainResourceAllocationPayload]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminReadsTheDomainUsage(
+class AUserReadingTheDomainReadsItsUsage(
     Scenario[
         TestSeedingSession, AUsagePlace, ResourceAllocationAdapter, DomainResourceAllocationPayload
     ]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-reads-a-domains-usage"
+        return "a-user-reading-the-domain-reads-its-usage"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 도메인의 사용량을 읽으면, 등록된 슬롯 종류의 한도가 무한대로 오고 "
-            "사용량은 0 입니다",
+            "도메인 범위에서 도메인을 읽을 수 있는 사용자가 그 도메인의 사용량을 읽으면, 등록된 "
+            "슬롯 종류의 한도가 무한대로 오고 사용량은 0 입니다",
             english=(
-                "when the superadmin reads a domain's usage, the registered slot type's limit "
-                "comes back unlimited and the usage is zero"
+                "when a user who can read the domain in its scope reads that domain's usage, the "
+                "registered slot type's limit comes back unlimited and the usage is zero"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AUsagePlace]:
-        return APlaceAndSomeone(role=UserRole.SUPERADMIN)
+        return APlaceAndSomeone(domain_read=True)
 
     @override
     def when(self) -> When[AUsagePlace, ResourceAllocationAdapter, DomainResourceAllocationPayload]:
@@ -640,16 +642,16 @@ class ANameNothingAnswersToIsNotFound(
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 없는 이름의 도메인 사용량을 읽으면 대상이 없다는 것으로 거부됩니다",
+            "없는 이름으로 도메인 사용량을 읽으면 대상이 없다는 것으로 거부됩니다",
             english=(
-                "when the superadmin reads the usage of a domain name nothing answers to, the "
-                "call is rejected as no such target"
+                "reading the usage of a domain name nothing answers to is rejected as no such "
+                "target"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AUsagePlace]:
-        return APlaceAndSomeone(role=UserRole.SUPERADMIN, slot_type=False)
+        return APlaceAndSomeone(slot_type=False)
 
     @override
     def when(self) -> When[AUsagePlace, ResourceAllocationAdapter, DomainResourceAllocationPayload]:
@@ -762,15 +764,15 @@ class AUserMayNotReadTheResourceGroupUsage(
 
 
 SCENARIOS: list[ReadingStep] = [
-    TheSuperadminReadsTheirConcurrency(),
+    AUserReadingTheirOwnUserReadsTheirConcurrency(),
     AUserGrantedNothingMayNotReadTheirConcurrency(),
-    TheSuperadminReadsTheirUserUsage(),
+    AUserReadingTheirOwnUserReadsTheirUserUsage(),
     AUserGrantedNothingMayNotReadTheirUserUsage(),
-    TheSuperadminReadsTheirKeypairUsage(),
+    AUserReadingTheirOwnUserReadsTheirKeypairUsage(),
     AUserGrantedNothingMayNotReadTheirKeypairUsage(),
-    TheSuperadminReadsTheProjectUsage(),
+    AUserReadingTheProjectReadsItsUsage(),
     AUserGrantedNothingMayNotReadTheProjectUsage(),
-    TheSuperadminReadsTheDomainUsage(),
+    AUserReadingTheDomainReadsItsUsage(),
     ANameNothingAnswersToIsNotFound(),
     TheSuperadminReadsTheResourceGroupUsage(),
     AUserMayNotReadTheResourceGroupUsage(),
