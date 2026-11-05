@@ -2,7 +2,7 @@
 
 [background](/src/ai/backend/manager/api/adapters/resource_policy/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/resource_policy/adapter.py)
 
-Scenario: incomplete 16 / 33
+Scenario: incomplete 6 / 33
 
 - built from ops (33)
   - admin_create_keypair_resource_policy: representative success ✓ · representative rejection ✓
@@ -14,18 +14,18 @@ Scenario: incomplete 16 / 33
   - admin_search_keypair_resource_policies: representative success ✓ · representative rejection ✓
   - admin_search_project_resource_policies: representative success ✓ · representative rejection ✓
   - admin_search_user_resource_policies: representative success ✓ · representative rejection ✓
-  - bulk_get_keypair_resource_policy_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - bulk_get_project_resource_policy_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - bulk_get_user_resource_policy_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - bulk_lookup_keypair_resource_policy_names: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - bulk_lookup_project_resource_policy_names: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - bulk_lookup_user_resource_policy_names: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - bulk_get_keypair_resource_policy_ids: representative success ✓ · representative rejection ✓
+  - bulk_get_project_resource_policy_ids: representative success ✓ · representative rejection ✓
+  - bulk_get_user_resource_policy_ids: representative success ✓ · representative rejection ✓
+  - bulk_lookup_keypair_resource_policy_names: representative success ✓ · representative rejection ✓
+  - bulk_lookup_project_resource_policy_names: representative success ✓ · representative rejection ✓
+  - bulk_lookup_user_resource_policy_names: representative success ✓ · representative rejection ✓
   - get_my_keypair_resource_policy: representative success ✓ · representative rejection ✓
   - get_my_user_resource_policy: representative success ✓ · representative rejection ✓
-  - get_project_resource_policy: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - lookup_keypair_resource_policy: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - lookup_project_resource_policy: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - lookup_user_resource_policy: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - get_project_resource_policy: representative success ✓ · representative rejection ✓
+  - lookup_keypair_resource_policy: representative success ✓ · representative rejection ✓
+  - lookup_project_resource_policy: representative success ✓ · representative rejection ✓
+  - lookup_user_resource_policy: representative success ✓ · representative rejection ✓
   - partial_bulk_purge_keypair_resource_policies: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - partial_bulk_purge_project_resource_policies: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - partial_bulk_purge_user_resource_policies: representative success ✓ · representative rejection ✗: SCENARIO-GAP
@@ -128,6 +128,48 @@ Scenario: incomplete 16 / 33
 | [when several user policy policies exist and the superadmin searches everything without a filter, every policy seeded in advance comes back and only those](#searching-the-superadmin-finds-every-user-policy) | answered |
 | [when a user who is not the superadmin tries to search every policy of the user policy kind, the call is rejected for lacking the role](#searching-a-user-who-is-not-the-superadmin-may-not-search-user-policy) | rejected |
 
+**bulk_get_keypair_resource_policy_ids**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin reads one keypair-policy by id, the whole policy comes back for that item](#bulk_reading-the-superadmin-reads-a-keypair-policy-by-id) | answered |
+| [a user granted nothing reading one policy by id is not rejected as a call, and that item is rejected for not enough permission](#bulk_reading-a-user-granted-nothing-reading-a-keypair-policy-by-id-is-refused-per-item) | rejected |
+
+**bulk_get_project_resource_policy_ids**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin reads one project-policy by id, the whole policy comes back for that item](#bulk_reading-the-superadmin-reads-a-project-policy-by-id) | answered |
+| [a user granted nothing reading one policy by id is not rejected as a call, and that item is rejected for not enough permission](#bulk_reading-a-user-granted-nothing-reading-a-project-policy-by-id-is-refused-per-item) | rejected |
+
+**bulk_get_user_resource_policy_ids**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin reads one user-policy by id, the whole policy comes back for that item](#bulk_reading-the-superadmin-reads-a-user-policy-by-id) | answered |
+| [a user granted nothing reading one policy by id is not rejected as a call, and that item is rejected for not enough permission](#bulk_reading-a-user-granted-nothing-reading-a-user-policy-by-id-is-refused-per-item) | rejected |
+
+**bulk_lookup_keypair_resource_policy_names**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin looks up several ids for a name that exists and one that does not, the keypair-policy id comes back for the name that exists and an empty value for the name that does not](#looking_up-the-superadmin-looks-up-several-keypair-policy-names) | answered |
+| [looking up several ids by name without a login context is rejected as user not found](#looking_up-looking-up-several-keypair-policy-names-without-login-is-refused) | rejected |
+
+**bulk_lookup_project_resource_policy_names**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin looks up several ids for a name that exists and one that does not, the project-policy id comes back for the name that exists and an empty value for the name that does not](#looking_up-the-superadmin-looks-up-several-project-policy-names) | answered |
+| [looking up several ids by name without a login context is rejected as user not found](#looking_up-looking-up-several-project-policy-names-without-login-is-refused) | rejected |
+
+**bulk_lookup_user_resource_policy_names**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin looks up several ids for a name that exists and one that does not, the user-policy id comes back for the name that exists and an empty value for the name that does not](#looking_up-the-superadmin-looks-up-several-user-policy-names) | answered |
+| [looking up several ids by name without a login context is rejected as user not found](#looking_up-looking-up-several-user-policy-names-without-login-is-refused) | rejected |
+
 **get_my_keypair_resource_policy**
 
 | scenario | verdict |
@@ -146,6 +188,34 @@ Scenario: incomplete 16 / 33
 | [a user granted read on the user policy in their own scope reading their own policy gets the whole policy assigned to that user](#reading_own-a-user-granted-read-in-their-own-scope-reads-their-user-policy) | answered |
 | [turning permission enforcement off lets a user granted nothing read their own user policy](#reading_own-turning-enforcement-off-lets-a-user-granted-nothing-read-their-own-user-policy) | answered |
 | [a user granted nothing reading their own user policy is rejected for not enough permission. the call reading their own policy checks the permission instead of only narrowing the scope](#reading_own-a-user-granted-nothing-may-not-read-their-own-user-policy) | rejected |
+
+**get_project_resource_policy**
+
+| scenario | verdict |
+|---|---|
+| [a user granted permission to read project resource policies in the project's scope gets the whole policy that project follows](#reading_project_policy-a-user-granted-read-in-the-project-reads-its-resource-policy) | answered |
+| [a user granted nothing reading the policy a project follows is rejected because they hold no permission in that project's scope](#reading_project_policy-a-user-granted-nothing-may-not-read-a-projects-resource-policy) | rejected |
+
+**lookup_keypair_resource_policy**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin looks up a keypair-policy by name, the id of that policy comes back](#looking_up-the-superadmin-looks-up-a-keypair-policy-by-name) | answered |
+| [when the superadmin looks up a name no keypair-policy holds, the call is rejected as no such target](#looking_up-looking-up-a-keypair-policy-name-nothing-answers-to-is-not-found) | rejected |
+
+**lookup_project_resource_policy**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin looks up a project-policy by name, the id of that policy comes back](#looking_up-the-superadmin-looks-up-a-project-policy-by-name) | answered |
+| [when the superadmin looks up a name no project-policy holds, the call is rejected as no such target](#looking_up-looking-up-a-project-policy-name-nothing-answers-to-is-not-found) | rejected |
+
+**lookup_user_resource_policy**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin looks up a user-policy by name, the id of that policy comes back](#looking_up-the-superadmin-looks-up-a-user-policy-by-name) | answered |
+| [when the superadmin looks up a name no user-policy holds, the call is rejected as no such target](#looking_up-looking-up-a-user-policy-name-nothing-answers-to-is-not-found) | rejected |
 
 **partial_bulk_purge_keypair_resource_policies**
 
@@ -1545,6 +1615,361 @@ Then
 - the call is rejected
   - rejected: InsufficientPrivilege
 
+### bulk_get_keypair_resource_policy_ids
+
+<a id="bulk_reading-the-superadmin-reads-a-keypair-policy-by-id"></a>
+
+#### [the-superadmin-reads-a-keypair-policy-by-id](/tests/scenario/bai_scenario/manager/resource_policy/test_bulk_reading.py): pass
+
+when the superadmin reads one keypair-policy by id, the whole policy comes back for that item
+
+Given
+
+- one unused keypair policy and one superadmin
+  - Domain home-1
+  - Prepare one user with policies assigned
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+
+When
+
+- ResourcePolicyAdapter.bulk_get_keypair_resource_policy_ids: user-1 reads several by the id of keypair-policy-2
+
+Then
+
+- the whole policy seeded in advance comes back for the item asked
+  - len(items) = 1
+  - items[0].id = 'keypair-policy-2'
+  - items[0].name = 'keypair-policy-2'
+  - items[0].created_at: the time this run wrote
+  - items[0].default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
+  - items[0].total_resource_slots = []
+  - items[0].max_session_lifetime = 0
+  - items[0].max_concurrent_sessions = 5
+  - items[0].max_pending_session_count = None
+  - items[0].max_priority = None
+  - items[0].max_pending_session_resource_slots = None
+  - items[0].max_concurrent_sftp_sessions = 1
+  - items[0].max_containers_per_session = 1
+  - items[0].idle_timeout = 3600
+  - items[0].allowed_vfolder_hosts = []
+
+<a id="bulk_reading-a-user-granted-nothing-reading-a-keypair-policy-by-id-is-refused-per-item"></a>
+
+#### [a-user-granted-nothing-reading-a-keypair-policy-by-id-is-refused-per-item](/tests/scenario/bai_scenario/manager/resource_policy/test_bulk_reading.py): pass
+
+a user granted nothing reading one policy by id is not rejected as a call, and that item is rejected for not enough permission
+
+Given
+
+- one unused keypair policy and one user
+  - Domain home-1
+  - Prepare one user with policies assigned
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+
+When
+
+- ResourcePolicyAdapter.bulk_get_keypair_resource_policy_ids: user-1 reads several by the id of keypair-policy-2
+
+Then
+
+- the item asked is rejected for not enough permission
+  - rejected: NotEnoughPermission
+
+### bulk_get_project_resource_policy_ids
+
+<a id="bulk_reading-the-superadmin-reads-a-project-policy-by-id"></a>
+
+#### [the-superadmin-reads-a-project-policy-by-id](/tests/scenario/bai_scenario/manager/resource_policy/test_bulk_reading.py): pass
+
+when the superadmin reads one project-policy by id, the whole policy comes back for that item
+
+Given
+
+- one unused project policy and one superadmin
+  - Domain home-1
+  - Prepare one user with policies assigned
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Project resource policy project-policy-1: up to 10 folders per project
+
+When
+
+- ResourcePolicyAdapter.bulk_get_project_resource_policy_ids: user-1 reads several by the id of project-policy-1
+
+Then
+
+- the whole policy seeded in advance comes back for the item asked
+  - len(items) = 1
+  - items[0].id = 'project-policy-1'
+  - items[0].name = 'project-policy-1'
+  - items[0].created_at: the time this run wrote
+  - items[0].max_vfolder_count = 10
+  - items[0].max_quota_scope_size = ('-1', '-1')
+  - items[0].max_network_count = 3
+
+<a id="bulk_reading-a-user-granted-nothing-reading-a-project-policy-by-id-is-refused-per-item"></a>
+
+#### [a-user-granted-nothing-reading-a-project-policy-by-id-is-refused-per-item](/tests/scenario/bai_scenario/manager/resource_policy/test_bulk_reading.py): pass
+
+a user granted nothing reading one policy by id is not rejected as a call, and that item is rejected for not enough permission
+
+Given
+
+- one unused project policy and one user
+  - Domain home-1
+  - Prepare one user with policies assigned
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Project resource policy project-policy-1: up to 10 folders per project
+
+When
+
+- ResourcePolicyAdapter.bulk_get_project_resource_policy_ids: user-1 reads several by the id of project-policy-1
+
+Then
+
+- the item asked is rejected for not enough permission
+  - rejected: NotEnoughPermission
+
+### bulk_get_user_resource_policy_ids
+
+<a id="bulk_reading-the-superadmin-reads-a-user-policy-by-id"></a>
+
+#### [the-superadmin-reads-a-user-policy-by-id](/tests/scenario/bai_scenario/manager/resource_policy/test_bulk_reading.py): pass
+
+when the superadmin reads one user-policy by id, the whole policy comes back for that item
+
+Given
+
+- one unused user policy and one superadmin
+  - Domain home-1
+  - Prepare one user with policies assigned
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - User resource policy user-policy-2: up to 10 folders per user
+
+When
+
+- ResourcePolicyAdapter.bulk_get_user_resource_policy_ids: user-1 reads several by the id of user-policy-2
+
+Then
+
+- the whole policy seeded in advance comes back for the item asked
+  - len(items) = 1
+  - items[0].id = 'user-policy-2'
+  - items[0].name = 'user-policy-2'
+  - items[0].created_at: the time this run wrote
+  - items[0].max_vfolder_count = 10
+  - items[0].max_concurrent_logins = None
+  - items[0].max_quota_scope_size = ('-1', '-1')
+  - items[0].max_session_count_per_model_session = 10
+  - items[0].max_customized_image_count = 3
+
+<a id="bulk_reading-a-user-granted-nothing-reading-a-user-policy-by-id-is-refused-per-item"></a>
+
+#### [a-user-granted-nothing-reading-a-user-policy-by-id-is-refused-per-item](/tests/scenario/bai_scenario/manager/resource_policy/test_bulk_reading.py): pass
+
+a user granted nothing reading one policy by id is not rejected as a call, and that item is rejected for not enough permission
+
+Given
+
+- one unused user policy and one user
+  - Domain home-1
+  - Prepare one user with policies assigned
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - User resource policy user-policy-2: up to 10 folders per user
+
+When
+
+- ResourcePolicyAdapter.bulk_get_user_resource_policy_ids: user-1 reads several by the id of user-policy-2
+
+Then
+
+- the item asked is rejected for not enough permission
+  - rejected: NotEnoughPermission
+
+### bulk_lookup_keypair_resource_policy_names
+
+<a id="looking_up-the-superadmin-looks-up-several-keypair-policy-names"></a>
+
+#### [the-superadmin-looks-up-several-keypair-policy-names](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+
+when the superadmin looks up several ids for a name that exists and one that does not, the keypair-policy id comes back for the name that exists and an empty value for the name that does not
+
+Given
+
+- one unused keypair policy and one superadmin
+  - Domain home-1
+  - Prepare one user with policies assigned
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+
+When
+
+- ResourcePolicyAdapter.bulk_lookup_keypair_resource_policy_names: user-1 looks up several ids for keypair-policy-2 and nobody
+
+Then
+
+- the id of that policy comes back for the name that exists, and an empty value for the name that does not
+  - [0]: same as the id of the policy seeded in advance
+  - [1] = None
+
+<a id="looking_up-looking-up-several-keypair-policy-names-without-login-is-refused"></a>
+
+#### [looking-up-several-keypair-policy-names-without-login-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+
+looking up several ids by name without a login context is rejected as user not found
+
+Given
+
+- one unused keypair policy and one user
+  - Domain home-1
+  - Prepare one user with policies assigned
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+
+When
+
+- ResourcePolicyAdapter.bulk_lookup_keypair_resource_policy_names: without a login context, looks up several ids for keypair-policy-2
+
+Then
+
+- the call is rejected
+  - rejected: UserNotFound
+
+### bulk_lookup_project_resource_policy_names
+
+<a id="looking_up-the-superadmin-looks-up-several-project-policy-names"></a>
+
+#### [the-superadmin-looks-up-several-project-policy-names](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+
+when the superadmin looks up several ids for a name that exists and one that does not, the project-policy id comes back for the name that exists and an empty value for the name that does not
+
+Given
+
+- one unused project policy and one superadmin
+  - Domain home-1
+  - Prepare one user with policies assigned
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Project resource policy project-policy-1: up to 10 folders per project
+
+When
+
+- ResourcePolicyAdapter.bulk_lookup_project_resource_policy_names: user-1 looks up several ids for project-policy-1 and nobody
+
+Then
+
+- the id of that policy comes back for the name that exists, and an empty value for the name that does not
+  - [0]: same as the id of the policy seeded in advance
+  - [1] = None
+
+<a id="looking_up-looking-up-several-project-policy-names-without-login-is-refused"></a>
+
+#### [looking-up-several-project-policy-names-without-login-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+
+looking up several ids by name without a login context is rejected as user not found
+
+Given
+
+- one unused project policy and one user
+  - Domain home-1
+  - Prepare one user with policies assigned
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Project resource policy project-policy-1: up to 10 folders per project
+
+When
+
+- ResourcePolicyAdapter.bulk_lookup_project_resource_policy_names: without a login context, looks up several ids for project-policy-1
+
+Then
+
+- the call is rejected
+  - rejected: UserNotFound
+
+### bulk_lookup_user_resource_policy_names
+
+<a id="looking_up-the-superadmin-looks-up-several-user-policy-names"></a>
+
+#### [the-superadmin-looks-up-several-user-policy-names](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+
+when the superadmin looks up several ids for a name that exists and one that does not, the user-policy id comes back for the name that exists and an empty value for the name that does not
+
+Given
+
+- one unused user policy and one superadmin
+  - Domain home-1
+  - Prepare one user with policies assigned
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - User resource policy user-policy-2: up to 10 folders per user
+
+When
+
+- ResourcePolicyAdapter.bulk_lookup_user_resource_policy_names: user-1 looks up several ids for user-policy-2 and nobody
+
+Then
+
+- the id of that policy comes back for the name that exists, and an empty value for the name that does not
+  - [0]: same as the id of the policy seeded in advance
+  - [1] = None
+
+<a id="looking_up-looking-up-several-user-policy-names-without-login-is-refused"></a>
+
+#### [looking-up-several-user-policy-names-without-login-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+
+looking up several ids by name without a login context is rejected as user not found
+
+Given
+
+- one unused user policy and one user
+  - Domain home-1
+  - Prepare one user with policies assigned
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - User resource policy user-policy-2: up to 10 folders per user
+
+When
+
+- ResourcePolicyAdapter.bulk_lookup_user_resource_policy_names: without a login context, looks up several ids for user-policy-2
+
+Then
+
+- the call is rejected
+  - rejected: UserNotFound
+
 ### get_my_keypair_resource_policy
 
 <a id="reading_own-a-user-granted-read-in-their-own-scope-reads-their-keypair-policy"></a>
@@ -1863,6 +2288,230 @@ Then
 
 - the call is rejected
   - rejected: NotEnoughPermission
+
+### get_project_resource_policy
+
+<a id="reading_project_policy-a-user-granted-read-in-the-project-reads-its-resource-policy"></a>
+
+#### [a-user-granted-read-in-the-project-reads-its-resource-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_project_policy.py): pass
+
+a user granted permission to read project resource policies in the project's scope gets the whole policy that project follows
+
+Given
+
+- one project and one regular user granted permission to read project resource policies in that project's scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Role policy-reader-1: applies only within the scope it is granted in
+  - Role policy-reader-1: READ allowed on every project_resource_policy
+  - regular user user-1: holds Role policy-reader-1
+
+When
+
+- ResourcePolicyAdapter.get_project_resource_policy: user-1 reads the policy of the project team-1
+
+Then
+
+- the whole project policy that project follows comes back
+  - id = 'default'
+  - name = 'default'
+  - created_at: the time this run wrote
+  - max_vfolder_count = 10
+  - max_quota_scope_size = ('-1', '-1')
+  - max_network_count = 3
+
+<a id="reading_project_policy-a-user-granted-nothing-may-not-read-a-projects-resource-policy"></a>
+
+#### [a-user-granted-nothing-may-not-read-a-projects-resource-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_project_policy.py): pass
+
+a user granted nothing reading the policy a project follows is rejected because they hold no permission in that project's scope
+
+Given
+
+- one project and one regular user granted nothing
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- ResourcePolicyAdapter.get_project_resource_policy: user-1 reads the policy of the project team-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### lookup_keypair_resource_policy
+
+<a id="looking_up-the-superadmin-looks-up-a-keypair-policy-by-name"></a>
+
+#### [the-superadmin-looks-up-a-keypair-policy-by-name](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+
+when the superadmin looks up a keypair-policy by name, the id of that policy comes back
+
+Given
+
+- one unused keypair policy and one superadmin
+  - Domain home-1
+  - Prepare one user with policies assigned
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+
+When
+
+- ResourcePolicyAdapter.lookup_keypair_resource_policy: user-1 looks up the id of keypair-policy-2
+
+Then
+
+- the id of that policy comes back
+  - id: same as the id of the policy seeded in advance
+
+<a id="looking_up-looking-up-a-keypair-policy-name-nothing-answers-to-is-not-found"></a>
+
+#### [looking-up-a-keypair-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+
+when the superadmin looks up a name no keypair-policy holds, the call is rejected as no such target
+
+Given
+
+- one unused keypair policy and one superadmin
+  - Domain home-1
+  - Prepare one user with policies assigned
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+
+When
+
+- ResourcePolicyAdapter.lookup_keypair_resource_policy: user-1 looks up the id of nobody
+
+Then
+
+- the call is rejected
+  - rejected: EntityNotFoundError
+
+### lookup_project_resource_policy
+
+<a id="looking_up-the-superadmin-looks-up-a-project-policy-by-name"></a>
+
+#### [the-superadmin-looks-up-a-project-policy-by-name](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+
+when the superadmin looks up a project-policy by name, the id of that policy comes back
+
+Given
+
+- one unused project policy and one superadmin
+  - Domain home-1
+  - Prepare one user with policies assigned
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Project resource policy project-policy-1: up to 10 folders per project
+
+When
+
+- ResourcePolicyAdapter.lookup_project_resource_policy: user-1 looks up the id of project-policy-1
+
+Then
+
+- the id of that policy comes back
+  - id: same as the id of the policy seeded in advance
+
+<a id="looking_up-looking-up-a-project-policy-name-nothing-answers-to-is-not-found"></a>
+
+#### [looking-up-a-project-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+
+when the superadmin looks up a name no project-policy holds, the call is rejected as no such target
+
+Given
+
+- one unused project policy and one superadmin
+  - Domain home-1
+  - Prepare one user with policies assigned
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - Project resource policy project-policy-1: up to 10 folders per project
+
+When
+
+- ResourcePolicyAdapter.lookup_project_resource_policy: user-1 looks up the id of nobody
+
+Then
+
+- the call is rejected
+  - rejected: EntityNotFoundError
+
+### lookup_user_resource_policy
+
+<a id="looking_up-the-superadmin-looks-up-a-user-policy-by-name"></a>
+
+#### [the-superadmin-looks-up-a-user-policy-by-name](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+
+when the superadmin looks up a user-policy by name, the id of that policy comes back
+
+Given
+
+- one unused user policy and one superadmin
+  - Domain home-1
+  - Prepare one user with policies assigned
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - User resource policy user-policy-2: up to 10 folders per user
+
+When
+
+- ResourcePolicyAdapter.lookup_user_resource_policy: user-1 looks up the id of user-policy-2
+
+Then
+
+- the id of that policy comes back
+  - id: same as the id of the policy seeded in advance
+
+<a id="looking_up-looking-up-a-user-policy-name-nothing-answers-to-is-not-found"></a>
+
+#### [looking-up-a-user-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+
+when the superadmin looks up a name no user-policy holds, the call is rejected as no such target
+
+Given
+
+- one unused user policy and one superadmin
+  - Domain home-1
+  - Prepare one user with policies assigned
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+  - User resource policy user-policy-2: up to 10 folders per user
+
+When
+
+- ResourcePolicyAdapter.lookup_user_resource_policy: user-1 looks up the id of nobody
+
+Then
+
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 ### partial_bulk_purge_keypair_resource_policies
 

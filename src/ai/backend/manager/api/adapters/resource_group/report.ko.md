@@ -2,11 +2,11 @@
 
 [배경](/src/ai/backend/manager/api/adapters/resource_group/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_group/adapter.py)
 
-시나리오: 미완성 4 / 25
+시나리오: 미완성 2 / 25
 
 - ops 구성 (10)
-  - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
-  - batch_load_by_names: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
+  - batch_load_by_names: 대표 성공 ✓ · 대표 거부 ✓
   - get: 대표 성공 ✓ · 대표 거부 ✓
   - get_allowed_resource_groups_for_domain: 대표 성공 ✓ · 대표 거부 ✓
   - get_allowed_resource_groups_for_project: 대표 성공 ✓ · 대표 거부 ✓
@@ -31,23 +31,23 @@
   - update_allowed_resource_groups_for_domain: 성공 있음 3 · 거부 있음 2 (global_scope, relation, single_entity)
   - update_allowed_resource_groups_for_project: 성공 있음 1 · 거부 있음 1 (global_scope, relation, single_entity)
   - update_config: 성공 있음 2 · 거부 있음 1 (single_entity)
-  - update_fair_share_spec: 성공 있음 2 · 거부 있음 2 (single_entity)
+  - update_fair_share_spec: 성공 있음 3 · 거부 있음 3 (single_entity)
 
 **batch_load_by_ids**
 
 | 시나리오 | 판정 |
 |---|---|
 | [빈 id 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환됩니다](#reading-a-batch-load-of-no-ids-answers-an-empty-list) | 성공 |
-| [아무 권한도 없는 사용자가 그룹 둘을 id 로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다](#reading-a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item) | 성공 |
 | [superadmin 이 미리 저장한 그룹 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 에 해당하는 항목은 비어 있습니다](#reading-the-superadmin-batch-load-by-ids-leaves-a-missing-id-empty) | 성공 |
+| [아무 권한도 없는 사용자가 그룹 둘을 id 로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다](#reading-a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item) | 거부 |
 
 **batch_load_by_names**
 
 | 시나리오 | 판정 |
 |---|---|
 | [빈 이름 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환됩니다](#reading-a-batch-load-of-no-names-answers-an-empty-list) | 성공 |
-| [아무 권한도 없는 사용자가 그룹 둘을 이름으로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다](#reading-a-user-granted-nothing-batch-loading-by-names-is-refused-per-item) | 성공 |
 | [superadmin 이 미리 저장한 그룹 둘과 없는 이름 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 이름에 해당하는 항목은 비어 있습니다](#reading-the-superadmin-batch-load-by-names-leaves-a-missing-name-empty) | 성공 |
+| [아무 권한도 없는 사용자가 그룹 둘을 이름으로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다](#reading-a-user-granted-nothing-batch-loading-by-names-is-refused-per-item) | 거부 |
 
 **get**
 
@@ -244,8 +244,10 @@
 | 시나리오 | 판정 |
 |---|---|
 | [그 자원 그룹에 부여된 역할로 수정 권한을 받은 사용자가 반감기를 바꾸면 그룹 전체가 반환됩니다](#fair_share-a-user-granted-update-on-the-group-changes-its-fair-share-spec) | 성공 |
+| [superadmin 이 슬롯 종류 하나의 가중치를 지정하면 그룹 전체가 반환됩니다. 반환되는 노드에는 이 설정이 담기지 않습니다](#fair_share-the-superadmin-assigns-a-resource-weight) | 성공 |
 | [superadmin 이 반감기를 바꾸면 그룹 전체가 반환됩니다. 반환되는 노드에는 이 설정이 담기지 않습니다](#fair_share-the-superadmin-changes-the-fair-share-half-life) | 성공 |
 | [아무 권한도 없는 사용자가 반감기를 바꾸려 하면 권한 부족으로 거부됩니다](#fair_share-a-user-granted-nothing-may-not-change-the-fair-share-spec) | 거부 |
+| [에이전트가 보고하지 않은 슬롯 종류에 가중치를 지정하면 입력이 잘못되었다는 것으로 거부됩니다](#fair_share-a-weight-on-a-resource-no-agent-reports-is-rejected) | 거부 |
 | [superadmin 이 존재하지 않는 이름의 반감기를 바꾸면 대상을 찾을 수 없다는 이유로 거부됩니다](#fair_share-changing-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found) | 거부 |
 
 ### batch_load_by_ids
@@ -276,35 +278,6 @@ Then
 
 - 빈 응답이 반환됩니다
   - items = []
-
-<a id="reading-a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item"></a>
-
-#### [a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
-
-아무 권한도 없는 사용자가 그룹 둘을 id 로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다
-
-Given
-
-- 리소스 그룹 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 자원 그룹 wanted-1: fifo 스케줄러를 사용합니다
-  - 자원 그룹 other-1: fifo 스케줄러를 사용합니다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- ResourceGroupAdapter.batch_load_by_ids: user-1이 미리 저장한 2개를 id 로 한 번에 조회합니다
-
-Then
-
-- 항목마다 권한 부족 거부가 담깁니다
-  - len(items) = 2
-  - items[0] = 'NotEnoughPermission'
-  - items[1] = 'NotEnoughPermission'
 
 <a id="reading-the-superadmin-batch-load-by-ids-leaves-a-missing-id-empty"></a>
 
@@ -370,6 +343,35 @@ Then
   - items[1].default_session_options: 건너뜀: 설치본이 정한 기본값입니다
   - items[2] = None
 
+<a id="reading-a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item"></a>
+
+#### [a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
+
+아무 권한도 없는 사용자가 그룹 둘을 id 로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다
+
+Given
+
+- 리소스 그룹 둘과, 일반 사용자 한 명
+  - 도메인 home-1
+  - 자원 그룹 wanted-1: fifo 스케줄러를 사용합니다
+  - 자원 그룹 other-1: fifo 스케줄러를 사용합니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- ResourceGroupAdapter.batch_load_by_ids: user-1이 미리 저장한 2개를 id 로 한 번에 조회합니다
+
+Then
+
+- 항목마다 권한 부족 거부가 담깁니다
+  - len(items) = 2
+  - 거부: NotEnoughPermission
+  - 거부: NotEnoughPermission
+
 ### batch_load_by_names
 
 <a id="reading-a-batch-load-of-no-names-answers-an-empty-list"></a>
@@ -398,35 +400,6 @@ Then
 
 - 빈 응답이 반환됩니다
   - items = []
-
-<a id="reading-a-user-granted-nothing-batch-loading-by-names-is-refused-per-item"></a>
-
-#### [a-user-granted-nothing-batch-loading-by-names-is-refused-per-item](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
-
-아무 권한도 없는 사용자가 그룹 둘을 이름으로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다
-
-Given
-
-- 리소스 그룹 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 자원 그룹 wanted-1: fifo 스케줄러를 사용합니다
-  - 자원 그룹 other-1: fifo 스케줄러를 사용합니다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- ResourceGroupAdapter.batch_load_by_names: user-1이 미리 저장한 2개를 이름으로 한 번에 조회합니다
-
-Then
-
-- 항목마다 권한 부족 거부가 담깁니다
-  - len(items) = 2
-  - items[0] = 'NotEnoughPermission'
-  - items[1] = 'NotEnoughPermission'
 
 <a id="reading-the-superadmin-batch-load-by-names-leaves-a-missing-name-empty"></a>
 
@@ -491,6 +464,35 @@ Then
   - items[1].default_deployment_options: 건너뜀: 설치본이 정한 기본값입니다
   - items[1].default_session_options: 건너뜀: 설치본이 정한 기본값입니다
   - items[2] = None
+
+<a id="reading-a-user-granted-nothing-batch-loading-by-names-is-refused-per-item"></a>
+
+#### [a-user-granted-nothing-batch-loading-by-names-is-refused-per-item](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
+
+아무 권한도 없는 사용자가 그룹 둘을 이름으로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다
+
+Given
+
+- 리소스 그룹 둘과, 일반 사용자 한 명
+  - 도메인 home-1
+  - 자원 그룹 wanted-1: fifo 스케줄러를 사용합니다
+  - 자원 그룹 other-1: fifo 스케줄러를 사용합니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- ResourceGroupAdapter.batch_load_by_names: user-1이 미리 저장한 2개를 이름으로 한 번에 조회합니다
+
+Then
+
+- 항목마다 권한 부족 거부가 담깁니다
+  - len(items) = 2
+  - 거부: NotEnoughPermission
+  - 거부: NotEnoughPermission
 
 ### get
 
@@ -3103,6 +3105,52 @@ Then
   - default_deployment_options: 건너뜀: 설치본이 정한 기본값입니다
   - default_session_options: 건너뜀: 설치본이 정한 기본값입니다
 
+<a id="fair_share-the-superadmin-assigns-a-resource-weight"></a>
+
+#### [the-superadmin-assigns-a-resource-weight](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
+
+superadmin 이 슬롯 종류 하나의 가중치를 지정하면 그룹 전체가 반환됩니다. 반환되는 노드에는 이 설정이 담기지 않습니다
+
+Given
+
+- 리소스 그룹 하나와, superadmin 한 명. 그 그룹의 에이전트가 슬롯 종류 하나를 용량과 함께 보고합니다
+  - 도메인 home-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 자원 슬롯 유형 slot-1: count 유형
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없습니다
+  - 에이전트 agent-1: slot-1 슬롯 용량 10 보고, 0 사용 중
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- ResourceGroupAdapter.update_fair_share_spec: user-1이 resource-group-1의 slot-1 가중치를 지정합니다
+
+Then
+
+- 미리 저장한 리소스 그룹 전체가 반환됩니다
+  - id: 건너뜀: 데이터베이스가 생성합니다
+  - name = 'resource-group-1'
+  - status.is_active = True
+  - status.is_public = True
+  - status.is_default = False
+  - metadata.description = None
+  - metadata.created_at: 이 실행이 쓴 시각
+  - network.wsproxy_addr = None
+  - network.use_host_network = False
+  - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
+  - scheduler.preemption.enabled = False
+  - scheduler.preemption.preemptible_priority = 5
+  - scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
+  - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
+  - scheduler.preemption.preemption_min_runtime = 0.0
+  - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - default_deployment_options: 건너뜀: 설치본이 정한 기본값입니다
+  - default_session_options: 건너뜀: 설치본이 정한 기본값입니다
+
 <a id="fair_share-the-superadmin-changes-the-fair-share-half-life"></a>
 
 #### [the-superadmin-changes-the-fair-share-half-life](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
@@ -3171,6 +3219,32 @@ Then
 
 - 거부됩니다
   - 거부: NotEnoughPermission
+
+<a id="fair_share-a-weight-on-a-resource-no-agent-reports-is-rejected"></a>
+
+#### [a-weight-on-a-resource-no-agent-reports-is-rejected](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
+
+에이전트가 보고하지 않은 슬롯 종류에 가중치를 지정하면 입력이 잘못되었다는 것으로 거부됩니다
+
+Given
+
+- 리소스 그룹 하나와, superadmin 한 명
+  - 도메인 home-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- ResourceGroupAdapter.update_fair_share_spec: user-1이 resource-group-1의 no-such-slot 가중치를 지정합니다
+
+Then
+
+- 거부됩니다
+  - 거부: InvalidResourceWeightError
 
 <a id="fair_share-changing-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found"></a>
 

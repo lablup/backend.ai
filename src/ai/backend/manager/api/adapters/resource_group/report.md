@@ -2,11 +2,11 @@
 
 [background](/src/ai/backend/manager/api/adapters/resource_group/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/resource_group/adapter.py)
 
-Scenario: incomplete 4 / 25
+Scenario: incomplete 2 / 25
 
 - built from ops (10)
-  - batch_load_by_ids: representative success ✓ · representative rejection ✗: SCENARIO-GAP
-  - batch_load_by_names: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_by_ids: representative success ✓ · representative rejection ✓
+  - batch_load_by_names: representative success ✓ · representative rejection ✓
   - get: representative success ✓ · representative rejection ✓
   - get_allowed_resource_groups_for_domain: representative success ✓ · representative rejection ✓
   - get_allowed_resource_groups_for_project: representative success ✓ · representative rejection ✓
@@ -31,23 +31,23 @@ Scenario: incomplete 4 / 25
   - update_allowed_resource_groups_for_domain: success present 3 · rejection present 2 (global_scope, relation, single_entity)
   - update_allowed_resource_groups_for_project: success present 1 · rejection present 1 (global_scope, relation, single_entity)
   - update_config: success present 2 · rejection present 1 (single_entity)
-  - update_fair_share_spec: success present 2 · rejection present 2 (single_entity)
+  - update_fair_share_spec: success present 3 · rejection present 3 (single_entity)
 
 **batch_load_by_ids**
 
 | scenario | verdict |
 |---|---|
 | [batch loading an empty id list answers an empty response without calling the lower layer](#reading-a-batch-load-of-no-ids-answers-an-empty-list) | answered |
-| [a user granted nothing batch loading two groups by id is not rejected as a call, and every item carries a denial for not enough permission](#reading-a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item) | answered |
 | [when the superadmin batch loads two seeded groups and one unknown id, the items come back in the order requested and the item for the unknown id is empty](#reading-the-superadmin-batch-load-by-ids-leaves-a-missing-id-empty) | answered |
+| [a user granted nothing batch loading two groups by id is not rejected as a call, and every item carries a denial for not enough permission](#reading-a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item) | rejected |
 
 **batch_load_by_names**
 
 | scenario | verdict |
 |---|---|
 | [batch loading an empty name list answers an empty response without calling the lower layer](#reading-a-batch-load-of-no-names-answers-an-empty-list) | answered |
-| [a user granted nothing batch loading two groups by name is not rejected as a call, and every item carries a denial for not enough permission](#reading-a-user-granted-nothing-batch-loading-by-names-is-refused-per-item) | answered |
 | [when the superadmin batch loads two seeded groups and one unknown name, the items come back in the order requested and the item for the unknown name is empty](#reading-the-superadmin-batch-load-by-names-leaves-a-missing-name-empty) | answered |
+| [a user granted nothing batch loading two groups by name is not rejected as a call, and every item carries a denial for not enough permission](#reading-a-user-granted-nothing-batch-loading-by-names-is-refused-per-item) | rejected |
 
 **get**
 
@@ -244,8 +244,10 @@ Scenario: incomplete 4 / 25
 | scenario | verdict |
 |---|---|
 | [a user granted update through the role granted on the resource group changing the half-life gets the whole group](#fair_share-a-user-granted-update-on-the-group-changes-its-fair-share-spec) | answered |
+| [when the superadmin assigns a weight to one resource type, the whole group comes back. the returned node does not carry this config](#fair_share-the-superadmin-assigns-a-resource-weight) | answered |
 | [when the superadmin changes the half-life, the whole group comes back. the returned node does not carry this config](#fair_share-the-superadmin-changes-the-fair-share-half-life) | answered |
 | [a user granted nothing trying to change the half-life is rejected for not enough permission](#fair_share-a-user-granted-nothing-may-not-change-the-fair-share-spec) | rejected |
+| [assigning a weight to a resource type no agent reports is rejected as an invalid input](#fair_share-a-weight-on-a-resource-no-agent-reports-is-rejected) | rejected |
 | [when the superadmin changes the half-life of a name nothing answers to, the call is rejected because no target answers to it](#fair_share-changing-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found) | rejected |
 
 ### batch_load_by_ids
@@ -276,35 +278,6 @@ Then
 
 - an empty response comes back
   - items = []
-
-<a id="reading-a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item"></a>
-
-#### [a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
-
-a user granted nothing batch loading two groups by id is not rejected as a call, and every item carries a denial for not enough permission
-
-Given
-
-- two resource groups and one regular user
-  - Domain home-1
-  - Resource group wanted-1: uses the fifo scheduler
-  - Resource group other-1: uses the fifo scheduler
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-
-When
-
-- ResourceGroupAdapter.batch_load_by_ids: user-1 batch loads the 2 seeded resource groups by id
-
-Then
-
-- every item carries a denial for not enough permission
-  - len(items) = 2
-  - items[0] = 'NotEnoughPermission'
-  - items[1] = 'NotEnoughPermission'
 
 <a id="reading-the-superadmin-batch-load-by-ids-leaves-a-missing-id-empty"></a>
 
@@ -370,6 +343,35 @@ Then
   - items[1].default_session_options: skipped: the default the installation sets
   - items[2] = None
 
+<a id="reading-a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item"></a>
+
+#### [a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
+
+a user granted nothing batch loading two groups by id is not rejected as a call, and every item carries a denial for not enough permission
+
+Given
+
+- two resource groups and one regular user
+  - Domain home-1
+  - Resource group wanted-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- ResourceGroupAdapter.batch_load_by_ids: user-1 batch loads the 2 seeded resource groups by id
+
+Then
+
+- every item carries a denial for not enough permission
+  - len(items) = 2
+  - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
+
 ### batch_load_by_names
 
 <a id="reading-a-batch-load-of-no-names-answers-an-empty-list"></a>
@@ -398,35 +400,6 @@ Then
 
 - an empty response comes back
   - items = []
-
-<a id="reading-a-user-granted-nothing-batch-loading-by-names-is-refused-per-item"></a>
-
-#### [a-user-granted-nothing-batch-loading-by-names-is-refused-per-item](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
-
-a user granted nothing batch loading two groups by name is not rejected as a call, and every item carries a denial for not enough permission
-
-Given
-
-- two resource groups and one regular user
-  - Domain home-1
-  - Resource group wanted-1: uses the fifo scheduler
-  - Resource group other-1: uses the fifo scheduler
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-
-When
-
-- ResourceGroupAdapter.batch_load_by_names: user-1 batch loads the 2 seeded resource groups by name
-
-Then
-
-- every item carries a denial for not enough permission
-  - len(items) = 2
-  - items[0] = 'NotEnoughPermission'
-  - items[1] = 'NotEnoughPermission'
 
 <a id="reading-the-superadmin-batch-load-by-names-leaves-a-missing-name-empty"></a>
 
@@ -491,6 +464,35 @@ Then
   - items[1].default_deployment_options: skipped: the default the installation sets
   - items[1].default_session_options: skipped: the default the installation sets
   - items[2] = None
+
+<a id="reading-a-user-granted-nothing-batch-loading-by-names-is-refused-per-item"></a>
+
+#### [a-user-granted-nothing-batch-loading-by-names-is-refused-per-item](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
+
+a user granted nothing batch loading two groups by name is not rejected as a call, and every item carries a denial for not enough permission
+
+Given
+
+- two resource groups and one regular user
+  - Domain home-1
+  - Resource group wanted-1: uses the fifo scheduler
+  - Resource group other-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- ResourceGroupAdapter.batch_load_by_names: user-1 batch loads the 2 seeded resource groups by name
+
+Then
+
+- every item carries a denial for not enough permission
+  - len(items) = 2
+  - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
 
 ### get
 
@@ -3103,6 +3105,52 @@ Then
   - default_deployment_options: skipped: the default the installation sets
   - default_session_options: skipped: the default the installation sets
 
+<a id="fair_share-the-superadmin-assigns-a-resource-weight"></a>
+
+#### [the-superadmin-assigns-a-resource-weight](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
+
+when the superadmin assigns a weight to one resource type, the whole group comes back. the returned node does not carry this config
+
+Given
+
+- one resource group and one superadmin. the group's agent reports one resource slot type with its capacity
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Resource slot type slot-1: count type
+  - Agent agent-1: alive, and has not reported any slot yet
+  - Agent agent-1: slot-1 slot capacity 10 reported, 0 in use
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ResourceGroupAdapter.update_fair_share_spec: user-1 assigns a weight to slot-1 on resource-group-1
+
+Then
+
+- the whole resource group seeded in advance comes back
+  - id: skipped: the database generates it
+  - name = 'resource-group-1'
+  - status.is_active = True
+  - status.is_public = True
+  - status.is_default = False
+  - metadata.description = None
+  - metadata.created_at: the time this run wrote
+  - network.wsproxy_addr = None
+  - network.use_host_network = False
+  - scheduler.type = <SchedulerTypeDTO.FIFO: 'fifo'>
+  - scheduler.preemption.enabled = False
+  - scheduler.preemption.preemptible_priority = 5
+  - scheduler.preemption.order = <PreemptionOrder.OLDEST: 'oldest'>
+  - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
+  - scheduler.preemption.preemption_min_runtime = 0.0
+  - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
+  - default_deployment_options: skipped: the default the installation sets
+  - default_session_options: skipped: the default the installation sets
+
 <a id="fair_share-the-superadmin-changes-the-fair-share-half-life"></a>
 
 #### [the-superadmin-changes-the-fair-share-half-life](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
@@ -3171,6 +3219,32 @@ Then
 
 - the call is rejected
   - rejected: NotEnoughPermission
+
+<a id="fair_share-a-weight-on-a-resource-no-agent-reports-is-rejected"></a>
+
+#### [a-weight-on-a-resource-no-agent-reports-is-rejected](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
+
+assigning a weight to a resource type no agent reports is rejected as an invalid input
+
+Given
+
+- one resource group and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ResourceGroupAdapter.update_fair_share_spec: user-1 assigns a weight to no-such-slot on resource-group-1
+
+Then
+
+- the call is rejected
+  - rejected: InvalidResourceWeightError
 
 <a id="fair_share-changing-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found"></a>
 
