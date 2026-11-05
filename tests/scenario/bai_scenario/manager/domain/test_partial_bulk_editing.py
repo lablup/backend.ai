@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     UpdateDomainInput,
 )
 from ai.backend.common.dto.manager.v2.domain.response import DomainNode
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -33,6 +34,7 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import (
     DomainLook,
     ManyDomainsAndACaller,
@@ -81,6 +83,38 @@ class EditingEveryTarget(When[ManyDomainsAndACaller, DomainAdapter, Edited]):
                     ]
                 )
             )
+
+
+@dataclass(frozen=True)
+class EditingEveryTargetWithoutLogin(When[ManyDomainsAndACaller, DomainAdapter, Edited]):
+    """로그인 문맥 없이 대상 도메인들의 설명을 한 번에 고친다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_update"
+
+    @override
+    def describe(self, laid: ManyDomainsAndACaller) -> str:
+        return Says(
+            f"로그인 문맥 없이 도메인 {len(laid.elsewhere())}개의 설명을 한 번에 수정합니다",
+            english=(
+                f"without a login context, edits the description of "
+                f"{len(laid.elsewhere())} domains at once"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: DomainAdapter, laid: ManyDomainsAndACaller) -> Edited:
+        return await adapter.partial_bulk_update(
+            PartialBulkUpdateDomainsInput(
+                items=[
+                    PartialBulkUpdateDomainItemInput(
+                        id=domain.id, input=UpdateDomainInput(description=EDITED)
+                    )
+                    for domain in laid.elsewhere()
+                ]
+            )
+        )
 
 
 @dataclass(frozen=True)
@@ -315,10 +349,43 @@ class AUserGrantedNothingEditsNone(
         return NothingIsProcessed(reason="Insufficient permission")
 
 
+@dataclass(frozen=True)
+class EditingWithoutLoginIsRefused(
+    Scenario[TestSeedingSession, ManyDomainsAndACaller, DomainAdapter, Edited]
+):
+    @override
+    def summary(self) -> str:
+        return "editing-domains-without-login-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "로그인 문맥 없이 도메인 여럿을 한 번에 수정하면, 문맥에 사용자가 없다는 오류로 "
+            "거부됩니다",
+            english=(
+                "editing several domains at once without a login context is rejected with "
+                "the error saying no user is in the context"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyDomainsAndACaller]:
+        return ManyDomainsAndSomeone(besides=1)
+
+    @override
+    def when(self) -> When[ManyDomainsAndACaller, DomainAdapter, Edited]:
+        return EditingEveryTargetWithoutLogin()
+
+    @override
+    def then(self) -> Then[ManyDomainsAndACaller, Edited]:
+        return TheCallIsRefused(UnreachableError)
+
+
 SCENARIOS: list[DomainStep] = [
     TheSuperadminEditsSeveralDomains(started=datetime.now(UTC)),
     AUserGrantedNothingEditsNone(),
     TheActiveFlagSoftDeletesOrRestoresEach(started=datetime.now(UTC)),
+    EditingWithoutLoginIsRefused(),
 ]
 
 

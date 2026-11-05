@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     PartialBulkRestoreDomainsInput,
 )
 from ai.backend.common.dto.manager.v2.domain.response import DomainNode
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -34,6 +35,7 @@ from ai.backend.testutils.scenario_steps import (
     When,
     in_language,
 )
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import (
     DomainLook,
     ManyDomainsAndACaller,
@@ -106,6 +108,52 @@ class SoftDeletingThenRestoringEveryTarget(When[ManyDomainsAndACaller, DomainAda
         with ActingAs(laid.caller):
             await adapter.partial_bulk_delete(PartialBulkDeleteDomainsInput(ids=ids))
             return await adapter.partial_bulk_restore(PartialBulkRestoreDomainsInput(ids=ids))
+
+
+@dataclass(frozen=True)
+class SoftDeletingEveryTargetWithoutLogin(When[ManyDomainsAndACaller, DomainAdapter, Deleted]):
+    """로그인 문맥 없이 대상 도메인들을 한 번에 soft delete 한다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_delete"
+
+    @override
+    def describe(self, laid: ManyDomainsAndACaller) -> str:
+        return Says(
+            f"로그인 문맥 없이 도메인 {len(laid.elsewhere())}개를 한 번에 soft delete 합니다",
+            english=(
+                f"without a login context, soft deletes {len(laid.elsewhere())} domains at once"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: DomainAdapter, laid: ManyDomainsAndACaller) -> Deleted:
+        return await adapter.partial_bulk_delete(
+            PartialBulkDeleteDomainsInput(ids=[domain.id for domain in laid.elsewhere()])
+        )
+
+
+@dataclass(frozen=True)
+class RestoringEveryTargetWithoutLogin(When[ManyDomainsAndACaller, DomainAdapter, Deleted]):
+    """로그인 문맥 없이 대상 도메인들을 한 번에 restore 한다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_restore"
+
+    @override
+    def describe(self, laid: ManyDomainsAndACaller) -> str:
+        return Says(
+            f"로그인 문맥 없이 도메인 {len(laid.elsewhere())}개를 한 번에 restore 합니다",
+            english=f"without a login context, restores {len(laid.elsewhere())} domains at once",
+        )
+
+    @override
+    async def call(self, adapter: DomainAdapter, laid: ManyDomainsAndACaller) -> Deleted:
+        return await adapter.partial_bulk_restore(
+            PartialBulkRestoreDomainsInput(ids=[domain.id for domain in laid.elsewhere()])
+        )
 
 
 @dataclass(frozen=True)
@@ -269,10 +317,76 @@ class RestoringBringsSeveralBack(
         return EveryTargetComesBack(started=self.started, active=True)
 
 
+@dataclass(frozen=True)
+class SoftDeletingWithoutLoginIsRefused(
+    Scenario[TestSeedingSession, ManyDomainsAndACaller, DomainAdapter, Deleted]
+):
+    @override
+    def summary(self) -> str:
+        return "soft-deleting-domains-without-login-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "로그인 문맥 없이 도메인 여럿을 한 번에 soft delete 하면, 문맥에 사용자가 없다는 "
+            "오류로 거부됩니다",
+            english=(
+                "soft-deleting several domains at once without a login context is rejected "
+                "with the error saying no user is in the context"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyDomainsAndACaller]:
+        return ManyDomainsAndSomeone(besides=1)
+
+    @override
+    def when(self) -> When[ManyDomainsAndACaller, DomainAdapter, Deleted]:
+        return SoftDeletingEveryTargetWithoutLogin()
+
+    @override
+    def then(self) -> Then[ManyDomainsAndACaller, Deleted]:
+        return TheCallIsRefused(UnreachableError)
+
+
+@dataclass(frozen=True)
+class RestoringWithoutLoginIsRefused(
+    Scenario[TestSeedingSession, ManyDomainsAndACaller, DomainAdapter, Deleted]
+):
+    @override
+    def summary(self) -> str:
+        return "restoring-domains-without-login-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "로그인 문맥 없이 도메인 여럿을 한 번에 restore 하면, 문맥에 사용자가 없다는 "
+            "오류로 거부됩니다",
+            english=(
+                "restoring several domains at once without a login context is rejected with "
+                "the error saying no user is in the context"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyDomainsAndACaller]:
+        return ManyDomainsAndSomeone(besides=1)
+
+    @override
+    def when(self) -> When[ManyDomainsAndACaller, DomainAdapter, Deleted]:
+        return RestoringEveryTargetWithoutLogin()
+
+    @override
+    def then(self) -> Then[ManyDomainsAndACaller, Deleted]:
+        return TheCallIsRefused(UnreachableError)
+
+
 SCENARIOS: list[DomainStep] = [
     SoftDeletingAnswersForTheMissingOne(started=datetime.now(UTC)),
     AUserGrantedNothingSoftDeletesNone(),
     RestoringBringsSeveralBack(started=datetime.now(UTC)),
+    SoftDeletingWithoutLoginIsRefused(),
+    RestoringWithoutLoginIsRefused(),
 ]
 
 
