@@ -26,13 +26,15 @@ class H2Frontend[TCircuitKeyType: (int, str)](BaseFrontend[H2Backend, TCircuitKe
         self.api_port_pool = set(range(h2_config.api_port_pool[0], h2_config.api_port_pool[1] + 1))
 
     @override
-    async def register_circuit(self, circuit: Circuit, routes: list[RouteInfo]) -> None:
+    async def register_circuit(self, circuit: Circuit, routes: list[RouteInfo]) -> bool:
         # nghttpx receives the requests, so the worker cannot check credentials or client addresses.
         # A stored circuit is skipped instead of raising, which would stop the worker from starting.
         if circuit.open_to_public and not circuit.ip_validator.is_restricted:
-            await super().register_circuit(circuit, routes)
+            registered = await super().register_circuit(circuit, routes)
         else:
             log.error("skipped an access-controlled HTTP/2 circuit", circuit_id=circuit.id)
+            registered = False
+        return registered
 
     @override
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
