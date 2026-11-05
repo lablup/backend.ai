@@ -35,6 +35,8 @@ const ACCEPTED_REMOVALS = {
   "Query.myVfolders.usedBy": USAGE_RENAME,
   "SessionUsedBy.agent": USAGE_RENAME,
   "SessionUsedBy.resourceGroup": USAGE_RENAME,
+  "ScalingGroupNode.wsproxy_api_token":
+    "The token is the App Proxy API credential, and every domain member could read it through `domain_nodes { scaling_groups }`. Superadmins still read it on `ScalingGroup`.",
 };
 
 const REMOVAL_CHANGES = [
