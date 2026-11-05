@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
     AppConfigAllowListNode,
 )
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
     AppConfigAllowListAdapter,
 )
@@ -40,6 +41,7 @@ from bai_scenario.components.app_config_allow_list import (
     TwoEntriesAndACaller,
     TwoEntriesAndSomeone,
 )
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
@@ -225,9 +227,69 @@ class AUserGrantedNothingReranksNone(
         return NeitherIsReranked()
 
 
+@dataclass(frozen=True)
+class ChangingRanksAsNobody(When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Edited]):
+    """사용자 컨텍스트 없이 순위를 한 번에 바꾼다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_update"
+
+    @override
+    def describe(self, laid: TwoEntriesAndACaller) -> str:
+        return Says(
+            "사용자 컨텍스트 없이 allow_list 둘의 순위를 한 번에 변경합니다",
+            english="changes the rank of both allow_lists in one call without a user context",
+        )
+
+    @override
+    async def call(self, adapter: AppConfigAllowListAdapter, laid: TwoEntriesAndACaller) -> Edited:
+        return await adapter.partial_bulk_update(
+            PartialBulkUpdateAppConfigAllowListsInput(
+                items=[
+                    UpdateAppConfigAllowListInput(id=entry.id, rank=RANK)
+                    for entry in (laid.first, laid.second)
+                ]
+            )
+        )
+
+
+@dataclass(frozen=True)
+class AnUpdateCarryingNoUserIsRefused(
+    Scenario[TestSeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Edited]
+):
+    @override
+    def summary(self) -> str:
+        return "an-allow-list-update-carrying-no-user-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "allow_list 둘이 있고 사용자 컨텍스트 없이 순위를 한 번에 바꾸면, 호출자를 알 수 없어 "
+            "거부됩니다",
+            english=(
+                "when two allow_lists exist and their ranks are changed in one call without a "
+                "user context, it is rejected because the caller cannot be known"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, TwoEntriesAndACaller]:
+        return TwoEntriesAndSomeone()
+
+    @override
+    def when(self) -> When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Edited]:
+        return ChangingRanksAsNobody()
+
+    @override
+    def then(self) -> Then[TwoEntriesAndACaller, Edited]:
+        return TheCallIsRefused(UnreachableError)
+
+
 SCENARIOS: list[EditingStep] = [
     TheSuperadminReranksBoth(started=datetime.now(UTC)),
     AUserGrantedNothingReranksNone(),
+    AnUpdateCarryingNoUserIsRefused(),
 ]
 
 

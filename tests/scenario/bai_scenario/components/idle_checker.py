@@ -89,6 +89,43 @@ class SomeCheckersAndSomeone(Given[Any, CheckersAndACaller]):
 
 
 @dataclass(frozen=True)
+class ACheckerAndADomainAndACaller:
+    """도메인에 켜지 않은 검사기 하나와 도메인 하나, 호출자 한 명."""
+
+    checker: IdleCheckerData
+    domain: DomainData
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class ACheckerAndADomain(Given[Any, ACheckerAndADomainAndACaller]):
+    """검사기 하나와 도메인 하나, 호출자 한 명을 둔다."""
+
+    role: UserRole = UserRole.USER
+
+    @override
+    def describe(self) -> str:
+        who = role_named(self.role)
+        return Says(
+            f"유휴 검사기 하나와 도메인 하나, {who} 한 명",
+            english=(
+                f"one idle checker, one domain and one {in_language(who, Language.ENGLISH)}"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> ACheckerAndADomainAndACaller:
+        checker = await seeding.creating(TestSeedIdleChecker())
+        domain = await seeding.creating(TestSeedDomain(name_hint="scope", description=WAS_HERE))
+        caller = await lay_a_caller(seeding, self.role)
+        return ACheckerAndADomainAndACaller(
+            checker=seeding.made(checker),
+            domain=seeding.made(domain),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
 class AssignmentsAndACaller:
     """도메인 여럿에 켜 둔 검사기 하나와, 할당 id 를 찾는 슈퍼관리자, 호출자."""
 
@@ -286,6 +323,75 @@ class NoCheckerIsPurged(Then[CheckersAndACaller, PartialBulkPayload[IdleCheckerN
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]
         return verdicts
+
+
+@dataclass(frozen=True)
+class EveryAssignmentIsListed(Then[AssignmentsAndACaller, AssignmentsAnswered]):
+    """심은 할당이 모두 한 번씩 집계되고, 각각이 통째로 온다. id 순으로 본다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "미리 저장한 할당이 모두 한 번씩 집계되어 전체가 반환됩니다",
+            english=(
+                "every assignment seeded in advance is counted once and each comes back whole"
+            ),
+        )
+
+    @override
+    def look(
+        self, laid: AssignmentsAndACaller, answered: Answered[AssignmentsAnswered]
+    ) -> list[Verdict]:
+        answer = answered.response
+        if answer is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        payload = answer.payload
+        written = WrittenByThisRun(self.started)
+        got = sorted(payload.items, key=lambda one: one.id)
+        expected = sorted(answer.ids, key=lambda one: one)
+        seen: list[Verdict] = [
+            Same("items.id", [one.id for one in got], list(expected)),
+            Same("total_count", payload.total_count, len(laid.domains)),
+            Same("has_next_page", payload.has_next_page, False),
+            Same("has_previous_page", payload.has_previous_page, False),
+        ]
+        by_scope = {domain.id: domain for domain in laid.domains}
+        for i, node in enumerate(got):
+            domain = by_scope.get(node.scope_id)
+            if domain is None:
+                seen.append(
+                    Same(
+                        f"items[{i}].scope_id",
+                        node.scope_id,
+                        Says("미리 저장한 도메인", english="a domain seeded in advance"),
+                    )
+                )
+                continue
+            seen += [
+                Same(f"items[{i}].scope_type", node.scope_type, IdleCheckerScopeTypeDTO.DOMAIN),
+                Held[UUID](
+                    f"items[{i}].scope_id",
+                    node.scope_id,
+                    SameAs(
+                        domain.id,
+                        Says("미리 저장한 도메인", english="the domain seeded in advance"),
+                    ),
+                ),
+                Held[IdleCheckerID](
+                    f"items[{i}].idle_checker_id",
+                    node.idle_checker_id,
+                    SameAs(
+                        laid.checker.id,
+                        Says("미리 저장한 검사기", english="the checker seeded in advance"),
+                    ),
+                ),
+                Same(f"items[{i}].enabled", node.enabled, True),
+                Held(f"items[{i}].created_at", node.created_at, written),
+                Held(f"items[{i}].updated_at", node.updated_at, written),
+            ]
+        return seen
 
 
 @dataclass(frozen=True)

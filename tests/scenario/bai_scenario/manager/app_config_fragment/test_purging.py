@@ -23,6 +23,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     PurgeAppConfigFragmentPayload,
 )
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.app_config_fragment.adapter import AppConfigFragmentAdapter
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
@@ -440,6 +441,62 @@ class TheSuperadminPurgesBoth(
         return BothArePurgedTheMissingFails()
 
 
+@dataclass(frozen=True)
+class PurgingManyAsNobody(When[SomeFragmentsAndACaller, AppConfigFragmentAdapter, BulkPurged]):
+    """사용자 컨텍스트 없이 한 번에 삭제한다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_purge"
+
+    @override
+    def describe(self, laid: SomeFragmentsAndACaller) -> str:
+        return Says(
+            f"사용자 컨텍스트 없이 조각 {len(laid.mine) + 1}개를 한 번에 삭제합니다",
+            english=f"deletes {len(laid.mine) + 1} fragments at once without a user context",
+        )
+
+    @override
+    async def call(
+        self, adapter: AppConfigFragmentAdapter, laid: SomeFragmentsAndACaller
+    ) -> BulkPurged:
+        asked = [*(one.id for one in laid.mine), laid.theirs.id]
+        return await adapter.partial_bulk_purge(
+            PartialBulkPurgeAppConfigFragmentsInput(ids=asked)
+        )
+
+
+@dataclass(frozen=True)
+class APurgeCarryingNoUserIsRefused(
+    Scenario[TestSeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, BulkPurged]
+):
+    @override
+    def summary(self) -> str:
+        return "a-fragment-purge-carrying-no-user-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "조각들이 있고 사용자 컨텍스트 없이 한 번에 삭제하면, 호출자를 알 수 없어 거부됩니다",
+            english=(
+                "when fragments exist and are purged at once without a user context, it is "
+                "rejected because the caller cannot be known"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, SomeFragmentsAndACaller]:
+        return SomeFragmentsAndSomeone(mine=1)
+
+    @override
+    def when(self) -> When[SomeFragmentsAndACaller, AppConfigFragmentAdapter, BulkPurged]:
+        return PurgingManyAsNobody()
+
+    @override
+    def then(self) -> Then[SomeFragmentsAndACaller, BulkPurged]:
+        return TheCallIsRefused(UnreachableError)
+
+
 SCENARIOS: list[PurgingStep] = [
     TheGrantedUserPurgesTheirOwn(),
     AnotherUsersFragmentIsRefused(),
@@ -450,6 +507,7 @@ SCENARIOS: list[PurgingStep] = [
 BULK_SCENARIOS: list[BulkStep] = [
     MixedIdsArePurgedEach(),
     TheSuperadminPurgesBoth(),
+    APurgeCarryingNoUserIsRefused(),
 ]
 
 

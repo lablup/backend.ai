@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.retention_policy.request import (
     UpdateRetentionPolicyInput,
 )
 from ai.backend.common.dto.manager.v2.retention_policy.response import RetentionPolicyNode
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.retention_policy.adapter import RetentionPolicyAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -29,6 +30,7 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.retention_policy import (
     ManyPoliciesAndACaller,
@@ -181,9 +183,72 @@ class AUserGrantedNothingEditsNone(
         return NothingIsProcessed(reason="Insufficient permission")
 
 
+@dataclass(frozen=True)
+class EditingPoliciesAsNobody(When[ManyPoliciesAndACaller, RetentionPolicyAdapter, Edited]):
+    """사용자 컨텍스트 없이 보존 일수를 한 번에 고친다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_update"
+
+    @override
+    def describe(self, laid: ManyPoliciesAndACaller) -> str:
+        return Says(
+            f"사용자 컨텍스트 없이 정책 {len(laid.laid)}개의 보존 일수를 한 번에 수정합니다",
+            english=(
+                f"edits the retention days of {len(laid.laid)} policies at once "
+                "without a user context"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: RetentionPolicyAdapter, laid: ManyPoliciesAndACaller) -> Edited:
+        return await adapter.partial_bulk_update(
+            PartialBulkUpdateRetentionPoliciesInput(
+                items=[
+                    UpdateRetentionPolicyInput(id=policy.id, retention_period_days=LONGER)
+                    for policy in laid.laid
+                ]
+            )
+        )
+
+
+@dataclass(frozen=True)
+class AnUpdateCarryingNoUserIsRefused(
+    Scenario[TestSeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Edited]
+):
+    @override
+    def summary(self) -> str:
+        return "a-policy-update-carrying-no-user-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "정책 둘이 있고 사용자 컨텍스트 없이 보존 일수를 한 번에 바꾸면, 호출자를 알 수 없어 "
+            "거부됩니다",
+            english=(
+                "when two policies exist and their retention days are changed at once without a "
+                "user context, it is rejected because the caller cannot be known"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyPoliciesAndACaller]:
+        return TwoPoliciesAndSomeone()
+
+    @override
+    def when(self) -> When[ManyPoliciesAndACaller, RetentionPolicyAdapter, Edited]:
+        return EditingPoliciesAsNobody()
+
+    @override
+    def then(self) -> Then[ManyPoliciesAndACaller, Edited]:
+        return TheCallIsRefused(UnreachableError)
+
+
 SCENARIOS: list[PolicyStep] = [
     TheSuperadminEditsSeveralPolicies(started=datetime.now(UTC)),
     AUserGrantedNothingEditsNone(),
+    AnUpdateCarryingNoUserIsRefused(),
 ]
 
 

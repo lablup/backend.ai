@@ -15,9 +15,11 @@ from ai.backend.common.dto.manager.v2.notification.request import (
     PartialBulkUpdateNotificationRulesInput,
 )
 from ai.backend.common.dto.manager.v2.notification.response import NotificationRuleNode
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.notification.adapter import NotificationAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.notification import (
     ManyRulesAndACaller,
     NothingIsProcessed,
@@ -130,9 +132,69 @@ class AUserGrantedNothingEditsNone(
         return NothingIsProcessed(reason="Insufficient permission")
 
 
+@dataclass(frozen=True)
+class DescribingRulesAsNobody(When[ManyRulesAndACaller, NotificationAdapter, Edited]):
+    """사용자 컨텍스트 없이 설명을 한 번에 바꾼다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_update_rules"
+
+    @override
+    def describe(self, laid: ManyRulesAndACaller) -> str:
+        return Says(
+            f"사용자 컨텍스트 없이 규칙 {len(laid.laid)}개의 설명을 한 번에 수정합니다",
+            english=(
+                f"edits the description of {len(laid.laid)} rules at once without a user context"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: NotificationAdapter, laid: ManyRulesAndACaller) -> Edited:
+        request = PartialBulkUpdateNotificationRulesInput(
+            items=[
+                PartialBulkUpdateNotificationRuleItemInput(id=one.id, description=NEW_DESCRIPTION)
+                for one in laid.laid
+            ]
+        )
+        return await adapter.partial_bulk_update_rules(request)
+
+
+@dataclass(frozen=True)
+class AnEditCarryingNoUserIsRefused(
+    Scenario[TestSeedingSession, ManyRulesAndACaller, NotificationAdapter, Edited]
+):
+    @override
+    def summary(self) -> str:
+        return "a-rule-edit-carrying-no-user-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "규칙 둘이 있고 사용자 컨텍스트 없이 설명을 한 번에 바꾸면, 호출자를 알 수 없어 거부됩니다",
+            english=(
+                "when two rules exist and their description is changed at once without "
+                "a user context, it is rejected because the caller cannot be known"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyRulesAndACaller]:
+        return TwoRulesAndSomeone()
+
+    @override
+    def when(self) -> When[ManyRulesAndACaller, NotificationAdapter, Edited]:
+        return DescribingRulesAsNobody()
+
+    @override
+    def then(self) -> Then[ManyRulesAndACaller, Edited]:
+        return TheCallIsRefused(UnreachableError)
+
+
 SCENARIOS: list[EditingStep] = [
     TheSuperadminDescribesSeveral(started=datetime.now(UTC)),
     AUserGrantedNothingEditsNone(),
+    AnEditCarryingNoUserIsRefused(),
 ]
 
 

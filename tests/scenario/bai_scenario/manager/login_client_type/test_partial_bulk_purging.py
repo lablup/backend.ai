@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.login_client_type.request import (
     PartialBulkPurgeLoginClientTypesInput,
 )
 from ai.backend.common.dto.manager.v2.login_client_type.response import LoginClientTypeNode
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -208,9 +209,63 @@ class AUserGrantedNothingPurgesNone(
         return NoTypeIsProcessed(reason="Insufficient permission")
 
 
+@dataclass(frozen=True)
+class PurgingTypesAsNobody(When[ManyTypesAndACaller, LoginClientTypeAdapter, Purged]):
+    """사용자 컨텍스트 없이 한 번에 purge 한다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_purge"
+
+    @override
+    def describe(self, laid: ManyTypesAndACaller) -> str:
+        return Says(
+            f"사용자 컨텍스트 없이 종류 {len(laid.laid)}개를 한 번에 purge 합니다",
+            english=f"purges {len(laid.laid)} login client types at once without a user context",
+        )
+
+    @override
+    async def call(self, adapter: LoginClientTypeAdapter, laid: ManyTypesAndACaller) -> Purged:
+        return await adapter.partial_bulk_purge(
+            PartialBulkPurgeLoginClientTypesInput(ids=[one.id for one in laid.laid])
+        )
+
+
+@dataclass(frozen=True)
+class APurgeCarryingNoUserIsRefused(
+    Scenario[TestSeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Purged]
+):
+    @override
+    def summary(self) -> str:
+        return "a-type-purge-carrying-no-user-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "종류 둘이 있고 사용자 컨텍스트 없이 한 번에 purge 하면, 호출자를 알 수 없어 거부됩니다",
+            english=(
+                "when two login client types exist and are purged at once without a user "
+                "context, it is rejected because the caller cannot be known"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyTypesAndACaller]:
+        return ManyTypesAndSomeone()
+
+    @override
+    def when(self) -> When[ManyTypesAndACaller, LoginClientTypeAdapter, Purged]:
+        return PurgingTypesAsNobody()
+
+    @override
+    def then(self) -> Then[ManyTypesAndACaller, Purged]:
+        return TheCallIsRefused(UnreachableError)
+
+
 SCENARIOS: list[PurgingStep] = [
     PurgingAnswersForTheMissingOne(started=datetime.now(UTC)),
     AUserGrantedNothingPurgesNone(),
+    APurgeCarryingNoUserIsRefused(),
 ]
 
 

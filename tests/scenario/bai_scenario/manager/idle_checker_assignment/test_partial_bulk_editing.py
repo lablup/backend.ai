@@ -13,11 +13,13 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     PartialBulkUpdateIdleCheckerAssignmentsInput,
     UpdateIdleCheckerAssignmentInput,
 )
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.idle_checker_assignment.adapter import (
     IdleCheckerAssignmentAdapter,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.idle_checker import (
     AssignmentsAndACaller,
     AssignmentsAnswered,
@@ -131,9 +133,70 @@ class AUserGrantedNothingDisablesNone(
         return NoAssignmentIsProcessed(reason="Cannot resolve the given idle_checker key")
 
 
+@dataclass(frozen=True)
+class DisablingAssignmentsAsNobody(When[AssignmentsAndACaller, Adapter, AssignmentsAnswered]):
+    """사용자 컨텍스트 없이 한 번에 끈다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_update"
+
+    @override
+    def describe(self, laid: AssignmentsAndACaller) -> str:
+        return Says(
+            f"사용자 컨텍스트 없이 할당 {len(laid.domains)}개를 한 번에 비활성화합니다",
+            english=f"disables {len(laid.domains)} assignments in one call without a user context",
+        )
+
+    @override
+    async def call(self, adapter: Adapter, laid: AssignmentsAndACaller) -> AssignmentsAnswered:
+        ids = await assignment_ids(adapter, laid)
+        payload = await adapter.partial_bulk_update(
+            PartialBulkUpdateIdleCheckerAssignmentsInput(
+                items=[
+                    UpdateIdleCheckerAssignmentInput(id=assignment_id, enabled=False)
+                    for assignment_id in ids
+                ]
+            )
+        )
+        return AssignmentsAnswered(ids=ids, payload=payload)
+
+
+@dataclass(frozen=True)
+class AnUpdateCarryingNoUserIsRefused(
+    Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, AssignmentsAnswered]
+):
+    @override
+    def summary(self) -> str:
+        return "an-assignment-update-carrying-no-user-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "할당 둘이 있고 사용자 컨텍스트 없이 한 번에 끄려 하면, 호출자를 알 수 없어 거부됩니다",
+            english=(
+                "when two assignments exist and are disabled at once without a user context, "
+                "it is rejected because the caller cannot be known"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AssignmentsAndACaller]:
+        return OneCheckerOnSomeDomains()
+
+    @override
+    def when(self) -> When[AssignmentsAndACaller, Adapter, AssignmentsAnswered]:
+        return DisablingAssignmentsAsNobody()
+
+    @override
+    def then(self) -> Then[AssignmentsAndACaller, AssignmentsAnswered]:
+        return TheCallIsRefused(UnreachableError)
+
+
 SCENARIOS: list[EditingStep] = [
     TheSuperadminDisablesSeveral(started=datetime.now(UTC)),
     AUserGrantedNothingDisablesNone(),
+    AnUpdateCarryingNoUserIsRefused(),
 ]
 
 

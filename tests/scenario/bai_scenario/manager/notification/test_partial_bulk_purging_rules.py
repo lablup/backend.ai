@@ -15,9 +15,11 @@ from ai.backend.common.dto.manager.v2.notification.request import (
     PartialBulkPurgeNotificationRulesInput,
 )
 from ai.backend.common.dto.manager.v2.notification.response import NotificationRuleNode
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.notification.adapter import NotificationAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.notification import (
     ManyRulesAndACaller,
     NothingIsProcessed,
@@ -131,9 +133,63 @@ class AUserGrantedNothingPurgesNone(
         return NothingIsProcessed(reason="Insufficient permission")
 
 
+@dataclass(frozen=True)
+class PurgingRulesAsNobody(When[ManyRulesAndACaller, NotificationAdapter, Purged]):
+    """사용자 컨텍스트 없이 한 번에 purge 한다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_purge_rules"
+
+    @override
+    def describe(self, laid: ManyRulesAndACaller) -> str:
+        return Says(
+            f"사용자 컨텍스트 없이 규칙 {len(laid.laid)}개를 한 번에 purge 합니다",
+            english=f"purges {len(laid.laid)} rules at once without a user context",
+        )
+
+    @override
+    async def call(self, adapter: NotificationAdapter, laid: ManyRulesAndACaller) -> Purged:
+        return await adapter.partial_bulk_purge_rules(
+            PartialBulkPurgeNotificationRulesInput(ids=[one.id for one in laid.laid])
+        )
+
+
+@dataclass(frozen=True)
+class APurgeCarryingNoUserIsRefused(
+    Scenario[TestSeedingSession, ManyRulesAndACaller, NotificationAdapter, Purged]
+):
+    @override
+    def summary(self) -> str:
+        return "a-rule-purge-carrying-no-user-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "규칙 둘이 있고 사용자 컨텍스트 없이 한 번에 purge 하면, 호출자를 알 수 없어 거부됩니다",
+            english=(
+                "when two rules exist and they are purged at once without a user context, "
+                "it is rejected because the caller cannot be known"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyRulesAndACaller]:
+        return TwoRulesAndSomeone()
+
+    @override
+    def when(self) -> When[ManyRulesAndACaller, NotificationAdapter, Purged]:
+        return PurgingRulesAsNobody()
+
+    @override
+    def then(self) -> Then[ManyRulesAndACaller, Purged]:
+        return TheCallIsRefused(UnreachableError)
+
+
 SCENARIOS: list[PurgingStep] = [
     PurgingAnswersForTheMissingOne(started=datetime.now(UTC)),
     AUserGrantedNothingPurgesNone(),
+    APurgeCarryingNoUserIsRefused(),
 ]
 
 

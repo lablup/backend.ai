@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.app_config_definition.response import (
     AppConfigDefinitionNode,
 )
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.app_config_definition.adapter import (
     AppConfigDefinitionAdapter,
 )
@@ -38,6 +39,7 @@ from bai_scenario.components.app_config_definition import (
     TwoDefinitionsAndACaller,
     TwoDefinitionsAndSomeone,
 )
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import Mentions
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
@@ -233,9 +235,66 @@ class AUserGrantedNothingPurgesNone(
         return NeitherIsPurged()
 
 
+@dataclass(frozen=True)
+class PurgingBothAsNobody(When[TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Purged]):
+    """사용자 컨텍스트 없이 한 번에 영구 삭제한다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_purge"
+
+    @override
+    def describe(self, laid: TwoDefinitionsAndACaller) -> str:
+        return Says(
+            "사용자 컨텍스트 없이 설정 정의 둘을 한 번에 영구 삭제합니다",
+            english="purges two config definitions at once without a user context",
+        )
+
+    @override
+    async def call(
+        self, adapter: AppConfigDefinitionAdapter, laid: TwoDefinitionsAndACaller
+    ) -> Purged:
+        return await adapter.partial_bulk_purge(
+            PartialBulkPurgeAppConfigDefinitionsInput(ids=[laid.first.id, laid.second.id])
+        )
+
+
+@dataclass(frozen=True)
+class APurgeCarryingNoUserIsRefused(
+    Scenario[TestSeedingSession, TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Purged]
+):
+    @override
+    def summary(self) -> str:
+        return "a-definition-purge-carrying-no-user-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "설정 정의 둘이 있고 사용자 컨텍스트 없이 한 번에 영구 삭제하면, 호출자를 알 수 없어 "
+            "거부됩니다",
+            english=(
+                "when two config definitions exist and are purged at once without a user "
+                "context, it is rejected because the caller cannot be known"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, TwoDefinitionsAndACaller]:
+        return TwoDefinitionsAndSomeone()
+
+    @override
+    def when(self) -> When[TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Purged]:
+        return PurgingBothAsNobody()
+
+    @override
+    def then(self) -> Then[TwoDefinitionsAndACaller, Purged]:
+        return TheCallIsRefused(UnreachableError)
+
+
 SCENARIOS: list[PurgingStep] = [
     TheSuperadminPurgesBothAndIsToldOfTheMissing(),
     AUserGrantedNothingPurgesNone(),
+    APurgeCarryingNoUserIsRefused(),
 ]
 
 
