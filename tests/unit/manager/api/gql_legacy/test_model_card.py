@@ -4,12 +4,21 @@ import uuid
 from collections.abc import Callable, Generator
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import graphene
 import pytest
+import sqlalchemy as sa
+from graphql_relay import to_global_id
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.manager.api.gql_legacy.vfolder import ModelCard
+from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
+from ai.backend.manager.models.user.row import UserRole
+from ai.backend.manager.models.vfolder.row import VFolderRow
+
+# Reachable only through string relationships of the vfolder row's eager loads.
+_ORM_CLUSTER = (ResourceGroupForProjectRow,)
 
 
 class TestModelCardParseModelModifiedAt:
@@ -95,3 +104,62 @@ class TestModelCardParseModelModifiedAt:
         card = ModelCard.parse_model(graph_ctx, vfolder_row, model_def=model_def)
 
         assert card.modified_at is None
+
+
+class TestModelCardGetNode:
+    """modelCard(id:) reads a vfolder only within the requester's vfolder permissions."""
+
+    @pytest.fixture
+    def db_session(self) -> MagicMock:
+        session = MagicMock()
+        session.scalar = AsyncMock(return_value=None)
+        return session
+
+    @pytest.fixture
+    def info(self, db_session: MagicMock) -> graphene.ResolveInfo:
+        ctx = MagicMock()
+        ctx.user = {"role": UserRole.USER, "domain_name": "default", "uuid": uuid.uuid4()}
+        ctx.db.connect = MagicMock(
+            return_value=AsyncMock(
+                __aenter__=AsyncMock(return_value=MagicMock()),
+                __aexit__=AsyncMock(return_value=None),
+            )
+        )
+        ctx.db.begin_readonly_session = MagicMock(
+            return_value=AsyncMock(
+                __aenter__=AsyncMock(return_value=db_session),
+                __aexit__=AsyncMock(return_value=None),
+            )
+        )
+        info = MagicMock(spec=graphene.ResolveInfo)
+        info.context = ctx
+        return info
+
+    @pytest.fixture
+    def model_card_id(self) -> str:
+        return to_global_id("ModelCard", str(uuid.uuid4()))
+
+    async def test_a_requester_reaching_no_vfolder_gets_null_without_a_read(
+        self, info: graphene.ResolveInfo, db_session: MagicMock, model_card_id: str
+    ) -> None:
+        permission_ctx = MagicMock(query_condition=None)
+        with patch(
+            "ai.backend.manager.api.gql_legacy.vfolder.get_permission_ctx",
+            AsyncMock(return_value=permission_ctx),
+        ):
+            assert await ModelCard.get_node(info, model_card_id) is None
+        db_session.scalar.assert_not_called()
+
+    async def test_the_read_is_bounded_by_the_permission_condition(
+        self, info: graphene.ResolveInfo, db_session: MagicMock, model_card_id: str
+    ) -> None:
+        permission_ctx = MagicMock(query_condition=VFolderRow.domain_name == "default")
+        with patch(
+            "ai.backend.manager.api.gql_legacy.vfolder.get_permission_ctx",
+            AsyncMock(return_value=permission_ctx),
+        ):
+            assert await ModelCard.get_node(info, model_card_id) is None
+        stmt: sa.Select[tuple[object]] = db_session.scalar.await_args.args[0]
+        where = str(stmt.whereclause)
+        assert "vfolders.domain_name" in where
+        assert "vfolders.id" in where
