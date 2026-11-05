@@ -24,6 +24,7 @@ from ai.backend.manager.data.artifact.types import (
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.artifact import ArtifactReadonly, ArtifactRevisionNotApproved
 from ai.backend.manager.errors.common import ServerMisconfiguredError
+from ai.backend.manager.errors.object_storage import ObjectStorageOperationNotSupported
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -68,6 +69,12 @@ RESERVOIR_CONFIG: Mapping[str, Any] = {
     "reservoir.storage_name": ARCHIVE_STORAGE,
     "reservoir.config.storage_type": "object_storage",
     "reservoir.config.bucket_name": BUCKET,
+}
+
+RESERVOIR_VFS_CONFIG: Mapping[str, Any] = {
+    "reservoir.storage_name": ARCHIVE_STORAGE,
+    "reservoir.config.storage_type": "vfs_storage",
+    "reservoir.config.subpath": "models",
 }
 
 
@@ -327,6 +334,47 @@ class NoReservoirConfigIsRefused(
 
 
 @dataclass(frozen=True)
+class AVfsReservoirIsRefused(
+    Scenario[
+        TestSeedingSession, ARevisionAndACaller, ObjectStorageAdapter, PresignedDownloadURLPayload
+    ],
+    Configured,
+):
+    @override
+    def summary(self) -> str:
+        return "downloading-from-a-vfs-reservoir-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "전역 설정의 reservoir 가 오브젝트 스토리지가 아니면 내려받기 URL 을 요청해도 "
+            "발급되지 않고 지원하지 않는 저장소라는 이유로 거부됩니다",
+            english=(
+                "when the reservoir in the global config is not an object storage, a download "
+                "URL request is rejected because the storage is not supported"
+            ),
+        )
+
+    @override
+    def config(self) -> Mapping[str, Any]:
+        return RESERVOIR_VFS_CONFIG
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ARevisionAndACaller]:
+        return ARevisionAndSomeone()
+
+    @override
+    def when(
+        self,
+    ) -> When[ARevisionAndACaller, ObjectStorageAdapter, PresignedDownloadURLPayload]:
+        return Downloading()
+
+    @override
+    def then(self) -> Then[ARevisionAndACaller, PresignedDownloadURLPayload]:
+        return TheCallIsRefused(ObjectStorageOperationNotSupported)
+
+
+@dataclass(frozen=True)
 class TheSuperadminUploads(
     Scenario[
         TestSeedingSession, ARevisionAndACaller, ObjectStorageAdapter, PresignedUploadURLPayload
@@ -413,6 +461,7 @@ SCENARIOS: list[Scenario[Any, Any, ObjectStorageAdapter, Any]] = [
     TheSuperadminDownloads(),
     AnUnavailableRevisionIsRefused(),
     NoReservoirConfigIsRefused(),
+    AVfsReservoirIsRefused(),
     TheSuperadminUploads(),
     AReadonlyArtifactRefusesUpload(),
 ]
