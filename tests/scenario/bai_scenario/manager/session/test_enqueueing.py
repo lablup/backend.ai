@@ -246,6 +246,8 @@ class TheSessionIsCreated(Then[LaidPlaceAndCaller, Enqueued]):
 
     @override
     def look(self, laid: LaidPlaceAndCaller, answered: Answered[Enqueued]) -> list[Verdict]:
+        if answered.raised is not None:
+            return [Same("raised", repr(answered.raised), None)]
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]

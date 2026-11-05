@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, override
@@ -17,6 +18,7 @@ from ai.backend.common.dto.manager.v2.scheduler.request import (
 )
 from ai.backend.common.dto.manager.v2.scheduler.response import ComputeSchedulePayload
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
+from ai.backend.common.types import IntrinsicSlotNames
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.image.types import ImageData
@@ -30,10 +32,10 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions impor
 )
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Condition,
     Given,
     Held,
     Same,
-    SameAs,
     Says,
     Scenario,
     Then,
@@ -49,11 +51,14 @@ from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.agent.agent import TestSeedAgent
 from bai_scenario.seeds.resource_slot.agent_resource import TestSeedReportedSlot
+from bai_scenario.seeds.resource_slot.slot_type import TestSeedSlotType
 
 type Schedule = ComputeSchedulePayload
 
-CAPACITY = Decimal(8)
-"""The agent reports this much of the slot the kernel asks for."""
+ASKED_FOR: dict[str, Decimal] = {"cpu": Decimal(1), "mem": Decimal(2147483648)}
+"""The slots the kernel asks for. The slot type table holds both of them."""
+CAPACITY: dict[str, Decimal] = {"cpu": Decimal(8), "mem": Decimal(34359738368)}
+"""What the agent reports in each slot, more than the kernel asks for."""
 
 
 @dataclass(frozen=True)
@@ -63,13 +68,12 @@ class LaidGroupAndAgent:
     domain: DomainData
     group: ResourceGroupData
     image: ImageData
-    slot_name: str
     caller: UserData
 
 
 @dataclass(frozen=True)
 class AGroupWithAnAgent(Given[Any, LaidGroupAndAgent]):
-    """슬롯 하나를 요구하는 커널을 받을 자원 그룹 하나와 사용자 한 명."""
+    """커널이 요구할 슬롯을 감당하는 자원 그룹 하나와 사용자 한 명."""
 
     with_agent: bool = True
     granted: bool = True
@@ -93,19 +97,21 @@ class AGroupWithAnAgent(Given[Any, LaidGroupAndAgent]):
 
     @override
     async def lay(self, seeding: Any) -> LaidGroupAndAgent:
-        place = await lay_a_place(seeding, slots=1)
-        slot_name = seeding.made(place.slot_types[0]).slot_name
+        place = await lay_a_place(seeding, slots=0)
+        for intrinsic in IntrinsicSlotNames:
+            await seeding.creating(TestSeedSlotType(intrinsic))
         if self.with_agent:
             agent = await seeding.creating_from(TestSeedAgent(), place.group)
-            await seeding.adding(
-                TestSeedReportedSlot(
-                    agent_id=agent.name,
-                    slot_name=slot_name,
-                    capacity=CAPACITY,
-                    used=Decimal(0),
-                ),
-                agent,
-            )
+            for slot_name, capacity in CAPACITY.items():
+                await seeding.adding(
+                    TestSeedReportedSlot(
+                        agent_id=agent.name,
+                        slot_name=slot_name,
+                        capacity=capacity,
+                        used=Decimal(0),
+                    ),
+                    agent,
+                )
         caller = await seeding.within(SomeoneOf(place.domain))
         if self.granted:
             await seeding.within(SomeoneGrantedOnTheGroup(place.group, caller, Permission.READ))
@@ -113,7 +119,6 @@ class AGroupWithAnAgent(Given[Any, LaidGroupAndAgent]):
             domain=seeding.made(place.domain),
             group=seeding.made(place.group),
             image=seeding.made(place.image),
-            slot_name=slot_name,
             caller=seeding.made(caller),
         )
 
@@ -127,11 +132,11 @@ class ComputingTheSchedule(When[LaidGroupAndAgent, SessionAdapter, Schedule]):
     @override
     def describe(self, laid: LaidGroupAndAgent) -> str:
         return Says(
-            f"{laid.caller.username}이 그 자원 그룹에서 슬롯 하나를 요구하는 커널이 들어갈 수 "
+            f"{laid.caller.username}이 그 자원 그룹에 cpu 와 mem 을 요구하는 커널이 들어갈 수 "
             "있는지 계산합니다",
             english=(
-                f"{laid.caller.username} computes whether a kernel asking for one slot fits the "
-                "resource group"
+                f"{laid.caller.username} computes whether a kernel asking for cpu and mem fits "
+                "the resource group"
             ),
         )
 
@@ -145,8 +150,9 @@ class ComputingTheSchedule(When[LaidGroupAndAgent, SessionAdapter, Schedule]):
                             image_id=ImageID(laid.image.id),
                             resources=[
                                 ResourceSlotEntryInput(
-                                    resource_type=laid.slot_name, quantity=str(Decimal(1))
+                                    resource_type=slot_name, quantity=str(amount)
                                 )
+                                for slot_name, amount in ASKED_FOR.items()
                             ],
                         )
                     ],
@@ -154,6 +160,24 @@ class ComputingTheSchedule(When[LaidGroupAndAgent, SessionAdapter, Schedule]):
                     resource_group_id=ResourceGroupID(laid.group.id),
                 )
             )
+
+
+@dataclass(frozen=True)
+class TheSlotsAskingFor(Condition[list[dict[str, Any]]]):
+    """요구한 슬롯 모두를 그 양만큼 담고 있다."""
+
+    asked: Mapping[str, Decimal]
+
+    @override
+    def says(self) -> str:
+        asked = ", ".join(f"{name} {amount}" for name, amount in sorted(self.asked.items()))
+        return Says(f"{asked} 를 요구한 슬롯", english=f"the slots asked for: {asked}")
+
+    @override
+    def holds(self, got: list[dict[str, Any]]) -> bool:
+        return {
+            str(entry["resource_type"]): Decimal(str(entry["quantity"])) for entry in got
+        } == self.asked
 
 
 @dataclass(frozen=True)
@@ -181,10 +205,7 @@ class TheKernelFits(Then[LaidGroupAndAgent, Schedule]):
             Held(
                 "requested_slots",
                 [entry.model_dump() for entry in result.requested_slots],
-                SameAs(
-                    [{"resource_type": laid.slot_name, "quantity": Decimal(1)}],
-                    Says("요구한 슬롯", english="the slots asked for"),
-                ),
+                TheSlotsAskingFor(ASKED_FOR),
             ),
             Same("requested_architecture", result.requested_architecture, "x86_64"),
             Same("success", result.success, True),
