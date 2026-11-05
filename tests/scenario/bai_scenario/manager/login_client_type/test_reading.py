@@ -9,6 +9,7 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.login_client_type.response import LoginClientTypeNode
 from ai.backend.common.exception import UnreachableError
@@ -166,7 +167,7 @@ class LoadingTheLaidAndAMissingOne(When[ManyTypesAndACaller, LoginClientTypeAdap
 
     @override
     async def call(self, adapter: LoginClientTypeAdapter, laid: ManyTypesAndACaller) -> Loaded:
-        ids: list = [*(one.id for one in laid.laid), uuid4()]
+        ids: list = [*(one.id for one in laid.laid), LoginClientTypeID(uuid4())]
         with ActingAs(laid.caller):
             return await adapter.batch_load_by_ids(ids)
 

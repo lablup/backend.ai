@@ -21,6 +21,7 @@ from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.idle_checker_assignment.adapter import (
     IdleCheckerAssignmentAdapter,
 )
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -195,10 +196,10 @@ class AnAssignmentCreatedWithoutAUserIsRefused(
     def describe(self) -> str:
         return Says(
             "검사기와 도메인이 있고 사용자 컨텍스트 없이 검사기를 도메인에 켜려 하면, "
-            "호출자를 알 수 없어 거부됩니다",
+            "권한 부족으로 거부됩니다",
             english=(
                 "when a checker and a domain exist and the checker is enabled on the domain "
-                "without a user context, it is rejected because the caller cannot be known"
+                "without a user context, it is rejected for lack of permission"
             ),
         )
 
@@ -216,7 +217,7 @@ class AnAssignmentCreatedWithoutAUserIsRefused(
 
     @override
     def then(self) -> Then[ACheckerAndADomainAndACaller, IdleCheckerAssignmentNode]:
-        return TheCallIsRefused(UnreachableError)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 SCENARIOS: list[CreatingStep] = [

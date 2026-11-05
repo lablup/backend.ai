@@ -14,7 +14,6 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     PartialBulkPurgeIdleCheckerAssignmentsInput,
 )
-from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.idle_checker_assignment.adapter import (
     IdleCheckerAssignmentAdapter,
 )
@@ -28,7 +27,6 @@ from ai.backend.testutils.scenario_steps import (
     When,
     in_language,
 )
-from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.idle_checker import (
     AssignmentsAndACaller,
     AssignmentsAnswered,
@@ -182,15 +180,17 @@ class APurgeCarryingNoUserIsRefused(
 ):
     @override
     def summary(self) -> str:
-        return "an-assignment-purge-carrying-no-user-is-refused"
+        return "an-assignment-purge-carrying-no-user-fails-every-item"
 
     @override
     def describe(self) -> str:
         return Says(
-            "할당 둘이 있고 사용자 컨텍스트 없이 한 번에 purge 하면, 호출자를 알 수 없어 거부됩니다",
+            "할당 둘이 있고 사용자 컨텍스트 없이 한 번에 purge 하면, 답이 와서 모두 호출자를 "
+            "알 수 없다는 이유로 실패 목록에 옵니다",
             english=(
                 "when two assignments exist and are purged at once without a user context, "
-                "it is rejected because the caller cannot be known"
+                "the call answers and every assignment comes back in the failed list because "
+                "the caller cannot be known"
             ),
         )
 
@@ -204,7 +204,7 @@ class APurgeCarryingNoUserIsRefused(
 
     @override
     def then(self) -> Then[AssignmentsAndACaller, AssignmentsAnswered]:
-        return TheCallIsRefused(UnreachableError)
+        return NoAssignmentIsProcessed(reason="User not found in context")
 
 
 SCENARIOS: list[PurgingStep] = [

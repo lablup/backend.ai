@@ -14,10 +14,10 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     IdleCheckerAssignmentFilter,
     SearchIdleCheckerAssignmentsInput,
 )
-from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.idle_checker_assignment.adapter import (
     IdleCheckerAssignmentAdapter,
 )
+from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
@@ -114,10 +114,10 @@ class ASearchCarryingNoUserIsRefused(
     @override
     def describe(self) -> str:
         return Says(
-            "할당 둘이 있고 사용자 컨텍스트 없이 검색하면, 호출자를 알 수 없어 거부됩니다",
+            "할당 둘이 있고 사용자 컨텍스트 없이 검색하면, 역할 부족으로 거부됩니다",
             english=(
                 "when two assignments exist and they are searched without a user context, "
-                "it is rejected because the caller cannot be known"
+                "it is rejected for lack of role"
             ),
         )
 
@@ -131,7 +131,7 @@ class ASearchCarryingNoUserIsRefused(
 
     @override
     def then(self) -> Then[AssignmentsAndACaller, Searched]:
-        return TheCallIsRefused(UnreachableError)
+        return TheCallIsRefused(InsufficientPrivilege)
 
 
 SCENARIOS: list[SearchingStep] = [

@@ -13,13 +13,11 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     PartialBulkUpdateIdleCheckerAssignmentsInput,
     UpdateIdleCheckerAssignmentInput,
 )
-from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.idle_checker_assignment.adapter import (
     IdleCheckerAssignmentAdapter,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
-from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.idle_checker import (
     AssignmentsAndACaller,
     AssignmentsAnswered,
@@ -168,15 +166,17 @@ class AnUpdateCarryingNoUserIsRefused(
 ):
     @override
     def summary(self) -> str:
-        return "an-assignment-update-carrying-no-user-is-refused"
+        return "an-assignment-update-carrying-no-user-fails-every-item"
 
     @override
     def describe(self) -> str:
         return Says(
-            "할당 둘이 있고 사용자 컨텍스트 없이 한 번에 끄려 하면, 호출자를 알 수 없어 거부됩니다",
+            "할당 둘이 있고 사용자 컨텍스트 없이 한 번에 끄려 하면, 답이 와서 모두 호출자를 "
+            "알 수 없다는 이유로 실패 목록에 옵니다",
             english=(
                 "when two assignments exist and are disabled at once without a user context, "
-                "it is rejected because the caller cannot be known"
+                "the call answers and every assignment comes back in the failed list because "
+                "the caller cannot be known"
             ),
         )
 
@@ -190,7 +190,7 @@ class AnUpdateCarryingNoUserIsRefused(
 
     @override
     def then(self) -> Then[AssignmentsAndACaller, AssignmentsAnswered]:
-        return TheCallIsRefused(UnreachableError)
+        return NoAssignmentIsProcessed(reason="User not found in context")
 
 
 SCENARIOS: list[EditingStep] = [

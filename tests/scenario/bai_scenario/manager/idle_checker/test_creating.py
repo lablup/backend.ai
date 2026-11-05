@@ -12,6 +12,7 @@ from ai.backend.common.data.idle_checker.types import CheckerType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
     CreateIdleCheckerInput,
+    IdleCheckerInputTypeDTO,
     IdleCheckerSpecInputDTO,
     SessionLifetimeSpecInputDTO,
 )
@@ -70,6 +71,7 @@ class CreatingAChecker(When[CheckersAndACaller, IdleCheckerAdapter, IdleCheckerN
     async def call(self, adapter: IdleCheckerAdapter, laid: CheckersAndACaller) -> IdleCheckerNode:
         request = CreateIdleCheckerInput(
             name="created-checker",
+            checker_type=IdleCheckerInputTypeDTO.SESSION_LIFETIME,
             target_session_types=[SessionTypes.INTERACTIVE],
             checker_spec=IdleCheckerSpecInputDTO(
                 session_lifetime=SessionLifetimeSpecInputDTO(

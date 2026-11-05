@@ -20,6 +20,7 @@ from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.idle_checker_assignment.adapter import (
     IdleCheckerAssignmentAdapter,
 )
+from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -155,11 +156,11 @@ class APurgeCarryingNoUserIsRefused(
     @override
     def describe(self) -> str:
         return Says(
-            "할당 둘이 있고 사용자 컨텍스트 없이 하나를 purge 하려 하면, 호출자를 알 수 없어 "
-            "거부됩니다",
+            "할당 둘이 있고 사용자 컨텍스트 없이 하나를 purge 하려 하면, 대상을 찾을 수 없다는 "
+            "이유로 거부됩니다",
             english=(
                 "when two assignments exist and one is purged without a user context, "
-                "it is rejected because the caller cannot be known"
+                "it is rejected because the target cannot be resolved"
             ),
         )
 
@@ -173,7 +174,7 @@ class APurgeCarryingNoUserIsRefused(
 
     @override
     def then(self) -> Then[AssignmentsAndACaller, PurgedOne]:
-        return TheCallIsRefused(UnreachableError)
+        return TheCallIsRefused(GenericBadRequest)
 
 
 SCENARIOS: list[RetiringStep] = [

@@ -34,6 +34,7 @@ from ai.backend.testutils.scenario_steps import (
     When,
 )
 from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.idle_checker import CheckersAndACaller, SomeCheckersAndSomeone
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
@@ -134,7 +135,7 @@ class TheEditedCheckerNode(Then[CheckersAndACaller, IdleCheckerNode]):
                 "created_at",
                 Says("수정 전에 기록된 시각", english="the time written before the edit"),
             ),
-            Held("updated_at", node.updated_at, self.started),
+            Held("updated_at", node.updated_at, WrittenByThisRun(self.started)),
         ]
 
 
