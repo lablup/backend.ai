@@ -288,7 +288,7 @@ class TheSessionIsCreated(Then[LaidPlaceAndCaller, Enqueued]):
             Held(
                 "metadata.access_key",
                 metadata.access_key,
-                SameAs(
+                SameAs[str | None](
                     laid.access_key,
                     Says("세션을 요청한 키", english="the key the session was requested with"),
                 ),
