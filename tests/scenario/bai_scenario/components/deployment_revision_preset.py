@@ -6,7 +6,7 @@ Presets live in public: a plain user only reads them.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
@@ -166,8 +166,8 @@ class ThePresetNode:
     ) -> list[Verdict]:
         described = self.described if self.described is not None else laid.description
         return [
-            Held(f"{at}id", node.id, SameAs(laid.id, PRESET_ID)),
-            Held(f"{at}entity_id", node.entity_id, SameAs(laid.id, PRESET_ID)),
+            Held[UUID](f"{at}id", node.id, SameAs(laid.id, PRESET_ID)),
+            Held[UUID](f"{at}entity_id", node.entity_id, SameAs(laid.id, PRESET_ID)),
             Held(f"{at}runtime_variant_id", node.runtime_variant_id, SameAs(laid.runtime_variant_id, VARIANT_ID)),
             Same(f"{at}name", node.name, laid.name),
             Same(f"{at}description", node.description, described),
@@ -175,7 +175,17 @@ class ThePresetNode:
             Same(f"{at}cluster.cluster_mode", node.cluster.cluster_mode, laid.cluster_mode),
             Same(f"{at}cluster.cluster_size", node.cluster.cluster_size, laid.cluster_size),
             Same(f"{at}resource.resource_opts", node.resource.resource_opts, laid.resource_opts),
-            Same(f"{at}execution.image_id", node.execution.image_id, laid.image_id),
+            Held(
+                f"{at}execution.image_id",
+                node.execution.image_id,
+                SameAs(
+                    laid.image_id,
+                    Says(
+                        "미리 정한 이미지 id",
+                        english="the image id fixed in advance",
+                    ),
+                ),
+            ),
             Same(f"{at}execution.startup_command", node.execution.startup_command, laid.startup_command),
             Same(f"{at}execution.bootstrap_script", node.execution.bootstrap_script, laid.bootstrap_script),
             Same(f"{at}execution.environ", node.execution.environ, laid.environ),

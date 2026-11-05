@@ -20,7 +20,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
-    Refused,
     Says,
     Scenario,
     Then,

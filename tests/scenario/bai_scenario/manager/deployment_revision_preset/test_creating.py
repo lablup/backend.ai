@@ -126,7 +126,7 @@ class TheCreatedPresetComesBack(Then[AVariantAndACaller, Answer]):
         return [
             Skipped("preset.id", "the database generates it"),
             Skipped("preset.entity_id", "the database generates it"),
-            Held(
+            Held[UUID](
                 "preset.runtime_variant_id",
                 node.runtime_variant_id,
                 SameAs(
@@ -140,7 +140,14 @@ class TheCreatedPresetComesBack(Then[AVariantAndACaller, Answer]):
             Same("preset.cluster.cluster_mode", node.cluster.cluster_mode, "single-node"),
             Same("preset.cluster.cluster_size", node.cluster.cluster_size, 1),
             Same("preset.resource.resource_opts", node.resource.resource_opts, []),
-            Same("preset.execution.image_id", node.execution.image_id, ImageID(UUID(int=7))),
+            Held(
+                "preset.execution.image_id",
+                node.execution.image_id,
+                SameAs(
+                    ImageID(UUID(int=7)),
+                    Says("미리 정한 이미지 id", english="the image id fixed in advance"),
+                ),
+            ),
             Same("preset.execution.startup_command", node.execution.startup_command, None),
             Same("preset.execution.bootstrap_script", node.execution.bootstrap_script, None),
             Same("preset.execution.environ", node.execution.environ, {}),

@@ -7,6 +7,7 @@ permissions.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
@@ -33,8 +34,30 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
 )
 from bai_scenario.components.deployment import lay_a_deployment, lay_a_place
-from bai_scenario.components.domain import Mentions
+from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.seeds.deployment.access_token import TestSeedAccessTokenOf
+
+TOKEN_ID = Says(
+    "미리 저장한 토큰의 id", english="the id of the token seeded in advance"
+)
+
+
+@dataclass(frozen=True)
+class TheTokenNode:
+    """미리 저장한 토큰의 노드가 어떤 값으로 와야 하는지. 값은 심은 것에서 읽는다."""
+
+    started: datetime
+
+    def verdicts(
+        self, node: AccessTokenNode, laid: ModelDeploymentAccessTokenData, at: str = ""
+    ) -> list[Verdict]:
+        return [
+            Held[UUID](f"{at}id", node.id, SameAs(laid.id, TOKEN_ID)),
+            Held[UUID](f"{at}field_id", node.field_id, SameAs(laid.id, TOKEN_ID)),
+            Same(f"{at}token", node.token, laid.token),
+            Same(f"{at}expires_at", node.expires_at, laid.expires_at),
+            Held(f"{at}created_at", node.created_at, WrittenByThisRun(self.started)),
+        ]
 
 
 @dataclass(frozen=True)

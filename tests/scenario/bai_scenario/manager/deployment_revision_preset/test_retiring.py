@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
+from uuid import UUID
 
 import pytest
 
@@ -19,7 +20,8 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
-    Same,
+    Held,
+    SameAs,
     Says,
     Scenario,
     Then,
@@ -28,6 +30,7 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.deployment_revision_preset import (
+    PRESET_ID,
     PresetsAndACaller,
     PresetsAndSomeone,
 )
@@ -81,8 +84,8 @@ class ThePresetIsGone(Then[PresetsAndACaller, Answer]):
         if payload is None:
             return [MissingResponse(answered.raised)]
         return [
-            Same("id", payload.id, laid.presets[0].id),
-            Same("entity_id", payload.entity_id, laid.presets[0].id),
+            Held[UUID]("id", payload.id, SameAs(laid.presets[0].id, PRESET_ID)),
+            Held[UUID]("entity_id", payload.entity_id, SameAs(laid.presets[0].id, PRESET_ID)),
         ]
 
 
