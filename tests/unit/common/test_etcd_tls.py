@@ -128,11 +128,6 @@ class TestEtcdTLSConfig:
                 expected_error="ca-cert",
             ),
         ],
-        ids=lambda case: "-".join([
-            *case.keys_set_to_a_pem_file,
-            *(f"missing-{key}" for key in case.keys_set_to_a_missing_file),
-        ])
-        or "no-certificates",
     )
     def test_rejects_invalid_certificates(
         self, case: _RejectedTLSConfigCase, raw_tls_config_of_case: dict[str, Any]
