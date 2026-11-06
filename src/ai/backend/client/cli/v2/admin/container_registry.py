@@ -7,7 +7,7 @@ import uuid
 
 import click
 
-from ai.backend.client.cli.insecure_http_guard import V2SecretSendingCommand
+from ai.backend.client.cli.insecure_http_guard import V2SecureEndpointCommand
 from ai.backend.client.cli.v2.helpers import (
     create_v2_registry,
     load_v2_config,
@@ -113,7 +113,7 @@ def search(
     asyncio.run(_run())
 
 
-@container_registry.command(cls=V2SecretSendingCommand)
+@container_registry.command(cls=V2SecureEndpointCommand)
 @click.argument("body", type=str)
 def create(body: str) -> None:
     """Create a new container registry (superadmin only).
@@ -146,7 +146,7 @@ def create(body: str) -> None:
     asyncio.run(_run())
 
 
-@container_registry.command(cls=V2SecretSendingCommand)
+@container_registry.command(cls=V2SecureEndpointCommand)
 @click.argument("body", type=str)
 def update(body: str) -> None:
     """Update a container registry (superadmin only).

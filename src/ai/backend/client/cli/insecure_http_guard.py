@@ -51,7 +51,7 @@ def reject_insecure_secret_endpoints(
         )
 
 
-class SecretSendingCommand(click.Command, ABC):
+class SecureEndpointCommand(click.Command, ABC):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.params.append(_ALLOW_INSECURE_HTTP_OPTION)
@@ -67,13 +67,13 @@ class SecretSendingCommand(click.Command, ABC):
         return super().invoke(ctx)
 
 
-class LegacySecretSendingCommand(SecretSendingCommand):
+class LegacySecureEndpointCommand(SecureEndpointCommand):
     @override
     def _load_endpoints(self) -> Iterable[URL]:
         return get_config().endpoints
 
 
-class V2SecretSendingCommand(SecretSendingCommand):
+class V2SecureEndpointCommand(SecureEndpointCommand):
     @override
     def _load_endpoints(self) -> Iterable[URL]:
         # Imported here because the v2 package imports this module while it loads.

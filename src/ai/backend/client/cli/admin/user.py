@@ -11,7 +11,7 @@ from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.params import BoolExprType, CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.insecure_http_guard import LegacySecretSendingCommand
+from ai.backend.client.cli.insecure_http_guard import LegacySecureEndpointCommand
 from ai.backend.client.cli.pretty import print_fail, print_info
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.exceptions import BackendAPIError
@@ -184,7 +184,7 @@ def list(
         sys.exit(ExitCode.FAILURE)
 
 
-@user.command(aliases=["create"], cls=LegacySecretSendingCommand)
+@user.command(aliases=["create"], cls=LegacySecureEndpointCommand)
 @pass_ctx_obj
 @click.argument("domain_name", type=str, metavar="DOMAIN_NAME")
 @click.argument("email", type=str, metavar="EMAIL")
@@ -378,7 +378,7 @@ def add(
         )
 
 
-@user.command(cls=LegacySecretSendingCommand)
+@user.command(cls=LegacySecureEndpointCommand)
 @pass_ctx_obj
 @click.argument("email", type=str, metavar="EMAIL")
 @click.option(

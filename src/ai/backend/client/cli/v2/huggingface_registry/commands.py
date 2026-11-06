@@ -6,7 +6,7 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.insecure_http_guard import V2SecretSendingCommand
+from ai.backend.client.cli.insecure_http_guard import V2SecureEndpointCommand
 from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
 
 
@@ -15,7 +15,7 @@ def huggingface_registry() -> None:
     """HuggingFace registry management commands."""
 
 
-@huggingface_registry.command(cls=V2SecretSendingCommand)
+@huggingface_registry.command(cls=V2SecureEndpointCommand)
 @click.option("--name", required=True, help="Registry name.")
 @click.option("--url", required=True, help="HuggingFace Hub URL.")
 @click.option("--token", default=None, help="Access token for the registry.")
@@ -77,7 +77,7 @@ def get(registry_id: str) -> None:
     asyncio.run(_run())
 
 
-@huggingface_registry.command(cls=V2SecretSendingCommand)
+@huggingface_registry.command(cls=V2SecureEndpointCommand)
 @click.option("--id", "registry_id", required=True, help="Registry ID to update.")
 @click.option("--name", default=None, help="Updated registry name.")
 @click.option("--url", default=None, help="Updated HuggingFace Hub URL.")

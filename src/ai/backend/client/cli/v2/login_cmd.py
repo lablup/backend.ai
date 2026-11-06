@@ -10,12 +10,12 @@ from typing import Any
 
 import click
 
-from ai.backend.client.cli.insecure_http_guard import V2SecretSendingCommand
+from ai.backend.client.cli.insecure_http_guard import V2SecureEndpointCommand
 
 from .helpers import ProfileStore, create_v2_registry, load_v2_config
 
 
-@click.command(cls=V2SecretSendingCommand)
+@click.command(cls=V2SecureEndpointCommand)
 @click.option(
     "--force", is_flag=True, default=False, help="Force login, invalidating existing sessions."
 )

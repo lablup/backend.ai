@@ -6,7 +6,7 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.insecure_http_guard import V2SecretSendingCommand
+from ai.backend.client.cli.insecure_http_guard import V2SecureEndpointCommand
 from ai.backend.client.cli.v2.helpers import (
     create_v2_registry,
     load_v2_config,
@@ -20,7 +20,7 @@ def object_storage() -> None:
     """Object storage management commands."""
 
 
-@object_storage.command(cls=V2SecretSendingCommand)
+@object_storage.command(cls=V2SecureEndpointCommand)
 @click.option("--name", required=True, help="Object storage name.")
 @click.option("--host", required=True, help="Host address of the object storage.")
 @click.option("--access-key", required=True, help="Access key for authentication.")
@@ -75,7 +75,7 @@ def get(storage_id: str) -> None:
     asyncio.run(_run())
 
 
-@object_storage.command(cls=V2SecretSendingCommand)
+@object_storage.command(cls=V2SecureEndpointCommand)
 @click.option("--id", "storage_id", required=True, help="Object storage ID to update.")
 @click.option("--name", default=None, help="Updated name.")
 @click.option("--host", default=None, help="Updated host address.")

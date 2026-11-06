@@ -6,7 +6,7 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.insecure_http_guard import V2SecretSendingCommand
+from ai.backend.client.cli.insecure_http_guard import V2SecureEndpointCommand
 from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
 
 
@@ -15,7 +15,7 @@ def reservoir_registry() -> None:
     """Reservoir registry management commands."""
 
 
-@reservoir_registry.command(cls=V2SecretSendingCommand)
+@reservoir_registry.command(cls=V2SecureEndpointCommand)
 @click.option("--name", required=True, help="Registry name.")
 @click.option("--endpoint", required=True, help="Reservoir endpoint URL.")
 @click.option("--access-key", required=True, help="Access key for authentication.")
@@ -91,7 +91,7 @@ def get(registry_id: str) -> None:
     asyncio.run(_run())
 
 
-@reservoir_registry.command(cls=V2SecretSendingCommand)
+@reservoir_registry.command(cls=V2SecureEndpointCommand)
 @click.option("--id", "registry_id", required=True, help="Registry ID to update.")
 @click.option("--name", default=None, help="Updated registry name.")
 @click.option("--endpoint", default=None, help="Updated endpoint URL.")

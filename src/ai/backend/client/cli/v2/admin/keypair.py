@@ -6,7 +6,7 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.insecure_http_guard import V2SecretSendingCommand
+from ai.backend.client.cli.insecure_http_guard import V2SecureEndpointCommand
 from ai.backend.client.cli.v2.helpers import (
     create_v2_registry,
     load_v2_config,
@@ -177,7 +177,7 @@ def ssh() -> None:
     """Admin SSH keypair commands (register/get/delete a user's SSH keypair)."""
 
 
-@ssh.command(name="register", cls=V2SecretSendingCommand)
+@ssh.command(name="register", cls=V2SecureEndpointCommand)
 @click.option("--access-key", required=True, type=str, help="Target access key.")
 @click.option(
     "--public-key-file",

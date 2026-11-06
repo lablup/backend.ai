@@ -6,7 +6,7 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.insecure_http_guard import V2SecretSendingCommand
+from ai.backend.client.cli.insecure_http_guard import V2SecureEndpointCommand
 from ai.backend.client.cli.v2.helpers import (
     EntityLabelTerm,
     create_v2_registry,
@@ -23,7 +23,7 @@ def user() -> None:
     """Admin user commands."""
 
 
-@user.command(cls=V2SecretSendingCommand)
+@user.command(cls=V2SecureEndpointCommand)
 @click.option("--email", required=True, type=str, help="User email address.")
 @click.option("--username", required=True, type=str, help="Username for login.")
 @click.option("--password", required=True, type=str, help="Initial password.")

@@ -11,12 +11,12 @@ from click.testing import CliRunner
 from yarl import URL
 
 from ai.backend.client.cli.insecure_http_guard import (
-    SecretSendingCommand,
+    SecureEndpointCommand,
     reject_insecure_secret_endpoints,
 )
 
 
-class _CommandReadingInsecureEndpoint(SecretSendingCommand):
+class _CommandReadingInsecureEndpoint(SecureEndpointCommand):
     @override
     def _load_endpoints(self) -> Iterable[URL]:
         return [URL("http://backend.example")]
@@ -37,7 +37,7 @@ def command_at_insecure_endpoint() -> _CommandAtInsecureEndpoint:
     )
 
 
-class TestSecretSendingCommand:
+class TestSecureEndpointCommand:
     def test_refuses_without_the_allow_option(
         self,
         command_at_insecure_endpoint: _CommandAtInsecureEndpoint,
