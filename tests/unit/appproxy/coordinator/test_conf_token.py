@@ -72,11 +72,16 @@ class TestConfToken:
 
         assert resp.status == HTTPStatus.UNAUTHORIZED
 
-    async def test_a_missing_token_is_refused_even_under_an_empty_secret(
-        self, make_client: Callable[[str], Awaitable[Any]], body: str
+    @pytest.mark.parametrize(
+        "headers",
+        [{}, {"X-BackendAI-Token": ""}],
+        ids=["missing", "empty"],
+    )
+    async def test_no_token_is_refused_even_under_an_empty_secret(
+        self, make_client: Callable[[str], Awaitable[Any]], body: str, headers: dict[str, str]
     ) -> None:
         client = await make_client("")
 
-        resp = await client.post("/v2/conf", data=body)
+        resp = await client.post("/v2/conf", data=body, headers=headers)
 
         assert resp.status == HTTPStatus.UNAUTHORIZED
