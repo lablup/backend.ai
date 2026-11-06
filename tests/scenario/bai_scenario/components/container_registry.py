@@ -200,14 +200,22 @@ class SomeoneKeepingRegistries(TestSeedNest[Laid[None]]):
 
     @override
     def kind(self) -> str:
-        held = [
+        held_ko = [
             place
             for place, given in (("레지스트리", self.on_registry), ("public", self.on_public))
             if given
         ]
+        held_en = [
+            place
+            for place, given in (
+                ("the registry", self.on_registry),
+                ("public", self.on_public),
+            )
+            if given
+        ]
         return Says(
-            f"{', '.join(held)} 범위에 수정 권한을 받은 사용자 준비",
-            english=f"Prepare a user granted update permission on {', '.join(held)}",
+            f"{', '.join(held_ko)} 범위에 수정 권한을 받은 사용자 준비",
+            english=f"Prepare a user granted update permission on {', '.join(held_en)}",
         )
 
     @override
