@@ -8,7 +8,6 @@ from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from aiohttp import web
 
 from ai.backend.common.dto.manager.v2.fair_share.response import (
     BulkUpsertDomainFairShareWeightPayload as BulkUpsertDomainFairShareWeightPayloadDTO,
@@ -34,6 +33,7 @@ from ai.backend.manager.api.gql.fair_share.types.user import (
     BulkUpsertUserFairShareWeightInput,
     UserWeightInputItem,
 )
+from ai.backend.manager.errors.auth import SuperadminRequired
 
 # Common fixtures
 
@@ -166,7 +166,7 @@ class TestBulkUpsertDomainFairShareWeightMutation:
         )
 
         resolver_fn = cast(Any, domain_resolver.bulk_upsert_domain_fair_share_weight).base_resolver
-        with pytest.raises(web.HTTPForbidden):
+        with pytest.raises(SuperadminRequired):
             await resolver_fn(mock_info, input_data)
 
         mock_adapter.assert_not_called()
@@ -260,7 +260,7 @@ class TestBulkUpsertProjectFairShareWeightMutation:
         resolver_fn = cast(
             Any, project_resolver.bulk_upsert_project_fair_share_weight
         ).base_resolver
-        with pytest.raises(web.HTTPForbidden):
+        with pytest.raises(SuperadminRequired):
             await resolver_fn(mock_info, input_data)
 
         mock_adapter.assert_not_called()
@@ -357,7 +357,7 @@ class TestBulkUpsertUserFairShareWeightMutation:
         )
 
         resolver_fn = cast(Any, user_resolver.bulk_upsert_user_fair_share_weight).base_resolver
-        with pytest.raises(web.HTTPForbidden):
+        with pytest.raises(SuperadminRequired):
             await resolver_fn(mock_info, input_data)
 
         mock_adapter.assert_not_called()
