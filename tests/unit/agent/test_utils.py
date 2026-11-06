@@ -222,3 +222,60 @@ class TestContainerSSHFileWriter:
         writer.write()
 
         assert (work_dir / "id_container").read_bytes() == self.PRIVATE_KEY
+
+
+class TestWriteFileBeneath:
+    @pytest.fixture
+    def work_dir(self, tmp_path: Path) -> Path:
+        path = tmp_path / "work"
+        path.mkdir()
+        return path
+
+    @pytest.fixture
+    def outside_dir(self, tmp_path: Path) -> Path:
+        path = tmp_path / "outside"
+        path.mkdir()
+        (path / "f.txt").write_bytes(b"outside")
+        return path
+
+    @pytest.fixture
+    def symlinked_dir(self, work_dir: Path, outside_dir: Path) -> Path:
+        link = work_dir / "sub"
+        link.symlink_to(outside_dir)
+        return link
+
+    @pytest.fixture
+    def symlinked_file(self, work_dir: Path, outside_dir: Path) -> Path:
+        link = work_dir / "f.txt"
+        link.symlink_to(outside_dir / "f.txt")
+        return link
+
+    def test_writes_file_creating_parents(self, work_dir: Path) -> None:
+        utils.write_file_beneath(work_dir, work_dir / "a" / "b" / "f.txt", b"data")
+
+        assert (work_dir / "a" / "b" / "f.txt").read_bytes() == b"data"
+
+    def test_overwrites_existing_file(self, work_dir: Path) -> None:
+        (work_dir / "f.txt").write_bytes(b"old content")
+
+        utils.write_file_beneath(work_dir, work_dir / "f.txt", b"new")
+
+        assert (work_dir / "f.txt").read_bytes() == b"new"
+
+    @pytest.mark.usefixtures("symlinked_dir")
+    def test_refuses_symlinked_directory(self, work_dir: Path, outside_dir: Path) -> None:
+        with pytest.raises(OSError):
+            utils.write_file_beneath(work_dir, work_dir / "sub" / "new.txt", b"evil")
+
+        assert not (outside_dir / "new.txt").exists()
+
+    @pytest.mark.usefixtures("symlinked_file")
+    def test_refuses_symlinked_file(self, work_dir: Path, outside_dir: Path) -> None:
+        with pytest.raises(OSError):
+            utils.write_file_beneath(work_dir, work_dir / "f.txt", b"evil")
+
+        assert (outside_dir / "f.txt").read_bytes() == b"outside"
+
+    def test_refuses_root_as_target(self, work_dir: Path) -> None:
+        with pytest.raises(IsADirectoryError):
+            utils.write_file_beneath(work_dir, work_dir, b"data")
