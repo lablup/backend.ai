@@ -18,6 +18,19 @@ from ai.backend.common.exception import (
 from ai.backend.common.json import dump_json
 
 
+class UnauthenticatedSessionError(BackendAIError, web.HTTPUnauthorized):
+    error_type = "https://api.backend.ai/probs/auth-failed"
+    error_title = "Unauthorized access"
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.UNAUTHORIZED,
+        )
+
+
 class AlreadyLoggedInError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "You have already logged in."

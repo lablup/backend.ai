@@ -104,7 +104,7 @@ from ai.backend.web.clients.manager_pool import (
     ManagerPoolGateHealthChecker,
 )
 from ai.backend.web.config.unified import EventLoopType, ServiceMode, WebServerUnifiedConfig
-from ai.backend.web.errors import ManagerConnectionUnavailable
+from ai.backend.web.errors import ManagerConnectionUnavailable, UnauthenticatedSessionError
 from ai.backend.web.ratelimit import manager_proxy_rate_limited
 from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_policy_middleware
 
@@ -617,13 +617,7 @@ async def extend_login_session(request: web.Request) -> web.Response:
     current = get_time()
     session = await get_session(request)
     if not session.get("authenticated", False):
-        raise web.HTTPUnauthorized(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/auth-failed",
-                "title": "Unauthorized access",
-            }),
-            content_type="application/problem+json",
-        )
+        raise UnauthenticatedSessionError()
 
     session.expiration_dt = current + login_session_extension_sec
     expires = datetime.fromtimestamp(session.expiration_dt, tz=UTC).isoformat()

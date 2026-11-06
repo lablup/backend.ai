@@ -1,18 +1,21 @@
+import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp_cors
 import pytest
 from aiohttp import web
-from aiohttp.typedefs import Handler
+from aiohttp.test_utils import make_mocked_request
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.common.dto.manager.auth.response import UpdatePasswordNoAuthResponse
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.web.session import SESSION_KEY, Session
 from ai.backend.web.config.unified import SecurityConfig
+from ai.backend.web.errors import UnauthenticatedSessionError
 from ai.backend.web.server import (
     build_cors_options,
     extend_login_session,
@@ -97,33 +100,61 @@ async def test_update_password_no_auth_returns_200_on_success(aiohttp_client: An
 
 class TestExtendLoginSession:
     @pytest.fixture
-    def session(self) -> Session:
-        return Session(None, data=None, new=True)
+    def current_time(self, monkeypatch: pytest.MonkeyPatch) -> int:
+        current = 2_000_000_000
+        monkeypatch.setattr("ai.backend.web.server.get_time", lambda: current)
+        return current
 
     @pytest.fixture
-    async def client(self, aiohttp_client: Any, session: Session) -> Any:
-        @web.middleware
-        async def session_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
-            request[SESSION_KEY] = session
-            return await handler(request)
+    def session(self, current_time: int) -> Session:
+        session = Session(None, data=None, new=True)
+        session.expiration_dt = current_time + 60
+        return session
 
-        app = web.Application(middlewares=[session_middleware])
-        app["config"] = MagicMock(session=MagicMock(login_session_extension_sec=3600))
-        app.router.add_route("POST", "/server/extend-login-session", extend_login_session)
-        return await aiohttp_client(app)
-
-    async def test_rejects_unauthenticated_session(self, client: Any) -> None:
-        resp = await client.post("/server/extend-login-session")
-
-        assert resp.status == 401
-
-    async def test_extends_authenticated_session(self, client: Any, session: Session) -> None:
+    @pytest.fixture
+    def authenticated_session(self, session: Session) -> Session:
         session["authenticated"] = True
+        return session
 
-        resp = await client.post("/server/extend-login-session")
+    @pytest.fixture
+    def extension_request(self, session: Session) -> web.Request:
+        app = web.Application()
+        app["config"] = MagicMock(session=MagicMock(login_session_extension_sec=3600))
+        request = make_mocked_request("POST", "/server/extend-login-session", app=app)
+        request[SESSION_KEY] = session
+        return request
+
+    async def test_rejects_unauthenticated_session(
+        self, extension_request: web.Request, session: Session
+    ) -> None:
+        original_expiration = session.expiration_dt
+
+        with pytest.raises(UnauthenticatedSessionError) as exc_info:
+            await extend_login_session(extension_request)
+
+        error = exc_info.value
+        assert error.status == 401
+        assert error.content_type == "application/problem+json"
+        assert error.text is not None
+        assert json.loads(error.text) == {
+            "type": "https://api.backend.ai/probs/auth-failed",
+            "title": "Unauthorized access",
+            "error_code": "auth_auth_unauthorized",
+        }
+        assert session.expiration_dt == original_expiration
+
+    async def test_extends_authenticated_session(
+        self, extension_request: web.Request, authenticated_session: Session, current_time: int
+    ) -> None:
+        resp = await extend_login_session(extension_request)
 
         assert resp.status == 200
-        assert (await resp.json())["status"] == 201
+        assert authenticated_session.expiration_dt == current_time + 3600
+        assert resp.text is not None
+        assert json.loads(resp.text) == {
+            "status": 201,
+            "expires": datetime.fromtimestamp(current_time + 3600, tz=UTC).isoformat(),
+        }
 
 
 ALLOWED_ORIGIN = "https://console.example.com"
