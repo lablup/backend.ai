@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import jinja2
 from jinja2 import nodes
 from jinja2.ext import Extension
 from jinja2.parser import Parser
@@ -74,3 +75,13 @@ def toml_scalar(s: Any) -> str:
     if s is None:
         raise InvalidTemplateValueError("null is not allowed as a TOML scalar value")
     return json.dumps(s, ensure_ascii=False)
+
+
+def build_template_environment() -> jinja2.Environment:
+    """The Jinja environment that renders the files under ``templates/``."""
+    env = jinja2.Environment(
+        extensions=[TOMLField, TOMLStringListField],
+        loader=jinja2.PackageLoader("ai.backend.web", "templates"),
+    )
+    env.filters["toml_scalar"] = toml_scalar
+    return env
