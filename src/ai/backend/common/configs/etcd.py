@@ -62,8 +62,7 @@ class EtcdTLSConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Seconds to wait for the TLS handshake with an etcd member. "
-                "Set to 0 for no limit (not recommended): request timeouts do not end a "
-                "stalled handshake."
+                "Set to 0 for no limit. Request timeouts do not end a stalled handshake."
             ),
             added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="10.0", prod="10.0"),
