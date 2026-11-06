@@ -60,7 +60,6 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticNodeMixin,
     PydanticOutputMixin,
 )
-from ai.backend.manager.api.gql.utils import check_admin_only
 
 from .storage_namespace import StorageNamespace, StorageNamespaceConnection, StorageNamespaceEdge
 from .types import StrawberryGQLContext
@@ -140,7 +139,6 @@ class ObjectStorageConnection(Connection[ObjectStorage]):
     BackendAIGQLMeta(added_version="25.14.0", description="Get an object storage by ID")
 )  # type: ignore[misc]
 async def object_storage(id: ID, info: Info[StrawberryGQLContext]) -> ObjectStorage | None:
-    check_admin_only()
     node = await info.context.adapters.object_storage.get(parse_uuid(id))
     return ObjectStorage.from_pydantic(node, extra={"region": node.region or ""})
 
@@ -155,7 +153,6 @@ async def object_storages(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ObjectStorageConnection | None:
-    check_admin_only()
     payload = await info.context.adapters.object_storage.admin_search(
         AdminSearchObjectStoragesInput(
             first=first,
@@ -299,7 +296,6 @@ class GetPresignedUploadURLPayload:
 async def create_object_storage(
     input: CreateObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> CreateObjectStoragePayload | None:
-    check_admin_only()
     result = await info.context.adapters.object_storage.create(input.to_pydantic())
     return CreateObjectStoragePayload(
         object_storage=ObjectStorage.from_pydantic(
@@ -312,7 +308,6 @@ async def create_object_storage(
 async def update_object_storage(
     input: UpdateObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> UpdateObjectStoragePayload | None:
-    check_admin_only()
     result = await info.context.adapters.object_storage.update(input.to_pydantic())
     return UpdateObjectStoragePayload(
         object_storage=ObjectStorage.from_pydantic(
@@ -325,7 +320,6 @@ async def update_object_storage(
 async def delete_object_storage(
     input: DeleteObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> DeleteObjectStoragePayload | None:
-    check_admin_only()
     pydantic_input = input.to_pydantic()
     result = await info.context.adapters.object_storage.delete(pydantic_input)
     return DeleteObjectStoragePayload.from_pydantic(result)
@@ -337,7 +331,6 @@ async def delete_object_storage(
 async def get_presigned_download_url(
     input: GetPresignedDownloadURLInput, info: Info[StrawberryGQLContext]
 ) -> GetPresignedDownloadURLPayload | None:
-    check_admin_only()
     dto = input.to_pydantic()
     result = await info.context.adapters.object_storage.get_presigned_download_url(
         artifact_revision_id=dto.artifact_revision_id,
@@ -351,7 +344,6 @@ async def get_presigned_download_url(
 async def get_presigned_upload_url(
     input: GetPresignedUploadURLInput, info: Info[StrawberryGQLContext]
 ) -> GetPresignedUploadURLPayload | None:
-    check_admin_only()
     dto = input.to_pydantic()
     result = await info.context.adapters.object_storage.get_presigned_upload_url(
         artifact_revision_id=dto.artifact_revision_id,

@@ -30,7 +30,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
-from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
+from ai.backend.manager.api.gql.utils import dedent_strip
 
 from .types import StrawberryGQLContext
 
@@ -136,7 +136,6 @@ class UnregisterStorageNamespacePayload:
 async def register_storage_namespace(
     input: RegisterStorageNamespaceInput, info: Info[StrawberryGQLContext]
 ) -> RegisterStorageNamespacePayload | None:
-    check_admin_only()
     payload = await info.context.adapters.storage_namespace.register(input.to_pydantic())
     return RegisterStorageNamespacePayload(id=payload.namespace.storage_id)
 
@@ -149,7 +148,6 @@ async def register_storage_namespace(
 async def unregister_storage_namespace(
     input: UnregisterStorageNamespaceInput, info: Info[StrawberryGQLContext]
 ) -> UnregisterStorageNamespacePayload | None:
-    check_admin_only()
     pydantic_input = input.to_pydantic()
     payload = await info.context.adapters.storage_namespace.unregister(pydantic_input)
     return UnregisterStorageNamespacePayload(id=payload.id)
