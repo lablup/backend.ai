@@ -11,8 +11,8 @@ from uuid import UUID
 from pydantic import ConfigDict, Field, IPvAnyNetwork, model_validator
 
 from ai.backend.common.api_handlers import BaseFieldModel
-from ai.backend.common.dto.appproxy.kernel_host import KernelHost
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.typed_validators import KernelHost
 from ai.backend.common.types import SessionId
 
 IngressID = NewType("IngressID", str)

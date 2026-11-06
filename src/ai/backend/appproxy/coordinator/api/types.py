@@ -8,7 +8,7 @@ from ai.backend.appproxy.common.types import (
     SerializableCircuit,
     SessionConfig,
 )
-from ai.backend.common.dto.appproxy.kernel_host import KernelHost
+from ai.backend.common.typed_validators import KernelHost
 from ai.backend.common.types import BackendAISchema
 
 
