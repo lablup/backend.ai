@@ -16,7 +16,7 @@ from ai.backend.storage.config.unified import StorageProxyUnifiedConfig
 
 from .etcd import EtcdProvider
 from .redis import RedisProvider, RedisProviderInput, StorageProxyValkeyClients
-from .redis_config import RedisConfigProvider
+from .redis_config import RedisConfigProvider, RedisConfigProviderInput
 
 
 @dataclass
@@ -58,7 +58,10 @@ class InfrastructureComposer(
         local_config = setup_input.local_config
 
         etcd = await stack.enter_dependency(EtcdProvider(), local_config)
-        redis_config = await stack.enter_dependency(RedisConfigProvider(), etcd)
+        redis_config = await stack.enter_dependency(
+            RedisConfigProvider(),
+            RedisConfigProviderInput(etcd=etcd, local_redis=local_config.redis),
+        )
         sentinel_monitors = await stack.enter_dependency(
             SentinelMonitorDependency(),
             redis_config.to_valkey_profile_target().targets(),

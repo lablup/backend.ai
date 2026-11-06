@@ -1145,7 +1145,12 @@ configure_backendai() {
   if [ $CONFIGURE_HA -eq 1 ]; then
     ./backend.ai mgr etcd put config/redis/sentinel "127.0.0.1:${REDIS_SENTINEL1_PORT},127.0.0.1:${REDIS_SENTINEL2_PORT},127.0.0.1:${REDIS_SENTINEL3_PORT}"
     ./backend.ai mgr etcd put config/redis/service_name "mymaster"
-    ./backend.ai mgr etcd put config/redis/password "develove"
+    # The Redis password is read only from each component's local config file.
+    cat >> ./manager.toml <<EOF
+
+[redis]
+password = "develove"
+EOF
   else
     ./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
   fi
@@ -1154,7 +1159,12 @@ configure_backendai() {
 
   cp configs/manager/sample.etcd.volumes.json ./dev.etcd.volumes.json
   MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
-  sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
+  # The manager reads the storage-proxy secret only from manager.toml.
+  cat >> ./manager.toml <<EOF
+
+[volumes.proxies.local]
+secret = "${MANAGER_AUTH_KEY}"
+EOF
   sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./dev.etcd.volumes.json
 
   # configure account-manager
@@ -1263,6 +1273,12 @@ configure_backendai() {
   # active; otherwise the [[artifact-storages]] placeholders stay in place.
   if [ $ENABLE_STORAGE -eq 1 ]; then
     configure_storage_proxy_minio "./storage-proxy.toml"
+  fi
+
+  if [ $CONFIGURE_HA -eq 1 ]; then
+    for f in ./agent.toml ./storage-proxy.toml; do
+      printf '\n[redis]\npassword = "develove"\n' >> "$f"
+    done
   fi
 
   # configure webserver

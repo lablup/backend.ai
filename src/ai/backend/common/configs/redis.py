@@ -158,6 +158,7 @@ class SingleRedisConfig(BackendAISchema):
             ),
             added_version="25.13.0",
             secret=True,
+            local_only=True,
             example=ConfigExample(local="", prod="REDIS_PASSWORD"),
         ),
     ]
@@ -176,6 +177,7 @@ class SingleRedisConfig(BackendAISchema):
             ),
             added_version="26.4.2",
             secret=True,
+            local_only=True,
             example=ConfigExample(local="", prod="REDIS_SENTINEL_PASSWORD"),
         ),
     ]
