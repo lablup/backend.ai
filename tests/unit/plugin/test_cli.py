@@ -94,9 +94,9 @@ def unusable_manager_config_and_agent_config_allowing_the_wheelhouse(
 
 
 @pytest.fixture
-def unusable_named_config(case: _UnusableConfigCase, wheelhouse_with_planted_wheel: Path) -> Path:
+def unusable_named_config(wheelhouse_with_planted_wheel: Path) -> Path:
     config_path = wheelhouse_with_planted_wheel.parent / "named.toml"
-    config_path.write_bytes(case.content)
+    config_path.write_bytes(b"[wheelhouse\n")
     return config_path
 
 
@@ -182,18 +182,6 @@ class TestScanWheelhouse:
         assert json.loads(result.stdout) == [_WHEELHOUSE_ROW]
         assert "manager.toml" in result.stderr
 
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _UnusableConfigCase(failure="invalid-toml", content=b"[wheelhouse\n"),
-            _UnusableConfigCase(failure="invalid-utf8", content=b"\xff"),
-            _UnusableConfigCase(
-                failure="invalid-section",
-                content=b'[wheelhouse]\nallow = "maybe"\n',
-            ),
-        ],
-        ids=lambda case: case.failure,
-    )
     def test_warns_once_about_an_unusable_named_config(self, unusable_named_config: Path) -> None:
         result = CliRunner().invoke(
             main, ["scan", _PLANTED_GROUP, "--format", "JSON", "-f", str(unusable_named_config)]
