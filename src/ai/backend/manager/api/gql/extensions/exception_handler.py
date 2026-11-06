@@ -16,6 +16,8 @@ from ai.backend.common.exception import (
     ErrorCode,
 )
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.errors.common import InternalServerError
+from ai.backend.manager.errors.repository import RepositoryIntegrityError
 
 log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -46,24 +48,29 @@ class GQLExceptionHandlerExtension(SchemaExtension):
     ) -> AwaitableOrValue[object]:
         try:
             result: object = _next(root, info, *args, **kwargs)
-        except BackendAIError as e:
-            if e.status_code // 100 == 4:
-                log.trace(
-                    "graphql client error", error_code=str(e.error_code()), error_message=str(e)
-                )
-            elif e.status_code // 100 == 5:
-                log.exception("graphql server error", error_code=str(e.error_code()))
-            raise GraphQLError(
-                message=str(e),
-                extensions={"code": str(e.error_code())},
-            ) from e
         except ValidationError as e:
             log.trace("graphql input validation failed", error_message=str(e))
             raise _to_graphql_validation_error(e) from e
+        except RepositoryIntegrityError as e:
+            # Its message carries the PostgreSQL diagnostic; answer with the title only.
+            log.trace("graphql client error", error_code=str(e.error_code()), error_message=str(e))
+            raise GraphQLError(
+                message=e.error_title, extensions={"code": str(e.error_code())}
+            ) from e
+        except BackendAIError as e:
+            if e.is_client_error():
+                log.trace(
+                    "graphql client error", error_code=str(e.error_code()), error_message=str(e)
+                )
+                raise GraphQLError(message=str(e), extensions={"code": str(e.error_code())}) from e
+            log.exception("graphql server error", error_code=str(e.error_code()))
+            raise GraphQLError(
+                message=e.error_title, extensions={"code": str(e.error_code())}
+            ) from e
         except Exception as e:
             log.exception("graphql unexpected error")
             raise GraphQLError(
-                message=str(e),
+                message=InternalServerError.error_title,
                 extensions={"code": str(ErrorCode.default())},
             ) from e
         if asyncio.iscoroutine(result):
@@ -73,23 +80,28 @@ class GQLExceptionHandlerExtension(SchemaExtension):
     async def _handle_async(self, coro: Awaitable[object]) -> object:
         try:
             return await coro
-        except BackendAIError as e:
-            if e.status_code // 100 == 4:
-                log.trace(
-                    "graphql client error", error_code=str(e.error_code()), error_message=str(e)
-                )
-            elif e.status_code // 100 == 5:
-                log.exception("graphql server error", error_code=str(e.error_code()))
-            raise GraphQLError(
-                message=str(e),
-                extensions={"code": str(e.error_code())},
-            ) from e
         except ValidationError as e:
             log.trace("graphql input validation failed", error_message=str(e))
             raise _to_graphql_validation_error(e) from e
+        except RepositoryIntegrityError as e:
+            # Its message carries the PostgreSQL diagnostic; answer with the title only.
+            log.trace("graphql client error", error_code=str(e.error_code()), error_message=str(e))
+            raise GraphQLError(
+                message=e.error_title, extensions={"code": str(e.error_code())}
+            ) from e
+        except BackendAIError as e:
+            if e.is_client_error():
+                log.trace(
+                    "graphql client error", error_code=str(e.error_code()), error_message=str(e)
+                )
+                raise GraphQLError(message=str(e), extensions={"code": str(e.error_code())}) from e
+            log.exception("graphql server error", error_code=str(e.error_code()))
+            raise GraphQLError(
+                message=e.error_title, extensions={"code": str(e.error_code())}
+            ) from e
         except Exception as e:
             log.exception("graphql unexpected error")
             raise GraphQLError(
-                message=str(e),
+                message=InternalServerError.error_title,
                 extensions={"code": str(ErrorCode.default())},
             ) from e
