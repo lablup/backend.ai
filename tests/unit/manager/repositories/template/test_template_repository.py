@@ -596,6 +596,29 @@ class TestTemplateRepository:
         result = await template_repository.get_cluster_template(uuid.uuid4().hex)
         assert result is None
 
+    async def test_get_cluster_template_owner_exists(
+        self,
+        template_repository: TemplateRepository,
+        test_domain: str,
+        test_user: uuid.UUID,
+        test_group: tuple[uuid.UUID, str],
+    ) -> None:
+        group_id, _ = test_group
+        template_id = await template_repository.create_cluster_template(
+            test_domain, group_id, test_user, "cluster-owner", {"data": True}
+        )
+
+        result = await template_repository.get_cluster_template_owner(template_id)
+
+        assert result == {"user_uuid": test_user, "domain_name": test_domain}
+
+    async def test_get_cluster_template_owner_not_found(
+        self,
+        template_repository: TemplateRepository,
+    ) -> None:
+        result = await template_repository.get_cluster_template_owner(uuid.uuid4().hex)
+        assert result is None
+
     async def test_cluster_template_exists_true(
         self,
         template_repository: TemplateRepository,
