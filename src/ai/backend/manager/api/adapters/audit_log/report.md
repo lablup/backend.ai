@@ -2,12 +2,12 @@
 
 [background](/src/ai/backend/manager/api/adapters/audit_log/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/audit_log/adapter.py)
 
-Scenario: complete
+Scenario: incomplete 1 / 5
 
 - built from ops (5)
   - admin_search: representative success ✓ · representative rejection ✓
   - batch_load_by_ids: representative success ✓ · representative rejection ✓
-  - batch_load_scopes_by_ids: representative success ✓ · representative rejection ✓
+  - batch_load_scopes_by_ids: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - scoped_search: representative success ✓ · representative rejection ✓
   - search_scopes: representative success ✓ · representative rejection ✓
 
@@ -43,7 +43,6 @@ Scenario: complete
 | scenario | verdict |
 |---|---|
 | [when the superadmin batch-loads the two scopes a record left and one unknown id, they come back in the order asked and the item for the unknown id is empty](#batch_loading_scopes-the-superadmin-batch-load-leaves-a-missing-scope-id-empty) | answered |
-| [when scopes exist and they are batch-loaded without a user context, it is rejected because the caller cannot be known](#batch_loading_scopes-a-scope-load-carrying-no-user-is-refused) | rejected |
 
 **scoped_search**
 
@@ -842,40 +841,6 @@ Then
   - items[1].scope_type = 'user'
   - items[1].scope_id: same as the scope entry the search read
   - items[2] = None
-
-<a id="batch_loading_scopes-a-scope-load-carrying-no-user-is-refused"></a>
-
-#### [a-scope-load-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading_scopes.py): pass
-
-when scopes exist and they are batch-loaded without a user context, it is rejected because the caller cannot be known
-
-Given
-
-- a record about one project was triggered by another user and left another project and one user as its scopes, and one superadmin
-  - Domain home-1
-  - Project resource policy default: the personal project created along with a user looks it up by this name
-  - Project team-1
-  - Project other-1
-  - Prepare one user in the domain
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-    - User resource policy user-policy-3: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-3: has their own keypair and personal project
-  - Project team-1: 'linked' record, 2 scopes added
-
-When
-
-- AuditLogAdapter.batch_load_scopes_by_ids: reads the scopes of one record at once without a user context
-
-Then
-
-- the call is rejected
-  - rejected: UnreachableError
 
 ### scoped_search
 

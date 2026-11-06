@@ -2,12 +2,12 @@
 
 [background](/src/ai/backend/manager/api/adapters/service_catalog/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/service_catalog/adapter.py)
 
-Scenario: complete
+Scenario: incomplete 1 / 2
 
 - built from ops (1)
   - admin_search: representative success ✓ · representative rejection ✓
 - direct implementation (1)
-  - batch_load_by_ids: success present 1 · rejection present 1 (partial_bulk)
+  - batch_load_by_ids: success present 1 · rejection absent (partial_bulk): SCENARIO-GAP
 
 **admin_search**
 
@@ -28,7 +28,6 @@ Scenario: complete
 | scenario | verdict |
 |---|---|
 | [when the superadmin batch-loads two services created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | answered |
-| [when two services exist and they are batch-loaded without a user context, it is rejected because the caller cannot be known](#reading-a-batch-load-carrying-no-user-is-refused) | rejected |
 
 ### admin_search
 
@@ -423,32 +422,4 @@ Then
   - items[1].last_heartbeat: the time this run wrote
   - items[1].config_hash = ''
   - items[2] = None
-
-<a id="reading-a-batch-load-carrying-no-user-is-refused"></a>
-
-#### [a-batch-load-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/service_catalog/test_reading.py): pass
-
-when two services exist and they are batch-loaded without a user context, it is rejected because the caller cannot be known
-
-Given
-
-- 2 services and one regular user
-  - Service wanted-1: registered as healthy in the manager group
-  - Service wanted-1: has one endpoint at http://127.0.0.1:8080
-  - Service other-1: registered as healthy in the manager group
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-
-When
-
-- ServiceCatalogAdapter.batch_load_by_ids: batch-loads 2 services without a user context
-
-Then
-
-- the call is rejected
-  - rejected: UnreachableError
 

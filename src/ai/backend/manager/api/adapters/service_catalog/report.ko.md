@@ -2,12 +2,12 @@
 
 [배경](/src/ai/backend/manager/api/adapters/service_catalog/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/service_catalog/adapter.py)
 
-시나리오: 완성
+시나리오: 미완성 1 / 2
 
 - ops 구성 (1)
   - admin_search: 대표 성공 ✓ · 대표 거부 ✓
 - 직접 구현 (1)
-  - batch_load_by_ids: 성공 있음 1 · 거부 있음 1 (partial_bulk)
+  - batch_load_by_ids: 성공 있음 1 · 거부 없음 (partial_bulk): SCENARIO-GAP
 
 **admin_search**
 
@@ -28,7 +28,6 @@
 | 시나리오 | 판정 |
 |---|---|
 | [superadmin 이 미리 저장한 서비스 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 에 해당하는 항목은 비어 있습니다](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | 성공 |
-| [서비스 둘이 있고 사용자 컨텍스트 없이 한 번에 조회하면, 호출자를 알 수 없어 거부됩니다](#reading-a-batch-load-carrying-no-user-is-refused) | 거부 |
 
 ### admin_search
 
@@ -423,32 +422,4 @@ Then
   - items[1].last_heartbeat: 이 실행이 쓴 시각
   - items[1].config_hash = ''
   - items[2] = None
-
-<a id="reading-a-batch-load-carrying-no-user-is-refused"></a>
-
-#### [a-batch-load-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/service_catalog/test_reading.py): pass
-
-서비스 둘이 있고 사용자 컨텍스트 없이 한 번에 조회하면, 호출자를 알 수 없어 거부됩니다
-
-Given
-
-- 서비스 2개와, 일반 사용자 한 명
-  - 서비스 wanted-1: manager 그룹에 정상 상태로 등록합니다
-  - 서비스 wanted-1: http://127.0.0.1:8080 엔드포인트 하나를 갖습니다
-  - 서비스 other-1: manager 그룹에 정상 상태로 등록합니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- ServiceCatalogAdapter.batch_load_by_ids: 사용자 컨텍스트 없이 서비스 2개를 한 번에 조회합니다
-
-Then
-
-- 거부됩니다
-  - 거부: UnreachableError
 

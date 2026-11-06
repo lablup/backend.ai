@@ -2,12 +2,12 @@
 
 [배경](/src/ai/backend/manager/api/adapters/audit_log/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/audit_log/adapter.py)
 
-시나리오: 완성
+시나리오: 미완성 1 / 5
 
 - ops 구성 (5)
   - admin_search: 대표 성공 ✓ · 대표 거부 ✓
   - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
-  - batch_load_scopes_by_ids: 대표 성공 ✓ · 대표 거부 ✓
+  - batch_load_scopes_by_ids: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
   - scoped_search: 대표 성공 ✓ · 대표 거부 ✓
   - search_scopes: 대표 성공 ✓ · 대표 거부 ✓
 
@@ -43,7 +43,6 @@
 | 시나리오 | 판정 |
 |---|---|
 | [범위 둘을 남긴 기록을 superadmin 이 그 범위들과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 에 해당하는 항목은 비어 있습니다](#batch_loading_scopes-the-superadmin-batch-load-leaves-a-missing-scope-id-empty) | 성공 |
-| [범위가 있고 사용자 컨텍스트 없이 한 번에 조회하면, 호출자를 알 수 없어 거부됩니다](#batch_loading_scopes-a-scope-load-carrying-no-user-is-refused) | 거부 |
 
 **scoped_search**
 
@@ -842,40 +841,6 @@ Then
   - items[1].scope_type = 'user'
   - items[1].scope_id: 검색에서 읽은 범위 항목와 같다
   - items[2] = None
-
-<a id="batch_loading_scopes-a-scope-load-carrying-no-user-is-refused"></a>
-
-#### [a-scope-load-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading_scopes.py): pass
-
-범위가 있고 사용자 컨텍스트 없이 한 번에 조회하면, 호출자를 알 수 없어 거부됩니다
-
-Given
-
-- 한 프로젝트에 대한 기록을 다른 사용자가 실행했고 그 기록이 다른 프로젝트와 한 사용자를 범위로 남겼으며, superadmin 한 명
-  - 도메인 home-1
-  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - superadmin user-3: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 프로젝트 team-1: 'linked' 기록, 스코프 2개 추가됨
-
-When
-
-- AuditLogAdapter.batch_load_scopes_by_ids: 사용자 컨텍스트 없이 기록 하나의 범위를 한 번에 조회합니다
-
-Then
-
-- 거부됩니다
-  - 거부: UnreachableError
 
 ### scoped_search
 
