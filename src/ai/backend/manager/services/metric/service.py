@@ -1,6 +1,11 @@
+<<<<<<< HEAD
 import logging
 
 from ai.backend.logging import BraceStyleAdapter
+=======
+from ai.backend.common.types import KernelId
+from ai.backend.manager.clients.prometheus.metric_types import ensure_container_metric_name
+>>>>>>> a449af324 (fix(BA-8876): reject a container metric name holding anything but letters, digits and underscores (#16465))
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 
 from .actions.container import (
@@ -32,8 +37,26 @@ class MetricService:
 
     async def query_container_metric(
         self,
+<<<<<<< HEAD
         action: ContainerMetricAction,
     ) -> ContainerMetricActionResult:
+=======
+        action: SearchUserContainerMetricsAction,
+    ) -> SearchUserContainerMetricsActionResult:
+        ensure_container_metric_name(action.metric_name)
+        result = await self._metric_repository.query_container_metric(
+            action.metric_name,
+            action.labels(),
+            action.time_range,
+        )
+        return SearchUserContainerMetricsActionResult(result=result)
+
+    async def global_search_container_metrics(
+        self,
+        action: GlobalSearchContainerMetricsAction,
+    ) -> GlobalSearchContainerMetricsActionResult:
+        ensure_container_metric_name(action.metric_name)
+>>>>>>> a449af324 (fix(BA-8876): reject a container metric name holding anything but letters, digits and underscores (#16465))
         result = await self._metric_repository.query_container_metric(
             action.metric_name,
             action.labels,

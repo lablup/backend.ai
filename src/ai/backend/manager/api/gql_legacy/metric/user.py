@@ -9,9 +9,23 @@ from uuid import UUID
 import graphene
 
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
+<<<<<<< HEAD
 from ai.backend.manager.clients.prometheus.metric_types import ContainerMetricOptionalLabel
 from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricAction,
+=======
+from ai.backend.common.exception import UnreachableError
+from ai.backend.manager.clients.prometheus.metric_types import (
+    ContainerMetricOptionalLabel,
+    ContainerMetricResult,
+    ensure_container_metric_name,
+)
+from ai.backend.manager.services.metric.actions.search_container_metrics import (
+    GlobalSearchContainerMetricsAction,
+)
+from ai.backend.manager.services.metric.actions.search_user_container_metrics import (
+    SearchUserContainerMetricsAction,
+>>>>>>> a449af324 (fix(BA-8876): reject a container metric name holding anything but letters, digits and underscores (#16465))
 )
 from ai.backend.manager.services.metric.types import (
     MetricQueryParameter,
@@ -46,6 +60,7 @@ class UserUtilizationMetricQueryInput(graphene.InputObjectType):  # type: ignore
     )
 
     def metric_query_param(self) -> MetricQueryParameter:
+        ensure_container_metric_name(self.metric_name)
         return MetricQueryParameter(
             metric_name=self.metric_name,
             value_type=self.value_type,

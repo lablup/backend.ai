@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -15,6 +16,7 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import KernelId
 from ai.backend.manager.clients.prometheus.preset import MetricPreset
 from ai.backend.manager.clients.prometheus.types import MetricValue, ValueType
+from ai.backend.manager.errors.metric import InvalidContainerMetricName
 
 __all__ = [
     "ContainerLiveStatQueries",
@@ -31,6 +33,11 @@ __all__ = [
     "RATE_METRICS",
     "MetricType",
     "ValueType",
+<<<<<<< HEAD
+=======
+    "ensure_container_metric_name",
+    "resolve_container_metric_unit_hint",
+>>>>>>> a449af324 (fix(BA-8876): reject a container metric name holding anything but letters, digits and underscores (#16465))
 ]
 
 
@@ -38,6 +45,14 @@ __all__ = [
 type MetricName = str
 # Raw Prometheus sample value, kept as the string Prometheus returned.
 type LiveStatRawValue = str
+
+_CONTAINER_METRIC_NAME_RE: Final = re.compile(r"[A-Za-z0-9_:-]+")
+
+
+def ensure_container_metric_name(metric_name: str) -> None:
+    """Raise `InvalidContainerMetricName` unless the name is letters, digits, `_`, `:` and `-`."""
+    if not _CONTAINER_METRIC_NAME_RE.fullmatch(metric_name):
+        raise InvalidContainerMetricName(f"Invalid container metric name: {metric_name!r}")
 
 
 class MetricType(StrEnum):
