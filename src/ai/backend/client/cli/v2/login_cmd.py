@@ -10,7 +10,13 @@ from typing import Any
 
 import click
 
+<<<<<<< HEAD
 from .helpers import COOKIE_FILE, SESSION_DIR, create_v2_registry, load_v2_config
+=======
+from ai.backend.client.cli.v2.insecure_http_guard import InsecureEndpointError
+
+from .helpers import ProfileStore, create_v2_registry, load_v2_config
+>>>>>>> a902ee626 (feat(BA-8941): refuse v2 CLI requests over insecure http unless allowed (#16482))
 
 
 @click.command()
@@ -23,8 +29,6 @@ def login(force: bool) -> None:
     Stores the session cookie in ``~/.backend.ai/session/cookie.dat``.
     Requires ``endpoint-type`` to be ``session``.
     """
-    user_id = os.environ.get("BACKEND_USER") or input("User ID: ")
-    password = os.environ.get("BACKEND_PASSWORD") or getpass.getpass("Password: ")
 
     async def _run() -> None:
         config = load_v2_config()
@@ -41,6 +45,9 @@ def login(force: bool) -> None:
 
         registry = await create_v2_registry(config)
         try:
+            user_id = os.environ.get("BACKEND_USER") or input("User ID: ")
+            password = os.environ.get("BACKEND_PASSWORD") or getpass.getpass("Password: ")
+
             client = registry._client
             login_url = client.build_url_raw("/server/login")
             payload: dict[str, str | bool] = {"username": user_id, "password": password}
@@ -93,6 +100,15 @@ def login(force: bool) -> None:
     asyncio.run(_run())
 
 
+def _remove_stored_session() -> None:
+    paths = ProfileStore().selected()
+    for path in [paths.cookie_file, paths.session_dir / "config.json"]:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
 @click.command()
 def logout() -> None:
     """Log out and clear the stored session cookie."""
@@ -109,7 +125,18 @@ def logout() -> None:
             )
             raise SystemExit(1)
 
-        registry = await create_v2_registry(config)
+        try:
+            registry = await create_v2_registry(config)
+        except InsecureEndpointError as refusal:
+            _remove_stored_session()
+            click.echo(
+                click.style(
+                    f"Removed the stored session. The server session stays active: {refusal.message}",
+                    fg="yellow",
+                )
+            )
+            return
+
         try:
             client = registry._client
             logout_url = client.build_url_raw("/server/logout")
@@ -121,12 +148,16 @@ def logout() -> None:
         finally:
             await registry.close()
 
+<<<<<<< HEAD
         for path in [COOKIE_FILE, SESSION_DIR / "config.json"]:
             try:
                 path.unlink(missing_ok=True)
             except OSError:
                 pass
 
+=======
+        _remove_stored_session()
+>>>>>>> a902ee626 (feat(BA-8941): refuse v2 CLI requests over insecure http unless allowed (#16482))
         click.echo(click.style("Logged out.", fg="green"))
 
     asyncio.run(_run())
