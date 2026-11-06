@@ -7,9 +7,9 @@ Background and rationale are in `KNOWLEDGE.md` in this directory, the layout in 
 - Scenarios live in this tree. Read them in the `report.md` (English) and `report.ko.md` (Korean) of the
   entity package. Do not write them in `KNOWLEDGE.md`.
 - Work from the `adapter.py` of the entity. Write scenarios for every call it exposes.
-- Do not write scenarios for what every entity handles the same way: AND, OR and NOT filter combinations,
-  pagination, default sort direction.
-- Write one representative filter and one representative sort per call. Do not write a row per field.
+- Do not write a row for what every entity handles the same way: AND, OR and NOT filter combinations,
+  pagination, default sort direction. Do not write a row per filter or sort field. The representative success
+  of a search call covers one filter, one order and pagination.
 - After writing, generate the reports of the entity package from the run with `--split`. `--verify` reports
   when either file disagrees with the run.
 
@@ -26,33 +26,33 @@ request DTO → Action (entity type, operation, scope, input fields) → process
 
 | Row | When | What |
 |---|---|---|
-| Representative success | Always | A non-superadmin user granted only the permission the operation needs calls it. Seeds fill optional fields too, and the whole response is checked |
-| Representative rejection | Unless the shape is public or anonymous | The user of the representative success, minus that one permission, calls it |
-| Representative failure | When the call has a constraint | A permitted user sends a request the constraint stops. One per constraint kind |
+| Representative success | Always | The success caller of the ops shape calls it. Seeds fill optional fields too, and the whole response is checked |
+| Representative rejection | When the ops shape has a rejection caller | The rejection caller of the ops shape calls it |
+| Representative failure | When the call has a constraint | The success caller sends a request the constraint stops. One per constraint kind |
 
 The representative success and rejection check the entity type, operation and scope the adapter puts in the
 Action, and the request and response mapping. The representative failure checks the service and repository
 constraints ops does not see, and the branches the adapter runs outside ops.
 
-The form of the representative rejection follows the ops shape, the group method in the report.
+The callers and the form of the representative rejection follow the ops shape, the group method in the report.
+The permitted user is a non-superadmin user granted only the permission the operation needs.
 
-| ops shape | Group method | Form of the representative rejection |
-|---|---|---|
-| Single entity | `single_entity`, `single_*_ops`, `entity_purge_ops`, `entity_upsert_ops`, single-row field ops | `NotEnoughPermission` |
-| Scope | `scope`, `*_create_ops`, `*_atomic_*_ops`, `scope_batch_*_ops` | `NotEnoughPermission` |
-| Search | `scope_search_ops`, `scoped_search_ops`, field `search_ops` | `NotEnoughPermission` |
-| Global | `global_scope`, `global_*_ops`, `global_searcher_ops` | `NotEnoughPermission` for a regular user |
-| Partial bulk | `partial_bulk`, `partial_bulk_*_ops`, `*_partial_bulk_purge_ops`, `bulk_lookup_ops`, field `partial_bulk_*` | A response whose `failed` holds the unpermitted item |
-| Atomic bulk | `atomic_bulk_field`, `legacy_partial_bulk`, field `atomic_bulk_*` | `NotEnoughPermission` for the whole call |
-| Membership, relation | `membership`, `relation` | `NotEnoughPermission` |
-| Key lookup | `lookup`, `lookup_ops`, `key_owner_lookup_ops`, `key_field_lookup_ops` | `NotEnoughPermission` for a user without READ on the entity found |
-| Public, anonymous | `public*`, `anonymous_*` | None. Nothing gates it beyond authentication |
+| ops shape | Group method | Success caller | Rejection caller | Form of the representative rejection |
+|---|---|---|---|---|
+| Single entity | `single_entity`, `single_*_ops`, `entity_purge_ops`, `entity_upsert_ops`, single-row field ops | Permitted user | Permitted user minus that permission | `NotEnoughPermission` |
+| Scope | `scope`, `*_create_ops`, `*_atomic_*_ops`, `scope_batch_*_ops` | Permitted user | Permitted user minus that permission | `NotEnoughPermission` |
+| Search | `scope_search_ops`, `scoped_search_ops`, field `search_ops` | Permitted user | Permitted user minus that permission | `NotEnoughPermission` |
+| Global | `global_scope`, `global_*_ops`, `global_searcher_ops` | Superadmin | Regular user | `NotEnoughPermission` |
+| Partial bulk | `partial_bulk`, `partial_bulk_*_ops`, `*_partial_bulk_purge_ops`, `bulk_lookup_ops`, field `partial_bulk_*` | Permitted user | Permitted user with one item it has no permission on | A response whose `failed` holds that item |
+| Atomic bulk | `atomic_bulk_field`, `legacy_partial_bulk`, field `atomic_bulk_*` | Permitted user | Permitted user with one item it has no permission on | `NotEnoughPermission` for the whole call |
+| Membership, relation | `membership`, `relation` | Permitted user | Permitted user minus that permission | `NotEnoughPermission` |
+| Key lookup | `lookup`, `lookup_ops`, `key_owner_lookup_ops`, `key_field_lookup_ops` | Permitted user | Permitted user minus READ on the entity found | `NotEnoughPermission` |
+| Public, anonymous | `public*`, `anonymous_*` | User granted no permission | None | None. Nothing gates it beyond authentication |
 
-- For the global shape, superadmin calls the representative success. State in `description` that the global role
-  gates it.
-- For the search shape, the representative success also seeds one row outside the requested scope and checks it
-  is not in the response.
-- For the public and anonymous shapes, a user granted no permission calls the representative success.
+- For the global shape, state in `description` that the global role gates it.
+- For the search shape, the representative success applies one filter, one order and pagination in one request.
+  It also seeds one row outside the requested scope and one row the filter excludes, and checks that neither is
+  in the response.
 
 Write one representative failure per constraint kind. Several constraints of one kind still get one row.
 
@@ -127,8 +127,8 @@ A scenario is one class. It defines its name, what it guarantees, and three step
 - Seed only the permissions needed. Do not depend on shipped role presets.
 - Pair a row with the permission and a row without it. With only one, you cannot tell whether the permission was
   too broad.
-- The user of the row without the permission is the user of the row with it, minus that one permission. A user
-  with no permission at all cannot tell whether the adapter checks the right entity type and operation.
+- The callers of the two rows follow the ops shape table above. A user with no permission at all cannot tell
+  whether the adapter checks the right entity type and operation.
 - The requesting user of a row that checks permissions must not be superadmin. The checker passes superadmin
   first, so such a row proves nothing about permissions. The exception is an operation gated by the global role.
   State that fact in `description` then.
