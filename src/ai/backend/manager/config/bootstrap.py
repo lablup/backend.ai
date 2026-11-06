@@ -12,6 +12,7 @@ from ai.backend.common.configs.loader import (
     TomlConfigLoader,
 )
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
+from ai.backend.common.configs.wheelhouse import WheelhouseConfig
 from ai.backend.common.types import BackendAISchema
 from ai.backend.logging.config import LoggingConfig
 from ai.backend.logging.types import LogLevel
@@ -64,6 +65,13 @@ class BootstrapConfig(BackendAISchema):
         Pyroscope profiling configuration.
         Controls integration with the Pyroscope performance profiling tool.
         Used for monitoring and analyzing application performance.
+        """,
+    )
+    wheelhouse: WheelhouseConfig = Field(
+        default=WheelhouseConfig.model_validate({}),
+        description="""
+        Plugin wheel loading configuration.
+        Read from here so that etcd cannot turn it on.
         """,
     )
     debug: DebugConfig = Field(

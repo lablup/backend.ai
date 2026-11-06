@@ -62,6 +62,7 @@ from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_mult
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
+<<<<<<< HEAD
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.runner.types import Runner
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
@@ -85,6 +86,9 @@ from ai.backend.common.types import (
     ServiceDiscoveryType,
     safe_print_redis_config,
 )
+=======
+from ai.backend.common.plugin import AbstractPlugin, BasePluginContext, load_configured_wheelhouse
+>>>>>>> 974f2a52c (feat(BA-8920): load plugin wheels only when the [wheelhouse] config allows it (#16407))
 from ai.backend.common.types import HostPortPair as CommonHostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
@@ -860,9 +864,16 @@ def main(
             )
             with logger:
                 setproctitle("backend.ai: storage-proxy")
+<<<<<<< HEAD
                 log.info("Backend.AI Storage Proxy", VERSION)
                 log.info("Runtime: {0}", env_info())
                 log.info("Node ID: {0}", local_config.storage_proxy.node_id)
+=======
+                log.info("Backend.AI Storage Proxy starting", version=VERSION)
+                log.info("runtime environment", runtime_info=env_info())
+                log.info("storage-proxy node", node_id=local_config.storage_proxy.node_id)
+                load_configured_wheelhouse(local_config.wheelhouse)
+>>>>>>> 974f2a52c (feat(BA-8920): load plugin wheels only when the [wheelhouse] config allows it (#16407))
                 log_config = logging.getLogger("ai.backend.agent.config")
                 if local_config.debug.enabled:
                     log_config.debug("debug mode enabled.")

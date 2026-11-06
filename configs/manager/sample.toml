@@ -484,6 +484,20 @@
   # Added in 24.12.1
   ## sample-rate = 100
 
+# Plugin wheels loaded when the manager starts. Read only from the config file:
+# etcd values are ignored. Wheels provided here run without verification, so
+# keep the path writable only by trusted operators.
+# Added in 26.10.0
+[wheelhouse]
+  # Whether to load the plugin wheels in the path when the server starts.
+  # Added in 26.10.0
+  allow = false
+  # Directory holding the plugin wheels. A relative path starts from the current
+  # directory of the server. The storage-proxy runs from the directory of its
+  # config file.
+  # Added in 26.10.0
+  path = "wheelhouse"
+
 # Debugging options configuration. Controls various debugging features that aid
 # in development and troubleshooting. Most debug options should be disabled in
 # production environments as they may impact performance or expose sensitive

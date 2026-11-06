@@ -20,6 +20,12 @@ from ai.backend.common.configs import (
     PyroscopeConfig,
     ServiceDiscoveryConfig,
 )
+<<<<<<< HEAD
+=======
+from ai.backend.common.configs.storage_status_report import StorageStatusReportConfig
+from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
+from ai.backend.common.configs.wheelhouse import WheelhouseConfig
+>>>>>>> 974f2a52c (feat(BA-8920): load plugin wheels only when the [wheelhouse] config allows it (#16407))
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.exception import GenericNotImplementedError, InvalidConfigError
@@ -1640,6 +1646,18 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "profiling data and send to a Pyroscope server for analysis."
             ),
             added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    wheelhouse: Annotated[
+        WheelhouseConfig,
+        Field(default_factory=WheelhouseConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Plugin wheels loaded when the storage-proxy starts. Wheels run without "
+                "verification, so keep the path writable only by trusted operators."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
     ]
