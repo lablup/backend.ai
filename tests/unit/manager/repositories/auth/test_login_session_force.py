@@ -390,7 +390,7 @@ class TestLoginSessionForce:
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1
 
         # Logout (invalidate session by token)
-        await auth_db_source.delete_session_by_token(
+        await auth_db_source.delete_owned_session_by_token(
             result1.session_token, UserID(sample_user.user_id), LoginAttemptResult.LOGOUT
         )
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 0
@@ -424,7 +424,7 @@ class TestLoginSessionForce:
             domain_name=sample_user.domain_name,
         )
 
-        owned_session_deleted = await auth_db_source.delete_session_by_token(
+        owned_session_deleted = await auth_db_source.delete_owned_session_by_token(
             created.session_token, UserID(uuid.uuid4()), LoginAttemptResult.LOGOUT
         )
 

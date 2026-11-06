@@ -680,7 +680,7 @@ class AuthDBSource:
             ]
 
     @auth_db_source_resilience.apply()
-    async def delete_session_by_token(
+    async def delete_owned_session_by_token(
         self,
         session_token: str,
         user_id: UserID,

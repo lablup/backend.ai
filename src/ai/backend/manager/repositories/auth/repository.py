@@ -215,14 +215,14 @@ class AuthRepository:
         )
 
     @auth_repository_resilience.apply()
-    async def delete_login_session_by_token(
+    async def delete_owned_login_session_by_token(
         self,
         session_token: str,
         user_id: UserID,
         result: LoginAttemptResult,
         client_ip: str | None = None,
     ) -> bool:
-        return await self._db_source.delete_session_by_token(
+        return await self._db_source.delete_owned_session_by_token(
             session_token, user_id, result, client_ip
         )
 

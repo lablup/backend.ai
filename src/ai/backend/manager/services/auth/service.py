@@ -607,7 +607,7 @@ class AuthService:
         )
 
     async def logout(self, action: LogoutAction) -> LogoutActionResult:
-        owned_session_deleted = await self._auth_repository.delete_login_session_by_token(
+        owned_session_deleted = await self._auth_repository.delete_owned_login_session_by_token(
             action.session_token,
             action.user_id,
             LoginAttemptResult.LOGOUT,
