@@ -18,6 +18,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageData
+from ai.backend.manager.data.resource.types import ResourceGroupProxyConnectionInfo
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import (
     SessionData,
@@ -193,11 +194,11 @@ class SessionRepository:
         return await self._db_source.get_group_name_by_domain_and_id(domain_name, group_id)
 
     @session_repository_resilience.apply()
-    async def get_resource_group_wsproxy_addr(
+    async def resource_group_proxy_connection_info(
         self,
         resource_group_name: str,
-    ) -> str | None:
-        return await self._db_source.get_resource_group_wsproxy_addr(resource_group_name)
+    ) -> ResourceGroupProxyConnectionInfo | None:
+        return await self._db_source.resource_group_proxy_connection_info(resource_group_name)
 
     @session_repository_resilience.apply()
     async def get_session_by_id(
