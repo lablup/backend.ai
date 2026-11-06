@@ -48,8 +48,10 @@ from ai.backend.common.dto.manager.auth.types import (
     AuthSuccessResponse,
     AuthTokenType,
 )
+from ai.backend.common.dto.manager.v2.user.request import UpdatePasswordInput
 from ai.backend.common.exception import UnreachableError
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.api.adapters.auth import AuthAdapter
 from ai.backend.manager.api.rest.middleware.auth import extract_client_ip
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.auth import AuthorizationFailed
@@ -61,7 +63,6 @@ from ai.backend.manager.services.auth.actions.logout import LogoutAction
 from ai.backend.manager.services.auth.actions.signout import SignoutAction
 from ai.backend.manager.services.auth.actions.signup import SignupAction
 from ai.backend.manager.services.auth.actions.update_full_name import UpdateFullNameAction
-from ai.backend.manager.services.auth.actions.update_password import UpdatePasswordAction
 from ai.backend.manager.services.auth.actions.update_password_no_auth import (
     UpdatePasswordNoAuthAction,
 )
@@ -74,8 +75,12 @@ log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 class AuthHandler:
     """Auth API handler with constructor-injected dependencies."""
 
+    _auth: AuthProcessors
+    _auth_adapter: AuthAdapter
+
     def __init__(self, *, auth: AuthProcessors) -> None:
         self._auth = auth
+        self._auth_adapter = AuthAdapter(auth)
 
     # ------------------------------------------------------------------
     # test_get (GET /auth, /auth/test)
@@ -240,19 +245,16 @@ class AuthHandler:
         req: RequestCtx,
     ) -> APIResponse:
         params = body.parsed
-        action = UpdatePasswordAction(
+        await self._auth_adapter.update_password(
+            UpdatePasswordInput(
+                old_password=params.old_password,
+                new_password=params.new_password,
+            ),
             request=req.request,
             user_id=UserID(ctx.user_uuid),
             domain_name=ctx.user_domain,
             email=ctx.user_email,
-            old_password=params.old_password,
-            new_password=params.new_password,
-            new_password_confirm=params.new_password2,
         )
-        result = await self._auth.update_password.run(action)
-        if not result.success:
-            resp = UpdatePasswordResponse(error_msg="new password mismatch")
-            return APIResponse.build(HTTPStatus.BAD_REQUEST, resp)
         return APIResponse.build(HTTPStatus.OK, UpdatePasswordResponse())
 
     # ------------------------------------------------------------------

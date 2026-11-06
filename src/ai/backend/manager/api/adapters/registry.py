@@ -20,6 +20,7 @@ from ai.backend.manager.api.adapters.app_config_fragment.adapter import (
 from ai.backend.manager.api.adapters.artifact.adapter import ArtifactAdapter
 from ai.backend.manager.api.adapters.artifact_registry.adapter import ArtifactRegistryAdapter
 from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
+from ai.backend.manager.api.adapters.auth import AuthAdapter
 from ai.backend.manager.api.adapters.client_ip_masking.adapter import ClientIPMaskingAdapter
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
@@ -106,6 +107,7 @@ class Adapters:
     def __init__(
         self,
         agent: AgentAdapter,
+        auth: AuthAdapter,
         app_config: AppConfigAdapter,
         app_config_fragment: AppConfigFragmentAdapter,
         app_config_allow_list: AppConfigAllowListAdapter,
@@ -164,6 +166,7 @@ class Adapters:
         vfs_storage: VFSStorageAdapter,
     ) -> None:
         self.agent = agent
+        self.auth = auth
         self.app_config = app_config
         self.app_config_fragment = app_config_fragment
         self.app_config_allow_list = app_config_allow_list
@@ -249,6 +252,7 @@ class Adapters:
         )
         return cls(
             agent=AgentAdapter(processors.agent),
+            auth=AuthAdapter(processors.auth),
             app_config=AppConfigAdapter(processors.app_config),
             app_config_fragment=AppConfigFragmentAdapter(processors.app_config),
             app_config_allow_list=AppConfigAllowListAdapter(processors.app_config),

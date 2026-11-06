@@ -14,7 +14,6 @@ class UpdatePasswordAction(UserEntityAction):
     email: str
     old_password: str
     new_password: str
-    new_password_confirm: str
 
     @override
     @classmethod
@@ -31,7 +30,8 @@ class UpdatePasswordAction(UserEntityAction):
         return {
             "old_password": self.old_password,
             "new_password": self.new_password,
-            "new_password2": self.new_password_confirm,
+            # Preserve the existing password-format hook parameter contract.
+            "new_password2": self.new_password,
         }
 
 
