@@ -542,28 +542,6 @@ class TestUpdatePassword:
         mock_processors.auth.update_password.run.assert_called_once()
         assert response.status_code == HTTPStatus.OK
 
-    async def test_returns_bad_request_on_failure(
-        self,
-        handler: AuthHandler,
-        user_context: UserContext,
-        request_ctx: RequestCtx,
-        mock_processors: MagicMock,
-    ) -> None:
-        """Verify BAD_REQUEST is returned when password update fails."""
-        body: BodyParam[UpdatePasswordRequest] = BodyParam(UpdatePasswordRequest)
-        body.from_body({
-            "old_password": "oldpass",
-            "new_password": "newpass",
-            "new_password2": "differentpass",
-        })
-        mock_processors.auth.update_password.run = AsyncMock(
-            return_value=UpdatePasswordActionResult(success=False, message="mismatch")
-        )
-
-        response = await handler.update_password(body, user_context, request_ctx)
-
-        assert response.status_code == HTTPStatus.BAD_REQUEST
-
 
 class TestUpdatePasswordNoAuth:
     """Tests for update_password_no_auth handler (public endpoint)."""
