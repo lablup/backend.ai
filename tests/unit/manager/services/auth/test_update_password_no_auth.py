@@ -81,7 +81,6 @@ async def test_update_password_no_auth_successful(
         email="user@example.com",
         current_password="current_pass",
         new_password="new_secure_password",
-        request=MagicMock(),
     )
 
     # Setup hook to pass
@@ -130,7 +129,6 @@ async def test_update_password_no_auth_fails_when_max_password_age_is_none(
         email="user@example.com",
         current_password="pass",
         new_password="newpass",
-        request=MagicMock(),
     )
 
     # Setup hook to pass
@@ -155,7 +153,6 @@ async def test_update_password_no_auth_fails_with_incorrect_current_password(
         email="user@example.com",
         current_password="wrong_password",
         new_password="new_password",
-        request=MagicMock(),
     )
 
     # Setup hook to pass
@@ -186,7 +183,6 @@ async def test_update_password_no_auth_fails_when_new_password_same_as_current(
         email="user@example.com",
         current_password="same_password",
         new_password="same_password",
-        request=MagicMock(),
     )
 
     # Setup hook to pass
@@ -221,7 +217,6 @@ async def test_update_password_no_auth_with_retry(
         email="retry@example.com",
         current_password="current",
         new_password="new_password",
-        request=MagicMock(),
     )
 
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
@@ -260,7 +255,6 @@ async def test_update_password_no_auth_hook_rejection(
         email="user@example.com",
         current_password="current",
         new_password="weak",
-        request=MagicMock(),
     )
 
     mock_auth_repository.check_credential_without_migration.return_value = UserCredential(

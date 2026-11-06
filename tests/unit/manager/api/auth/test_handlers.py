@@ -523,7 +523,6 @@ class TestUpdatePassword:
         self,
         handler: AuthHandler,
         user_context: UserContext,
-        request_ctx: RequestCtx,
         mock_processors: MagicMock,
     ) -> None:
         """Verify processor is called and OK is returned on success."""
@@ -537,7 +536,7 @@ class TestUpdatePassword:
             return_value=UpdatePasswordActionResult(success=True, message="OK")
         )
 
-        response = await handler.update_password(body, user_context, request_ctx)
+        response = await handler.update_password(body, user_context)
 
         mock_processors.auth.update_password.run.assert_called_once()
         assert response.status_code == HTTPStatus.OK
@@ -546,7 +545,6 @@ class TestUpdatePassword:
         self,
         handler: AuthHandler,
         user_context: UserContext,
-        request_ctx: RequestCtx,
         mock_processors: MagicMock,
     ) -> None:
         """Verify BAD_REQUEST is returned when password update fails."""
@@ -560,7 +558,7 @@ class TestUpdatePassword:
             return_value=UpdatePasswordActionResult(success=False, message="mismatch")
         )
 
-        response = await handler.update_password(body, user_context, request_ctx)
+        response = await handler.update_password(body, user_context)
 
         assert response.status_code == HTTPStatus.BAD_REQUEST
 
@@ -571,7 +569,6 @@ class TestUpdatePasswordNoAuth:
     async def test_calls_processor_and_returns_created(
         self,
         handler: AuthHandler,
-        request_ctx: RequestCtx,
         mock_processors: MagicMock,
     ) -> None:
         """Verify processor is called and HTTP 201 CREATED is returned."""
@@ -590,7 +587,7 @@ class TestUpdatePasswordNoAuth:
             )
         )
 
-        response = await handler.update_password_no_auth(body, request_ctx)
+        response = await handler.update_password_no_auth(body)
 
         mock_processors.auth.update_password_no_auth.run.assert_called_once()
         assert response.status_code == HTTPStatus.CREATED

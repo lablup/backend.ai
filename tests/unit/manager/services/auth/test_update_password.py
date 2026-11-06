@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from uuid import UUID
 
 import pytest
@@ -57,7 +57,6 @@ async def test_update_password_successful(
 ) -> None:
     """Test successful password update"""
     action = UpdatePasswordAction(
-        request=MagicMock(),
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
@@ -104,7 +103,6 @@ async def test_update_password_fails_when_new_passwords_dont_match(
 ) -> None:
     """Test password update fails when new passwords don't match"""
     action = UpdatePasswordAction(
-        request=MagicMock(),
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
@@ -143,7 +141,6 @@ async def test_update_password_fails_with_incorrect_old_password(
 ) -> None:
     """Test password update fails with incorrect old password"""
     action = UpdatePasswordAction(
-        request=MagicMock(),
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
@@ -179,7 +176,6 @@ async def test_update_password_with_hook_rejection(
 ) -> None:
     """Test password update fails when hook rejects password format"""
     action = UpdatePasswordAction(
-        request=MagicMock(),
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="default",
         email="user@example.com",
@@ -214,7 +210,6 @@ async def test_update_password_repository_call(
 ) -> None:
     """Test that password update calls repository with correct parameters"""
     action = UpdatePasswordAction(
-        request=MagicMock(),
         user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
         domain_name="test-domain",
         email="update@example.com",
