@@ -2796,7 +2796,7 @@ When
 Then
 
 - every wired entity with its operations comes back in name order
-  - items: every wired entity with its operations, each in name order
+  - items: the list carrying the entities, operations and bits the scenario states, each in name order
 
 ### get_permission_matrix
 
@@ -2825,7 +2825,7 @@ When
 Then
 
 - the table carrying every wired scope, entity and operation comes back
-  - items: the table carrying every wired scope, entity and operation
+  - items: the table carrying the scopes, entities, operations and bits the scenario states
 
 ### get_scope_entity_combinations
 
@@ -2854,7 +2854,7 @@ When
 Then
 
 - every scope comes back with the entities it may name, in name order
-  - items: every scope with the entities it may name, each in name order
+  - items: each scope the scenario states, with the entities it may name
 
 ### my_atomic_bulk_scope_permissions
 
