@@ -44,6 +44,7 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.user.fields import TestSeedConfigFileOf
 
 CONFIG_PATH = ".vimrc"
 RESERVED_PATH = ".ssh/authorized_keys"
@@ -69,30 +70,44 @@ class AUserAndTheirOwnConfig:
 
 @dataclass(frozen=True)
 class SomeoneWithTheirOwnConfig(Given[Any, AUserAndTheirOwnConfig]):
-    """도메인 하나와 사용자 하나. ``permissions``만큼 자기 사용자 권한을 받는다."""
+    """도메인 하나와 사용자 하나. ``permissions``만큼 자기 사용자 권한을 받는다.
+
+    ``with_a_config_file`` 이면 기본으로 표시되지 않은 설정 파일 하나를 함께 심는다.
+    """
 
     permissions: tuple[Permission, ...] = ()
+    with_a_config_file: bool = False
 
     @override
     def describe(self) -> str:
+        parts_ko = ["도메인 하나와 사용자 하나"]
+        parts_en = ["one domain and one user"]
+        if self.with_a_config_file:
+            parts_ko.append("사용자는 기본으로 표시되지 않은 설정 파일 하나를 갖고 있습니다")
+            parts_en.append("the user holds one config file not marked as default")
         if self.permissions:
             names = ", ".join(str(p.name) for p in self.permissions)
-            return Says(
-                f"도메인 하나와 사용자 하나, 사용자는 자기 자신에게 {names} 권한을 받았습니다",
-                english=(
-                    f"one domain and one user, and the user holds the {names} permission on "
-                    "themselves"
-                ),
-            )
-        return Says(
-            "도메인 하나와 사용자 하나, 사용자는 아무 권한도 받지 않았습니다",
-            english="one domain and one user, and the user holds no permission",
-        )
+            parts_ko.append(f"사용자는 자기 자신에게 {names} 권한을 받았습니다")
+            parts_en.append(f"the user holds the {names} permission on themselves")
+        else:
+            parts_ko.append("사용자는 아무 권한도 받지 않았습니다")
+            parts_en.append("the user holds no permission")
+        return Says(", ".join(parts_ko), english=", ".join(parts_en))
 
     @override
     async def lay(self, seeding: Any) -> AUserAndTheirOwnConfig:
         domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         owner = await seeding.within(SomeoneOf(domain))
+        if self.with_a_config_file:
+            await seeding.adding(
+                TestSeedConfigFileOf(
+                    owner=UserID(seeding.made(owner).id),
+                    path=CONFIG_PATH,
+                    perm=CONFIG_PERMISSION,
+                    data=CONFIG_DATA,
+                ),
+                owner,
+            )
         if self.permissions:
             await seeding.within(AGrant.on_user(owner, owner, *self.permissions))
         return AUserAndTheirOwnConfig(seeding.made(owner))
@@ -249,21 +264,23 @@ class DeletingADefaultConfigFile(When[AUserAndTheirOwnConfig, UserConfigAdapter,
 
 @dataclass(frozen=True)
 class TheFileIsWritten(Then[AUserAndTheirOwnConfig, Answer]):
-    """파일이 저장되고 빈 응답이 온다."""
+    """빈 응답이 온다.
+
+    만든 파일을 다시 읽을 경로가 없어(발견 기록 참고) 응답 본문 전체를 본다.
+    """
 
     @override
     def says(self) -> str:
-        return Says(
-            "파일이 저장되고 빈 응답이 옵니다",
-            english="the file is saved and an empty response comes back",
-        )
+        return Says("빈 응답이 옵니다", english="an empty response comes back")
 
     @override
     def look(self, laid: AUserAndTheirOwnConfig, answered: Answered[Answer]) -> list[Verdict]:
         response = answered.response
         if response is None:
             return [MissingResponse(answered.raised)]
-        return [Same("response", type(response).__name__, "CreateDotfileResponse")]
+        if not isinstance(response, CreateDotfileResponse):
+            return [Same("response", type(response).__name__, "CreateDotfileResponse")]
+        return [Same("response", response.model_dump(), {})]
 
 
 @dataclass(frozen=True)
@@ -467,7 +484,7 @@ class AConfigFileThatIsNotDefaultIsNotFound(
 
     @override
     def given(self) -> Given[TestSeedingSession, AUserAndTheirOwnConfig]:
-        return SomeoneWithTheirOwnConfig(permissions=(Permission.READ,))
+        return SomeoneWithTheirOwnConfig(permissions=(Permission.READ,), with_a_config_file=True)
 
     @override
     def when(self) -> When[AUserAndTheirOwnConfig, UserConfigAdapter, Answer]:
@@ -530,7 +547,9 @@ class UpdatingAConfigFileThatIsNotDefaultIsNotFound(
 
     @override
     def given(self) -> Given[TestSeedingSession, AUserAndTheirOwnConfig]:
-        return SomeoneWithTheirOwnConfig(permissions=(Permission.READ, Permission.UPDATE))
+        return SomeoneWithTheirOwnConfig(
+            permissions=(Permission.READ, Permission.UPDATE), with_a_config_file=True
+        )
 
     @override
     def when(self) -> When[AUserAndTheirOwnConfig, UserConfigAdapter, Answer]:
@@ -593,7 +612,9 @@ class DeletingAConfigFileThatIsNotDefaultIsNotFound(
 
     @override
     def given(self) -> Given[TestSeedingSession, AUserAndTheirOwnConfig]:
-        return SomeoneWithTheirOwnConfig(permissions=(Permission.READ, Permission.UPDATE))
+        return SomeoneWithTheirOwnConfig(
+            permissions=(Permission.READ, Permission.UPDATE), with_a_config_file=True
+        )
 
     @override
     def when(self) -> When[AUserAndTheirOwnConfig, UserConfigAdapter, Answer]:
