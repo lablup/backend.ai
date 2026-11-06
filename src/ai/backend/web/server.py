@@ -98,6 +98,10 @@ from ai.backend.web.clients.manager_pool import (
     ManagerPoolGateHealthChecker,
 )
 from ai.backend.web.config.unified import EventLoopType, ServiceMode, WebServerUnifiedConfig
+<<<<<<< HEAD
+=======
+from ai.backend.web.errors import ManagerConnectionUnavailable, UnauthenticatedError
+>>>>>>> 6e4504f4 (fix(BA-8944): reject extending a login session that is not authenticated (#16613))
 from ai.backend.web.ratelimit import manager_proxy_rate_limited
 from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_policy_middleware
 
@@ -607,6 +611,8 @@ async def extend_login_session(request: web.Request) -> web.Response:
 
     current = get_time()
     session = await get_session(request)
+    if not session.get("authenticated", False):
+        raise UnauthenticatedError()
 
     session.expiration_dt = current + login_session_extension_sec
     expires = datetime.fromtimestamp(session.expiration_dt, tz=UTC).isoformat()
