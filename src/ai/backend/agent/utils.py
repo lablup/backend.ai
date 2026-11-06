@@ -37,6 +37,7 @@ from ai.backend.common.cgroup import (
     get_container_pids,
 )
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.files import open_dir_beneath
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import PID, ContainerId, ContainerPID, HostPID, KernelId
 from ai.backend.logging import BraceStyleAdapter
@@ -478,3 +479,19 @@ def get_safe_ulimit(name: str, desired_soft: int, desired_hard: int) -> DockerUl
         # If we can't get system limits, log and use desired values
         log.warning("Could not get system ulimit for {}: {}", name, e)
         return {"Name": name, "Soft": desired_soft, "Hard": desired_hard}
+
+
+def write_file_beneath(root: Path, target: Path, data: bytes) -> None:
+    """Write ``data`` to ``target`` inside ``root``, creating parents and refusing any symlink."""
+    parts = target.relative_to(root).parts
+    if not parts:
+        raise IsADirectoryError(target)
+    with open_dir_beneath(root, parts[:-1], mkdir_mode=0o777) as dir_fd:
+        fd = os.open(
+            parts[-1],
+            os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW,
+            0o666,
+            dir_fd=dir_fd,
+        )
+    with os.fdopen(fd, "wb") as f:
+        f.write(data)
