@@ -12,6 +12,8 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
+from ai.backend.manager.api.adapters.auth import AuthAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.gql.schema import schema as strawberry_schema
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
@@ -22,11 +24,14 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.user.row import users
 from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 
 if TYPE_CHECKING:
     from tests.component.conftest import UserFixtureData
+
+_CURRENT_PASSWORD = "CurrentPasswordForTest!"
 
 _OLD_PASSWORD_CHANGED_AT = datetime(2000, 1, 1, tzinfo=UTC)
 
@@ -75,7 +80,16 @@ async def _require_password_change(db_engine: SAEngine, user: UserFixtureData) -
         await conn.execute(
             sa.update(users)
             .where(users.c.uuid == str(user.user_uuid))
-            .values(need_password_change=True, password_changed_at=_OLD_PASSWORD_CHANGED_AT)
+            .values(
+                password=PasswordInfo(
+                    password=_CURRENT_PASSWORD,
+                    algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                    rounds=600_000,
+                    salt_size=32,
+                ),
+                need_password_change=True,
+                password_changed_at=_OLD_PASSWORD_CHANGED_AT,
+            )
         )
 
 
@@ -93,6 +107,7 @@ async def _password_state(db_engine: SAEngine, user: UserFixtureData) -> sa.Row[
 def server_module_registries(
     route_deps: RouteDeps,
     user_processors: UserProcessors,
+    auth_processors: AuthProcessors,
     domain_processors: DomainProcessors,
     config_provider: ManagerConfigProvider,
 ) -> list[RouteRegistry]:
@@ -100,6 +115,7 @@ def server_module_registries(
     mock_gql_deps = MagicMock()
     mock_gql_deps.processors.user = user_processors
     mock_gql_deps.config_provider = config_provider
+    mock_gql_deps.adapters.auth = AuthAdapter(auth_processors)
     mock_gql_deps.adapters.user = UserAdapter(
         user_processors,
         domain_processors,
@@ -149,12 +165,29 @@ class TestUpdateUserV2NeedPasswordChange:
         await _call_gql_ok(
             user_registry,
             _UPDATE_USER_V2,
-            {"input": {"password": secrets.token_urlsafe(12)}},
+            {"input": {"password": secrets.token_urlsafe(12), "oldPassword": _CURRENT_PASSWORD}},
         )
 
         state = await _password_state(db_engine, user_needing_password_change)
         assert state.need_password_change is False
         assert state.password_changed_at > _OLD_PASSWORD_CHANGED_AT
+
+    @pytest.mark.parametrize("old_password", [None, "incorrect-password"])
+    async def test_own_password_change_rejects_invalid_credentials(
+        self,
+        user_registry: BackendAIClientRegistry,
+        user_needing_password_change: UserFixtureData,
+        db_engine: SAEngine,
+        old_password: str | None,
+    ) -> None:
+        input_data = {"password": secrets.token_urlsafe(12)}
+        if old_password is not None:
+            input_data["oldPassword"] = old_password
+        response = await _call_gql(user_registry, _UPDATE_USER_V2, {"input": input_data})
+        assert response.get("errors")
+        state = await _password_state(db_engine, user_needing_password_change)
+        assert state.need_password_change is True
+        assert state.password_changed_at == _OLD_PASSWORD_CHANGED_AT
 
     async def test_own_update_without_password_keeps_flag(
         self,
