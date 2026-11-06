@@ -552,6 +552,58 @@ class TestSessionStartService:
         post_call_kwargs = mock_session_obj.post.call_args[1]
         assert post_call_kwargs["json"]["kernel_host"] == "192.168.1.100"
 
+    async def test_start_service_does_not_forward_the_login_session_token(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        session_seed: SessionSeedData,
+        db_engine: SAEngine,
+        resource_group_name: ResourceGroupName,
+        agent_registry: AsyncMock,
+        appproxy_client_pool: AsyncMock,
+    ) -> None:
+        """A login session token in the request does not reach the app proxy coordinator."""
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                sa.update(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
+                .values(wsproxy_addr=_WSPROXY_ADDR)
+            )
+            await conn.execute(
+                sa.update(kernels)
+                .where(kernels.c.id == session_seed.kernel_id)
+                .values(service_ports=_SERVICE_PORTS_TTYD, kernel_host="10.0.0.1")
+            )
+
+        mock_status = MagicMock()
+        mock_status.advertise_address = _WSPROXY_ADDR
+        mock_client = AsyncMock()
+        mock_client.fetch_status.return_value = mock_status
+        appproxy_client_pool.load_client.return_value = mock_client
+
+        agent_registry.start_service.return_value = {"status": "started"}
+
+        mock_resp = AsyncMock()
+        mock_resp.json.return_value = {"token": "login-session-test-token"}
+        mock_session_ctx = AsyncMock()
+        mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
+        mock_session_ctx.__aexit__ = AsyncMock(return_value=False)
+        mock_session_obj = MagicMock()
+        mock_session_obj.post.return_value = mock_session_ctx
+        mock_session_cls = AsyncMock()
+        mock_session_cls.__aenter__ = AsyncMock(return_value=mock_session_obj)
+        mock_session_cls.__aexit__ = AsyncMock(return_value=False)
+
+        with patch(
+            "ai.backend.manager.services.session.service.aiohttp.ClientSession",
+            return_value=mock_session_cls,
+        ):
+            await admin_registry.session.start_service(
+                session_seed.session_id,
+                StartServiceRequest(app="ttyd", login_session_token="login-session-token-value"),
+            )
+
+        assert mock_session_obj.post.call_args[1]["json"]["login_session_token"] == ""
+
     async def test_start_service_wsproxy_advertise_address_fallback(
         self,
         admin_registry: BackendAIClientRegistry,
