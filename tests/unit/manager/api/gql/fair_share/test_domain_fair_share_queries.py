@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
+from aiohttp import web
 
 from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
@@ -32,7 +33,6 @@ from ai.backend.manager.data.fair_share.types import (
     FairShareMetadata,
     FairShareSpec,
 )
-from ai.backend.manager.errors.auth import SuperadminRequired
 from ai.backend.manager.errors.resource import DomainNotFound
 
 # Common fixtures
@@ -166,13 +166,13 @@ class TestAdminDomainFairShareSingleQuery:
         self,
         mock_regular_user: UserData,
     ) -> None:
-        """Should raise SuperadminRequired for non-admin users."""
+        """Should raise HTTPForbidden for non-admin users."""
         context = MagicMock()
         context.adapters.fair_share.get_domain = AsyncMock()
         info = create_mock_info(context)
 
         with with_user_context(mock_regular_user):
-            with pytest.raises(SuperadminRequired):
+            with pytest.raises(web.HTTPForbidden):
                 await domain_resolver.admin_domain_fair_share.base_resolver(
                     info=info,
                     resource_group_name="default",
@@ -270,13 +270,13 @@ class TestAdminDomainFairSharesListQuery:
         self,
         mock_regular_user: UserData,
     ) -> None:
-        """Should raise SuperadminRequired for non-admin users."""
+        """Should raise HTTPForbidden for non-admin users."""
         context = MagicMock()
         context.adapters.fair_share.search_domain = AsyncMock()
         info = create_mock_info(context)
 
         with with_user_context(mock_regular_user):
-            with pytest.raises(SuperadminRequired):
+            with pytest.raises(web.HTTPForbidden):
                 await domain_resolver.admin_domain_fair_shares.base_resolver(
                     info=info,
                     filter=None,
