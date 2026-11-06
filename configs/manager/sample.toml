@@ -97,14 +97,14 @@
   # keys will be stored under this namespace.
   # Added in 22.03.0
   namespace = "backend"
-  # Username for authenticating with etcd. Optional if etcd doesn't require
-  # authentication. Should be set along with password for secure deployments.
+  # Username for authenticating with etcd. Set together with the password field.
+  # Required since 26.10.0.
   # Added in 22.03.0
-  ## user = "backend"
-  # Password for authenticating with etcd. Should be kept secret in production
-  # environments. Set together with the user field for authentication.
+  user = "backend"
+  # Password for authenticating with etcd. Set together with the user field.
+  # Required since 26.10.0.
   # Added in 22.03.0
-  ## password = "ETCD_PASSWORD"
+  password = "ETCD_PASSWORD"
   # Seconds without a frame from an etcd member before a keep-alive ping is sent
   # on a connection with requests in flight. Must not be below the server's
   # --grpc-keepalive-min-time (5 seconds by default).

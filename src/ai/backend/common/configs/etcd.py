@@ -8,6 +8,7 @@ from pydantic import Field, model_validator
 from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.typed_validators import HostPortPair
 
 __all__ = ("EtcdConfig",)
@@ -63,7 +64,10 @@ class EtcdConfig(BaseConfigSchema):
         str,
         Field(min_length=1),
         BackendAIConfigMeta(
-            description="Username for authenticating with etcd. Set together with the password field.",
+            description=(
+                "Username for authenticating with etcd. Set together with the password field. "
+                f"Required since {NEXT_RELEASE_VERSION}."
+            ),
             added_version="22.03.0",
             example=ConfigExample(local="root", prod="backend"),
         ),
@@ -72,7 +76,10 @@ class EtcdConfig(BaseConfigSchema):
         str,
         Field(min_length=1),
         BackendAIConfigMeta(
-            description="Password for authenticating with etcd. Set together with the user field.",
+            description=(
+                "Password for authenticating with etcd. Set together with the user field. "
+                f"Required since {NEXT_RELEASE_VERSION}."
+            ),
             added_version="22.03.0",
             secret=True,
             example=ConfigExample(local="develove", prod="ETCD_PASSWORD"),
