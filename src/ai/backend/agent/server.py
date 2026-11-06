@@ -81,7 +81,7 @@ from ai.backend.common.asyncio import current_loop
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
-from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.configs.loader.redis_loader import load_redis_config
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import (
@@ -572,20 +572,8 @@ class AgentRPCServer(aobject):
         log.info("manager detected")
 
     async def read_agent_config(self) -> None:
-        # Fill up Redis configs from etcd and store as separate attributes
-        self._redis_config = config.redis_config_iv.check(
-            await self.etcd.get_prefix("config/redis"),
-        )
-
-        # Update local_config with redis settings
-        # Convert HostPortPair to dict format for compatibility
-        redis_config_dict = self._redis_config.copy()
-        if isinstance(self._redis_config.get("addr"), object):
-            addr = self._redis_config["addr"]
-            if addr is not None:
-                redis_config_dict["addr"] = f"{addr.host}:{addr.port}"
-
-        redis_config = RedisConfig.model_validate(redis_config_dict)
+        # Redis passwords come only from the local config file.
+        redis_config = await load_redis_config(self.etcd, self.local_config.redis)
         log.info("redis configured", redis_config=safe_print_redis_config(redis_config))
         self.local_config.overwrite(redis=redis_config)
 

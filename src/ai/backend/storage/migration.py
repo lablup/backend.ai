@@ -20,8 +20,7 @@ import tqdm
 import yarl
 
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
-from ai.backend.common.config import redis_config_iv
-from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.configs.loader.redis_loader import load_redis_config
 from ai.backend.common.data.storage.types import StorageBackendCapability
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events.dispatcher import (
@@ -237,10 +236,7 @@ async def check_and_upgrade(
     force_scan_folder_size: bool = False,
 ) -> None:
     etcd = make_etcd(local_config)
-    raw_redis_config = redis_config_iv.check(
-        await etcd.get_prefix("config/redis"),
-    )
-    redis_config = RedisConfig.model_validate(raw_redis_config)
+    redis_config = await load_redis_config(etcd, local_config.redis)
     redis_profile_target = redis_config.to_redis_profile_target()
     stream_target = redis_profile_target.profile_target(RedisRole.STREAM)
     sentinel_monitors = SentinelMonitorSet(redis_profile_target.valkey_targets())
