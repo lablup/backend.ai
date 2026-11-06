@@ -72,9 +72,11 @@ def _watcher_cfg() -> dict[str, Any]:
     return {
         "logging": MagicMock(),
         "etcd": EtcdConfig.model_validate({
-            "namespace": "test",
             "user": "test",
             "password": "test",
+            "namespace": "test",
+            "keep-alive-interval": 5.0,
+            "keep-alive-timeout": 3.0,
         }),
         "watcher": {"ssl-enabled": False, "service-addr": MagicMock()},
     }

@@ -16,9 +16,11 @@ class TestWatcherSSL:
         config = {
             "logging": MagicMock(),
             "etcd": EtcdConfig.model_validate({
-                "namespace": "test",
                 "user": "test",
                 "password": "test",
+                "namespace": "test",
+                "keep-alive-interval": 5.0,
+                "keep-alive-timeout": 3.0,
             }),
             "watcher": {
                 "service-addr": HostPortPair("127.0.0.1", 6009),
