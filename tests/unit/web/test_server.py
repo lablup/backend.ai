@@ -6,12 +6,18 @@ from unittest.mock import AsyncMock, MagicMock
 import aiohttp_cors
 import pytest
 from aiohttp import web
+from aiohttp.typedefs import Handler
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.common.dto.manager.auth.response import UpdatePasswordNoAuthResponse
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.web.session import SESSION_KEY, Session
 from ai.backend.web.config.unified import SecurityConfig
-from ai.backend.web.server import build_cors_options, update_password_no_auth
+from ai.backend.web.server import (
+    build_cors_options,
+    extend_login_session,
+    update_password_no_auth,
+)
 
 MANAGER_ENDPOINT = "http://manager:8081"
 PASSWORD_UPDATE_BODY = {
@@ -87,6 +93,37 @@ async def test_update_password_no_auth_returns_200_on_success(aiohttp_client: An
         "data": None,
         "password_changed_at": "2026-09-29T00:00:00+00:00",
     }
+
+
+class TestExtendLoginSession:
+    @pytest.fixture
+    def session(self) -> Session:
+        return Session(None, data=None, new=True)
+
+    @pytest.fixture
+    async def client(self, aiohttp_client: Any, session: Session) -> Any:
+        @web.middleware
+        async def session_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
+            request[SESSION_KEY] = session
+            return await handler(request)
+
+        app = web.Application(middlewares=[session_middleware])
+        app["config"] = MagicMock(session=MagicMock(login_session_extension_sec=3600))
+        app.router.add_route("POST", "/server/extend-login-session", extend_login_session)
+        return await aiohttp_client(app)
+
+    async def test_rejects_unauthenticated_session(self, client: Any) -> None:
+        resp = await client.post("/server/extend-login-session")
+
+        assert resp.status == 401
+
+    async def test_extends_authenticated_session(self, client: Any, session: Session) -> None:
+        session["authenticated"] = True
+
+        resp = await client.post("/server/extend-login-session")
+
+        assert resp.status == 200
+        assert (await resp.json())["status"] == 201
 
 
 ALLOWED_ORIGIN = "https://console.example.com"
