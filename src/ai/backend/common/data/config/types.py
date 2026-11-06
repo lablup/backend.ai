@@ -20,4 +20,4 @@ class EtcdConfigData:
     password: str | None
     keep_alive_interval: float
     keep_alive_timeout: float
-    tls: EtcdTLSConfigData | None = None
+    tls: EtcdTLSConfigData | None
