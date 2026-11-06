@@ -3,8 +3,7 @@
     "timezone": "UTC"
   },
   "redis": {
-    "addr": "127.0.0.1:6379",
-    "password": "REDIS_PASSWORD"
+    "addr": "127.0.0.1:6379"
   },
   "docker": {
     "registry": {

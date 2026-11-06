@@ -14,7 +14,7 @@ from ai.backend.logging.types import LogLevel
 
 from .config import AgentConfigLoaderDependency, AgentConfigLoaderInput
 from .etcd import AgentEtcdDependency
-from .redis_config import RedisConfigDependency
+from .redis_config import RedisConfigDependency, RedisConfigInput
 
 
 @dataclass
@@ -86,11 +86,11 @@ class AgentBootstrapComposer(DependencyComposer[AgentBootstrapInput, AgentBootst
             config,
         )
 
-        # Stage 3: Read redis config from etcd
-        # (same as server.py read_agent_config() lines 457-473)
+        # Stage 3: Read redis config from etcd and the local config file
+        # (same as server.py read_agent_config())
         redis_config = await stack.enter_dependency(
             RedisConfigDependency(),
-            etcd,
+            RedisConfigInput(etcd=etcd, local_redis=config.redis),
         )
 
         # Yield bootstrap resources
