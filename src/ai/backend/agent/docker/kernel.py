@@ -29,13 +29,8 @@ from ai.backend.agent.errors import KernelRunnerNotInitializedError, SubprocessS
 from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
 from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.agent.types import AgentEventData, KernelOwnershipData
-<<<<<<< HEAD
-from ai.backend.agent.utils import closing_async, get_arch_name
-from ai.backend.common.asyncio import current_loop
-=======
 from ai.backend.agent.utils import closing_async, get_arch_name, write_file_beneath
-from ai.backend.common.asyncio import run_in_executor_with_context
->>>>>>> 930c41139 (fix(BA-8807): write agent file uploads without following symlinks (#16470))
+from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
@@ -316,13 +311,9 @@ class DockerKernel(AbstractKernel):
             raise PermissionError("Not allowed to upload files outside /home/work")
 
         try:
-<<<<<<< HEAD
-            await loop.run_in_executor(None, _write_to_disk)
-=======
-            await run_in_executor_with_context(
+            await loop.run_in_executor(
                 None, write_file_beneath, host_work_dir, host_abspath, filedata
             )
->>>>>>> 930c41139 (fix(BA-8807): write agent file uploads without following symlinks (#16470))
         except OSError as e:
             raise RuntimeError(
                 f"{self.kernel_id}: writing uploaded file failed: {container_path} -> {host_abspath} ({e!r})"
