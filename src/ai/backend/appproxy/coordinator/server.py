@@ -61,7 +61,6 @@ from ai.backend.appproxy.common.errors import (
     ObjectNotFound,
     URLNotFound,
 )
-from ai.backend.appproxy.common.etcd import TraefikEtcd
 from ai.backend.appproxy.common.events import (
     DoCheckUnusedPortEvent,
     DoCheckWorkerLostEvent,
@@ -89,7 +88,6 @@ from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiv
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK, RedisRole
 from ai.backend.common.dto.appproxy_coordinator.v2.status.types import AppProxyStatusResponse
-from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.exception import BackendAIError, BackendAISchemaValidationFailed
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
@@ -124,7 +122,6 @@ from ai.backend.common.service_discovery.service_discovery import (
 )
 from ai.backend.common.types import (
     AgentId,
-    HostPortPair,
     RedisProfileTarget,
     ServiceDiscoveryType,
 )
@@ -136,10 +133,10 @@ from . import __version__
 from .config import ServerConfig
 from .config import load as load_config
 from .defs import EVENT_DISPATCHER_CONSUMER_GROUP
+from .dependencies.infrastructure.etcd import EtcdProvider
 from .errors import (
     CleanupContextNotInitializedError,
     MissingProfilingConfigError,
-    MissingTraefikConfigError,
 )
 from .health.database import DatabaseHealthChecker
 from .models import Circuit, Worker
@@ -481,34 +478,9 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def etcd_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    if root_ctx.local_config.proxy_coordinator.enable_traefik:
-        traefik_config = root_ctx.local_config.proxy_coordinator.traefik
-        if not traefik_config:
-            raise MissingTraefikConfigError(
-                "Traefik configuration is required when enable_traefik is True"
-            )
-
-        creds: dict[str, str] | None = None
-        if traefik_config.etcd.password:
-            creds = {"password": traefik_config.etcd.password}
-
-        # Handle addr as either single HostPortPair or list
-        addr = traefik_config.etcd.addr
-        if isinstance(addr, list):
-            # Use first address from the list
-            host_port = addr[0]
-        else:
-            host_port = addr
-
-        root_ctx.traefik_etcd = TraefikEtcd(
-            HostPortPair(host_port.host, host_port.port),
-            traefik_config.etcd.namespace,
-            {ConfigScopes.GLOBAL: ""},
-            credentials=creds,
-        )
-    else:
-        root_ctx.traefik_etcd = None
-    yield
+    async with EtcdProvider().provide(root_ctx.local_config) as traefik_etcd:
+        root_ctx.traefik_etcd = traefik_etcd
+        yield
 
 
 async def on_worker_lost_event(
