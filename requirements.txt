@@ -77,13 +77,8 @@ python-json-logger~=3.2.0
 pyzmq~=26.4
 PyJWT~=2.15.1
 PyYAML~=6.0
-<<<<<<< HEAD
-pydantic[email]~=2.11.3
-=======
-pyasn1>=0.6.5
 oauthlib>=4.0.1
-pydantic[email]~=2.13.5
->>>>>>> 2a5d83e82 (deps(BA-8964): bump oauthlib past CVE-2026-49272 (#16580))
+pydantic[email]~=2.11.3
 packaging>=24.1
 hiredis>=3.0.0
 huggingface-hub~=0.34.3
