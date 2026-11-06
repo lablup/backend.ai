@@ -100,6 +100,16 @@ def unusable_named_config(case: _UnusableConfigCase, wheelhouse_with_planted_whe
     return config_path
 
 
+@pytest.fixture
+def unusable_config_named_by_the_environment(
+    wheelhouse_with_planted_wheel: Path, monkeypatch: pytest.MonkeyPatch
+) -> Path:
+    config_path = wheelhouse_with_planted_wheel.parent / "environment.toml"
+    config_path.write_bytes(b"[wheelhouse\n")
+    monkeypatch.setenv("BACKEND_CONFIG_FILE", str(config_path))
+    return config_path
+
+
 def _scan_rows(*extra_args: str) -> list[dict[str, str]]:
     result = CliRunner().invoke(main, ["scan", _PLANTED_GROUP, "--format", "JSON", *extra_args])
     assert result.exit_code == 0, result.output
@@ -184,13 +194,19 @@ class TestScanWheelhouse:
         ],
         ids=lambda case: case.failure,
     )
-    def test_fails_with_a_message_when_the_named_config_is_unusable(
-        self, unusable_named_config: Path
-    ) -> None:
+    def test_warns_once_about_an_unusable_named_config(self, unusable_named_config: Path) -> None:
         result = CliRunner().invoke(
-            main, ["scan", _PLANTED_GROUP, "-f", str(unusable_named_config)]
+            main, ["scan", _PLANTED_GROUP, "--format", "JSON", "-f", str(unusable_named_config)]
         )
 
-        assert result.exit_code == 1
-        assert result.stdout == ""
-        assert str(unusable_named_config) in result.stderr
+        assert result.exit_code == 0
+        assert json.loads(result.stdout) == []
+        assert result.stderr.count(str(unusable_named_config)) == 1
+
+    def test_warns_once_about_an_unusable_config_named_by_the_environment(
+        self, unusable_config_named_by_the_environment: Path
+    ) -> None:
+        result = CliRunner().invoke(main, ["scan", _PLANTED_GROUP])
+
+        assert result.exit_code == 0
+        assert result.stderr.count(str(unusable_config_named_by_the_environment)) == 1

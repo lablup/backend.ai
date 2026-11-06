@@ -65,33 +65,40 @@ def main(
     ctx.obj = ctx.with_resource(CLIContext(log_level))
 
 
-def _find_allowed_wheelhouse_paths(config_path: Path | None) -> set[Path]:
-    from tomli import TOMLDecodeError
+def _find_daemon_config_paths() -> set[Path]:
+    from ai.backend.common.config import ConfigurationError, find_config_file
 
-    from ai.backend.common.config import ConfigurationError, find_config_file, read_from_file
+    daemon_config_paths: set[Path] = set()
+    for daemon_name in _DAEMONS_LOADING_WHEELS:
+        try:
+            daemon_config_paths.add(find_config_file(daemon_name))
+        except ConfigurationError:
+            # A node runs only some of the daemons.
+            continue
+    return daemon_config_paths
+
+
+def _find_allowed_wheelhouse_paths(config_paths: set[Path]) -> set[Path]:
+    import tomli
+
     from ai.backend.common.configs.wheelhouse import WheelhouseConfig
     from ai.backend.common.exception import BackendAISchemaValidationFailed
 
     wheelhouse_paths: set[Path] = set()
-    for daemon_name in _DAEMONS_LOADING_WHEELS:
+    for config_path in config_paths:
         try:
-            toml_path = config_path or find_config_file(daemon_name)
-        except ConfigurationError:
-            # A node runs only some of the daemons.
-            continue
-        try:
-            raw_config, _ = read_from_file(toml_path, daemon_name)
+            raw_config = tomli.loads(config_path.read_text())
             wheelhouse_config = WheelhouseConfig.model_validate(raw_config.get("wheelhouse", {}))
         except (
-            ConfigurationError,
-            TOMLDecodeError,
+            OSError,
+            tomli.TOMLDecodeError,
             UnicodeDecodeError,
             BackendAISchemaValidationFailed,
         ) as e:
-            read_failure = f"Could not read [wheelhouse] from {toml_path}: {e.__cause__ or e}"
-            if config_path is not None:
-                raise click.ClickException(read_failure) from e
-            click.echo(f"Warning: {read_failure}", err=True)
+            click.echo(
+                f"Warning: Could not read [wheelhouse] from {config_path}: {e.__cause__ or e}",
+                err=True,
+            )
             continue
         if wheelhouse_config.allow:
             wheelhouse_paths.add(wheelhouse_config.path.resolve())
@@ -132,6 +139,7 @@ def scan(
 
     sources: dict[str, set[str]] = defaultdict(set)
     rows = []
+    config_paths_to_read = {config_path} if config_path is not None else _find_daemon_config_paths()
 
     for source, entrypoint in itertools.chain(
         (("buildscript", item) for item in scan_entrypoint_from_buildscript(group_name)),
@@ -139,7 +147,7 @@ def scan(
         (("python-package", item) for item in scan_entrypoint_from_package_metadata(group_name)),
         (
             ("wheelhouse", item)
-            for wheelhouse_path in _find_allowed_wheelhouse_paths(config_path)
+            for wheelhouse_path in _find_allowed_wheelhouse_paths(config_paths_to_read)
             for item in scan_entrypoint_from_wheelhouse(group_name, wheelhouse_path)
         ),
     ):
