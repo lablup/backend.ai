@@ -304,11 +304,30 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         id: str,
     ) -> Self | None:
         graphene_ctx: GraphQueryContext = info.context
+<<<<<<< HEAD
         _, raw_session_id = AsyncNode.resolve_global_id(info, id)
         async with graphene_ctx.db.begin_readonly_session() as db_session:
             stmt = (
                 sa.select(SessionRow)
                 .where(SessionRow.id == parse_uuid(raw_session_id))
+=======
+        session_id = resolve_entity_id(id, SessionID)
+        user = graphene_ctx.user
+        visible: sa.ColumnElement[bool]
+        match user["role"]:
+            case UserRole.SUPERADMIN:
+                visible = sa.true()
+            case UserRole.ADMIN:
+                visible = SessionRow.domain_name == user["domain_name"]
+            case UserRole.USER:
+                visible = SessionRow.user_uuid == user["uuid"]
+            case _:
+                visible = sa.false()
+        async with graphene_ctx.db.begin_readonly_session_read_committed() as db_session:
+            stmt = (
+                sa.select(SessionRow)
+                .where(visible & (SessionRow.id == session_id))
+>>>>>>> 5082123f7 (fix(BA-8882): check permissions in legacy GQL single-node lookups (#16445))
                 .options(selectinload(SessionRow.kernels), joinedload(SessionRow.user))
             )
             query_result = await db_session.scalar(stmt)

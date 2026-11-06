@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.exc import NoResultFound
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.permission.types import RBACElementType
@@ -140,10 +141,31 @@ class NetworkNode(graphene.ObjectType):  # type: ignore[misc]
             raise InvalidAPIParameters(f"Invalid id: {id}") from e
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
-            try:
-                return cls.from_row(await NetworkRow.get(db_session, network_id, load_project=True))
-            except NoResultFound as e:
-                raise ValueError(f"Network not found (id: {raw_network_id})") from e
+            visible = await cls._visible_networks_condition(db_session, graph_ctx)
+            query = sa.select(NetworkRow).where(visible & (NetworkRow.id == network_id))
+            network_row = await db_session.scalar(query)
+        if network_row is None:
+            raise NetworkNotFound(f"Network not found (id: {raw_network_id})")
+        return cls.from_row(network_row)
+
+    @staticmethod
+    async def _visible_networks_condition(
+        db_session: SASession, graph_ctx: GraphQueryContext
+    ) -> sa.ColumnElement[bool]:
+        match graph_ctx.user["role"]:
+            case UserRole.SUPERADMIN:
+                return sa.true()
+            case UserRole.ADMIN:
+                domain_name: str = graph_ctx.user["domain_name"]
+                return NetworkRow.domain_name == domain_name
+            case UserRole.USER:
+                project_query = user_scope_membership_query(
+                    ProjectEntityType(), graph_ctx.user["uuid"]
+                )
+                available_projects = (await db_session.execute(project_query)).all()
+                return NetworkRow.project.in_([p.scope_id for p in available_projects])
+            case _:
+                return sa.false()
 
     @classmethod
     async def get_connection(
@@ -188,6 +210,7 @@ class NetworkNode(graphene.ObjectType):  # type: ignore[misc]
             last=last,
         )
         async with graph_ctx.db.begin_readonly_session() as db_session:
+<<<<<<< HEAD
             additional_cond: sa.ColumnElement[bool]
             match graph_ctx.user["role"]:
                 case UserRole.SUPERADMIN:
@@ -203,6 +226,9 @@ class NetworkNode(graphene.ObjectType):  # type: ignore[misc]
                         p.group_id for p in available_projects
                     ])
 
+=======
+            additional_cond = await cls._visible_networks_condition(db_session, graph_ctx)
+>>>>>>> 5082123f7 (fix(BA-8882): check permissions in legacy GQL single-node lookups (#16445))
             query = query.where(additional_cond)
             cnt_query = cnt_query.where(additional_cond)
             query = query.options(

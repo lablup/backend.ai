@@ -251,6 +251,7 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
         graph_ctx: GraphQueryContext = info.context
+<<<<<<< HEAD
         _, raw_group_id = AsyncNode.resolve_global_id(info, id)
         group_id = parse_uuid(raw_group_id)
         query = sa.select(GroupRow).where(GroupRow.id == group_id)
@@ -259,6 +260,31 @@ class GroupNode(graphene.ObjectType):  # type: ignore[misc]
             if group_row is None:
                 raise GroupNotFound(f"Group not found: {group_id}")
             return cls.from_row(graph_ctx, group_row)
+=======
+        group_id = resolve_entity_id(id, ProjectID)
+        user = graph_ctx.user
+        visible: sa.ColumnElement[bool]
+        match user["role"]:
+            case UserRole.SUPERADMIN:
+                visible = sa.true()
+            case UserRole.ADMIN:
+                visible = ProjectRow.domain_name == user["domain_name"]
+            case UserRole.USER:
+                member_projects = user_scope_membership_query(
+                    ProjectEntityType(), user["uuid"]
+                ).subquery()
+                visible = (ProjectRow.domain_name == user["domain_name"]) & ProjectRow.id.in_(
+                    sa.select(member_projects.c.scope_id)
+                )
+            case _:
+                visible = sa.false()
+        query = sa.select(ProjectRow).where(visible & (ProjectRow.id == group_id))
+        async with graph_ctx.db.begin_readonly_session_read_committed() as db_session:
+            group_row = (await db_session.scalars(query)).first()
+        if group_row is None:
+            raise GroupNotFound(f"Group not found: {group_id}")
+        return cls.from_data(ProjectSearchableFields.own.to_data(group_row))
+>>>>>>> 5082123f7 (fix(BA-8882): check permissions in legacy GQL single-node lookups (#16445))
 
     @classmethod
     async def get_connection(
