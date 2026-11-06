@@ -43,7 +43,7 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointData,
     EndpointLifecycle,
 )
-from ai.backend.manager.errors.common import GenericForbidden, InternalServerError
+from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.service import (
     AutoScalingRuleNotFound,
     EndpointNotFound,
@@ -696,7 +696,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
         dto = row.to_data()
         result = await cls.from_dto(ctx, dto)
         if result is None:
-            raise InternalServerError(f"Failed to convert EndpointRow {row.id} to GQL type")
+            raise ValueError(f"Failed to convert EndpointRow {row.id} to GQL type")
         return result
 
     @classmethod

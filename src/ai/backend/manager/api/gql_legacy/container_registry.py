@@ -19,7 +19,6 @@ from ai.backend.manager.api.gql.base import resolve_entity_id
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
 from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
 from ai.backend.manager.models.container_registry.row import (
@@ -176,7 +175,7 @@ class ContainerRegistryNode(graphene.ObjectType):  # type: ignore[misc]
         async with graph_ctx.db.begin_readonly_session() as db_session:
             reg_row = cast(ContainerRegistryRow | None, await db_session.scalar(select_stmt))
             if reg_row is None:
-                raise ContainerRegistryNotFound(f"Container registry not found (id: {reg_id})")
+                raise ValueError(f"Container registry not found (id: {reg_id})")
             return cls.from_row(graph_ctx, reg_row)
 
     @classmethod
@@ -558,7 +557,7 @@ class CreateContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
                         CreateRegistryQuotaAction(scope_id=scope_id, quota=int(quota))
                     )
                 case _:
-                    raise InvalidAPIParameters("Only project scope is supported for now.")
+                    raise NotImplementedError("Only project scope is supported for now.")
 
             return cls(ok=True, msg="success")
         except Exception as e:
@@ -596,7 +595,7 @@ class UpdateContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
                         UpdateRegistryQuotaAction(scope_id=scope_id, quota=int(quota))
                     )
                 case _:
-                    raise InvalidAPIParameters("Only project scope is supported for now.")
+                    raise NotImplementedError("Only project scope is supported for now.")
 
             return cls(ok=True, msg="success")
         except Exception as e:
@@ -632,7 +631,7 @@ class DeleteContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
                         DeleteRegistryQuotaAction(scope_id=scope_id)
                     )
                 case _:
-                    raise InvalidAPIParameters("Only project scope is supported for now.")
+                    raise NotImplementedError("Only project scope is supported for now.")
 
             return cls(ok=True, msg="success")
         except Exception as e:
@@ -838,9 +837,7 @@ class ModifyContainerRegistry(graphene.Mutation):  # type: ignore[misc]
             )
             reg_row = await session.scalar(stmt)
             if reg_row is None:
-                raise ContainerRegistryNotFound(
-                    f"ContainerRegistry not found (hostname: {hostname})"
-                )
+                raise ValueError(f"ContainerRegistry not found (hostname: {hostname})")
 
             for field, val in input_config.items():
                 setattr(reg_row, field, val)

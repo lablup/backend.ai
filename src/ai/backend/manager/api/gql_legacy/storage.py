@@ -12,7 +12,6 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import (
     VolumeInfo,
 )
-from ai.backend.manager.errors.common import ObjectNotFound
 
 from .base import Item, PaginatedList
 
@@ -119,9 +118,8 @@ class StorageVolume(graphene.ObjectType):  # type: ignore[misc]
         for volume_data in reply["volumes"]:
             if volume_data["name"] == volume_name:
                 return cls.from_info(proxy_name, volume_data)
-        raise ObjectNotFound(
+        raise ValueError(
             f"no such volume in the storage proxy {proxy_name!r}: {volume_name!r}",
-            object_name="storage volume",
         )
 
 

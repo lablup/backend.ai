@@ -27,7 +27,7 @@ from graphene.types.utils import get_type
 from graphql_relay.utils import base64, unbase64
 
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import InternalServerError, ServerMisconfiguredError
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.resource import DataTransformationFailed
 
 
@@ -146,7 +146,7 @@ class AsyncNode(Node):  # type: ignore[misc]
     @staticmethod
     def to_global_id(type_: str, id_: str) -> str:
         if id_ is None:
-            raise InternalServerError("Encoding None value as Global ID is not allowed.")
+            raise Exception("Encoding None value as Global ID is not allowed.")
         return base64(f"{type_}:{id_}")
 
     @classmethod
@@ -161,7 +161,7 @@ class AsyncNode(Node):  # type: ignore[misc]
 
         graphene_type = info.schema.get_type(_type)
         if graphene_type is None:
-            raise InvalidAPIParameters(f'Relay Node "{_type}" not found in schema')
+            raise Exception(f'Relay Node "{_type}" not found in schema')
 
         graphene_type = graphene_type.graphene_type
 
@@ -175,14 +175,12 @@ class AsyncNode(Node):  # type: ignore[misc]
 
         _meta = getattr(graphene_type, "_meta", None)
         if _meta is None or cls not in _meta.interfaces:
-            raise InvalidAPIParameters(
-                f'ObjectType "{_type}" does not implement the "{cls}" interface.'
-            )
+            raise Exception(f'ObjectType "{_type}" does not implement the "{cls}" interface.')
 
         get_node = getattr(graphene_type, "get_node", None)
         if get_node:
             return await get_node(info, global_id)
-        raise InvalidAPIParameters(f'ObjectType "{_type}" does not implement `get_node` method.')
+        raise Exception(f'ObjectType "{_type}" does not implement `get_node` method.')
 
 
 class Connection(graphene.ObjectType):  # type: ignore[misc]

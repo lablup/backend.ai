@@ -25,7 +25,6 @@ from ai.backend.manager.api.gql_legacy.user import (
     _validate_container_uid_gid,
     validate_user_mutation_props,
 )
-from ai.backend.manager.errors.api import InvalidAPIParameters
 
 # ============= Helper Functions =============
 
@@ -79,16 +78,16 @@ class TestValidateContainerUidGid:
         _validate_container_uid_gid(Undefined)
 
     def test_invalid_negative_value_raises_error(self) -> None:
-        """Raise InvalidAPIParameters for negative values."""
-        with pytest.raises(InvalidAPIParameters):
+        """Raise ValueError for negative values."""
+        with pytest.raises(ValueError):
             _validate_container_uid_gid(-1)
 
-        with pytest.raises(InvalidAPIParameters):
+        with pytest.raises(ValueError):
             _validate_container_uid_gid(-1000)
 
     def test_error_message_content(self) -> None:
         """Verify error message contains expected text."""
-        with pytest.raises(InvalidAPIParameters, match="UID and GID must be non-negative integers"):
+        with pytest.raises(ValueError, match="UID and GID must be non-negative integers"):
             _validate_container_uid_gid(-1)
 
 
@@ -112,31 +111,31 @@ class TestValidateUserMutationProps:
         validate_user_mutation_props(props)
 
     def test_user_input_with_negative_uid_raises_error(self) -> None:
-        """Raise InvalidAPIParameters when container_uid is negative."""
+        """Raise ValueError when container_uid is negative."""
         props = create_user_input_with_container_fields(
             container_uid=-1,
             container_main_gid=1000,
         )
-        with pytest.raises(InvalidAPIParameters, match="UID and GID must be non-negative integers"):
+        with pytest.raises(ValueError, match="UID and GID must be non-negative integers"):
             validate_user_mutation_props(props)
 
     def test_user_input_with_negative_main_gid_raises_error(self) -> None:
-        """Raise InvalidAPIParameters when container_main_gid is negative."""
+        """Raise ValueError when container_main_gid is negative."""
         props = create_user_input_with_container_fields(
             container_uid=1000,
             container_main_gid=-1,
         )
-        with pytest.raises(InvalidAPIParameters, match="UID and GID must be non-negative integers"):
+        with pytest.raises(ValueError, match="UID and GID must be non-negative integers"):
             validate_user_mutation_props(props)
 
     def test_user_input_with_negative_gid_in_list_raises_error(self) -> None:
-        """Raise InvalidAPIParameters when container_gids contains negative value."""
+        """Raise ValueError when container_gids contains negative value."""
         props = create_user_input_with_container_fields(
             container_uid=1000,
             container_main_gid=1000,
             container_gids=[100, -1, 200],
         )
-        with pytest.raises(InvalidAPIParameters, match="UID and GID must be non-negative integers"):
+        with pytest.raises(ValueError, match="UID and GID must be non-negative integers"):
             validate_user_mutation_props(props)
 
     def test_modify_user_input_with_valid_uid_gid(self) -> None:
@@ -155,11 +154,11 @@ class TestValidateUserMutationProps:
         validate_user_mutation_props(props)
 
     def test_modify_user_input_with_negative_uid_raises_error(self) -> None:
-        """Raise InvalidAPIParameters when ModifyUserInput container_uid is negative."""
+        """Raise ValueError when ModifyUserInput container_uid is negative."""
         props = create_modify_user_input_with_container_fields(
             container_uid=-1,
         )
-        with pytest.raises(InvalidAPIParameters, match="UID and GID must be non-negative integers"):
+        with pytest.raises(ValueError, match="UID and GID must be non-negative integers"):
             validate_user_mutation_props(props)
 
 
@@ -199,7 +198,7 @@ class TestCreateUserMutationValidation:
         mock_info: MagicMock,
         mock_graph_ctx: MagicMock,
     ) -> None:
-        """CreateUser.mutate() raises InvalidAPIParameters before calling processor."""
+        """CreateUser.mutate() raises ValueError before calling processor."""
         props = create_user_input_with_container_fields(
             container_uid=-1,
             container_main_gid=1000,
@@ -210,7 +209,7 @@ class TestCreateUserMutationValidation:
         props.need_password_change = False
         props.domain_name = "default"
 
-        with pytest.raises(InvalidAPIParameters, match="UID and GID must be non-negative"):
+        with pytest.raises(ValueError, match="UID and GID must be non-negative"):
             await CreateUser.mutate(None, mock_info, "test@example.com", props)
 
         # Verify processor was NOT called
@@ -221,7 +220,7 @@ class TestCreateUserMutationValidation:
         mock_info: MagicMock,
         mock_graph_ctx: MagicMock,
     ) -> None:
-        """CreateUser.mutate() raises InvalidAPIParameters for negative container_main_gid."""
+        """CreateUser.mutate() raises ValueError for negative container_main_gid."""
         props = create_user_input_with_container_fields(
             container_uid=1000,
             container_main_gid=-1,
@@ -232,7 +231,7 @@ class TestCreateUserMutationValidation:
         props.need_password_change = False
         props.domain_name = "default"
 
-        with pytest.raises(InvalidAPIParameters, match="UID and GID must be non-negative"):
+        with pytest.raises(ValueError, match="UID and GID must be non-negative"):
             await CreateUser.mutate(None, mock_info, "test@example.com", props)
 
         # Verify processor was NOT called
@@ -243,7 +242,7 @@ class TestCreateUserMutationValidation:
         mock_info: MagicMock,
         mock_graph_ctx: MagicMock,
     ) -> None:
-        """CreateUser.mutate() raises InvalidAPIParameters for negative gid in container_gids."""
+        """CreateUser.mutate() raises ValueError for negative gid in container_gids."""
         props = create_user_input_with_container_fields(
             container_uid=1000,
             container_main_gid=1000,
@@ -255,7 +254,7 @@ class TestCreateUserMutationValidation:
         props.need_password_change = False
         props.domain_name = "default"
 
-        with pytest.raises(InvalidAPIParameters, match="UID and GID must be non-negative"):
+        with pytest.raises(ValueError, match="UID and GID must be non-negative"):
             await CreateUser.mutate(None, mock_info, "test@example.com", props)
 
         # Verify processor was NOT called
@@ -270,12 +269,12 @@ class TestModifyUserMutationValidation:
         mock_info: MagicMock,
         mock_graph_ctx: MagicMock,
     ) -> None:
-        """ModifyUser.mutate() raises InvalidAPIParameters before calling processor."""
+        """ModifyUser.mutate() raises ValueError before calling processor."""
         props = create_modify_user_input_with_container_fields(
             container_uid=-1,
         )
 
-        with pytest.raises(InvalidAPIParameters, match="UID and GID must be non-negative"):
+        with pytest.raises(ValueError, match="UID and GID must be non-negative"):
             await ModifyUser.mutate(None, mock_info, "test@example.com", props)
 
         # Verify processor was NOT called
@@ -286,12 +285,12 @@ class TestModifyUserMutationValidation:
         mock_info: MagicMock,
         mock_graph_ctx: MagicMock,
     ) -> None:
-        """ModifyUser.mutate() raises InvalidAPIParameters for negative container_main_gid."""
+        """ModifyUser.mutate() raises ValueError for negative container_main_gid."""
         props = create_modify_user_input_with_container_fields(
             container_main_gid=-1,
         )
 
-        with pytest.raises(InvalidAPIParameters, match="UID and GID must be non-negative"):
+        with pytest.raises(ValueError, match="UID and GID must be non-negative"):
             await ModifyUser.mutate(None, mock_info, "test@example.com", props)
 
         # Verify processor was NOT called

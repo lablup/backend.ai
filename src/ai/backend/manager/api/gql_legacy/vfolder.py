@@ -45,8 +45,6 @@ from ai.backend.manager.data.permission.permission_defs import (
 )
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus, VFolderOwnershipType
 from ai.backend.manager.defs import is_unmanaged
-from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.storage import (
     ModelCardParseError,
     QuotaScopeNotFoundError,
@@ -761,12 +759,12 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
                 db_session, vfolder_id, load_user=True, load_group=True
             )
             if vfolder_row.usage_mode != VFolderUsageMode.MODEL:
-                raise InvalidAPIParameters(
+                raise ValueError(
                     f"The vfolder is not model. expect: {VFolderUsageMode.MODEL.value}, got:"
                     f" {vfolder_row.usage_mode.value}. (id: {vfolder_id})"
                 )
             if vfolder_row.status in VFolderOperationStatus.dead():
-                raise VFolderNotFound(
+                raise ValueError(
                     f"The vfolder is deleted. (id: {vfolder_id}, status: {vfolder_row.status})"
                 )
         return await cls.from_row(graph_ctx, vfolder_row)
@@ -935,7 +933,7 @@ class VirtualFolder(graphene.ObjectType):  # type: ignore[misc]
                     status=row.status,
                     cur_size=row.cur_size,
                 )
-        raise InternalServerError(f"Type not allowed to parse (t:{type(row)})")
+        raise ValueError(f"Type not allowed to parse (t:{type(row)})")
 
     @classmethod
     def from_orm_row(cls, row: VFolderRow) -> VirtualFolder:
