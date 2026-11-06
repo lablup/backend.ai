@@ -192,7 +192,7 @@ class AUserGrantedOnBothScopesChangesVisibility(
 
     @override
     def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
-        return ARegistryAndSomeone(keeping=True)
+        return ARegistryAndSomeone(keeps_registry=True, keeps_public=True)
 
     @override
     def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryData]:
@@ -203,9 +203,83 @@ class AUserGrantedOnBothScopesChangesVisibility(
         return TheRegistryTakesTheNewVisibility(is_global=False)
 
 
+@dataclass(frozen=True)
+class AUserGrantedOnTheRegistryButNotPublicMayNotChangeVisibility(
+    Scenario[
+        TestSeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryData
+    ]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-on-the-registry-but-not-public-may-not-change-a-registry-visibility"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "레지스트리에 수정 권한을 받고 public 에는 받지 않은 사용자가 레지스트리의 전역 여부를 "
+            "바꾸려 하면 권한 부족으로 거부됩니다. 이 호출은 두 스코프 가운데 하나만 허락해도 "
+            "통과하지 않습니다",
+            english=(
+                "when a user granted update permission on the registry but not on public tries to "
+                "change a registry's visibility, it is rejected for lack of permission. This call "
+                "does not pass with only one of the two scopes permitting it"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
+        return ARegistryAndSomeone(keeps_registry=True)
+
+    @override
+    def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryData]:
+        return SettingGlobal(is_global=False)
+
+    @override
+    def then(self) -> Then[ARegistryAndACaller, ContainerRegistryData]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
+@dataclass(frozen=True)
+class AUserGrantedOnPublicButNotTheRegistryMayNotChangeVisibility(
+    Scenario[
+        TestSeedingSession, ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryData
+    ]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-on-public-but-not-the-registry-may-not-change-a-registry-visibility"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "public 에 수정 권한을 받고 레지스트리에는 받지 않은 사용자가 레지스트리의 전역 여부를 "
+            "바꾸려 하면 권한 부족으로 거부됩니다. 이 호출은 두 스코프 가운데 하나만 허락해도 "
+            "통과하지 않습니다",
+            english=(
+                "when a user granted update permission on public but not on the registry tries to "
+                "change a registry's visibility, it is rejected for lack of permission. This call "
+                "does not pass with only one of the two scopes permitting it"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ARegistryAndACaller]:
+        return ARegistryAndSomeone(keeps_public=True)
+
+    @override
+    def when(self) -> When[ARegistryAndACaller, ContainerRegistryAdapter, ContainerRegistryData]:
+        return SettingGlobal(is_global=False)
+
+    @override
+    def then(self) -> Then[ARegistryAndACaller, ContainerRegistryData]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
 SCENARIOS: list[SettingStep] = [
     TheSuperadminTakesTheRegistryOutOfPublic(),
     AUserGrantedOnBothScopesChangesVisibility(),
+    AUserGrantedOnTheRegistryButNotPublicMayNotChangeVisibility(),
+    AUserGrantedOnPublicButNotTheRegistryMayNotChangeVisibility(),
     AUserGrantedNothingMayNotChangeVisibility(),
 ]
 
