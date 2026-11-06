@@ -531,14 +531,9 @@ def main(
             with logger:
                 ns = bootstrap_cfg.etcd.namespace
                 setproctitle(f"backend.ai: manager {ns}")
-<<<<<<< HEAD
                 log.info("Backend.AI Manager {0}", __version__)
                 log.info("runtime: {0}", env_info())
-=======
-                log.info("Backend.AI Manager starting", version=__version__)
-                log.info("runtime environment", runtime_info=env_info())
                 load_configured_wheelhouse(bootstrap_cfg.wheelhouse)
->>>>>>> 974f2a52 (feat(BA-8920): load plugin wheels only when the [wheelhouse] config allows it (#16407))
                 log_config = logging.getLogger("ai.backend.manager.config")
                 log_config.debug("debug mode enabled.")
                 runner: Callable[..., Any]

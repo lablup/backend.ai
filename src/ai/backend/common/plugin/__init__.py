@@ -12,13 +12,8 @@ from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.configs.wheelhouse import WheelhouseConfig
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.exception import ConfigurationError
-<<<<<<< HEAD
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.plugin.entrypoint import scan_entrypoints
-=======
-from ai.backend.logging.structured import StructuredLogger
 from ai.backend.plugin.entrypoint import prepare_wheelhouse, scan_entrypoints
->>>>>>> 974f2a52 (feat(BA-8920): load plugin wheels only when the [wheelhouse] config allows it (#16407))
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -36,7 +31,7 @@ def load_configured_wheelhouse(wheelhouse_config: WheelhouseConfig) -> None:
     if wheelhouse_config.allow:
         wheelhouse_path = wheelhouse_config.path.resolve()
         prepare_wheelhouse(wheelhouse_path)
-        log.info("wheelhouse loaded", wheelhouse_path=str(wheelhouse_path))
+        log.info("wheelhouse loaded: {}", wheelhouse_path)
 
 
 class AbstractPlugin(metaclass=ABCMeta):

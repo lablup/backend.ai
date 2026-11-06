@@ -480,16 +480,10 @@ def main(
             )
             with logger:
                 setproctitle("backend.ai: storage-proxy")
-<<<<<<< HEAD
                 log.info("Backend.AI Storage Proxy", VERSION)
                 log.info("Runtime: {0}", env_info())
                 log.info("Node ID: {0}", local_config.storage_proxy.node_id)
-=======
-                log.info("Backend.AI Storage Proxy starting", version=VERSION)
-                log.info("runtime environment", runtime_info=env_info())
-                log.info("storage-proxy node", node_id=local_config.storage_proxy.node_id)
                 load_configured_wheelhouse(local_config.wheelhouse)
->>>>>>> 974f2a52 (feat(BA-8920): load plugin wheels only when the [wheelhouse] config allows it (#16407))
                 log_config = logging.getLogger("ai.backend.agent.config")
                 if local_config.debug.enabled:
                     log_config.debug("debug mode enabled.")

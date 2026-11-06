@@ -1801,13 +1801,9 @@ def main(
                     server_config.agent_common.var_base_path / _CRASH_DUMP_DIR_NAME,
                     "supervisor",
                 )
-<<<<<<< HEAD
                 log.info("Backend.AI Agent {0}", VERSION)
                 log.info("runtime: {0}", utils.env_info())
-=======
-                log.info("agent starting", version=VERSION, runtime=utils.env_info())
                 load_configured_wheelhouse(server_config.wheelhouse)
->>>>>>> 974f2a52 (feat(BA-8920): load plugin wheels only when the [wheelhouse] config allows it (#16407))
 
                 # Built here rather than at module scope: these allocate shared memory
                 # and a semaphore, which no other `ag` subcommand has any use for.

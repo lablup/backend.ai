@@ -3688,7 +3688,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "config file: etcd values are ignored. Wheels provided here run without "
                 "verification, so keep the path writable only by trusted operators."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.8",
             composite=CompositeType.FIELD,
         ),
     ]
