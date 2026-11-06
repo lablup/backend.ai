@@ -183,7 +183,8 @@ def load_v2_config() -> V2ConnectionConfig:
         access_key = env_ak
     if env_sk := os.environ.get("BACKEND_SECRET_KEY"):
         secret_key = env_sk
-    if env_allow_insecure_http := os.environ.get(ALLOW_INSECURE_HTTP_ENV):
+    env_allow_insecure_http = os.environ.get(ALLOW_INSECURE_HTTP_ENV)
+    if env_allow_insecure_http:
         cfg["allow_insecure_http"] = env_allow_insecure_http.lower() in ("true", "1", "yes")
 
     # Defer cookie jar creation to async context (aiohttp >=3.13 requires event loop)
