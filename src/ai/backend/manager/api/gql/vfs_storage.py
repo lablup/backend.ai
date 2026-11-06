@@ -45,7 +45,6 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticNodeMixin,
     PydanticOutputMixin,
 )
-from ai.backend.manager.api.gql.utils import check_admin_only
 
 from .types import StrawberryGQLContext
 
@@ -93,7 +92,6 @@ class VFSStorageConnection(Connection[VFSStorage]):
 
 @gql_root_field(BackendAIGQLMeta(added_version="25.16.0", description="Get a VFS storage by ID"))  # type: ignore[misc]
 async def vfs_storage(id: ID, info: Info[StrawberryGQLContext]) -> VFSStorage | None:
-    check_admin_only()
     node = await info.context.adapters.vfs_storage.get(parse_uuid(id))
     return VFSStorage.from_pydantic(node)
 
@@ -108,7 +106,6 @@ async def vfs_storages(
     limit: int | None = None,
     offset: int | None = None,
 ) -> VFSStorageConnection | None:
-    check_admin_only()
     items = await info.context.adapters.vfs_storage.list_all()
     nodes = [VFSStorage.from_pydantic(item) for item in items]
     edges = [VFSStorageEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
@@ -193,7 +190,6 @@ class DeleteVFSStoragePayload(PydanticOutputMixin[DeleteVFSStoragePayloadDTO]):
 async def create_vfs_storage(
     input: CreateVFSStorageInput, info: Info[StrawberryGQLContext]
 ) -> CreateVFSStoragePayload | None:
-    check_admin_only()
     result = await info.context.adapters.vfs_storage.create(input.to_pydantic())
     return CreateVFSStoragePayload(vfs_storage=VFSStorage.from_pydantic(result.vfs_storage))
 
@@ -205,7 +201,6 @@ async def create_vfs_storage(
 async def update_vfs_storage(
     input: UpdateVFSStorageInput, info: Info[StrawberryGQLContext]
 ) -> UpdateVFSStoragePayload | None:
-    check_admin_only()
     result = await info.context.adapters.vfs_storage.update(input.to_pydantic())
     return UpdateVFSStoragePayload(vfs_storage=VFSStorage.from_pydantic(result.vfs_storage))
 
@@ -217,6 +212,5 @@ async def update_vfs_storage(
 async def delete_vfs_storage(
     input: DeleteVFSStorageInput, info: Info[StrawberryGQLContext]
 ) -> DeleteVFSStoragePayload | None:
-    check_admin_only()
     result = await info.context.adapters.vfs_storage.delete(input.to_pydantic())
     return DeleteVFSStoragePayload.from_pydantic(result)
