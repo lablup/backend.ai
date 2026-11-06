@@ -6,7 +6,7 @@ import click
 from ai.backend.cli.params import BoolExprType, JSONParamType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.insecure_http_guard import LegacySecureEndpointCommand
+from ai.backend.client.cli.insecure_http_guard import SecureEndpointCommand
 from ai.backend.client.cli.pretty import print_done
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.func.scaling_group import _default_detail_fields, _default_list_fields
@@ -69,7 +69,7 @@ def list(ctx: CLIContext) -> None:
             sys.exit(ExitCode.FAILURE)
 
 
-@scaling_group.command(cls=LegacySecureEndpointCommand)
+@scaling_group.command(cls=SecureEndpointCommand)
 @pass_ctx_obj
 @click.argument("name", type=str, metavar="NAME")
 @click.option(
@@ -167,7 +167,7 @@ def add(
         )
 
 
-@scaling_group.command(cls=LegacySecureEndpointCommand)
+@scaling_group.command(cls=SecureEndpointCommand)
 @pass_ctx_obj
 @click.argument("name", type=str, metavar="NAME")
 @click.option(

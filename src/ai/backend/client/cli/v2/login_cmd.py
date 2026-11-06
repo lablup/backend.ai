@@ -10,12 +10,15 @@ from typing import Any
 
 import click
 
-from ai.backend.client.cli.insecure_http_guard import V2SecureEndpointCommand
+from .helpers import (
+    ProfileStore,
+    create_v2_registry,
+    load_v2_config,
+    reject_insecure_v2_endpoint,
+)
 
-from .helpers import ProfileStore, create_v2_registry, load_v2_config
 
-
-@click.command(cls=V2SecureEndpointCommand)
+@click.command()
 @click.option(
     "--force", is_flag=True, default=False, help="Force login, invalidating existing sessions."
 )
@@ -25,6 +28,8 @@ def login(force: bool) -> None:
     Stores the session cookie in ``session/cookie.dat`` of the selected profile.
     Requires ``endpoint-type`` to be ``session``.
     """
+    reject_insecure_v2_endpoint(load_v2_config())
+
     user_id = os.environ.get("BACKEND_USER") or input("User ID: ")
     password = os.environ.get("BACKEND_PASSWORD") or getpass.getpass("Password: ")
 

@@ -17,6 +17,7 @@ import click
 from pydantic import TypeAdapter, ValidationError
 from yarl import URL
 
+from ai.backend.client.cli.insecure_http_guard import reject_insecure_endpoints
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
 CONFIG_DIR = Path.home() / ".backend.ai"
 
 PROFILE_ENV = "BACKEND_PROFILE"
+ALLOW_INSECURE_HTTP_ENV = "BACKEND_ALLOW_INSECURE_HTTP"
 PROFILE_META_KEY = "ai.backend.client.cli.v2.profile"
 _PROFILE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
@@ -34,6 +36,7 @@ DEFAULTS = {
     "endpoint_type": "api",
     "api_version": "v9.20250722",
     "skip_ssl_verification": False,
+    "allow_insecure_http": False,
 }
 
 
@@ -47,6 +50,7 @@ class V2ConnectionConfig:
     secret_key: str | None
     api_version: str
     skip_ssl_verification: bool = False
+    allow_insecure_http: bool = False
     cookie_file: Path | None = field(default=None)
 
 
@@ -179,6 +183,8 @@ def load_v2_config() -> V2ConnectionConfig:
         access_key = env_ak
     if env_sk := os.environ.get("BACKEND_SECRET_KEY"):
         secret_key = env_sk
+    if env_allow_insecure_http := os.environ.get(ALLOW_INSECURE_HTTP_ENV):
+        cfg["allow_insecure_http"] = env_allow_insecure_http.lower() in ("true", "1", "yes")
 
     # Defer cookie jar creation to async context (aiohttp >=3.13 requires event loop)
     cookie_file = None
@@ -193,12 +199,24 @@ def load_v2_config() -> V2ConnectionConfig:
         secret_key=secret_key,
         api_version=str(cfg["api_version"]),
         skip_ssl_verification=bool(cfg.get("skip_ssl_verification", False)),
+        allow_insecure_http=bool(cfg.get("allow_insecure_http", False)),
         cookie_file=cookie_file,
+    )
+
+
+def reject_insecure_v2_endpoint(config: V2ConnectionConfig) -> None:
+    reject_insecure_endpoints(
+        [config.endpoint],
+        config.allow_insecure_http,
+        how_to_allow=(
+            f"set {ALLOW_INSECURE_HTTP_ENV}=1 or run `./bai config set allow-insecure-http true`"
+        ),
     )
 
 
 async def create_v2_registry(config: V2ConnectionConfig) -> V2ClientRegistry:
     """Build a ``V2ClientRegistry`` from a ``V2ConnectionConfig``."""
+    reject_insecure_v2_endpoint(config)
     from ai.backend.client.v2.auth import HMACAuth, NoAuth
     from ai.backend.client.v2.config import ClientConfig
     from ai.backend.client.v2.v2_registry import V2ClientRegistry

@@ -28,11 +28,10 @@ into/from the console server.
 
 .. note::
 
-   Commands that send a password, key or token, such as ``login``,
-   ``update-password`` and ``update-password-no-auth``, refuse to send it to an
-   endpoint that is neither https nor loopback, because it can be read on the
-   network.
-   Pass ``--allow-insecure-http`` to send it anyway.
+   ``login``, ``update-password`` and ``update-password-no-auth`` refuse to run
+   against an endpoint that is neither https nor loopback, because a password
+   can be read on the network.
+   Pass ``--allow-insecure-http`` to run them anyway.
 
 
 API Mode

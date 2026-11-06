@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ipaddress
-from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from typing import Any, override
 
@@ -32,9 +31,10 @@ def _is_loopback_host(host: str | None) -> bool:
         return False
 
 
-def reject_insecure_secret_endpoints(
+def reject_insecure_endpoints(
     endpoints: Iterable[URL],
     allow_insecure_http: bool,
+    how_to_allow: str,
 ) -> None:
     if allow_insecure_http:
         return
@@ -45,38 +45,26 @@ def reject_insecure_secret_endpoints(
     ]
     if insecure_endpoints:
         raise click.ClickException(
-            f"This command can send a password, key or token to {', '.join(insecure_endpoints)}: "
-            "it is neither https nor loopback, so the value can be read on the network. "
-            "Use an https endpoint, or pass --allow-insecure-http to run it anyway."
+            f"Refusing to send a request to {', '.join(insecure_endpoints)}: "
+            "it is neither https nor loopback, so passwords, keys, tokens and session cookies "
+            f"can be read on the network. Use an https endpoint, or {how_to_allow}."
         )
 
 
-class SecureEndpointCommand(click.Command, ABC):
+class SecureEndpointCommand(click.Command):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.params.append(_ALLOW_INSECURE_HTTP_OPTION)
 
-    @abstractmethod
     def _load_endpoints(self) -> Iterable[URL]:
-        raise NotImplementedError
+        return get_config().endpoints
 
     @override
     def invoke(self, ctx: click.Context) -> Any:
         allow_insecure_http = ctx.params.pop("allow_insecure_http")
-        reject_insecure_secret_endpoints(self._load_endpoints(), allow_insecure_http)
+        reject_insecure_endpoints(
+            self._load_endpoints(),
+            allow_insecure_http,
+            how_to_allow="pass --allow-insecure-http to run it anyway",
+        )
         return super().invoke(ctx)
-
-
-class LegacySecureEndpointCommand(SecureEndpointCommand):
-    @override
-    def _load_endpoints(self) -> Iterable[URL]:
-        return get_config().endpoints
-
-
-class V2SecureEndpointCommand(SecureEndpointCommand):
-    @override
-    def _load_endpoints(self) -> Iterable[URL]:
-        # Imported here because the v2 package imports this module while it loads.
-        from ai.backend.client.cli.v2.helpers import load_v2_config
-
-        return [load_v2_config().endpoint]

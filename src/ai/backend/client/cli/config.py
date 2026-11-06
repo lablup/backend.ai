@@ -8,7 +8,7 @@ import click
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.client import __version__
-from ai.backend.client.cli.insecure_http_guard import LegacySecureEndpointCommand
+from ai.backend.client.cli.insecure_http_guard import SecureEndpointCommand
 from ai.backend.client.config import get_config, local_state_path
 from ai.backend.client.exceptions import BackendClientError
 from ai.backend.client.session import Session
@@ -112,7 +112,7 @@ def config() -> None:
             warnings.showwarning(w.message, w.category, w.filename, w.lineno, w.line)
 
 
-@main.command(cls=LegacySecureEndpointCommand)
+@main.command(cls=SecureEndpointCommand)
 def login() -> None:
     """
     Log-in to the console API proxy.
@@ -174,7 +174,7 @@ def logout() -> None:
             print_error(e)
 
 
-@main.command(cls=LegacySecureEndpointCommand)
+@main.command(cls=SecureEndpointCommand)
 @click.argument("old_password", metavar="OLD_PASSWORD")
 @click.argument("new_password", metavar="NEW_PASSWORD")
 @click.argument("new_password2", metavar="NEW_PASSWORD2")
@@ -195,7 +195,7 @@ def update_password(old_password: str, new_password: str, new_password2: str) ->
             print_error(e)
 
 
-@main.command(cls=LegacySecureEndpointCommand)
+@main.command(cls=SecureEndpointCommand)
 @click.argument("domain", metavar="USER_ID")
 @click.argument("user_id", metavar="USER_ID")
 @click.argument("current_password", metavar="CURRENT_PASSWORD")
