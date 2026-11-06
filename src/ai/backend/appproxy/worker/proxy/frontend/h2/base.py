@@ -32,7 +32,7 @@ class H2Frontend[TCircuitKeyType: (int, str)](BaseFrontend[H2Backend, TCircuitKe
         if circuit.open_to_public and not circuit.ip_validator.is_restricted:
             registered = await super().register_circuit(circuit, routes)
         else:
-            log.error("skipped an access-controlled HTTP/2 circuit", circuit_id=circuit.id)
+            log.error("skipped an access-controlled HTTP/2 circuit (id: {})", circuit.id)
             registered = False
         return registered
 
