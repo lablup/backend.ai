@@ -22,8 +22,11 @@ class TOTPConfig(BackendAISchema):
         ),
     )
     token_secret: str = Field(
-        min_length=1,
-        description=("Secret used when creating TOTP registration token for anonymous users."),
+        min_length=32,
+        description=(
+            "Secret used when creating TOTP registration token for anonymous users. "
+            "Must contain at least 32 characters."
+        ),
     )
     token_lifetime: int = Field(
         default=300,
