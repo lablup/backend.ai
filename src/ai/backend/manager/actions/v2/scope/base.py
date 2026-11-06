@@ -32,3 +32,13 @@ class BaseScopeAction(ABC):
         declared rather than derived so a class rename cannot split the recorded
         history. Naming rule: services/AGENTS.md."""
         raise NotImplementedError
+
+
+class GrantingScopeAction(BaseScopeAction):
+    """A scope action whose run attaches entities inside the scopes as a second write:
+    a role on a roster (BEP-1076)."""
+
+    @abstractmethod
+    def granted_targets(self) -> Sequence[EntityIdentifier]:
+        """The entities the run grants. The caller needs the operation's permission on each."""
+        raise NotImplementedError

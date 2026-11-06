@@ -8,6 +8,7 @@ from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.scope.base import GrantingScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.data.user.types import UserData
 
@@ -15,11 +16,15 @@ from .base import ProjectRosterAction
 
 
 @dataclass(frozen=True)
-class JoinProjectAction(ProjectRosterAction):
+class JoinProjectAction(ProjectRosterAction, GrantingScopeAction):
     """Put users on a project's roster, granting ``role_id`` where one is named and the
     project's auto_assign roles where none is."""
 
     role_id: RoleID | None = None
+
+    @override
+    def granted_targets(self) -> Sequence[EntityIdentifier]:
+        return [self.role_id] if self.role_id is not None else []
 
     @override
     @classmethod

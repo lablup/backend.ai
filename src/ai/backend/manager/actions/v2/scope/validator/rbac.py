@@ -5,7 +5,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.v2.ops.base import ScopedSearchOpsAction
-from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction, GrantingScopeAction
 from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValidator
 from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -17,8 +17,9 @@ from ai.backend.manager.repositories.rbac.permission_check_repository import (
 
 
 class VirtualEntityScopeActionRBACValidator(ScopeActionValidator):
-    """Scope-action RBAC validator: the govern check on every scope the action names and
-    the own READ check on every entity whose use narrows a search, answered in one read.
+    """Scope-action RBAC validator: the govern check on every scope the action names, the
+    own READ check on every entity whose use narrows a search, and the own check of the
+    operation's permission on every entity the run grants, answered in one read.
 
     Each target scope is checked as an entity (reachable through its own and its
     ancestors' virtual entities), while permission rows are matched on the
@@ -51,7 +52,8 @@ class VirtualEntityScopeActionRBACValidator(ScopeActionValidator):
         user_id = UserID(user.user_id)
         govern_keys = self._govern_keys(action, user_id)
         own_keys = self._own_keys(action, user_id)
-        answered = await self._repository.checked_permissions(govern_keys, own_keys)
+        grant_keys = self._grant_keys(action, user_id)
+        answered = await self._repository.checked_permissions(govern_keys, [*own_keys, *grant_keys])
 
         permission = action.operation_type().to_permission()
         denied = [
@@ -73,6 +75,15 @@ class VirtualEntityScopeActionRBACValidator(ScopeActionValidator):
             raise NotEnoughPermission(
                 f"User {user_id} cannot read the used-by entities {unreadable}"
             )
+        ungrantable = [
+            key.entity
+            for key in grant_keys
+            if not answered.owned.get(key, Permission.NONE).covers(permission)
+        ]
+        if ungrantable:
+            raise NotEnoughPermission(
+                f"User {user_id} lacks permission {permission!r} to grant {ungrantable}"
+            )
 
     def _govern_keys(self, action: BaseScopeAction, user_id: UserID) -> list[GovernCheckKey]:
         return [
@@ -88,4 +99,12 @@ class VirtualEntityScopeActionRBACValidator(ScopeActionValidator):
         return [
             OwnCheckKey(user_id=user_id, entity=used.target)
             for used in search_action.searcher.used_by
+        ]
+
+    def _grant_keys(self, action: BaseScopeAction, user_id: UserID) -> list[OwnCheckKey]:
+        """The entities a granting action attaches; every other scope action names none."""
+        if not isinstance(action, GrantingScopeAction):
+            return []
+        return [
+            OwnCheckKey(user_id=user_id, entity=granted) for granted in action.granted_targets()
         ]

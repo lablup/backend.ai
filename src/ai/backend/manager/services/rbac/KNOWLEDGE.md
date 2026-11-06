@@ -11,6 +11,9 @@ sources:
 generated:
   by: claude-code/opus-5
   at: 2026-09-07
+updated:
+  by: claude-code/fable-5.1
+  at: 2026-11-04
 status: stable
 ---
 
@@ -77,6 +80,12 @@ entity type, shape, operation, gate and backing.
   (its membership row and caps are not written again).
 - A user not taken is left out of the result by `join_members` and rejected by
   `join_member` with `ProjectMemberNotJoinableError`.
+- A named role has to be an active role enrolled in that project (BEP-1076): one of
+  another scope, an inactive one and one that is not there are all rejected with
+  `ProjectRoleNotGrantableError`, so the roster is not a path for attaching an unrelated role.
+- A named role is also a `granted_targets()` entry of `JoinProjectAction`, so the scope
+  gate asks CREATE on the role itself beside the `user` permission at the project: the
+  same permission `AssignRoleAction` asks of the role.
 
 ## The personal-project rejection is an ops invariant
 

@@ -15,12 +15,13 @@ from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
-from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.data.permission.types import Permission, RoleStatus
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.resource import (
     PersonalProjectMemberAdditionError,
     ProjectMemberNotJoinableError,
+    ProjectRoleNotGrantableError,
 )
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
@@ -391,6 +392,69 @@ class TestEnrollUsersInProject:
                 )
             ).all()
             assert len(members) == 2
+
+    async def test_enroll_refuses_a_role_of_another_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        roster_repository: RbacRosterRepository,
+        test_project: ProjectID,
+        personal_project: ProjectID,
+        same_domain_user_1: UserID,
+    ) -> None:
+        """A role enrolled in another project is not granted through this project's
+        roster (BEP-1076)."""
+        other_role = RoleID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as session:
+            session.add(
+                RoleRow(
+                    id=other_role,
+                    name=f"other-role-{other_role.hex[:8]}",
+                    scope_type=ProjectEntityType(),
+                    scope_id=personal_project,
+                )
+            )
+
+        with pytest.raises(ProjectRoleNotGrantableError):
+            await roster_repository.join_members(test_project, [same_domain_user_1], other_role)
+
+        async with db_with_cleanup.begin_readonly_session() as session:
+            granted = await session.scalar(
+                sa.select(UserRoleRow).where(UserRoleRow.role_id == other_role)
+            )
+            assert granted is None
+
+    async def test_enroll_refuses_an_inactive_role_of_the_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        roster_repository: RbacRosterRepository,
+        test_project: ProjectID,
+        same_domain_user_1: UserID,
+    ) -> None:
+        inactive_role = RoleID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as session:
+            session.add(
+                RoleRow(
+                    id=inactive_role,
+                    name=f"inactive-role-{inactive_role.hex[:8]}",
+                    scope_type=ProjectEntityType(),
+                    scope_id=test_project,
+                    status=RoleStatus.INACTIVE,
+                )
+            )
+
+        with pytest.raises(ProjectRoleNotGrantableError):
+            await roster_repository.join_members(test_project, [same_domain_user_1], inactive_role)
+
+    async def test_enroll_refuses_a_role_that_is_not_there(
+        self,
+        roster_repository: RbacRosterRepository,
+        test_project: ProjectID,
+        same_domain_user_1: UserID,
+    ) -> None:
+        with pytest.raises(ProjectRoleNotGrantableError):
+            await roster_repository.join_members(
+                test_project, [same_domain_user_1], RoleID(uuid.uuid4())
+            )
 
     async def test_enroll_empty_list_returns_empty(
         self,

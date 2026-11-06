@@ -55,6 +55,8 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
   the action and one wiring per operation serves every relation.
 - Putting a user in an organization is the contained case, and it grants roles as a
   second write: see `proposals/BEP-1076-project-membership.md`.
+- A second write that grants entities is a `GrantingScopeAction`: `granted_targets()`
+  names them, and the scope gate asks the operation's permission on each.
 
 ## What an action takes
 

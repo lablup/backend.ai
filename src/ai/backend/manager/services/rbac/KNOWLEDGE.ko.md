@@ -55,6 +55,12 @@
   기록하지 않는다.
 - 받지 않은 사용자는 `join_members` 결과에서 제외되고, `join_member` 에서는
   `ProjectMemberNotJoinableError` 로 거부된다.
+- 지정한 역할은 그 프로젝트에 등록된 활성 역할이어야 한다(BEP-1076). 다른 스코프의 역할,
+  비활성 역할, 없는 역할은 모두 `ProjectRoleNotGrantableError` 로 거부하므로 roster 가
+  무관한 역할을 붙이는 경로가 되지 않는다.
+- 지정한 역할은 `JoinProjectAction` 의 `granted_targets()` 항목이기도 해서, scope gate 는
+  프로젝트의 `user` 권한에 더해 역할 자체에 대한 CREATE 를 묻는다. `AssignRoleAction` 이
+  역할에 묻는 것과 같은 권한이다.
 
 ## 개인 프로젝트 거부는 ops 불변 조건이다
 
