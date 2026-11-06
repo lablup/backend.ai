@@ -29,7 +29,7 @@ from ai.backend.agent.errors import KernelRunnerNotInitializedError, SubprocessS
 from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
 from ai.backend.agent.resources import KernelResourceSpec
 from ai.backend.agent.types import AgentEventData, KernelOwnershipData
-from ai.backend.agent.utils import closing_async, get_arch_name
+from ai.backend.agent.utils import closing_async, get_arch_name, write_file_beneath
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
@@ -310,12 +310,10 @@ class DockerKernel(AbstractKernel):
         if not host_abspath.is_relative_to(host_work_dir):
             raise PermissionError("Not allowed to upload files outside /home/work")
 
-        def _write_to_disk() -> None:
-            host_abspath.parent.mkdir(parents=True, exist_ok=True)
-            host_abspath.write_bytes(filedata)
-
         try:
-            await loop.run_in_executor(None, _write_to_disk)
+            await loop.run_in_executor(
+                None, write_file_beneath, host_work_dir, host_abspath, filedata
+            )
         except OSError as e:
             raise RuntimeError(
                 f"{self.kernel_id}: writing uploaded file failed: {container_path} -> {host_abspath} ({e!r})"
