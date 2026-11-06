@@ -466,8 +466,21 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.proxy_frontend.apply_content_encoding_config(registration.content_encoding)
 
     circuits = await list_worker_circuits(root_ctx, str(uuid.uuid4()))
+    registered_circuits: list[Circuit] = []
     for circuit in circuits:
+<<<<<<< HEAD
         await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info)
+=======
+        if await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info):
+            registered_circuits.append(circuit)
+    # Applied rather than replaced, so circuits from events handled meanwhile are kept.
+    ingress_writer = root_ctx.ingress_state.writer
+    if ingress_writer is not None:
+        ingress_authority = IngressAuthority(root_ctx.local_config.proxy_worker.authority)
+        await ingress_writer.apply([
+            circuit.to_ingress(ingress_authority) for circuit in registered_circuits
+        ])
+>>>>>>> f22702d9 (fix(BA-8913): refuse HTTP/2 circuits that need access control (#16418))
 
     cron = LocalCron([WorkerHeartbeatTask(root_ctx)])
     await cron.start()
@@ -662,6 +675,7 @@ async def handle_proxy_route_event(
 
     match event:
         case AppProxyCircuitCreatedEvent():
+<<<<<<< HEAD
             log.debug(
                 "handle_proxy_route_event(evt: AppProxyCircuitCreatedEvent({}))",
                 [c.id for c in event.circuits],
@@ -670,6 +684,20 @@ async def handle_proxy_route_event(
                 await context.proxy_frontend.register_circuit(
                     Circuit.from_serialized_circuit(circuit), circuit.route_info
                 )
+=======
+            log.debug("circuits created: {}", [str(c.id) for c in event.circuits])
+            created_circuits = [Circuit.from_serialized_circuit(c) for c in event.circuits]
+            registered_circuits: list[Circuit] = []
+            for created_circuit in created_circuits:
+                if await context.proxy_frontend.register_circuit(
+                    created_circuit, created_circuit.route_info
+                ):
+                    registered_circuits.append(created_circuit)
+            if ingress_writer is not None:
+                await ingress_writer.apply([
+                    circuit.to_ingress(ingress_authority) for circuit in registered_circuits
+                ])
+>>>>>>> f22702d9 (fix(BA-8913): refuse HTTP/2 circuits that need access control (#16418))
             await context.event_producer.broadcast_event(
                 AppProxyWorkerCircuitAddedEvent(
                     target_worker_authority=context.local_config.proxy_worker.authority,
