@@ -18,7 +18,7 @@ from ai.backend.common.exception import (
 from ai.backend.common.json import dump_json
 
 
-class UnauthenticatedSessionError(BackendAIError, web.HTTPUnauthorized):
+class UnauthenticatedError(BackendAIError, web.HTTPUnauthorized):
     error_type = "https://api.backend.ai/probs/auth-failed"
     error_title = "Unauthorized access"
 

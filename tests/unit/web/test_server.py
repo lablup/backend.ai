@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.auth.response import UpdatePasswordNoAuthResp
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.web.session import SESSION_KEY, Session
 from ai.backend.web.config.unified import SecurityConfig
-from ai.backend.web.errors import UnauthenticatedSessionError
+from ai.backend.web.errors import UnauthenticatedError
 from ai.backend.web.server import (
     build_cors_options,
     extend_login_session,
@@ -129,7 +129,7 @@ class TestExtendLoginSession:
     ) -> None:
         original_expiration = session.expiration_dt
 
-        with pytest.raises(UnauthenticatedSessionError) as exc_info:
+        with pytest.raises(UnauthenticatedError) as exc_info:
             await extend_login_session(extension_request)
 
         error = exc_info.value
