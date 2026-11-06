@@ -1,7 +1,7 @@
 ---
 name: scenario-tests-rationale
 type: design-rationale
-description: why the scenario tree has no shared background, seeds through write specs rather than adapters, and what the template database holds
+description: why the scenario tree has no shared background, seeds through write specs rather than adapters, checks only representative rows over ops, and what the template database holds
 scope: tests/scenario
 keywords: [scenario, seeder, rbac, template-database, adapter]
 generated:
@@ -9,7 +9,7 @@ generated:
   at: 2026-09-10
 updated:
   by: claude-code/opus-5-5
-  at: 2026-11-02
+  at: 2026-11-06
 status: draft
 ---
 # Scenario tests: background
@@ -69,6 +69,18 @@ latter changes.
 
 The four shipped role presets are all `deleted: true`, so they do not work as they are. Reviving them bypasses
 the product state.
+
+## Why scenarios check only representative rows over ops
+
+The ops tests check every case of the ops a call uses. Every ops factory src uses has processor or service tests
+(checked 2026-11-06). Repeating those cases in each entity's scenarios adds rows without checking anything new.
+
+What ops does not see, the adapter decides: which permission it checks, how it maps the request and response, and
+what it does outside ops. The defects found while writing scenarios were all there. An id found by name was looked
+up by another column, an empty domain name was passed on, and fields were dropped from a response.
+
+A rejection row whose user has no permission at all passes even when the adapter puts the wrong entity type or
+operation in the Action. Only a user with one permission removed from the success user tells them apart.
 
 ## Some entities cannot carry permissions
 

@@ -8,9 +8,53 @@ Background and rationale are in `KNOWLEDGE.md` in this directory, the layout in 
   entity package. Do not write them in `KNOWLEDGE.md`.
 - Work from the `adapter.py` of the entity. Write scenarios for every call it exposes.
 - Do not write scenarios for what every entity handles the same way: AND, OR and NOT filter combinations,
-  pagination, default sort direction. Entity scenarios cover the filters and sorts of that entity's fields.
+  pagination, default sort direction.
+- Write one representative filter and one representative sort per call. Do not write a row per field.
 - After writing, generate the reports of the entity package from the run with `--split`. `--verify` reports
   when either file disagrees with the run.
+
+## What scenarios check over ops
+
+The ops tests (`tests/unit/manager/actions/ops/`) and the processor tests check every case of what ops decides.
+Scenarios check only what the adapter adds over ops, with representative rows.
+
+One adapter method runs:
+
+```
+request DTO → Action (entity type, operation, scope, input fields) → processor and ops (permission check, repository) → data → response DTO
+```
+
+| What | Covers | How it is checked |
+|---|---|---|
+| ops | Per-item rejection, requests mixing permitted and unpermitted items, missing ids, repeated ids, response order, whole rejection of an atomic bulk, both checks of a membership, union of scopes, pages, superadmin pass, calls without a user | ops tests. No scenario rows |
+| Permission target | The entity type, operation and scope the adapter puts in the Action | Representative success and representative rejection |
+| Request and response mapping | Request → Action input fields (filters and sorts included), data → response DTO | The whole response of the representative success |
+| Code outside ops | What the adapter does without ops: steps before and after ops (finding an id by name, calling another Action first, building arguments) and calls with no ops | A row per case. No ops test covers it |
+
+- Representative success: a non-superadmin user granted only the permission the operation needs calls it.
+- Representative rejection: the same user without that one permission calls it.
+- The seeds of the representative success fill optional fields too. An empty value skips the response mapping.
+
+The representative rejection depends on the ops shape, the group method in the report.
+
+| ops shape | Group method | Representative rejection | Add to the representative success |
+|---|---|---|---|
+| Single entity | `single_entity`, `single_*_ops`, `entity_purge_ops`, `entity_upsert_ops`, single-row field ops | `NotEnoughPermission` | Nothing |
+| Scope | `scope`, `*_create_ops`, `*_atomic_*_ops`, `scope_batch_*_ops` | `NotEnoughPermission` | Nothing |
+| Search | `scope_search_ops`, `scoped_search_ops`, field `search_ops` | `NotEnoughPermission` | Seed one row outside the requested scope and check it is not in the response |
+| Global | `global_scope`, `global_*_ops`, `global_searcher_ops` | `NotEnoughPermission` for a regular user | superadmin calls it. State in `description` that the global role gates it |
+| Partial bulk | `partial_bulk`, `partial_bulk_*_ops`, `*_partial_bulk_purge_ops`, `bulk_lookup_ops`, field `partial_bulk_*` | A response whose `failed` holds the one unpermitted item | Nothing |
+| Atomic bulk | `atomic_bulk_field`, `legacy_partial_bulk`, field `atomic_bulk_*` | `NotEnoughPermission` for the whole call | Nothing |
+| Membership, relation | `membership`, `relation` | `NotEnoughPermission` | Nothing |
+| Key lookup | `lookup`, `lookup_ops`, `key_owner_lookup_ops`, `key_field_lookup_ops` | `NotEnoughPermission` for a user without READ on the entity found | Nothing |
+| Public, anonymous | `public*`, `anonymous_*` | None. Nothing gates it beyond authentication | A user granted no permission calls it |
+
+- Do not record an internal error such as `UnreachableError` as a rejection. Do not write rows that call without a
+  user.
+- If an unpermitted caller can tell from the response whether the target exists, do not pin it as the expected
+  behavior. Record it as a defect candidate.
+- If a defect prevents the representative success or rejection, leave the call as SCENARIO-GAP and put the defect
+  issue key in the PR description. Do not write rows that state a defect as the expected behavior.
 
 ## What a row says
 
@@ -67,6 +111,8 @@ A scenario is one class. It defines its name, what it guarantees, and three step
 - Seed only the permissions needed. Do not depend on shipped role presets.
 - Pair a row with the permission and a row without it. With only one, you cannot tell whether the permission was
   too broad.
+- The user of the row without the permission is the user of the row with it, minus that one permission. A user
+  with no permission at all cannot tell whether the adapter checks the right entity type and operation.
 - The requesting user of a row that checks permissions must not be superadmin. The checker passes superadmin
   first, so such a row proves nothing about permissions. The exception is an operation gated by the global role.
   State that fact in `description` then.
