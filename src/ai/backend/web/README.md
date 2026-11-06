@@ -128,7 +128,6 @@ web/
 ├── proxy.py             # API proxy
 ├── security.py          # Security utilities
 ├── response.py          # Response helpers
-├── stats.py             # Statistics tracking
 ├── server.py            # Main server entry point
 └── template.py          # Template rendering
 ```
