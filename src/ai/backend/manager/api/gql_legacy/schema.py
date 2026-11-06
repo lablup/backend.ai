@@ -135,8 +135,10 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import TooManyKernelsFound
+from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.image.row import (
     ImageLoadFilter,
@@ -3420,6 +3422,8 @@ class GQLExceptionMiddleware:
             res = next(root, info, **args)
         except GraphQLError:
             raise
+        except RepositoryIntegrityError as e:
+            raise self._wrap_integrity_error(e) from e
         except BackendAIError as e:
             raise self._wrap_backend_error(e) from e
         except Exception as e:
@@ -3435,30 +3439,30 @@ class GQLExceptionMiddleware:
             return await coro
         except GraphQLError:
             raise
+        except RepositoryIntegrityError as e:
+            raise self._wrap_integrity_error(e) from e
         except BackendAIError as e:
             raise self._wrap_backend_error(e) from e
         except BaseException as e:
             raise self._wrap_unexpected_error(e) from e
 
+    def _wrap_integrity_error(self, e: RepositoryIntegrityError) -> GraphQLError:
+        # Its message carries the PostgreSQL diagnostic; answer with the title only.
+        log.trace("graphql client error", error_code=str(e.error_code()), error_message=str(e))
+        return GraphQLError(message=e.error_title, extensions={"code": str(e.error_code())})
+
     def _wrap_backend_error(self, e: BackendAIError) -> GraphQLError:
-        if e.status_code // 100 == 4:
+        if e.is_client_error():
             log.trace("graphql client error", error_code=str(e.error_code()), error_message=str(e))
-        elif e.status_code // 100 == 5:
-            log.exception("graphql server error", error_code=str(e.error_code()))
-        return GraphQLError(
-            message=str(e),
-            extensions={
-                "code": str(e.error_code()),
-            },
-        )
+            return GraphQLError(message=str(e), extensions={"code": str(e.error_code())})
+        log.exception("graphql server error", error_code=str(e.error_code()))
+        return GraphQLError(message=e.error_title, extensions={"code": str(e.error_code())})
 
     def _wrap_unexpected_error(self, e: BaseException) -> GraphQLError:
         log.exception("graphql unexpected error")
         return GraphQLError(
-            message=str(e),
-            extensions={
-                "code": str(ErrorCode.default()),
-            },
+            message=InternalServerError.error_title,
+            extensions={"code": str(ErrorCode.default())},
         )
 
 
