@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -27,6 +28,7 @@ from ai.backend.manager.models.session.row import SessionRow
 from .conftest import SessionSeedData
 
 _WSPROXY_ADDR = "http://127.0.0.1:5050"
+_WSPROXY_API_TOKEN = "coordinator-api-token"
 _SERVICE_PORTS_TTYD = [
     {
         "name": "ttyd",
@@ -37,6 +39,13 @@ _SERVICE_PORTS_TTYD = [
         "is_inference": False,
     }
 ]
+
+
+@dataclass(frozen=True)
+class _ScalingGroupApiTokenCase:
+    description: str
+    wsproxy_api_token: str | None
+    expected_conf_request_headers: dict[str, str]
 
 
 def _make_wsproxy_mock(token: str = "test-token-xyz") -> AsyncMock:
@@ -328,6 +337,27 @@ class TestSessionComplete:
 class TestSessionStartService:
     """Start service endpoint — app token and wsproxy address scenarios."""
 
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ScalingGroupApiTokenCase(
+                description="api_token_set",
+                wsproxy_api_token=_WSPROXY_API_TOKEN,
+                expected_conf_request_headers={"X-BackendAI-Token": _WSPROXY_API_TOKEN},
+            ),
+            _ScalingGroupApiTokenCase(
+                description="no_api_token",
+                wsproxy_api_token=None,
+                expected_conf_request_headers={},
+            ),
+            _ScalingGroupApiTokenCase(
+                description="empty_api_token",
+                wsproxy_api_token="",
+                expected_conf_request_headers={},
+            ),
+        ],
+        ids=lambda case: case.description,
+    )
     async def test_start_service_returns_token_and_wsproxy(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -336,13 +366,14 @@ class TestSessionStartService:
         scaling_group_fixture: str,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
+        case: _ScalingGroupApiTokenCase,
     ) -> None:
         """S-1: Start service 'ttyd' → StartServiceResponse with token and wsproxy_addr."""
         async with db_engine.begin() as conn:
             await conn.execute(
                 sa.update(scaling_groups)
                 .where(scaling_groups.c.name == scaling_group_fixture)
-                .values(wsproxy_addr=_WSPROXY_ADDR)
+                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=case.wsproxy_api_token)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
@@ -377,6 +408,8 @@ class TestSessionStartService:
         assert isinstance(result, StartServiceResponse)
         assert result.token == "test-token-xyz"
         assert result.wsproxy_addr == _WSPROXY_ADDR
+        post_call_kwargs = mock_session_cls.__aenter__.return_value.post.call_args.kwargs
+        assert post_call_kwargs["headers"] == case.expected_conf_request_headers
 
     async def test_start_service_with_specific_port(
         self,

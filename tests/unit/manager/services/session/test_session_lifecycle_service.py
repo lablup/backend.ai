@@ -36,6 +36,7 @@ from ai.backend.manager.api.rest.session.handler import (
     _route_legacy_uuid_mounts,
 )
 from ai.backend.manager.api.utils import undefined
+from ai.backend.manager.data.resource.types import ScalingGroupProxyConnectionInfo
 from ai.backend.manager.data.session.types import (
     SessionData,
     SessionRoutingInfo,
@@ -1966,8 +1967,10 @@ class TestStartService:
             ],
         )
         mock_session_repository.get_session_with_routing_minimal = AsyncMock(return_value=info)
-        mock_session_repository.get_scaling_group_wsproxy_addr = AsyncMock(
-            return_value="http://wsproxy:10200"
+        mock_session_repository.scaling_group_proxy_connection_info = AsyncMock(
+            return_value=ScalingGroupProxyConnectionInfo(
+                addr="http://wsproxy:10200", api_token=None
+            )
         )
 
         mock_client = MagicMock()
@@ -2031,8 +2034,10 @@ class TestStartService:
             ],
         )
         mock_session_repository.get_session_with_routing_minimal = AsyncMock(return_value=info)
-        mock_session_repository.get_scaling_group_wsproxy_addr = AsyncMock(
-            return_value="http://wsproxy:10200"
+        mock_session_repository.scaling_group_proxy_connection_info = AsyncMock(
+            return_value=ScalingGroupProxyConnectionInfo(
+                addr="http://wsproxy:10200", api_token=None
+            )
         )
 
         mock_client = MagicMock()
@@ -2109,8 +2114,10 @@ class TestStartService:
             ],
         )
         mock_session_repository.get_session_with_routing_minimal = AsyncMock(return_value=info)
-        mock_session_repository.get_scaling_group_wsproxy_addr = AsyncMock(
-            return_value="http://wsproxy:10200"
+        mock_session_repository.scaling_group_proxy_connection_info = AsyncMock(
+            return_value=ScalingGroupProxyConnectionInfo(
+                addr="http://wsproxy:10200", api_token=None
+            )
         )
 
         mock_client = MagicMock()
