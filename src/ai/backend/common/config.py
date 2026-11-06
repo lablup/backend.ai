@@ -109,7 +109,6 @@ etcd_config_iv = t.Dict({
         t.Key("addrs", optional=True): t.List(tx.HostPortPair, min_length=1),
         t.Key("user", default=""): t.Null | t.String(allow_blank=True),
         t.Key("password", default=""): t.Null | t.String(allow_blank=True),
-        t.Key("tls", default={}): t.Dict().allow_extra("*"),
     }).allow_extra("*")
     & _align_etcd_addr_and_addrs,
 }).allow_extra("*")

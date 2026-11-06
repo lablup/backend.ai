@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from ai.backend.agent.watcher import watcher_server
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.types import HostPortPair
 
 
@@ -14,7 +15,7 @@ class TestWatcherSSL:
         key_path = tmp_path / "watcher.key"
         config = {
             "logging": MagicMock(),
-            "etcd": {"user": None, "password": None, "addrs": [], "namespace": "test"},
+            "etcd": EtcdConfig.model_validate({"namespace": "test"}),
             "watcher": {
                 "service-addr": HostPortPair("127.0.0.1", 6009),
                 "ssl-enabled": True,
@@ -33,7 +34,10 @@ class TestWatcherSSL:
 
         with (
             patch("ai.backend.agent.watcher.Logger"),
-            patch("ai.backend.agent.watcher.AsyncEtcd", return_value=etcd_context),
+            patch(
+                "ai.backend.agent.watcher.AsyncEtcd.create_from_config",
+                return_value=etcd_context,
+            ),
             patch("ai.backend.agent.watcher.web.AppRunner", return_value=AsyncMock()),
             patch("ai.backend.agent.watcher.web.TCPSite", return_value=AsyncMock()) as tcp_site,
             patch("ai.backend.agent.watcher.ssl.create_default_context", return_value=ssl_context),

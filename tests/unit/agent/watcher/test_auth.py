@@ -14,6 +14,7 @@ from ai.backend.agent.errors.watcher import (
     WatcherTokenNotConfiguredError,
 )
 from ai.backend.agent.watcher import auth_middleware, watcher_server
+from ai.backend.common.configs.etcd import EtcdConfig
 
 _TOKEN_HEADER = "X-BackendAI-Watcher-Token"
 
@@ -70,7 +71,7 @@ class TestAuthMiddleware:
 def _watcher_cfg() -> dict[str, Any]:
     return {
         "logging": MagicMock(),
-        "etcd": {"user": None, "addrs": [], "namespace": "test"},
+        "etcd": EtcdConfig.model_validate({"namespace": "test"}),
         "watcher": {"ssl-enabled": False, "service-addr": MagicMock()},
     }
 
@@ -87,7 +88,10 @@ class TestStartupToken:
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
         with (
-            patch("ai.backend.agent.watcher.AsyncEtcd", return_value=_mock_etcd("watcher-secret")),
+            patch(
+                "ai.backend.agent.watcher.AsyncEtcd.create_from_config",
+                return_value=_mock_etcd("watcher-secret"),
+            ),
             patch("ai.backend.agent.watcher.Logger"),
             patch("ai.backend.agent.watcher.web.AppRunner", return_value=AsyncMock()),
             patch("ai.backend.agent.watcher.web.TCPSite", return_value=AsyncMock()) as tcp_site,
@@ -104,7 +108,10 @@ class TestStartupToken:
     @pytest.mark.parametrize("stored_token", [None, ""], ids=["missing", "empty"])
     async def test_refuses_to_start_without_token(self, stored_token: str | None) -> None:
         with (
-            patch("ai.backend.agent.watcher.AsyncEtcd", return_value=_mock_etcd(stored_token)),
+            patch(
+                "ai.backend.agent.watcher.AsyncEtcd.create_from_config",
+                return_value=_mock_etcd(stored_token),
+            ),
             patch("ai.backend.agent.watcher.Logger"),
             patch("ai.backend.agent.watcher.web.AppRunner", return_value=AsyncMock()),
             patch("ai.backend.agent.watcher.web.TCPSite", return_value=AsyncMock()) as tcp_site,
