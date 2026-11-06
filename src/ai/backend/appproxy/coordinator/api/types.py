@@ -8,6 +8,7 @@ from ai.backend.appproxy.common.types import (
     SerializableCircuit,
     SessionConfig,
 )
+from ai.backend.common.dto.appproxy.kernel_host import KernelHost
 from ai.backend.common.types import BackendAISchema
 
 
@@ -32,6 +33,6 @@ class CircuitListResponseModel(BackendAISchema):
 
 class ConfRequestModel(BackendAISchema):
     login_session_token: str | None
-    kernel_host: str
+    kernel_host: KernelHost
     kernel_port: int
     session: SessionConfig

@@ -6,8 +6,6 @@ from __future__ import annotations
 
 from typing import override
 
-from aiohttp import web
-
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -59,19 +57,4 @@ class InvalidCircuitStateError(BackendAIError):
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.MISMATCH,
-        )
-
-
-class InvalidKernelHostError(BackendAIError, web.HTTPBadRequest):
-    """Raised when a kernel host cannot become a proxy target."""
-
-    error_type = "https://api.backend.ai/probs/appproxy/invalid-kernel-host"
-    error_title = "The kernel host cannot be used as a proxy target."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.APPPROXY,
-            operation=ErrorOperation.REQUEST,
-            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )

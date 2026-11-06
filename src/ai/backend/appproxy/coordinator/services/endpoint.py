@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING
 
 from pydantic import AnyUrl
 
-from ai.backend.appproxy.coordinator.kernel_host import find_kernel_host_rejection_reason
 from ai.backend.appproxy.coordinator.models import Circuit
 from ai.backend.appproxy.coordinator.repositories.endpoint import (
     EndpointRepository,
@@ -90,25 +89,17 @@ class EndpointService:
         """
         if not items:
             return []
-        allowed_items, rejection_reason_by_deployment = self._split_items_with_rejected_hosts(items)
-        rejected_results = [
-            UpdatedRoutesItem(deployment_id=deployment_id, success=False, error=rejection_reason)
-            for deployment_id, rejection_reason in rejection_reason_by_deployment.items()
-        ]
         try:
-            results = await self._repository.update_routes(allowed_items)
+            results = await self._repository.update_routes(items)
         except Exception as exc:
             log.exception("failed to update routes in bulk")
             return [
-                *rejected_results,
-                *[
-                    UpdatedRoutesItem(
-                        deployment_id=item.deployment_id,
-                        success=False,
-                        error=str(exc),
-                    )
-                    for item in allowed_items
-                ],
+                UpdatedRoutesItem(
+                    deployment_id=item.deployment_id,
+                    success=False,
+                    error=str(exc),
+                )
+                for item in items
             ]
 
         update_items = [
@@ -138,15 +129,12 @@ class EndpointService:
                         result.error = f"Worker propagation failed: {exc}"
 
         return [
-            *rejected_results,
-            *[
-                UpdatedRoutesItem(
-                    deployment_id=result.deployment_id,
-                    success=result.success,
-                    error=result.error,
-                )
-                for result in results
-            ],
+            UpdatedRoutesItem(
+                deployment_id=result.deployment_id,
+                success=result.success,
+                error=result.error,
+            )
+            for result in results
         ]
 
     async def register_routes_bulk(
@@ -163,33 +151,19 @@ class EndpointService:
         """
         if not items:
             return []
-        allowed_items, rejection_reason_by_deployment = self._split_items_with_rejected_hosts(items)
-        rejected_results = [
-            RegisteredRoutesItem(
-                deployment_id=deployment_id,
-                success=False,
-                registered_route_ids=[],
-                already_registered_route_ids=[],
-                error=rejection_reason,
-            )
-            for deployment_id, rejection_reason in rejection_reason_by_deployment.items()
-        ]
         try:
-            results = await self._repository.register_routes(allowed_items)
+            results = await self._repository.register_routes(items)
         except Exception as exc:
             log.exception("failed to register routes in bulk")
             return [
-                *rejected_results,
-                *[
-                    RegisteredRoutesItem(
-                        deployment_id=item.deployment_id,
-                        success=False,
-                        registered_route_ids=[],
-                        already_registered_route_ids=[],
-                        error=str(exc),
-                    )
-                    for item in allowed_items
-                ],
+                RegisteredRoutesItem(
+                    deployment_id=item.deployment_id,
+                    success=False,
+                    registered_route_ids=[],
+                    already_registered_route_ids=[],
+                    error=str(exc),
+                )
+                for item in items
             ]
 
         update_items = [
@@ -217,17 +191,14 @@ class EndpointService:
                         result.error = f"Worker propagation failed: {exc}"
 
         return [
-            *rejected_results,
-            *[
-                RegisteredRoutesItem(
-                    deployment_id=result.deployment_id,
-                    success=result.success,
-                    registered_route_ids=result.registered_route_ids,
-                    already_registered_route_ids=result.already_registered_route_ids,
-                    error=result.error,
-                )
-                for result in results
-            ],
+            RegisteredRoutesItem(
+                deployment_id=result.deployment_id,
+                success=result.success,
+                registered_route_ids=result.registered_route_ids,
+                already_registered_route_ids=result.already_registered_route_ids,
+                error=result.error,
+            )
+            for result in results
         ]
 
     async def unregister_routes_bulk(
@@ -323,24 +294,6 @@ class EndpointService:
             DeletedEndpointItem(deployment_id=deployment_id, success=True)
             for deployment_id in deployment_ids
         ]
-
-    def _split_items_with_rejected_hosts[TRoutesItem: UpdateRoutesItem | RegisterRoutesItem](
-        self, items: list[TRoutesItem]
-    ) -> tuple[list[TRoutesItem], dict[DeploymentID, str]]:
-        allowed_items: list[TRoutesItem] = []
-        rejection_reason_by_deployment: dict[DeploymentID, str] = {}
-        for item in items:
-            rejection_reasons = [
-                rejection_reason
-                for route in item.routes
-                if (rejection_reason := find_kernel_host_rejection_reason(route.kernel_host))
-                is not None
-            ]
-            if rejection_reasons:
-                rejection_reason_by_deployment[item.deployment_id] = rejection_reasons[0]
-            else:
-                allowed_items.append(item)
-        return allowed_items, rejection_reason_by_deployment
 
     async def _propagate_new_circuits(
         self,

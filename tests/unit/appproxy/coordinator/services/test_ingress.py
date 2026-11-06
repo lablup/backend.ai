@@ -5,7 +5,6 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from http import HTTPStatus
 from unittest.mock import AsyncMock, MagicMock, Mock, call
-from uuid import UUID
 
 import aiohttp
 import pytest
@@ -18,7 +17,6 @@ from ai.backend.appproxy.common.defs import (
 )
 from ai.backend.appproxy.common.types import IngressDeliveryMode
 from ai.backend.appproxy.coordinator.clients.worker.traefik.client import TraefikWorkerClient
-from ai.backend.appproxy.coordinator.errors.circuit import InvalidKernelHostError
 from ai.backend.appproxy.coordinator.errors.ingress import (
     ApiDeliveryWorkerServerError,
     ApiDeliveryWorkerUnreachableError,
@@ -46,14 +44,12 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
     IngressTargetGroup,
     IngressTargetGroupID,
     PortFrontend,
-    SessionIngressTarget,
 )
 from ai.backend.common.service_discovery.service_discovery import (
     ServiceDiscovery,
     ServiceEndpoint,
     ServiceMetadata,
 )
-from ai.backend.common.types import SessionId
 
 WORKER_1_NODE_A = "10.0.0.1:10201"
 WORKER_1_NODE_B = "10.0.0.2:10201"
@@ -312,40 +308,7 @@ def api_delivery_ingress_service(
     )
 
 
-@pytest.fixture
-def ingress_targeting_a_metadata_address(worker_1_ingress: Ingress) -> Ingress:
-    target = SessionIngressTarget(
-        host="169.254.169.254",
-        port=80,
-        session_id=SessionId(UUID("f5cd34ba-ae53-4537-a813-09f38496443d")),
-    )
-    return worker_1_ingress.model_copy(
-        update={
-            "backend": IngressBackend(
-                id=IngressBackendID("backend-1"),
-                target_groups=[
-                    IngressTargetGroup(
-                        id=IngressTargetGroupID("group-1"), weight=1, targets=[target]
-                    )
-                ],
-            )
-        }
-    )
-
-
 class TestIngressService:
-    async def test_upsert_rejects_a_target_host_before_pushing(
-        self,
-        api_delivery_ingress_service: IngressService,
-        worker_sessions: dict[str, MagicMock],
-        ingress_targeting_a_metadata_address: Ingress,
-    ) -> None:
-        with pytest.raises(InvalidKernelHostError):
-            await api_delivery_ingress_service.upsert([ingress_targeting_a_metadata_address])
-
-        for session in worker_sessions.values():
-            session.post.assert_not_called()
-
     async def test_upsert_pushes_each_authority_to_its_api_nodes(
         self,
         api_delivery_ingress_service: IngressService,

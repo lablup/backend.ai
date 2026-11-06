@@ -16,6 +16,7 @@ from pydantic import AliasChoices, AnyUrl, Field
 from ai.backend.common.api_handlers import BaseFieldModel
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.dto.appproxy.kernel_host import KernelHost
 
 
 class SessionTagsModel(BaseFieldModel):
@@ -203,7 +204,7 @@ class RouteEntry(BaseFieldModel):
         ...,
         description="Route UUID — the manager-side identity of this routing entry.",
     )
-    kernel_host: str = Field(
+    kernel_host: KernelHost = Field(
         ...,
         description="Host / IP that the proxy uses to reach the kernel of the session.",
     )

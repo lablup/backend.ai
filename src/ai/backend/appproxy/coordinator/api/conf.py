@@ -10,7 +10,6 @@ from ai.backend.appproxy.common.types import CORSOptions, PydanticResponse, WebM
 from ai.backend.appproxy.common.utils import pydantic_api_handler
 from ai.backend.appproxy.coordinator.api.types import ConfRequestModel
 from ai.backend.appproxy.coordinator.errors import InvalidSessionParameterError
-from ai.backend.appproxy.coordinator.kernel_host import ensure_kernel_host_allowed
 from ai.backend.appproxy.coordinator.models import Token
 from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.common.types import BackendAISchema
@@ -40,8 +39,6 @@ async def conf_v2(
 
     if not params.session.id or not params.session.access_key:
         raise InvalidSessionParameterError("Not meant for inference apps")
-
-    ensure_kernel_host_allowed(params.kernel_host)
 
     async with root_ctx.db.begin_session() as sess:
         token_id = uuid.uuid4()

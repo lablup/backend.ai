@@ -16,7 +16,6 @@ from ai.backend.appproxy.coordinator.clients.worker.base import AbstractWorkerCl
 from ai.backend.appproxy.coordinator.clients.worker.client import AppProxyWorkerClient
 from ai.backend.appproxy.coordinator.clients.worker.traefik.client import TraefikWorkerClient
 from ai.backend.appproxy.coordinator.errors.ingress import IngressPushFailedError
-from ai.backend.appproxy.coordinator.kernel_host import ensure_kernel_host_allowed
 from ai.backend.common.clients.http_client.client_pool import ClientKey, ClientPool
 from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressAuthority, IngressKey
 from ai.backend.common.exception import BackendAIError
@@ -45,10 +44,6 @@ class IngressService:
         self._traefik_worker_client = traefik_worker_client
 
     async def upsert(self, ingresses: Sequence[Ingress]) -> None:
-        for ingress in ingresses:
-            for target_group in ingress.backend.target_groups:
-                for target in target_group.targets:
-                    ensure_kernel_host_allowed(target.host)
         ingresses_by_authority: defaultdict[IngressAuthority, list[Ingress]] = defaultdict(list)
         for ingress in ingresses:
             ingresses_by_authority[ingress.authority].append(ingress)

@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import ConfigDict, Field, IPvAnyNetwork, model_validator
 
 from ai.backend.common.api_handlers import BaseFieldModel
+from ai.backend.common.dto.appproxy.kernel_host import KernelHost
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import SessionId
 
@@ -121,7 +122,7 @@ class IngressAccess(BaseFieldModel):
 
 class IngressTarget(BaseFieldModel, ABC):
     kind: IngressTargetKind
-    host: str
+    host: KernelHost
     port: int = Field(ge=1, le=65535)
 
     @property
