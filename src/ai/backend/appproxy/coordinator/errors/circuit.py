@@ -4,13 +4,10 @@ Circuit-related exceptions for the coordinator.
 
 from __future__ import annotations
 
-<<<<<<< HEAD
-=======
 from typing import override
 
 from aiohttp import web
 
->>>>>>> f22702d9a (fix(BA-8913): refuse HTTP/2 circuits that need access control (#16418))
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
