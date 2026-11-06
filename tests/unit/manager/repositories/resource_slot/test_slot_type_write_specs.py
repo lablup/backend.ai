@@ -76,7 +76,7 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 
 
@@ -159,6 +159,9 @@ def _creator(
     enabled: bool = True,
     display_name: str = "",
     rank: int = 0,
+    sealed_launch: bool = False,
+    max_per_session: Decimal | None = None,
+    single_node_only: bool = False,
 ) -> ResourceSlotTypeCreator:
     """Build a creator with every field named, since the spec carries no defaults."""
     return ResourceSlotTypeCreator(
@@ -172,6 +175,9 @@ def _creator(
         display_icon="",
         number_format=NumberFormat(),
         rank=rank,
+        sealed_launch=sealed_launch,
+        max_per_session=max_per_session,
+        single_node_only=single_node_only,
     )
 
 
@@ -197,6 +203,35 @@ class TestResourceSlotTypeCreator:
         assert data.enabled is False
         assert data.rank == 7
         assert isinstance(data.uuid, uuid.UUID)
+
+    async def test_limit_attributes_default_to_unrestricted(
+        self,
+        db_with_referencing_tables: ExtendedAsyncSAEngine,
+    ) -> None:
+        async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
+            data = await w.create_entity(_creator("cpu", SlotTypes.COUNT))
+
+        assert data.sealed_launch is False
+        assert data.max_per_session is None
+        assert data.single_node_only is False
+
+    async def test_limit_attributes_are_stored(
+        self,
+        db_with_referencing_tables: ExtendedAsyncSAEngine,
+    ) -> None:
+        creator = _creator(
+            "confidential.tdx",
+            SlotTypes.UNIQUE,
+            sealed_launch=True,
+            max_per_session=Decimal("1"),
+            single_node_only=True,
+        )
+        async with V2DBOpsProvider(db_with_referencing_tables).write_ops() as w:
+            data = await w.create_entity(creator)
+
+        assert data.sealed_launch is True
+        assert data.max_per_session == Decimal("1")
+        assert data.single_node_only is True
 
     async def test_each_row_gets_a_distinct_uuid(
         self,
@@ -256,6 +291,37 @@ class TestResourceSlotTypeUpdater:
         assert data.required is True
         assert data.display_name == "GPU"
         assert data.slot_type == "unique"
+
+    async def test_sets_and_clears_the_limit_attributes(
+        self,
+        db_with_referencing_tables: ExtendedAsyncSAEngine,
+        existing_slot_type: ResourceSlotTypeData,
+    ) -> None:
+        provider = V2DBOpsProvider(db_with_referencing_tables)
+        async with provider.write_ops() as w:
+            data_or_none = await w.update_data(
+                ResourceSlotTypeUpdater(
+                    slot_type_id=existing_slot_type.uuid,
+                    sealed_launch=OptionalState.update(True),
+                    max_per_session=TriState.update(Decimal("2.5")),
+                    single_node_only=OptionalState.update(True),
+                )
+            )
+        assert data_or_none is not None
+        assert data_or_none.sealed_launch is True
+        assert data_or_none.max_per_session == Decimal("2.5")
+        assert data_or_none.single_node_only is True
+
+        async with provider.write_ops() as w:
+            cleared = await w.update_data(
+                ResourceSlotTypeUpdater(
+                    slot_type_id=existing_slot_type.uuid,
+                    max_per_session=TriState.nullify(),
+                )
+            )
+        assert cleared is not None
+        assert cleared.max_per_session is None
+        assert cleared.sealed_launch is True
 
     async def test_unknown_name_matches_nothing(
         self,

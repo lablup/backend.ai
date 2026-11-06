@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+from decimal import Decimal
 
 import click
 
 from ai.backend.client.cli.v2.helpers import (
     create_v2_registry,
     load_v2_config,
+    nullable_option,
     parse_order_options,
     print_result,
 )
@@ -96,6 +98,22 @@ def search(
 @click.option("--binary/--decimal", default=False, help="Binary (1024) or decimal (1000) prefixes.")
 @click.option("--round-length", type=int, default=0, help="Decimal places when displaying.")
 @click.option("--rank", type=int, default=0, help="Display ordering rank.")
+@click.option(
+    "--sealed-launch/--no-sealed-launch",
+    default=False,
+    help="Whether kernels holding it must be launched sealed.",
+)
+@click.option(
+    "--max-per-session",
+    type=Decimal,
+    default=None,
+    help="Maximum total amount one session may request. Omit for no limit.",
+)
+@click.option(
+    "--single-node-only/--no-single-node-only",
+    default=False,
+    help="Whether sessions requesting it must run on a single node.",
+)
 def create(
     slot_name: str,
     slot_type_category: str,
@@ -108,6 +126,9 @@ def create(
     binary: bool,
     round_length: int,
     rank: int,
+    sealed_launch: bool,
+    max_per_session: Decimal | None,
+    single_node_only: bool,
 ) -> None:
     """Register a new resource slot type."""
     from ai.backend.common.dto.manager.v2.resource_slot.request import (
@@ -130,6 +151,9 @@ def create(
                     display_icon=display_icon,
                     number_format=NumberFormatInput(binary=binary, round_length=round_length),
                     rank=rank,
+                    sealed_launch=sealed_launch,
+                    max_per_session=max_per_session,
+                    single_node_only=single_node_only,
                 ),
             )
             print_result(result)
@@ -164,6 +188,25 @@ def create(
     help="Decimal places when displaying. Sets the number format.",
 )
 @click.option("--rank", type=int, default=None, help="Display ordering rank.")
+@click.option(
+    "--sealed-launch/--no-sealed-launch",
+    "sealed_launch",
+    default=None,
+    help="Whether kernels holding it must be launched sealed.",
+)
+@click.option(
+    "--max-per-session",
+    type=Decimal,
+    default=None,
+    help="Maximum total amount one session may request.",
+)
+@click.option("--set-null-max-per-session", is_flag=True, help="Remove the per-session limit.")
+@click.option(
+    "--single-node-only/--no-single-node-only",
+    "single_node_only",
+    default=None,
+    help="Whether sessions requesting it must run on a single node.",
+)
 def update(
     slot_name: str,
     required: bool | None,
@@ -175,6 +218,10 @@ def update(
     binary: bool | None,
     round_length: int | None,
     rank: int | None,
+    sealed_launch: bool | None,
+    max_per_session: Decimal | None,
+    set_null_max_per_session: bool,
+    single_node_only: bool | None,
 ) -> None:
     """Update a resource slot type. The slot name and slot type are immutable."""
     from ai.backend.common.dto.manager.v2.resource_slot.request import (
@@ -193,6 +240,8 @@ def update(
         else None
     )
 
+    limit = nullable_option(max_per_session, set_null_max_per_session, option="max-per-session")
+
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
@@ -208,6 +257,9 @@ def update(
                     display_icon=display_icon,
                     number_format=number_format,
                     rank=rank,
+                    sealed_launch=sealed_launch,
+                    max_per_session=limit,
+                    single_node_only=single_node_only,
                 ),
             )
             print_result(result)

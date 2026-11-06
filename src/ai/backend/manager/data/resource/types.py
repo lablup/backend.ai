@@ -94,10 +94,15 @@ class SlotTypeInfo:
       drives value humanization.
     - required: slot names with required=true. Sessions must request
       nonzero amounts for these slots.
+    - max_per_session: slot name -> largest total one session may request;
+      slots without a limit are absent.
+    - single_node_only: slots a session may request only on a single node.
     """
 
     types: Mapping[ResourceSlotName, SlotTypes]
     required: frozenset[ResourceSlotName]
+    max_per_session: Mapping[ResourceSlotName, Decimal] = field(default_factory=dict)
+    single_node_only: frozenset[ResourceSlotName] = frozenset()
 
 
 @dataclass(frozen=True)

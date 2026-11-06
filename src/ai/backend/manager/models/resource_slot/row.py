@@ -116,6 +116,23 @@ class ResourceSlotTypeRow(LifecycleTimestampsMixin, Base):
     rank: Mapped[int] = mapped_column(
         "rank", sa.Integer, nullable=False, server_default=sa.text("0")
     )
+    sealed_launch: Mapped[bool] = mapped_column(
+        "sealed_launch",
+        sa.Boolean,
+        nullable=False,
+        default=False,
+        server_default=sa.false(),
+    )
+    max_per_session: Mapped[Decimal | None] = mapped_column(
+        "max_per_session", sa.Numeric(precision=24, scale=6), nullable=True
+    )
+    single_node_only: Mapped[bool] = mapped_column(
+        "single_node_only",
+        sa.Boolean,
+        nullable=False,
+        default=False,
+        server_default=sa.false(),
+    )
 
 
 class AgentResourceRow(LifecycleTimestampsMixin, Base):

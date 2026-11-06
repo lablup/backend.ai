@@ -54,6 +54,9 @@ class TestSeedSlotType(TestSeedRow[ResourceSlotTypeData]):
             display_icon="",
             number_format=NumberFormat(),
             rank=0,
+            sealed_launch=False,
+            max_per_session=None,
+            single_node_only=False,
         )
 
 
@@ -100,4 +103,7 @@ class TestSeedResourceSlotType(TestSeedRow[ResourceSlotTypeData]):
             display_icon=self.display_icon,
             number_format=self.number_format,
             rank=self.rank,
+            sealed_launch=False,
+            max_per_session=None,
+            single_node_only=False,
         )

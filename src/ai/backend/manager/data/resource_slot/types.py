@@ -58,6 +58,9 @@ class ResourceSlotTypeData(EntityData):
     display_icon: str
     number_format: NumberFormatData
     rank: int
+    sealed_launch: bool
+    max_per_session: Decimal | None
+    single_node_only: bool
 
     @override
     def entity_id(self) -> EntityIdentifier:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Any, override
 
 from sqlalchemy.orm import InstrumentedAttribute
@@ -17,7 +18,7 @@ from ai.backend.manager.models.resource_slot.searchable_fields import (
 from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
@@ -40,6 +41,9 @@ class ResourceSlotTypeUpdater(DataUpdater[ResourceSlotTypeRow, ResourceSlotTypeD
         default_factory=OptionalState[NumberFormat].nop
     )
     rank: OptionalState[int] = field(default_factory=OptionalState[int].nop)
+    sealed_launch: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
+    max_per_session: TriState[Decimal] = field(default_factory=TriState[Decimal].nop)
+    single_node_only: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
 
     @property
     @override
@@ -70,6 +74,9 @@ class ResourceSlotTypeUpdater(DataUpdater[ResourceSlotTypeRow, ResourceSlotTypeD
         self.display_icon.update_dict(to_update, "display_icon")
         self.number_format.update_dict(to_update, "number_format")
         self.rank.update_dict(to_update, "rank")
+        self.sealed_launch.update_dict(to_update, "sealed_launch")
+        self.max_per_session.update_dict(to_update, "max_per_session")
+        self.single_node_only.update_dict(to_update, "single_node_only")
         return to_update
 
     @override

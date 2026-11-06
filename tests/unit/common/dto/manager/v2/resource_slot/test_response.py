@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from uuid import uuid4
 
 from ai.backend.common.dto.manager.v2.resource_slot.response import ResourceSlotTypeNode
@@ -22,6 +23,9 @@ def _make_resource_slot_type_node(slot_name: str = "cpu") -> ResourceSlotTypeNod
         display_icon="cpu",
         number_format=NumberFormatInfo(binary=False, round_length=2),
         rank=1,
+        sealed_launch=False,
+        max_per_session=None,
+        single_node_only=False,
     )
 
 
@@ -56,6 +60,9 @@ class TestResourceSlotTypeNode:
             display_icon="memory",
             number_format=NumberFormatInfo(binary=True, round_length=2),
             rank=2,
+            sealed_launch=False,
+            max_per_session=None,
+            single_node_only=False,
         )
         assert node.slot_name == "mem"
         assert node.number_format.binary is True
@@ -89,8 +96,14 @@ class TestResourceSlotTypeNode:
             display_icon="gpu",
             number_format=NumberFormatInfo(binary=False, round_length=0),
             rank=3,
+            sealed_launch=True,
+            max_per_session=Decimal("1"),
+            single_node_only=True,
         )
         assert node.slot_name == "cuda.device"
         assert node.slot_type == "unique"
         assert node.required is False
         assert node.enabled is False
+        assert node.sealed_launch is True
+        assert node.max_per_session == Decimal("1")
+        assert node.single_node_only is True
