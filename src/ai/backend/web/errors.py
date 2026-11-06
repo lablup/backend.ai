@@ -13,6 +13,36 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+<<<<<<< HEAD
+=======
+from ai.backend.common.json import dump_json
+
+
+class UnauthenticatedError(BackendAIError, web.HTTPUnauthorized):
+    error_type = "https://api.backend.ai/probs/auth-failed"
+    error_title = "Unauthorized access"
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.UNAUTHORIZED,
+        )
+
+
+class AlreadyLoggedInError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/generic-bad-request"
+    error_title = "You have already logged in."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+>>>>>>> 6e4504f45 (fix(BA-8944): reject extending a login session that is not authenticated (#16613))
 
 
 class InvalidAPIConfigurationError(BackendAIError, web.HTTPInternalServerError):
