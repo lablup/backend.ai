@@ -32,7 +32,6 @@ from .auth import (
     get_anonymous_session,
     get_api_session,
 )
-from .stats import WebStats
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -239,8 +238,6 @@ async def _run_proxy_request(
     healthy-endpoint pool for the manager case, a static one-shot
     :func:`_direct_acquire` for the pipeline case.
     """
-    stats: WebStats = frontend_rqst.app["stats"]
-    stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
     open_session = get_anonymous_session if is_anonymous else get_api_session
     try:
         async with acquire_ctx as acquired:
@@ -577,8 +574,6 @@ async def web_plugin_handler(
     path = frontend_rqst.match_info["path"]
     _reject_dot_segments(path)
     _reject_disabled_signup(frontend_rqst, path)
-    stats: WebStats = frontend_rqst.app["stats"]
-    stats.active_proxy_plugin_handlers.add(asyncio.current_task())  # type: ignore
     config: WebServerUnifiedConfig = frontend_rqst.app["config"]
     open_session = get_anonymous_session if is_anonymous else get_api_session
     try:
@@ -691,8 +686,6 @@ async def websocket_handler(
     # Exactly one of endpoint_pool / static_endpoint must be provided. The
     # Apollo Router and pipeline upstreams are not (yet) managed by a
     # healthy-endpoint pool, so their callers hand a chosen URL directly.
-    stats: WebStats = request.app["stats"]
-    stats.active_proxy_websocket_handlers.add(asyncio.current_task())  # type: ignore
     path = _strip_route_prefix(request, prefix="/func")
     session = await get_session(request)
     app = request.query.get("app")
