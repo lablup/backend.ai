@@ -99,7 +99,7 @@ Shared prerequisites:
 | halfstack services (PostgreSQL, Valkey, etcd) | all | the reference definitions live in `docker-compose.halfstack-main.yml` |
 | `supergraph.graphql` and a GraphQL gateway (for example, `ghcr.io/graphql-hive/gateway`) | GraphQL federation | the supergraph schema is generated per release (`scripts/generate-graphql-schema.sh`); the gateway composes manager subgraphs |
 | RPC auth key distribution | manager, agent | the agent needs the manager's RPC **public** key to authenticate RPC calls: share the parity-mounted fixtures directory across nodes, or mount a common key directory at `/etc/backend.ai/keys:ro` |
-| `wheelhouse/` mount at `/app/wheelhouse` | manager, agent | staging directory for extra plugin wheels (for example, accelerator plugins). The DOCKER install mode creates and mounts `<install-dir>/wheelhouse` read-write (installing from it unpacks the wheels in place). Nothing in the images consumes it automatically, so install with `docker exec <container> pip install /app/wheelhouse/*.whl` or build a derived image |
+| `wheelhouse/` mount at `/app/wheelhouse` | manager, agent | staging directory for extra plugin wheels (for example, accelerator plugins). The DOCKER install mode creates and mounts `<install-dir>/wheelhouse` read-write (installing from it unpacks the wheels in place). Nothing reads it by default. Set `allow = true` under `[wheelhouse]` in `manager.toml` or `agent.toml` to load its wheels at startup: the images run from `/app`, so the default `path` of `./wheelhouse` is this directory. Otherwise install with `docker exec <container> pip install /app/wheelhouse/*.whl` or build a derived image |
 
 ## Container privileges
 
