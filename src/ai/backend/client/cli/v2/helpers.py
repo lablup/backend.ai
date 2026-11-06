@@ -17,6 +17,7 @@ import click
 from pydantic import TypeAdapter, ValidationError
 from yarl import URL
 
+from ai.backend.client.owner_only_files import make_missing_dirs_owner_only
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -128,7 +129,7 @@ class ProfileStore:
         if name is None:
             self._current_file.unlink(missing_ok=True)
             return
-        self._root.mkdir(parents=True, exist_ok=True)
+        make_missing_dirs_owner_only(self._root)
         self._current_file.write_text(name + "\n")
 
     def selected_name(self) -> str | None:

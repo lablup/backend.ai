@@ -10,6 +10,7 @@ from ai.backend.cli.types import ExitCode
 from ai.backend.client import __version__
 from ai.backend.client.config import get_config, local_state_path
 from ai.backend.client.exceptions import BackendClientError
+from ai.backend.client.owner_only_files import ensure_owner_only_file
 from ai.backend.client.session import Session
 
 from .pretty import print_done, print_error, print_fail, print_warn
@@ -142,10 +143,13 @@ def login() -> None:
                 sys.exit(ExitCode.FAILURE)
             print_done("Login succeeded.")
 
-            local_state_path.mkdir(parents=True, exist_ok=True)
+            cookie_path = local_state_path / "cookie.dat"
+            session_config_path = local_state_path / "config.json"
+            ensure_owner_only_file(cookie_path)
+            ensure_owner_only_file(session_config_path)
             session.aiohttp_session.cookie_jar.update_cookies(result["cookies"])
-            session.aiohttp_session.cookie_jar.save(local_state_path / "cookie.dat")
-            (local_state_path / "config.json").write_text(json.dumps(result.get("config", {})))
+            session.aiohttp_session.cookie_jar.save(cookie_path)
+            session_config_path.write_text(json.dumps(result.get("config", {})))
         except Exception as e:
             print_error(e)
 

@@ -1,14 +1,7 @@
 """Filesystem helpers for ``./bai deployment chat`` storage.
 
-Three on-disk JSON files live under ``~/.backend.ai/deployment_chat/`` —
-``cache.json`` for the auto-managed endpoint cache, ``config.json`` for
-user-supplied tokens, and ``history.json`` for per-deployment chat
-transcripts. The per-feature subdirectory matches the existing
-``session/`` layout used by ``./bai login``.
-
-All three files are written as plain JSON (no atomic-rename, no special
-POSIX permissions) to stay aligned with the existing CLI credential-storage
-convention in :mod:`ai.backend.client.cli.v2.config_cmd`.
+``cache.json``, ``config.json`` (tokens) and ``history.json`` under
+``~/.backend.ai/deployment_chat/`` are plain JSON files readable only by their owner.
 """
 
 from __future__ import annotations
@@ -17,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from ai.backend.client.cli.v2.helpers import CONFIG_DIR
+from ai.backend.client.owner_only_files import ensure_owner_only_file
 from ai.backend.common.json import load_json
 
 CHAT_DIR = CONFIG_DIR / "deployment_chat"
@@ -38,6 +32,6 @@ def read_json_file(path: Path) -> dict[str, Any] | None:
 
 
 def write_json_file(path: Path, text: str) -> None:
-    """Write ``text`` to ``path`` after ensuring the parent directory exists."""
-    path.parent.mkdir(parents=True, exist_ok=True)
+    """Write ``text`` to the owner-only file ``path``, creating its parent directories."""
+    ensure_owner_only_file(path)
     path.write_text(text, encoding="utf-8")

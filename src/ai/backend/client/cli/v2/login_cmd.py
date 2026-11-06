@@ -10,6 +10,9 @@ from typing import Any
 
 import click
 
+from ai.backend.client.auth import encrypt_payload
+from ai.backend.client.owner_only_files import ensure_owner_only_file
+
 from .helpers import ProfileStore, create_v2_registry, load_v2_config
 
 
@@ -26,7 +29,7 @@ def login(force: bool) -> None:
     user_id = os.environ.get("BACKEND_USER") or input("User ID: ")
     password = os.environ.get("BACKEND_PASSWORD") or getpass.getpass("Password: ")
 
-    async def _run() -> None:
+    async def _log_in_and_save_session() -> None:
         config = load_v2_config()
 
         if config.endpoint_type != "session":
@@ -46,8 +49,24 @@ def login(force: bool) -> None:
             payload: dict[str, str | bool] = {"username": user_id, "password": password}
             if force:
                 payload["force"] = True
-            async with client.session.post(login_url, json=payload) as resp:
-                data = await resp.json()
+
+            async def _post_login_payload() -> dict[str, Any]:
+                if config.endpoint.scheme == "https":
+                    login_request = client.session.post(login_url, json=payload)
+                else:
+                    # The webserver derives the key from the request's scheme and Host header,
+                    # so a path or trailing slash in the configured endpoint must not reach it.
+                    encoded_body = encrypt_payload(
+                        str(config.endpoint.origin()), json.dumps(payload).encode()
+                    )
+                    login_request = client.session.post(
+                        login_url, data=encoded_body, headers={"X-BackendAI-Encoded": "true"}
+                    )
+                async with login_request as resp:
+                    response_body: dict[str, Any] = await resp.json()
+                    return response_body
+
+            login_response = await _post_login_payload()
 
             def _get_details(resp_data: dict[str, Any]) -> str:
                 raw = resp_data.get("data")
@@ -62,36 +81,36 @@ def login(force: bool) -> None:
                     return str(resp_data["title"])
                 return "Unknown error"
 
-            if not data.get("authenticated"):
-                details = _get_details(data)
+            if not login_response.get("authenticated"):
+                details = _get_details(login_response)
 
                 if details == "OTP not provided":
                     otp = input("One-time Password: ")
                     payload["otp"] = otp.strip()
-                    async with client.session.post(login_url, json=payload) as resp:
-                        data = await resp.json()
+                    login_response = await _post_login_payload()
 
-            if not data.get("authenticated"):
-                details = _get_details(data)
+            if not login_response.get("authenticated"):
+                details = _get_details(login_response)
                 click.echo(click.style(f"Login failed: {details}", fg="red"))
                 raise SystemExit(1)
 
             paths = ProfileStore().selected()
-            paths.session_dir.mkdir(parents=True, exist_ok=True)
             cookie_jar = client.session.cookie_jar
             if hasattr(cookie_jar, "save"):
+                ensure_owner_only_file(paths.cookie_file)
                 cookie_jar.save(paths.cookie_file)
 
-            login_config = data.get("config", {})
+            login_config = login_response.get("config", {})
             if login_config:
-                config_path = paths.session_dir / "config.json"
-                config_path.write_text(json.dumps(login_config))
+                session_config_path = paths.session_dir / "config.json"
+                ensure_owner_only_file(session_config_path)
+                session_config_path.write_text(json.dumps(login_config))
 
             click.echo(click.style("Login succeeded.", fg="green"))
         finally:
             await registry.close()
 
-    asyncio.run(_run())
+    asyncio.run(_log_in_and_save_session())
 
 
 @click.command()
