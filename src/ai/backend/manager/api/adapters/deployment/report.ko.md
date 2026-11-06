@@ -172,6 +172,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
+| [배포 조회 권한을 받은 사용자가 트래픽이 켜진 라우트의 복제본을 조회하면, 심은 복제본이 옵니다](#searching_replicas-a-user-granted-deployment-read-searches-the-replica-with-traffic-enabled) | 성공 |
 | [배포 조회 권한을 받은 사용자가 배포의 복제본을 조회하면, 심은 복제본이 옵니다](#searching_replicas-a-user-granted-deployment-read-searches-the-replicas) | 성공 |
 | [아무 권한도 받지 않은 사용자가 배포의 복제본을 조회하려 하면, 권한이 없다는 이유로 거부됩니다](#searching_replicas-a-user-granted-nothing-searches-no-replica) | 거부 |
 
@@ -1836,6 +1837,67 @@ Then
   - 거부: InsufficientPrivilege
 
 ### search_replicas
+
+<a id="searching_replicas-a-user-granted-deployment-read-searches-the-replica-with-traffic-enabled"></a>
+
+#### [a-user-granted-deployment-read-searches-the-replica-with-traffic-enabled](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas.py): pass
+
+배포 조회 권한을 받은 사용자가 트래픽이 켜진 라우트의 복제본을 조회하면, 심은 복제본이 옵니다
+
+Given
+
+- 리비전과 트래픽이 켜진 복제본 라우트 1개가 딸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 vfolder, 인퍼런스 런타임 종류, 자원 슬롯 유형 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+    - vfolder 읽기 권한 부여
+      - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+    - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+    - 자원 슬롯 유형 mem: 리비전이 채우지 않아도 됩니다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+
+When
+
+- DeploymentAdapter.search_replicas: user-1 이 deployment-1의 복제본을 조회합니다
+
+Then
+
+- 심은 복제본이 양과 함께 옵니다
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: 미리 저장한 라우트의 id 와 같다
+  - items[0].field_id: 미리 저장한 라우트의 id 와 같다
+  - items[0].deployment_id: 복제본이 받쳐주는 배포의 id 와 같다
+  - items[0].revision_id: 미리 저장한 리비전의 id 와 같다
+  - items[0].session_id = None
+  - items[0].readiness_status = 'NOT_CHECKED'
+  - items[0].liveness_status = 'NOT_CHECKED'
+  - items[0].activeness_status = 'INACTIVE'
+  - items[0].status = 'provisioning'
+  - items[0].traffic_status = 'active'
+  - items[0].health_status = 'not_checked'
+  - items[0].created_at: 이 실행이 쓴 시각
 
 <a id="searching_replicas-a-user-granted-deployment-read-searches-the-replicas"></a>
 

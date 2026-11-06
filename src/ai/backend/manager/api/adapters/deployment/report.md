@@ -172,6 +172,7 @@ Scenario: incomplete 12 / 47
 
 | scenario | verdict |
 |---|---|
+| [when a user granted deployment read searches the replica of a route with traffic enabled, the replicas seeded in advance come back](#searching_replicas-a-user-granted-deployment-read-searches-the-replica-with-traffic-enabled) | answered |
 | [when a user granted deployment read searches the replicas of the deployment, the replicas seeded in advance come back](#searching_replicas-a-user-granted-deployment-read-searches-the-replicas) | answered |
 | [when a user granted nothing tries to search the replicas of the deployment, the search is rejected because the user lacks permission](#searching_replicas-a-user-granted-nothing-searches-no-replica) | rejected |
 
@@ -1836,6 +1837,67 @@ Then
   - rejected: InsufficientPrivilege
 
 ### search_replicas
+
+<a id="searching_replicas-a-user-granted-deployment-read-searches-the-replica-with-traffic-enabled"></a>
+
+#### [a-user-granted-deployment-read-searches-the-replica-with-traffic-enabled](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas.py): pass
+
+when a user granted deployment read searches the replica of a route with traffic enabled, the replicas seeded in advance come back
+
+Given
+
+- one deployment holding one revision and 1 replica routes with traffic enabled, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.search_replicas: user-1 searches the replicas of deployment-1
+
+Then
+
+- the replicas seeded in advance come back with their count
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: same as the id of the route seeded in advance
+  - items[0].field_id: same as the id of the route seeded in advance
+  - items[0].deployment_id: same as the id of the deployment the replica serves
+  - items[0].revision_id: same as the id of the revision seeded in advance
+  - items[0].session_id = None
+  - items[0].readiness_status = 'NOT_CHECKED'
+  - items[0].liveness_status = 'NOT_CHECKED'
+  - items[0].activeness_status = 'INACTIVE'
+  - items[0].status = 'provisioning'
+  - items[0].traffic_status = 'active'
+  - items[0].health_status = 'not_checked'
+  - items[0].created_at: the time this run wrote
 
 <a id="searching_replicas-a-user-granted-deployment-read-searches-the-replicas"></a>
 

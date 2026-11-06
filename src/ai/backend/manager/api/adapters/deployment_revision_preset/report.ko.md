@@ -36,6 +36,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [프리셋 조회 권한을 받은 사용자가 심은 프리셋 하나를 id 로 읽으면, 그 프리셋이 옵니다](#reading-a-preset-reader-reads-a-preset) | 성공 |
+| [프리셋 조회 권한을 받은 사용자가 모델 정의와 런타임 파라미터 값이 채워진 프리셋을 id 로 읽으면, 그 프리셋이 옵니다](#reading-a-preset-reader-reads-a-preset-with-a-model-definition) | 성공 |
 | [아무 권한도 받지 않은 사용자가 심은 프리셋 하나를 id 로 읽으려 하면, 권한이 없다는 이유로 거부됩니다](#reading-a-user-granted-nothing-reads-no-preset) | 거부 |
 
 **partial_bulk_purge**
@@ -326,6 +327,59 @@ Then
   - created_at: 미리 저장한 프리셋이 만들어진 시각와 같다
   - updated_at: 미리 저장한 프리셋이 만들어진 시각와 같다
 
+<a id="reading-a-preset-reader-reads-a-preset-with-a-model-definition"></a>
+
+#### [a-preset-reader-reads-a-preset-with-a-model-definition](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_reading.py): pass
+
+프리셋 조회 권한을 받은 사용자가 모델 정의와 런타임 파라미터 값이 채워진 프리셋을 id 로 읽으면, 그 프리셋이 옵니다
+
+Given
+
+- 모델 정의와 런타임 파라미터 값이 채워진 배포 리비전 프리셋 하나와, 일반 사용자 한 명
+  - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+  - 런타임 파라미터 preset-1: 대상 env, 값 종류 str
+  - 배포 리비전 프리셋 preset-2: 단일 노드, 복제본 하나, 롤링 업데이트, 모델 정의가 채워져 있다, 런타임 파라미터 값이 채워져 있다
+  - 도메인 home-1
+  - public 에서 deployment_preset 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 public-reader-1: deployment_preset 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- DeploymentRevisionPresetAdapter.get: user-1 이 심은 프리셋 하나를 id 로 읽습니다
+
+Then
+
+- 읽은 프리셋이 전체가 응답으로 옵니다
+  - id: 미리 저장한 프리셋의 id 와 같다
+  - entity_id: 미리 저장한 프리셋의 id 와 같다
+  - runtime_variant_id: 프리셋이 놓인 변형의 id 와 같다
+  - name = 'preset-2'
+  - description = '미리 저장한 프리셋'
+  - rank = 100
+  - cluster.cluster_mode = 'single-node'
+  - cluster.cluster_size = 1
+  - resource.resource_opts = []
+  - execution.image_id: 미리 정한 이미지 id
+  - execution.startup_command = None
+  - execution.bootstrap_script = None
+  - execution.environ = []
+  - deployment_defaults.open_to_public = None
+  - deployment_defaults.replica_count = 1
+  - deployment_defaults.revision_history_limit = None
+  - deployment_defaults.deployment_strategy = <DeploymentStrategy.ROLLING: 'ROLLING'>
+  - deployment_defaults.deployment_strategy_spec = {}
+  - model_definition = PresetModelDefinitionInfoDTO(models=[PresetModelConfigInfoDTO(name='preset-model', model_path='/models/preset-model', service=None, metadata=None)])
+  - preset_values = [PresetValueInfo(preset_id=RuntimeVariantPresetID('01a1aeb8-1a7b-74b8-90b0-1342e054204f'), value='preset-value')]
+  - created_at: 미리 저장한 프리셋이 만들어진 시각와 같다
+  - updated_at: 미리 저장한 프리셋이 만들어진 시각와 같다
+
 <a id="reading-a-user-granted-nothing-reads-no-preset"></a>
 
 #### [a-user-granted-nothing-reads-no-preset](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_reading.py): pass
@@ -526,12 +580,13 @@ Given
 
 When
 
-- DeploymentRevisionPresetAdapter.search: user-1 이 프리셋을 훕습니다
+- DeploymentRevisionPresetAdapter.search: user-1 이 프리셋을 훑습니다
 
 Then
 
 - 심은 프리셋이 전체가 응답으로 옵니다
   - total_count = 2
+  - items count = 2
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: 미리 저장한 프리셋의 id 와 같다
@@ -600,7 +655,7 @@ Given
 
 When
 
-- DeploymentRevisionPresetAdapter.search: user-1 이 프리셋을 훕습니다
+- DeploymentRevisionPresetAdapter.search: user-1 이 프리셋을 훑습니다
 
 Then
 
@@ -641,6 +696,7 @@ Then
 
 - 프리셋이 두는 슬롯이 양과 함께 옵니다
   - total_count = 1
+  - items count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].slot_name = 'cpu'

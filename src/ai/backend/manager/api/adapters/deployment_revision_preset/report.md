@@ -36,6 +36,7 @@ Scenario: incomplete 3 / 10
 | scenario | verdict |
 |---|---|
 | [when a user granted preset read reads one of the presets seeded in advance by id, that preset comes back](#reading-a-preset-reader-reads-a-preset) | answered |
+| [when a user granted preset read reads a preset carrying a model definition and runtime preset values by id, that preset comes back](#reading-a-preset-reader-reads-a-preset-with-a-model-definition) | answered |
 | [when a user granted nothing tries to read one of the presets seeded in advance by id, the read is rejected because the user lacks permission](#reading-a-user-granted-nothing-reads-no-preset) | rejected |
 
 **partial_bulk_purge**
@@ -326,6 +327,59 @@ Then
   - created_at: same as the time the preset seeded in advance was made
   - updated_at: same as the time the preset seeded in advance was made
 
+<a id="reading-a-preset-reader-reads-a-preset-with-a-model-definition"></a>
+
+#### [a-preset-reader-reads-a-preset-with-a-model-definition](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_reading.py): pass
+
+when a user granted preset read reads a preset carrying a model definition and runtime preset values by id, that preset comes back
+
+Given
+
+- one deployment revision preset carrying a model definition and runtime preset values, and one regular user
+  - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+  - Runtime variant preset preset-1: target env, value type str
+  - Deployment revision preset preset-2: single node, one replica, rolling update, carries a model definition, carries runtime preset values
+  - Domain home-1
+  - Prepare a user granted read permission on deployment_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every deployment_preset
+    - regular user user-1: holds Role public-reader-1
+
+When
+
+- DeploymentRevisionPresetAdapter.get: user-1 reads one of the presets seeded in advance by id
+
+Then
+
+- the whole preset read comes back
+  - id: same as the id of the preset seeded in advance
+  - entity_id: same as the id of the preset seeded in advance
+  - runtime_variant_id: same as the id of the runtime variant the preset is laid on
+  - name = 'preset-2'
+  - description = 'a preset created in advance'
+  - rank = 100
+  - cluster.cluster_mode = 'single-node'
+  - cluster.cluster_size = 1
+  - resource.resource_opts = []
+  - execution.image_id: the image id fixed in advance
+  - execution.startup_command = None
+  - execution.bootstrap_script = None
+  - execution.environ = []
+  - deployment_defaults.open_to_public = None
+  - deployment_defaults.replica_count = 1
+  - deployment_defaults.revision_history_limit = None
+  - deployment_defaults.deployment_strategy = <DeploymentStrategy.ROLLING: 'ROLLING'>
+  - deployment_defaults.deployment_strategy_spec = {}
+  - model_definition = PresetModelDefinitionInfoDTO(models=[PresetModelConfigInfoDTO(name='preset-model', model_path='/models/preset-model', service=None, metadata=None)])
+  - preset_values = [PresetValueInfo(preset_id=RuntimeVariantPresetID('01a1aeb8-1a7b-74b8-90b0-1342e054204f'), value='preset-value')]
+  - created_at: same as the time the preset seeded in advance was made
+  - updated_at: same as the time the preset seeded in advance was made
+
 <a id="reading-a-user-granted-nothing-reads-no-preset"></a>
 
 #### [a-user-granted-nothing-reads-no-preset](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_reading.py): pass
@@ -532,6 +586,7 @@ Then
 
 - the presets seeded in advance come back
   - total_count = 2
+  - items count = 2
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: same as the id of the preset seeded in advance
@@ -641,6 +696,7 @@ Then
 
 - the slot the preset declares comes back with its quantity
   - total_count = 1
+  - items count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].slot_name = 'cpu'
