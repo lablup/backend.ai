@@ -28,6 +28,7 @@ from ai.backend.agent.errors.watcher import (
 )
 from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
+from ai.backend.common.configs.etcd import EtcdTLSConfig
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
@@ -328,6 +329,7 @@ async def watcher_server(
             app["config"]["etcd"]["namespace"],
             scope_prefix_map=scope_prefix_map,
             credentials=etcd_credentials,
+            tls=EtcdTLSConfig.model_validate(app["config"]["etcd"]["tls"]).to_dataclass(),
         ) as etcd:
             app["config_server"] = etcd
 

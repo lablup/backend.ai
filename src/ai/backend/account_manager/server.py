@@ -216,6 +216,7 @@ def build_root_app(
         local_config.etcd.namespace,
         scope_prefix_map,
         credentials=etcd_credentials,
+        tls=local_config.etcd.tls.to_dataclass(),
     )
     root_ctx = RootContext()
     root_ctx.etcd = etcd
