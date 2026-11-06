@@ -1,14 +1,26 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 from unittest.mock import AsyncMock
 
 import click
 import pytest
+from click.testing import CliRunner
 from yarl import URL
 
-from ai.backend.client.cli.v2.helpers import V2ConnectionConfig, create_v2_registry
-from ai.backend.client.cli.v2.insecure_http_guard import reject_insecure_endpoint
+from ai.backend.client.cli.v2 import v2
+from ai.backend.client.cli.v2.helpers import (
+    PROFILE_ENV,
+    ProfileStore,
+    V2ConnectionConfig,
+    create_v2_registry,
+    load_v2_config,
+)
+from ai.backend.client.cli.v2.insecure_http_guard import (
+    ALLOW_INSECURE_HTTP_ENV,
+    reject_insecure_endpoint,
+)
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 
 
@@ -28,6 +40,49 @@ def v2_config_at_insecure_endpoint() -> V2ConnectionConfig:
         secret_key=None,
         api_version="v9.20250722",
     )
+
+
+@pytest.fixture
+def profile_at_insecure_endpoint(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv(PROFILE_ENV, raising=False)
+    monkeypatch.delenv(ALLOW_INSECURE_HTTP_ENV, raising=False)
+    monkeypatch.setenv("BACKEND_ENDPOINT", "http://backend.example")
+    monkeypatch.setenv("BACKEND_ENDPOINT_TYPE", "session")
+
+
+@pytest.fixture
+def stored_session_cookie_at_insecure_endpoint(profile_at_insecure_endpoint: None) -> Path:
+    paths = ProfileStore().selected()
+    paths.session_dir.mkdir(parents=True)
+    paths.cookie_file.write_text("cookie")
+    return paths.cookie_file
+
+
+@pytest.mark.usefixtures("profile_at_insecure_endpoint")
+class TestAllowInsecureHttpSetting:
+    def test_environment_variable_allows_it(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv(ALLOW_INSECURE_HTTP_ENV, "1")
+
+        assert load_v2_config().allow_insecure_http is True
+
+    def test_config_set_allows_it(self) -> None:
+        result = CliRunner().invoke(v2, ["config", "set", "allow-insecure-http", "true"])
+
+        assert result.exit_code == 0, result.output
+        assert load_v2_config().allow_insecure_http is True
+
+
+class TestLogout:
+    def test_removes_the_stored_cookie_when_the_endpoint_is_refused(
+        self,
+        stored_session_cookie_at_insecure_endpoint: Path,
+    ) -> None:
+        result = CliRunner().invoke(v2, ["logout"])
+
+        assert result.exit_code == 0, result.output
+        assert not stored_session_cookie_at_insecure_endpoint.exists()
 
 
 class TestCreateV2Registry:
