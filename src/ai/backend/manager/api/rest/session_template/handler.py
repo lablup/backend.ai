@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import uuid
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
@@ -149,9 +150,23 @@ class SessionTemplateHandler:
         ctx: UserContext,
         req: RequestCtx,
     ) -> APIResponse:
+        params = query.parsed
         log.info("SESSION_TEMPLATE.LIST (ak:{})", ctx.access_key)
 
-        action = ListTaskTemplatesAction(user_uuid=ctx.user_uuid)
+        group_id_filter: uuid.UUID | None = None
+        if params.group_id is not None:
+            try:
+                group_id_filter = uuid.UUID(params.group_id)
+            except ValueError as e:
+                raise InvalidAPIParameters("group_id must be a UUID") from e
+        action = ListTaskTemplatesAction(
+            user_uuid=ctx.user_uuid,
+            user_role=req.request["user"]["role"],
+            domain_name=ctx.user_domain,
+            is_superadmin=ctx.is_superadmin,
+            list_all=params.all,
+            group_id_filter=group_id_filter,
+        )
         result = await self._template.list_task.wait_for_complete(action)
 
         items = [

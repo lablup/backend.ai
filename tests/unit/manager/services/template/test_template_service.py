@@ -397,35 +397,70 @@ class TestListTaskTemplatesAction:
     def service(self, mock_repo: MagicMock) -> TemplateService:
         return TemplateService(repository=mock_repo)
 
-    async def test_returns_filtered_entries(
+    async def test_superadmin_with_list_all_returns_every_template(
         self,
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
         user_uuid = uuid.uuid4()
-        entries = [
-            {"name": "t1", "id": "id1", "user_uuid": user_uuid},
-            {"name": "t2", "id": "id2", "user_uuid": user_uuid},
-        ]
-        mock_repo.list_task_templates = AsyncMock(return_value=entries)
+        entries = [{"name": "t1"}, {"name": "t2"}]
+        mock_repo.list_task_templates_all = AsyncMock(return_value=entries)
 
-        action = ListTaskTemplatesAction(user_uuid=user_uuid)
+        action = ListTaskTemplatesAction(
+            user_uuid=user_uuid,
+            user_role=UserRole.SUPERADMIN,
+            domain_name="default",
+            is_superadmin=True,
+            list_all=True,
+        )
         result = await service.list_task_templates(action)
 
-        assert len(result.entries) == 2
-        mock_repo.list_task_templates.assert_called_once_with(user_uuid)
+        assert result.entries == entries
+        mock_repo.list_task_templates_all.assert_called_once_with(user_uuid)
 
-    async def test_empty_returns_empty_entries(
+    @pytest.mark.parametrize(
+        ("role", "is_superadmin", "list_all"),
+        [
+            (UserRole.USER, False, True),
+            (UserRole.ADMIN, False, False),
+            (UserRole.SUPERADMIN, True, False),
+        ],
+        ids=["user_asking_for_all", "domain_admin", "superadmin_without_all"],
+    )
+    async def test_others_get_only_the_accessible_templates(
         self,
         service: TemplateService,
         mock_repo: MagicMock,
+        role: UserRole,
+        is_superadmin: bool,
+        list_all: bool,
     ) -> None:
-        mock_repo.list_task_templates = AsyncMock(return_value=[])
+        user_uuid = uuid.uuid4()
+        group_id = uuid.uuid4()
+        entries = [{"name": "mine"}]
+        mock_repo.list_accessible_templates = AsyncMock(return_value=entries)
+        mock_repo.list_task_templates_all = AsyncMock(return_value=[])
 
-        action = ListTaskTemplatesAction(user_uuid=uuid.uuid4())
+        action = ListTaskTemplatesAction(
+            user_uuid=user_uuid,
+            user_role=role,
+            domain_name="default",
+            is_superadmin=is_superadmin,
+            list_all=list_all,
+            group_id_filter=group_id,
+        )
         result = await service.list_task_templates(action)
 
-        assert result.entries == []
+        assert result.entries == entries
+        mock_repo.list_task_templates_all.assert_not_called()
+        mock_repo.list_accessible_templates.assert_called_once_with(
+            TemplateType.TASK,
+            user_uuid,
+            role,
+            "default",
+            allowed_types=["user", "group"],
+            group_id_filter=group_id,
+        )
 
 
 class TestUpdateTaskTemplateAction:
@@ -890,7 +925,7 @@ class TestListClusterTemplatesAction:
     ) -> None:
         user_uuid = uuid.uuid4()
         entries = [{"name": "my-cluster"}]
-        mock_repo.list_accessible_cluster_templates = AsyncMock(return_value=entries)
+        mock_repo.list_accessible_templates = AsyncMock(return_value=entries)
 
         action = ListClusterTemplatesAction(
             user_uuid=user_uuid,
@@ -903,7 +938,8 @@ class TestListClusterTemplatesAction:
         result = await service.list_cluster_templates(action)
 
         assert len(result.entries) == 1
-        mock_repo.list_accessible_cluster_templates.assert_called_once_with(
+        mock_repo.list_accessible_templates.assert_called_once_with(
+            TemplateType.CLUSTER,
             user_uuid,
             UserRole.USER,
             "default",
@@ -918,7 +954,7 @@ class TestListClusterTemplatesAction:
     ) -> None:
         user_uuid = uuid.uuid4()
         group_id = uuid.uuid4()
-        mock_repo.list_accessible_cluster_templates = AsyncMock(return_value=[])
+        mock_repo.list_accessible_templates = AsyncMock(return_value=[])
 
         action = ListClusterTemplatesAction(
             user_uuid=user_uuid,
@@ -930,7 +966,8 @@ class TestListClusterTemplatesAction:
         )
         await service.list_cluster_templates(action)
 
-        mock_repo.list_accessible_cluster_templates.assert_called_once_with(
+        mock_repo.list_accessible_templates.assert_called_once_with(
+            TemplateType.CLUSTER,
             user_uuid,
             UserRole.USER,
             "default",

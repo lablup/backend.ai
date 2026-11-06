@@ -420,7 +420,7 @@ class TestTemplateRepository:
         ]
         await template_repository.create_task_templates(test_domain, items)
 
-        entries = await template_repository.list_task_templates(test_user)
+        entries = await template_repository.list_task_templates_all(test_user)
 
         assert len(entries) == 2
         for entry in entries:
@@ -433,7 +433,7 @@ class TestTemplateRepository:
         self,
         template_repository: TemplateRepository,
     ) -> None:
-        entries = await template_repository.list_task_templates(uuid.uuid4())
+        entries = await template_repository.list_task_templates_all(uuid.uuid4())
         assert entries == []
 
     async def test_list_task_templates_only_active(
@@ -465,7 +465,7 @@ class TestTemplateRepository:
         await template_repository.create_task_templates(test_domain, items)
         await template_repository.soft_delete_template(deleted_id, TemplateType.TASK)
 
-        entries = await template_repository.list_task_templates(test_user)
+        entries = await template_repository.list_task_templates_all(test_user)
 
         assert len(entries) == 1
         assert entries[0]["id"].hex == active_id
@@ -694,7 +694,7 @@ class TestTemplateRepository:
         assert await template_repository.cluster_template_exists(template_id) is False
 
     # =========================================================================
-    # list_accessible_cluster_templates Tests
+    # list_accessible_templates Tests
     # =========================================================================
 
     async def test_list_accessible_user_templates(
@@ -710,8 +710,8 @@ class TestTemplateRepository:
             test_domain, group_id, test_user, "my-cluster", {"data": True}
         )
 
-        entries = await template_repository.list_accessible_cluster_templates(
-            test_user, UserRole.USER, test_domain, ["user"]
+        entries = await template_repository.list_accessible_templates(
+            TemplateType.CLUSTER, test_user, UserRole.USER, test_domain, ["user"]
         )
 
         assert len(entries) == 1
@@ -734,8 +734,8 @@ class TestTemplateRepository:
             test_domain, group_id, test_superadmin, "admin-cluster", {"data": True}
         )
 
-        entries = await template_repository.list_accessible_cluster_templates(
-            test_user, UserRole.USER, test_domain, ["user", "group"]
+        entries = await template_repository.list_accessible_templates(
+            TemplateType.CLUSTER, test_user, UserRole.USER, test_domain, ["user", "group"]
         )
 
         group_entries = [e for e in entries if e["group_name"] == group_name]
@@ -755,16 +755,69 @@ class TestTemplateRepository:
         )
 
         # Filter by the correct group
-        entries = await template_repository.list_accessible_cluster_templates(
-            test_user, UserRole.USER, test_domain, ["user"], group_id_filter=group_id
+        entries = await template_repository.list_accessible_templates(
+            TemplateType.CLUSTER,
+            test_user,
+            UserRole.USER,
+            test_domain,
+            ["user"],
+            group_id_filter=group_id,
         )
         assert len(entries) == 1
 
         # Filter by a different group
-        entries = await template_repository.list_accessible_cluster_templates(
-            test_user, UserRole.USER, test_domain, ["user"], group_id_filter=uuid.uuid4()
+        entries = await template_repository.list_accessible_templates(
+            TemplateType.CLUSTER,
+            test_user,
+            UserRole.USER,
+            test_domain,
+            ["user"],
+            group_id_filter=uuid.uuid4(),
         )
         assert len(entries) == 0
+
+    async def test_list_accessible_task_templates_skip_other_users(
+        self,
+        template_repository: TemplateRepository,
+        test_domain: str,
+        test_user: uuid.UUID,
+        test_superadmin: uuid.UUID,
+        test_group: tuple[uuid.UUID, str],
+    ) -> None:
+        """A task template of another user in a project the user is not in is not listed."""
+        group_id, _ = test_group
+        own_id = uuid.uuid4().hex
+        template = {"apiVersion": "v1", "kind": "taskTemplate"}
+        await template_repository.create_task_templates(
+            test_domain,
+            [
+                {
+                    "id": own_id,
+                    "user_uuid": test_user,
+                    "group_id": group_id,
+                    "name": "mine",
+                    "template": template,
+                },
+                {
+                    "id": uuid.uuid4().hex,
+                    "user_uuid": test_superadmin,
+                    "group_id": group_id,
+                    "name": "theirs",
+                    "template": template,
+                },
+            ],
+        )
+        await template_repository.create_cluster_template(
+            test_domain, group_id, test_user, "my-cluster", {"data": True}
+        )
+
+        entries = await template_repository.list_accessible_templates(
+            TemplateType.TASK, test_user, UserRole.USER, test_domain, ["user", "group"]
+        )
+
+        assert [entry["id"].hex for entry in entries] == [own_id]
+        assert entries[0]["type"] == TemplateType.TASK
+        assert entries[0]["template"] == template
 
     # =========================================================================
     # resolve_owner Tests

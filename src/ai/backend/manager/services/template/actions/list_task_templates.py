@@ -6,15 +6,21 @@ from typing import Any, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.models.user import UserRole
 
 from .base import TemplateAction
 
 
 @dataclass
 class ListTaskTemplatesAction(TemplateAction):
-    """Action to list all active task templates."""
+    """Action to list the task templates the requester may see."""
 
     user_uuid: uuid.UUID
+    user_role: UserRole
+    domain_name: str
+    is_superadmin: bool
+    list_all: bool
+    group_id_filter: uuid.UUID | None = None
 
     @override
     @classmethod
