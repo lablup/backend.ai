@@ -98,13 +98,12 @@ class TestListVFSStorages:
         assert isinstance(result, ListVFSStorageResponse)
         assert isinstance(result.storages, list)
 
-    async def test_user_lists_vfs_storages(
+    async def test_user_cannot_list_vfs_storages(
         self,
         user_registry: BackendAIClientRegistry,
     ) -> None:
-        result = await user_registry.storage.list_vfs_storages()
-        assert isinstance(result, ListVFSStorageResponse)
-        assert isinstance(result.storages, list)
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.storage.list_vfs_storages()
 
 
 class TestGetVFSStorage:

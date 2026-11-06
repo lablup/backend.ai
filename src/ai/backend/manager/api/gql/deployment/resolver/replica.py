@@ -23,6 +23,7 @@ from ai.backend.manager.api.gql.deployment.types.replica import (
     ReplicaStatusChangedPayload,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import check_admin_only
 
 # Query resolvers
 
@@ -45,6 +46,7 @@ async def replicas(
     offset: int | None = None,
 ) -> ModelReplicaConnection | None:
     """List replicas with optional filtering and pagination (admin, all deployments)."""
+    check_admin_only()
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
     payload = await info.context.adapters.deployment.admin_search_replicas(
