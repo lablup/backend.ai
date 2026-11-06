@@ -68,6 +68,7 @@
     "mypy==1.18.2",
     "namedlist~=1.8",
     "networkx~=3.3.0",
+    "oauthlib>=4.0.1",
     "opentelemetry-api~=1.45.1",
     "opentelemetry-exporter-otlp-proto-grpc~=1.45.1",
     "opentelemetry-instrumentation-aiohttp-client~=0.66b1",
