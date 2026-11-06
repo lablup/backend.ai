@@ -6,11 +6,7 @@ import click
 from ai.backend.cli.params import BoolExprType, JSONParamType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.insecure_http_guard import (
-    legacy_endpoints,
-    option_given,
-    refuse_secret_over_insecure_http,
-)
+from ai.backend.client.cli.insecure_http_guard import LegacySecretSendingCommand
 from ai.backend.client.cli.pretty import print_done
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.func.scaling_group import _default_detail_fields, _default_list_fields
@@ -73,7 +69,7 @@ def list(ctx: CLIContext) -> None:
             sys.exit(ExitCode.FAILURE)
 
 
-@scaling_group.command()
+@scaling_group.command(cls=LegacySecretSendingCommand)
 @pass_ctx_obj
 @click.argument("name", type=str, metavar="NAME")
 @click.option(
@@ -117,7 +113,6 @@ def list(ctx: CLIContext) -> None:
 )
 @click.option("--wsproxy-addr", type=str, default=None, help="Set app proxy address.")
 @click.option("--wsproxy-api-token", type=str, default=None, help="Set app proxy API token.")
-@refuse_secret_over_insecure_http(legacy_endpoints, sends_secret=option_given("wsproxy_api_token"))
 def add(
     ctx: CLIContext,
     name: str,
@@ -172,7 +167,7 @@ def add(
         )
 
 
-@scaling_group.command()
+@scaling_group.command(cls=LegacySecretSendingCommand)
 @pass_ctx_obj
 @click.argument("name", type=str, metavar="NAME")
 @click.option(
@@ -241,7 +236,6 @@ def add(
     default=undefined,
     help="Set app proxy API token.",
 )
-@refuse_secret_over_insecure_http(legacy_endpoints, sends_secret=option_given("wsproxy_api_token"))
 def update(
     ctx: CLIContext,
     name: str,

@@ -1,21 +1,18 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import override
 
 import click
 import pytest
 from click.testing import CliRunner
 from yarl import URL
 
-from ai.backend.cli.params import OptionalType
-from ai.backend.cli.types import Undefined, undefined
 from ai.backend.client.cli.insecure_http_guard import (
-    option_given,
-    refuse_secret_over_insecure_http,
+    SecretSendingCommand,
     reject_insecure_secret_endpoints,
 )
-
-_ALLOW_FLAG = "--allow-insecure-http"
 
 
 @dataclass(frozen=True)
@@ -31,51 +28,51 @@ class _RejectedEndpointsCase:
 
 
 @dataclass(frozen=True)
-class _DecoratedCommandCase:
+class _CommandInvocationCase:
     arguments: list[str]
-    expected_runs: bool
+    expected_body_runs: bool
 
 
 @dataclass(frozen=True)
-class _CommandBehindGuard:
+class _CommandAtInsecureEndpoint:
     command: click.Command
-    body_calls: list[str | None | Undefined]
+    body_runs: list[bool]
+
+
+class _CommandReadingInsecureEndpoint(SecretSendingCommand):
+    @override
+    def _load_endpoints(self) -> Iterable[URL]:
+        return [URL("http://backend.example")]
 
 
 @pytest.fixture
-def command_behind_guard_at_insecure_endpoint() -> _CommandBehindGuard:
-    body_calls: list[str | None | Undefined] = []
+def command_at_insecure_endpoint() -> _CommandAtInsecureEndpoint:
+    body_runs: list[bool] = []
 
-    @click.command()
-    @click.option("--secret", type=OptionalType(str), default=undefined)
-    @refuse_secret_over_insecure_http(
-        lambda: [URL("http://backend.example")],
-        sends_secret=option_given("secret"),
-    )
-    def command(secret: str | None | Undefined) -> None:
-        body_calls.append(secret)
+    @click.command(cls=_CommandReadingInsecureEndpoint)
+    def command() -> None:
+        body_runs.append(True)
 
-    return _CommandBehindGuard(command=command, body_calls=body_calls)
+    return _CommandAtInsecureEndpoint(command=command, body_runs=body_runs)
 
 
-class TestRefuseSecretOverInsecureHttp:
+class TestSecretSendingCommand:
     @pytest.mark.parametrize(
         "case",
         [
-            _DecoratedCommandCase(arguments=["--secret", "value"], expected_runs=False),
-            _DecoratedCommandCase(arguments=["--secret", "value", _ALLOW_FLAG], expected_runs=True),
-            _DecoratedCommandCase(arguments=[], expected_runs=True),
+            _CommandInvocationCase(arguments=[], expected_body_runs=False),
+            _CommandInvocationCase(arguments=["--allow-insecure-http"], expected_body_runs=True),
         ],
-        ids=lambda case: " ".join(case.arguments) or "no-secret",
+        ids=lambda case: " ".join(case.arguments) or "no-option",
     )
-    def test_runs_the_command_body_unless_the_secret_is_refused(
+    def test_runs_the_body_only_with_the_allow_option(
         self,
-        command_behind_guard_at_insecure_endpoint: _CommandBehindGuard,
-        case: _DecoratedCommandCase,
+        command_at_insecure_endpoint: _CommandAtInsecureEndpoint,
+        case: _CommandInvocationCase,
     ) -> None:
-        CliRunner().invoke(command_behind_guard_at_insecure_endpoint.command, case.arguments)
+        CliRunner().invoke(command_at_insecure_endpoint.command, case.arguments)
 
-        assert bool(command_behind_guard_at_insecure_endpoint.body_calls) is case.expected_runs
+        assert bool(command_at_insecure_endpoint.body_runs) is case.expected_body_runs
 
 
 class TestRejectInsecureSecretEndpoints:

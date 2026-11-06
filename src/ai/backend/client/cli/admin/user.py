@@ -11,11 +11,7 @@ from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.params import BoolExprType, CommaSeparatedListType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.insecure_http_guard import (
-    legacy_endpoints,
-    option_given,
-    refuse_secret_over_insecure_http,
-)
+from ai.backend.client.cli.insecure_http_guard import LegacySecretSendingCommand
 from ai.backend.client.cli.pretty import print_fail, print_info
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.exceptions import BackendAPIError
@@ -188,7 +184,7 @@ def list(
         sys.exit(ExitCode.FAILURE)
 
 
-@user.command(aliases=["create"])
+@user.command(aliases=["create"], cls=LegacySecretSendingCommand)
 @pass_ctx_obj
 @click.argument("domain_name", type=str, metavar="DOMAIN_NAME")
 @click.argument("email", type=str, metavar="EMAIL")
@@ -279,7 +275,6 @@ def list(
     default="default",
     help='Add to the groups. If unspecified, it will use the "default" group.',
 )
-@refuse_secret_over_insecure_http(legacy_endpoints)
 def add(
     ctx: CLIContext,
     domain_name: str,
@@ -383,7 +378,7 @@ def add(
         )
 
 
-@user.command()
+@user.command(cls=LegacySecretSendingCommand)
 @pass_ctx_obj
 @click.argument("email", type=str, metavar="EMAIL")
 @click.option(
@@ -515,7 +510,6 @@ def add(
     default=False,
     help="Unset the user's container supplementary group IDs.",
 )
-@refuse_secret_over_insecure_http(legacy_endpoints, sends_secret=option_given("password"))
 def update(
     ctx: CLIContext,
     email: str,

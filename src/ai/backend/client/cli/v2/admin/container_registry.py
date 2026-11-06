@@ -4,31 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from collections.abc import Mapping
-from typing import Any
 
 import click
 
-from ai.backend.client.cli.insecure_http_guard import (
-    refuse_secret_over_insecure_http,
-    v2_endpoints,
-)
+from ai.backend.client.cli.insecure_http_guard import V2SecretSendingCommand
 from ai.backend.client.cli.v2.helpers import (
     create_v2_registry,
     load_v2_config,
     parse_order_options,
     print_result,
 )
-
-
-def _body_sets_password(params: Mapping[str, Any]) -> bool:
-    import json
-
-    try:
-        body = json.loads(params["body"])
-    except json.JSONDecodeError:
-        return False
-    return isinstance(body, dict) and body.get("password") is not None
 
 
 @click.group()
@@ -128,9 +113,8 @@ def search(
     asyncio.run(_run())
 
 
-@container_registry.command()
+@container_registry.command(cls=V2SecretSendingCommand)
 @click.argument("body", type=str)
-@refuse_secret_over_insecure_http(v2_endpoints, sends_secret=_body_sets_password)
 def create(body: str) -> None:
     """Create a new container registry (superadmin only).
 
@@ -162,9 +146,8 @@ def create(body: str) -> None:
     asyncio.run(_run())
 
 
-@container_registry.command()
+@container_registry.command(cls=V2SecretSendingCommand)
 @click.argument("body", type=str)
-@refuse_secret_over_insecure_http(v2_endpoints, sends_secret=_body_sets_password)
 def update(body: str) -> None:
     """Update a container registry (superadmin only).
 

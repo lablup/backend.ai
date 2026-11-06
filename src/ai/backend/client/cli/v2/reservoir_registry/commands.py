@@ -6,11 +6,7 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.insecure_http_guard import (
-    option_given,
-    refuse_secret_over_insecure_http,
-    v2_endpoints,
-)
+from ai.backend.client.cli.insecure_http_guard import V2SecretSendingCommand
 from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
 
 
@@ -19,13 +15,12 @@ def reservoir_registry() -> None:
     """Reservoir registry management commands."""
 
 
-@reservoir_registry.command()
+@reservoir_registry.command(cls=V2SecretSendingCommand)
 @click.option("--name", required=True, help="Registry name.")
 @click.option("--endpoint", required=True, help="Reservoir endpoint URL.")
 @click.option("--access-key", required=True, help="Access key for authentication.")
 @click.option("--secret-key", required=True, help="Secret key for authentication.")
 @click.option("--api-version", required=True, help="API version string.")
-@refuse_secret_over_insecure_http(v2_endpoints)
 def create(
     name: str,
     endpoint: str,
@@ -96,14 +91,13 @@ def get(registry_id: str) -> None:
     asyncio.run(_run())
 
 
-@reservoir_registry.command()
+@reservoir_registry.command(cls=V2SecretSendingCommand)
 @click.option("--id", "registry_id", required=True, help="Registry ID to update.")
 @click.option("--name", default=None, help="Updated registry name.")
 @click.option("--endpoint", default=None, help="Updated endpoint URL.")
 @click.option("--access-key", default=None, help="Updated access key.")
 @click.option("--secret-key", default=None, help="Updated secret key.")
 @click.option("--api-version", default=None, help="Updated API version.")
-@refuse_secret_over_insecure_http(v2_endpoints, sends_secret=option_given("secret_key"))
 def update(
     registry_id: str,
     name: str | None,

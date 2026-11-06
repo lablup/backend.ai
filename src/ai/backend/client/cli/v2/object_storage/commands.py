@@ -6,11 +6,7 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.insecure_http_guard import (
-    option_given,
-    refuse_secret_over_insecure_http,
-    v2_endpoints,
-)
+from ai.backend.client.cli.insecure_http_guard import V2SecretSendingCommand
 from ai.backend.client.cli.v2.helpers import (
     create_v2_registry,
     load_v2_config,
@@ -24,14 +20,13 @@ def object_storage() -> None:
     """Object storage management commands."""
 
 
-@object_storage.command()
+@object_storage.command(cls=V2SecretSendingCommand)
 @click.option("--name", required=True, help="Object storage name.")
 @click.option("--host", required=True, help="Host address of the object storage.")
 @click.option("--access-key", required=True, help="Access key for authentication.")
 @click.option("--secret-key", required=True, help="Secret key for authentication.")
 @click.option("--endpoint", required=True, help="Endpoint URL of the object storage.")
 @click.option("--region", required=True, help="Region of the object storage.")
-@refuse_secret_over_insecure_http(v2_endpoints)
 def create(
     name: str,
     host: str,
@@ -80,7 +75,7 @@ def get(storage_id: str) -> None:
     asyncio.run(_run())
 
 
-@object_storage.command()
+@object_storage.command(cls=V2SecretSendingCommand)
 @click.option("--id", "storage_id", required=True, help="Object storage ID to update.")
 @click.option("--name", default=None, help="Updated name.")
 @click.option("--host", default=None, help="Updated host address.")
@@ -94,7 +89,6 @@ def get(storage_id: str) -> None:
     default=False,
     help="Clear the region. Mutually exclusive with --region.",
 )
-@refuse_secret_over_insecure_http(v2_endpoints, sends_secret=option_given("secret_key"))
 def update(
     storage_id: str,
     name: str | None,

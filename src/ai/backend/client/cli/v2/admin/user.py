@@ -6,10 +6,7 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.insecure_http_guard import (
-    refuse_secret_over_insecure_http,
-    v2_endpoints,
-)
+from ai.backend.client.cli.insecure_http_guard import V2SecretSendingCommand
 from ai.backend.client.cli.v2.helpers import (
     EntityLabelTerm,
     create_v2_registry,
@@ -26,7 +23,7 @@ def user() -> None:
     """Admin user commands."""
 
 
-@user.command()
+@user.command(cls=V2SecretSendingCommand)
 @click.option("--email", required=True, type=str, help="User email address.")
 @click.option("--username", required=True, type=str, help="Username for login.")
 @click.option("--password", required=True, type=str, help="Initial password.")
@@ -46,7 +43,6 @@ def user() -> None:
 @click.option("--full-name", default=None, type=str, help="Full display name.")
 @click.option("--description", default=None, type=str, help="Optional description.")
 @click.option("--resource-policy", default="default", type=str, help="Resource policy name.")
-@refuse_secret_over_insecure_http(v2_endpoints)
 def create(
     email: str,
     username: str,

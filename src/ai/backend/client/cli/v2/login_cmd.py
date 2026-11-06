@@ -10,19 +10,15 @@ from typing import Any
 
 import click
 
-from ai.backend.client.cli.insecure_http_guard import (
-    refuse_secret_over_insecure_http,
-    v2_endpoints,
-)
+from ai.backend.client.cli.insecure_http_guard import V2SecretSendingCommand
 
 from .helpers import ProfileStore, create_v2_registry, load_v2_config
 
 
-@click.command()
+@click.command(cls=V2SecretSendingCommand)
 @click.option(
     "--force", is_flag=True, default=False, help="Force login, invalidating existing sessions."
 )
-@refuse_secret_over_insecure_http(v2_endpoints)
 def login(force: bool) -> None:
     """Log in to a Backend.AI webserver endpoint.
 
