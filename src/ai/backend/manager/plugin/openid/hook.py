@@ -11,6 +11,11 @@ import jwt.exceptions
 import sqlalchemy as sa
 from aiohttp import web
 
+<<<<<<< HEAD
+=======
+from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
+from ai.backend.common.data.entity.user import UserID
+>>>>>>> 03ecfc03f (fix(BA-8947): scope logout to the owner and end login sessions on password change (#16555))
 from ai.backend.common.plugin.hook import HookHandler, HookPlugin, Reject
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.models.login_session.enums import LoginSessionStatus
@@ -86,6 +91,7 @@ class OIDCHookPlugin(HookPlugin):
                 raise Reject("user is inactivated")
 
         if payload.get("force", False):
+<<<<<<< HEAD
             async with db.begin() as conn:
                 await conn.execute(
                     sa.update(LoginSessionRow.__table__)
@@ -102,6 +108,12 @@ class OIDCHookPlugin(HookPlugin):
                 "AUTHORIZE_HOOK(openid): force-invalidated existing login sessions for {}",
                 email,
             )
+=======
+            invalidated_tokens = await auth_repository.invalidate_active_login_sessions(user_id)
+            valkey_session = cast(ValkeySessionClient, root_app["_valkey_session"])
+            await valkey_session.delete_login_sessions(invalidated_tokens)
+            log.trace("openid login sessions force-invalidated", user_email=email)
+>>>>>>> 03ecfc03f (fix(BA-8947): scope logout to the owner and end login sessions on password change (#16555))
 
         log.info("AUTHORIZE_HOOK(openid): {} authenticated by auth token", email)
         return user
