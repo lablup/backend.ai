@@ -9,10 +9,8 @@ import pytest
 from click.testing import CliRunner
 from yarl import URL
 
-from ai.backend.client.cli.v2 import v2
+from ai.backend.client.cli.v2 import config_cmd, helpers, login_cmd, v2
 from ai.backend.client.cli.v2.helpers import (
-    PROFILE_ENV,
-    ProfileStore,
     V2ConnectionConfig,
     create_v2_registry,
     load_v2_config,
@@ -43,24 +41,30 @@ def v2_config_at_insecure_endpoint() -> V2ConnectionConfig:
 
 
 @pytest.fixture
-def profile_at_insecure_endpoint(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def config_dir_at_insecure_endpoint(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    config_file = tmp_path / "config.toml"
+    session_dir = tmp_path / "session"
+    cookie_file = session_dir / "cookie.dat"
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.delenv(PROFILE_ENV, raising=False)
+    monkeypatch.setattr(helpers, "CONFIG_FILE", config_file)
+    monkeypatch.setattr(helpers, "CREDENTIALS_FILE", tmp_path / "credentials.toml")
+    monkeypatch.setattr(helpers, "COOKIE_FILE", cookie_file)
+    monkeypatch.setattr(config_cmd, "CONFIG_FILE", config_file)
+    monkeypatch.setattr(login_cmd, "SESSION_DIR", session_dir)
+    monkeypatch.setattr(login_cmd, "COOKIE_FILE", cookie_file)
     monkeypatch.delenv(ALLOW_INSECURE_HTTP_ENV, raising=False)
     monkeypatch.setenv("BACKEND_ENDPOINT", "http://backend.example")
     monkeypatch.setenv("BACKEND_ENDPOINT_TYPE", "session")
 
 
 @pytest.fixture
-def stored_session_cookie_at_insecure_endpoint(profile_at_insecure_endpoint: None) -> Path:
-    paths = ProfileStore().selected()
-    paths.session_dir.mkdir(parents=True)
-    paths.cookie_file.write_text("cookie")
-    return paths.cookie_file
+def stored_session_cookie_at_insecure_endpoint(config_dir_at_insecure_endpoint: None) -> Path:
+    helpers.COOKIE_FILE.parent.mkdir(parents=True)
+    helpers.COOKIE_FILE.write_text("cookie")
+    return helpers.COOKIE_FILE
 
 
-@pytest.mark.usefixtures("profile_at_insecure_endpoint")
+@pytest.mark.usefixtures("config_dir_at_insecure_endpoint")
 class TestAllowInsecureHttpSetting:
     def test_environment_variable_allows_it(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv(ALLOW_INSECURE_HTTP_ENV, "1")

@@ -10,13 +10,9 @@ from typing import Any
 
 import click
 
-<<<<<<< HEAD
-from .helpers import COOKIE_FILE, SESSION_DIR, create_v2_registry, load_v2_config
-=======
 from ai.backend.client.cli.v2.insecure_http_guard import InsecureEndpointError
 
-from .helpers import ProfileStore, create_v2_registry, load_v2_config
->>>>>>> a902ee626 (feat(BA-8941): refuse v2 CLI requests over insecure http unless allowed (#16482))
+from .helpers import COOKIE_FILE, SESSION_DIR, create_v2_registry, load_v2_config
 
 
 @click.command()
@@ -101,8 +97,7 @@ def login(force: bool) -> None:
 
 
 def _remove_stored_session() -> None:
-    paths = ProfileStore().selected()
-    for path in [paths.cookie_file, paths.session_dir / "config.json"]:
+    for path in [COOKIE_FILE, SESSION_DIR / "config.json"]:
         try:
             path.unlink(missing_ok=True)
         except OSError:
@@ -148,16 +143,7 @@ def logout() -> None:
         finally:
             await registry.close()
 
-<<<<<<< HEAD
-        for path in [COOKIE_FILE, SESSION_DIR / "config.json"]:
-            try:
-                path.unlink(missing_ok=True)
-            except OSError:
-                pass
-
-=======
         _remove_stored_session()
->>>>>>> a902ee626 (feat(BA-8941): refuse v2 CLI requests over insecure http unless allowed (#16482))
         click.echo(click.style("Logged out.", fg="green"))
 
     asyncio.run(_run())

@@ -16,15 +16,11 @@ import click
 from pydantic import TypeAdapter, ValidationError
 from yarl import URL
 
-<<<<<<< HEAD
-=======
 from ai.backend.client.cli.v2.insecure_http_guard import (
     ALLOW_INSECURE_HTTP_ENV,
     reject_insecure_endpoint,
 )
-from ai.backend.common.tristate.unset import UNSET, Unset
 
->>>>>>> a902ee626 (feat(BA-8941): refuse v2 CLI requests over insecure http unless allowed (#16482))
 if TYPE_CHECKING:
     from ai.backend.client.v2.v2_registry import V2ClientRegistry
 
