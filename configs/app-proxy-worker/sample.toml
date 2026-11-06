@@ -190,6 +190,16 @@
   # defaults to api_bind_addr. Required when behind NAT or containers.
   # Added in 25.9.0
   ## announce_addr = { host = "worker.example.com", port = 10201 }
+<<<<<<< HEAD
+=======
+  # CIDR blocks (or bare IP addresses) of load balancers / reverse proxies in
+  # front of this worker, trusted to set 'X-Forwarded-For', 'X-Forwarded-Host'
+  # and 'X-Forwarded-Proto'. Leave empty when clients connect directly to the
+  # worker; the worker then ignores these headers and uses the connection
+  # address, the 'Host' header and its TLS configuration.
+  # Added in 26.4.5
+  trusted_proxies = ["10.0.0.0/8"]
+>>>>>>> 61c3b0851 (fix(BA-8916): trust forwarded host and proto only from trusted proxies (#16409))
 
   # Configuration for wildcard domain routing. Required when frontend_mode is
   # 'wildcard'. Defines the bind address, base domain, and port settings for

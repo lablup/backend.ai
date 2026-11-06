@@ -805,12 +805,11 @@ class ProxyWorkerConfig(BaseSchema):
         Field(default_factory=list),
         BackendAIConfigMeta(
             description=(
-                "CIDR blocks (or bare IP addresses) of load balancers / reverse proxies that sit "
-                "in front of this worker and may be trusted to set the 'X-Forwarded-For' header. "
-                "Client-IP allowlist checks honor 'X-Forwarded-For' only when the immediate peer "
-                "matches one of these networks; otherwise the direct connection address is used, so "
-                "a directly-exposed worker cannot be spoofed by a forged header. Leave empty when "
-                "clients connect directly to the worker."
+                "CIDR blocks (or bare IP addresses) of load balancers / reverse proxies in front "
+                "of this worker, trusted to set 'X-Forwarded-For', 'X-Forwarded-Host' and "
+                "'X-Forwarded-Proto'. Leave empty when clients connect directly to the worker; "
+                "the worker then ignores these headers and uses the connection address, the "
+                "'Host' header and its TLS configuration."
             ),
             added_version="26.4.5",
             example=ConfigExample(local="[]", prod='["10.0.0.0/8"]'),
