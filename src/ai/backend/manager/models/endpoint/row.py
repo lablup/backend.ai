@@ -275,8 +275,8 @@ class EndpointRow(Base):
     # target group's ``target_revision_id`` (``None`` when no rollout is in
     # progress). Joined through ``replica_groups`` so existing consumers
     # (``to_deployment_info`` and the ``selectinload`` paths) are unchanged.
-    # current_revision_row and deploying_revision_row are read by DeploymentSearcher,
-    # DeploymentInfoSearcher, the deployment db_source, to_deployment_info and to_data.
+    # current_revision_row and deploying_revision_row are read by DeploymentInfoSearcher,
+    # to_deployment_info, to_data, ModelServingRepository and gql_legacy (endpoint.py).
     # Deleted by the story that moves those to subqueries (B-3).
     current_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
         "DeploymentRevisionRow",
@@ -293,8 +293,8 @@ class EndpointRow(Base):
         uselist=False,
     )
 
-    # Read by DeploymentSearcher, DeploymentInfoSearcher, the deployment db_source and
-    # to_deployment_info. Deleted by the story that moves those to subqueries (B-3).
+    # Read by DeploymentSearcher, DeploymentInfoSearcher and to_deployment_info. Deleted
+    # by the story that moves those to subqueries (B-3).
     deployment_policy: Mapped[DeploymentPolicyRow | None] = relationship(
         "DeploymentPolicyRow",
         primaryjoin=_get_deployment_policy_join_condition,
@@ -541,24 +541,6 @@ class EndpointRow(Base):
             deploying_revision_id=DeploymentRevisionID(deploying_row.id) if deploying_row else None,
             current_revision=revisions.to_data(current_row) if current_row else None,
             deploying_revision=revisions.to_data(deploying_row) if deploying_row else None,
-            policy=(
-                DeploymentPolicySearchableFields.own.to_data(self.deployment_policy)
-                if self.deployment_policy is not None
-                else None
-            ),
-        )
-
-    def to_modern_deployment_info(self) -> DeploymentInfo:
-        """Lightweight DeploymentInfo carrying only the revision *ids* (sourced
-        from the replica groups), without loading the full revision rows. Used
-        by the modern (v2) read path, which only needs the ids. Requires
-        ``current_revision_id`` to be filled with ``with_expression``.
-        """
-        return self._build_deployment_info(
-            current_revision_id=self.current_revision_id,
-            deploying_revision_id=self.deploying_revision_id,
-            current_revision=None,
-            deploying_revision=None,
             policy=(
                 DeploymentPolicySearchableFields.own.to_data(self.deployment_policy)
                 if self.deployment_policy is not None
