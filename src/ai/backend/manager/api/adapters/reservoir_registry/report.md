@@ -472,14 +472,14 @@ Then
   - successes[0].name = 'registry-1'
   - successes[0].endpoint = 'https://storage.example.com'
   - successes[0].access_key = 'access-key'
-  - successes[0].secret_key = 'secret-key'
+  - successes[0].secret_key = '*****'
   - successes[0].api_version = 'v1'
   - successes[1].id: same as the id of the registry seeded in advance
   - successes[1].entity_id: same as the id of the registry seeded in advance
   - successes[1].name = 'registry-2'
   - successes[1].endpoint = 'https://storage.example.com'
   - successes[1].access_key = 'access-key'
-  - successes[1].secret_key = 'secret-key'
+  - successes[1].secret_key = '*****'
   - successes[1].api_version = 'v1'
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-registries"></a>
@@ -668,7 +668,7 @@ Then
   - name = 'registry-1'
   - endpoint = 'https://storage.example.com'
   - access_key = 'access-key'
-  - secret_key = 'secret-key'
+  - secret_key = '*****'
   - api_version = 'v1'
 
 <a id="editing-a-user-granted-nothing-may-not-edit-a-registry"></a>

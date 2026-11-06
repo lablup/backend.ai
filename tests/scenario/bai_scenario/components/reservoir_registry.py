@@ -24,6 +24,7 @@ from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.defs import SECRET_KEY_PLACEHOLDER
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -216,7 +217,7 @@ def registry_verdicts(
         Same(f"{at}name", node.name, registry.name),
         Same(f"{at}endpoint", node.endpoint, endpoint),
         Same(f"{at}access_key", node.access_key, registry.access_key),
-        Same(f"{at}secret_key", node.secret_key, registry.secret_key),
+        Same(f"{at}secret_key", node.secret_key, SECRET_KEY_PLACEHOLDER),
         Same(f"{at}api_version", node.api_version, registry.api_version),
     ]
 
