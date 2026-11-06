@@ -14,9 +14,17 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+<<<<<<< HEAD
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult
+=======
+from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.image.types import ImageData
+from ai.backend.manager.data.resource.types import ResourceGroupProxyConnectionInfo
+from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
+>>>>>>> 2244118a5 (fix(BA-8890): send the API token from the manager to the App Proxy /v2/conf endpoint (#16408))
 from ai.backend.manager.data.session.types import (
     SessionData,
     SessionListResult,
@@ -190,11 +198,19 @@ class SessionRepository:
         return await self._db_source.get_group_name_by_domain_and_id(domain_name, group_id)
 
     @session_repository_resilience.apply()
+<<<<<<< HEAD
     async def get_scaling_group_wsproxy_addr(
         self,
         scaling_group_name: str,
     ) -> str | None:
         return await self._db_source.get_scaling_group_wsproxy_addr(scaling_group_name)
+=======
+    async def resource_group_proxy_connection_info(
+        self,
+        resource_group_name: str,
+    ) -> ResourceGroupProxyConnectionInfo | None:
+        return await self._db_source.resource_group_proxy_connection_info(resource_group_name)
+>>>>>>> 2244118a5 (fix(BA-8890): send the API token from the manager to the App Proxy /v2/conf endpoint (#16408))
 
     @session_repository_resilience.apply()
     async def get_session_by_id(

@@ -10,11 +10,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only, noload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
+<<<<<<< HEAD
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import AccessKey, AgentId, ImageAlias, SessionId
 from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
 from ai.backend.manager.data.kernel.types import KernelListResult
+=======
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
+from ai.backend.common.types import (
+    AccessKey,
+    AgentId,
+    KernelId,
+    ResourceSlot,
+    SessionId,
+)
+from ai.backend.manager.data.image.types import ImageData, ImageStatus
+from ai.backend.manager.data.resource.types import ResourceGroupProxyConnectionInfo
+from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
+>>>>>>> 2244118a5 (fix(BA-8890): send the API token from the manager to the App Proxy /v2/conf endpoint (#16408))
 from ai.backend.manager.data.session.types import (
     SessionData,
     SessionListResult,
@@ -346,6 +361,7 @@ class SessionDBSource:
             )
             return await conn.scalar(query)
 
+<<<<<<< HEAD
     async def get_scaling_group_wsproxy_addr(
         self,
         scaling_group_name: str,
@@ -355,10 +371,28 @@ class SessionDBSource:
                 sa.select(scaling_groups.c.wsproxy_addr)
                 .select_from(scaling_groups)
                 .where(scaling_groups.c.name == scaling_group_name)
+=======
+    async def resource_group_proxy_connection_info(
+        self,
+        resource_group_name: str,
+    ) -> ResourceGroupProxyConnectionInfo | None:
+        async with self._db.begin_readonly() as conn:
+            query = (
+                sa.select(resource_groups.c.wsproxy_addr, resource_groups.c.wsproxy_api_token)
+                .select_from(resource_groups)
+                .where(resource_groups.c.name == resource_group_name)
+>>>>>>> 2244118a5 (fix(BA-8890): send the API token from the manager to the App Proxy /v2/conf endpoint (#16408))
             )
             result = await conn.execute(query)
-            sgroup = result.first()
-            return sgroup.wsproxy_addr if sgroup else None
+            resource_group = result.first()
+            if resource_group is None:
+                return None
+            if not resource_group.wsproxy_addr:
+                return None
+            return ResourceGroupProxyConnectionInfo(
+                addr=resource_group.wsproxy_addr,
+                api_token=resource_group.wsproxy_api_token,
+            )
 
     async def get_session_by_id(
         self,
