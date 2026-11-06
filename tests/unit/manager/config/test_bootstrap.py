@@ -10,7 +10,10 @@ _WHEELHOUSE_PATH = Path("/srv/wheelhouse")
 @pytest.fixture
 def config_file_allowing_the_wheelhouse(tmp_path: Path) -> Path:
     config_path = tmp_path / "manager.toml"
-    config_path.write_text(f'[wheelhouse]\nallow = true\npath = "{_WHEELHOUSE_PATH}"\n')
+    config_path.write_text(
+        '[etcd]\nuser = "root"\npassword = "develove"\n'
+        f'[wheelhouse]\nallow = true\npath = "{_WHEELHOUSE_PATH}"\n'
+    )
     return config_path
 
 

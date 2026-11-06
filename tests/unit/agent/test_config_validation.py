@@ -556,6 +556,8 @@ class TestAgentUnifiedConfigValidation:
             "etcd": {
                 "namespace": "test",
                 "addr": HostPortPair(host="127.0.0.1", port=2379),
+                "user": "test",
+                "password": "test",
             },
         }
 
@@ -740,6 +742,8 @@ class TestAgentUnifiedConfigSingleAgentMode:
             "etcd": {
                 "namespace": "test",
                 "addr": HostPortPair(host="127.0.0.1", port=2379),
+                "user": "test",
+                "password": "test",
             },
         }
 
@@ -801,6 +805,8 @@ class TestMultipleAgentsConfigValidation:
             "etcd": {
                 "namespace": "test",
                 "addr": HostPortPair(host="127.0.0.1", port=2379),
+                "user": "test",
+                "password": "test",
             },
         }
 
@@ -1238,6 +1244,8 @@ class TestResourceAllocationModes:
             "etcd": {
                 "namespace": "test",
                 "addr": HostPortPair(host="127.0.0.1", port=2379),
+                "user": "test",
+                "password": "test",
             },
         }
 

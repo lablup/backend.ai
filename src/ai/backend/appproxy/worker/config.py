@@ -35,7 +35,6 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.common import config
 from ai.backend.common.configs import (
-    EtcdConfig,
     OTELConfig,
     PyroscopeConfig,
     ServiceDiscoveryConfig,
@@ -1129,18 +1128,6 @@ class ServerConfig(BaseSchema):
             description=(
                 "Service discovery configuration for locating the coordinator and other Backend.AI "
                 "components. Supports Redis-based or etcd-based service registration and discovery."
-            ),
-            added_version="25.9.0",
-            composite=CompositeType.FIELD,
-        ),
-    ]
-    etcd: Annotated[
-        EtcdConfig,
-        Field(default_factory=EtcdConfig),
-        BackendAIConfigMeta(
-            description=(
-                "etcd connection configuration for distributed coordination. "
-                "Used for service discovery (if etcd-based) and shared configuration management."
             ),
             added_version="25.9.0",
             composite=CompositeType.FIELD,

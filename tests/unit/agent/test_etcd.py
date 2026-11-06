@@ -44,6 +44,8 @@ def agent_config(rpc_auth_key_config: dict[str, Path]) -> AgentUnifiedConfig:
         "etcd": {
             "addr": "127.0.0.1:2379",
             "namespace": "test-ns",
+            "user": "test",
+            "password": "test",
         },
         "redis": {
             "addr": "127.0.0.1:6379",

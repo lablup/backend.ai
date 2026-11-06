@@ -73,34 +73,10 @@ class CLIContext:
 
 @contextlib.asynccontextmanager
 async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
-    from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-    from ai.backend.common.exception import ConfigurationError
+    from ai.backend.common.etcd import AsyncEtcd
 
     bootstrap_config = await cli_ctx.get_bootstrap_config()
-    etcd_config_data = bootstrap_config.etcd.to_dataclass()
-    creds = None
-    if etcd_config_data.user:
-        if not etcd_config_data.password:
-            raise ConfigurationError({
-                "etcd": "password is required when user is set",
-            })
-
-        creds = {
-            "user": etcd_config_data.user,
-            "password": etcd_config_data.password,
-        }
-    scope_prefix_map = {
-        ConfigScopes.GLOBAL: "",
-        # TODO: provide a way to specify other scope prefixes
-    }
-    async with AsyncEtcd(
-        [addr.to_legacy() for addr in etcd_config_data.addrs],
-        etcd_config_data.namespace,
-        scope_prefix_map,
-        credentials=creds,
-        keep_alive_interval=etcd_config_data.keep_alive_interval,
-        keep_alive_timeout=etcd_config_data.keep_alive_timeout,
-    ) as etcd:
+    async with AsyncEtcd.create_from_config(bootstrap_config.etcd.to_dataclass()) as etcd:
         yield etcd
 
 
@@ -117,7 +93,7 @@ async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerUnifiedConfig]
     async with AsyncEtcd.create_from_config(etcd_config_data) as etcd:
         etcd_loader = LegacyEtcdLoader(etcd)
         redis_config = await etcd_loader.load()
-        unified_config = ManagerUnifiedConfig(**redis_config)
+        unified_config = ManagerUnifiedConfig(**redis_config, etcd=bootstrap_config.etcd)
     yield unified_config
 
 

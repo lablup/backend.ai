@@ -49,8 +49,8 @@ def base_agent_config(rpc_auth_key_config: dict[str, Path]) -> AgentUnifiedConfi
         etcd=EtcdConfig.model_validate({
             "namespace": "test",
             "addrs": [HostPortPair(host="127.0.0.1", port=2379)],
-            "user": None,
-            "password": None,
+            "user": "test",
+            "password": "test",
         }),
     )
 

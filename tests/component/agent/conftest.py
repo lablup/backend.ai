@@ -27,6 +27,8 @@ from ai.backend.logging import LocalLogger
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat, LogLevel
 from ai.backend.testutils.bootstrap import (  # noqa: F401
+    ETCD_PASSWORD,
+    ETCD_USER,
     etcd_container,
     redis_container,
     sync_file_lock,
@@ -176,6 +178,8 @@ def local_config(
         "etcd": {
             "addr": etcd_addr,
             "namespace": f"ns-{test_id}",
+            "user": ETCD_USER,
+            "password": ETCD_PASSWORD,
         },
         "redis": {
             "addr": redis_addr,

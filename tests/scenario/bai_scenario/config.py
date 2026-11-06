@@ -49,6 +49,7 @@ def base_config_dict(
 ) -> dict[str, Any]:
     raw: dict[str, Any] = {
         "redis": {"addr": {"host": redis_addr.host, "port": redis_addr.port}},
+        "etcd": {"user": "test", "password": "test"},
         "db": {
             "addr": {"host": db_addr.host, "port": db_addr.port},
             "name": dbname,
