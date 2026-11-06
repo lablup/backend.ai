@@ -32,10 +32,8 @@ __all__ = (
 
 class HookHandler(Protocol):
     """
-    The handler should accept a single argument containing
-    a tuple of parameters passed to the handler.
-    If it decides to cancel the ongoing event, it should raise
-    :class:`HookDenied` exception.
+    Returns the result of the handler, or None when it has no result for this event.
+    Raises :class:`Reject` to cancel the ongoing event.
     """
 
     async def __call__(self, *args: Any) -> Any:
@@ -128,15 +126,15 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
     ) -> HookResult:
         """
         Invoke the handlers that matches with the given ``event_name``.
-        If any of the handlers raises :class:`HookDenied`,
-        the event caller should seize the processing.
+        A handler raising :class:`Reject` or any other exception ends the dispatch.
+        ``FIRST_COMPLETED`` also ends it at the first non-None result, continuing past None.
         """
         executed_plugin_names = []
-        results: list[Any] = []
+        handler_results: list[Any] = []
         for plugin_name, hook_handler in self._get_handlers(event_name, order=order):
             try:
                 executed_plugin_names.append(plugin_name)
-                result = await hook_handler(*args)
+                handler_result = await hook_handler(*args)
             except Reject as e:
                 return HookResult(
                     status=REJECTED,
@@ -150,23 +148,32 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
                     reason=repr(e),
                 )
             else:
-                if return_when == FIRST_COMPLETED:
+                first_completed_result_found = (
+                    return_when == FIRST_COMPLETED and handler_result is not None
+                )
+                if first_completed_result_found:
                     return HookResult(
                         status=PASSED,
                         src_plugin=plugin_name,
-                        result=result,
+                        result=handler_result,
                     )
-                results.append(result)
+                handler_results.append(handler_result)
         if not success_if_no_hook and not executed_plugin_names:
             return HookResult(
                 status=REJECTED,
                 src_plugin=executed_plugin_names,  # empty
-                result=results,  # empty
+                result=handler_results,  # empty
+            )
+        if return_when == FIRST_COMPLETED:
+            return HookResult(
+                status=PASSED,
+                src_plugin=executed_plugin_names,
+                result=None,
             )
         return HookResult(
             status=PASSED,
             src_plugin=executed_plugin_names,
-            result=results,
+            result=handler_results,
         )
 
     async def notify(
