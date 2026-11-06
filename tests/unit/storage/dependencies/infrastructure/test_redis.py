@@ -17,7 +17,10 @@ from ai.backend.storage.dependencies.infrastructure.redis import (
     RedisProviderInput,
     StorageProxyValkeyClients,
 )
-from ai.backend.storage.dependencies.infrastructure.redis_config import RedisConfigProvider
+from ai.backend.storage.dependencies.infrastructure.redis_config import (
+    RedisConfigProvider,
+    RedisConfigProviderInput,
+)
 from ai.backend.testutils.bootstrap import ETCD_PASSWORD, ETCD_USER
 
 
@@ -71,7 +74,9 @@ class TestRedisProvider:
         etcd_client: AsyncEtcd,
     ) -> None:
         """Provider should create and cleanup all Valkey clients."""
-        async with RedisConfigProvider().provide(etcd_client) as redis_config:
+        async with RedisConfigProvider().provide(
+            RedisConfigProviderInput(etcd=etcd_client, local_redis=None)
+        ) as redis_config:
             provider_input = RedisProviderInput(
                 redis_config=redis_config, sentinel_monitors=SentinelMonitorSet([]), pidx=0
             )
@@ -90,7 +95,9 @@ class TestRedisProvider:
         etcd_client: AsyncEtcd,
     ) -> None:
         """Provider should cleanup clients even on exception."""
-        async with RedisConfigProvider().provide(etcd_client) as redis_config:
+        async with RedisConfigProvider().provide(
+            RedisConfigProviderInput(etcd=etcd_client, local_redis=None)
+        ) as redis_config:
             provider_input = RedisProviderInput(
                 redis_config=redis_config, sentinel_monitors=SentinelMonitorSet([]), pidx=0
             )

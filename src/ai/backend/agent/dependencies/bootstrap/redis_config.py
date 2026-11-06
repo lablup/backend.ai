@@ -2,19 +2,23 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common import config as common_config
+from ai.backend.common.configs.loader.redis_loader import load_redis_config
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.etcd import AsyncEtcd
 
 
-class RedisConfigDependency(NonMonitorableDependencyProvider[AsyncEtcd, RedisConfig]):
-    """Reads redis configuration from etcd.
+@dataclass(frozen=True)
+class RedisConfigInput:
+    etcd: AsyncEtcd
+    local_redis: RedisConfig | None
 
-    Matches the behavior in server.py's read_agent_config() (lines 457-473).
-    """
+
+class RedisConfigDependency(NonMonitorableDependencyProvider[RedisConfigInput, RedisConfig]):
+    """Reads the redis configuration from etcd and the local config file, as server.py does."""
 
     @property
     @override
@@ -23,27 +27,5 @@ class RedisConfigDependency(NonMonitorableDependencyProvider[AsyncEtcd, RedisCon
 
     @asynccontextmanager
     @override
-    async def provide(self, setup_input: AsyncEtcd) -> AsyncIterator[RedisConfig]:
-        """Read redis config from etcd.
-
-        Args:
-            setup_input: Etcd client
-
-        Yields:
-            RedisConfig loaded from etcd
-        """
-        # Read redis config from etcd (same as server.py read_agent_config() lines 459-473)
-        _redis_config = common_config.redis_config_iv.check(
-            await setup_input.get_prefix("config/redis"),
-        )
-
-        # Convert HostPortPair to dict format for compatibility
-        redis_config_dict = _redis_config.copy()
-        if isinstance(_redis_config.get("addr"), object):
-            addr = _redis_config["addr"]
-            if addr is not None:
-                redis_config_dict["addr"] = f"{addr.host}:{addr.port}"
-
-        redis_config = RedisConfig.model_validate(redis_config_dict)
-
-        yield redis_config
+    async def provide(self, setup_input: RedisConfigInput) -> AsyncIterator[RedisConfig]:
+        yield await load_redis_config(setup_input.etcd, setup_input.local_redis)
