@@ -48,6 +48,12 @@ class ScalingGroupProxyTarget:
 
 
 @dataclass(frozen=True)
+class ScalingGroupProxyConnectionInfo:
+    addr: str
+    api_token: str | None
+
+
+@dataclass(frozen=True)
 class SlotTypePolicy:
     """Global slot-type admin policy from `resource_slot_types`.
 

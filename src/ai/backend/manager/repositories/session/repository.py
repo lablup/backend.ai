@@ -17,6 +17,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult
+from ai.backend.manager.data.resource.types import ScalingGroupProxyConnectionInfo
 from ai.backend.manager.data.session.types import (
     SessionData,
     SessionListResult,
@@ -190,11 +191,11 @@ class SessionRepository:
         return await self._db_source.get_group_name_by_domain_and_id(domain_name, group_id)
 
     @session_repository_resilience.apply()
-    async def get_scaling_group_wsproxy_addr(
+    async def scaling_group_proxy_connection_info(
         self,
         scaling_group_name: str,
-    ) -> str | None:
-        return await self._db_source.get_scaling_group_wsproxy_addr(scaling_group_name)
+    ) -> ScalingGroupProxyConnectionInfo | None:
+        return await self._db_source.scaling_group_proxy_connection_info(scaling_group_name)
 
     @session_repository_resilience.apply()
     async def get_session_by_id(

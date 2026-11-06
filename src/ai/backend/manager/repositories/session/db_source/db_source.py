@@ -15,6 +15,7 @@ from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import AccessKey, AgentId, ImageAlias, SessionId
 from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
 from ai.backend.manager.data.kernel.types import KernelListResult
+from ai.backend.manager.data.resource.types import ScalingGroupProxyConnectionInfo
 from ai.backend.manager.data.session.types import (
     SessionData,
     SessionListResult,
@@ -346,19 +347,26 @@ class SessionDBSource:
             )
             return await conn.scalar(query)
 
-    async def get_scaling_group_wsproxy_addr(
+    async def scaling_group_proxy_connection_info(
         self,
         scaling_group_name: str,
-    ) -> str | None:
+    ) -> ScalingGroupProxyConnectionInfo | None:
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(scaling_groups.c.wsproxy_addr)
+                sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
                 .select_from(scaling_groups)
                 .where(scaling_groups.c.name == scaling_group_name)
             )
             result = await conn.execute(query)
-            sgroup = result.first()
-            return sgroup.wsproxy_addr if sgroup else None
+            scaling_group = result.first()
+            if scaling_group is None:
+                return None
+            if not scaling_group.wsproxy_addr:
+                return None
+            return ScalingGroupProxyConnectionInfo(
+                addr=scaling_group.wsproxy_addr,
+                api_token=scaling_group.wsproxy_api_token,
+            )
 
     async def get_session_by_id(
         self,
