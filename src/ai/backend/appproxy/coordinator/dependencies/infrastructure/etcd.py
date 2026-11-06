@@ -27,7 +27,7 @@ class EtcdProvider(DependencyProvider[ServerConfig, TraefikEtcd | None]):
         """Create and provide Traefik etcd connection if enabled."""
         if setup_input.proxy_coordinator.enable_traefik:
             traefik_config = setup_input.proxy_coordinator.traefik
-            if not traefik_config:
+            if traefik_config is None or traefik_config.etcd is None:
                 raise MissingTraefikConfigError(
                     "Traefik is enabled but traefik configuration is missing."
                 )

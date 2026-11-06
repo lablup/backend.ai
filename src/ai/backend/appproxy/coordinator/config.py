@@ -291,13 +291,14 @@ class ClientIPStrategyConfig(BaseSchema):
 
 class TraefikConfig(BaseSchema):
     etcd: Annotated[
-        EtcdConfig,
-        Field(),
+        EtcdConfig | None,
+        Field(default=None),
         BackendAIConfigMeta(
             description=(
                 "Configuration for the etcd connection used by Traefik integration. "
                 "Traefik uses etcd as its configuration backend to dynamically update routing rules. "
-                "The namespace should be set to 'traefik' to isolate Traefik's configuration keys."
+                "The namespace should be set to 'traefik' to isolate Traefik's configuration keys. "
+                "Required when enable_traefik is enabled."
             ),
             added_version="25.9.0",
             composite=CompositeType.FIELD,
@@ -861,9 +862,9 @@ def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET)
                 server_config.profiling.pyroscope_config.application_name = (
                     f"proxy-coordinator-{server_config.proxy_coordinator.bind_addr.port}"
                 )
-        if (
-            server_config.proxy_coordinator.enable_traefik
-            and not server_config.proxy_coordinator.traefik
+        if server_config.proxy_coordinator.enable_traefik and (
+            server_config.proxy_coordinator.traefik is None
+            or server_config.proxy_coordinator.traefik.etcd is None
         ):
             raise ConfigValidationError("Traefik enabled but configuration is not populated")
         if server_config.debug.enabled:

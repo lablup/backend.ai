@@ -293,7 +293,7 @@
     # Configuration for the etcd connection used by Traefik integration. Traefik
     # uses etcd as its configuration backend to dynamically update routing
     # rules. The namespace should be set to 'traefik' to isolate Traefik's
-    # configuration keys.
+    # configuration keys. Required when enable_traefik is enabled.
     # Added in 25.9.0
     [proxy_coordinator.traefik.etcd]
       # Namespace prefix for etcd keys used by Backend.AI. Allows multiple
