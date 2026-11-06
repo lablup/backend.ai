@@ -17,7 +17,10 @@ import click
 from pydantic import TypeAdapter, ValidationError
 from yarl import URL
 
-from ai.backend.client.cli.insecure_http_guard import reject_insecure_endpoints
+from ai.backend.client.cli.v2.insecure_http_guard import (
+    ALLOW_INSECURE_HTTP_ENV,
+    reject_insecure_endpoint,
+)
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -27,7 +30,6 @@ if TYPE_CHECKING:
 CONFIG_DIR = Path.home() / ".backend.ai"
 
 PROFILE_ENV = "BACKEND_PROFILE"
-ALLOW_INSECURE_HTTP_ENV = "BACKEND_ALLOW_INSECURE_HTTP"
 PROFILE_META_KEY = "ai.backend.client.cli.v2.profile"
 _PROFILE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
@@ -207,13 +209,7 @@ def load_v2_config() -> V2ConnectionConfig:
 
 async def create_v2_registry(config: V2ConnectionConfig) -> V2ClientRegistry:
     """Build a ``V2ClientRegistry`` from a ``V2ConnectionConfig``."""
-    reject_insecure_endpoints(
-        [config.endpoint],
-        config.allow_insecure_http,
-        how_to_allow=(
-            f"set {ALLOW_INSECURE_HTTP_ENV}=1 or run `./bai config set allow-insecure-http true`"
-        ),
-    )
+    reject_insecure_endpoint(config.endpoint, config.allow_insecure_http)
     from ai.backend.client.v2.auth import HMACAuth, NoAuth
     from ai.backend.client.v2.config import ClientConfig
     from ai.backend.client.v2.v2_registry import V2ClientRegistry

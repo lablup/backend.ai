@@ -1,44 +1,15 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
-from dataclasses import dataclass, replace
-from typing import override
-from unittest.mock import AsyncMock, MagicMock
+from dataclasses import replace
+from unittest.mock import AsyncMock
 
 import click
 import pytest
-from click.testing import CliRunner
 from yarl import URL
 
-from ai.backend.client.cli.insecure_http_guard import (
-    SecureEndpointCommand,
-    reject_insecure_endpoints,
-)
 from ai.backend.client.cli.v2.helpers import V2ConnectionConfig, create_v2_registry
+from ai.backend.client.cli.v2.insecure_http_guard import reject_insecure_endpoint
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-
-_INSECURE_ENDPOINT = URL("http://backend.example")
-
-
-class _CommandReadingInsecureEndpoint(SecureEndpointCommand):
-    @override
-    def _load_endpoints(self) -> Iterable[URL]:
-        return [_INSECURE_ENDPOINT]
-
-
-@dataclass(frozen=True)
-class _CommandAtInsecureEndpoint:
-    command: click.Command
-    body: MagicMock
-
-
-@pytest.fixture
-def command_at_insecure_endpoint() -> _CommandAtInsecureEndpoint:
-    body = MagicMock()
-    return _CommandAtInsecureEndpoint(
-        command=_CommandReadingInsecureEndpoint(name="command", callback=body),
-        body=body,
-    )
 
 
 @pytest.fixture
@@ -51,30 +22,12 @@ def registry_create(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
 @pytest.fixture
 def v2_config_at_insecure_endpoint() -> V2ConnectionConfig:
     return V2ConnectionConfig(
-        endpoint=_INSECURE_ENDPOINT,
+        endpoint=URL("http://backend.example"),
         endpoint_type="api",
         access_key=None,
         secret_key=None,
         api_version="v9.20250722",
     )
-
-
-class TestSecureEndpointCommand:
-    def test_refuses_without_the_allow_option(
-        self,
-        command_at_insecure_endpoint: _CommandAtInsecureEndpoint,
-    ) -> None:
-        CliRunner().invoke(command_at_insecure_endpoint.command, [])
-
-        command_at_insecure_endpoint.body.assert_not_called()
-
-    def test_runs_the_body_with_the_allow_option(
-        self,
-        command_at_insecure_endpoint: _CommandAtInsecureEndpoint,
-    ) -> None:
-        CliRunner().invoke(command_at_insecure_endpoint.command, ["--allow-insecure-http"])
-
-        command_at_insecure_endpoint.body.assert_called_once_with()
 
 
 class TestCreateV2Registry:
@@ -98,7 +51,7 @@ class TestCreateV2Registry:
         registry_create.assert_called_once()
 
 
-class TestRejectInsecureEndpoints:
+class TestRejectInsecureEndpoint:
     @pytest.mark.parametrize(
         "endpoint",
         [
@@ -109,7 +62,7 @@ class TestRejectInsecureEndpoints:
         ],
     )
     def test_accepts_https_and_loopback(self, endpoint: str) -> None:
-        reject_insecure_endpoints([URL(endpoint)], False, how_to_allow="allow it")
+        reject_insecure_endpoint(URL(endpoint), allow_insecure_http=False)
 
     @pytest.mark.parametrize(
         "endpoint",
@@ -120,4 +73,4 @@ class TestRejectInsecureEndpoints:
     )
     def test_rejects_other_http(self, endpoint: str) -> None:
         with pytest.raises(click.ClickException):
-            reject_insecure_endpoints([URL(endpoint)], False, how_to_allow="allow it")
+            reject_insecure_endpoint(URL(endpoint), allow_insecure_http=False)

@@ -6,7 +6,6 @@ import click
 from ai.backend.cli.params import BoolExprType, JSONParamType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.insecure_http_guard import SecureEndpointGroup
 from ai.backend.client.cli.pretty import print_done
 from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.func.scaling_group import _default_detail_fields, _default_list_fields
@@ -16,7 +15,7 @@ from ai.backend.client.session import Session
 from . import admin
 
 
-@admin.group("scaling-group", cls=SecureEndpointGroup)
+@admin.group("scaling-group")
 def scaling_group() -> None:
     """
     Scaling group (resource group) administration commands.
