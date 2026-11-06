@@ -70,7 +70,7 @@ class EtcdTLSConfig(BaseConfigSchema):
     ]
 
     @model_validator(mode="after")
-    def _check_required_certificates(self) -> Self:
+    def _validate_certificate_combination(self) -> Self:
         if self.enabled and self.ca_cert is None:
             raise ValueError("etcd.tls.ca-cert is required when etcd.tls.enabled is true")
         if (self.client_cert is None) != (self.client_key is None):
