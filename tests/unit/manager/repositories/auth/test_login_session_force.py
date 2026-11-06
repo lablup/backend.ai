@@ -431,19 +431,82 @@ class TestLoginSessionForce:
         assert owned_session_deleted is False
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1
 
-    async def test_invalidate_returns_tokens_of_active_sessions(
+    @pytest.fixture
+    async def mixed_session_tokens(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, sample_user: SampleUserData
+    ) -> dict[str, str]:
+        other_user_id = uuid.uuid4()
+        other_email = f"other-{other_user_id}@example.com"
+        tokens = {name: uuid.uuid4().hex for name in ("active", "invalidated", "other")}
+        async with db_with_cleanup.begin_session() as db_session:
+            domain_id = await db_session.scalar(
+                sa.select(DomainRow.id).where(DomainRow.name == sample_user.domain_name)
+            )
+            db_session.add(
+                UserRow(
+                    uuid=other_user_id,
+                    username=other_email,
+                    email=other_email,
+                    password=self._make_password_info(),
+                    domain_name=sample_user.domain_name,
+                    domain_id=domain_id,
+                    role=UserRole.USER,
+                    resource_policy="test-user-policy",
+                    need_password_change=False,
+                )
+            )
+            await db_session.flush()
+            db_session.add_all([
+                LoginSessionRow(
+                    user_id=UserID(sample_user.user_id),
+                    access_key=sample_user.access_key,
+                    session_token=tokens["active"],
+                    status=LoginSessionStatus.ACTIVE,
+                ),
+                LoginSessionRow(
+                    user_id=UserID(sample_user.user_id),
+                    access_key=sample_user.access_key,
+                    session_token=tokens["invalidated"],
+                    status=LoginSessionStatus.INVALIDATED,
+                    invalidated_at=sa.func.now(),
+                ),
+                LoginSessionRow(
+                    user_id=UserID(other_user_id),
+                    access_key=f"AKIA{uuid.uuid4().hex[:16]}",
+                    session_token=tokens["other"],
+                    status=LoginSessionStatus.ACTIVE,
+                ),
+            ])
+            await db_session.commit()
+        return tokens
+
+    async def test_invalidate_returns_only_newly_invalidated_tokens(
         self,
         auth_db_source: AuthDBSource,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_user: SampleUserData,
+        mixed_session_tokens: dict[str, str],
     ) -> None:
-        created = await auth_db_source.create_login_session(
-            user_id=sample_user.user_id,
-            access_key=sample_user.access_key,
-            domain_name=sample_user.domain_name,
-        )
+        tokens = await auth_db_source.invalidate_active_login_sessions(UserID(sample_user.user_id))
+
+        assert tokens == [mixed_session_tokens["active"]]
+        assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 0
+        async with db_with_cleanup.begin_readonly() as conn:
+            other_status = await conn.scalar(
+                sa.select(LoginSessionRow.status).where(
+                    LoginSessionRow.session_token == mixed_session_tokens["other"]
+                )
+            )
+        assert other_status == LoginSessionStatus.ACTIVE
+
+    async def test_repeated_invalidation_returns_no_tokens(
+        self,
+        auth_db_source: AuthDBSource,
+        sample_user: SampleUserData,
+        mixed_session_tokens: dict[str, str],
+    ) -> None:
+        await auth_db_source.invalidate_active_login_sessions(UserID(sample_user.user_id))
 
         tokens = await auth_db_source.invalidate_active_login_sessions(UserID(sample_user.user_id))
 
-        assert tokens == [created.session_token]
-        assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 0
+        assert tokens == []

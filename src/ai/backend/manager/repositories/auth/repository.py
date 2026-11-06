@@ -263,4 +263,5 @@ class AuthRepository:
 
     @auth_repository_resilience.apply()
     async def invalidate_active_login_sessions(self, user_id: UserID) -> list[str]:
+        """Return only tokens of this user's sessions invalidated by this call."""
         return await self._db_source.invalidate_active_login_sessions(user_id)

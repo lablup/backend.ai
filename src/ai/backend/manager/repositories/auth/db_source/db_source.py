@@ -797,7 +797,9 @@ class AuthDBSource:
 
     @auth_db_source_resilience.apply()
     async def invalidate_active_login_sessions(self, user_id: UserID) -> list[str]:
-        """Mark every active login session of a user invalidated and return their tokens."""
+        """Invalidate the user's active sessions and return only their newly invalidated tokens.
+        Exclude already invalidated sessions and sessions belonging to other users.
+        """
         async with self._db.begin_session() as db_session:
             result = await db_session.execute(
                 sa.update(LoginSessionRow)
