@@ -397,8 +397,8 @@ Then
   - [0].remote_status = None
   - [0].created_at = None
   - [0].updated_at = None
-  - [0].digest = None
-  - [0].verification_result = None
+  - [0].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
+  - [0].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - [0].readme = 'the revision readme'
   - [1] = None
   - [2].id: same as the id of the revision created in advance
@@ -410,8 +410,8 @@ Then
   - [2].remote_status = None
   - [2].created_at = None
   - [2].updated_at = None
-  - [2].digest = None
-  - [2].verification_result = None
+  - [2].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
+  - [2].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - [2].readme = 'the revision readme'
 
 <a id="reading-a-user-granted-nothing-loading-revisions-is-refused-on-every-readable-one"></a>
@@ -554,8 +554,8 @@ Then
   - remote_status = None
   - created_at = None
   - updated_at = None
-  - digest = None
-  - verification_result = None
+  - digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
+  - verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - readme = 'the revision readme'
 
 <a id="reading-a-user-granted-nothing-may-not-read-a-revision"></a>
@@ -947,8 +947,8 @@ Then
   - [0].remote_status = None
   - [0].created_at = None
   - [0].updated_at = None
-  - [0].digest = None
-  - [0].verification_result = None
+  - [0].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
+  - [0].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - [0].readme = 'the revision readme'
   - [1].id: same as the id of the revision created in advance
   - [1].field_id: same as the id of the revision created in advance
@@ -959,8 +959,8 @@ Then
   - [1].remote_status = None
   - [1].created_at = None
   - [1].updated_at = None
-  - [1].digest = None
-  - [1].verification_result = None
+  - [1].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
+  - [1].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - [1].readme = 'the revision readme'
 
 <a id="revision_searching-a-user-granted-nothing-may-not-search-one-artifacts-revisions"></a>
@@ -1385,8 +1385,8 @@ Then
   - remote_status = None
   - created_at = None
   - updated_at = None
-  - digest = None
-  - verification_result = None
+  - digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
+  - verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - readme = 'the revision readme'
 
 <a id="revision_transitions-a-revision-not-waiting-for-approval-is-not-approved"></a>
@@ -1494,8 +1494,8 @@ Then
   - remote_status = None
   - created_at = None
   - updated_at = None
-  - digest = None
-  - verification_result = None
+  - digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
+  - verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - readme = 'the revision readme'
 
 <a id="revision_transitions-cancelling-a-running-import-puts-the-revision-back-to-scanned"></a>
@@ -1537,8 +1537,8 @@ Then
   - remote_status = None
   - created_at = None
   - updated_at = None
-  - digest = None
-  - verification_result = None
+  - digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
+  - verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - readme = 'the revision readme'
 
 <a id="revision_transitions-cancelling-the-import-of-a-missing-revision-is-refused"></a>
@@ -1982,8 +1982,8 @@ Then
   - remote_status = None
   - created_at = None
   - updated_at = None
-  - digest = None
-  - verification_result = None
+  - digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
+  - verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - readme = 'the revision readme'
 
 <a id="revision_transitions-rejecting-an-available-revision-makes-it-rejected"></a>
@@ -2025,8 +2025,8 @@ Then
   - remote_status = None
   - created_at = None
   - updated_at = None
-  - digest = None
-  - verification_result = None
+  - digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
+  - verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - readme = 'the revision readme'
 
 <a id="revision_transitions-a-user-granted-nothing-may-not-reject-a-revision"></a>
@@ -2242,8 +2242,8 @@ Then
   - [0].remote_status = None
   - [0].created_at = None
   - [0].updated_at = None
-  - [0].digest = None
-  - [0].verification_result = None
+  - [0].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
+  - [0].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - [0].readme = 'the revision readme'
   - [1].id: same as the id of the revision created in advance
   - [1].field_id: same as the id of the revision created in advance
@@ -2254,8 +2254,8 @@ Then
   - [1].remote_status = None
   - [1].created_at = None
   - [1].updated_at = None
-  - [1].digest = None
-  - [1].verification_result = None
+  - [1].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
+  - [1].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - [1].readme = 'the revision readme'
 
 <a id="revision_searching-searching-revisions-without-a-condition-returns-every"></a>
@@ -2300,8 +2300,8 @@ Then
   - [0].remote_status = None
   - [0].created_at = None
   - [0].updated_at = None
-  - [0].digest = None
-  - [0].verification_result = None
+  - [0].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
+  - [0].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - [0].readme = 'the revision readme'
   - [1].id: same as the id of the revision created in advance
   - [1].field_id: same as the id of the revision created in advance
@@ -2312,8 +2312,8 @@ Then
   - [1].remote_status = None
   - [1].created_at = None
   - [1].updated_at = None
-  - [1].digest = None
-  - [1].verification_result = None
+  - [1].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
+  - [1].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - [1].readme = 'the revision readme'
   - [2].id: same as the id of the revision created in advance
   - [2].field_id: same as the id of the revision created in advance
@@ -2324,8 +2324,8 @@ Then
   - [2].remote_status = None
   - [2].created_at = None
   - [2].updated_at = None
-  - [2].digest = None
-  - [2].verification_result = None
+  - [2].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
+  - [2].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - [2].readme = 'the revision readme'
   - [3].id: same as the id of the revision created in advance
   - [3].field_id: same as the id of the revision created in advance
@@ -2336,8 +2336,8 @@ Then
   - [3].remote_status = None
   - [3].created_at = None
   - [3].updated_at = None
-  - [3].digest = None
-  - [3].verification_result = None
+  - [3].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
+  - [3].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - [3].readme = 'the revision readme'
 
 <a id="revision_searching-a-user-granted-nothing-may-not-search-revisions"></a>
