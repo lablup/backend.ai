@@ -204,7 +204,8 @@ def load_v2_config() -> V2ConnectionConfig:
     )
 
 
-def reject_insecure_v2_endpoint(config: V2ConnectionConfig) -> None:
+async def create_v2_registry(config: V2ConnectionConfig) -> V2ClientRegistry:
+    """Build a ``V2ClientRegistry`` from a ``V2ConnectionConfig``."""
     reject_insecure_endpoints(
         [config.endpoint],
         config.allow_insecure_http,
@@ -212,11 +213,6 @@ def reject_insecure_v2_endpoint(config: V2ConnectionConfig) -> None:
             f"set {ALLOW_INSECURE_HTTP_ENV}=1 or run `./bai config set allow-insecure-http true`"
         ),
     )
-
-
-async def create_v2_registry(config: V2ConnectionConfig) -> V2ClientRegistry:
-    """Build a ``V2ClientRegistry`` from a ``V2ConnectionConfig``."""
-    reject_insecure_v2_endpoint(config)
     from ai.backend.client.v2.auth import HMACAuth, NoAuth
     from ai.backend.client.v2.config import ClientConfig
     from ai.backend.client.v2.v2_registry import V2ClientRegistry
