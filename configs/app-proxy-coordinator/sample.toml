@@ -301,6 +301,16 @@
       # related keys will be stored under this namespace.
       # Added in 22.03.0
       namespace = "backend"
+      # Username for authenticating with etcd. Optional if etcd doesn't require
+      # authentication. Should be set along with password for secure
+      # deployments.
+      # Added in 22.03.0
+      ## user = "backend"
+      # Password for authenticating with etcd. Should be kept secret in
+      # production environments. Set together with the user field for
+      # authentication.
+      # Added in 22.03.0
+      ## password = "ETCD_PASSWORD"
 
       # TLS settings for the connection to etcd.
       # Added in 26.10.0
@@ -323,17 +333,6 @@
         # timeouts do not end a stalled handshake.
         # Added in 26.10.0
         handshake-timeout = 5.0
-
-      # Username for authenticating with etcd. Optional if etcd doesn't require
-      # authentication. Should be set along with password for secure
-      # deployments.
-      # Added in 22.03.0
-      ## user = "backend"
-      # Password for authenticating with etcd. Should be kept secret in
-      # production environments. Set together with the user field for
-      # authentication.
-      # Added in 22.03.0
-      ## password = "ETCD_PASSWORD"
 
       # Addresses of the etcd cluster members. List every member of an etcd
       # cluster, or a single address of a standalone server.
