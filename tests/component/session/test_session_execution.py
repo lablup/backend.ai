@@ -590,15 +590,15 @@ class TestSessionStartService:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        resource_group_name: ResourceGroupName,
+        scaling_group_fixture: str,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
         """A login session token in the request does not reach the app proxy coordinator."""
         async with db_engine.begin() as conn:
             await conn.execute(
-                sa.update(resource_groups)
-                .where(resource_groups.c.name == resource_group_name)
+                sa.update(scaling_groups)
+                .where(scaling_groups.c.name == scaling_group_fixture)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
             await conn.execute(
@@ -631,7 +631,7 @@ class TestSessionStartService:
             return_value=mock_session_cls,
         ):
             await admin_registry.session.start_service(
-                session_seed.session_id,
+                session_seed.session_name,
                 StartServiceRequest(app="ttyd", login_session_token="login-session-token-value"),
             )
 
