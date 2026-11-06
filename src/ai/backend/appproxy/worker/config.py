@@ -844,7 +844,9 @@ class ProxyWorkerConfig(BaseSchema):
                 "Separate workers for each traffic type enables specialized scaling."
             ),
             added_version="25.9.0",
-            example=ConfigExample(local="interactive,inference", prod="interactive,inference"),
+            example=ConfigExample(
+                local='["interactive", "inference"]', prod='["interactive", "inference"]'
+            ),
         ),
     ]
     app_filters: Annotated[
