@@ -2487,7 +2487,7 @@ a user holding no permission who tries to delete their own config file is reject
 
 Given
 
-- one domain and one user, and the user holds no permission
+- one domain and one user, the user holds no permission
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -2512,13 +2512,14 @@ when a user holding READ and UPDATE deletes a config file not marked as default,
 
 Given
 
-- one domain and one user, and the user holds the READ, UPDATE permission on themselves
+- one domain and one user, the user holds one config file not marked as default, the user holds the READ, UPDATE permission on themselves
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
+  - regular user user-1: has one config file that is not marked default
   - a role assignment granting the user the READ, UPDATE permissions
     - Role user-role-1: applies only within the scope it is granted in
     - Role user-role-1: READ allowed on every user
@@ -2544,13 +2545,14 @@ when a user holding READ reads a config file not marked as default, it is reject
 
 Given
 
-- one domain and one user, and the user holds the READ permission on themselves
+- one domain and one user, the user holds one config file not marked as default, the user holds the READ permission on themselves
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
+  - regular user user-1: has one config file that is not marked default
   - a role assignment granting the user the READ permissions
     - Role user-role-1: applies only within the scope it is granted in
     - Role user-role-1: READ allowed on every user
@@ -2573,7 +2575,7 @@ a user holding no permission who tries to read their own config file is rejected
 
 Given
 
-- one domain and one user, and the user holds no permission
+- one domain and one user, the user holds no permission
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -2600,7 +2602,7 @@ when a user holding READ lists the config files of theirs marked as default, an 
 
 Given
 
-- one domain and one user, and the user holds the READ permission on themselves
+- one domain and one user, the user holds the READ permission on themselves
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -2629,7 +2631,7 @@ a user holding no permission who tries to list their own config files is rejecte
 
 Given
 
-- one domain and one user, and the user holds no permission
+- one domain and one user, the user holds no permission
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -2656,7 +2658,7 @@ a user holding no permission who tries to change their own config file is reject
 
 Given
 
-- one domain and one user, and the user holds no permission
+- one domain and one user, the user holds no permission
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -2681,13 +2683,14 @@ when a user holding READ and UPDATE changes a config file not marked as default,
 
 Given
 
-- one domain and one user, and the user holds the READ, UPDATE permission on themselves
+- one domain and one user, the user holds one config file not marked as default, the user holds the READ, UPDATE permission on themselves
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
+  - regular user user-1: has one config file that is not marked default
   - a role assignment granting the user the READ, UPDATE permissions
     - Role user-role-1: applies only within the scope it is granted in
     - Role user-role-1: READ allowed on every user
@@ -6098,7 +6101,7 @@ when a user holding UPDATE on themselves writes a config file, an empty response
 
 Given
 
-- one domain and one user, and the user holds the UPDATE permission on themselves
+- one domain and one user, the user holds the UPDATE permission on themselves
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -6116,8 +6119,8 @@ When
 
 Then
 
-- the file is saved and an empty response comes back
-  - response = 'CreateDotfileResponse'
+- an empty response comes back
+  - response = {}
 
 <a id="config_files-a-config-file-in-a-place-the-manager-keeps-is-refused"></a>
 
@@ -6127,7 +6130,7 @@ when a user holding UPDATE tries to write a config file where the manager keeps 
 
 Given
 
-- one domain and one user, and the user holds the UPDATE permission on themselves
+- one domain and one user, the user holds the UPDATE permission on themselves
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -6156,7 +6159,7 @@ a user holding no permission who tries to write their own config file is rejecte
 
 Given
 
-- one domain and one user, and the user holds no permission
+- one domain and one user, the user holds no permission
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
