@@ -30,7 +30,7 @@ from ai.backend.common import config, utils
 from ai.backend.common import validators as tx
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.exception import BackendAIError
+from ai.backend.common.exception import BackendAIError, InvalidConfigError
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.utils import Fstab
@@ -317,14 +317,18 @@ async def watcher_server(
     )
     with logger:
         etcd_config = app["config"]["etcd"]
+        if etcd_config["user"] is None:
+            raise InvalidConfigError("etcd user is required")
+        if etcd_config["password"] is None:
+            raise InvalidConfigError("etcd password is required")
         async with AsyncEtcd.create_from_config(
             EtcdConfigData(
                 namespace=etcd_config["namespace"],
                 addrs=[
                     HostPortPair(host=addr.host, port=addr.port) for addr in etcd_config["addrs"]
                 ],
-                user=etcd_config["user"] or "",
-                password=etcd_config["password"] or "",
+                user=etcd_config["user"],
+                password=etcd_config["password"],
                 keep_alive_interval=etcd_config["keep-alive-interval"],
                 keep_alive_timeout=etcd_config["keep-alive-timeout"],
             )
