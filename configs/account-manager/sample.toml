@@ -16,7 +16,7 @@ enabled = false
 # client-key = "/etc/backend.ai/etcd/client-key.pem"
 
 # Seconds to wait for the TLS handshake with an etcd member.
-handshake-timeout = 5.0
+handshake-timeout = 10.0
 
 
 [db]
