@@ -751,13 +751,28 @@ class ModelCard(graphene.ObjectType):  # type: ignore[misc]
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self | None:
+        """The model card of the vfolder, ``None`` when the requester may not read it."""
         graph_ctx: GraphQueryContext = info.context
 
         vfolder_id = resolve_entity_id(id, VFolderUUID)
-        async with graph_ctx.db.begin_readonly_session() as db_session:
-            vfolder_row = await VFolderRow.get(
-                db_session, vfolder_id, load_user=True, load_group=True
+        user = graph_ctx.user
+        client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
+        async with graph_ctx.db.connect() as db_conn:
+            permission_ctx = await get_permission_ctx(
+                db_conn, client_ctx, SystemScope(), VFolderRBACPermission.READ_ATTRIBUTE
             )
+            cond = permission_ctx.query_condition
+            if cond is None:
+                return None
+            query = (
+                sa.select(VFolderRow)
+                .where(sa.and_(cond, VFolderRow.id == vfolder_id))
+                .options(selectinload(VFolderRow.user_row), selectinload(VFolderRow.group_row))
+            )
+            async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
+                vfolder_row = await db_session.scalar(query)
+            if vfolder_row is None:
+                return None
             if vfolder_row.usage_mode != VFolderUsageMode.MODEL:
                 raise ValueError(
                     f"The vfolder is not model. expect: {VFolderUsageMode.MODEL.value}, got:"

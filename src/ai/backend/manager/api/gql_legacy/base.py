@@ -640,7 +640,7 @@ def privileged_mutation(
             elif required_role == UserRole.ADMIN:
                 if ctx.user["role"] == UserRole.SUPERADMIN:
                     permitted = True
-                elif ctx.user["role"] == UserRole.USER:
+                elif ctx.user["role"] != UserRole.ADMIN:
                     permitted = False
                 else:
                     if target_func is None:

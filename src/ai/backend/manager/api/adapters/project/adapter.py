@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from typing import assert_never
 from uuid import UUID
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
@@ -63,6 +64,7 @@ from ai.backend.manager.data.container_registry.types import ProjectAllowedRegis
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.project.types import ProjectType as DataProjectType
 from ai.backend.manager.data.user.types import UserData, UserStatus
+from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import (
     combine_conditions_and,
@@ -255,6 +257,7 @@ class ProjectAdapter(BaseAdapter):
 
     async def update(self, project_id: ProjectID, input: UpdateProjectInput) -> ProjectPayload:
         """Update an existing project."""
+        self._refuse_resource_policy_change_unless_superadmin([input])
         result = await self._project.update_project.run(
             UpdateProjectAction(updater=self._to_updater(project_id, input))
         )
@@ -281,6 +284,7 @@ class ProjectAdapter(BaseAdapter):
         self, input: PartialBulkUpdateProjectsInput
     ) -> PartialBulkPayload[ProjectNode]:
         """Update several projects, answering for each one."""
+        self._refuse_resource_policy_change_unless_superadmin([item.input for item in input.items])
         result = await self._project.partial_bulk_update.run(
             PartialBulkUpdateProjectsAction(
                 updaters=[self._to_updater(ProjectID(item.id), item.input) for item in input.items]
@@ -351,6 +355,19 @@ class ProjectAdapter(BaseAdapter):
             DeleteProjectAction(updater=ProjectSoftDeleteUpdater(project_id=data.entity_id()))
         )
         return deleted.data
+
+    @staticmethod
+    def _refuse_resource_policy_change_unless_superadmin(
+        inputs: Sequence[UpdateProjectInput],
+    ) -> None:
+        """A project's resource policy is reassigned by a superadmin only."""
+        if not any(isinstance(input.resource_policy, str) for input in inputs):
+            return
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        if not me.is_superadmin:
+            raise InsufficientPrivilege("Only a superadmin can change the resource policy")
 
     def _to_updater(self, project_id: ProjectID, input: UpdateProjectInput) -> ProjectUpdater:
         return ProjectUpdater(
