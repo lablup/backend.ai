@@ -470,15 +470,15 @@
 
 # Plugin wheels loaded when the agent starts. Wheels run without verification,
 # so keep the path writable only by trusted operators.
-# Added in 26.10.0
+# Added in 26.4.19
 [wheelhouse]
   # Whether to load the plugin wheels in the path when the server starts.
-  # Added in 26.10.0
+  # Added in 26.4.19
   allow = false
   # Directory holding the plugin wheels. A relative path starts from the current
   # directory of the server. The storage-proxy runs from the directory of its
   # config file.
-  # Added in 26.10.0
+  # Added in 26.4.19
   path = "wheelhouse"
 
 # Logging configuration for the agent. Controls log levels, output destinations,

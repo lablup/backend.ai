@@ -6,7 +6,7 @@ from typing import Annotated
 from pydantic import Field
 
 from ai.backend.common.config import BaseConfigSchema
-from ai.backend.common.meta import NEXT_RELEASE_VERSION, BackendAIConfigMeta, ConfigExample
+from ai.backend.common.meta import BackendAIConfigMeta, ConfigExample
 
 __all__ = ("WheelhouseConfig",)
 
@@ -19,7 +19,7 @@ class WheelhouseConfig(BaseConfigSchema):
         Field(default=False),
         BackendAIConfigMeta(
             description=("Whether to load the plugin wheels in the path when the server starts."),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.19",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]
@@ -32,7 +32,7 @@ class WheelhouseConfig(BaseConfigSchema):
                 "directory of the server. The storage-proxy runs from the directory of its "
                 "config file."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.19",
             example=ConfigExample(local="wheelhouse", prod="wheelhouse"),
         ),
     ]

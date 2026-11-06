@@ -44,19 +44,8 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.configs.redis import RedisConfig
-<<<<<<< HEAD
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
-=======
-from ai.backend.common.configs.storage_status_report import StorageStatusReportConfig
-from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
 from ai.backend.common.configs.wheelhouse import WheelhouseConfig
-from ai.backend.common.meta import (
-    NEXT_RELEASE_VERSION,
-    BackendAIConfigMeta,
-    CompositeType,
-    ConfigExample,
-)
->>>>>>> 974f2a52c (feat(BA-8920): load plugin wheels only when the [wheelhouse] config allows it (#16407))
+from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     GroupID,
@@ -2158,7 +2147,7 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "Plugin wheels loaded when the agent starts. Wheels run without "
                 "verification, so keep the path writable only by trusted operators."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.19",
             composite=CompositeType.FIELD,
         ),
     ]
