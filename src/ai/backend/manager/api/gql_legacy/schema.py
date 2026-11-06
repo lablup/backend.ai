@@ -36,7 +36,6 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.services.keypair_resource_policy.actions.lookup import (
     LookupKeypairResourcePolicyAction,
@@ -3113,9 +3112,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         storage_host_name: str | None = None,
     ) -> QuotaScope:
         if not quota_scope_id or not storage_host_name:
-            raise InvalidAPIParameters(
-                "Either quota_scope_id and storage_host_name has to be defined"
-            )
+            raise ValueError("Either quota_scope_id and storage_host_name has to be defined")
         graph_ctx: GraphQueryContext = info.context
         qsid = QuotaScopeID.parse(quota_scope_id)
         volumes_by_host = await graph_ctx.storage_manager.get_all_volumes()
@@ -3123,10 +3120,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             if f"{host}:{volume['name']}" == storage_host_name:
                 break
         else:
-            raise ObjectNotFound(
-                f"storage volume {storage_host_name} does not exist",
-                object_name="storage volume",
-            )
+            raise ValueError(f"storage volume {storage_host_name} does not exist")
         async with graph_ctx.db.begin_readonly_session() as sess:
             await ensure_quota_scope_accessible_by_user(sess, qsid, graph_ctx.user)
             return QuotaScope(

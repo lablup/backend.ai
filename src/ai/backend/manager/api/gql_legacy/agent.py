@@ -32,7 +32,6 @@ from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.permission_defs import AgentPermission
-from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.agent.row import AgentRow, agents
 from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.keypair.row import keypairs
@@ -665,7 +664,7 @@ async def _query_domain_groups_by_ak(
     )
     row = (await db_conn.execute(user_query)).first()
     if row is None:
-        raise UserNotFound(f"No user found for access_key: {access_key}")
+        raise ValueError(f"No user found for access_key: {access_key}")
     user_domain = domain_name if domain_name is not None else row.domain_name
     membership = user_scope_membership_query(ProjectEntityType(), row.uuid).subquery()
     query = (

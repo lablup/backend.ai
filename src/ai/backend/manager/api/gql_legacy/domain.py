@@ -31,7 +31,6 @@ from ai.backend.manager.data.permission.permission_defs import (
     DomainPermission,
     ResourceGroupPermission,
 )
-from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.domain.row import DomainRow, domains, get_permission_ctx
 from ai.backend.manager.models.domain.updaters import (
@@ -404,7 +403,7 @@ async def _ensure_sgroup_permission(
     )
     not_allowed_sgroups = set(sgroup_names) - {sg.name for sg in sgroup_models}
     if not_allowed_sgroups:
-        raise GenericForbidden(
+        raise ValueError(
             f"Not allowed to associate the domain with given scaling groups(s:{not_allowed_sgroups})"
         )
 
