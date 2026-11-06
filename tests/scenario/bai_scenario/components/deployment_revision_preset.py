@@ -315,7 +315,7 @@ class ThePresetNode:
             zip(node.preset_values, laid.runtime_variant_preset_values, strict=False)
         ):
             verdicts += [
-                Held(
+                Held[UUID](
                     f"{at}preset_values[{i}].preset_id",
                     value.preset_id,
                     SameAs(
