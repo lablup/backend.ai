@@ -6,6 +6,11 @@ from uuid import UUID, uuid4
 
 import pytest
 
+<<<<<<< HEAD
+=======
+from ai.backend.common.auth.password import PasswordHashAlgorithm
+from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
+>>>>>>> 03ecfc03 (fix(BA-8947): scope logout to the owner and end login sessions on password change (#16555))
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
@@ -14,6 +19,11 @@ from ai.backend.manager.data.client_ip.masking import ClientIPMasker, ClientIPMa
 from ai.backend.manager.repositories.client_ip_masking.repository import ClientIPMaskingRepository
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
+
+
+@pytest.fixture
+def mock_valkey_session_client() -> AsyncMock:
+    return AsyncMock(spec=ValkeySessionClient)
 
 
 @pytest.fixture
