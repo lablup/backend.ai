@@ -53,7 +53,9 @@ class PortFrontend(H2Frontend[int]):
                     str(worker_config.tls_privkey),
                 ]
             else:
-                nghttpx_args.append(f"--frontend=*,{listen_port};no-tls")
+                nghttpx_args.append(
+                    f"--frontend={port_proxy_config.bind_host},{listen_port};no-tls"
+                )
 
             proc = await subprocess.create_subprocess_exec(
                 h2_config.nghttpx_path,
