@@ -8,6 +8,8 @@ from collections.abc import Iterator, Mapping
 from typing import Any, ClassVar, TypeVar, cast
 from weakref import WeakSet
 
+from pydantic import ValidationError
+
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.exception import ConfigurationError
@@ -180,6 +182,8 @@ class BasePluginContext[P: AbstractPlugin]:
             try:
                 plugin_instance = plugin_entry(plugin_config, self.local_config)
                 await plugin_instance.init(context=context)
+            except ValidationError:
+                raise
             except Exception:
                 log.exception("plugin initialization failed", plugin_name=plugin_name)
                 continue
