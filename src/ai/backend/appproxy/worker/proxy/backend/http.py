@@ -13,6 +13,16 @@ from aiohttp import ClientConnectorError, web
 from multidict import CIMultiDict
 from yarl import URL
 
+from ai.backend.appproxy.common.defs import (
+    FORWARDED_HEADER,
+    HOST_HEADER,
+    X_FORWARDED_FOR_HEADER,
+    X_FORWARDED_HOST_HEADER,
+    X_FORWARDED_PORT_HEADER,
+    X_FORWARDED_PROTO_HEADER,
+    X_RSTUDIO_PROTO_HEADER,
+    X_RSTUDIO_REQUEST_HEADER,
+)
 from ai.backend.appproxy.common.errors import ContainerConnectionRefused
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.types import Circuit
@@ -40,6 +50,16 @@ HOP_ONLY_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
     ("Trailers", 1),
     ("Transfer-Encoding", 1),
     ("Upgrade", 1),
+])
+
+_FORWARDING_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
+    (FORWARDED_HEADER, 1),
+    (X_FORWARDED_FOR_HEADER, 1),
+    (X_FORWARDED_HOST_HEADER, 1),
+    (X_FORWARDED_PORT_HEADER, 1),
+    (X_FORWARDED_PROTO_HEADER, 1),
+    (X_RSTUDIO_PROTO_HEADER, 1),
+    (X_RSTUDIO_REQUEST_HEADER, 1),
 ])
 
 
@@ -85,14 +105,17 @@ class HTTPBackend(BaseBackend):
         await self.client_pool.close()
 
     def get_x_forwarded_proto(self, request: web.Request) -> str:
-        use_tls = (
-            self.root_context.local_config.proxy_worker.tls_advertised
-            or self.root_context.local_config.proxy_worker.tls_listen
-        )
-        return request.headers.get("x-forwarded-proto") or ("https" if use_tls else "http")
+        worker_config = self.root_context.local_config.proxy_worker
+        use_tls = worker_config.tls_advertised or worker_config.tls_listen
+        configured_proto = "https" if use_tls else "http"
+        if worker_config.trusted_proxies:
+            return request.headers.get(X_FORWARDED_PROTO_HEADER) or configured_proto
+        return configured_proto
 
     def get_x_forwarded_host(self, request: web.Request) -> str | None:
-        return request.headers.get("x-forwarded-host") or request.headers.get("host")
+        if self.root_context.local_config.proxy_worker.trusted_proxies:
+            return request.headers.get(X_FORWARDED_HOST_HEADER) or request.headers.get(HOST_HEADER)
+        return request.headers.get(HOST_HEADER)
 
     @asynccontextmanager
     async def request_http(
@@ -153,26 +176,26 @@ class HTTPBackend(BaseBackend):
         # copy frontend request headers without hop-by-hop headers,
         # preserving repeated headers (multidict add(), not dict assignment)
         for key, value in frontend_request.headers.items():
-            if key not in HOP_ONLY_HEADERS:
+            if key not in HOP_ONLY_HEADERS and key not in _FORWARDING_HEADERS:
                 backend_rqst_hdrs.add(key, value)
         # overwrite proxy-related headers
-        backend_rqst_hdrs["x-forwarded-proto"] = protocol
+        backend_rqst_hdrs[X_FORWARDED_PROTO_HEADER] = protocol
         if self.circuit.app == "rstudio":
-            backend_rqst_hdrs["x-rstudio-proto"] = protocol
+            backend_rqst_hdrs[X_RSTUDIO_PROTO_HEADER] = protocol
         if host:
-            backend_rqst_hdrs["forwarded"] = f"host={host};proto={protocol}"
-            backend_rqst_hdrs["x-forwarded-host"] = host
+            backend_rqst_hdrs[FORWARDED_HEADER] = f"host={host};proto={protocol}"
+            backend_rqst_hdrs[X_FORWARDED_HOST_HEADER] = host
             if self.circuit.app == "rstudio":
-                backend_rqst_hdrs["x-rstudio-request"] = (
+                backend_rqst_hdrs[X_RSTUDIO_REQUEST_HEADER] = (
                     f"{protocol}://{host}{frontend_request.path or ''}"
                 )
             split = host.split(":")
             if len(split) >= 2:
-                backend_rqst_hdrs["x-forwarded-port"] = split[1]
+                backend_rqst_hdrs[X_FORWARDED_PORT_HEADER] = split[1]
             elif remote_port:
-                backend_rqst_hdrs["x-forwarded-port"] = remote_port
+                backend_rqst_hdrs[X_FORWARDED_PORT_HEADER] = remote_port
         if remote_host:
-            backend_rqst_hdrs["x-forwarded-for"] = f"{remote_host[0]}:{remote_host[1]}"
+            backend_rqst_hdrs[X_FORWARDED_FOR_HEADER] = f"{remote_host[0]}:{remote_host[1]}"
         if frontend_request.body_exists:
             backend_rqst_body = frontend_request.content.iter_any()
         else:
