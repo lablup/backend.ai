@@ -710,9 +710,9 @@ class AuthDBSource:
                 ).select_from(deleted.join(users, deleted.c.user_id == users.c.uuid)),
             )
             inserted = await conn.execute(insert_query.returning(lh.c.id))
-            is_deleted = inserted.first() is not None
+            owned_session_deleted = inserted.first() is not None
             await conn.commit()
-            return is_deleted
+            return owned_session_deleted
 
     @auth_db_source_resilience.apply()
     async def delete_sessions_by_user(

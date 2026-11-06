@@ -424,11 +424,11 @@ class TestLoginSessionForce:
             domain_name=sample_user.domain_name,
         )
 
-        is_deleted = await auth_db_source.delete_session_by_token(
+        owned_session_deleted = await auth_db_source.delete_session_by_token(
             created.session_token, UserID(uuid.uuid4()), LoginAttemptResult.LOGOUT
         )
 
-        assert is_deleted is False
+        assert owned_session_deleted is False
         assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1
 
     async def test_invalidate_returns_tokens_of_active_sessions(

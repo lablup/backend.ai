@@ -607,13 +607,15 @@ class AuthService:
         )
 
     async def logout(self, action: LogoutAction) -> LogoutActionResult:
-        is_deleted = await self._auth_repository.delete_login_session_by_token(
+        owned_session_deleted = await self._auth_repository.delete_login_session_by_token(
             action.session_token,
             action.user_id,
             LoginAttemptResult.LOGOUT,
             await self._recorded_client_ip(),
         )
-        if is_deleted:
+        # Logout action may involve other user session tokens (As processor only verifies user id ownership for the current session)
+        # So we only delete the session from the valkey session client if session token was owned by the user
+        if owned_session_deleted:
             await self._valkey_session_client.delete_login_session(action.session_token)
         return LogoutActionResult(success=True)
 
