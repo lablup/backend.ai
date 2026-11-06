@@ -6,6 +6,10 @@ import asyncio
 
 import click
 
+from ai.backend.client.cli.insecure_http_guard import (
+    allow_insecure_http_option,
+    reject_insecure_secret_endpoints,
+)
 from ai.backend.client.cli.v2.helpers import (
     create_v2_registry,
     load_v2_config,
@@ -190,8 +194,16 @@ def ssh() -> None:
     type=click.Path(exists=True, dir_okay=False, readable=True),
     help="Path to PEM-encoded SSH private key file.",
 )
-def ssh_register(access_key: str, public_key_file: str, private_key_file: str) -> None:
+@allow_insecure_http_option
+def ssh_register(
+    access_key: str,
+    public_key_file: str,
+    private_key_file: str,
+    allow_insecure_http: bool,
+) -> None:
     """Register (overwrite) a user's SSH keypair (superadmin only)."""
+    config = load_v2_config()
+    reject_insecure_secret_endpoints([config.endpoint], allow_insecure_http)
     from pathlib import Path
 
     from ai.backend.common.dto.manager.v2.keypair.request import AdminRegisterSSHKeypairInput
@@ -205,7 +217,7 @@ def ssh_register(access_key: str, public_key_file: str, private_key_file: str) -
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(load_v2_config())
+        registry = await create_v2_registry(config)
         try:
             result = await registry.keypair.admin_register_ssh_keypair(input_dto)
             print_result(result)

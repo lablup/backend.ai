@@ -12,7 +12,7 @@ import click
 
 from ai.backend.client.cli.insecure_http_guard import (
     allow_insecure_http_option,
-    reject_insecure_password_endpoints,
+    reject_insecure_secret_endpoints,
 )
 
 from .helpers import ProfileStore, create_v2_registry, load_v2_config
@@ -30,7 +30,7 @@ def login(force: bool, allow_insecure_http: bool) -> None:
     Requires ``endpoint-type`` to be ``session``.
     """
     config = load_v2_config()
-    reject_insecure_password_endpoints([config.endpoint], allow_insecure_http)
+    reject_insecure_secret_endpoints([config.endpoint], allow_insecure_http)
 
     user_id = os.environ.get("BACKEND_USER") or input("User ID: ")
     password = os.environ.get("BACKEND_PASSWORD") or getpass.getpass("Password: ")

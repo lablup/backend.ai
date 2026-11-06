@@ -11,7 +11,7 @@ allow_insecure_http_option = click.option(
     is_flag=True,
     default=False,
     help=(
-        "Send the password to an endpoint that is neither https nor loopback. "
+        "Send a password, key or token to an endpoint that is neither https nor loopback. "
         "Anyone on the network path can read it."
     ),
 )
@@ -28,7 +28,7 @@ def _is_loopback_host(host: str | None) -> bool:
         return False
 
 
-def reject_insecure_password_endpoints(
+def reject_insecure_secret_endpoints(
     endpoints: Iterable[URL],
     allow_insecure_http: bool,
 ) -> None:
@@ -41,7 +41,7 @@ def reject_insecure_password_endpoints(
     ]
     if insecure_endpoints:
         raise click.ClickException(
-            f"Refusing to send a password to {', '.join(insecure_endpoints)}: "
-            "it is neither https nor loopback, so the password can be read on the network. "
+            f"Refusing to send a password, key or token to {', '.join(insecure_endpoints)}: "
+            "it is neither https nor loopback, so the value can be read on the network. "
             "Use an https endpoint, or pass --allow-insecure-http to send it anyway."
         )

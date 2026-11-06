@@ -28,9 +28,10 @@ into/from the console server.
 
 .. note::
 
-   ``login``, ``update-password`` and ``update-password-no-auth`` refuse to send
-   a password to an endpoint that is neither https nor loopback, because it can
-   be read on the network.
+   Commands that send a password, key or token, such as ``login``,
+   ``update-password`` and ``update-password-no-auth``, refuse to send it to an
+   endpoint that is neither https nor loopback, because it can be read on the
+   network.
    Pass ``--allow-insecure-http`` to send it anyway.
 
 

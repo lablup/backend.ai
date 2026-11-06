@@ -7,6 +7,10 @@ import uuid
 
 import click
 
+from ai.backend.client.cli.insecure_http_guard import (
+    allow_insecure_http_option,
+    reject_insecure_secret_endpoints,
+)
 from ai.backend.client.cli.v2.helpers import (
     create_v2_registry,
     load_v2_config,
@@ -114,7 +118,8 @@ def search(
 
 @container_registry.command()
 @click.argument("body", type=str)
-def create(body: str) -> None:
+@allow_insecure_http_option
+def create(body: str, allow_insecure_http: bool) -> None:
     """Create a new container registry (superadmin only).
 
     BODY is a JSON string with container registry creation fields.
@@ -132,8 +137,12 @@ def create(body: str) -> None:
         click.echo(f"Invalid JSON: {e}", err=True)
         sys.exit(1)
 
+    config = load_v2_config()
+    if data.get("password") is not None:
+        reject_insecure_secret_endpoints([config.endpoint], allow_insecure_http)
+
     async def _run() -> None:
-        registry = await create_v2_registry(load_v2_config())
+        registry = await create_v2_registry(config)
         try:
             result = await registry.container_registry.admin_create(
                 CreateContainerRegistryInput(**data)
@@ -147,7 +156,8 @@ def create(body: str) -> None:
 
 @container_registry.command()
 @click.argument("body", type=str)
-def update(body: str) -> None:
+@allow_insecure_http_option
+def update(body: str, allow_insecure_http: bool) -> None:
     """Update a container registry (superadmin only).
 
     BODY is a JSON string with fields to update. Must include "id" (UUID).
@@ -165,8 +175,12 @@ def update(body: str) -> None:
         click.echo(f"Invalid JSON: {e}", err=True)
         sys.exit(1)
 
+    config = load_v2_config()
+    if data.get("password") is not None:
+        reject_insecure_secret_endpoints([config.endpoint], allow_insecure_http)
+
     async def _run() -> None:
-        registry = await create_v2_registry(load_v2_config())
+        registry = await create_v2_registry(config)
         try:
             result = await registry.container_registry.admin_update(
                 UpdateContainerRegistryInput(**data)

@@ -12,7 +12,7 @@ from ai.backend.client.config import get_config, local_state_path
 from ai.backend.client.exceptions import BackendClientError
 from ai.backend.client.session import Session
 
-from .insecure_http_guard import allow_insecure_http_option, reject_insecure_password_endpoints
+from .insecure_http_guard import allow_insecure_http_option, reject_insecure_secret_endpoints
 from .pretty import print_done, print_error, print_fail, print_warn
 
 
@@ -121,7 +121,7 @@ def login(allow_insecure_http: bool) -> None:
     local application data location.
     """
     config = get_config()
-    reject_insecure_password_endpoints(config.endpoints, allow_insecure_http)
+    reject_insecure_secret_endpoints(config.endpoints, allow_insecure_http)
 
     user_id = input("User ID: ")
     password = getpass.getpass()
@@ -192,7 +192,7 @@ def update_password(
     if config.endpoint_type != "session":
         print_warn('To update password, your endpoint type must be "session".')
         raise click.Abort()
-    reject_insecure_password_endpoints(config.endpoints, allow_insecure_http)
+    reject_insecure_secret_endpoints(config.endpoints, allow_insecure_http)
 
     with Session() as session:
         try:
@@ -214,7 +214,7 @@ def update_password_no_auth(
     """
     Update user's password. This is used to update `EXPIRED` password only.
     """
-    reject_insecure_password_endpoints(get_config().endpoints, allow_insecure_http)
+    reject_insecure_secret_endpoints(get_config().endpoints, allow_insecure_http)
 
     with Session() as session:
         try:

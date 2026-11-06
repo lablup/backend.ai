@@ -6,6 +6,10 @@ import asyncio
 
 import click
 
+from ai.backend.client.cli.insecure_http_guard import (
+    allow_insecure_http_option,
+    reject_insecure_secret_endpoints,
+)
 from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
 
 
@@ -20,20 +24,24 @@ def reservoir_registry() -> None:
 @click.option("--access-key", required=True, help="Access key for authentication.")
 @click.option("--secret-key", required=True, help="Secret key for authentication.")
 @click.option("--api-version", required=True, help="API version string.")
+@allow_insecure_http_option
 def create(
     name: str,
     endpoint: str,
     access_key: str,
     secret_key: str,
     api_version: str,
+    allow_insecure_http: bool,
 ) -> None:
     """Create a new Reservoir registry."""
+    config = load_v2_config()
+    reject_insecure_secret_endpoints([config.endpoint], allow_insecure_http)
     from ai.backend.common.dto.manager.v2.reservoir_registry.request import (
         CreateReservoirRegistryInput,
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(load_v2_config())
+        registry = await create_v2_registry(config)
         try:
             result = await registry.reservoir_registry.create(
                 CreateReservoirRegistryInput(
@@ -97,6 +105,7 @@ def get(registry_id: str) -> None:
 @click.option("--access-key", default=None, help="Updated access key.")
 @click.option("--secret-key", default=None, help="Updated secret key.")
 @click.option("--api-version", default=None, help="Updated API version.")
+@allow_insecure_http_option
 def update(
     registry_id: str,
     name: str | None,
@@ -104,8 +113,12 @@ def update(
     access_key: str | None,
     secret_key: str | None,
     api_version: str | None,
+    allow_insecure_http: bool,
 ) -> None:
     """Update an existing Reservoir registry."""
+    config = load_v2_config()
+    if secret_key is not None:
+        reject_insecure_secret_endpoints([config.endpoint], allow_insecure_http)
     from uuid import UUID
 
     from ai.backend.common.dto.manager.v2.reservoir_registry.request import (
@@ -113,7 +126,7 @@ def update(
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(load_v2_config())
+        registry = await create_v2_registry(config)
         try:
             result = await registry.reservoir_registry.update(
                 UpdateReservoirRegistryInput(
