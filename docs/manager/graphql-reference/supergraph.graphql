@@ -679,6 +679,16 @@ enum AgentResourceSlotOrderField
   USED @join__enumValue(graph: STRAWBERRY)
 }
 
+"""Added in 26.10.0. How agents are chosen for a session's kernels."""
+enum AgentSelectionStrategy
+  @join__type(graph: STRAWBERRY)
+{
+  DISPERSED @join__enumValue(graph: STRAWBERRY)
+  CONCENTRATED @join__enumValue(graph: STRAWBERRY)
+  ROUNDROBIN @join__enumValue(graph: STRAWBERRY)
+  LEGACY @join__enumValue(graph: STRAWBERRY)
+}
+
 """Added in 25.15.0. Aggregated resource statistics for an agent."""
 type AgentStats
   @join__type(graph: STRAWBERRY)
@@ -5218,6 +5228,9 @@ input CreateResourceGroupInput
   Added in 26.9.0. Make this the default resource group. At most one resource group may hold the flag, so this is rejected while another one holds it; clear that one first.
   """
   isDefault: Boolean! = false
+
+  """Added in 26.10.0. Scheduler options. Omit to use the defaults."""
+  schedulerOptions: CreateResourceGroupSchedulerOptionsInput = null
 }
 
 """Added in 26.4.2. Payload for resource group creation."""
@@ -5226,6 +5239,50 @@ type CreateResourceGroupPayload
 {
   """The created resource group."""
   resourceGroup: ResourceGroup!
+}
+
+"""
+Added in 26.10.0. Input for the config section of a new resource group's scheduler options.
+"""
+input CreateResourceGroupSchedulerOptionsConfigInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Number of scheduling retries before a pending session is skipped."""
+  numRetriesToSkip: Int = null
+}
+
+"""Added in 26.10.0. Input for a new resource group's scheduler options."""
+input CreateResourceGroupSchedulerOptionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Added in 26.10.0. Session types that may be created in the resource group.
+  """
+  allowedSessionTypes: [SessionTypes!]! = [INTERACTIVE, BATCH, INFERENCE]
+
+  """
+  Seconds a session may stay pending before it is cancelled (0 = no timeout).
+  """
+  pendingTimeout: Float! = 0
+
+  """The config section of the scheduler options."""
+  config: CreateResourceGroupSchedulerOptionsConfigInput = null
+
+  """How agents are chosen for a session's kernels."""
+  agentSelectionStrategy: AgentSelectionStrategy! = DISPERSED
+
+  """Added in 26.10.0. Options of the agent selector."""
+  agentSelectorConfig: JSON! = {}
+
+  """
+  Whether an agent may start a kernel that fragments a fractional resource request.
+  """
+  allowFractionalResourceFragmentation: Boolean! = true
+
+  """
+  Added in 26.10.0. Route health statuses (healthy/unhealthy/degraded) whose routes are cleaned up automatically.
+  """
+  routeCleanupTargetStatuses: [String!]! = ["unhealthy"]
 }
 
 type CreateResourcePreset
@@ -23370,6 +23427,55 @@ type ResourceGroupSchedulerConfig
 
   """Added in 26.3.0. Preemption configuration for this resource group."""
   preemption: PreemptionConfig!
+
+  """
+  Added in 26.10.0. Scheduler options other than the preemption configuration.
+  """
+  options: ResourceGroupSchedulerOptions!
+}
+
+"""
+Added in 26.10.0. Scheduler options of a resource group, other than the preemption configuration.
+"""
+type ResourceGroupSchedulerOptions
+  @join__type(graph: STRAWBERRY)
+{
+  """Session types that may be created in the resource group."""
+  allowedSessionTypes: [SessionTypes!]!
+
+  """
+  Seconds a session may stay pending before it is cancelled (0 = no timeout).
+  """
+  pendingTimeout: Float!
+
+  """The config section of the scheduler options."""
+  config: ResourceGroupSchedulerOptionsConfig!
+
+  """How agents are chosen for a session's kernels."""
+  agentSelectionStrategy: AgentSelectionStrategy!
+
+  """Options of the agent selector."""
+  agentSelectorConfig: JSON!
+
+  """
+  Whether an agent may start a kernel that fragments a fractional resource request.
+  """
+  allowFractionalResourceFragmentation: Boolean!
+
+  """
+  Route health statuses (healthy/unhealthy/degraded) whose routes are cleaned up automatically.
+  """
+  routeCleanupTargetStatuses: [String!]!
+}
+
+"""
+Added in 26.10.0. The config section of a resource group's scheduler options.
+"""
+type ResourceGroupSchedulerOptionsConfig
+  @join__type(graph: STRAWBERRY)
+{
+  """Number of scheduling retries before a pending session is skipped."""
+  numRetriesToSkip: Int
 }
 
 """

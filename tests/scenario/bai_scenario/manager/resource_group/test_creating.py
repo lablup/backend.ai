@@ -9,9 +9,14 @@ from typing import Any, override
 import pytest
 
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.resource_group.request import CreateResourceGroupInput
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    CreateResourceGroupInput,
+    CreateResourceGroupSchedulerOptionsConfigInput,
+    CreateResourceGroupSchedulerOptionsInput,
+)
 from ai.backend.common.dto.manager.v2.resource_group.response import ResourceGroupDetailNode
 from ai.backend.common.exception import ResourceGroupConflict
+from ai.backend.common.types import AgentSelectionStrategy, SessionTypes
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource import DefaultResourceGroupAlreadyExists
@@ -69,6 +74,52 @@ class Creating(When[Any, ResourceGroupAdapter, ResourceGroupDetailNode]):
 
 
 @dataclass(frozen=True)
+class CreatingWithSchedulerOptions(When[ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]):
+    """스케줄러 옵션을 지정해 그룹을 만든다."""
+
+    named: str
+
+    @override
+    def operation(self) -> str:
+        return "create"
+
+    @override
+    def describe(self, laid: ACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 {self.named}을 허용 세션 타입, 대기 제한 시간, "
+            "대기 세션 건너뛰기 재시도 횟수, 에이전트 선택 전략, 분할 자원 조각화 허용 여부, "
+            "자동 정리할 라우트 상태를 지정해 생성합니다",
+            english=(
+                f"{laid.caller.username} creates {self.named} with the allowed session types, "
+                "the pending timeout, the retries before skipping a pending session, the agent "
+                "selection strategy, whether fractional resources may fragment and the route "
+                "statuses to clean up"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: ResourceGroupAdapter, laid: ACaller) -> ResourceGroupDetailNode:
+        with ActingAs(laid.caller):
+            payload = await adapter.create(
+                CreateResourceGroupInput(
+                    name=self.named,
+                    domain_name=laid.caller.domain_name,
+                    scheduler_options=CreateResourceGroupSchedulerOptionsInput(
+                        allowed_session_types=[SessionTypes.BATCH],
+                        pending_timeout=60,
+                        config=CreateResourceGroupSchedulerOptionsConfigInput(
+                            num_retries_to_skip=3
+                        ),
+                        agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
+                        allow_fractional_resource_fragmentation=False,
+                        route_cleanup_target_statuses=["unhealthy", "degraded"],
+                    ),
+                )
+            )
+        return payload.resource_group
+
+
+@dataclass(frozen=True)
 class TheSuperadminMakesAGroup(
     Scenario[TestSeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
@@ -101,6 +152,49 @@ class TheSuperadminMakesAGroup(
     @override
     def then(self) -> Then[ACaller, ResourceGroupDetailNode]:
         return TheNewGroupNode(started=self.started, named="compute")
+
+
+@dataclass(frozen=True)
+class TheSuperadminMakesAGroupWithItsSchedulerOptions(
+    Scenario[TestSeedingSession, ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-makes-a-resource-group-with-its-scheduler-options"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 스케줄러 옵션을 지정해 자원 그룹을 생성하면 지정한 옵션으로 채워진 "
+            "그룹 전체가 반환됩니다",
+            english=(
+                "when the superadmin creates a resource group with its scheduler options, the "
+                "whole group comes back with those options"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ACaller]:
+        return SomeoneAlone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return CreatingWithSchedulerOptions(named="batch-only")
+
+    @override
+    def then(self) -> Then[ACaller, ResourceGroupDetailNode]:
+        return TheNewGroupNode(
+            started=self.started,
+            named="batch-only",
+            allowed_session_types=(SessionTypes.BATCH,),
+            pending_timeout=60.0,
+            num_retries_to_skip=3,
+            agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
+            allow_fractional_resource_fragmentation=False,
+            route_cleanup_target_statuses=("unhealthy", "degraded"),
+        )
 
 
 @dataclass(frozen=True)
@@ -264,6 +358,7 @@ class TheMonitorMayNotCreate(
 
 SCENARIOS: list[CreatingStep] = [
     TheSuperadminMakesAGroup(started=datetime.now(UTC)),
+    TheSuperadminMakesAGroupWithItsSchedulerOptions(started=datetime.now(UTC)),
     ADefaultGroupIsMade(started=datetime.now(UTC)),
     ANameAnotherGroupHoldsIsRefused(),
     # TODO(BA-7946): the create path maps every unique violation to a name conflict, so a
