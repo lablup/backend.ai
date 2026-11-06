@@ -7,6 +7,7 @@ from typing import Any, override
 import click
 from yarl import URL
 
+from ai.backend.cli.extensions import ExtendedCommandGroup
 from ai.backend.client.config import get_config
 
 _ALLOW_INSECURE_HTTP_OPTION = click.Option(
@@ -68,3 +69,7 @@ class SecureEndpointCommand(click.Command):
             how_to_allow="pass --allow-insecure-http to run it anyway",
         )
         return super().invoke(ctx)
+
+
+class SecureEndpointGroup(ExtendedCommandGroup):
+    command_class = SecureEndpointCommand
