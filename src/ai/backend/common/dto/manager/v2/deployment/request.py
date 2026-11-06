@@ -58,6 +58,7 @@ from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNes
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsDTOInput
 from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.common.tristate.unset import UNSET, Unset
+from ai.backend.common.typed_validators import HealthCheckPath
 from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
@@ -135,7 +136,7 @@ __all__ = (
 class ModelHealthCheckInput(BaseRequestModel):
     enable: bool = False
     interval: float | None = None
-    path: str | None = None
+    path: HealthCheckPath | None = None
     max_retries: int | None = None
     max_wait_time: float | None = None
     expected_status_code: int | None = None
