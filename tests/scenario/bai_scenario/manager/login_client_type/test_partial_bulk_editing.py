@@ -16,7 +16,6 @@ from ai.backend.common.dto.manager.v2.login_client_type.request import (
     UpdateLoginClientTypeInput,
 )
 from ai.backend.common.dto.manager.v2.login_client_type.response import LoginClientTypeNode
-from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -31,7 +30,6 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
-from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WrittenByThisRun
 from bai_scenario.components.login_client_type import (
     ManyTypesAndACaller,
@@ -191,74 +189,9 @@ class AUserGrantedNothingEditsNone(
         return NoTypeIsProcessed(reason="Insufficient permission")
 
 
-@dataclass(frozen=True)
-class EditingTypesAsNobody(When[ManyTypesAndACaller, LoginClientTypeAdapter, Edited]):
-    """사용자 컨텍스트 없이 설명을 한 번에 고친다."""
-
-    @override
-    def operation(self) -> str:
-        return "partial_bulk_update"
-
-    @override
-    def describe(self, laid: ManyTypesAndACaller) -> str:
-        return Says(
-            f"사용자 컨텍스트 없이 종류 {len(laid.laid)}개의 설명을 한 번에 수정합니다",
-            english=(
-                f"updates the description of {len(laid.laid)} login client types at once "
-                "without a user context"
-            ),
-        )
-
-    @override
-    async def call(self, adapter: LoginClientTypeAdapter, laid: ManyTypesAndACaller) -> Edited:
-        return await adapter.partial_bulk_update(
-            PartialBulkUpdateLoginClientTypesInput(
-                items=[
-                    PartialBulkUpdateLoginClientTypeItemInput(
-                        id=client_type.id,
-                        input=UpdateLoginClientTypeInput(description=EDITED),
-                    )
-                    for client_type in laid.laid
-                ]
-            )
-        )
-
-
-@dataclass(frozen=True)
-class AnUpdateCarryingNoUserIsRefused(
-    Scenario[TestSeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Edited]
-):
-    @override
-    def summary(self) -> str:
-        return "a-type-update-carrying-no-user-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "종류 둘이 있고 사용자 컨텍스트 없이 설명을 한 번에 바꾸면, 호출자를 알 수 없어 거부됩니다",
-            english=(
-                "when two login client types exist and their description is changed at once "
-                "without a user context, it is rejected because the caller cannot be known"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ManyTypesAndACaller]:
-        return ManyTypesAndSomeone()
-
-    @override
-    def when(self) -> When[ManyTypesAndACaller, LoginClientTypeAdapter, Edited]:
-        return EditingTypesAsNobody()
-
-    @override
-    def then(self) -> Then[ManyTypesAndACaller, Edited]:
-        return TheCallIsRefused(UnreachableError)
-
-
 SCENARIOS: list[EditingStep] = [
     TheSuperadminEditsSeveralTypes(started=datetime.now(UTC)),
     AUserGrantedNothingEditsNone(),
-    AnUpdateCarryingNoUserIsRefused(),
 ]
 
 

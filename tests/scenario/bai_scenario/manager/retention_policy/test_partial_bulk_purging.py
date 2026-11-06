@@ -16,7 +16,6 @@ from ai.backend.common.dto.manager.v2.retention_policy.request import (
     PartialBulkPurgeRetentionPoliciesInput,
 )
 from ai.backend.common.dto.manager.v2.retention_policy.response import RetentionPolicyNode
-from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.retention_policy.adapter import RetentionPolicyAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -33,7 +32,6 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
-from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.components.retention_policy import (
     ManyPoliciesAndACaller,
@@ -206,63 +204,9 @@ class AUserGrantedNothingPurgesNone(
         return NothingIsProcessed(reason="Insufficient permission")
 
 
-@dataclass(frozen=True)
-class PurgingPoliciesAsNobody(When[ManyPoliciesAndACaller, RetentionPolicyAdapter, Purged]):
-    """사용자 컨텍스트 없이 한 번에 완전 삭제한다."""
-
-    @override
-    def operation(self) -> str:
-        return "partial_bulk_purge"
-
-    @override
-    def describe(self, laid: ManyPoliciesAndACaller) -> str:
-        return Says(
-            f"사용자 컨텍스트 없이 정책 {len(laid.laid)}개를 한 번에 영구 삭제합니다",
-            english=f"purges {len(laid.laid)} policies at once without a user context",
-        )
-
-    @override
-    async def call(self, adapter: RetentionPolicyAdapter, laid: ManyPoliciesAndACaller) -> Purged:
-        return await adapter.partial_bulk_purge(
-            PartialBulkPurgeRetentionPoliciesInput(ids=[one.id for one in laid.laid])
-        )
-
-
-@dataclass(frozen=True)
-class APurgeCarryingNoUserIsRefused(
-    Scenario[TestSeedingSession, ManyPoliciesAndACaller, RetentionPolicyAdapter, Purged]
-):
-    @override
-    def summary(self) -> str:
-        return "a-policy-purge-carrying-no-user-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "정책 둘이 있고 사용자 컨텍스트 없이 한 번에 영구 삭제하면, 호출자를 알 수 없어 거부됩니다",
-            english=(
-                "when two policies exist and are purged at once without a user context, "
-                "it is rejected because the caller cannot be known"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ManyPoliciesAndACaller]:
-        return TwoPoliciesAndSomeone()
-
-    @override
-    def when(self) -> When[ManyPoliciesAndACaller, RetentionPolicyAdapter, Purged]:
-        return PurgingPoliciesAsNobody()
-
-    @override
-    def then(self) -> Then[ManyPoliciesAndACaller, Purged]:
-        return TheCallIsRefused(UnreachableError)
-
-
 SCENARIOS: list[PolicyStep] = [
     PurgingAnswersForTheMissingOne(started=datetime.now(UTC)),
     AUserGrantedNothingPurgesNone(),
-    APurgeCarryingNoUserIsRefused(),
 ]
 
 

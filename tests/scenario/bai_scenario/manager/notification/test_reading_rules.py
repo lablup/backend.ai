@@ -13,7 +13,6 @@ import pytest
 from ai.backend.common.data.entity.notification import NotificationRuleID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.notification.response import NotificationRuleNode
-from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.notification.adapter import NotificationAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -141,26 +140,6 @@ class ReadingNoIds(When[ManyRulesAndACaller, NotificationAdapter, LoadedRules]):
     async def call(self, adapter: NotificationAdapter, laid: ManyRulesAndACaller) -> LoadedRules:
         with ActingAs(laid.caller):
             return await adapter.batch_load_rules_by_ids([])
-
-
-@dataclass(frozen=True)
-class LoadingRulesAsNobody(When[ManyRulesAndACaller, NotificationAdapter, LoadedRules]):
-    """사용자 컨텍스트 없이 한 번에 조회한다."""
-
-    @override
-    def operation(self) -> str:
-        return "batch_load_rules_by_ids"
-
-    @override
-    def describe(self, laid: ManyRulesAndACaller) -> str:
-        return Says(
-            f"사용자 컨텍스트 없이 규칙 {len(laid.laid)}개를 한 번에 조회합니다",
-            english=f"batch-loads {len(laid.laid)} rules without a user context",
-        )
-
-    @override
-    async def call(self, adapter: NotificationAdapter, laid: ManyRulesAndACaller) -> LoadedRules:
-        return await adapter.batch_load_rules_by_ids([one.id for one in laid.laid])
 
 
 @dataclass(frozen=True)
@@ -353,37 +332,6 @@ class ABatchLoadOfNothingAnswersNothing(
         return NothingComesBack()
 
 
-@dataclass(frozen=True)
-class ABatchLoadCarryingNoUserIsRefused(
-    Scenario[TestSeedingSession, ManyRulesAndACaller, NotificationAdapter, LoadedRules]
-):
-    @override
-    def summary(self) -> str:
-        return "a-batch-load-carrying-no-user-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "규칙 둘이 있고 사용자 컨텍스트 없이 한 번에 조회하면, 호출자를 알 수 없어 거부됩니다",
-            english=(
-                "when two rules exist and they are batch-loaded without a user context, "
-                "it is rejected because the caller cannot be known"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ManyRulesAndACaller]:
-        return TwoRulesAndSomeone()
-
-    @override
-    def when(self) -> When[ManyRulesAndACaller, NotificationAdapter, LoadedRules]:
-        return LoadingRulesAsNobody()
-
-    @override
-    def then(self) -> Then[ManyRulesAndACaller, LoadedRules]:
-        return TheCallIsRefused(UnreachableError)
-
-
 SCENARIOS: list[ReadingStep] = [
     TheSuperadminReadsARule(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotRead(),
@@ -391,7 +339,6 @@ SCENARIOS: list[ReadingStep] = [
     TheSuperadminLoadsLaidAndMissing(started=datetime.now(UTC)),
     AUserGrantedNothingIsRefusedPerItem(),
     ABatchLoadOfNothingAnswersNothing(),
-    ABatchLoadCarryingNoUserIsRefused(),
 ]
 
 

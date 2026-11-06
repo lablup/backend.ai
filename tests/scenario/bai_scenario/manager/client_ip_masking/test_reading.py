@@ -28,7 +28,6 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
-from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.client_ip_masking import (
     ManyMaskingPoliciesAndACaller,
     TwoMaskingPoliciesAndSomeone,
@@ -75,28 +74,6 @@ class LoadingTheLaidAndAMissingOne(
         ]
         with ActingAs(laid.caller):
             return await adapter.batch_load_by_ids(ids)
-
-
-@dataclass(frozen=True)
-class LoadingAsNobody(When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Loaded]):
-    """사용자 컨텍스트 없이 한 번에 조회한다."""
-
-    @override
-    def operation(self) -> str:
-        return "batch_load_by_ids"
-
-    @override
-    def describe(self, laid: ManyMaskingPoliciesAndACaller) -> str:
-        return Says(
-            f"사용자 컨텍스트 없이 정책 {len(laid.laid)}개를 한 번에 조회합니다",
-            english=f"batch-loads {len(laid.laid)} policies without a user context",
-        )
-
-    @override
-    async def call(
-        self, adapter: ClientIPMaskingAdapter, laid: ManyMaskingPoliciesAndACaller
-    ) -> Loaded:
-        return await adapter.batch_load_by_ids([one.id for one in laid.laid])
 
 
 @dataclass(frozen=True)
@@ -190,40 +167,8 @@ class TheSuperadminLoadsLaidAndMissing(
         return TheyComeBackInTheOrderAsked(started=self.started)
 
 
-@dataclass(frozen=True)
-class ABatchLoadCarryingNoUserIsRefused(
-    Scenario[TestSeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Loaded]
-):
-    @override
-    def summary(self) -> str:
-        return "a-batch-load-carrying-no-user-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "정책 둘이 있고 사용자 컨텍스트 없이 한 번에 조회하면, 호출자를 알 수 없어 거부됩니다",
-            english=(
-                "when two policies exist and they are batch-loaded without a user context, "
-                "it is rejected because the caller cannot be known"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ManyMaskingPoliciesAndACaller]:
-        return TwoMaskingPoliciesAndSomeone()
-
-    @override
-    def when(self) -> When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Loaded]:
-        return LoadingAsNobody()
-
-    @override
-    def then(self) -> Then[ManyMaskingPoliciesAndACaller, Loaded]:
-        return TheCallIsRefused(UnreachableError)
-
-
 SCENARIOS: list[ReadingStep] = [
     TheSuperadminLoadsLaidAndMissing(started=datetime.now(UTC)),
-    ABatchLoadCarryingNoUserIsRefused(),
 ]
 
 

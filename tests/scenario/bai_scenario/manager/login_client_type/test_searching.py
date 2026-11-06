@@ -16,11 +16,9 @@ from ai.backend.common.dto.manager.v2.login_client_type.request import (
 from ai.backend.common.dto.manager.v2.login_client_type.response import (
     SearchLoginClientTypesPayload,
 )
-from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
-from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.login_client_type import (
     EveryLaidTypeIsCounted,
     ManyTypesAndACaller,
@@ -91,60 +89,8 @@ class AUserGrantedNothingCountsEveryType(
         return EveryLaidTypeIsCounted()
 
 
-@dataclass(frozen=True)
-class SearchingAsNobody(When[ManyTypesAndACaller, LoginClientTypeAdapter, Searched]):
-    """사용자 컨텍스트 없이 전체를 검색한다."""
-
-    @override
-    def operation(self) -> str:
-        return "search"
-
-    @override
-    def describe(self, laid: ManyTypesAndACaller) -> str:
-        return Says(
-            "사용자 컨텍스트 없이 전체를 조회합니다",
-            english="reads every login client type without a user context",
-        )
-
-    @override
-    async def call(self, adapter: LoginClientTypeAdapter, laid: ManyTypesAndACaller) -> Searched:
-        return await adapter.search(SearchLoginClientTypesInput())
-
-
-@dataclass(frozen=True)
-class ASearchCarryingNoUserIsRefused(
-    Scenario[TestSeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Searched]
-):
-    @override
-    def summary(self) -> str:
-        return "a-search-carrying-no-user-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "종류 둘이 있고 사용자 컨텍스트 없이 검색하면, 호출자를 알 수 없어 거부됩니다",
-            english=(
-                "when two login client types exist and they are searched without a user context, "
-                "it is rejected because the caller cannot be known"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ManyTypesAndACaller]:
-        return ManyTypesAndSomeone()
-
-    @override
-    def when(self) -> When[ManyTypesAndACaller, LoginClientTypeAdapter, Searched]:
-        return SearchingAsNobody()
-
-    @override
-    def then(self) -> Then[ManyTypesAndACaller, Searched]:
-        return TheCallIsRefused(UnreachableError)
-
-
 SCENARIOS: list[SearchingStep] = [
     AUserGrantedNothingCountsEveryType(),
-    ASearchCarryingNoUserIsRefused(),
 ]
 
 

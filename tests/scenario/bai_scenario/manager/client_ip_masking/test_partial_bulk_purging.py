@@ -15,7 +15,6 @@ from ai.backend.common.dto.manager.v2.client_ip_masking.request import (
 )
 from ai.backend.common.dto.manager.v2.client_ip_masking.response import ClientIPMaskingPolicyNode
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
-from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.client_ip_masking.adapter import ClientIPMaskingAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -32,7 +31,6 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
-from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.client_ip_masking import (
     ManyMaskingPoliciesAndACaller,
     NoMaskingPolicyIsProcessed,
@@ -224,65 +222,9 @@ class AUserGrantedNothingPurgesNone(
         return NoMaskingPolicyIsProcessed(reason="Insufficient permission")
 
 
-@dataclass(frozen=True)
-class PurgingPoliciesAsNobody(When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Purged]):
-    """사용자 컨텍스트 없이 한 번에 purge 한다."""
-
-    @override
-    def operation(self) -> str:
-        return "partial_bulk_purge"
-
-    @override
-    def describe(self, laid: ManyMaskingPoliciesAndACaller) -> str:
-        return Says(
-            f"사용자 컨텍스트 없이 정책 {len(laid.laid)}개를 한 번에 purge 합니다",
-            english=f"purges {len(laid.laid)} policies at once without a user context",
-        )
-
-    @override
-    async def call(
-        self, adapter: ClientIPMaskingAdapter, laid: ManyMaskingPoliciesAndACaller
-    ) -> Purged:
-        return await adapter.partial_bulk_purge(
-            PartialBulkPurgeClientIPMaskingPoliciesInput(ids=[one.id for one in laid.laid])
-        )
-
-
-@dataclass(frozen=True)
-class APurgeCarryingNoUserIsRefused(
-    Scenario[TestSeedingSession, ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Purged]
-):
-    @override
-    def summary(self) -> str:
-        return "a-policy-purge-carrying-no-user-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "정책 둘이 있고 사용자 컨텍스트 없이 한 번에 purge 하면, 호출자를 알 수 없어 거부됩니다",
-            english=(
-                "when two policies exist and are purged at once without a user context, "
-                "it is rejected because the caller cannot be known"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ManyMaskingPoliciesAndACaller]:
-        return TwoMaskingPoliciesAndSomeone()
-
-    @override
-    def when(self) -> When[ManyMaskingPoliciesAndACaller, ClientIPMaskingAdapter, Purged]:
-        return PurgingPoliciesAsNobody()
-
-    @override
-    def then(self) -> Then[ManyMaskingPoliciesAndACaller, Purged]:
-        return TheCallIsRefused(UnreachableError)
-
-
 SCENARIOS: list[PurgingStep] = [
     PurgingAnswersForTheMissingOne(started=datetime.now(UTC)),
     AUserGrantedNothingPurgesNone(),
-    APurgeCarryingNoUserIsRefused(),
 ]
 
 

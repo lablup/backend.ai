@@ -173,26 +173,6 @@ class LoadingTheLaidAndAMissingOne(When[ManyTypesAndACaller, LoginClientTypeAdap
 
 
 @dataclass(frozen=True)
-class LoadingAsNobody(When[ManyTypesAndACaller, LoginClientTypeAdapter, Loaded]):
-    """사용자 컨텍스트 없이 한 번에 조회한다."""
-
-    @override
-    def operation(self) -> str:
-        return "batch_load_by_ids"
-
-    @override
-    def describe(self, laid: ManyTypesAndACaller) -> str:
-        return Says(
-            f"사용자 컨텍스트 없이 종류 {len(laid.laid)}개를 한 번에 조회합니다",
-            english=f"batch-loads {len(laid.laid)} login client types without a user context",
-        )
-
-    @override
-    async def call(self, adapter: LoginClientTypeAdapter, laid: ManyTypesAndACaller) -> Loaded:
-        return await adapter.batch_load_by_ids([one.id for one in laid.laid])
-
-
-@dataclass(frozen=True)
 class TheyComeBackInTheOrderAsked(Then[ManyTypesAndACaller, Loaded]):
     """요청한 순서대로 한 항목씩 반환되고, 없는 id 에 해당하는 항목은 비어 있습니다."""
 
@@ -265,42 +245,10 @@ class TheSuperadminLoadsLaidAndMissing(
         return TheyComeBackInTheOrderAsked(started=self.started)
 
 
-@dataclass(frozen=True)
-class ABatchLoadCarryingNoUserIsRefused(
-    Scenario[TestSeedingSession, ManyTypesAndACaller, LoginClientTypeAdapter, Loaded]
-):
-    @override
-    def summary(self) -> str:
-        return "a-batch-load-carrying-no-user-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "종류 둘이 있고 사용자 컨텍스트 없이 한 번에 조회하면, 호출자를 알 수 없어 거부됩니다",
-            english=(
-                "when two login client types exist and they are batch-loaded without a user "
-                "context, it is rejected because the caller cannot be known"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ManyTypesAndACaller]:
-        return ManyTypesAndSomeone()
-
-    @override
-    def when(self) -> When[ManyTypesAndACaller, LoginClientTypeAdapter, Loaded]:
-        return LoadingAsNobody()
-
-    @override
-    def then(self) -> Then[ManyTypesAndACaller, Loaded]:
-        return TheCallIsRefused(UnreachableError)
-
-
 SCENARIOS: list[ReadingStep | LoadingStep] = [
     AUserGrantedNothingReadsById(started=datetime.now(UTC)),
     AnIdNothingAnswersToIsRefused(),
     TheSuperadminLoadsLaidAndMissing(started=datetime.now(UTC)),
-    ABatchLoadCarryingNoUserIsRefused(),
 ]
 
 

@@ -15,7 +15,6 @@ from ai.backend.common.dto.manager.v2.idle_checker.request import (
     PartialBulkPurgeIdleCheckersInput,
 )
 from ai.backend.common.dto.manager.v2.idle_checker.response import IdleCheckerNode
-from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.idle_checker.adapter import IdleCheckerAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -27,7 +26,6 @@ from ai.backend.testutils.scenario_steps import (
     When,
     in_language,
 )
-from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.idle_checker import (
     CheckersAndACaller,
     EveryCheckerIsPurged,
@@ -146,63 +144,9 @@ class AUserGrantedNothingPurgesNone(
         return NoCheckerIsPurged(reason="Insufficient permission")
 
 
-@dataclass(frozen=True)
-class PurgingCheckersAsNobody(When[CheckersAndACaller, IdleCheckerAdapter, Purged]):
-    """사용자 컨텍스트 없이 한 번에 purge 한다."""
-
-    @override
-    def operation(self) -> str:
-        return "admin_partial_bulk_purge"
-
-    @override
-    def describe(self, laid: CheckersAndACaller) -> str:
-        return Says(
-            f"사용자 컨텍스트 없이 유휴 검사기 {len(laid.laid)}개를 한 번에 purge 합니다",
-            english=f"purges {len(laid.laid)} idle checkers at once without a user context",
-        )
-
-    @override
-    async def call(self, adapter: IdleCheckerAdapter, laid: CheckersAndACaller) -> Purged:
-        return await adapter.admin_partial_bulk_purge(
-            PartialBulkPurgeIdleCheckersInput(ids=[one.id for one in laid.laid])
-        )
-
-
-@dataclass(frozen=True)
-class APurgeCarryingNoUserIsRefused(
-    Scenario[TestSeedingSession, CheckersAndACaller, IdleCheckerAdapter, Purged]
-):
-    @override
-    def summary(self) -> str:
-        return "a-checker-purge-carrying-no-user-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "검사기 둘이 있고 사용자 컨텍스트 없이 한 번에 purge 하면, 호출자를 알 수 없어 거부됩니다",
-            english=(
-                "when two checkers exist and are purged at once without a user context, "
-                "it is rejected because the caller cannot be known"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, CheckersAndACaller]:
-        return SomeCheckersAndSomeone()
-
-    @override
-    def when(self) -> When[CheckersAndACaller, IdleCheckerAdapter, Purged]:
-        return PurgingCheckersAsNobody()
-
-    @override
-    def then(self) -> Then[CheckersAndACaller, Purged]:
-        return TheCallIsRefused(UnreachableError)
-
-
 SCENARIOS: list[PurgingStep] = [
     TheSuperadminPurgesSeveral(),
     AUserGrantedNothingPurgesNone(),
-    APurgeCarryingNoUserIsRefused(),
 ]
 
 

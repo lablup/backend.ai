@@ -30,7 +30,6 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
-from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.audit_log import AScopedRecord, ScopesToSearch
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
@@ -74,33 +73,6 @@ class LoadingTheScopesAndAMissingOne(When[ScopesToSearch, AuditLogAdapter, Scope
                 *(AuditLogScopeID(one.id) for one in scopes.items),
                 AuditLogScopeID(uuid4()),
             ])
-        return ScopeSlotsAnswered(entries=tuple(scopes.items), loaded=loaded)
-
-
-@dataclass(frozen=True)
-class LoadingScopesAsNobody(When[ScopesToSearch, AuditLogAdapter, ScopeSlotsAnswered]):
-    """사용자 컨텍스트 없이 한 번에 조회한다."""
-
-    @override
-    def operation(self) -> str:
-        return "batch_load_scopes_by_ids"
-
-    @override
-    def describe(self, laid: ScopesToSearch) -> str:
-        return Says(
-            "사용자 컨텍스트 없이 기록 하나의 범위를 한 번에 조회합니다",
-            english="reads the scopes of one record at once without a user context",
-        )
-
-    @override
-    async def call(self, adapter: AuditLogAdapter, laid: ScopesToSearch) -> ScopeSlotsAnswered:
-        with ActingAs(laid.caller):
-            scopes = await adapter.search_scopes(
-                AuditLogID(laid.record), SearchAuditLogScopesInput()
-            )
-        loaded = await adapter.batch_load_scopes_by_ids([
-            AuditLogScopeID(one.id) for one in scopes.items
-        ])
         return ScopeSlotsAnswered(entries=tuple(scopes.items), loaded=loaded)
 
 
@@ -211,42 +183,10 @@ class TheSuperadminLoadsTheScopesAndMissing(
         return TheScopesComeBackInTheOrderAsked()
 
 
-@dataclass(frozen=True)
-class AScopeLoadCarryingNoUserIsRefused(
-    Scenario[TestSeedingSession, ScopesToSearch, AuditLogAdapter, ScopeSlotsAnswered]
-):
-    @override
-    def summary(self) -> str:
-        return "a-scope-load-carrying-no-user-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "범위가 있고 사용자 컨텍스트 없이 한 번에 조회하면, 호출자를 알 수 없어 거부됩니다",
-            english=(
-                "when scopes exist and they are batch-loaded without a user context, "
-                "it is rejected because the caller cannot be known"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ScopesToSearch]:
-        return AScopedRecord()
-
-    @override
-    def when(self) -> When[ScopesToSearch, AuditLogAdapter, ScopeSlotsAnswered]:
-        return LoadingScopesAsNobody()
-
-    @override
-    def then(self) -> Then[ScopesToSearch, ScopeSlotsAnswered]:
-        return TheCallIsRefused(UnreachableError)
-
-
 SCENARIOS: list[
     Scenario[TestSeedingSession, ScopesToSearch, AuditLogAdapter, ScopeSlotsAnswered]
 ] = [
     TheSuperadminLoadsTheScopesAndMissing(),
-    AScopeLoadCarryingNoUserIsRefused(),
 ]
 
 

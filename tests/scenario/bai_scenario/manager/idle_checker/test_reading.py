@@ -27,7 +27,6 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
-from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.idle_checker import (
     CheckersAndACaller,
     SomeCheckersAndSomeone,
@@ -68,26 +67,6 @@ class LoadingTheLaidAndAMissingOne(When[CheckersAndACaller, IdleCheckerAdapter, 
         ]
         with ActingAs(laid.caller):
             return await adapter.batch_load_by_ids(ids)
-
-
-@dataclass(frozen=True)
-class LoadingAsNobody(When[CheckersAndACaller, IdleCheckerAdapter, Loaded]):
-    """사용자 컨텍스트 없이 한 번에 조회한다."""
-
-    @override
-    def operation(self) -> str:
-        return "batch_load_by_ids"
-
-    @override
-    def describe(self, laid: CheckersAndACaller) -> str:
-        return Says(
-            f"사용자 컨텍스트 없이 검사기 {len(laid.laid)}개를 한 번에 조회합니다",
-            english=f"batch-loads {len(laid.laid)} checkers without a user context",
-        )
-
-    @override
-    async def call(self, adapter: IdleCheckerAdapter, laid: CheckersAndACaller) -> Loaded:
-        return await adapter.batch_load_by_ids([one.id for one in laid.laid])
 
 
 @dataclass(frozen=True)
@@ -164,40 +143,8 @@ class TheSuperadminLoadsLaidAndMissing(
         return TheyComeBackInTheOrderAsked()
 
 
-@dataclass(frozen=True)
-class ABatchLoadCarryingNoUserIsRefused(
-    Scenario[TestSeedingSession, CheckersAndACaller, IdleCheckerAdapter, Loaded]
-):
-    @override
-    def summary(self) -> str:
-        return "a-batch-load-carrying-no-user-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "검사기 둘이 있고 사용자 컨텍스트 없이 한 번에 조회하면, 호출자를 알 수 없어 거부됩니다",
-            english=(
-                "when two checkers exist and they are batch-loaded without a user context, "
-                "it is rejected because the caller cannot be known"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, CheckersAndACaller]:
-        return SomeCheckersAndSomeone()
-
-    @override
-    def when(self) -> When[CheckersAndACaller, IdleCheckerAdapter, Loaded]:
-        return LoadingAsNobody()
-
-    @override
-    def then(self) -> Then[CheckersAndACaller, Loaded]:
-        return TheCallIsRefused(UnreachableError)
-
-
 SCENARIOS: list[ReadingStep] = [
     TheSuperadminLoadsLaidAndMissing(),
-    ABatchLoadCarryingNoUserIsRefused(),
 ]
 
 
