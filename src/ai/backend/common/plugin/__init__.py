@@ -9,17 +9,29 @@ from typing import Any, ClassVar, TypeVar, cast
 from weakref import WeakSet
 
 from ai.backend.common.asyncio import cancel_tasks
+from ai.backend.common.configs.wheelhouse import WheelhouseConfig
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.exception import ConfigurationError
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.plugin.entrypoint import scan_entrypoints
+from ai.backend.plugin.entrypoint import prepare_wheelhouse, scan_entrypoints
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
     "AbstractPlugin",
     "BasePluginContext",
+    "load_configured_wheelhouse",
 )
+
+
+def load_configured_wheelhouse(wheelhouse_config: WheelhouseConfig) -> None:
+    """
+    Called by ``start-server`` before its workers start, which inherit ``sys.path``.
+    """
+    if wheelhouse_config.allow:
+        wheelhouse_path = wheelhouse_config.path.resolve()
+        prepare_wheelhouse(wheelhouse_path)
+        log.info("wheelhouse loaded: {}", wheelhouse_path)
 
 
 class AbstractPlugin(metaclass=ABCMeta):

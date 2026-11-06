@@ -204,6 +204,7 @@ from ai.backend.common.configs.otel import OTELConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.configs.service_discovery import ServiceDiscoveryConfig
+from ai.backend.common.configs.wheelhouse import WheelhouseConfig
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep, NamedStorageTarget
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
@@ -3483,6 +3484,19 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "production deployments."
             ),
             added_version="25.8.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    wheelhouse: Annotated[
+        WheelhouseConfig,
+        Field(default_factory=WheelhouseConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Plugin wheels loaded when the manager starts. Read only from the "
+                "config file: etcd values are ignored. Wheels provided here run without "
+                "verification, so keep the path writable only by trusted operators."
+            ),
+            added_version="26.4.19",
             composite=CompositeType.FIELD,
         ),
     ]
