@@ -17,7 +17,6 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
     DeploymentRevisionPresetNode,
-    PresetValueInfo,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     PresetModelConfigInfoDTO,
@@ -250,11 +249,7 @@ class ThePresetNode:
             if laid.model_definition is not None
             else None
         )
-        expected_preset_values = [
-            PresetValueInfo(preset_id=pv.preset_id, value=pv.value)
-            for pv in laid.runtime_variant_preset_values
-        ]
-        return [
+        verdicts: list[Verdict] = [
             Held[UUID](f"{at}id", node.id, SameAs(laid.id, PRESET_ID)),
             Held[UUID](f"{at}entity_id", node.entity_id, SameAs(laid.id, PRESET_ID)),
             Held(
@@ -310,10 +305,34 @@ class ThePresetNode:
                 laid.deployment_strategy_spec,
             ),
             Same(f"{at}model_definition", node.model_definition, expected_model_definition),
-            Same(f"{at}preset_values", node.preset_values, expected_preset_values),
+            Same(
+                f"{at}preset_values count",
+                len(node.preset_values),
+                len(laid.runtime_variant_preset_values),
+            ),
+        ]
+        for i, (value, pv) in enumerate(
+            zip(node.preset_values, laid.runtime_variant_preset_values, strict=False)
+        ):
+            verdicts += [
+                Held(
+                    f"{at}preset_values[{i}].preset_id",
+                    value.preset_id,
+                    SameAs(
+                        pv.preset_id,
+                        Says(
+                            "그 값이 걸린 런타임 파라미터의 id",
+                            english="the id of the runtime variant preset the value is bound to",
+                        ),
+                    ),
+                ),
+                Same(f"{at}preset_values[{i}].value", value.value, pv.value),
+            ]
+        verdicts += [
             Held(f"{at}created_at", node.created_at, SameAs(laid.created_at, PRESET_CREATED_AT)),
             Held(f"{at}updated_at", node.updated_at, updated_at),
         ]
+        return verdicts
 
 
 @dataclass(frozen=True)
