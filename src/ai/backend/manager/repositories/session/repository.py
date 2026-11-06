@@ -22,7 +22,6 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageData
-from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import (
     SessionData,
@@ -38,6 +37,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.session.db_source.db_source import SessionDBSource
+from ai.backend.manager.views.resource_group import ResourceGroupProxyTargetWithOptionalToken
 
 session_repository_resilience = Resilience(
     policies=[
@@ -205,7 +205,7 @@ class SessionRepository:
     async def resource_group_proxy_target(
         self,
         resource_group_name: str,
-    ) -> ResourceGroupProxyTarget | None:
+    ) -> ResourceGroupProxyTargetWithOptionalToken | None:
         return await self._db_source.resource_group_proxy_target(resource_group_name)
 
     @session_repository_resilience.apply()

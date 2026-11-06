@@ -6,7 +6,6 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
@@ -28,6 +27,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
+from ai.backend.manager.views.resource_group import ResourceGroupProxyTargetWithOptionalToken
 from ai.backend.testutils.db import with_tables
 
 _RESOURCE_GROUP_NAME = "default"
@@ -40,7 +40,7 @@ class _ProxyTargetCase:
     description: str
     wsproxy_addr: str | None
     wsproxy_api_token: str | None
-    expected_target: ResourceGroupProxyTarget | None
+    expected_target: ResourceGroupProxyTargetWithOptionalToken | None
 
 
 class TestResourceGroupProxyTarget:
@@ -106,7 +106,7 @@ class TestResourceGroupProxyTarget:
                 description="address_and_token",
                 wsproxy_addr=_WSPROXY_ADDR,
                 wsproxy_api_token=_WSPROXY_API_TOKEN,
-                expected_target=ResourceGroupProxyTarget(
+                expected_target=ResourceGroupProxyTargetWithOptionalToken(
                     addr=_WSPROXY_ADDR,
                     api_token=_WSPROXY_API_TOKEN,
                 ),
@@ -121,13 +121,19 @@ class TestResourceGroupProxyTarget:
                 description="no_token",
                 wsproxy_addr=_WSPROXY_ADDR,
                 wsproxy_api_token=None,
-                expected_target=ResourceGroupProxyTarget(addr=_WSPROXY_ADDR, api_token=""),
+                expected_target=ResourceGroupProxyTargetWithOptionalToken(
+                    addr=_WSPROXY_ADDR,
+                    api_token=None,
+                ),
             ),
             _ProxyTargetCase(
                 description="empty_token",
                 wsproxy_addr=_WSPROXY_ADDR,
                 wsproxy_api_token="",
-                expected_target=ResourceGroupProxyTarget(addr=_WSPROXY_ADDR, api_token=""),
+                expected_target=ResourceGroupProxyTargetWithOptionalToken(
+                    addr=_WSPROXY_ADDR,
+                    api_token="",
+                ),
             ),
         ],
         ids=lambda case: case.description,
