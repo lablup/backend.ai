@@ -1290,17 +1290,17 @@ class SessionService:
 
         if session_data.resource_group_name is None:
             raise ServiceUnavailable("Session has no scaling group assigned")
-        proxy_target = await self._session_repository.resource_group_proxy_target(
+        proxy_connection_info = await self._session_repository.resource_group_proxy_connection_info(
             session_data.resource_group_name
         )
-        if proxy_target is None:
+        if proxy_connection_info is None:
             raise ServiceUnavailable("No coordinator configured for this resource group")
-        client = self._appproxy_client_pool.load_client(proxy_target.addr, "")
+        client = self._appproxy_client_pool.load_client(proxy_connection_info.addr, "")
         wsproxy_status = await client.fetch_status()
         if wsproxy_status.advertise_address:
             wsproxy_advertise_addr = wsproxy_status.advertise_address
         else:
-            wsproxy_advertise_addr = proxy_target.addr
+            wsproxy_advertise_addr = proxy_connection_info.addr
 
         if info.kernel_host is None:
             kernel_host = urlparse(info.agent_addr).hostname
@@ -1369,13 +1369,13 @@ class SessionService:
         }
 
         conf_request_headers: dict[str, str] = {}
-        if proxy_target.api_token:
-            conf_request_headers["X-BackendAI-Token"] = proxy_target.api_token
+        if proxy_connection_info.api_token:
+            conf_request_headers["X-BackendAI-Token"] = proxy_connection_info.api_token
 
         async with (
             aiohttp.ClientSession() as req,
             req.post(
-                f"{proxy_target.addr}/v2/conf",
+                f"{proxy_connection_info.addr}/v2/conf",
                 json=body,
                 headers=conf_request_headers,
             ) as resp,

@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.manager.data.resource.types import ResourceGroupProxyConnectionInfo
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
@@ -27,7 +28,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
-from ai.backend.manager.views.resource_group import ResourceGroupProxyTargetWithOptionalToken
 from ai.backend.testutils.db import with_tables
 
 _RESOURCE_GROUP_NAME = "default"
@@ -36,14 +36,14 @@ _WSPROXY_API_TOKEN = "coordinator-api-token"
 
 
 @dataclass(frozen=True)
-class _ProxyTargetCase:
+class _ProxyConnectionInfoCase:
     description: str
     wsproxy_addr: str | None
     wsproxy_api_token: str | None
-    expected_target: ResourceGroupProxyTargetWithOptionalToken | None
+    expected_connection_info: ResourceGroupProxyConnectionInfo | None
 
 
-class TestResourceGroupProxyTarget:
+class TestResourceGroupProxyConnectionInfo:
     @pytest.fixture
     async def db_with_cleanup(
         self, database_connection: ExtendedAsyncSAEngine
@@ -80,7 +80,7 @@ class TestResourceGroupProxyTarget:
 
     @pytest.fixture
     async def resource_group_configured_by_case(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, case: _ProxyTargetCase
+        self, db_with_cleanup: ExtendedAsyncSAEngine, case: _ProxyConnectionInfoCase
     ) -> str:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -102,35 +102,35 @@ class TestResourceGroupProxyTarget:
     @pytest.mark.parametrize(
         "case",
         [
-            _ProxyTargetCase(
+            _ProxyConnectionInfoCase(
                 description="address_and_token",
                 wsproxy_addr=_WSPROXY_ADDR,
                 wsproxy_api_token=_WSPROXY_API_TOKEN,
-                expected_target=ResourceGroupProxyTargetWithOptionalToken(
+                expected_connection_info=ResourceGroupProxyConnectionInfo(
                     addr=_WSPROXY_ADDR,
                     api_token=_WSPROXY_API_TOKEN,
                 ),
             ),
-            _ProxyTargetCase(
+            _ProxyConnectionInfoCase(
                 description="no_address",
                 wsproxy_addr=None,
                 wsproxy_api_token=_WSPROXY_API_TOKEN,
-                expected_target=None,
+                expected_connection_info=None,
             ),
-            _ProxyTargetCase(
+            _ProxyConnectionInfoCase(
                 description="no_token",
                 wsproxy_addr=_WSPROXY_ADDR,
                 wsproxy_api_token=None,
-                expected_target=ResourceGroupProxyTargetWithOptionalToken(
+                expected_connection_info=ResourceGroupProxyConnectionInfo(
                     addr=_WSPROXY_ADDR,
                     api_token=None,
                 ),
             ),
-            _ProxyTargetCase(
+            _ProxyConnectionInfoCase(
                 description="empty_token",
                 wsproxy_addr=_WSPROXY_ADDR,
                 wsproxy_api_token="",
-                expected_target=ResourceGroupProxyTargetWithOptionalToken(
+                expected_connection_info=ResourceGroupProxyConnectionInfo(
                     addr=_WSPROXY_ADDR,
                     api_token="",
                 ),
@@ -138,19 +138,21 @@ class TestResourceGroupProxyTarget:
         ],
         ids=lambda case: case.description,
     )
-    async def test_returns_target_only_when_address_is_set(
+    async def test_returns_connection_info_only_when_address_is_set(
         self,
         repository: SessionRepository,
         resource_group_configured_by_case: str,
-        case: _ProxyTargetCase,
+        case: _ProxyConnectionInfoCase,
     ) -> None:
-        target = await repository.resource_group_proxy_target(resource_group_configured_by_case)
+        proxy_connection_info = await repository.resource_group_proxy_connection_info(
+            resource_group_configured_by_case
+        )
 
-        assert target == case.expected_target
+        assert proxy_connection_info == case.expected_connection_info
 
     async def test_returns_none_for_unknown_resource_group(
         self, repository: SessionRepository
     ) -> None:
-        target = await repository.resource_group_proxy_target("unknown")
+        proxy_connection_info = await repository.resource_group_proxy_connection_info("unknown")
 
-        assert target is None
+        assert proxy_connection_info is None

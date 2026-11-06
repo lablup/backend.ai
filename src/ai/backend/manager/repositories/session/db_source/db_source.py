@@ -21,6 +21,7 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.manager.data.image.types import ImageData, ImageStatus
+from ai.backend.manager.data.resource.types import ResourceGroupProxyConnectionInfo
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import (
     SessionData,
@@ -72,7 +73,6 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
 from ai.backend.manager.utils import query_userinfo
-from ai.backend.manager.views.resource_group import ResourceGroupProxyTargetWithOptionalToken
 
 
 class SessionDBSource:
@@ -407,10 +407,10 @@ class SessionDBSource:
             )
             return await conn.scalar(query)
 
-    async def resource_group_proxy_target(
+    async def resource_group_proxy_connection_info(
         self,
         resource_group_name: str,
-    ) -> ResourceGroupProxyTargetWithOptionalToken | None:
+    ) -> ResourceGroupProxyConnectionInfo | None:
         async with self._db.begin_readonly() as conn:
             query = (
                 sa.select(resource_groups.c.wsproxy_addr, resource_groups.c.wsproxy_api_token)
@@ -423,7 +423,7 @@ class SessionDBSource:
                 return None
             if not resource_group.wsproxy_addr:
                 return None
-            return ResourceGroupProxyTargetWithOptionalToken(
+            return ResourceGroupProxyConnectionInfo(
                 addr=resource_group.wsproxy_addr,
                 api_token=resource_group.wsproxy_api_token,
             )
