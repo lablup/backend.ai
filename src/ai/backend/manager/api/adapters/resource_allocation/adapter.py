@@ -43,6 +43,7 @@ from ai.backend.manager.data.resource_allocation.types import (
     ResourceGroupUsageData,
     ScopeUsageData,
 )
+from ai.backend.manager.errors.auth import AuthenticationRequired
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
@@ -127,7 +128,7 @@ class ResourceAllocationAdapter(BaseAdapter):
         """
         me = current_user()
         if me is None:
-            raise PermissionError("Not authenticated")
+            raise AuthenticationRequired()
         access_key, resource_policy = await self._resolve_keypair_context(me.user_id)
         return await self.effective_allocation(
             input=input,
@@ -160,7 +161,7 @@ class ResourceAllocationAdapter(BaseAdapter):
         """
         me = current_user()
         if me is None:
-            raise PermissionError("Not authenticated")
+            raise AuthenticationRequired()
         access_key, resource_policy = await self._resolve_keypair_context(me.user_id)
         return await self.check_preset_availability(
             input=input,
@@ -257,7 +258,7 @@ class ResourceAllocationAdapter(BaseAdapter):
         """Get effective allocation for the current user."""
         me = current_user()
         if me is None:
-            raise PermissionError("Not authenticated")
+            raise AuthenticationRequired()
         grv, hide = self._visibility_settings()
         result = await self._session.resource_allocation.get_effective_allocation.run(
             GetEffectiveAllocationAction(
@@ -306,7 +307,7 @@ class ResourceAllocationAdapter(BaseAdapter):
         """Check which resource presets are available for session creation."""
         me = current_user()
         if me is None:
-            raise PermissionError("Not authenticated")
+            raise AuthenticationRequired()
         grv, hide = self._visibility_settings()
         result = await self._session.resource_allocation.check_preset_availability.run(
             CheckPresetAvailabilityAction(

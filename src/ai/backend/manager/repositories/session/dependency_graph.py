@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.types import SessionId
-from ai.backend.manager.errors.kernel import InvalidSessionData, SessionNotFound
+from ai.backend.manager.errors.kernel import InvalidSessionData, KernelNotFound, SessionNotFound
 from ai.backend.manager.models.kernel.row import kernels
 from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
 
@@ -55,7 +55,7 @@ async def _find_dependency_sessions(
 
     kernel_query_result = (await db_session.execute(kernel_query)).first()
     if kernel_query_result is None:
-        raise ValueError(f"Kernel not found for session {session_id}")
+        raise KernelNotFound(f"Kernel not found for session {session_id}")
 
     session_info: dict[str, list[Any] | str] = {
         "session_id": session_id,
