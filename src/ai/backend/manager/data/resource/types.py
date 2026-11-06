@@ -48,19 +48,14 @@ class ScalingGroupProxyTarget:
 
 
 @dataclass(frozen=True)
-<<<<<<< HEAD
-class SlotTypePolicy:
-    """Global slot-type admin policy from `resource_slot_types`.
-=======
-class ResourceGroupProxyConnectionInfo:
+class ScalingGroupProxyConnectionInfo:
     addr: str
     api_token: str | None
 
 
 @dataclass(frozen=True)
-class SlotTypeInfo:
-    """Global slot-type registry from `resource_slot_types`.
->>>>>>> 2244118a5 (fix(BA-8890): send the API token from the manager to the App Proxy /v2/conf endpoint (#16408))
+class SlotTypePolicy:
+    """Global slot-type admin policy from `resource_slot_types`.
 
     - enabled: slot names with enabled=true. Image-side validators
       (`ImageSlotTypeRule`, `ResourceLimitRule`) only enforce slots in this

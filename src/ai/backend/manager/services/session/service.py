@@ -1323,13 +1323,8 @@ class SessionService:
 
         if session_data.scaling_group_name is None:
             raise ServiceUnavailable("Session has no scaling group assigned")
-<<<<<<< HEAD
-        wsproxy_addr = await self._session_repository.get_scaling_group_wsproxy_addr(
+        proxy_connection_info = await self._session_repository.scaling_group_proxy_connection_info(
             session_data.scaling_group_name
-=======
-        proxy_connection_info = await self._session_repository.resource_group_proxy_connection_info(
-            session_data.resource_group_name
->>>>>>> 2244118a5 (fix(BA-8890): send the API token from the manager to the App Proxy /v2/conf endpoint (#16408))
         )
         if proxy_connection_info is None:
             raise ServiceUnavailable("No coordinator configured for this resource group")

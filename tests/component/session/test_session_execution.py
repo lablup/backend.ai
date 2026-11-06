@@ -42,7 +42,7 @@ _SERVICE_PORTS_TTYD = [
 
 
 @dataclass(frozen=True)
-class _ResourceGroupApiTokenCase:
+class _ScalingGroupApiTokenCase:
     description: str
     wsproxy_api_token: str | None
     expected_conf_request_headers: dict[str, str]
@@ -340,17 +340,17 @@ class TestSessionStartService:
     @pytest.mark.parametrize(
         "case",
         [
-            _ResourceGroupApiTokenCase(
+            _ScalingGroupApiTokenCase(
                 description="api_token_set",
                 wsproxy_api_token=_WSPROXY_API_TOKEN,
                 expected_conf_request_headers={"X-BackendAI-Token": _WSPROXY_API_TOKEN},
             ),
-            _ResourceGroupApiTokenCase(
+            _ScalingGroupApiTokenCase(
                 description="no_api_token",
                 wsproxy_api_token=None,
                 expected_conf_request_headers={},
             ),
-            _ResourceGroupApiTokenCase(
+            _ScalingGroupApiTokenCase(
                 description="empty_api_token",
                 wsproxy_api_token="",
                 expected_conf_request_headers={},
@@ -366,20 +366,14 @@ class TestSessionStartService:
         scaling_group_fixture: str,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
-        case: _ResourceGroupApiTokenCase,
+        case: _ScalingGroupApiTokenCase,
     ) -> None:
         """S-1: Start service 'ttyd' → StartServiceResponse with token and wsproxy_addr."""
         async with db_engine.begin() as conn:
             await conn.execute(
-<<<<<<< HEAD
                 sa.update(scaling_groups)
                 .where(scaling_groups.c.name == scaling_group_fixture)
-                .values(wsproxy_addr=_WSPROXY_ADDR)
-=======
-                sa.update(resource_groups)
-                .where(resource_groups.c.name == resource_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=case.wsproxy_api_token)
->>>>>>> 2244118a5 (fix(BA-8890): send the API token from the manager to the App Proxy /v2/conf endpoint (#16408))
             )
         async with db_engine.begin() as conn:
             await conn.execute(
