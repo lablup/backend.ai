@@ -1316,24 +1316,23 @@ class SessionService:
 
         arguments = action.arguments
         envs = action.envs
-        login_session_token = action.login_session_token
 
         info = await self._session_repository.get_session_with_routing_minimal(session_id)
         session_data = info.session
 
         if session_data.scaling_group_name is None:
             raise ServiceUnavailable("Session has no scaling group assigned")
-        wsproxy_addr = await self._session_repository.get_scaling_group_wsproxy_addr(
+        proxy_connection_info = await self._session_repository.scaling_group_proxy_connection_info(
             session_data.scaling_group_name
         )
-        if not wsproxy_addr:
+        if proxy_connection_info is None:
             raise ServiceUnavailable("No coordinator configured for this resource group")
-        client = self._appproxy_client_pool.load_client(wsproxy_addr, "")
+        client = self._appproxy_client_pool.load_client(proxy_connection_info.addr, "")
         wsproxy_status = await client.fetch_status()
         if wsproxy_status.advertise_address:
             wsproxy_advertise_addr = wsproxy_status.advertise_address
         else:
-            wsproxy_advertise_addr = wsproxy_addr
+            wsproxy_advertise_addr = proxy_connection_info.addr
 
         if info.kernel_host is None:
             kernel_host = urlparse(info.agent_addr).hostname
@@ -1389,7 +1388,9 @@ class SessionService:
             )
 
         body = {
-            "login_session_token": login_session_token,
+            # A coordinator of an older version requires the key, and the legacy
+            # backend.ai-proxy-coordinator saves it to a non-nullable column.
+            "login_session_token": "",
             "kernel_host": kernel_host,
             "kernel_port": host_port,
             "session": {
@@ -1401,11 +1402,16 @@ class SessionService:
             },
         }
 
+        conf_request_headers: dict[str, str] = {}
+        if proxy_connection_info.api_token:
+            conf_request_headers["X-BackendAI-Token"] = proxy_connection_info.api_token
+
         async with (
             aiohttp.ClientSession() as req,
             req.post(
-                f"{wsproxy_addr}/v2/conf",
+                f"{proxy_connection_info.addr}/v2/conf",
                 json=body,
+                headers=conf_request_headers,
             ) as resp,
         ):
             token_json = await resp.json()

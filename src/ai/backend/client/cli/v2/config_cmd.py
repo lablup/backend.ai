@@ -13,6 +13,7 @@ CONFIGURABLE_KEYS = {
     "endpoint-type": ("config", "endpoint_type"),
     "api-version": ("config", "api_version"),
     "skip-ssl-verification": ("config", "skip_ssl_verification"),
+    "allow-insecure-http": ("config", "allow_insecure_http"),
     "access-key": ("credentials", "access_key"),
     "secret-key": ("credentials", "secret_key"),
 }
@@ -57,6 +58,7 @@ def show() -> None:
     click.echo(f"Endpoint type:        {click.style(cfg.endpoint_type, bold=True)}")
     click.echo(f"API version:          {click.style(cfg.api_version, bold=True)}")
     click.echo(f"Skip SSL:             {click.style(str(cfg.skip_ssl_verification), bold=True)}")
+    click.echo(f"Allow insecure HTTP:  {click.style(str(cfg.allow_insecure_http), bold=True)}")
     if cfg.access_key:
         click.echo(f"Access key:           {click.style(cfg.access_key, bold=True)}")
     else:
@@ -76,7 +78,7 @@ def set_value(key: str, value: str) -> None:
     """Set a configuration value.
 
     KEY is one of: endpoint, endpoint-type, api-version, skip-ssl-verification,
-    access-key, secret-key.
+    allow-insecure-http, access-key, secret-key.
     """
     file_type, toml_key = CONFIGURABLE_KEYS[key]
 
@@ -88,7 +90,7 @@ def set_value(key: str, value: str) -> None:
     data = _load_toml(path)
     section = data.setdefault("backend-ai", {})
 
-    if key == "skip-ssl-verification":
+    if key in ("skip-ssl-verification", "allow-insecure-http"):
         section[toml_key] = value.lower() in ("true", "1", "yes")
     else:
         section[toml_key] = value
@@ -109,6 +111,7 @@ def get_value(key: str) -> None:
         "endpoint-type": cfg.endpoint_type,
         "api-version": cfg.api_version,
         "skip-ssl-verification": str(cfg.skip_ssl_verification),
+        "allow-insecure-http": str(cfg.allow_insecure_http),
         "access-key": cfg.access_key or "(not set)",
         "secret-key": cfg.secret_key or "(not set)",
     }
