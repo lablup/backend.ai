@@ -22,7 +22,6 @@ from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.project.types import UnassignUserFailure
 from ai.backend.manager.data.user.types import UserData
@@ -31,6 +30,7 @@ from ai.backend.manager.errors.resource import (
     PersonalProjectMemberAdditionError,
     ProjectMemberNotJoinableError,
     ProjectNotFound,
+    ProjectRoleNotGrantableError,
 )
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
@@ -90,8 +90,9 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
         user_ids: Sequence[UserID],
         role_id: RoleID | None = None,
     ) -> list[UserData]:
-        """Put the named users on the project's roster and grant them ``role_id``, or
-        the project's auto_assign roles where none is named. Answers who was added.
+        """Put the named users on the project's roster and grant them ``role_id``, one of
+        the project's own roles, or its auto_assign roles where none is named. Answers who
+        was added.
 
         Narrowed to users of the project's domain that are not already on it: a user
         outside the domain is not a member the project can take, and one already on the
@@ -100,8 +101,8 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
         if not user_ids:
             return []
         await self._refuse_personal_project(project_id)
-        if role_id is not None and not await self._role_exists(role_id):
-            raise InvalidAPIParameters(f"Role not found: {role_id}")
+        if role_id is not None:
+            await self._refuse_role_outside_project(project_id, role_id)
         rows = await self._domain_users(project_id, user_ids, include_joined=False)
         if not rows:
             return []
@@ -156,9 +157,23 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
             failures=failures,
         )
 
-    async def _role_exists(self, role_id: RoleID) -> bool:
-        stmt = sa.select(sa.literal(1)).select_from(RoleRow).where(RoleRow.id == role_id)
-        return (await self._sess.execute(stmt)).first() is not None
+    async def _refuse_role_outside_project(self, project_id: ProjectID, role_id: RoleID) -> None:
+        """Refuse the write when the role is not an active role enrolled in the project
+        (BEP-1076). A role that is not there and one of another scope answer alike."""
+        stmt = (
+            sa.select(sa.literal(1))
+            .select_from(RoleRow)
+            .where(
+                RoleRow.id == role_id,
+                RoleRow.scope_type == ProjectEntityType(),
+                RoleRow.scope_id == project_id,
+                RoleRow.status == RoleStatus.ACTIVE,
+            )
+        )
+        if (await self._sess.execute(stmt)).first() is None:
+            raise ProjectRoleNotGrantableError(
+                f"Role {role_id} is not a role of project {project_id}"
+            )
 
     async def _domain_users(
         self, project_id: ProjectID, user_ids: Collection[UserID], *, include_joined: bool
