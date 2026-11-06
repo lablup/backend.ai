@@ -31,6 +31,7 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
+from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.seeds.artifact_registry.registry import TestSeedHuggingFaceRegistry
 from bai_scenario.seeds.domain.domain import TestSeedDomain
@@ -230,5 +231,5 @@ class TheRegistryNode(Then[ARegistryAndACaller, ArtifactRegistryGQLNode]):
     ) -> list[Verdict]:
         node = answered.response
         if node is None:
-            return [Same("registry", node, None)]
+            return [MissingResponse(answered.raised)]
         return registry_verdicts("", node, laid.registry)

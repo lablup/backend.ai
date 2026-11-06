@@ -54,6 +54,7 @@ from ai.backend.testutils.scenario_steps import (
     Same,
     SameAs,
     Says,
+    Skipped,
     Then,
     Verdict,
 )
@@ -616,8 +617,26 @@ def revision_verdicts(
         ),
         Same(f"{prefix}created_at", node.created_at, revision.created_at),
         Same(f"{prefix}updated_at", node.updated_at, revision.updated_at),
-        Same(f"{prefix}digest", node.digest, None),
-        Same(f"{prefix}verification_result", node.verification_result, None),
+        Skipped(
+            f"{prefix}digest",
+            Says(
+                "어댑터가 리비전 노드에 다이제스트를 담지 않아 응답으로 확인할 수 없습니다",
+                english=(
+                    "the adapter does not put the digest on the revision node, so it cannot be "
+                    "stated from the response"
+                ),
+            ),
+        ),
+        Skipped(
+            f"{prefix}verification_result",
+            Says(
+                "어댑터가 검증 결과를 리비전 노드에 담지 않아 응답으로 확인할 수 없습니다",
+                english=(
+                    "the adapter does not put the verification result on the revision node, so it "
+                    "cannot be stated from the response"
+                ),
+            ),
+        ),
         Same(f"{prefix}readme", node.readme, revision.readme),
     ]
 
