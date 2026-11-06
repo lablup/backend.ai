@@ -31,7 +31,7 @@ from ai.backend.appproxy.common.utils import (
     pydantic_api_handler,
     pydantic_api_response_handler,
 )
-from ai.backend.appproxy.coordinator.models import Token, Worker, WorkerAppFilter, WorkerStatus
+from ai.backend.appproxy.coordinator.models import Worker, WorkerAppFilter, WorkerStatus
 from ai.backend.appproxy.coordinator.models.utils import execute_with_txn_retry
 from ai.backend.appproxy.coordinator.types import RootContext
 from ai.backend.common.events.dispatcher import EventHandler
@@ -117,17 +117,6 @@ class WorkerRegistrationResponseModel(WorkerResponseModel):
 
 class WorkerListResponseModel(BackendAISchema):
     workers: list[WorkerResponseModel]
-
-
-class TokenResponseModel(BackendAISchema):
-    login_session_token: str | None
-    kernel_host: str
-    kernel_port: int
-    session_id: UUID
-    user_uuid: UUID
-    group_id: UUID
-    access_key: str
-    domain_name: str
 
 
 @auth_required("worker")
@@ -333,20 +322,6 @@ async def heartbeat_worker(request: web.Request) -> PydanticResponse[WorkerRespo
         )
     request["do_not_print_access_log"] = True
     return PydanticResponse(WorkerResponseModel(**result))
-
-
-@auth_required("worker")
-@pydantic_api_response_handler
-async def get_token(request: web.Request) -> PydanticResponse[TokenResponseModel]:
-    """
-    Lists tokens issued within /v2/conf request handler.
-    """
-    root_ctx: RootContext = request.app["_root.context"]
-    token_id = UUID(request.match_info["token_id"])
-
-    async with root_ctx.db.begin_readonly_session() as sess:
-        token = await Token.get(sess, token_id)
-        return PydanticResponse(TokenResponseModel(**token.dump_model()))
 
 
 async def check_worker_lost(

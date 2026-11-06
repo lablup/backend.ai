@@ -283,7 +283,6 @@ Generates and returns a token which will be used as an authentication credential
 
 ```ts
 {
-  login_session_token: Partial(string) & Partial(null)
   kernel_host: string
   kernel_port: integer
   session: {
@@ -1135,7 +1134,6 @@ Lists every circuits worker is currently serving.
 
 ```ts
 {
-  login_session_token: Partial(string) & Partial(null)
   kernel_host: string
   kernel_port: integer
   session: {
