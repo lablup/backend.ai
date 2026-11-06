@@ -82,24 +82,15 @@ def _find_allowed_wheelhouse_paths(config_paths: set[Path]) -> set[Path]:
     import tomli
 
     from ai.backend.common.configs.wheelhouse import WheelhouseConfig
-    from ai.backend.common.exception import BackendAISchemaValidationFailed
 
     wheelhouse_paths: set[Path] = set()
     for config_path in config_paths:
         try:
             raw_config = tomli.loads(config_path.read_text())
-            wheelhouse_config = WheelhouseConfig.model_validate(raw_config.get("wheelhouse", {}))
-        except (
-            OSError,
-            tomli.TOMLDecodeError,
-            UnicodeDecodeError,
-            BackendAISchemaValidationFailed,
-        ) as e:
-            click.echo(
-                f"Warning: Could not read [wheelhouse] from {config_path}: {e.__cause__ or e}",
-                err=True,
-            )
+        except (OSError, tomli.TOMLDecodeError) as e:
+            click.echo(f"Warning: Could not read [wheelhouse] from {config_path}: {e}", err=True)
             continue
+        wheelhouse_config = WheelhouseConfig.model_validate(raw_config.get("wheelhouse", {}))
         if wheelhouse_config.allow:
             wheelhouse_paths.add(wheelhouse_config.path.resolve())
     return wheelhouse_paths

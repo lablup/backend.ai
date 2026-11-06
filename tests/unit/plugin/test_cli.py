@@ -166,11 +166,6 @@ class TestScanWheelhouse:
                 mode=0o000,
             ),
             _UnusableConfigCase(failure="invalid-toml", content=b"[wheelhouse\n"),
-            _UnusableConfigCase(failure="invalid-utf8", content=b"\xff"),
-            _UnusableConfigCase(
-                failure="invalid-section",
-                content=b'[wheelhouse]\nallow = "maybe"\n',
-            ),
         ],
         ids=lambda case: case.failure,
     )
