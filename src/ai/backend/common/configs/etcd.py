@@ -189,12 +189,13 @@ class EtcdConfig(BaseConfigSchema):
     ]
     tls: Annotated[
         EtcdTLSConfig,
+        Field(default_factory=EtcdTLSConfig),
         BackendAIConfigMeta(
             description="TLS settings for the connection to etcd.",
             added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
-    ] = Field(default=EtcdTLSConfig.model_validate({}))
+    ]
 
     @model_validator(mode="before")
     @classmethod

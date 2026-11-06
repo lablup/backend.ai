@@ -231,10 +231,13 @@ class EtcdConfig(BaseSchema):
     ]
     user: Annotated[str, Field(description="etcd user.")]
     password: Annotated[str, Field(description="etcd password.")]
-    tls: EtcdTLSConfig = Field(
-        default=EtcdTLSConfig.model_validate({}),
-        description="TLS settings for the connection to etcd.",
-    )
+    tls: Annotated[
+        EtcdTLSConfig,
+        Field(
+            default_factory=EtcdTLSConfig,
+            description="TLS settings for the connection to etcd.",
+        ),
+    ]
 
 
 class DBConfig(BaseSchema):
