@@ -7,12 +7,12 @@ from ai.backend.cli.params import BoolExprType, JSONParamType, OptionalType
 from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.insecure_http_guard import (
-    allow_insecure_http_option,
-    reject_insecure_secret_endpoints,
+    legacy_endpoints,
+    option_given,
+    refuse_secret_over_insecure_http,
 )
 from ai.backend.client.cli.pretty import print_done
 from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.config import get_config
 from ai.backend.client.func.scaling_group import _default_detail_fields, _default_list_fields
 from ai.backend.client.output.fields import scaling_group_fields
 from ai.backend.client.session import Session
@@ -117,7 +117,7 @@ def list(ctx: CLIContext) -> None:
 )
 @click.option("--wsproxy-addr", type=str, default=None, help="Set app proxy address.")
 @click.option("--wsproxy-api-token", type=str, default=None, help="Set app proxy API token.")
-@allow_insecure_http_option
+@refuse_secret_over_insecure_http(legacy_endpoints, sends_secret=option_given("wsproxy_api_token"))
 def add(
     ctx: CLIContext,
     name: str,
@@ -131,15 +131,12 @@ def add(
     use_host_network: bool,
     wsproxy_addr: str,
     wsproxy_api_token: str,
-    allow_insecure_http: bool,
 ) -> None:
     """
     Add a new scaling group.
 
     NAME: Name of new scaling group.
     """
-    if wsproxy_api_token is not None:
-        reject_insecure_secret_endpoints(get_config().endpoints, allow_insecure_http)
     with Session() as session:
         try:
             data = session.ScalingGroup.create(
@@ -244,7 +241,7 @@ def add(
     default=undefined,
     help="Set app proxy API token.",
 )
-@allow_insecure_http_option
+@refuse_secret_over_insecure_http(legacy_endpoints, sends_secret=option_given("wsproxy_api_token"))
 def update(
     ctx: CLIContext,
     name: str,
@@ -258,15 +255,12 @@ def update(
     use_host_network: bool | Undefined,
     wsproxy_addr: str | Undefined,
     wsproxy_api_token: str | Undefined,
-    allow_insecure_http: bool,
 ) -> None:
     """
     Update existing scaling group.
 
     NAME: Name of new scaling group.
     """
-    if wsproxy_api_token is not undefined:
-        reject_insecure_secret_endpoints(get_config().endpoints, allow_insecure_http)
     with Session() as session:
         try:
             data = session.ScalingGroup.update(

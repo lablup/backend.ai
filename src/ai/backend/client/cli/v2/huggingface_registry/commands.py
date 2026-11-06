@@ -7,8 +7,9 @@ import asyncio
 import click
 
 from ai.backend.client.cli.insecure_http_guard import (
-    allow_insecure_http_option,
-    reject_insecure_secret_endpoints,
+    option_given,
+    refuse_secret_over_insecure_http,
+    v2_endpoints,
 )
 from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
 
@@ -22,18 +23,15 @@ def huggingface_registry() -> None:
 @click.option("--name", required=True, help="Registry name.")
 @click.option("--url", required=True, help="HuggingFace Hub URL.")
 @click.option("--token", default=None, help="Access token for the registry.")
-@allow_insecure_http_option
-def create(name: str, url: str, token: str | None, allow_insecure_http: bool) -> None:
+@refuse_secret_over_insecure_http(v2_endpoints, sends_secret=option_given("token"))
+def create(name: str, url: str, token: str | None) -> None:
     """Create a new HuggingFace registry."""
-    config = load_v2_config()
-    if token is not None:
-        reject_insecure_secret_endpoints([config.endpoint], allow_insecure_http)
     from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
         CreateHuggingFaceRegistryInput,
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(config)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.huggingface_registry.create(
                 CreateHuggingFaceRegistryInput(name=name, url=url, token=token),
@@ -89,18 +87,14 @@ def get(registry_id: str) -> None:
 @click.option("--name", default=None, help="Updated registry name.")
 @click.option("--url", default=None, help="Updated HuggingFace Hub URL.")
 @click.option("--token", default=None, help="Updated access token.")
-@allow_insecure_http_option
+@refuse_secret_over_insecure_http(v2_endpoints, sends_secret=option_given("token"))
 def update(
     registry_id: str,
     name: str | None,
     url: str | None,
     token: str | None,
-    allow_insecure_http: bool,
 ) -> None:
     """Update an existing HuggingFace registry."""
-    config = load_v2_config()
-    if token is not None:
-        reject_insecure_secret_endpoints([config.endpoint], allow_insecure_http)
     from uuid import UUID
 
     from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
@@ -108,7 +102,7 @@ def update(
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(config)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.huggingface_registry.update(
                 UpdateHuggingFaceRegistryInput(

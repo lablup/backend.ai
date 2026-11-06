@@ -4,9 +4,18 @@ from dataclasses import dataclass
 
 import click
 import pytest
+from click.testing import CliRunner
 from yarl import URL
 
-from ai.backend.client.cli.insecure_http_guard import reject_insecure_secret_endpoints
+from ai.backend.cli.params import OptionalType
+from ai.backend.cli.types import Undefined, undefined
+from ai.backend.client.cli.insecure_http_guard import (
+    option_given,
+    refuse_secret_over_insecure_http,
+    reject_insecure_secret_endpoints,
+)
+
+_ALLOW_FLAG = "--allow-insecure-http"
 
 
 @dataclass(frozen=True)
@@ -19,6 +28,54 @@ class _AcceptedEndpointsCase:
 class _RejectedEndpointsCase:
     endpoints: list[str]
     expected_refused_endpoints: str
+
+
+@dataclass(frozen=True)
+class _DecoratedCommandCase:
+    arguments: list[str]
+    expected_runs: bool
+
+
+@dataclass(frozen=True)
+class _CommandBehindGuard:
+    command: click.Command
+    body_calls: list[str | None | Undefined]
+
+
+@pytest.fixture
+def command_behind_guard_at_insecure_endpoint() -> _CommandBehindGuard:
+    body_calls: list[str | None | Undefined] = []
+
+    @click.command()
+    @click.option("--secret", type=OptionalType(str), default=undefined)
+    @refuse_secret_over_insecure_http(
+        lambda: [URL("http://backend.example")],
+        sends_secret=option_given("secret"),
+    )
+    def command(secret: str | None | Undefined) -> None:
+        body_calls.append(secret)
+
+    return _CommandBehindGuard(command=command, body_calls=body_calls)
+
+
+class TestRefuseSecretOverInsecureHttp:
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _DecoratedCommandCase(arguments=["--secret", "value"], expected_runs=False),
+            _DecoratedCommandCase(arguments=["--secret", "value", _ALLOW_FLAG], expected_runs=True),
+            _DecoratedCommandCase(arguments=[], expected_runs=True),
+        ],
+        ids=lambda case: " ".join(case.arguments) or "no-secret",
+    )
+    def test_runs_the_command_body_unless_the_secret_is_refused(
+        self,
+        command_behind_guard_at_insecure_endpoint: _CommandBehindGuard,
+        case: _DecoratedCommandCase,
+    ) -> None:
+        CliRunner().invoke(command_behind_guard_at_insecure_endpoint.command, case.arguments)
+
+        assert bool(command_behind_guard_at_insecure_endpoint.body_calls) is case.expected_runs
 
 
 class TestRejectInsecureSecretEndpoints:

@@ -12,12 +12,12 @@ from ai.backend.cli.params import BoolExprType, CommaSeparatedListType, Optional
 from ai.backend.cli.types import ExitCode, Undefined, undefined
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.insecure_http_guard import (
-    allow_insecure_http_option,
-    reject_insecure_secret_endpoints,
+    legacy_endpoints,
+    option_given,
+    refuse_secret_over_insecure_http,
 )
 from ai.backend.client.cli.pretty import print_fail, print_info
 from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.config import get_config
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.output.fields import user_fields
 from ai.backend.client.session import Session
@@ -279,7 +279,7 @@ def list(
     default="default",
     help='Add to the groups. If unspecified, it will use the "default" group.',
 )
-@allow_insecure_http_option
+@refuse_secret_over_insecure_http(legacy_endpoints)
 def add(
     ctx: CLIContext,
     domain_name: str,
@@ -297,7 +297,6 @@ def add(
     container_main_gid: int | None,
     container_gids: Iterable[int] | None,
     groups: Iterable[str],
-    allow_insecure_http: bool,
 ) -> None:
     """
     Create a new user. As the user must belong to a domain,
@@ -308,7 +307,6 @@ def add(
     EMAIL: Email of new user.
     PASSWORD: Password of new user.
     """
-    reject_insecure_secret_endpoints(get_config().endpoints, allow_insecure_http)
     with Session() as session:
         try:
             group_ids = []
@@ -517,7 +515,7 @@ def add(
     default=False,
     help="Unset the user's container supplementary group IDs.",
 )
-@allow_insecure_http_option
+@refuse_secret_over_insecure_http(legacy_endpoints, sends_secret=option_given("password"))
 def update(
     ctx: CLIContext,
     email: str,
@@ -538,7 +536,6 @@ def update(
     unset_container_main_gid: bool,
     container_gids: Iterable[int] | Undefined,
     unset_container_gids: bool,
-    allow_insecure_http: bool,
 ) -> None:
     """
     Update an existing user.
@@ -546,8 +543,6 @@ def update(
     \b
     EMAIL: Email of user to update.
     """
-    if password is not undefined:
-        reject_insecure_secret_endpoints(get_config().endpoints, allow_insecure_http)
 
     def validate_input[T_Input](value: T_Input, null_flag: bool, field_name: str) -> T_Input | None:
         _val: T_Input | None = value

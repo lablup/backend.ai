@@ -7,8 +7,8 @@ import asyncio
 import click
 
 from ai.backend.client.cli.insecure_http_guard import (
-    allow_insecure_http_option,
-    reject_insecure_secret_endpoints,
+    refuse_secret_over_insecure_http,
+    v2_endpoints,
 )
 from ai.backend.client.cli.v2.helpers import (
     EntityLabelTerm,
@@ -46,7 +46,7 @@ def user() -> None:
 @click.option("--full-name", default=None, type=str, help="Full display name.")
 @click.option("--description", default=None, type=str, help="Optional description.")
 @click.option("--resource-policy", default="default", type=str, help="Resource policy name.")
-@allow_insecure_http_option
+@refuse_secret_over_insecure_http(v2_endpoints)
 def create(
     email: str,
     username: str,
@@ -57,11 +57,8 @@ def create(
     full_name: str | None,
     description: str | None,
     resource_policy: str,
-    allow_insecure_http: bool,
 ) -> None:
     """Create a new user (superadmin only)."""
-    config = load_v2_config()
-    reject_insecure_secret_endpoints([config.endpoint], allow_insecure_http)
     from ai.backend.common.dto.manager.v2.user.request import CreateUserInput
     from ai.backend.common.dto.manager.v2.user.types import (
         UserRole as UserRoleEnum,
@@ -83,7 +80,7 @@ def create(
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(config)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.user.create(body)
             print_result(result)

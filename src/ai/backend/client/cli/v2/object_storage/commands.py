@@ -7,8 +7,9 @@ import asyncio
 import click
 
 from ai.backend.client.cli.insecure_http_guard import (
-    allow_insecure_http_option,
-    reject_insecure_secret_endpoints,
+    option_given,
+    refuse_secret_over_insecure_http,
+    v2_endpoints,
 )
 from ai.backend.client.cli.v2.helpers import (
     create_v2_registry,
@@ -30,7 +31,7 @@ def object_storage() -> None:
 @click.option("--secret-key", required=True, help="Secret key for authentication.")
 @click.option("--endpoint", required=True, help="Endpoint URL of the object storage.")
 @click.option("--region", required=True, help="Region of the object storage.")
-@allow_insecure_http_option
+@refuse_secret_over_insecure_http(v2_endpoints)
 def create(
     name: str,
     host: str,
@@ -38,15 +39,12 @@ def create(
     secret_key: str,
     endpoint: str,
     region: str,
-    allow_insecure_http: bool,
 ) -> None:
     """Create a new object storage."""
-    config = load_v2_config()
-    reject_insecure_secret_endpoints([config.endpoint], allow_insecure_http)
     from ai.backend.common.dto.manager.v2.object_storage.request import CreateObjectStorageInput
 
     async def _run() -> None:
-        registry = await create_v2_registry(config)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.object_storage.create(
                 CreateObjectStorageInput(
@@ -96,7 +94,7 @@ def get(storage_id: str) -> None:
     default=False,
     help="Clear the region. Mutually exclusive with --region.",
 )
-@allow_insecure_http_option
+@refuse_secret_over_insecure_http(v2_endpoints, sends_secret=option_given("secret_key"))
 def update(
     storage_id: str,
     name: str | None,
@@ -106,12 +104,8 @@ def update(
     endpoint: str | None,
     region: str | None,
     set_null_region: bool,
-    allow_insecure_http: bool,
 ) -> None:
     """Update an existing object storage."""
-    config = load_v2_config()
-    if secret_key is not None:
-        reject_insecure_secret_endpoints([config.endpoint], allow_insecure_http)
     from uuid import UUID
 
     from ai.backend.common.dto.manager.v2.object_storage.request import UpdateObjectStorageInput
@@ -128,7 +122,7 @@ def update(
         region_value = region
 
     async def _run() -> None:
-        registry = await create_v2_registry(config)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.object_storage.update(
                 UpdateObjectStorageInput(
