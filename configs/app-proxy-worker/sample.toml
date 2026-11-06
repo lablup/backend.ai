@@ -148,7 +148,9 @@
   frontend_mode = "wildcard"
   # The protocol to use for proxied connections. 'http' for HTTP/1.1 traffic,
   # 'h2' for HTTP/2 traffic (requires http2 config), 'tcp' for raw TCP proxying.
-  # 'grpc' is not directly supported; use 'h2' instead for gRPC traffic.
+  # 'grpc' is not directly supported; use 'h2' instead for gRPC traffic. An 'h2'
+  # worker cannot check credentials or client addresses, so it serves only
+  # circuits that are open to public and have no 'allowed_client_ips'.
   # Added in 25.9.0
   protocol = "http"
   # The types of traffic this worker accepts. Use 'interactive' for user-facing

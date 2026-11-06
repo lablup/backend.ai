@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 from yarl import URL
 
+from ai.backend.appproxy.common.client_ip import ClientIPValidator
 from ai.backend.appproxy.common.errors import (
     ObjectNotFound,
     PortNotAvailable,
@@ -30,6 +31,7 @@ from ai.backend.appproxy.common.types import (
     Slot,
 )
 from ai.backend.appproxy.coordinator.errors import MissingFrontendConfigError
+from ai.backend.appproxy.coordinator.errors.circuit import HTTP2AccessControlNotSupportedError
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import Subdomain
 from ai.backend.logging import BraceStyleAdapter
@@ -441,6 +443,10 @@ async def add_circuit(
             raise WorkerNotAvailable
     else:
         worker = await pick_worker(session, session_info, endpoint_info, protocol, mode)
+
+    needs_access_control = not open_to_public or ClientIPValidator(allowed_client_ips).is_restricted
+    if worker.protocol == ProxyProtocol.HTTP2 and needs_access_control:
+        raise HTTP2AccessControlNotSupportedError
 
     circuit_params: dict[str, Any] = {}
 
