@@ -79,7 +79,11 @@ _SESSION_COOKIE_PATH: Final[str] = "/func/openid"
 
 
 def _session_cookie_name(session_key: str) -> str:
-    return f"{_SESSION_COOKIE_PREFIX}{session_key}"
+    try:
+        session_id = uuid.UUID(session_key)
+    except ValueError as e:
+        raise InvalidSession(reason="OpenID session must be a UUID") from e
+    return f"{_SESSION_COOKIE_PREFIX}{session_id}"
 
 
 async def ping(_request: web.Request) -> web.Response:
@@ -365,7 +369,10 @@ class OIDCWebAppPlugin(WebappPlugin):
     async def redirect(self, request: web.Request) -> web.Response:
         state = urllib.parse.parse_qs(request.query.get("state", ""))
         redirect_uri = self._return_uri(state.get("redirect", [None])[0])
+        cookie_name: str | None = None
         try:
+            if "session" in state:
+                cookie_name = _session_cookie_name(state["session"][0])
             stoken = await self._authorize(request, state)
         except OpenIDRedirectError as e:
             self._log_authorization_failure(e)
@@ -375,10 +382,8 @@ class OIDCWebAppPlugin(WebappPlugin):
             response = self._redirect_to(redirect_uri, {"bai_error": "internal-server-error"})
         else:
             response = self._redirect_to(redirect_uri, {"sToken": stoken})
-        if "session" in state:
-            response.del_cookie(
-                _session_cookie_name(state["session"][0]), path=_SESSION_COOKIE_PATH
-            )
+        if cookie_name is not None:
+            response.del_cookie(cookie_name, path=_SESSION_COOKIE_PATH)
         return response
 
     def _callback_uri(self) -> str:

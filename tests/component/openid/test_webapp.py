@@ -380,6 +380,11 @@ class TestWebAppRedirect:
         assert "sToken=" in location
         assert "app.example.com/dashboard" in location
 
+        state = urllib.parse.parse_qs(redirect_request.query["state"])
+        cookie = response.cookies[f"bai_openid_session_{state['session'][0]}"]
+        assert cookie["max-age"] == "0"
+        assert cookie["path"] == "/func/openid"
+
         # Verify user was created in DB
         db = mock_root_app["_db"]
         async with db.begin_readonly_session() as sess:
@@ -567,6 +572,31 @@ class TestWebAppRedirect:
         location = await self._redirect(webapp_plugin, redirect_request, mock_oauth2_client)
 
         assert location.query["bai_error"] == "invalid-openid-session"
+        mock_oauth2_client.fetch_token.assert_not_called()
+
+    @pytest.mark.parametrize("session_key", ["foo bar", "foo;bar", "not-a-uuid"])
+    async def test_redirect_rejects_malformed_session_without_deleting_cookie(
+        self,
+        webapp_plugin: OIDCWebAppPlugin,
+        redirect_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+        session_key: str,
+    ) -> None:
+        redirect_request.query = {
+            "state": urllib.parse.urlencode({"session": session_key}),
+            "code": "auth-code-123",
+        }
+        with patch(
+            "ai.backend.manager.plugin.openid.webapp.AsyncOAuth2Client",
+            return_value=mock_oauth2_client,
+        ):
+            response = await webapp_plugin.redirect(redirect_request)
+
+        assert response.status == 302
+        location = yarl.URL(response.headers["Location"])
+        assert location.query["bai_error"] == "invalid-openid-session"
+        assert "sToken" not in location.query
+        assert not response.cookies
         mock_oauth2_client.fetch_token.assert_not_called()
 
     async def test_redirect_without_state_returns_to_login_uri(
