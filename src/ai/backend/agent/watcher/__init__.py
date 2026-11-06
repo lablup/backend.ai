@@ -315,21 +315,22 @@ async def watcher_server(
         },
     )
     with logger:
+        etcd_config = app["config"]["etcd"]
         etcd_credentials = None
-        if app["config"]["etcd"]["user"]:
+        if etcd_config["user"]:
             etcd_credentials = {
-                "user": app["config"]["etcd"]["user"],
-                "password": app["config"]["etcd"]["password"],
+                "user": etcd_config["user"],
+                "password": etcd_config["password"],
             }
         scope_prefix_map = {
             ConfigScopes.GLOBAL: "",
         }
         async with AsyncEtcd(
-            app["config"]["etcd"]["addrs"],
-            app["config"]["etcd"]["namespace"],
+            etcd_config["addrs"],
+            etcd_config["namespace"],
             scope_prefix_map=scope_prefix_map,
             credentials=etcd_credentials,
-            tls=EtcdTLSConfig.model_validate(app["config"]["etcd"]["tls"]).to_dataclass(),
+            tls=EtcdTLSConfig.model_validate(etcd_config["tls"]).to_dataclass(),
         ) as etcd:
             app["config_server"] = etcd
 
