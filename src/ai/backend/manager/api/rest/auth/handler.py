@@ -179,13 +179,13 @@ class AuthHandler:
     async def signup(self, body: BodyParam[SignupRequest], ctx: RequestCtx) -> APIResponse:
         params = body.parsed
         action = SignupAction(
-            request=ctx.request,
             domain_name=params.domain,
             email=params.email,
             password=params.password,
             username=params.username,
             full_name=params.full_name,
             description=params.description,
+            lang=ctx.request.headers.get("Accept-Language", "en-us").split(",")[0].lower(),
         )
         result = await self._auth.signup.run(action)
         resp = SignupResponse(
@@ -237,11 +237,9 @@ class AuthHandler:
         self,
         body: BodyParam[UpdatePasswordRequest],
         ctx: UserContext,
-        req: RequestCtx,
     ) -> APIResponse:
         params = body.parsed
         action = UpdatePasswordAction(
-            request=req.request,
             user_id=UserID(ctx.user_uuid),
             domain_name=ctx.user_domain,
             email=ctx.user_email,
@@ -260,11 +258,10 @@ class AuthHandler:
     # ------------------------------------------------------------------
 
     async def update_password_no_auth(
-        self, body: BodyParam[UpdatePasswordNoAuthRequest], ctx: RequestCtx
+        self, body: BodyParam[UpdatePasswordNoAuthRequest]
     ) -> APIResponse:
         params = body.parsed
         action = UpdatePasswordNoAuthAction(
-            request=ctx.request,
             domain_name=params.domain,
             email=params.username,
             current_password=params.current_password,
