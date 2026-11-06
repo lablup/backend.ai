@@ -137,6 +137,10 @@ class TemplateRepository:
         return await self._db_source.get_cluster_template(template_id)
 
     @template_repository_resilience.apply()
+    async def get_cluster_template_owner(self, template_id: str) -> dict[str, Any] | None:
+        return await self._db_source.get_cluster_template_owner(template_id)
+
+    @template_repository_resilience.apply()
     async def cluster_template_exists(self, template_id: str) -> bool:
         return await self._db_source.cluster_template_exists(template_id)
 

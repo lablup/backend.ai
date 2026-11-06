@@ -450,6 +450,24 @@ class TemplateDBSource:
                 return template
             return dict(template)
 
+    async def get_cluster_template_owner(self, template_id: str) -> dict[str, Any] | None:
+        """Get the `user_uuid` and `domain_name` of an active cluster template."""
+        async with self._db.begin_readonly() as conn:
+            q = (
+                sa.select(session_templates.c.user_uuid, session_templates.c.domain_name)
+                .select_from(session_templates)
+                .where(
+                    (session_templates.c.id == template_id)
+                    & (session_templates.c.is_active)
+                    & (session_templates.c.type == TemplateType.CLUSTER),
+                )
+            )
+            result = await conn.execute(q)
+            row = result.first()
+            if row is None:
+                return None
+            return {"user_uuid": row.user_uuid, "domain_name": row.domain_name}
+
     async def cluster_template_exists(self, template_id: str) -> bool:
         """Check if an active cluster template exists."""
         async with self._db.begin_readonly() as conn:
