@@ -58,11 +58,12 @@ class EtcdTLSConfig(BaseConfigSchema):
     ]
     handshake_timeout: Annotated[
         float,
-        Field(default=10.0, gt=0),
+        Field(default=10.0, ge=0),
         BackendAIConfigMeta(
             description=(
                 "Seconds to wait for the TLS handshake with an etcd member. "
-                "Request timeouts do not end a stalled handshake."
+                "Set to 0 for no limit (not recommended): request timeouts do not end a "
+                "stalled handshake."
             ),
             added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="10.0", prod="10.0"),
@@ -85,7 +86,7 @@ class EtcdTLSConfig(BaseConfigSchema):
             ca_cert=self.ca_cert,
             client_cert=self.client_cert,
             client_key=self.client_key,
-            handshake_timeout=self.handshake_timeout,
+            handshake_timeout=self.handshake_timeout if self.handshake_timeout > 0 else None,
         )
 
 

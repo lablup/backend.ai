@@ -875,8 +875,8 @@
     # Added in 26.10.0
     ## client-key = "/etc/backend.ai/etcd/client-key.pem"
 
-    # Seconds to wait for the TLS handshake with an etcd member. Request
-    # timeouts do not end a stalled handshake.
+    # Seconds to wait for the TLS handshake with an etcd member. Set to 0 for no
+    # limit (not recommended): request timeouts do not end a stalled handshake.
     # Added in 26.10.0
     handshake-timeout = 10.0
 

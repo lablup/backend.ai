@@ -56,6 +56,15 @@ def enabled_tls_config_with_client_certificate(pem_file: Path) -> EtcdTLSConfig:
 
 
 @pytest.fixture
+def enabled_tls_config_with_no_handshake_limit(pem_file: Path) -> EtcdTLSConfig:
+    return EtcdTLSConfig.model_validate({
+        "enabled": True,
+        "ca-cert": pem_file,
+        "handshake-timeout": 0,
+    })
+
+
+@pytest.fixture
 def etcd_of_server_silent_during_handshake(pem_file: Path) -> Iterator[AsyncEtcd]:
     with socket.create_server(("127.0.0.1", 0)) as silent_server:
         yield AsyncEtcd.create_from_config(
@@ -121,6 +130,16 @@ class TestEtcdTLSConfig:
             client_cert=pem_file,
             client_key=pem_file,
             handshake_timeout=1.5,
+        )
+
+    def test_zero_handshake_timeout_converts_to_no_limit(
+        self, enabled_tls_config_with_no_handshake_limit: EtcdTLSConfig, pem_file: Path
+    ) -> None:
+        assert enabled_tls_config_with_no_handshake_limit.to_dataclass() == EtcdTLSConfigData(
+            ca_cert=pem_file,
+            client_cert=None,
+            client_key=None,
+            handshake_timeout=None,
         )
 
 
