@@ -128,6 +128,7 @@ class TestEtcdTLSConfig:
                 expected_error="ca-cert",
             ),
         ],
+        ids=["no-certificates", "client-cert-only", "client-key-only", "missing-ca-cert"],
     )
     def test_rejects_invalid_certificates(
         self, case: _RejectedTLSConfigCase, raw_tls_config_of_case: dict[str, Any]
