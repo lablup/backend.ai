@@ -146,6 +146,15 @@ async def registry_ctx() -> AsyncGenerator[
         await registry.shutdown()
 
 
+class TestAgentRegistryInit:
+    async def test_init_does_not_create_docker_client(
+        self,
+        registry_ctx: tuple[AgentRegistry, *tuple[Any, ...]],
+    ) -> None:
+        registry = registry_ctx[0]
+        assert not hasattr(registry, "docker")
+
+
 @dataclass
 class MockEndpointData:
     """Minimal stand-in for ``EndpointData`` exposing only ``model_definition``.
