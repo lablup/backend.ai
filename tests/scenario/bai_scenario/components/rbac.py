@@ -7,21 +7,22 @@ checks more than one table shares.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.permission.types import role_scope_types
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.rbac.response import (
     EntityOperationCombinationInfo,
+    OperationInfo,
     PermissionNode,
     RoleAssignmentNode,
     RoleNode,
@@ -356,91 +357,142 @@ class NothingIsProcessed(Then[RolesAndACaller, PartialBulkPayload[RoleNode]]):
         return verdicts
 
 
+CATALOG_SCOPES: tuple[EntityType, ...] = (
+    DomainEntityType(),
+    ProjectEntityType(),
+    UserEntityType(),
+)
+"""역할이 놓이는 스코프. 배선에서 읽지 않고 시나리오가 직접 적는다."""
+
+CATALOG_OPERATIONS: Mapping[EntityType, Mapping[str, PermissionBitDTO]] = {
+    RoleEntityType(): {
+        "add_role_permission": PermissionBitDTO.UPDATE,
+        "bulk_get_permissions": PermissionBitDTO.READ,
+        "bulk_get_roles": PermissionBitDTO.READ,
+        "bulk_remove_role_permissions": PermissionBitDTO.UPDATE,
+        "create_role": PermissionBitDTO.CREATE,
+        "delete_permission": PermissionBitDTO.UPDATE,
+        "delete_role": PermissionBitDTO.SOFT_DELETE,
+        "get_role_detail": PermissionBitDTO.READ,
+        "lookup_bulk_role_permission_owner": PermissionBitDTO.READ,
+        "lookup_role_permission_owner": PermissionBitDTO.READ,
+        "partial_bulk_delete_roles": PermissionBitDTO.SOFT_DELETE,
+        "partial_bulk_purge_roles": PermissionBitDTO.HARD_DELETE,
+        "partial_bulk_restore_roles": PermissionBitDTO.SOFT_DELETE,
+        "partial_bulk_update_roles": PermissionBitDTO.UPDATE,
+        "purge_role": PermissionBitDTO.HARD_DELETE,
+        "replace_role_permissions": PermissionBitDTO.UPDATE,
+        "restore_role": PermissionBitDTO.SOFT_DELETE,
+        "scoped_get_held_permissions": PermissionBitDTO.READ,
+        "search_role_permissions": PermissionBitDTO.READ,
+        "search_roles_in_scope": PermissionBitDTO.READ,
+        "update_permission": PermissionBitDTO.UPDATE,
+        "update_role": PermissionBitDTO.UPDATE,
+    },
+    UserEntityType(): {
+        "join_project": PermissionBitDTO.CREATE,
+        "leave_project": PermissionBitDTO.SOFT_DELETE,
+        "scoped_search_role_assignments": PermissionBitDTO.READ,
+    },
+}
+"""엔티티마다 권한이 지목할 수 있는 연산과 그 연산이 요구하는 비트.
+
+배선에서 읽지 않고 시나리오가 직접 적는다. 배선이 다른 비트를 걸거나 연산을 더하면
+이 표와 달라져 행이 실패한다.
+"""
+
+
+def _operations_match(
+    actions: Sequence[OperationInfo], expected: Mapping[str, PermissionBitDTO]
+) -> bool:
+    """연산 이름과 요구 비트가 적어 둔 표와 같은지, 설명이 붙었는지."""
+    if [operation.operation for operation in actions] != sorted(expected):
+        return False
+    if any(not operation.description for operation in actions):
+        return False
+    return {operation.operation: operation.required_permission for operation in actions} == dict(
+        expected
+    )
+
+
 @dataclass(frozen=True)
 class ThePermissionMatrix(Condition[list[ScopeEntityOperationCombinationInfo]]):
-    """배선이 정한 스코프와 엔티티, 연산을 모두 실은 표.
+    """시나리오가 적은 스코프와 엔티티, 연산, 요구 비트를 그대로 실은 표.
 
-    스코프는 역할이 놓이는 셋 그대로이고, 모든 스코프가 같은 엔티티를 실으며, 엔티티와
-    연산은 이름 순이다. 연산마다 요구 권한과 설명이 있다.
+    모든 스코프가 같은 엔티티를 싣고, 엔티티와 연산은 이름 순이며, 연산마다 설명이 있다.
     """
 
     @override
     def says(self) -> Says:
         return Says(
-            "배선된 스코프와 엔티티, 연산을 모두 실은 표",
-            english="the table carrying every wired scope, entity and operation",
+            "시나리오가 적은 스코프와 엔티티, 연산, 요구 권한을 그대로 실은 표",
+            english="the table carrying the scopes, entities, operations and bits the scenario states",
         )
 
     @override
     def holds(self, got: list[ScopeEntityOperationCombinationInfo]) -> bool:
-        if [one.scope_type for one in got] != list(role_scope_types()):
+        if [one.scope_type for one in got] != list(CATALOG_SCOPES):
             return False
         if not got:
             return False
-        first = [entity.entity_type for entity in got[0].entities]
+        expected = sorted(CATALOG_OPERATIONS)
         for one in got:
             entities = [entity.entity_type for entity in one.entities]
-            if entities != first or entities != sorted(entities):
+            if entities != expected:
                 return False
             for entity in one.entities:
-                names = [operation.operation for operation in entity.actions]
-                if not names or names != sorted(names):
+                wanted = CATALOG_OPERATIONS.get(entity.entity_type)
+                if wanted is None:
                     return False
-                if any(not operation.description for operation in entity.actions):
-                    return False
-                if any(
-                    not isinstance(operation.required_permission, PermissionBitDTO)
-                    for operation in entity.actions
-                ):
+                if not _operations_match(entity.actions, wanted):
                     return False
         return True
 
 
 @dataclass(frozen=True)
 class TheEntityOperations(Condition[list[EntityOperationCombinationInfo]]):
-    """역할이 허용할 수 있는 엔티티와 그 연산. 엔티티와 연산은 이름 순이다."""
+    """시나리오가 적은 엔티티와 그 연산, 요구 비트를 그대로 실은 목록. 엔티티와 연산은 이름 순이다."""
 
     @override
     def says(self) -> Says:
         return Says(
-            "배선된 엔티티와 그 연산을 모두 싣고 이름 순인 목록",
-            english="every wired entity with its operations, each in name order",
+            "시나리오가 적은 엔티티와 연산, 요구 권한을 그대로 싣고 이름 순인 목록",
+            english=(
+                "the list carrying the entities, operations and bits the scenario states, each in "
+                "name order"
+            ),
         )
 
     @override
     def holds(self, got: list[EntityOperationCombinationInfo]) -> bool:
-        entities = [one.entity_type for one in got]
-        if not entities or entities != sorted(entities):
+        if [one.entity_type for one in got] != sorted(CATALOG_OPERATIONS):
             return False
         for one in got:
-            names = [operation.operation for operation in one.operations]
-            if not names or names != sorted(names):
+            wanted = CATALOG_OPERATIONS.get(one.entity_type)
+            if wanted is None:
                 return False
-            if any(not operation.description for operation in one.operations):
+            if not _operations_match(one.operations, wanted):
                 return False
         return True
 
 
 @dataclass(frozen=True)
 class TheScopeEntities(Condition[list[ScopeEntityCombinationInfo]]):
-    """역할이 놓이는 스코프마다 권한이 지목할 수 있는 엔티티. 스코프와 엔티티는 이름 순이다."""
+    """시나리오가 적은 스코프마다 권한이 지목할 수 있는 엔티티. 스코프와 엔티티는 이름 순이다."""
 
     @override
     def says(self) -> Says:
         return Says(
-            "스코프마다 지목할 수 있는 엔티티를 모두 싣고 이름 순인 목록",
-            english="every scope with the entities it may name, each in name order",
+            "시나리오가 적은 스코프마다 지목할 수 있는 엔티티를 실은 목록",
+            english="each scope the scenario states, with the entities it may name",
         )
 
     @override
     def holds(self, got: list[ScopeEntityCombinationInfo]) -> bool:
-        if [one.scope_type for one in got] != list(role_scope_types()):
+        if [one.scope_type for one in got] != list(CATALOG_SCOPES):
             return False
-        first = list(got[0].valid_entity_types) if got else []
+        expected = sorted(CATALOG_OPERATIONS)
         for one in got:
-            entities = list(one.valid_entity_types)
-            if not entities or entities != sorted(entities):
-                return False
-            if entities != first:
+            if list(one.valid_entity_types) != expected:
                 return False
         return True
