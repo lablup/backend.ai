@@ -75,9 +75,12 @@ the product state.
 The ops tests check every case of the ops a call uses. Every ops factory src uses has processor or service tests
 (checked 2026-11-06). Repeating those cases in each entity's scenarios adds rows without checking anything new.
 
-What ops does not see, the adapter decides: which permission it checks, how it maps the request and response, and
-what it does outside ops. The defects found while writing scenarios were all there. An id found by name was looked
-up by another column, an empty domain name was passed on, and fields were dropped from a response.
+What ops does not see lies in two places. The adapter decides which permission it checks, how it maps the request
+and response, and what it does outside ops. Services and repositories decide the constraints that reject a
+permitted request: uniqueness, state transitions, rows in use, value ranges. The defects found while writing
+scenarios were all there. An id found by name was looked up by another column, an empty domain name was passed
+on, fields were dropped from a response, a uniqueness conflict was not converted to `BackendAIError`, and a
+folder not in the trash was restored.
 
 A rejection row whose user has no permission at all passes even when the adapter puts the wrong entity type or
 operation in the Action. Only a user with one permission removed from the success user tells them apart.
