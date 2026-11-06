@@ -99,10 +99,10 @@ def info(ctx: CLIContext, model_name: str) -> None:
 @click.option(
     "-g",
     "--group",
-    metavar="GROUP",
+    metavar="GROUP_ID",
     type=str,
     default=None,
-    help="Group ID or NAME.",
+    help="Project ID (UUID).",
 )
 @click.option(
     "--unmanaged",

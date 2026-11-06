@@ -71,10 +71,10 @@ def list_allowed_types() -> None:
 @click.option(
     "-g",
     "--group",
-    metavar="GROUP",
+    metavar="GROUP_ID",
     type=str,
     default=None,
-    help="Group ID or NAME. Specify this option if you want to create a group folder.",
+    help="Project ID (UUID). Specify this option if you want to create a project folder.",
 )
 @click.option(
     "--unmanaged",
