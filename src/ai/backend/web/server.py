@@ -616,6 +616,14 @@ async def extend_login_session(request: web.Request) -> web.Response:
 
     current = get_time()
     session = await get_session(request)
+    if not session.get("authenticated", False):
+        raise web.HTTPUnauthorized(
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/auth-failed",
+                "title": "Unauthorized access",
+            }),
+            content_type="application/problem+json",
+        )
 
     session.expiration_dt = current + login_session_extension_sec
     expires = datetime.fromtimestamp(session.expiration_dt, tz=UTC).isoformat()
