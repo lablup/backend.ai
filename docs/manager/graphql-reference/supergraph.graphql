@@ -9489,6 +9489,10 @@ type HuggingFaceRegistry implements Node
   entityId: UUID!
   url: String!
   name: String!
+
+  """
+  Access token for the registry. Masked unless the caller is a superadmin.
+  """
   token: String
 }
 
@@ -23089,6 +23093,10 @@ type ReservoirRegistry implements Node
   name: String!
   endpoint: String!
   accessKey: String!
+
+  """
+  Secret key for authentication. Masked unless the caller is a superadmin.
+  """
   secretKey: String!
   apiVersion: String!
 
