@@ -77,6 +77,7 @@ python-json-logger~=3.2.0
 pyzmq~=26.4
 PyJWT~=2.15.1
 PyYAML~=6.0
+oauthlib>=4.0.1
 pydantic[email]~=2.11.3
 packaging>=24.1
 hiredis>=3.0.0
