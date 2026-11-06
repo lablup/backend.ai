@@ -33,7 +33,9 @@ from textual.app import App
 from textual.containers import Vertical
 from textual.widgets import ProgressBar
 
+from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair
 
 from .common import detect_os
@@ -134,8 +136,8 @@ class Context(metaclass=ABCMeta):
             redis_sentinel_addrs=[],
             redis_password=None,
             etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8120))],
-            etcd_user=None,
-            etcd_password=None,
+            etcd_user="root",
+            etcd_password="develove",
         )
         service_config = ServiceConfig(
             webserver_addr=ServerAddr(
@@ -425,23 +427,19 @@ class Context(metaclass=ABCMeta):
     @actxmgr
     async def etcd_ctx(self) -> AsyncIterator[AsyncEtcd]:
         halfstack = self.install_info.halfstack_config
-        scope_prefix_map = {
-            ConfigScopes.GLOBAL: "",
-        }
-        creds: dict[str, str] | None = None
-        if halfstack.etcd_user is not None:
-            if halfstack.etcd_password is None:
-                raise ValueError("etcd_password must be set when etcd_user is provided")
-            creds = {
-                "user": halfstack.etcd_user,
-                "password": halfstack.etcd_password,
-            }
-        async with AsyncEtcd(
-            [addr.face for addr in self.install_info.halfstack_config.etcd_addr],
-            "local",
-            scope_prefix_map,
-            credentials=creds,
-        ) as etcd:
+        etcd_config = EtcdConfigData(
+            namespace="local",
+            addrs=[
+                HostPortPairModel(host=addr.face.host, port=addr.face.port)
+                for addr in halfstack.etcd_addr
+            ],
+            user=halfstack.etcd_user,
+            password=halfstack.etcd_password,
+            keep_alive_interval=halfstack.etcd_keep_alive_interval,
+            keep_alive_timeout=halfstack.etcd_keep_alive_timeout,
+            tls=None,
+        )
+        async with AsyncEtcd.create_from_config(etcd_config) as etcd:
             yield etcd
 
     async def etcd_put_json(
@@ -521,6 +519,7 @@ class Context(metaclass=ABCMeta):
         self.log_header("Installing halfstack...")
         await self._prepare_halfstack_files()
         await self._start_halfstack()
+        await self._enable_etcd_auth()
 
     async def _prepare_halfstack_files(self) -> None:
         base_path = self.install_info.base_path
@@ -654,6 +653,39 @@ class Context(metaclass=ABCMeta):
         """,
             cwd=self.install_info.base_path,
         )
+
+    def _halfstack_compose_cmd(self) -> list[str]:
+        compose_path = self.install_info.base_path / "docker-compose.halfstack.current.yml"
+        return [*self.docker_sudo, "docker", "compose", "-f", str(compose_path)]
+
+    async def _enable_etcd_auth(self) -> None:
+        """Create the halfstack etcd root user and enable authentication, unless already enabled."""
+        halfstack = self.install_info.halfstack_config
+        # The etcd image has no shell, so etcdctl runs through `docker compose exec`.
+        etcdctl = [*self._halfstack_compose_cmd(), "exec", "-T", "backendai-half-etcd", "etcdctl"]
+        proc = await asyncio.create_subprocess_exec(
+            *etcdctl,
+            "auth",
+            "status",
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout, _ = await proc.communicate()
+        if b"Authentication Status: false" not in stdout:
+            return
+        self.log_header("Enabling etcd authentication...")
+        # The root user remains from an earlier run that stopped before `auth enable`.
+        await self.run_exec([
+            *etcdctl,
+            "user",
+            "add",
+            halfstack.etcd_user,
+            f"--new-user-password={halfstack.etcd_password}",
+        ])
+        exit_code = await self.run_exec([*etcdctl, "auth", "enable"])
+        if exit_code != 0:
+            raise RuntimeError(f"Failed to enable etcd authentication (exit {exit_code})")
 
     async def load_seeds(self) -> None:
         with (
@@ -1129,14 +1161,8 @@ class Context(metaclass=ABCMeta):
             etcd_addr_table["port"] = halfstack.etcd_addr[0].face.port
             etcd_table["addr"] = etcd_addr_table
             etcd_table["namespace"] = "local"
-            if halfstack.etcd_user:
-                etcd_table["user"] = halfstack.etcd_user
-            else:
-                etcd_table.pop("user", None)
-            if halfstack.etcd_password:
-                etcd_table["password"] = halfstack.etcd_password
-            else:
-                etcd_table.pop("password", None)
+            etcd_table["user"] = halfstack.etcd_user
+            etcd_table["password"] = halfstack.etcd_password
             data["etcd"] = etcd_table
             data["storage-proxy"]["secret"] = service.storage_proxy_random  # type: ignore
             data["storage-proxy"]["ipc-base-path"] = service.storage_proxy_ipc_base_path  # type: ignore
@@ -2483,6 +2509,11 @@ class DockerContext(Context):
         compose_path = await self.generate_services_compose()
         self.log.write(Text.from_markup(f"generated [bold]{compose_path}[/]"))
         await self._start_halfstack()
+        await self._enable_etcd_auth()
+
+    @override
+    def _halfstack_compose_cmd(self) -> list[str]:
+        return [*self.docker_sudo, *self._services_compose_args()]
 
     @override
     async def _start_halfstack(self) -> None:

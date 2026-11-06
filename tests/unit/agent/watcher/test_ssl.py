@@ -15,7 +15,11 @@ class TestWatcherSSL:
         key_path = tmp_path / "watcher.key"
         config = {
             "logging": MagicMock(),
-            "etcd": EtcdConfig.model_validate({"namespace": "test"}),
+            "etcd": EtcdConfig.model_validate({
+                "namespace": "test",
+                "user": "test",
+                "password": "test",
+            }),
             "watcher": {
                 "service-addr": HostPortPair("127.0.0.1", 6009),
                 "ssl-enabled": True,
@@ -35,8 +39,7 @@ class TestWatcherSSL:
         with (
             patch("ai.backend.agent.watcher.Logger"),
             patch(
-                "ai.backend.agent.watcher.AsyncEtcd.create_from_config",
-                return_value=etcd_context,
+                "ai.backend.agent.watcher.AsyncEtcd.create_from_config", return_value=etcd_context
             ),
             patch("ai.backend.agent.watcher.web.AppRunner", return_value=AsyncMock()),
             patch("ai.backend.agent.watcher.web.TCPSite", return_value=AsyncMock()) as tcp_site,

@@ -1463,26 +1463,13 @@ async def aiomonitor_ctx(
 
 @asynccontextmanager
 async def etcd_ctx(local_config: AgentUnifiedConfig) -> AsyncGenerator[AsyncEtcd]:
-    etcd_credentials = None
-    if local_config.etcd.user and local_config.etcd.password:
-        etcd_credentials = {
-            "user": local_config.etcd.user,
-            "password": local_config.etcd.password,
-        }
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
         ConfigScopes.SGROUP: f"sgroup/{local_config.agent.legacy_sgroup_name()}",
         ConfigScopes.NODE: f"nodes/agents/{local_config.agent.defaulted_id}",
     }
-    etcd_config_data = local_config.etcd.to_dataclass()
-    async with AsyncEtcd(
-        [addr.to_legacy() for addr in etcd_config_data.addrs],
-        local_config.etcd.namespace,
-        scope_prefix_map,
-        credentials=etcd_credentials,
-        tls=etcd_config_data.tls,
-        keep_alive_interval=etcd_config_data.keep_alive_interval,
-        keep_alive_timeout=etcd_config_data.keep_alive_timeout,
+    async with AsyncEtcd.create_from_config(
+        local_config.etcd.to_dataclass(), scope_prefix_map
     ) as etcd:
         yield etcd
 

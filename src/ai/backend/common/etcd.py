@@ -61,6 +61,7 @@ from etcd_client import (
 )
 
 from ai.backend.common.data.config.types import EtcdConfigData, EtcdTLSConfigData
+from ai.backend.common.exception import InvalidConfigError
 from ai.backend.logging.structured import StructuredLogger
 
 from .types import HostPortPair, QueueSentinel
@@ -432,31 +433,18 @@ class AsyncEtcd(AbstractKVStore):
         return cast(float, min(delay, self.watch_reconnect_max_intvl))
 
     @classmethod
-    def create_from_config(cls, etcd_config: EtcdConfigData) -> Self:
-        etcd_addrs = [addr.to_legacy() for addr in etcd_config.addrs]
-        namespace = etcd_config.namespace
-        etcd_user = etcd_config.user
-        etcd_password = etcd_config.password
-
-        credentials = None
-        if etcd_user:
-            if etcd_password is None:
-                raise RuntimeError("etcd user is set, but password is not set")
-
-            credentials = {
-                "user": etcd_user,
-                "password": etcd_password,
-            }
-        scope_prefix_map = {
-            ConfigScopes.GLOBAL: "",
-            # TODO: provide a way to specify other scope prefixes
-        }
-
+    def create_from_config(
+        cls,
+        etcd_config: EtcdConfigData,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> Self:
+        if not etcd_config.user or not etcd_config.password:
+            raise InvalidConfigError("etcd user and password are required")
         return cls(
-            etcd_addrs,
-            namespace,
-            scope_prefix_map,
-            credentials=credentials,
+            [addr.to_legacy() for addr in etcd_config.addrs],
+            etcd_config.namespace,
+            scope_prefix_map or {ConfigScopes.GLOBAL: ""},
+            credentials={"user": etcd_config.user, "password": etcd_config.password},
             tls=etcd_config.tls,
             keep_alive_interval=etcd_config.keep_alive_interval,
             keep_alive_timeout=etcd_config.keep_alive_timeout,

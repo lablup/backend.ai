@@ -76,6 +76,8 @@ def create_test_config(
         "etcd": {
             "addr": "127.0.0.1:2379",
             "namespace": "test",
+            "user": "test",
+            "password": "test",
         },
     }
 

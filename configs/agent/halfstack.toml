@@ -1,8 +1,8 @@
 [etcd]
 namespace = "local"
 addr = { host = "127.0.0.1", port = 8120 }
-user = ""
-password = ""
+user = "root"
+password = "develove"
 
 
 [agent]

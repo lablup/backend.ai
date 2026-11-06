@@ -71,7 +71,11 @@ class TestAuthMiddleware:
 def _watcher_cfg() -> dict[str, Any]:
     return {
         "logging": MagicMock(),
-        "etcd": EtcdConfig.model_validate({"namespace": "test"}),
+        "etcd": EtcdConfig.model_validate({
+            "namespace": "test",
+            "user": "test",
+            "password": "test",
+        }),
         "watcher": {"ssl-enabled": False, "service-addr": MagicMock()},
     }
 

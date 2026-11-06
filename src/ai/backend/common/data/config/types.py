@@ -16,8 +16,8 @@ class EtcdTLSConfigData:
 class EtcdConfigData:
     namespace: str
     addrs: list[HostPortPair]
-    user: str | None
-    password: str | None
+    user: str
+    password: str
     keep_alive_interval: float
     keep_alive_timeout: float
     tls: EtcdTLSConfigData | None

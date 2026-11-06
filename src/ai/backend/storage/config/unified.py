@@ -1763,7 +1763,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
     ]
     etcd: Annotated[
         EtcdConfig,
-        Field(default_factory=EtcdConfig),
+        Field(),
         BackendAIConfigMeta(
             description=(
                 "etcd configuration for distributed key-value storage. etcd is used for "

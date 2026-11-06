@@ -18,7 +18,6 @@ from pydantic import (
 
 from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs import (
-    EtcdConfig,
     OTELConfig,
     PyroscopeConfig,
     ServiceDiscoveryConfig,
@@ -2313,18 +2312,6 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         Field(default_factory=OTELConfig),
         BackendAIConfigMeta(
             description="OpenTelemetry integration for distributed tracing and metrics collection.",
-            added_version="25.12.0",
-            composite=CompositeType.FIELD,
-        ),
-    ]
-    etcd: Annotated[
-        EtcdConfig,
-        Field(default_factory=EtcdConfig),
-        BackendAIConfigMeta(
-            description=(
-                "etcd connection settings for distributed configuration and "
-                "coordination with other Backend.AI components."
-            ),
             added_version="25.12.0",
             composite=CompositeType.FIELD,
         ),
