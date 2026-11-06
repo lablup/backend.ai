@@ -6,11 +6,12 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from etcd_client import GRPCStatusError
 
-from ai.backend.common.configs.etcd import EtcdTLSConfig
+from ai.backend.common.configs.etcd import EtcdConfig, EtcdTLSConfig
 from ai.backend.common.data.config.types import EtcdConfigData, EtcdTLSConfigData
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import BackendAISchemaValidationFailed
@@ -33,6 +34,12 @@ class _HandshakeTimeoutConversionCase:
     expected_handshake_timeout: float | None
 
 
+@dataclass(frozen=True)
+class _EndpointSchemeCase:
+    tls_enabled: bool
+    expected_endpoint: str
+
+
 @pytest.fixture
 def pem_file(tmp_path: Path) -> Path:
     path = tmp_path / "certificate.pem"
@@ -52,8 +59,13 @@ def raw_tls_config_of_case(
 
 
 @pytest.fixture
-def disabled_tls_config_with_certificates(pem_file: Path) -> EtcdTLSConfig:
-    return EtcdTLSConfig.model_validate({"enabled": False, "ca-cert": pem_file})
+def etcd_config_data_of_case(case: _EndpointSchemeCase, pem_file: Path) -> EtcdConfigData:
+    return EtcdConfig.model_validate({
+        "addrs": [{"host": "127.0.0.1", "port": 2379}],
+        "user": "etcd-user",
+        "password": "etcd-password",
+        "tls": {"enabled": case.tls_enabled, "ca-cert": pem_file},
+    }).to_dataclass()
 
 
 @pytest.fixture
@@ -81,6 +93,7 @@ def etcd_of_server_silent_during_handshake(pem_file: Path) -> Iterator[AsyncEtcd
                 keep_alive_interval=5.0,
                 keep_alive_timeout=3.0,
                 tls=EtcdTLSConfigData(
+                    enabled=True,
                     ca_cert=pem_file,
                     client_cert=None,
                     client_key=None,
@@ -127,11 +140,6 @@ class TestEtcdTLSConfig:
         with pytest.raises(BackendAISchemaValidationFailed, match=case.expected_error):
             EtcdTLSConfig.model_validate(raw_tls_config_of_case)
 
-    def test_disabled_config_converts_to_none(
-        self, disabled_tls_config_with_certificates: EtcdTLSConfig
-    ) -> None:
-        assert disabled_tls_config_with_certificates.to_dataclass() is None
-
     @pytest.mark.parametrize(
         "case",
         [
@@ -147,6 +155,7 @@ class TestEtcdTLSConfig:
         pem_file: Path,
     ) -> None:
         assert enabled_tls_config_of_case.to_dataclass() == EtcdTLSConfigData(
+            enabled=True,
             ca_cert=pem_file,
             client_cert=pem_file,
             client_key=pem_file,
@@ -155,6 +164,22 @@ class TestEtcdTLSConfig:
 
 
 class TestAsyncEtcdOverTLS:
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _EndpointSchemeCase(tls_enabled=True, expected_endpoint="https://127.0.0.1:2379"),
+            _EndpointSchemeCase(tls_enabled=False, expected_endpoint="http://127.0.0.1:2379"),
+        ],
+        ids=lambda case: f"tls-enabled-{case.tls_enabled}",
+    )
+    def test_tls_enabled_selects_endpoint_scheme(
+        self, case: _EndpointSchemeCase, etcd_config_data_of_case: EtcdConfigData
+    ) -> None:
+        with patch("ai.backend.common.etcd.EtcdClient") as etcd_client_cls:
+            AsyncEtcd.create_from_config(etcd_config_data_of_case)
+
+        assert etcd_client_cls.call_args.args[0] == [case.expected_endpoint]
+
     async def test_handshake_timeout_ends_open_on_silent_server(
         self, etcd_of_server_silent_during_handshake: AsyncEtcd
     ) -> None:

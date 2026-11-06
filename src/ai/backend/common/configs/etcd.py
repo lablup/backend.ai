@@ -78,11 +78,9 @@ class EtcdTLSConfig(BaseConfigSchema):
             raise ValueError("etcd.tls.client-cert and etcd.tls.client-key must be set together")
         return self
 
-    def to_dataclass(self) -> EtcdTLSConfigData | None:
-        """Convert to EtcdTLSConfigData, or None when TLS is not enabled."""
-        if not self.enabled or self.ca_cert is None:
-            return None
+    def to_dataclass(self) -> EtcdTLSConfigData:
         return EtcdTLSConfigData(
+            enabled=self.enabled,
             ca_cert=self.ca_cert,
             client_cert=self.client_cert,
             client_key=self.client_key,
