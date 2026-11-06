@@ -221,8 +221,8 @@ class AuthRepository:
         user_id: UserID,
         result: LoginAttemptResult,
         client_ip: str | None = None,
-    ) -> bool:
-        return await self._db_source.delete_owned_session_by_token(
+    ) -> None:
+        await self._db_source.delete_owned_session_by_token(
             session_token, user_id, result, client_ip
         )
 

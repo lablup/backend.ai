@@ -18,7 +18,7 @@ from ai.backend.manager.data.auth.login_session_types import (
     LoginSessionStatus,
 )
 from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.errors.auth import AuthorizationFailed
+from ai.backend.manager.errors.auth import AuthorizationFailed, LoginSessionNotFoundError
 from ai.backend.manager.models.agent.row import AgentRow
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
@@ -424,12 +424,26 @@ class TestLoginSessionForce:
             domain_name=sample_user.domain_name,
         )
 
-        owned_session_deleted = await auth_db_source.delete_owned_session_by_token(
-            created.session_token, UserID(uuid.uuid4()), LoginAttemptResult.LOGOUT
+        with pytest.raises(LoginSessionNotFoundError):
+            await auth_db_source.delete_owned_session_by_token(
+                created.session_token, UserID(uuid.uuid4()), LoginAttemptResult.LOGOUT
+            )
+
+        assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1
+        assert (
+            await self._count_login_history(
+                db_with_cleanup, sample_user.user_id, LoginAttemptResult.LOGOUT
+            )
+            == 0
         )
 
-        assert owned_session_deleted is False
-        assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1
+    async def test_logout_with_missing_token_raises_not_found(
+        self, auth_db_source: AuthDBSource, sample_user: SampleUserData
+    ) -> None:
+        with pytest.raises(LoginSessionNotFoundError):
+            await auth_db_source.delete_owned_session_by_token(
+                "missing-token", UserID(sample_user.user_id), LoginAttemptResult.LOGOUT
+            )
 
     @pytest.fixture
     async def mixed_session_tokens(

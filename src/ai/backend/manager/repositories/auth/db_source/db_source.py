@@ -686,19 +686,22 @@ class AuthDBSource:
         user_id: UserID,
         result: LoginAttemptResult,
         client_ip: str | None = None,
-    ) -> bool:
-        """Delete the user's login session by its token and record history.
-
-        Returns False, deleting nothing, if the token is missing or owned by another user.
+    ) -> None:
+        """Validate ownership, delete the session, and record history in one transaction.
+        Raise LoginSessionNotFoundError if the token is missing or belongs to another user.
         """
         ls = LoginSessionRow.__table__
         lh = LoginHistoryRow.__table__
-        async with self._db.connect() as conn:
-            deleted = (
-                sa.delete(ls)
+        async with self._db.begin() as conn:
+            session_id = await conn.scalar(
+                sa.select(ls.c.id)
                 .where((ls.c.session_token == session_token) & (ls.c.user_id == user_id))
-                .returning(ls.c.user_id)
-                .cte("deleted")
+                .with_for_update()
+            )
+            if session_id is None:
+                raise LoginSessionNotFoundError()
+            deleted = (
+                sa.delete(ls).where(ls.c.id == session_id).returning(ls.c.user_id).cte("deleted")
             )
             insert_query = lh.insert().from_select(
                 ["user_id", "domain_name", "result", "client_ip"],
@@ -709,10 +712,7 @@ class AuthDBSource:
                     sa.literal(client_ip, type_=pgsql.INET).label("client_ip"),
                 ).select_from(deleted.join(users, deleted.c.user_id == users.c.uuid)),
             )
-            inserted = await conn.execute(insert_query.returning(lh.c.id))
-            owned_session_deleted = inserted.first() is not None
-            await conn.commit()
-            return owned_session_deleted
+            await conn.execute(insert_query)
 
     @auth_db_source_resilience.apply()
     async def delete_sessions_by_user(
