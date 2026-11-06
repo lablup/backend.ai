@@ -1077,6 +1077,27 @@ class CreateResourceGroupInputGQL(PydanticInputMixin[CreateResourceGroupInputDTO
         ),
         default=False,
     )
+    is_active: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether the resource group is active.",
+        ),
+        default=True,
+    )
+    is_public: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether the resource group is public.",
+        ),
+        default=True,
+    )
+    scheduler_type: SchedulerTypeGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE).",
+        ),
+        default=SchedulerTypeGQL.FIFO,
+    )
 
 
 @gql_pydantic_type(

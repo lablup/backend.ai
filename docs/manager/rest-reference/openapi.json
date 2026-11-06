@@ -25114,6 +25114,17 @@
         "title": "AdminSearchResourceGroupsInput",
         "type": "object"
       },
+      "SchedulerTypeDTO": {
+        "description": "Scheduler type for resource group.",
+        "enum": [
+          "fifo",
+          "lifo",
+          "drf",
+          "fair-share"
+        ],
+        "title": "SchedulerTypeDTO",
+        "type": "string"
+      },
       "CreateResourceGroupInput": {
         "description": "Input for creating a new resource group.",
         "properties": {
@@ -25201,6 +25212,23 @@
             "description": "Make this the default resource group. At most one resource group may hold the flag, so this is rejected while another one holds it; clear that one first.",
             "title": "Is Default",
             "type": "boolean"
+          },
+          "is_active": {
+            "default": true,
+            "description": "Whether the resource group is active.",
+            "title": "Is Active",
+            "type": "boolean"
+          },
+          "is_public": {
+            "default": true,
+            "description": "Whether the resource group is public.",
+            "title": "Is Public",
+            "type": "boolean"
+          },
+          "scheduler_type": {
+            "$ref": "#/components/schemas/SchedulerTypeDTO",
+            "default": "fifo",
+            "description": "Scheduler type value (fifo/lifo/drf/fair-share)."
           }
         },
         "required": [
@@ -25290,17 +25318,6 @@
           "resource-group"
         ],
         "title": "PreemptionVictimScope",
-        "type": "string"
-      },
-      "SchedulerTypeDTO": {
-        "description": "Scheduler type for resource group.",
-        "enum": [
-          "fifo",
-          "lifo",
-          "drf",
-          "fair-share"
-        ],
-        "title": "SchedulerTypeDTO",
         "type": "string"
       },
       "UpdateResourceGroupInput": {
