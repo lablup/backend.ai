@@ -22,7 +22,7 @@ from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
 from ai.backend.common import config
-from ai.backend.common.configs.etcd import EtcdTLSConfig
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.types import BackendAISchema
 from ai.backend.logging import LogLevel
 
@@ -218,26 +218,6 @@ class GroupID:
                 core_schema.str_schema(),
             ])
         )
-
-
-class EtcdConfig(BaseSchema):
-    namespace: Annotated[str, Field(description="etcd namespace.")]
-    addr: Annotated[
-        HostPortPair,
-        Field(
-            description="Address to access the etcd.",
-            examples=[HostPortPair(host="127.0.0.1", port=8121)],
-        ),
-    ]
-    user: Annotated[str, Field(description="etcd user.")]
-    password: Annotated[str, Field(description="etcd password.")]
-    tls: Annotated[
-        EtcdTLSConfig,
-        Field(
-            default_factory=EtcdTLSConfig,
-            description="TLS settings for the connection to etcd.",
-        ),
-    ]
 
 
 class DBConfig(BaseSchema):
