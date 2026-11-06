@@ -318,17 +318,21 @@
         # Connect to etcd over TLS. Requires ca-cert.
         # Added in 26.10.0
         enabled = false
+
         # PEM file of the CA certificate that signed the etcd server
         # certificate.
         # Added in 26.10.0
         ## ca-cert = "/etc/backend.ai/etcd/ca.pem"
+
         # PEM file of the client certificate, for an etcd started with --client-
         # cert-auth. Set together with client-key.
         # Added in 26.10.0
         ## client-cert = "/etc/backend.ai/etcd/client.pem"
+
         # PEM file of the client private key. Set together with client-cert.
         # Added in 26.10.0
         ## client-key = "/etc/backend.ai/etcd/client-key.pem"
+
         # Seconds to wait for the TLS handshake with an etcd member. Request
         # timeouts do not end a stalled handshake.
         # Added in 26.10.0
