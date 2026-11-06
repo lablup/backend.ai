@@ -81,6 +81,7 @@ jobs:
           COMMIT_AUTHOR: ${{ matrix.author }}
           COMMIT_AUTHOR_EMAIL: ${{ matrix.author_email }}
           TARGET_COMMIT: ${{ matrix.commit }}
+          TARGET_BRANCH: ${{ matrix.target_branch }}
         run: |
           git config user.name "$COMMIT_AUTHOR"
           git config user.email "$COMMIT_AUTHOR_EMAIL"
@@ -93,12 +94,26 @@ jobs:
             "docs/manager/graphql-reference/*.graphql merge=ours" \
             >> .git/info/attributes
           if ! git cherry-pick "$TARGET_COMMIT"; then
-            # Source conflict: commit the markers as-is so the pull request is
-            # still created (without auto-merge) -- CI fails on it until a
-            # human resolves the markers on its branch.
+            # A file the release branch does not have conflicts as "deleted by
+            # us"; `git add` would copy main's whole file in, so leave it out.
+            missing_files=$(git status --porcelain=v1 | sed -n 's/^DU //p')
+            if [ -n "$missing_files" ]; then
+              printf '%s\n' "$missing_files" | while IFS= read -r path; do git rm -q -- "$path"; done
+            fi
+            # No check fails on markers in every kind of file, so the pull
+            # request is opened as a draft that lists what to resolve.
+            conflict_files=$(git diff --name-only --diff-filter=U)
+            details=""
+            if [ -n "$conflict_files" ]; then
+              details=$(printf "Conflict markers are committed in:\n\n\`\`\`\n%s\n\`\`\`" "$conflict_files")
+            fi
+            if [ -n "$missing_files" ]; then
+              details=$(printf "%s\n\nLeft out because \`%s\` does not have them:\n\n\`\`\`\n%s\n\`\`\`" "$details" "$TARGET_BRANCH" "$missing_files")
+            fi
             {
-              echo "conflict_files<<EOF"
-              git diff --name-only --diff-filter=U
+              echo "conflicted=true"
+              echo "conflict_details<<EOF"
+              printf '%s\n' "$details"
               echo "EOF"
             } >> "$GITHUB_OUTPUT"
             git add -A
@@ -113,7 +128,13 @@ jobs:
           # The headline keeps the original `(#N)` suffix -- with no backport
           # trailers, that is the only provenance the commit carries.
           title: "${{ matrix.commit_headline }}"
-          body: "This is an auto-generated backport of #${{ matrix.pr_number }} to the ${{ matrix.target_branch }} release."
+          body: |
+            This is an auto-generated backport of #${{ matrix.pr_number }} to the ${{ matrix.target_branch }} release.
+
+            ${{ steps.pick.outputs.conflicted == 'true' && '**The cherry-pick conflicted.** This pull request is a draft without auto-merge: resolve the files below on its branch, then mark it ready.' || '' }}
+
+            ${{ steps.pick.outputs.conflict_details }}
+          draft: ${{ steps.pick.outputs.conflicted == 'true' }}
           branch: "backport/${{ matrix.pr_number }}-to-${{ matrix.target_branch }}"
           base: ${{ matrix.target_branch }}
           labels: |
@@ -121,21 +142,22 @@ jobs:
             ${{ matrix.labels }}
           assignees: ${{ matrix.author_login }}
       - name: Enable auto-merge
-        if: ${{ steps.pr.outputs.pull-request-number && steps.pick.outputs.conflict_files == '' }}
+        if: ${{ steps.pr.outputs.pull-request-number && steps.pick.outputs.conflicted != 'true' }}
         env:
           GH_TOKEN: ${{ secrets.OCTODOG }}
         run: gh pr merge "${{ steps.pr.outputs.pull-request-number }}" --auto --squash
       - name: Report the conflict
-        if: ${{ failure() || steps.pick.outputs.conflict_files != '' }}
+        if: ${{ failure() || steps.pick.outputs.conflicted == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ matrix.pr_number }}
           TARGET_BRANCH: ${{ matrix.target_branch }}
-          CONFLICT_FILES: ${{ steps.pick.outputs.conflict_files }}
+          CONFLICTED: ${{ steps.pick.outputs.conflicted }}
+          CONFLICT_DETAILS: ${{ steps.pick.outputs.conflict_details }}
           BACKPORT_PR_URL: ${{ steps.pr.outputs.pull-request-url }}
         run: |
-          if [ -n "$BACKPORT_PR_URL" ] && [ -n "$CONFLICT_FILES" ]; then
-            body=$(printf 'The backport to `%s` hit conflicts: %s was created with the conflict markers committed in:\n\n```\n%s\n```\n\nCI on it fails until the markers are resolved; check out its branch, fix, push, and merge it by hand (auto-merge is not enabled for conflicted backports).' "$TARGET_BRANCH" "$BACKPORT_PR_URL" "$CONFLICT_FILES")
+          if [ -n "$BACKPORT_PR_URL" ] && [ "$CONFLICTED" = "true" ]; then
+            body=$(printf "The backport to \`%s\` hit conflicts: %s was opened as a draft without auto-merge. Resolve it on its branch, mark it ready and merge it by hand.\n\n%s" "$TARGET_BRANCH" "$BACKPORT_PR_URL" "$CONFLICT_DETAILS")
           else
             body="The backport to \`$TARGET_BRANCH\` did not apply cleanly and has to be done by hand."
           fi
