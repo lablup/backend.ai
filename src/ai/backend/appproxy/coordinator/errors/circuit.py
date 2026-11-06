@@ -4,6 +4,13 @@ Circuit-related exceptions for the coordinator.
 
 from __future__ import annotations
 
+<<<<<<< HEAD
+=======
+from typing import override
+
+from aiohttp import web
+
+>>>>>>> f22702d9a (fix(BA-8913): refuse HTTP/2 circuits that need access control (#16418))
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -52,4 +59,19 @@ class InvalidCircuitStateError(BackendAIError):
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.MISMATCH,
+        )
+
+
+class HTTP2AccessControlNotSupportedError(BackendAIError, web.HTTPBadRequest):
+    """Raised when a circuit on an HTTP/2 worker needs credentials or a client IP allowlist."""
+
+    error_type = "https://api.backend.ai/probs/appproxy/http2-access-control-not-supported"
+    error_title = "An HTTP/2 worker serves only public circuits without a client IP allowlist."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.APPPROXY,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )

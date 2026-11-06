@@ -649,7 +649,9 @@ class ProxyWorkerConfig(BaseSchema):
             description=(
                 "The protocol to use for proxied connections. 'http' for HTTP/1.1 traffic, "
                 "'h2' for HTTP/2 traffic (requires http2 config), 'tcp' for raw TCP proxying. "
-                "'grpc' is not directly supported; use 'h2' instead for gRPC traffic."
+                "'grpc' is not directly supported; use 'h2' instead for gRPC traffic. "
+                "An 'h2' worker cannot check credentials or client addresses, so it serves only "
+                "circuits that are open to public and have no 'allowed_client_ips'."
             ),
             added_version="25.9.0",
             example=ConfigExample(local="http", prod="http"),

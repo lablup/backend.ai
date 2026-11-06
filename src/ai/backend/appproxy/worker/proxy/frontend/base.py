@@ -25,7 +25,7 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
         self.circuits = {}
         self.backends = {}
 
-    async def register_circuit(self, circuit: Circuit, routes: list[RouteInfo]) -> None:
+    async def register_circuit(self, circuit: Circuit, routes: list[RouteInfo]) -> bool:
         metrics = self.root_context.metrics
 
         key = self.get_circuit_key(circuit)
@@ -35,6 +35,7 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
             "circuit {} (app:{}, mode: {}) registered", circuit.id, circuit.app, circuit.app_mode
         )
         metrics.circuit.observe_circuit_creation(protocol=circuit.protocol.name)
+        return True
 
     async def update_circuit_route_info(
         self, circuit: Circuit, new_routes: list[RouteInfo]
