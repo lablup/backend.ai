@@ -1,4 +1,4 @@
-"""Manager-side request body for the single-endpoint AppProxy coordinator API.
+"""Manager-side request bodies for the AppProxy coordinator API.
 
 Shared tag models (``SessionTagsModel`` / ``EndpointTagsModel`` / ``TagsModel``)
 live in :mod:`ai.backend.common.dto.appproxy_coordinator.v2.endpoint.types` —
@@ -6,6 +6,8 @@ import them from there instead of this module.
 """
 
 from __future__ import annotations
+
+from uuid import UUID
 
 from pydantic import Field
 
@@ -54,3 +56,22 @@ class CreateEndpointRequestBody(BaseRequestModel):
             "service replicas using this path / interval / timeout."
         ),
     )
+
+
+class SessionAppSessionInfo(BaseRequestModel):
+    """Session identity sent with ``POST /v2/conf``."""
+
+    id: UUID = Field(..., description="Session ID.")
+    user_uuid: UUID = Field(..., description="Session owner's user ID.")
+    group_id: UUID = Field(..., description="Session's project ID (legacy wire key).")
+    access_key: str | None = Field(..., description="Session owner's access key.")
+    domain_name: str = Field(..., description="Session's domain name.")
+
+
+class CreateSessionAppTokenRequestBody(BaseRequestModel):
+    """Request body for ``POST /v2/conf``, which issues a token for an interactive session app."""
+
+    login_session_token: str | None = Field(..., description="Webserver login session token.")
+    kernel_host: str = Field(..., description="Host the app port is reachable on.")
+    kernel_port: int = Field(..., description="Host port of the app.")
+    session: SessionAppSessionInfo = Field(..., description="Session identity.")

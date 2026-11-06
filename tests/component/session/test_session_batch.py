@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
@@ -178,23 +178,11 @@ class TestSessionStartService:
         # Mock agent start_service
         agent_registry.start_service.return_value = {"status": "started"}
 
-        # Mock the HTTP POST to wsproxy /v2/conf
-        mock_resp = AsyncMock()
-        mock_resp.json.return_value = {"token": "test-token-xyz"}
-        mock_session_ctx = AsyncMock()
-        mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
-        mock_session_ctx.__aexit__ = AsyncMock(return_value=False)
-        mock_session_obj = MagicMock()
-        mock_session_obj.post.return_value = mock_session_ctx
-        mock_session_cls = AsyncMock()
-        mock_session_cls.__aenter__ = AsyncMock(return_value=mock_session_obj)
-        mock_session_cls.__aexit__ = AsyncMock(return_value=False)
-
-        with patch("aiohttp.ClientSession", return_value=mock_session_cls):
-            result = await admin_registry.session.start_service(
-                session_seed.session_id,
-                StartServiceRequest(app="ttyd"),
-            )
+        mock_client.create_session_app_token.return_value = "test-token-xyz"
+        result = await admin_registry.session.start_service(
+            session_seed.session_id,
+            StartServiceRequest(app="ttyd"),
+        )
 
         assert isinstance(result, StartServiceResponse)
         assert result.token == "test-token-xyz"
