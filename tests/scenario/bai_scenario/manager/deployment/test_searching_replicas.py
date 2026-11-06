@@ -8,6 +8,7 @@ from typing import override
 
 import pytest
 
+from ai.backend.common.data.model_deployment.types import RouteTrafficStatus
 from ai.backend.common.dto.manager.v2.deployment.request import SearchReplicasInput
 from ai.backend.common.dto.manager.v2.deployment.response import SearchReplicasPayload
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
@@ -73,6 +74,7 @@ class TheReplicaPageComesBack(Then[ARoutedDeploymentAndACaller, Answer]):
     """심은 복제본이 양과 함께 온다."""
 
     started: datetime
+    traffic_status: str = "inactive"
 
     @override
     def says(self) -> str:
@@ -97,9 +99,9 @@ class TheReplicaPageComesBack(Then[ARoutedDeploymentAndACaller, Answer]):
             if route is None:
                 verdicts.append(Same(f"items[{i}].id", node.id, "a replica the deployment holds"))
             else:
-                verdicts += TheReplicaNode(self.started, revision_id=laid.revision_id).verdicts(
-                    node, route, f"items[{i}]."
-                )
+                verdicts += TheReplicaNode(
+                    self.started, revision_id=laid.revision_id, traffic_status=self.traffic_status
+                ).verdicts(node, route, f"items[{i}].")
         return verdicts
 
 
@@ -134,6 +136,42 @@ class AUserGrantedDeploymentReadSearchesTheReplicas(
     @override
     def then(self) -> Then[ARoutedDeploymentAndACaller, Answer]:
         return TheReplicaPageComesBack(started=self.started)
+
+
+@dataclass(frozen=True)
+class AUserGrantedDeploymentReadSearchesTheReplicaWithTrafficEnabled(
+    Scenario[TestSeedingSession, ARoutedDeploymentAndACaller, DeploymentAdapter, Answer]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-deployment-read-searches-the-replica-with-traffic-enabled"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "배포 조회 권한을 받은 사용자가 트래픽이 켜진 라우트의 복제본을 조회하면, "
+            "심은 복제본이 옵니다",
+            english=(
+                "when a user granted deployment read searches the replica of a route with "
+                "traffic enabled, the replicas seeded in advance come back"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ARoutedDeploymentAndACaller]:
+        return ADeploymentWithRoutes(granted=(Permission.READ,), active_traffic=True)
+
+    @override
+    def when(self) -> When[ARoutedDeploymentAndACaller, DeploymentAdapter, Answer]:
+        return SearchingTheReplicasOfTheDeployment()
+
+    @override
+    def then(self) -> Then[ARoutedDeploymentAndACaller, Answer]:
+        return TheReplicaPageComesBack(
+            started=self.started, traffic_status=RouteTrafficStatus.ACTIVE.value
+        )
 
 
 @dataclass(frozen=True)
@@ -172,6 +210,7 @@ STARTED = datetime.now(UTC)
 
 SCENARIOS: list[ReplicaStep] = [
     AUserGrantedDeploymentReadSearchesTheReplicas(started=STARTED),
+    AUserGrantedDeploymentReadSearchesTheReplicaWithTrafficEnabled(started=STARTED),
     AUserGrantedNothingSearchesNoReplica(),
 ]
 

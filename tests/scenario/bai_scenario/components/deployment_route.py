@@ -19,7 +19,7 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.deployment.response import ReplicaNode, RouteNode
-from ai.backend.manager.data.deployment.types import DeploymentInfo
+from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteTrafficStatus
 from ai.backend.manager.data.model_serving.types import RoutingData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
@@ -65,6 +65,7 @@ class ADeploymentWithRoutes(Given[Any, ARoutedDeploymentAndACaller]):
     granted: tuple[Permission, ...] = ()
     role: UserRole = UserRole.USER
     routes: int = 1
+    active_traffic: bool = False
 
     @override
     def describe(self) -> str:
@@ -78,12 +79,15 @@ class ADeploymentWithRoutes(Given[Any, ARoutedDeploymentAndACaller]):
             names = ", ".join(p.name or "" for p in self.granted)
             who_ko = f"배포에 {names} 권한을 받은 사용자"
             who_en = f"a user granted the {names} permission on deployments"
+        if self.active_traffic:
+            routes_ko = f"트래픽이 켜진 복제본 라우트 {self.routes}개"
+            routes_en = f"{self.routes} replica routes with traffic enabled"
+        else:
+            routes_ko = f"복제본 라우트 {self.routes}개"
+            routes_en = f"{self.routes} replica routes"
         return Says(
-            f"리비전과 복제본 라우트 {self.routes}개가 딸린 배포 하나와, {who_ko} 한 명",
-            english=(
-                f"one deployment holding one revision and {self.routes} replica routes, "
-                f"and {who_en}"
-            ),
+            f"리비전과 {routes_ko}가 딸린 배포 하나와, {who_ko} 한 명",
+            english=(f"one deployment holding one revision and {routes_en}, and {who_en}"),
         )
 
     @override
@@ -107,6 +111,11 @@ class ADeploymentWithRoutes(Given[Any, ARoutedDeploymentAndACaller]):
                     session_owner_id=made.metadata.session_owner,
                     domain=made.metadata.domain,
                     project_id=made.metadata.project,
+                    traffic_status=(
+                        RouteTrafficStatus.ACTIVE
+                        if self.active_traffic
+                        else RouteTrafficStatus.INACTIVE
+                    ),
                 ),
                 deployment,
             )

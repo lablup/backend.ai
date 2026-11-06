@@ -60,7 +60,7 @@ class SearchingPresets(When[PresetsAndACaller, DeploymentRevisionPresetAdapter, 
     @override
     def describe(self, laid: PresetsAndACaller) -> str:
         return Says(
-            f"{laid.caller.username} 이 프리셋을 훕습니다",
+            f"{laid.caller.username} 이 프리셋을 훑습니다",
             english=f"{laid.caller.username} searches the presets",
         )
 
@@ -92,6 +92,7 @@ class TheSeededPresetsComeBack(Then[PresetsAndACaller, Answer]):
             return [Refused(NotEnoughPermission, answered.raised)]
         verdicts: list[Verdict] = [
             Same("total_count", page.total_count, len(laid.presets)),
+            Same("items count", len(page.items), len(laid.presets)),
             Same("has_next_page", page.has_next_page, False),
             Same("has_previous_page", page.has_previous_page, False),
         ]

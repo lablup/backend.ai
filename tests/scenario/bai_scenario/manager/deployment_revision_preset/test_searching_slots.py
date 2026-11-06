@@ -129,6 +129,7 @@ class TheSlotComesBack(Then[PresetsAndACaller, Answer]):
             return [MissingResponse(answered.raised)]
         verdicts: list[Verdict] = [
             Same("total_count", page.total_count, 1),
+            Same("items count", len(page.items), 1),
             Same("has_next_page", page.has_next_page, False),
             Same("has_previous_page", page.has_previous_page, False),
         ]

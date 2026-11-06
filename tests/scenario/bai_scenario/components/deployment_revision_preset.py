@@ -10,17 +10,24 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.config import PresetModelConfig, PresetModelDefinition
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
     DeploymentRevisionPresetNode,
+    PresetValueInfo,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
+    PresetModelConfigInfoDTO,
+    PresetModelDefinitionInfoDTO,
 )
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Condition,
@@ -38,6 +45,7 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.domain import Mentions
 from bai_scenario.components.system import lay_a_caller, lay_a_public_reader, role_named
 from bai_scenario.seeds.deployment.revision_preset import TestSeedDeploymentRevisionPreset
+from bai_scenario.seeds.runtime_variant.preset import TestSeedRuntimeVariantPreset
 from bai_scenario.seeds.runtime_variant.runtime_variant import TestSeedRuntimeVariant
 
 LAID_DESCRIPTION = Says("미리 저장한 프리셋", english="a preset seeded in advance")
@@ -125,6 +133,50 @@ class PresetsAndAnOutsider(Given[Any, PresetsAndACaller]):
 
 
 @dataclass(frozen=True)
+class AFilledPresetAndACaller(Given[Any, PresetsAndACaller]):
+    """모델 정의와 런타임 파라미터 값이 채워진 프리셋 하나와, 그것을 읽을 수 있는 사용자 한 명."""
+
+    role: UserRole = UserRole.USER
+
+    @override
+    def describe(self) -> str:
+        who = role_named(self.role)
+        return Says(
+            f"모델 정의와 런타임 파라미터 값이 채워진 배포 리비전 프리셋 하나와, {who} 한 명",
+            english=(
+                "one deployment revision preset carrying a model definition and runtime "
+                f"preset values, and one {in_language(who, Language.ENGLISH)}"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> PresetsAndACaller:
+        variant = await seeding.creating(TestSeedRuntimeVariant())
+        runtime_preset = await seeding.creating_from(TestSeedRuntimeVariantPreset(), variant)
+        preset = await seeding.creating_from(
+            TestSeedDeploymentRevisionPreset(
+                model_definition=PresetModelDefinition(
+                    models=[
+                        PresetModelConfig(name="preset-model", model_path="/models/preset-model")
+                    ]
+                ),
+                preset_values=(
+                    RuntimeVariantPresetValueEntry(
+                        preset_id=seeding.made(runtime_preset).id,
+                        value="preset-value",
+                    ),
+                ),
+            ),
+            variant,
+        )
+        caller = await lay_a_public_reader(seeding, DeploymentPresetEntityType(), self.role)
+        return PresetsAndACaller(
+            presets=(seeding.made(preset),),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
 class AVariantAndACaller:
     """변형 하나와, 그것으로 프리셋을 만들 사람."""
 
@@ -188,6 +240,20 @@ class ThePresetNode:
             if self.updated_at is not None
             else SameAs(laid.updated_at, PRESET_CREATED_AT)
         )
+        expected_model_definition = (
+            PresetModelDefinitionInfoDTO(
+                models=[
+                    PresetModelConfigInfoDTO(name=m.name, model_path=m.model_path)
+                    for m in laid.model_definition.models
+                ]
+            )
+            if laid.model_definition is not None
+            else None
+        )
+        expected_preset_values = [
+            PresetValueInfo(preset_id=pv.preset_id, value=pv.value)
+            for pv in laid.runtime_variant_preset_values
+        ]
         return [
             Held[UUID](f"{at}id", node.id, SameAs(laid.id, PRESET_ID)),
             Held[UUID](f"{at}entity_id", node.entity_id, SameAs(laid.id, PRESET_ID)),
@@ -243,8 +309,8 @@ class ThePresetNode:
                 node.deployment_defaults.deployment_strategy_spec,
                 laid.deployment_strategy_spec,
             ),
-            Same(f"{at}model_definition", node.model_definition, laid.model_definition),
-            Same(f"{at}preset_values", node.preset_values, laid.runtime_variant_preset_values),
+            Same(f"{at}model_definition", node.model_definition, expected_model_definition),
+            Same(f"{at}preset_values", node.preset_values, expected_preset_values),
             Held(f"{at}created_at", node.created_at, SameAs(laid.created_at, PRESET_CREATED_AT)),
             Held(f"{at}updated_at", node.updated_at, updated_at),
         ]

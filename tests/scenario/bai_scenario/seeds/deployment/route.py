@@ -9,7 +9,7 @@ from uuid import UUID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
-from ai.backend.manager.data.deployment.types import DeploymentInfo
+from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteTrafficStatus
 from ai.backend.manager.data.model_serving.types import RoutingData
 from ai.backend.manager.models.routing.creators import ReplicaCreator
 from ai.backend.testutils.scenario_steps import Says
@@ -30,6 +30,7 @@ class TestSeedRouteOf(TestSeedFieldCreator[DeploymentInfo, RoutingData]):
     session_owner_id: UUID
     domain: str
     project_id: UUID
+    traffic_status: RouteTrafficStatus = RouteTrafficStatus.INACTIVE
 
     @override
     def kind(self) -> str:
@@ -49,4 +50,5 @@ class TestSeedRouteOf(TestSeedFieldCreator[DeploymentInfo, RoutingData]):
             health_check=None,
             termination_grace_period=0.0,
             replica_group_id=self.replica_group_id,
+            traffic_status=self.traffic_status,
         )

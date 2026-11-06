@@ -28,6 +28,7 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.deployment_revision_preset import (
+    AFilledPresetAndACaller,
     PresetsAndACaller,
     PresetsAndAnOutsider,
     PresetsAndSomeone,
@@ -123,6 +124,40 @@ class AReaderReadsAPreset(
 
 
 @dataclass(frozen=True)
+class AReaderReadsAPresetWithAModelDefinition(
+    Scenario[TestSeedingSession, PresetsAndACaller, DeploymentRevisionPresetAdapter, Answer]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "a-preset-reader-reads-a-preset-with-a-model-definition"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "프리셋 조회 권한을 받은 사용자가 모델 정의와 런타임 파라미터 값이 채워진 프리셋을 "
+            "id 로 읽으면, 그 프리셋이 옵니다",
+            english=(
+                "when a user granted preset read reads a preset carrying a model definition "
+                "and runtime preset values by id, that preset comes back"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, PresetsAndACaller]:
+        return AFilledPresetAndACaller()
+
+    @override
+    def when(self) -> When[PresetsAndACaller, DeploymentRevisionPresetAdapter, Answer]:
+        return ReadingTheFirstPreset()
+
+    @override
+    def then(self) -> Then[PresetsAndACaller, Answer]:
+        return ThePresetReadComesBack(started=self.started)
+
+
+@dataclass(frozen=True)
 class AUserGrantedNothingReadsNoPreset(
     Scenario[TestSeedingSession, PresetsAndACaller, DeploymentRevisionPresetAdapter, Answer]
 ):
@@ -158,6 +193,7 @@ STARTED = datetime.now(UTC)
 
 SCENARIOS: list[ReadStep] = [
     AReaderReadsAPreset(started=STARTED),
+    AReaderReadsAPresetWithAModelDefinition(started=STARTED),
     AUserGrantedNothingReadsNoPreset(),
 ]
 
