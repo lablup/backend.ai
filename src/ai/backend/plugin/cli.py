@@ -66,8 +66,11 @@ def main(
 
 
 def _find_allowed_wheelhouse_paths(config_path: Path | None) -> set[Path]:
+    from tomli import TOMLDecodeError
+
     from ai.backend.common.config import ConfigurationError, find_config_file, read_from_file
     from ai.backend.common.configs.wheelhouse import WheelhouseConfig
+    from ai.backend.common.exception import BackendAISchemaValidationFailed
 
     wheelhouse_paths: set[Path] = set()
     for daemon_name in _DAEMONS_LOADING_WHEELS:
@@ -76,8 +79,20 @@ def _find_allowed_wheelhouse_paths(config_path: Path | None) -> set[Path]:
         except ConfigurationError:
             # A node runs only some of the daemons.
             continue
-        raw_config, _ = read_from_file(toml_path, daemon_name)
-        wheelhouse_config = WheelhouseConfig.model_validate(raw_config.get("wheelhouse", {}))
+        try:
+            raw_config, _ = read_from_file(toml_path, daemon_name)
+            wheelhouse_config = WheelhouseConfig.model_validate(raw_config.get("wheelhouse", {}))
+        except (
+            ConfigurationError,
+            TOMLDecodeError,
+            UnicodeDecodeError,
+            BackendAISchemaValidationFailed,
+        ) as e:
+            read_failure = f"Could not read [wheelhouse] from {toml_path}: {e.__cause__ or e}"
+            if config_path is not None:
+                raise click.ClickException(read_failure) from e
+            click.echo(f"Warning: {read_failure}", err=True)
+            continue
         if wheelhouse_config.allow:
             wheelhouse_paths.add(wheelhouse_config.path.resolve())
     return wheelhouse_paths

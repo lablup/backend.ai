@@ -18,6 +18,13 @@ class _ConfigFileCase:
     file_name: str
 
 
+@dataclass(frozen=True)
+class _UnusableConfigCase:
+    failure: str
+    content: bytes
+    mode: int = 0o644
+
+
 @pytest.fixture
 def wheelhouse_with_planted_wheel(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(sys, "path", [*sys.path])
@@ -74,6 +81,25 @@ def named_config_allowing_the_default_path(wheelhouse_with_planted_wheel: Path) 
     return config_path
 
 
+@pytest.fixture
+def unusable_manager_config_and_agent_config_allowing_the_wheelhouse(
+    case: _UnusableConfigCase, wheelhouse_with_planted_wheel: Path
+) -> None:
+    manager_config_path = Path("manager.toml")
+    manager_config_path.write_bytes(case.content)
+    manager_config_path.chmod(case.mode)
+    Path("agent.toml").write_text(
+        f'[wheelhouse]\nallow = true\npath = "{wheelhouse_with_planted_wheel}"\n'
+    )
+
+
+@pytest.fixture
+def unusable_named_config(case: _UnusableConfigCase, wheelhouse_with_planted_wheel: Path) -> Path:
+    config_path = wheelhouse_with_planted_wheel.parent / "named.toml"
+    config_path.write_bytes(case.content)
+    return config_path
+
+
 def _scan_rows(*extra_args: str) -> list[dict[str, str]]:
     result = CliRunner().invoke(main, ["scan", _PLANTED_GROUP, "--format", "JSON", *extra_args])
     assert result.exit_code == 0, result.output
@@ -113,3 +139,58 @@ class TestScanWheelhouse:
     @pytest.mark.usefixtures("wheelhouse_with_planted_wheel")
     def test_does_not_list_the_wheels_without_a_config(self) -> None:
         assert _scan_rows() == []
+
+    @pytest.mark.usefixtures("wheelhouse_with_planted_wheel")
+    def test_does_not_warn_about_daemon_configs_that_do_not_exist(self) -> None:
+        result = CliRunner().invoke(main, ["scan", _PLANTED_GROUP])
+
+        assert result.exit_code == 0
+        assert result.stderr == ""
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _UnusableConfigCase(
+                failure="unreadable",
+                content=b"[wheelhouse]\nallow = true\n",
+                mode=0o000,
+            ),
+            _UnusableConfigCase(failure="invalid-toml", content=b"[wheelhouse\n"),
+            _UnusableConfigCase(failure="invalid-utf8", content=b"\xff"),
+            _UnusableConfigCase(
+                failure="invalid-section",
+                content=b'[wheelhouse]\nallow = "maybe"\n',
+            ),
+        ],
+        ids=lambda case: case.failure,
+    )
+    @pytest.mark.usefixtures("unusable_manager_config_and_agent_config_allowing_the_wheelhouse")
+    def test_warns_about_an_unusable_daemon_config_and_lists_the_wheels_of_the_others(self) -> None:
+        result = CliRunner().invoke(main, ["scan", _PLANTED_GROUP, "--format", "JSON"])
+
+        assert result.exit_code == 0
+        assert json.loads(result.stdout) == [_WHEELHOUSE_ROW]
+        assert "manager.toml" in result.stderr
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _UnusableConfigCase(failure="invalid-toml", content=b"[wheelhouse\n"),
+            _UnusableConfigCase(failure="invalid-utf8", content=b"\xff"),
+            _UnusableConfigCase(
+                failure="invalid-section",
+                content=b'[wheelhouse]\nallow = "maybe"\n',
+            ),
+        ],
+        ids=lambda case: case.failure,
+    )
+    def test_fails_with_a_message_when_the_named_config_is_unusable(
+        self, unusable_named_config: Path
+    ) -> None:
+        result = CliRunner().invoke(
+            main, ["scan", _PLANTED_GROUP, "-f", str(unusable_named_config)]
+        )
+
+        assert result.exit_code == 1
+        assert result.stdout == ""
+        assert str(unusable_named_config) in result.stderr
