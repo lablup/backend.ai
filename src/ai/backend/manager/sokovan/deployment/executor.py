@@ -13,6 +13,9 @@ from ai.backend.common.clients.http_client.client_pool import (
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     BulkCreateEndpointRequest,
     BulkDeleteEndpointRequest,
@@ -499,12 +502,12 @@ class DeploymentExecutor:
             service_name=deployment.metadata.name,
             tags=TagsModel(
                 session=SessionTagsModel(
-                    user_uuid=str(deployment.metadata.session_owner),
-                    project_id=str(deployment.metadata.project),
-                    domain_name=deployment.metadata.domain,
+                    user_uuid=UserID(deployment.metadata.session_owner),
+                    project_id=ProjectID(deployment.metadata.project),
+                    domain_name=DomainName(deployment.metadata.domain),
                 ),
                 endpoint=EndpointTagsModel(
-                    id=str(deployment.id),
+                    id=deployment.id,
                     runtime_variant=variant.name,
                     existing_url=str(deployment.network.url) if deployment.network.url else None,
                 ),
