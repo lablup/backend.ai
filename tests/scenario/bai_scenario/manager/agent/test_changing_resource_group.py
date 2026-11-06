@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import override
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.agent.request import (
@@ -21,6 +22,7 @@ from ai.backend.manager.errors.agent import (
     ConflictingSessionRescheduleNotSupported,
 )
 from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.agent import (
@@ -270,3 +272,18 @@ async def test_changing_resource_group(
     scenario: MoveStep, adapter: AgentAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:
     await run_scenario(scenario, adapter, engine)
+    assert await designated_agent_count(engine) == expected_designations(scenario)
+
+
+async def designated_agent_count(engine: ExtendedAsyncSAEngine) -> int:
+    """세션 지정 에이전트 행의 수. 이 표의 상황은 많아야 하나를 심는다."""
+    async with engine.begin_readonly_session() as session:
+        query = sa.select(sa.func.count()).select_from(SessionDesignatedAgentRow)
+        return int(await session.scalar(query) or 0)
+
+
+def expected_designations(scenario: MoveStep) -> int:
+    """강제로 옮긴 행만 지정을 지운다. 충돌로 거부된 행은 지정을 그대로 둔다."""
+    if isinstance(scenario, RefusedRow):
+        return 1 if scenario.expected is AgentHasConflictingSessions else 0
+    return 0
