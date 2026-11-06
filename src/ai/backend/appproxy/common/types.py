@@ -250,17 +250,6 @@ class SerializableCircuit(BackendAISchema):
         return ClientIPValidator(self.allowed_client_ips)
 
 
-class SerializableToken(BackendAISchema):
-    login_session_token: str | None
-    kernel_host: str
-    kernel_port: int
-    session_id: UUID
-    user_uuid: UUID
-    group_id: UUID
-    access_key: str
-    domain_name: str
-
-
 class SessionConfig(BackendAISchema):
     model_config = ConfigDict(populate_by_name=True)
 

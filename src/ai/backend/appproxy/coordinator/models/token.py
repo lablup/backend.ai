@@ -44,7 +44,6 @@ class Token(Base, BaseMixin):  # type: ignore[misc]
     def create(
         cls,
         id: UUID,
-        login_session_token: str | None,
         kernel_host: str,
         kernel_port: int,
         session_id: UUID,
@@ -55,7 +54,6 @@ class Token(Base, BaseMixin):  # type: ignore[misc]
     ) -> "Token":
         t = Token()
         t.id = id
-        t.login_session_token = login_session_token
         t.kernel_host = kernel_host
         t.kernel_port = kernel_port
         t.session_id = session_id
