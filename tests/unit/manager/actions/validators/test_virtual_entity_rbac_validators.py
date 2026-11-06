@@ -40,7 +40,7 @@ from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualEntityPartialBulkActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.ops.base import ScopedSearchOpsAction
-from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction, GrantingScopeAction
 from ai.backend.manager.actions.v2.scope.validator.rbac import (
     VirtualEntityScopeActionRBACValidator,
 )
@@ -110,7 +110,9 @@ _ORM_CLUSTER = (
 _DOMAIN_ID: uuid.UUID = uuid.uuid4()
 _OTHER_DOMAIN_ID: uuid.UUID = uuid.uuid4()
 _PROJECT_ID: uuid.UUID = uuid.uuid4()
+_OTHER_PROJECT_ID: uuid.UUID = uuid.uuid4()
 _VFOLDER_ID: uuid.UUID = uuid.uuid4()
+_OTHER_VFOLDER_ID: uuid.UUID = uuid.uuid4()
 _BULK_VF_GRANTED: uuid.UUID = uuid.uuid4()
 _BULK_VF_DENIED: uuid.UUID = uuid.uuid4()
 
@@ -148,6 +150,38 @@ class _ProjectCreateScopeAction(BaseScopeAction):
     @override
     def action_name(cls) -> str:
         return "create_project"
+
+
+class _VfolderCreateGrantingAction(GrantingScopeAction):
+    """VFOLDER:CREATE at the project scope, granting the named vfolders as a second write."""
+
+    _granted: Sequence[EntityIdentifier]
+
+    def __init__(self, granted: Sequence[EntityIdentifier]) -> None:
+        self._granted = granted
+
+    @classmethod
+    @override
+    def entity_type(cls) -> EntityType:
+        return VFolderEntityType()
+
+    @override
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return [ProjectID(_PROJECT_ID)]
+
+    @override
+    def granted_targets(self) -> Sequence[EntityIdentifier]:
+        return self._granted
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+    @classmethod
+    @override
+    def action_name(cls) -> str:
+        return "create_vfolder_granting"
 
 
 class _UnusedVFolderSearcher(Searcher[VFolderRow, VFolderData]):
@@ -859,6 +893,89 @@ async def user_with_vfolder_read_at_project(
 
 
 @pytest.fixture
+async def user_with_vfolder_create_at_project(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> UserData:
+    """VFOLDER:CREATE granted at the project scope, which owns itself and ``_VFOLDER_ID``."""
+    user = await _seed_granted_user(
+        db_with_rbac_tables,
+        owner_scope_type="project",
+        owner_scope_id=_PROJECT_ID,
+        entity_type="vfolder",
+        entity_ids=[_VFOLDER_ID],
+        perm_scope_type=ProjectEntityType(),
+        perm_entity_type=VFolderEntityType(),
+        operation=Permission.CREATE,
+    )
+    async with db_with_rbac_tables.begin_session() as db_sess:
+        project_node_id = await _node_id(db_sess, EntityType("project"), _PROJECT_ID)
+        await VirtualEntitySeeder().cap_edge(db_sess, project_node_id, project_node_id, None)
+        await db_sess.flush()
+    return user
+
+
+@pytest.fixture
+async def user_with_vfolder_create_at_project_reading_another(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> UserData:
+    """VFOLDER:CREATE at ``_PROJECT_ID`` through one role, and VFOLDER:READ through a
+    second role at ``_OTHER_PROJECT_ID``, which owns ``_OTHER_VFOLDER_ID``."""
+    user = await _seed_granted_user(
+        db_with_rbac_tables,
+        owner_scope_type="project",
+        owner_scope_id=_PROJECT_ID,
+        entity_type="vfolder",
+        entity_ids=[],
+        perm_scope_type=ProjectEntityType(),
+        perm_entity_type=VFolderEntityType(),
+        operation=Permission.CREATE,
+    )
+    await _seed_vs_chain(
+        db_with_rbac_tables,
+        owner_scope_type="project",
+        owner_scope_id=_OTHER_PROJECT_ID,
+        entity_type="vfolder",
+        entity_ids=[_OTHER_VFOLDER_ID],
+    )
+    reader_role_id = uuid.uuid4()
+    async with db_with_rbac_tables.begin_session() as db_sess:
+        project_node_id = await _node_id(db_sess, EntityType("project"), _PROJECT_ID)
+        await VirtualEntitySeeder().cap_edge(db_sess, project_node_id, project_node_id, None)
+        db_sess.add(
+            RoleRow(
+                id=reader_role_id,
+                name=f"reader-role-{reader_role_id.hex[:8]}",
+                description="virtual-entity validator test role",
+                scope_type=EntityType("project"),
+                scope_id=_OTHER_PROJECT_ID,
+            )
+        )
+        await db_sess.flush()
+        db_sess.add(UserRoleRow(user_id=user.user_id, role_id=reader_role_id))
+        await db_sess.flush()
+    await _grant_permission(
+        db_with_rbac_tables,
+        role_id=reader_role_id,
+        scope_type=ProjectEntityType(),
+        scope_id=_OTHER_PROJECT_ID,
+        entity_type=VFolderEntityType(),
+        operation=Permission.READ,
+    )
+    return user
+
+
+@pytest.fixture
+def grantable_action() -> _VfolderCreateGrantingAction:
+    return _VfolderCreateGrantingAction(granted=[_VfolderID(_VFOLDER_ID)])
+
+
+@pytest.fixture
+def ungrantable_action() -> _VfolderCreateGrantingAction:
+    """Grants the owned vfolder plus one the user has no chain to."""
+    return _VfolderCreateGrantingAction(granted=[_VfolderID(_VFOLDER_ID), _VfolderID(uuid.uuid4())])
+
+
+@pytest.fixture
 def readable_used_by_action() -> _VfolderSearchUsedByAction:
     return _used_by_action([_VfolderID(_VFOLDER_ID)])
 
@@ -1264,3 +1381,63 @@ class TestHeldPermissions:
         assert held[granted].covers(Permission.UPDATE)
         # An entity nothing reaches holds NONE rather than being absent.
         assert held[denied] == Permission.NONE
+
+
+class TestScopeActionGrantedCheck:
+    """The own check of the operation's permission the scope validator runs on what a
+    run grants."""
+
+    async def test_grantable_passes(
+        self,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
+        grantable_action: _VfolderCreateGrantingAction,
+        trigger_meta: ActionTriggerMeta,
+        user_with_vfolder_create_at_project: UserData,
+    ) -> None:
+        with with_user_context(user_with_vfolder_create_at_project):
+            await scope_validator.validate(grantable_action, trigger_meta)
+
+    async def test_ungrantable_among_targets_raises(
+        self,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
+        ungrantable_action: _VfolderCreateGrantingAction,
+        trigger_meta: ActionTriggerMeta,
+        user_with_vfolder_create_at_project: UserData,
+    ) -> None:
+        with with_user_context(user_with_vfolder_create_at_project):
+            with pytest.raises(NotEnoughPermission, match="to grant"):
+                await scope_validator.validate(ungrantable_action, trigger_meta)
+
+    async def test_read_on_the_granted_entity_is_not_enough(
+        self,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
+        trigger_meta: ActionTriggerMeta,
+        user_with_vfolder_create_at_project_reading_another: UserData,
+    ) -> None:
+        # The scope check passes on CREATE at the project; the grant asks CREATE on the
+        # vfolder too, and the user only reads it through the other project.
+        action = _VfolderCreateGrantingAction(granted=[_VfolderID(_OTHER_VFOLDER_ID)])
+        with with_user_context(user_with_vfolder_create_at_project_reading_another):
+            with pytest.raises(NotEnoughPermission, match="to grant"):
+                await scope_validator.validate(action, trigger_meta)
+
+    async def test_no_granted_targets_leaves_the_scope_check_alone(
+        self,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
+        trigger_meta: ActionTriggerMeta,
+        user_with_vfolder_create_at_project: UserData,
+    ) -> None:
+        # A join that names no role grants nothing beyond the scope permission.
+        action = _VfolderCreateGrantingAction(granted=[])
+        with with_user_context(user_with_vfolder_create_at_project):
+            await scope_validator.validate(action, trigger_meta)
+
+    async def test_superadmin_bypasses_check(
+        self,
+        scope_validator: VirtualEntityScopeActionRBACValidator,
+        ungrantable_action: _VfolderCreateGrantingAction,
+        trigger_meta: ActionTriggerMeta,
+        superadmin_user: UserData,
+    ) -> None:
+        with with_user_context(superadmin_user):
+            await scope_validator.validate(ungrantable_action, trigger_meta)
