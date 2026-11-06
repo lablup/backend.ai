@@ -14,13 +14,20 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     PreemptionConfigInputDTO,
     UpdateResourceGroupConfigInput,
     UpdateResourceGroupInput,
+    UpdateResourceGroupSchedulerOptionsConfigInput,
+    UpdateResourceGroupSchedulerOptionsInput,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import ResourceGroupDetailNode
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     PreemptionModeDTO,
     SchedulerTypeDTO,
 )
-from ai.backend.common.types import PreemptionOrder, PreemptionVictimScope
+from ai.backend.common.types import (
+    AgentSelectionStrategy,
+    PreemptionOrder,
+    PreemptionVictimScope,
+    SessionTypes,
+)
 from ai.backend.manager.api.adapters.resource_group.adapter import ResourceGroupAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -155,6 +162,90 @@ class EditingTheConfig(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGrou
             )
         with ActingAs(laid.caller):
             payload = await adapter.update_config(asked)
+        return payload.resource_group
+
+
+@dataclass(frozen=True)
+class EditingTheSchedulerOptions(
+    When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    """id로 선점 설정과 함께 스케줄러 옵션 전부를 바꾼다."""
+
+    @override
+    def operation(self) -> str:
+        return "update"
+
+    @override
+    def describe(self, laid: AGroupAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 {laid.group.name}의 선점 설정과 스케줄러 옵션을 함께 수정합니다",
+            english=(
+                f"{laid.caller.username} updates the preemption config and the scheduler options "
+                f"of {laid.group.name} together"
+            ),
+        )
+
+    @override
+    async def call(
+        self, adapter: ResourceGroupAdapter, laid: AGroupAndACaller
+    ) -> ResourceGroupDetailNode:
+        with ActingAs(laid.caller):
+            payload = await adapter.update(
+                await adapter.lookup_name(laid.group.name),
+                UpdateResourceGroupInput(
+                    preemption=PreemptionConfigInputDTO(enabled=True),
+                    scheduler_options=UpdateResourceGroupSchedulerOptionsInput(
+                        allowed_session_types=[SessionTypes.INTERACTIVE],
+                        pending_timeout=60,
+                        config=UpdateResourceGroupSchedulerOptionsConfigInput(
+                            num_retries_to_skip=3
+                        ),
+                        agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
+                        agent_selector_config={"kernel_counts_weight": 2},
+                        allow_fractional_resource_fragmentation=False,
+                        route_cleanup_target_statuses=["degraded"],
+                    ),
+                ),
+            )
+        return payload.resource_group
+
+
+@dataclass(frozen=True)
+class ClearingTheRetriesToSkip(
+    When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    """이름으로 대기 세션 건너뛰기 재시도 횟수를 비운다."""
+
+    @override
+    def operation(self) -> str:
+        return "update_config"
+
+    @override
+    def describe(self, laid: AGroupAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 {laid.group.name}의 대기 세션 건너뛰기 재시도 횟수를 "
+            "비우도록 수정합니다",
+            english=(
+                f"{laid.caller.username} clears the retries before skipping a pending session "
+                f"of {laid.group.name}"
+            ),
+        )
+
+    @override
+    async def call(
+        self, adapter: ResourceGroupAdapter, laid: AGroupAndACaller
+    ) -> ResourceGroupDetailNode:
+        with ActingAs(laid.caller):
+            payload = await adapter.update_config(
+                UpdateResourceGroupConfigInput(
+                    resource_group_name=laid.group.name,
+                    scheduler_options=UpdateResourceGroupSchedulerOptionsInput(
+                        config=UpdateResourceGroupSchedulerOptionsConfigInput(
+                            num_retries_to_skip=None
+                        ),
+                    ),
+                )
+            )
         return payload.resource_group
 
 
@@ -498,6 +589,87 @@ class TheSuperadminChangesThePreemptionConfig(
 
 
 @dataclass(frozen=True)
+class TheSuperadminChangesTheSchedulerOptions(
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-changes-the-scheduler-options-with-the-preemption-config"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 선점 설정과 함께 스케줄러 옵션을 바꾸면 선점 설정과 스케줄러 옵션이 "
+            "모두 새 값인 그룹 전체가 반환됩니다",
+            english=(
+                "when the superadmin changes the scheduler options together with the preemption "
+                "config, the whole group comes back with both holding the new values"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
+        return AGroupAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return EditingTheSchedulerOptions()
+
+    @override
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+        return TheGroupNode(
+            GroupLook(
+                started=self.started,
+                preemption_enabled=True,
+                allowed_session_types=[SessionTypes.INTERACTIVE],
+                pending_timeout=60.0,
+                num_retries_to_skip=3,
+                agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
+                agent_selector_config={"kernel_counts_weight": 2},
+                allow_fractional_resource_fragmentation=False,
+                route_cleanup_target_statuses=["degraded"],
+            )
+        )
+
+
+@dataclass(frozen=True)
+class TheSuperadminClearsTheRetriesToSkip(
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "the-superadmin-clears-the-retries-to-skip"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "대기 세션 건너뛰기 재시도 횟수가 있는 그룹에서 superadmin 이 그 값을 비우면 "
+            "재시도 횟수가 없고 나머지는 그대로인 그룹 전체가 반환됩니다",
+            english=(
+                "when the superadmin clears the retries before skipping a pending session on a "
+                "group that has them, the whole group comes back without them and otherwise "
+                "unchanged"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
+        return AGroupAndSomeone(role=UserRole.SUPERADMIN, num_retries_to_skip=3)
+
+    @override
+    def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
+        return ClearingTheRetriesToSkip()
+
+    @override
+    def then(self) -> Then[AGroupAndACaller, ResourceGroupDetailNode]:
+        return TheGroupNode(GroupLook(started=self.started, num_retries_to_skip=None))
+
+
+@dataclass(frozen=True)
 class AUserGrantedNothingMayNotEditTheConfig(
     Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]
 ):
@@ -539,6 +711,8 @@ SCENARIOS: list[EditingStep] = [
     TheSuperadminEditingAnUnknownNameIsNotFound(),
     TheSuperadminChangesTheConfig(started=datetime.now(UTC)),
     TheSuperadminChangesThePreemptionConfig(started=datetime.now(UTC)),
+    TheSuperadminChangesTheSchedulerOptions(started=datetime.now(UTC)),
+    TheSuperadminClearsTheRetriesToSkip(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotEditTheConfig(),
 ]
 
