@@ -1,9 +1,11 @@
 import logging
 
 from ai.backend.common.exception import PrometheusQueryPresetInvalidLabel
+from ai.backend.common.metrics.types import CONTAINER_UTILIZATION_METRIC_LABEL_NAME
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
+from ai.backend.manager.clients.prometheus.metric_types import ensure_container_metric_name
 from ai.backend.manager.clients.prometheus.preset import (
     LabelMatcher,
     MetricPreset,
@@ -101,6 +103,9 @@ class PrometheusQueryPresetService:
     async def execute_preset(self, action: ExecutePresetAction) -> ExecutePresetActionResult:
         preset_data = await self._repository.get_by_id(action.preset_id)
         self._validate_labels(action.options, preset_data)
+        metric_name = action.options.filter_labels.get(CONTAINER_UTILIZATION_METRIC_LABEL_NAME)
+        if metric_name is not None:
+            ensure_container_metric_name(metric_name)
         # Window fallback: request → preset → server default
         time_window = action.time_window or preset_data.time_window or self._default_timewindow
 
