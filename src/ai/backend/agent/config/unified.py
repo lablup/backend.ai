@@ -45,6 +45,7 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.configs.wheelhouse import WheelhouseConfig
 from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
@@ -2144,6 +2145,18 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "and memory issues in the agent process."
             ),
             added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    wheelhouse: Annotated[
+        WheelhouseConfig,
+        Field(default_factory=WheelhouseConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Plugin wheels loaded when the agent starts. Wheels run without "
+                "verification, so keep the path writable only by trusted operators."
+            ),
+            added_version="26.9.8",
             composite=CompositeType.FIELD,
         ),
     ]
