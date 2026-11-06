@@ -371,9 +371,9 @@ class AsyncEtcd(AbstractKVStore):
         else:
             self._connect_options = None
         if tls is not None:
-            self._connect_options = (self._connect_options or ConnectOptions()).with_tls(
-                self._tls_options_from_cert_files(tls)
-            )
+            tls_options = self._tls_options_from_cert_files(tls)
+            connect_options = self._connect_options or ConnectOptions()
+            self._connect_options = connect_options.with_tls(tls_options)
         self._request_options = (
             (self._connect_options or ConnectOptions())
             .with_timeout(request_timeout)
@@ -405,14 +405,17 @@ class AsyncEtcd(AbstractKVStore):
 
     @staticmethod
     def _tls_options_from_cert_files(tls: EtcdTLSConfigData) -> TlsOptions:
+        ca_cert_pem = tls.ca_cert.read_bytes()
         tls_options = (
             TlsOptions()
-            .with_ca_certificate(tls.ca_cert.read_bytes())
+            .with_ca_certificate(ca_cert_pem)
             .with_handshake_timeout(tls.handshake_timeout)
         )
         if tls.client_cert is None or tls.client_key is None:
             return tls_options
-        return tls_options.with_identity(tls.client_cert.read_bytes(), tls.client_key.read_bytes())
+        client_cert_pem = tls.client_cert.read_bytes()
+        client_key_pem = tls.client_key.read_bytes()
+        return tls_options.with_identity(client_cert_pem, client_key_pem)
 
     def _should_rewatch(self, e: GRPCStatusError) -> bool:
         """A watch stream cut by a lost connection ends with ``UNAVAILABLE`` or ``UNKNOWN``."""
