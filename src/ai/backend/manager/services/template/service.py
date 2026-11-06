@@ -111,8 +111,18 @@ class TemplateService:
     async def list_task_templates(
         self, action: ListTaskTemplatesAction
     ) -> ListTaskTemplatesActionResult:
-        """List all active task templates."""
-        entries = await self._repository.list_task_templates(action.user_uuid)
+        """List the task templates the requester may see."""
+        if action.is_superadmin and action.list_all:
+            entries = await self._repository.list_task_templates_all(action.user_uuid)
+        else:
+            entries = await self._repository.list_accessible_templates(
+                TemplateType.TASK,
+                action.user_uuid,
+                action.user_role,
+                action.domain_name,
+                allowed_types=["user", "group"],
+                group_id_filter=action.group_id_filter,
+            )
         return ListTaskTemplatesActionResult(entries=entries)
 
     async def get_task_template(self, action: GetTaskTemplateAction) -> GetTaskTemplateActionResult:
@@ -217,7 +227,8 @@ class TemplateService:
         if action.is_superadmin and action.list_all:
             entries = await self._repository.list_cluster_templates_all(action.user_uuid)
         else:
-            entries = await self._repository.list_accessible_cluster_templates(
+            entries = await self._repository.list_accessible_templates(
+                TemplateType.CLUSTER,
                 action.user_uuid,
                 action.user_role,
                 action.domain_name,

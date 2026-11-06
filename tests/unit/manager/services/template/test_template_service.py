@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from dataclasses import dataclass
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -52,6 +53,15 @@ from ai.backend.manager.services.template.actions.update_task_template import (
     UpdateTaskTemplateAction,
 )
 from ai.backend.manager.services.template.service import TemplateService
+
+
+@dataclass(frozen=True)
+class _TaskTemplateListCase:
+    label: str
+    user_role: UserRole
+    is_superadmin: bool
+    list_all: bool
+    group_id_filter: uuid.UUID | None
 
 
 def _template_id(name: str) -> SessionTemplateID:
@@ -347,35 +357,92 @@ class TestListTaskTemplatesAction:
     def service(self, mock_repo: MagicMock) -> TemplateService:
         return TemplateService(repository=mock_repo)
 
-    async def test_returns_filtered_entries(
+    async def test_superadmin_with_list_all_returns_every_template(
         self,
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        user_uuid = UserID(uuid.uuid4())
-        entries = [
-            {"name": "t1", "id": "id1", "user_uuid": user_uuid},
-            {"name": "t2", "id": "id2", "user_uuid": user_uuid},
-        ]
-        mock_repo.list_task_templates = AsyncMock(return_value=entries)
+        user_uuid = uuid.uuid4()
+        entries = [{"name": "t1"}, {"name": "t2"}]
+        mock_repo.list_task_templates_all = AsyncMock(return_value=entries)
 
-        action = ListTaskTemplatesAction(user_uuid=user_uuid)
+        action = ListTaskTemplatesAction(
+            user_uuid=UserID(user_uuid),
+            user_role=UserRole.SUPERADMIN,
+            domain_name="default",
+            is_superadmin=True,
+            list_all=True,
+        )
         result = await service.list_task_templates(action)
 
-        assert len(result.entries) == 2
-        mock_repo.list_task_templates.assert_called_once_with(user_uuid)
+        assert result.entries == entries
+        mock_repo.list_task_templates_all.assert_called_once_with(user_uuid)
 
-    async def test_empty_returns_empty_entries(
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _TaskTemplateListCase(
+                label="user",
+                user_role=UserRole.USER,
+                is_superadmin=False,
+                list_all=False,
+                group_id_filter=None,
+            ),
+            _TaskTemplateListCase(
+                label="user-asking-for-all",
+                user_role=UserRole.USER,
+                is_superadmin=False,
+                list_all=True,
+                group_id_filter=None,
+            ),
+            _TaskTemplateListCase(
+                label="superadmin-not-asking-for-all",
+                user_role=UserRole.SUPERADMIN,
+                is_superadmin=True,
+                list_all=False,
+                group_id_filter=None,
+            ),
+            _TaskTemplateListCase(
+                label="user-filtering-by-project",
+                user_role=UserRole.USER,
+                is_superadmin=False,
+                list_all=False,
+                group_id_filter=uuid.UUID(int=1),
+            ),
+        ],
+        ids=lambda case: case.label,
+    )
+    async def test_other_requests_return_only_the_accessible_templates(
         self,
         service: TemplateService,
         mock_repo: MagicMock,
+        case: _TaskTemplateListCase,
     ) -> None:
-        mock_repo.list_task_templates = AsyncMock(return_value=[])
+        user_uuid = uuid.uuid4()
+        entries = [{"name": "my-task"}]
+        mock_repo.list_accessible_templates = AsyncMock(return_value=entries)
+        mock_repo.list_task_templates_all = AsyncMock()
 
-        action = ListTaskTemplatesAction(user_uuid=UserID(uuid.uuid4()))
+        action = ListTaskTemplatesAction(
+            user_uuid=UserID(user_uuid),
+            user_role=case.user_role,
+            domain_name="default",
+            is_superadmin=case.is_superadmin,
+            list_all=case.list_all,
+            group_id_filter=case.group_id_filter,
+        )
         result = await service.list_task_templates(action)
 
-        assert result.entries == []
+        assert result.entries == entries
+        mock_repo.list_task_templates_all.assert_not_called()
+        mock_repo.list_accessible_templates.assert_called_once_with(
+            TemplateType.TASK,
+            user_uuid,
+            case.user_role,
+            "default",
+            allowed_types=["user", "group"],
+            group_id_filter=case.group_id_filter,
+        )
 
 
 class TestUpdateTaskTemplateAction:
@@ -690,7 +757,7 @@ class TestListClusterTemplatesAction:
     ) -> None:
         user_uuid = uuid.uuid4()
         entries = [{"name": "my-cluster"}]
-        mock_repo.list_accessible_cluster_templates = AsyncMock(return_value=entries)
+        mock_repo.list_accessible_templates = AsyncMock(return_value=entries)
 
         action = ListClusterTemplatesAction(
             user_uuid=UserID(user_uuid),
@@ -703,7 +770,8 @@ class TestListClusterTemplatesAction:
         result = await service.list_cluster_templates(action)
 
         assert len(result.entries) == 1
-        mock_repo.list_accessible_cluster_templates.assert_called_once_with(
+        mock_repo.list_accessible_templates.assert_called_once_with(
+            TemplateType.CLUSTER,
             user_uuid,
             UserRole.USER,
             "default",
@@ -718,7 +786,7 @@ class TestListClusterTemplatesAction:
     ) -> None:
         user_uuid = uuid.uuid4()
         group_id = uuid.uuid4()
-        mock_repo.list_accessible_cluster_templates = AsyncMock(return_value=[])
+        mock_repo.list_accessible_templates = AsyncMock(return_value=[])
 
         action = ListClusterTemplatesAction(
             user_uuid=UserID(user_uuid),
@@ -730,7 +798,8 @@ class TestListClusterTemplatesAction:
         )
         await service.list_cluster_templates(action)
 
-        mock_repo.list_accessible_cluster_templates.assert_called_once_with(
+        mock_repo.list_accessible_templates.assert_called_once_with(
+            TemplateType.CLUSTER,
             user_uuid,
             UserRole.USER,
             "default",
