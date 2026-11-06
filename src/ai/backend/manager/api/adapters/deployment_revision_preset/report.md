@@ -133,7 +133,7 @@ Then
   - [0].deployment_defaults.deployment_strategy = <DeploymentStrategy.ROLLING: 'ROLLING'>
   - [0].deployment_defaults.deployment_strategy_spec = {}
   - [0].model_definition = None
-  - [0].preset_values = []
+  - [0].preset_values count = 0
   - [0].created_at: same as the time the preset seeded in advance was made
   - [0].updated_at: same as the time the preset seeded in advance was made
   - [1].id: same as the id of the preset seeded in advance
@@ -155,7 +155,7 @@ Then
   - [1].deployment_defaults.deployment_strategy = <DeploymentStrategy.ROLLING: 'ROLLING'>
   - [1].deployment_defaults.deployment_strategy_spec = {}
   - [1].model_definition = None
-  - [1].preset_values = []
+  - [1].preset_values count = 0
   - [1].created_at: same as the time the preset seeded in advance was made
   - [1].updated_at: same as the time the preset seeded in advance was made
 
@@ -323,7 +323,7 @@ Then
   - deployment_defaults.deployment_strategy = <DeploymentStrategy.ROLLING: 'ROLLING'>
   - deployment_defaults.deployment_strategy_spec = {}
   - model_definition = None
-  - preset_values = []
+  - preset_values count = 0
   - created_at: same as the time the preset seeded in advance was made
   - updated_at: same as the time the preset seeded in advance was made
 
@@ -376,7 +376,9 @@ Then
   - deployment_defaults.deployment_strategy = <DeploymentStrategy.ROLLING: 'ROLLING'>
   - deployment_defaults.deployment_strategy_spec = {}
   - model_definition = PresetModelDefinitionInfoDTO(models=[PresetModelConfigInfoDTO(name='preset-model', model_path='/models/preset-model', service=None, metadata=None)])
-  - preset_values = [PresetValueInfo(preset_id=RuntimeVariantPresetID('01a1aeb8-1a7b-74b8-90b0-1342e054204f'), value='preset-value')]
+  - preset_values count = 1
+  - preset_values[0].preset_id: same as the id of the runtime variant preset the value is bound to
+  - preset_values[0].value = 'preset-value'
   - created_at: same as the time the preset seeded in advance was made
   - updated_at: same as the time the preset seeded in advance was made
 
@@ -608,7 +610,7 @@ Then
   - items[0].deployment_defaults.deployment_strategy = <DeploymentStrategy.ROLLING: 'ROLLING'>
   - items[0].deployment_defaults.deployment_strategy_spec = {}
   - items[0].model_definition = None
-  - items[0].preset_values = []
+  - items[0].preset_values count = 0
   - items[0].created_at: same as the time the preset seeded in advance was made
   - items[0].updated_at: same as the time the preset seeded in advance was made
   - items[1].id: same as the id of the preset seeded in advance
@@ -630,7 +632,7 @@ Then
   - items[1].deployment_defaults.deployment_strategy = <DeploymentStrategy.ROLLING: 'ROLLING'>
   - items[1].deployment_defaults.deployment_strategy_spec = {}
   - items[1].model_definition = None
-  - items[1].preset_values = []
+  - items[1].preset_values count = 0
   - items[1].created_at: same as the time the preset seeded in advance was made
   - items[1].updated_at: same as the time the preset seeded in advance was made
 
@@ -857,7 +859,7 @@ Then
   - deployment_defaults.deployment_strategy = <DeploymentStrategy.ROLLING: 'ROLLING'>
   - deployment_defaults.deployment_strategy_spec = {}
   - model_definition = None
-  - preset_values = []
+  - preset_values count = 0
   - created_at: same as the time the preset seeded in advance was made
   - updated_at: the time this run wrote
 
