@@ -14,7 +14,7 @@
   - admin_purge: 성공 있음 2 · 거부 있음 2 (global_scope)
   - admin_update: 성공 있음 3 · 거부 있음 4 (global_scope, membership, relation)
   - apply_allowed_groups: 성공 있음 8 · 거부 있음 6 (relation)
-  - apply_global: 성공 있음 2 · 거부 있음 1 (membership)
+  - apply_global: 성공 있음 2 · 거부 있음 3 (membership)
   - link_project_as_default: 성공 있음 1 · 거부 있음 3 (relation)
 
 **admin_partial_bulk_purge**
@@ -105,6 +105,8 @@
 | [레지스트리와 public 두 범위에 수정 권한을 받은 사용자가 레지스트리의 전역 여부를 거짓으로 바꾸면, 같은 레지스트리가 전역이 아닌 채로 통째로 반환됩니다](#setting_global-a-user-granted-on-both-scopes-takes-a-registry-out-of-public) | 성공 |
 | [superadmin 이 레지스트리의 전역 여부를 거짓으로 바꾸면, 같은 레지스트리가 전역이 아닌 채로 통째로 반환됩니다](#setting_global-the-superadmin-takes-a-registry-out-of-public) | 성공 |
 | [아무 권한도 받지 않은 사용자가 레지스트리의 전역 여부를 바꾸려 하면 권한 부족으로 거부됩니다. 이 호출은 레지스트리와 public 스코프 양쪽의 권한을 함께 봅니다](#setting_global-a-user-granted-nothing-may-not-change-a-registry-visibility) | 거부 |
+| [public 에 수정 권한을 받고 레지스트리에는 받지 않은 사용자가 레지스트리의 전역 여부를 바꾸려 하면 권한 부족으로 거부됩니다. 이 호출은 두 스코프 가운데 하나만 허락해도 통과하지 않습니다](#setting_global-a-user-granted-on-public-but-not-the-registry-may-not-change-a-registry-visibility) | 거부 |
+| [레지스트리에 수정 권한을 받고 public 에는 받지 않은 사용자가 레지스트리의 전역 여부를 바꾸려 하면 권한 부족으로 거부됩니다. 이 호출은 두 스코프 가운데 하나만 허락해도 통과하지 않습니다](#setting_global-a-user-granted-on-the-registry-but-not-public-may-not-change-a-registry-visibility) | 거부 |
 
 **link_project_as_default**
 
@@ -1451,7 +1453,7 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 레지스트리와 public 두 범위에 수정 권한을 받은 사용자 준비
+  - 레지스트리, public 범위에 수정 권한을 받은 사용자 준비
     - 역할 registry-keeper-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 registry-keeper-1: container_registry 전체에 UPDATE 허용
     - 일반 사용자 user-1: 역할 registry-keeper-1 보유
@@ -1528,6 +1530,66 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- ContainerRegistryAdapter.apply_global: user-1이 host-1의 전역 여부를 바꿉니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+<a id="setting_global-a-user-granted-on-public-but-not-the-registry-may-not-change-a-registry-visibility"></a>
+
+#### [a-user-granted-on-public-but-not-the-registry-may-not-change-a-registry-visibility](/tests/scenario/bai_scenario/manager/container_registry/test_setting_global.py): pass
+
+public 에 수정 권한을 받고 레지스트리에는 받지 않은 사용자가 레지스트리의 전역 여부를 바꾸려 하면 권한 부족으로 거부됩니다. 이 호출은 두 스코프 가운데 하나만 허락해도 통과하지 않습니다
+
+Given
+
+- 레지스트리 하나, user 한 명, public 에 수정 권한을 받고 레지스트리에는 받지 않은
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - public 범위에 수정 권한을 받은 사용자 준비
+    - 역할 public-registry-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 public-registry-keeper-1: global 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 public-registry-keeper-1 보유
+
+When
+
+- ContainerRegistryAdapter.apply_global: user-1이 host-1의 전역 여부를 바꿉니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+<a id="setting_global-a-user-granted-on-the-registry-but-not-public-may-not-change-a-registry-visibility"></a>
+
+#### [a-user-granted-on-the-registry-but-not-public-may-not-change-a-registry-visibility](/tests/scenario/bai_scenario/manager/container_registry/test_setting_global.py): pass
+
+레지스트리에 수정 권한을 받고 public 에는 받지 않은 사용자가 레지스트리의 전역 여부를 바꾸려 하면 권한 부족으로 거부됩니다. 이 호출은 두 스코프 가운데 하나만 허락해도 통과하지 않습니다
+
+Given
+
+- 레지스트리 하나, user 한 명, 레지스트리에 수정 권한을 받고 public 에는 받지 않은
+  - 도메인 home-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 레지스트리 범위에 수정 권한을 받은 사용자 준비
+    - 역할 registry-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 registry-keeper-1: container_registry 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 registry-keeper-1 보유
 
 When
 

@@ -14,7 +14,7 @@ Scenario: complete
   - admin_purge: success present 2 · rejection present 2 (global_scope)
   - admin_update: success present 3 · rejection present 4 (global_scope, membership, relation)
   - apply_allowed_groups: success present 8 · rejection present 6 (relation)
-  - apply_global: success present 2 · rejection present 1 (membership)
+  - apply_global: success present 2 · rejection present 3 (membership)
   - link_project_as_default: success present 1 · rejection present 3 (relation)
 
 **admin_partial_bulk_purge**
@@ -105,6 +105,8 @@ Scenario: complete
 | [when a user granted update permission on the registry and on public sets the registry not global, the same registry comes back whole with global false](#setting_global-a-user-granted-on-both-scopes-takes-a-registry-out-of-public) | answered |
 | [when the superadmin sets a registry not global, the same registry comes back whole with global false](#setting_global-the-superadmin-takes-a-registry-out-of-public) | answered |
 | [when a user granted nothing tries to change a registry's visibility, it is rejected for lack of permission. This call checks permission on the registry and on the public scope together](#setting_global-a-user-granted-nothing-may-not-change-a-registry-visibility) | rejected |
+| [when a user granted update permission on public but not on the registry tries to change a registry's visibility, it is rejected for lack of permission. This call does not pass with only one of the two scopes permitting it](#setting_global-a-user-granted-on-public-but-not-the-registry-may-not-change-a-registry-visibility) | rejected |
+| [when a user granted update permission on the registry but not on public tries to change a registry's visibility, it is rejected for lack of permission. This call does not pass with only one of the two scopes permitting it](#setting_global-a-user-granted-on-the-registry-but-not-public-may-not-change-a-registry-visibility) | rejected |
 
 **link_project_as_default**
 
@@ -1451,7 +1453,7 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-  - Prepare a user granted update permission on the registry and on public
+  - Prepare a user granted update permission on the registry, public
     - Role registry-keeper-1: applies only within the scope it is granted in
     - Role registry-keeper-1: UPDATE allowed on every container_registry
     - regular user user-1: holds Role registry-keeper-1
@@ -1528,6 +1530,66 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
+
+When
+
+- ContainerRegistryAdapter.apply_global: user-1 changes whether host-1 is global
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="setting_global-a-user-granted-on-public-but-not-the-registry-may-not-change-a-registry-visibility"></a>
+
+#### [a-user-granted-on-public-but-not-the-registry-may-not-change-a-registry-visibility](/tests/scenario/bai_scenario/manager/container_registry/test_setting_global.py): pass
+
+when a user granted update permission on public but not on the registry tries to change a registry's visibility, it is rejected for lack of permission. This call does not pass with only one of the two scopes permitting it
+
+Given
+
+- one registry, and one user, granted update on public and not on the registry
+  - Domain home-1
+  - Container registry host-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted update permission on public
+    - Role public-registry-keeper-1: applies only within the scope it is granted in
+    - Role public-registry-keeper-1: UPDATE allowed on every global
+    - regular user user-1: holds Role public-registry-keeper-1
+
+When
+
+- ContainerRegistryAdapter.apply_global: user-1 changes whether host-1 is global
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="setting_global-a-user-granted-on-the-registry-but-not-public-may-not-change-a-registry-visibility"></a>
+
+#### [a-user-granted-on-the-registry-but-not-public-may-not-change-a-registry-visibility](/tests/scenario/bai_scenario/manager/container_registry/test_setting_global.py): pass
+
+when a user granted update permission on the registry but not on public tries to change a registry's visibility, it is rejected for lack of permission. This call does not pass with only one of the two scopes permitting it
+
+Given
+
+- one registry, and one user, granted update on the registry and not on public
+  - Domain home-1
+  - Container registry host-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted update permission on the registry
+    - Role registry-keeper-1: applies only within the scope it is granted in
+    - Role registry-keeper-1: UPDATE allowed on every container_registry
+    - regular user user-1: holds Role registry-keeper-1
 
 When
 
