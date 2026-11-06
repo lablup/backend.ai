@@ -28,6 +28,7 @@ from ai.backend.manager.api.gql.base import resolve_entity_id
 from ai.backend.manager.data.user.types import (
     UserData,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.minilang import (
     ExternalTableFilterSpec,
@@ -1270,7 +1271,7 @@ class PurgeUser(graphene.Mutation):  # type: ignore[misc]
 
 def _validate_container_uid_gid(value: Any) -> None:
     if value is not Undefined and value is not None and value < 0:
-        raise ValueError("UID and GID must be non-negative integers.")
+        raise InvalidAPIParameters("UID and GID must be non-negative integers.")
 
 
 def validate_user_mutation_props(props: UserInput | ModifyUserInput) -> None:

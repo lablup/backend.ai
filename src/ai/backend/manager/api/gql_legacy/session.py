@@ -904,7 +904,7 @@ class TotalResourceSlot(graphene.ObjectType):  # type: ignore[misc]
 
 def _validate_priority_input(priority: int) -> None:
     if not (SESSION_PRIORITY_MIN <= priority <= SESSION_PRIORITY_MAX):
-        raise ValueError(
+        raise InvalidAPIParameters(
             f"The priority value {priority!r} is out of range: "
             f"[{SESSION_PRIORITY_MIN}, {SESSION_PRIORITY_MAX}]."
         )
@@ -914,7 +914,7 @@ def _validate_name_input(name: str) -> None:
     try:
         tx.SessionName().check(name)
     except t.DataError as e:
-        raise ValueError(f"Not allowed session name (n:{name})") from e
+        raise InvalidAPIParameters(f"Not allowed session name (n:{name})") from e
 
 
 class ModifyComputeSession(graphene.relay.ClientIDMutation):  # type: ignore[misc]

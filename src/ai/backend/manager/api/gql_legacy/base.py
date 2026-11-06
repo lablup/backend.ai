@@ -915,13 +915,13 @@ def validate_connection_args(
         cursor = after
     if first is not None:
         if first < 0:
-            raise ValueError("Argument 'first' must be a non-negative integer.")
+            raise InvalidAPIParameters("Argument 'first' must be a non-negative integer.")
         order = ConnectionPaginationOrder.FORWARD
         requested_page_size = first
 
     if before is not None:
         if order is ConnectionPaginationOrder.FORWARD:
-            raise ValueError(
+            raise InvalidAPIParameters(
                 "Can only paginate with single direction, forwards or backwards. Please set only"
                 " one of (after, first) or (before, last)."
             )
@@ -929,9 +929,9 @@ def validate_connection_args(
         cursor = before
     if last is not None:
         if last < 0:
-            raise ValueError("Argument 'last' must be a non-negative integer.")
+            raise InvalidAPIParameters("Argument 'last' must be a non-negative integer.")
         if order is ConnectionPaginationOrder.FORWARD:
-            raise ValueError(
+            raise InvalidAPIParameters(
                 "Can only paginate with single direction, forwards or backwards. Please set only"
                 " one of (after, first) or (before, last)."
             )
@@ -1251,7 +1251,7 @@ def generate_sql_info_for_gql_connection(
     ctx: GraphQueryContext = info.context
     max_page_size = ctx.config_provider.config.api.max_gql_connection_page_size
     if max_page_size is not None and ret.requested_page_size > max_page_size:
-        raise ValueError(
+        raise InvalidAPIParameters(
             f"Cannot fetch a page larger than {max_page_size}. "
             "Set 'first' or 'last' to a smaller integer."
         )

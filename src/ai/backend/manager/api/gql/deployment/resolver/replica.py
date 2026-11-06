@@ -24,6 +24,7 @@ from ai.backend.manager.api.gql.deployment.types.replica import (
     ReplicaStatusChangedPayload,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.errors.api import NotImplementedAPI
 
 # Query resolvers
 
@@ -97,5 +98,5 @@ async def replica_status_changed(
 ) -> AsyncGenerator[ReplicaStatusChangedPayload, None]:
     """Subscribe to replica status changes."""
     # TODO: Implement actual subscription logic using pub/sub system
-    raise NotImplementedError("Subscription not implemented")
+    raise NotImplementedAPI("Subscription not implemented")
     yield  # type: ignore[unreachable]  # Makes this an async generator
