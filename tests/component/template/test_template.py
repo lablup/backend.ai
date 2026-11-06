@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from ai.backend.client.v2.exceptions import NotFoundError
+from ai.backend.client.v2.exceptions import NotFoundError, PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.template import (
     CreateClusterTemplateRequest,
@@ -262,6 +262,97 @@ class TestDeleteSessionTemplate:
         # The server returns 404 for soft-deleted templates.
         with pytest.raises(NotFoundError):
             await admin_registry.template.get_session_template(template_id)
+
+
+class TestSessionTemplateOwnerCheck:
+    @pytest.fixture()
+    async def user_template_id(
+        self,
+        user_registry: BackendAIClientRegistry,
+        domain_fixture: DomainFixtureData,
+        group_name_fixture: str,
+    ) -> str:
+        result = await user_registry.template.create_session_template(
+            CreateSessionTemplateRequest(
+                domain=domain_fixture.domain_name,
+                group=group_name_fixture,
+                payload=_session_template_payload("owned-by-user"),
+            ),
+        )
+        return result.root[0].id
+
+    async def test_another_user_cannot_read_it(
+        self,
+        outsider_registry: BackendAIClientRegistry,
+        user_template_id: str,
+    ) -> None:
+        with pytest.raises(PermissionDeniedError):
+            await outsider_registry.template.get_session_template(user_template_id)
+
+    async def test_a_project_member_cannot_update_a_template_they_do_not_own(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        user_registry: BackendAIClientRegistry,
+        domain_fixture: DomainFixtureData,
+        group_name_fixture: str,
+    ) -> None:
+        created = await admin_registry.template.create_session_template(
+            CreateSessionTemplateRequest(
+                domain=domain_fixture.domain_name,
+                group=group_name_fixture,
+                payload=_session_template_payload("owned-by-admin"),
+            ),
+        )
+        template_id = created.root[0].id
+
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.template.update_session_template(
+                template_id,
+                UpdateSessionTemplateRequest(
+                    domain=domain_fixture.domain_name,
+                    group=group_name_fixture,
+                    payload=_session_template_payload("taken-over"),
+                ),
+            )
+
+        result = await admin_registry.template.get_session_template(template_id)
+        assert result.name == "owned-by-admin"
+
+    async def test_another_user_cannot_delete_it(
+        self,
+        outsider_registry: BackendAIClientRegistry,
+        user_registry: BackendAIClientRegistry,
+        user_template_id: str,
+    ) -> None:
+        with pytest.raises(PermissionDeniedError):
+            await outsider_registry.template.delete_session_template(user_template_id)
+
+        result = await user_registry.template.get_session_template(user_template_id)
+        assert result.name == "owned-by-user"
+
+    async def test_a_superadmin_reads_it(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        user_template_id: str,
+    ) -> None:
+        result = await admin_registry.template.get_session_template(user_template_id)
+        assert result.name == "owned-by-user"
+
+    async def test_the_list_of_another_user_leaves_it_out(
+        self,
+        outsider_registry: BackendAIClientRegistry,
+        user_registry: BackendAIClientRegistry,
+        user_template_id: str,
+    ) -> None:
+        outsider_list = await outsider_registry.template.list_session_templates(
+            ListSessionTemplatesRequest(),
+        )
+        owner_list = await user_registry.template.list_session_templates(
+            ListSessionTemplatesRequest(),
+        )
+
+        assert user_template_id not in [item.id for item in outsider_list.root]
+        assert user_template_id in [item.id for item in owner_list.root]
 
 
 # ====================================================================
