@@ -15,7 +15,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [빈 id 목록으로 레지스트리를 읽으면 하위 계층을 호출하지 않고 빈 응답이 반환됩니다](#reading_many-an-empty-registry-id-list-answers-empty) | 성공 |
-| [superadmin 이 미리 저장한 레지스트리 둘과 없는 id 하나를 한 번에 읽으면, 자리마다 미리 저장한 레지스트리 전체가 오고 없는 id 자리는 비어 있습니다](#reading_many-loading-many-registry-ids-keeps-the-positions) | 성공 |
+| [global 에서 아티팩트 레지스트리 읽기 권한을 받은 사용자가 미리 저장한 레지스트리 둘을 한 번에 읽으면, 자리마다 미리 저장한 레지스트리 전체가 요청한 순서대로 옵니다](#reading_many-loading-many-registry-ids-keeps-the-positions) | 성공 |
 | [아무 권한도 받지 않은 사용자가 레지스트리 id 여럿을 한 번에 읽으면, 항목마다 권한 부족 거부가 담겨 오고 없는 id 도 같은 거부로 와서 있는지 없는지가 드러나지 않습니다](#reading_many-a-user-granted-nothing-loading-registry-ids-is-refused-on-every-position) | 거부 |
 
 **get_registry_metas**
@@ -43,15 +43,19 @@
 
 Given
 
-- HuggingFace 레지스트리 2개와, superadmin 한 명
+- HuggingFace 레지스트리 2개와, global 에서 아티팩트 레지스트리에 READ 권한을 받은 user 한 명
   - 도메인 home-1
   - 허깅 페이스 레지스트리 registry-1: https://huggingface.co 을 참조합니다
   - 허깅 페이스 레지스트리 registry-2: https://huggingface.co 을 참조합니다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - global 에서 아티팩트 레지스트리 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 registry-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 registry-keeper-1: artifact_registry 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 registry-keeper-1 보유
 
 When
 
@@ -66,39 +70,42 @@ Then
 
 #### [loading-many-registry-ids-keeps-the-positions](/tests/scenario/bai_scenario/manager/artifact_registry/test_reading_many.py): pass
 
-superadmin 이 미리 저장한 레지스트리 둘과 없는 id 하나를 한 번에 읽으면, 자리마다 미리 저장한 레지스트리 전체가 오고 없는 id 자리는 비어 있습니다
+global 에서 아티팩트 레지스트리 읽기 권한을 받은 사용자가 미리 저장한 레지스트리 둘을 한 번에 읽으면, 자리마다 미리 저장한 레지스트리 전체가 요청한 순서대로 옵니다
 
 Given
 
-- HuggingFace 레지스트리 2개와, superadmin 한 명
+- HuggingFace 레지스트리 2개와, global 에서 아티팩트 레지스트리에 READ 권한을 받은 user 한 명
   - 도메인 home-1
   - 허깅 페이스 레지스트리 registry-1: https://huggingface.co 을 참조합니다
   - 허깅 페이스 레지스트리 registry-2: https://huggingface.co 을 참조합니다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - global 에서 아티팩트 레지스트리 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 registry-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 registry-keeper-1: artifact_registry 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 registry-keeper-1 보유
 
 When
 
-- ArtifactRegistryAdapter.batch_load_by_ids: user-1이 미리 저장한 레지스트리 둘과 없는 id 하나를 한 번에 읽습니다
+- ArtifactRegistryAdapter.batch_load_by_ids: user-1이 미리 저장한 레지스트리 둘을 한 번에 읽습니다
 
 Then
 
-- 자리마다 미리 저장한 레지스트리 전체가 오고, 없는 id 자리는 비어 있습니다
-  - length = 3
+- 자리마다 미리 저장한 레지스트리 전체가 요청한 순서대로 옵니다
+  - length = 2
   - [0].id: 같은 응답의 entity id 와 같다
   - [0].entity_id: 같은 응답의 id 와 같다
   - [0].registry_id: 미리 저장한 레지스트리의 id 와 같다
   - [0].name = 'registry-1'
   - [0].type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
-  - [1] = None
-  - [2].id: 같은 응답의 entity id 와 같다
-  - [2].entity_id: 같은 응답의 id 와 같다
-  - [2].registry_id: 미리 저장한 레지스트리의 id 와 같다
-  - [2].name = 'registry-2'
-  - [2].type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
+  - [1].id: 같은 응답의 entity id 와 같다
+  - [1].entity_id: 같은 응답의 id 와 같다
+  - [1].registry_id: 미리 저장한 레지스트리의 id 와 같다
+  - [1].name = 'registry-2'
+  - [1].type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
 
 <a id="reading_many-a-user-granted-nothing-loading-registry-ids-is-refused-on-every-position"></a>
 
