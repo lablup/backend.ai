@@ -8,7 +8,7 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInfo
+from ai.backend.common.dto.manager.v2.model_card.response import ResourceSlotEntryInfo
 from ai.backend.manager.api.adapters.model_card.adapter import ModelCardAdapter
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission

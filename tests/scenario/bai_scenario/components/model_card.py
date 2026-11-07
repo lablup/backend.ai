@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import Decimal
 from typing import Any, override
 from uuid import UUID
 
@@ -13,12 +12,14 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.common import PartialBulkPayload, ResourceSlotEntryInfo
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.model_card.response import (
     ModelCardNode,
+    ResourceSlotEntryInfo,
     SearchModelCardsPayload,
 )
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardAccessLevel
+from ai.backend.common.types import IntrinsicSlotNames
 from ai.backend.manager.data.model_card.types import (
     ModelCardData,
     ModelCardResourceRequirementData,
@@ -47,6 +48,7 @@ from bai_scenario.seeds.model_card.model_card import TestSeedCardRequirement, Te
 from bai_scenario.seeds.project.project import TestSeedProject
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
 from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.resource_slot.slot_type import TestSeedSlotType
 from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 from bai_scenario.seeds.vfolder.vfolder import TestSeedProjectVFolder
 
@@ -317,7 +319,7 @@ class ProjectCards:
 
     def entries(self, card: ModelCardData) -> list[ResourceSlotEntryInfo]:
         return [
-            ResourceSlotEntryInfo(resource_type=r.slot_name, quantity=Decimal(r.min_quantity))
+            ResourceSlotEntryInfo(resource_type=r.slot_name, quantity=r.min_quantity)
             for r in self.requirements
             if r.model_card_id == card.entity_id()
         ]
@@ -390,11 +392,13 @@ class TwoProjectsOfCardsAndSomeone(Given[Any, ProjectCards]):
                     TestSeedModelCard(title=title, filled=True), where, folder, owner
                 )
             )
+        slot = await seeding.once(TestSeedSlotType(IntrinsicSlotNames.CPU))
+        slot_name = seeding.made(slot).slot_name
         requirements = []
         for number, card in enumerate(laid_cards, start=1):
             requirements.append(
                 await seeding.adding(
-                    TestSeedCardRequirement(slot_name="cpu", min_quantity=str(number)), card
+                    TestSeedCardRequirement(slot_name=slot_name, min_quantity=str(number)), card
                 )
             )
         caller = await seeding.within(SomeoneOf(domain))
