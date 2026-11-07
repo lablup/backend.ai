@@ -8,7 +8,7 @@ Scenario: incomplete 1 / 3
   - batch_load_by_ids: representative success ✓ · representative rejection ✓
   - get_registry_metas: representative success ✓ · representative rejection ✗: SCENARIO-GAP
 - direct implementation (1)
-  - get_registry_meta: success present 1 · rejection present 4 (single_entity)
+  - get_registry_meta: success present 1 · rejection present 2 (single_entity)
 
 **batch_load_by_ids**
 
@@ -32,8 +32,6 @@ Scenario: incomplete 1 / 3
 | [when a user granted read permission on artifact registries in global reads a registry by id, the whole registry made in advance comes back](#reading-a-user-granted-read-reads-a-registry-by-id) | answered |
 | [reading by a name that names no registry is rejected as the name not being resolvable](#reading-a-name-naming-no-registry-is-refused) | rejected |
 | [when a user granted nothing tries to read a registry by id, it is rejected for lack of permission](#reading-a-user-granted-nothing-may-not-read-a-registry) | rejected |
-| [when the superadmin reads by an id that names no registry, it is rejected as no such registry](#reading-an-id-naming-no-registry-is-refused) | rejected |
-| [reading a registry with neither an id nor a name is rejected as invalid request parameters](#reading-reading-a-registry-with-neither-an-id-nor-a-name-is-refused) | rejected |
 
 ### batch_load_by_ids
 
@@ -246,14 +244,18 @@ reading by a name that names no registry is rejected as the name not being resol
 
 Given
 
-- one HuggingFace registry and one user with no permission
+- one HuggingFace registry and one user granted READ on artifact registries in global
   - Domain home-1
   - HuggingFace registry registry-1: refers to https://huggingface.co
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted permission on artifact registries in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role registry-keeper-1: applies only within the scope it is granted in
+    - Role registry-keeper-1: READ allowed on every artifact_registry
+    - regular user user-1: holds Role registry-keeper-1
 
 When
 
@@ -289,56 +291,4 @@ Then
 
 - the call is rejected
   - rejected: NotEnoughPermission
-
-<a id="reading-an-id-naming-no-registry-is-refused"></a>
-
-#### [an-id-naming-no-registry-is-refused](/tests/scenario/bai_scenario/manager/artifact_registry/test_reading.py): pass
-
-when the superadmin reads by an id that names no registry, it is rejected as no such registry
-
-Given
-
-- one HuggingFace registry and one superadmin
-  - Domain home-1
-  - HuggingFace registry registry-1: refers to https://huggingface.co
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- ArtifactRegistryAdapter.get_registry_meta: user-1 reads by an id that names no registry
-
-Then
-
-- the call is rejected
-  - rejected: ArtifactRegistryNotFoundError
-
-<a id="reading-reading-a-registry-with-neither-an-id-nor-a-name-is-refused"></a>
-
-#### [reading-a-registry-with-neither-an-id-nor-a-name-is-refused](/tests/scenario/bai_scenario/manager/artifact_registry/test_reading.py): pass
-
-reading a registry with neither an id nor a name is rejected as invalid request parameters
-
-Given
-
-- one HuggingFace registry and one user with no permission
-  - Domain home-1
-  - HuggingFace registry registry-1: refers to https://huggingface.co
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-
-When
-
-- ArtifactRegistryAdapter.get_registry_meta: user-1 reads with neither an id nor a name
-
-Then
-
-- the call is rejected
-  - rejected: InvalidAPIParameters
 

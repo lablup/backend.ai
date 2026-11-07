@@ -698,9 +698,7 @@ class TheArtifactPage(Then[ArtifactsToSearch, AdminSearchArtifactsPayload]):
         if payload is None:
             return [MissingResponse(answered.raised)]
         matched = [
-            one
-            for one in laid.laid
-            if not self.only_models or one.type is DataArtifactType.MODEL
+            one for one in laid.laid if not self.only_models or one.type is DataArtifactType.MODEL
         ]
         if self.ordered_by_name:
             matched.sort(key=lambda artifact: artifact.name)
@@ -745,9 +743,7 @@ class TheRevisionPage(
         if self.only_status is not None:
             return Says(
                 "그 상태의 리비전만 버전 순서로 한 페이지에 옵니다",
-                english=(
-                    "only revisions in that status come back, in version order on one page"
-                ),
+                english=("only revisions in that status come back, in version order on one page"),
             )
         if self.only_artifact_index is not None:
             return Says(

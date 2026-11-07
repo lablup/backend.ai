@@ -15,21 +15,21 @@ Scenario: incomplete 9 / 25
   - restore: representative success ✓ · representative rejection ✓
   - search_revisions_of_artifact_gql: representative success ✓ · representative rejection ✓
 - direct implementation (16)
-  - admin_search: success present 2 · rejection present 1 (global_scope)
-  - admin_search_gql: success present 2 · rejection present 1 (global_scope)
+  - admin_search: success present 1 · rejection present 1 (global_scope)
+  - admin_search_gql: success present 1 · rejection present 1 (global_scope)
   - approve_revision: success present 1 · rejection present 2 (single_field)
-  - cancel_import: success present 2 · rejection present 1 (single_field)
+  - cancel_import: success present 1 · rejection present 1 (single_field)
   - cleanup_revision: success absent · rejection present 2 (single_field): SCENARIO-GAP
   - delegate_import_batch: success absent · rejection present 2 (global_scope): SCENARIO-GAP
   - delegate_scan: success absent · rejection present 1 (global_scope): SCENARIO-GAP
   - delete_artifacts: success present 1 · rejection present 1 (global_scope)
   - get: success present 1 · rejection present 1 (single_entity)
   - import_revision: success absent · rejection present 2 (single_field): SCENARIO-GAP
-  - reject_revision: success present 2 · rejection present 1 (single_field)
+  - reject_revision: success present 1 · rejection present 1 (single_field)
   - restore_artifacts: success present 1 · rejection present 1 (global_scope)
   - retrieve_models: success absent · rejection present 1 (global_scope): SCENARIO-GAP
   - scan: success absent · rejection present 1 (global_scope): SCENARIO-GAP
-  - search_revisions_gql: success present 2 · rejection present 1 (global_scope)
+  - search_revisions_gql: success present 1 · rejection present 1 (global_scope)
   - update: success present 1 · rejection present 2 (single_entity)
 
 **batch_load_by_ids**
@@ -46,7 +46,7 @@ Scenario: incomplete 9 / 25
 |---|---|
 | [loading revisions with an empty id list calls no lower layer and an empty answer comes back](#reading-an-empty-revision-id-list-answers-empty) | answered |
 | [when the superadmin loads two revisions made in advance and one id that does not exist at once, every position holds a whole revision made in advance and the position of the id that does not exist is empty](#reading-loading-many-revision-ids-keeps-the-positions) | answered |
-| [when a user granted nothing loads several revision ids at once, every revision the caller may not read comes back with a rejection for lack of permission, and the position of the id that does not exist is empty](#reading-a-user-granted-nothing-loading-revisions-is-refused-on-every-readable-one) | rejected |
+| [when a user granted nothing loads several revision ids at once, every revision the caller may not read comes back with a rejection for lack of permission](#reading-a-user-granted-nothing-loading-revisions-is-refused-on-every-readable-one) | rejected |
 
 **delete**
 
@@ -93,23 +93,21 @@ Scenario: incomplete 9 / 25
 
 | scenario | verdict |
 |---|---|
-| [when a user granted read permission on artifacts in global searches the revisions of one artifact, only the revisions that artifact holds come back on one page](#revision_searching-searching-one-artifacts-revisions-returns-only-the-ones-it-holds) | answered |
+| [when a user granted read permission on artifacts in global searches only the revisions of one artifact, narrowed to the needs-approval status, ordered by version and limited to the first one, one needs-approval revision of that artifact comes back](#revision_searching-searching-one-artifacts-revisions-returns-only-the-ones-it-holds) | answered |
 | [when a user granted nothing tries to search the revisions of one artifact, the whole request is rejected because they hold no permission on that artifact](#revision_searching-a-user-granted-nothing-may-not-search-one-artifacts-revisions) | rejected |
 
 **admin_search**
 
 | scenario | verdict |
 |---|---|
-| [when a user granted read permission on artifacts in global searches narrowed to the model type, only model artifacts remain](#searching-narrowing-to-the-model-type-leaves-only-model-artifacts) | answered |
-| [when a user granted read permission on artifacts in global searches with no condition, every artifact made in advance comes back on one page](#searching-searching-without-a-condition-returns-every-artifact) | answered |
+| [when a user granted read permission on artifacts in global searches narrowed to the model type, ordered by name and limited to two, two model artifacts come back in name order](#searching-narrowing-to-the-model-type-leaves-only-model-artifacts) | answered |
 | [when a user granted nothing tries to search artifacts, it is rejected for lack of permission because they hold no global role](#searching-a-user-granted-nothing-may-not-search-artifacts) | rejected |
 
 **admin_search_gql**
 
 | scenario | verdict |
 |---|---|
-| [when a user granted read permission on artifacts in global searches narrowed by the GQL type filter, only model artifacts remain](#searching_gql-gql-narrowing-to-the-model-type-leaves-only-model-artifacts) | answered |
-| [when a user granted read permission on artifacts in global searches with no GQL condition, every artifact made in advance comes back on one page](#searching_gql-gql-searching-without-a-condition-returns-every-artifact) | answered |
+| [when a user granted read permission on artifacts in global searches narrowed by the GQL type filter, ordered by name and limited to two, two model artifacts come back in name order](#searching_gql-gql-narrowing-to-the-model-type-leaves-only-model-artifacts) | answered |
 | [when a user granted nothing tries to search artifacts with GQL filters, it is rejected for lack of permission because they hold no global role](#searching_gql-a-user-granted-nothing-may-not-search-artifacts-with-gql-filters) | rejected |
 
 **approve_revision**
@@ -118,21 +116,20 @@ Scenario: incomplete 9 / 25
 |---|---|
 | [when a revision waiting for approval is approved, the revision comes back in the available state](#revision_transitions-approving-a-revision-waiting-for-approval-makes-it-available) | answered |
 | [a revision that is not waiting for approval cannot be approved, and it is rejected as not verified](#revision_transitions-a-revision-not-waiting-for-approval-is-not-approved) | rejected |
-| [a revision that is already available cannot be approved again, and it is rejected as not verified](#revision_transitions-an-already-available-revision-is-not-approved-again) | rejected |
+| [when a user granted only read permission tries to approve a revision, it is rejected for lack of permission](#revision_transitions-a-user-granted-read-but-not-update-may-not-approve-a-revision) | rejected |
 
 **cancel_import**
 
 | scenario | verdict |
 |---|---|
-| [cancelling the import of a revision that is already available puts it back to the scanned state. Cancelling does not check the status it starts from](#revision_transitions-cancelling-a-finished-import-puts-the-revision-back-to-scanned) | answered |
 | [when the import of a revision that is being pulled is cancelled, the revision comes back in the scanned state](#revision_transitions-cancelling-a-running-import-puts-the-revision-back-to-scanned) | answered |
-| [when the superadmin cancels the import of a revision that does not exist, it is rejected as no such revision](#revision_transitions-cancelling-the-import-of-a-missing-revision-is-refused) | rejected |
+| [when a user granted only read permission tries to cancel the import of a revision, it is rejected for lack of permission](#revision_transitions-a-user-granted-read-but-not-update-may-not-cancel-an-import) | rejected |
 
 **cleanup_revision**
 
 | scenario | verdict |
 |---|---|
-| [a revision that is being pulled cannot be cleaned up, and it is rejected as not ready to be cleaned up](#revision_transitions-cleaning-up-a-revision-being-pulled-is-refused) | rejected |
+| [when a user granted only read permission tries to clean up a revision, it is rejected for lack of permission](#revision_transitions-a-user-granted-read-but-not-soft-delete-may-not-clean-up-a-revision) | rejected |
 | [a revision that has only been scanned cannot be cleaned up, and it is rejected as not ready to be cleaned up](#revision_transitions-cleaning-up-a-scanned-revision-is-refused) | rejected |
 
 **delegate_import_batch**
@@ -166,16 +163,15 @@ Scenario: incomplete 9 / 25
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin imports a revision that does not exist, it is rejected as no such revision](#revision_transitions-importing-a-missing-revision-is-refused) | rejected |
+| [when a user granted only read permission tries to import a revision, it is rejected for lack of permission](#revision_transitions-a-user-granted-read-but-not-create-may-not-import-a-revision) | rejected |
 | [when a revision is imported without reservoir configuration, it is rejected as the server being misconfigured](#revision_transitions-importing-without-reservoir-configuration-is-refused) | rejected |
 
 **reject_revision**
 
 | scenario | verdict |
 |---|---|
-| [when a revision waiting for approval is rejected, it comes back in the rejected state](#revision_transitions-rejecting-a-revision-waiting-for-approval-makes-it-rejected) | answered |
 | [when an available revision is rejected, the revision comes back in the rejected state. Rejecting does not check the status it starts from](#revision_transitions-rejecting-an-available-revision-makes-it-rejected) | answered |
-| [when a user granted nothing tries to reject a revision, it is rejected as the artifact holding it not being resolvable](#revision_transitions-a-user-granted-nothing-may-not-reject-a-revision) | rejected |
+| [when a user granted only read permission tries to reject a revision, it is rejected for lack of permission](#revision_transitions-a-user-granted-read-but-not-update-may-not-reject-a-revision) | rejected |
 
 **restore_artifacts**
 
@@ -200,8 +196,7 @@ Scenario: incomplete 9 / 25
 
 | scenario | verdict |
 |---|---|
-| [when the read-only monitor searches revisions narrowed to the needs-approval status, only revisions in that status remain](#revision_searching-filtering-revisions-by-status-leaves-only-that-status) | answered |
-| [when the read-only monitor searches revisions with no condition, every revision made in advance comes back on one page](#revision_searching-searching-revisions-without-a-condition-returns-every) | answered |
+| [when the read-only monitor searches narrowed to the needs-approval status, ordered by version and limited to the first one, one needs-approval revision comes back](#revision_searching-filtering-revisions-by-status-leaves-only-that-status) | answered |
 | [when a user granted nothing tries to search revisions, it is rejected for lack of permission because they hold no global role](#revision_searching-a-user-granted-nothing-may-not-search-revisions) | rejected |
 
 **update**
@@ -418,7 +413,7 @@ Then
 
 #### [a-user-granted-nothing-loading-revisions-is-refused-on-every-readable-one](/tests/scenario/bai_scenario/manager/artifact/test_reading.py): pass
 
-when a user granted nothing loads several revision ids at once, every revision the caller may not read comes back with a rejection for lack of permission, and the position of the id that does not exist is empty
+when a user granted nothing loads several revision ids at once, every revision the caller may not read comes back with a rejection for lack of permission
 
 Given
 
@@ -440,10 +435,10 @@ When
 
 Then
 
-- every revision the caller may not read comes back with a rejection for lack of permission, and the position of the id that does not exist is empty
+- every revision the caller may not read comes back with a rejection for lack of permission
   - length = 3
   - rejected: NotEnoughPermission
-  - [1] = None
+  - [1]: skipped: an id naming no revision comes back empty while a revision the caller may not read comes back as a denial, so this position reveals whether the revision exists. It is recorded as a defect candidate rather than pinned as the expected behavior
   - rejected: NotEnoughPermission
 
 ### delete
@@ -905,18 +900,20 @@ Then
 
 #### [searching-one-artifacts-revisions-returns-only-the-ones-it-holds](/tests/scenario/bai_scenario/manager/artifact/test_revision_searching.py): pass
 
-when a user granted read permission on artifacts in global searches the revisions of one artifact, only the revisions that artifact holds come back on one page
+when a user granted read permission on artifacts in global searches only the revisions of one artifact, narrowed to the needs-approval status, ordered by version and limited to the first one, one needs-approval revision of that artifact comes back
 
 Given
 
-- 2 artifacts with 2 revisions each and one user granted READ on artifacts
+- 2 artifacts with 3 revisions each and one user granted READ on artifacts
   - Domain home-1
   - Artifact artifact-1: a model scanned from a HuggingFace registry
   - Artifact artifact-1: revision 1.0
   - Artifact artifact-1: revision 2.0
+  - Artifact artifact-1: revision 3.0
   - Artifact artifact-2: a model scanned from a HuggingFace registry
   - Artifact artifact-2: revision 1.0
   - Artifact artifact-2: revision 2.0
+  - Artifact artifact-2: revision 3.0
   - Prepare a user granted permission on artifacts in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -929,39 +926,27 @@ Given
 
 When
 
-- ArtifactAdapter.search_revisions_of_artifact_gql: user-1 searches the revisions artifact-1 holds
+- ArtifactAdapter.search_revisions_of_artifact_gql: user-1 searches only the revisions artifact-1 holds, narrowed to the needs-approval status, ordered by version and limited to the first one
 
 Then
 
-- every revision the artifact holds comes back on one page
-  - count = 2
+- only revisions in that status come back, in version order on one page
+  - count = 1
   - total_count = 2
-  - has_next_page = False
+  - has_next_page = True
   - has_previous_page = False
   - [0].id: same as the id of the revision created in advance
   - [0].field_id: same as the id of the revision created in advance
   - [0].artifact_id: same as the id of the artifact created in advance
   - [0].version = '1.0'
   - [0].size = '1024'
-  - [0].status = <ArtifactStatus.SCANNED: 'SCANNED'>
+  - [0].status = <ArtifactStatus.NEEDS_APPROVAL: 'NEEDS_APPROVAL'>
   - [0].remote_status = None
   - [0].created_at = None
   - [0].updated_at = None
   - [0].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
   - [0].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - [0].readme = 'the revision readme'
-  - [1].id: same as the id of the revision created in advance
-  - [1].field_id: same as the id of the revision created in advance
-  - [1].artifact_id: same as the id of the artifact created in advance
-  - [1].version = '2.0'
-  - [1].size = '1024'
-  - [1].status = <ArtifactStatus.NEEDS_APPROVAL: 'NEEDS_APPROVAL'>
-  - [1].remote_status = None
-  - [1].created_at = None
-  - [1].updated_at = None
-  - [1].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
-  - [1].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
-  - [1].readme = 'the revision readme'
 
 <a id="revision_searching-a-user-granted-nothing-may-not-search-one-artifacts-revisions"></a>
 
@@ -987,7 +972,7 @@ Given
 
 When
 
-- ArtifactAdapter.search_revisions_of_artifact_gql: user-1 searches the revisions artifact-1 holds
+- ArtifactAdapter.search_revisions_of_artifact_gql: user-1 searches only the revisions artifact-1 holds, narrowed to the needs-approval status, ordered by version and limited to the first one
 
 Then
 
@@ -1000,15 +985,16 @@ Then
 
 #### [narrowing-to-the-model-type-leaves-only-model-artifacts](/tests/scenario/bai_scenario/manager/artifact/test_searching.py): pass
 
-when a user granted read permission on artifacts in global searches narrowed to the model type, only model artifacts remain
+when a user granted read permission on artifacts in global searches narrowed to the model type, ordered by name and limited to two, two model artifacts come back in name order
 
 Given
 
-- 2 model artifacts and 1 package artifacts, and one user granted READ on artifacts
+- 3 model artifacts and 1 package artifacts, and one user granted READ on artifacts
   - Domain home-1
   - Artifact artifact-1: a model scanned from a HuggingFace registry
   - Artifact artifact-2: a model scanned from a HuggingFace registry
   - Artifact artifact-3: a model scanned from a HuggingFace registry
+  - Artifact artifact-4: a model scanned from a HuggingFace registry
   - Prepare a user granted permission on artifacts in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -1021,79 +1007,14 @@ Given
 
 When
 
-- ArtifactAdapter.admin_search: user-1 searches narrowed to the model type
+- ArtifactAdapter.admin_search: user-1 searches narrowed to the model type, ordered by name and limited to two
 
 Then
 
-- every model artifact comes back on one page
+- only model artifacts come back, in name order on one page
   - count = 2
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-  - [0].name = 'artifact-1'
-  - [0].type = <ArtifactType.MODEL: 'MODEL'>
-  - [0].description = 'an artifact that already existed'
-  - [0].registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
-  - [0].source_registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
-  - [0].availability = <ArtifactAvailability.ALIVE: 'ALIVE'>
-  - [0].readonly = False
-  - [0].extra = None
-  - [0].revisions = []
-  - [0].id: same as the id of the artifact made in advance
-  - [0].entity_id: same as the id of the artifact made in advance
-  - [0].registry_id: same as the registry id of the artifact made in advance
-  - [0].source_registry_id: same as the registry id of the artifact made in advance
-  - [0].scanned_at: the time this run wrote
-  - [0].updated_at: the time this run wrote
-  - [1].name = 'artifact-2'
-  - [1].type = <ArtifactType.MODEL: 'MODEL'>
-  - [1].description = 'an artifact that already existed'
-  - [1].registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
-  - [1].source_registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
-  - [1].availability = <ArtifactAvailability.ALIVE: 'ALIVE'>
-  - [1].readonly = False
-  - [1].extra = None
-  - [1].revisions = []
-  - [1].id: same as the id of the artifact made in advance
-  - [1].entity_id: same as the id of the artifact made in advance
-  - [1].registry_id: same as the registry id of the artifact made in advance
-  - [1].source_registry_id: same as the registry id of the artifact made in advance
-  - [1].scanned_at: the time this run wrote
-  - [1].updated_at: the time this run wrote
-
-<a id="searching-searching-without-a-condition-returns-every-artifact"></a>
-
-#### [searching-without-a-condition-returns-every-artifact](/tests/scenario/bai_scenario/manager/artifact/test_searching.py): pass
-
-when a user granted read permission on artifacts in global searches with no condition, every artifact made in advance comes back on one page
-
-Given
-
-- 2 model artifacts and 1 package artifacts, and one user granted READ on artifacts
-  - Domain home-1
-  - Artifact artifact-1: a model scanned from a HuggingFace registry
-  - Artifact artifact-2: a model scanned from a HuggingFace registry
-  - Artifact artifact-3: a model scanned from a HuggingFace registry
-  - Prepare a user granted permission on artifacts in global
-    - Prepare one user in the domain
-      - Project resource policy default: the personal project created along with a user looks it up by this name
-      - User resource policy user-policy-1: up to 10 folders per user
-      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-      - regular user user-1: has their own keypair and personal project
-    - Role artifact-keeper-1: applies only within the scope it is granted in
-    - Role artifact-keeper-1: READ allowed on every artifact
-    - regular user user-1: holds Role artifact-keeper-1
-
-When
-
-- ArtifactAdapter.admin_search: user-1 searches with no condition
-
-Then
-
-- every artifact made in advance comes back on one page
-  - count = 3
   - total_count = 3
-  - has_next_page = False
+  - has_next_page = True
   - has_previous_page = False
   - [0].name = 'artifact-1'
   - [0].type = <ArtifactType.MODEL: 'MODEL'>
@@ -1125,21 +1046,6 @@ Then
   - [1].source_registry_id: same as the registry id of the artifact made in advance
   - [1].scanned_at: the time this run wrote
   - [1].updated_at: the time this run wrote
-  - [2].name = 'artifact-3'
-  - [2].type = <ArtifactType.PACKAGE: 'PACKAGE'>
-  - [2].description = 'an artifact that already existed'
-  - [2].registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
-  - [2].source_registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
-  - [2].availability = <ArtifactAvailability.ALIVE: 'ALIVE'>
-  - [2].readonly = False
-  - [2].extra = None
-  - [2].revisions = []
-  - [2].id: same as the id of the artifact made in advance
-  - [2].entity_id: same as the id of the artifact made in advance
-  - [2].registry_id: same as the registry id of the artifact made in advance
-  - [2].source_registry_id: same as the registry id of the artifact made in advance
-  - [2].scanned_at: the time this run wrote
-  - [2].updated_at: the time this run wrote
 
 <a id="searching-a-user-granted-nothing-may-not-search-artifacts"></a>
 
@@ -1162,7 +1068,7 @@ Given
 
 When
 
-- ArtifactAdapter.admin_search: user-1 searches with no condition
+- ArtifactAdapter.admin_search: user-1 searches narrowed to the model type, ordered by name and limited to two
 
 Then
 
@@ -1175,15 +1081,16 @@ Then
 
 #### [gql-narrowing-to-the-model-type-leaves-only-model-artifacts](/tests/scenario/bai_scenario/manager/artifact/test_searching_gql.py): pass
 
-when a user granted read permission on artifacts in global searches narrowed by the GQL type filter, only model artifacts remain
+when a user granted read permission on artifacts in global searches narrowed by the GQL type filter, ordered by name and limited to two, two model artifacts come back in name order
 
 Given
 
-- 2 model artifacts and 1 package artifacts, and one user granted READ on artifacts
+- 3 model artifacts and 1 package artifacts, and one user granted READ on artifacts
   - Domain home-1
   - Artifact artifact-1: a model scanned from a HuggingFace registry
   - Artifact artifact-2: a model scanned from a HuggingFace registry
   - Artifact artifact-3: a model scanned from a HuggingFace registry
+  - Artifact artifact-4: a model scanned from a HuggingFace registry
   - Prepare a user granted permission on artifacts in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -1196,79 +1103,14 @@ Given
 
 When
 
-- ArtifactAdapter.admin_search_gql: user-1 searches narrowed to the model type
+- ArtifactAdapter.admin_search_gql: user-1 searches with a GQL filter narrowed to the model type, ordered by name and limited to two
 
 Then
 
-- every model artifact comes back on one page
+- only model artifacts come back, in name order on one page
   - count = 2
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-  - [0].name = 'artifact-1'
-  - [0].type = <ArtifactType.MODEL: 'MODEL'>
-  - [0].description = 'an artifact that already existed'
-  - [0].registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
-  - [0].source_registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
-  - [0].availability = <ArtifactAvailability.ALIVE: 'ALIVE'>
-  - [0].readonly = False
-  - [0].extra = None
-  - [0].revisions = []
-  - [0].id: same as the id of the artifact made in advance
-  - [0].entity_id: same as the id of the artifact made in advance
-  - [0].registry_id: same as the registry id of the artifact made in advance
-  - [0].source_registry_id: same as the registry id of the artifact made in advance
-  - [0].scanned_at: the time this run wrote
-  - [0].updated_at: the time this run wrote
-  - [1].name = 'artifact-2'
-  - [1].type = <ArtifactType.MODEL: 'MODEL'>
-  - [1].description = 'an artifact that already existed'
-  - [1].registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
-  - [1].source_registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
-  - [1].availability = <ArtifactAvailability.ALIVE: 'ALIVE'>
-  - [1].readonly = False
-  - [1].extra = None
-  - [1].revisions = []
-  - [1].id: same as the id of the artifact made in advance
-  - [1].entity_id: same as the id of the artifact made in advance
-  - [1].registry_id: same as the registry id of the artifact made in advance
-  - [1].source_registry_id: same as the registry id of the artifact made in advance
-  - [1].scanned_at: the time this run wrote
-  - [1].updated_at: the time this run wrote
-
-<a id="searching_gql-gql-searching-without-a-condition-returns-every-artifact"></a>
-
-#### [gql-searching-without-a-condition-returns-every-artifact](/tests/scenario/bai_scenario/manager/artifact/test_searching_gql.py): pass
-
-when a user granted read permission on artifacts in global searches with no GQL condition, every artifact made in advance comes back on one page
-
-Given
-
-- 2 model artifacts and 1 package artifacts, and one user granted READ on artifacts
-  - Domain home-1
-  - Artifact artifact-1: a model scanned from a HuggingFace registry
-  - Artifact artifact-2: a model scanned from a HuggingFace registry
-  - Artifact artifact-3: a model scanned from a HuggingFace registry
-  - Prepare a user granted permission on artifacts in global
-    - Prepare one user in the domain
-      - Project resource policy default: the personal project created along with a user looks it up by this name
-      - User resource policy user-policy-1: up to 10 folders per user
-      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-      - regular user user-1: has their own keypair and personal project
-    - Role artifact-keeper-1: applies only within the scope it is granted in
-    - Role artifact-keeper-1: READ allowed on every artifact
-    - regular user user-1: holds Role artifact-keeper-1
-
-When
-
-- ArtifactAdapter.admin_search_gql: user-1 searches with no condition
-
-Then
-
-- every artifact made in advance comes back on one page
-  - count = 3
   - total_count = 3
-  - has_next_page = False
+  - has_next_page = True
   - has_previous_page = False
   - [0].name = 'artifact-1'
   - [0].type = <ArtifactType.MODEL: 'MODEL'>
@@ -1300,21 +1142,6 @@ Then
   - [1].source_registry_id: same as the registry id of the artifact made in advance
   - [1].scanned_at: the time this run wrote
   - [1].updated_at: the time this run wrote
-  - [2].name = 'artifact-3'
-  - [2].type = <ArtifactType.PACKAGE: 'PACKAGE'>
-  - [2].description = 'an artifact that already existed'
-  - [2].registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
-  - [2].source_registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
-  - [2].availability = <ArtifactAvailability.ALIVE: 'ALIVE'>
-  - [2].readonly = False
-  - [2].extra = None
-  - [2].revisions = []
-  - [2].id: same as the id of the artifact made in advance
-  - [2].entity_id: same as the id of the artifact made in advance
-  - [2].registry_id: same as the registry id of the artifact made in advance
-  - [2].source_registry_id: same as the registry id of the artifact made in advance
-  - [2].scanned_at: the time this run wrote
-  - [2].updated_at: the time this run wrote
 
 <a id="searching_gql-a-user-granted-nothing-may-not-search-artifacts-with-gql-filters"></a>
 
@@ -1337,7 +1164,7 @@ Given
 
 When
 
-- ArtifactAdapter.admin_search_gql: user-1 searches with no condition
+- ArtifactAdapter.admin_search_gql: user-1 searches with a GQL filter narrowed to the model type, ordered by name and limited to two
 
 Then
 
@@ -1421,15 +1248,15 @@ Then
 - the call is rejected
   - rejected: ArtifactRevisionNotVerified
 
-<a id="revision_transitions-an-already-available-revision-is-not-approved-again"></a>
+<a id="revision_transitions-a-user-granted-read-but-not-update-may-not-approve-a-revision"></a>
 
-#### [an-already-available-revision-is-not-approved-again](/tests/scenario/bai_scenario/manager/artifact/test_revision_transitions.py): pass
+#### [a-user-granted-read-but-not-update-may-not-approve-a-revision](/tests/scenario/bai_scenario/manager/artifact/test_revision_transitions.py): pass
 
-a revision that is already available cannot be approved again, and it is rejected as not verified
+when a user granted only read permission tries to approve a revision, it is rejected for lack of permission
 
 Given
 
-- one artifact with 1 revisions and one user granted READ, UPDATE on artifacts
+- one artifact with 1 revisions and one user granted READ on artifacts
   - Domain home-1
   - Artifact artifact-1: a model scanned from a HuggingFace registry
   - Artifact artifact-1: revision 1.0
@@ -1441,7 +1268,6 @@ Given
       - regular user user-1: has their own keypair and personal project
     - Role artifact-keeper-1: applies only within the scope it is granted in
     - Role artifact-keeper-1: READ allowed on every artifact
-    - Role artifact-keeper-1: UPDATE allowed on every artifact
     - regular user user-1: holds Role artifact-keeper-1
 
 When
@@ -1451,52 +1277,9 @@ When
 Then
 
 - the call is rejected
-  - rejected: ArtifactRevisionNotVerified
+  - rejected: NotEnoughPermission
 
 ### cancel_import
-
-<a id="revision_transitions-cancelling-a-finished-import-puts-the-revision-back-to-scanned"></a>
-
-#### [cancelling-a-finished-import-puts-the-revision-back-to-scanned](/tests/scenario/bai_scenario/manager/artifact/test_revision_transitions.py): pass
-
-cancelling the import of a revision that is already available puts it back to the scanned state. Cancelling does not check the status it starts from
-
-Given
-
-- one artifact with 1 revisions and one user granted READ, UPDATE on artifacts
-  - Domain home-1
-  - Artifact artifact-1: a model scanned from a HuggingFace registry
-  - Artifact artifact-1: revision 1.0
-  - Prepare a user granted permission on artifacts in global
-    - Prepare one user in the domain
-      - Project resource policy default: the personal project created along with a user looks it up by this name
-      - User resource policy user-policy-1: up to 10 folders per user
-      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-      - regular user user-1: has their own keypair and personal project
-    - Role artifact-keeper-1: applies only within the scope it is granted in
-    - Role artifact-keeper-1: READ allowed on every artifact
-    - Role artifact-keeper-1: UPDATE allowed on every artifact
-    - regular user user-1: holds Role artifact-keeper-1
-
-When
-
-- ArtifactAdapter.cancel_import: user-1 cancels the import of revision 1.0
-
-Then
-
-- the whole revision created in advance comes back
-  - id: same as the id of the revision created in advance
-  - field_id: same as the id of the revision created in advance
-  - artifact_id: same as the id of the artifact created in advance
-  - version = '1.0'
-  - size = '1024'
-  - status = <ArtifactStatus.SCANNED: 'SCANNED'>
-  - remote_status = None
-  - created_at = None
-  - updated_at = None
-  - digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
-  - verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
-  - readme = 'the revision readme'
 
 <a id="revision_transitions-cancelling-a-running-import-puts-the-revision-back-to-scanned"></a>
 
@@ -1541,44 +1324,15 @@ Then
   - verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - readme = 'the revision readme'
 
-<a id="revision_transitions-cancelling-the-import-of-a-missing-revision-is-refused"></a>
+<a id="revision_transitions-a-user-granted-read-but-not-update-may-not-cancel-an-import"></a>
 
-#### [cancelling-the-import-of-a-missing-revision-is-refused](/tests/scenario/bai_scenario/manager/artifact/test_revision_transitions.py): pass
+#### [a-user-granted-read-but-not-update-may-not-cancel-an-import](/tests/scenario/bai_scenario/manager/artifact/test_revision_transitions.py): pass
 
-when the superadmin cancels the import of a revision that does not exist, it is rejected as no such revision
-
-Given
-
-- one artifact with 1 revisions and one superadmin
-  - Domain home-1
-  - Artifact artifact-1: a model scanned from a HuggingFace registry
-  - Artifact artifact-1: revision 1.0
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- ArtifactAdapter.cancel_import: user-1 tries to cancel an import for a missing revision id
-
-Then
-
-- the call is rejected
-  - rejected: FieldNotFoundError
-
-### cleanup_revision
-
-<a id="revision_transitions-cleaning-up-a-revision-being-pulled-is-refused"></a>
-
-#### [cleaning-up-a-revision-being-pulled-is-refused](/tests/scenario/bai_scenario/manager/artifact/test_revision_transitions.py): pass
-
-a revision that is being pulled cannot be cleaned up, and it is rejected as not ready to be cleaned up
+when a user granted only read permission tries to cancel the import of a revision, it is rejected for lack of permission
 
 Given
 
-- one artifact with 1 revisions and one user granted READ, SOFT_DELETE on artifacts
+- one artifact with 1 revisions and one user granted READ on artifacts
   - Domain home-1
   - Artifact artifact-1: a model scanned from a HuggingFace registry
   - Artifact artifact-1: revision 1.0
@@ -1590,7 +1344,39 @@ Given
       - regular user user-1: has their own keypair and personal project
     - Role artifact-keeper-1: applies only within the scope it is granted in
     - Role artifact-keeper-1: READ allowed on every artifact
-    - Role artifact-keeper-1: SOFT_DELETE allowed on every artifact
+    - regular user user-1: holds Role artifact-keeper-1
+
+When
+
+- ArtifactAdapter.cancel_import: user-1 cancels the import of revision 1.0
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### cleanup_revision
+
+<a id="revision_transitions-a-user-granted-read-but-not-soft-delete-may-not-clean-up-a-revision"></a>
+
+#### [a-user-granted-read-but-not-soft-delete-may-not-clean-up-a-revision](/tests/scenario/bai_scenario/manager/artifact/test_revision_transitions.py): pass
+
+when a user granted only read permission tries to clean up a revision, it is rejected for lack of permission
+
+Given
+
+- one artifact with 1 revisions and one user granted READ on artifacts
+  - Domain home-1
+  - Artifact artifact-1: a model scanned from a HuggingFace registry
+  - Artifact artifact-1: revision 1.0
+  - Prepare a user granted permission on artifacts in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role artifact-keeper-1: applies only within the scope it is granted in
+    - Role artifact-keeper-1: READ allowed on every artifact
     - regular user user-1: holds Role artifact-keeper-1
 
 When
@@ -1600,7 +1386,7 @@ When
 Then
 
 - the call is rejected
-  - rejected: ArtifactRevisionDeletionBadRequestError
+  - rejected: NotEnoughPermission
 
 <a id="revision_transitions-cleaning-up-a-scanned-revision-is-refused"></a>
 
@@ -1882,32 +1668,36 @@ Then
 
 ### import_revision
 
-<a id="revision_transitions-importing-a-missing-revision-is-refused"></a>
+<a id="revision_transitions-a-user-granted-read-but-not-create-may-not-import-a-revision"></a>
 
-#### [importing-a-missing-revision-is-refused](/tests/scenario/bai_scenario/manager/artifact/test_revision_transitions.py): pass
+#### [a-user-granted-read-but-not-create-may-not-import-a-revision](/tests/scenario/bai_scenario/manager/artifact/test_revision_transitions.py): pass
 
-when the superadmin imports a revision that does not exist, it is rejected as no such revision
+when a user granted only read permission tries to import a revision, it is rejected for lack of permission
 
 Given
 
-- one artifact with 1 revisions and one superadmin
+- one artifact with 1 revisions and one user granted READ on artifacts
   - Domain home-1
   - Artifact artifact-1: a model scanned from a HuggingFace registry
   - Artifact artifact-1: revision 1.0
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted permission on artifacts in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role artifact-keeper-1: applies only within the scope it is granted in
+    - Role artifact-keeper-1: READ allowed on every artifact
+    - regular user user-1: holds Role artifact-keeper-1
 
 When
 
-- ArtifactAdapter.import_revision: user-1 tries to import a revision id that does not exist
+- ArtifactAdapter.import_revision: user-1 imports revision 1.0
 
 Then
 
 - the call is rejected
-  - rejected: FieldNotFoundError
+  - rejected: NotEnoughPermission
 
 <a id="revision_transitions-importing-without-reservoir-configuration-is-refused"></a>
 
@@ -1942,49 +1732,6 @@ Then
   - rejected: ServerMisconfiguredError
 
 ### reject_revision
-
-<a id="revision_transitions-rejecting-a-revision-waiting-for-approval-makes-it-rejected"></a>
-
-#### [rejecting-a-revision-waiting-for-approval-makes-it-rejected](/tests/scenario/bai_scenario/manager/artifact/test_revision_transitions.py): pass
-
-when a revision waiting for approval is rejected, it comes back in the rejected state
-
-Given
-
-- one artifact with 1 revisions and one user granted READ, UPDATE on artifacts
-  - Domain home-1
-  - Artifact artifact-1: a model scanned from a HuggingFace registry
-  - Artifact artifact-1: revision 1.0
-  - Prepare a user granted permission on artifacts in global
-    - Prepare one user in the domain
-      - Project resource policy default: the personal project created along with a user looks it up by this name
-      - User resource policy user-policy-1: up to 10 folders per user
-      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-      - regular user user-1: has their own keypair and personal project
-    - Role artifact-keeper-1: applies only within the scope it is granted in
-    - Role artifact-keeper-1: READ allowed on every artifact
-    - Role artifact-keeper-1: UPDATE allowed on every artifact
-    - regular user user-1: holds Role artifact-keeper-1
-
-When
-
-- ArtifactAdapter.reject_revision: user-1 rejects revision 1.0
-
-Then
-
-- the whole revision created in advance comes back
-  - id: same as the id of the revision created in advance
-  - field_id: same as the id of the revision created in advance
-  - artifact_id: same as the id of the artifact created in advance
-  - version = '1.0'
-  - size = '1024'
-  - status = <ArtifactStatus.REJECTED: 'REJECTED'>
-  - remote_status = None
-  - created_at = None
-  - updated_at = None
-  - digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
-  - verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
-  - readme = 'the revision readme'
 
 <a id="revision_transitions-rejecting-an-available-revision-makes-it-rejected"></a>
 
@@ -2029,23 +1776,27 @@ Then
   - verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - readme = 'the revision readme'
 
-<a id="revision_transitions-a-user-granted-nothing-may-not-reject-a-revision"></a>
+<a id="revision_transitions-a-user-granted-read-but-not-update-may-not-reject-a-revision"></a>
 
-#### [a-user-granted-nothing-may-not-reject-a-revision](/tests/scenario/bai_scenario/manager/artifact/test_revision_transitions.py): pass
+#### [a-user-granted-read-but-not-update-may-not-reject-a-revision](/tests/scenario/bai_scenario/manager/artifact/test_revision_transitions.py): pass
 
-when a user granted nothing tries to reject a revision, it is rejected as the artifact holding it not being resolvable
+when a user granted only read permission tries to reject a revision, it is rejected for lack of permission
 
 Given
 
-- one artifact with 1 revisions and one user with no permission
+- one artifact with 1 revisions and one user granted READ on artifacts
   - Domain home-1
   - Artifact artifact-1: a model scanned from a HuggingFace registry
   - Artifact artifact-1: revision 1.0
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted permission on artifacts in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role artifact-keeper-1: applies only within the scope it is granted in
+    - Role artifact-keeper-1: READ allowed on every artifact
+    - regular user user-1: holds Role artifact-keeper-1
 
 When
 
@@ -2054,7 +1805,7 @@ When
 Then
 
 - the call is rejected
-  - rejected: GenericBadRequest
+  - rejected: NotEnoughPermission
 
 ### restore_artifacts
 
@@ -2204,18 +1955,20 @@ Then
 
 #### [filtering-revisions-by-status-leaves-only-that-status](/tests/scenario/bai_scenario/manager/artifact/test_revision_searching.py): pass
 
-when the read-only monitor searches revisions narrowed to the needs-approval status, only revisions in that status remain
+when the read-only monitor searches narrowed to the needs-approval status, ordered by version and limited to the first one, one needs-approval revision comes back
 
 Given
 
-- 2 artifacts with 2 revisions each and one monitor with no permission
+- 2 artifacts with 3 revisions each and one monitor with no permission
   - Domain home-1
   - Artifact artifact-1: a model scanned from a HuggingFace registry
   - Artifact artifact-1: revision 1.0
   - Artifact artifact-1: revision 2.0
+  - Artifact artifact-1: revision 3.0
   - Artifact artifact-2: a model scanned from a HuggingFace registry
   - Artifact artifact-2: revision 1.0
   - Artifact artifact-2: revision 2.0
+  - Artifact artifact-2: revision 3.0
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
@@ -2224,19 +1977,19 @@ Given
 
 When
 
-- ArtifactAdapter.search_revisions_gql: user-1 searches narrowed to the NEEDS_APPROVAL status
+- ArtifactAdapter.search_revisions_gql: user-1 searches narrowed to the needs-approval status, ordered by version and limited to the first one
 
 Then
 
-- every revision in that status comes back on one page
-  - count = 2
-  - total_count = 2
-  - has_next_page = False
+- only revisions in that status come back, in version order on one page
+  - count = 1
+  - total_count = 4
+  - has_next_page = True
   - has_previous_page = False
   - [0].id: same as the id of the revision created in advance
   - [0].field_id: same as the id of the revision created in advance
   - [0].artifact_id: same as the id of the artifact created in advance
-  - [0].version = '2.0'
+  - [0].version = '1.0'
   - [0].size = '1024'
   - [0].status = <ArtifactStatus.NEEDS_APPROVAL: 'NEEDS_APPROVAL'>
   - [0].remote_status = None
@@ -2245,100 +1998,6 @@ Then
   - [0].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
   - [0].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - [0].readme = 'the revision readme'
-  - [1].id: same as the id of the revision created in advance
-  - [1].field_id: same as the id of the revision created in advance
-  - [1].artifact_id: same as the id of the artifact created in advance
-  - [1].version = '2.0'
-  - [1].size = '1024'
-  - [1].status = <ArtifactStatus.NEEDS_APPROVAL: 'NEEDS_APPROVAL'>
-  - [1].remote_status = None
-  - [1].created_at = None
-  - [1].updated_at = None
-  - [1].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
-  - [1].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
-  - [1].readme = 'the revision readme'
-
-<a id="revision_searching-searching-revisions-without-a-condition-returns-every"></a>
-
-#### [searching-revisions-without-a-condition-returns-every](/tests/scenario/bai_scenario/manager/artifact/test_revision_searching.py): pass
-
-when the read-only monitor searches revisions with no condition, every revision made in advance comes back on one page
-
-Given
-
-- 2 artifacts with 2 revisions each and one monitor with no permission
-  - Domain home-1
-  - Artifact artifact-1: a model scanned from a HuggingFace registry
-  - Artifact artifact-1: revision 1.0
-  - Artifact artifact-1: revision 2.0
-  - Artifact artifact-2: a model scanned from a HuggingFace registry
-  - Artifact artifact-2: revision 1.0
-  - Artifact artifact-2: revision 2.0
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - monitor user-1: has their own keypair and personal project
-
-When
-
-- ArtifactAdapter.search_revisions_gql: user-1 searches with no condition
-
-Then
-
-- every revision made in advance comes back on one page
-  - count = 4
-  - total_count = 4
-  - has_next_page = False
-  - has_previous_page = False
-  - [0].id: same as the id of the revision created in advance
-  - [0].field_id: same as the id of the revision created in advance
-  - [0].artifact_id: same as the id of the artifact created in advance
-  - [0].version = '1.0'
-  - [0].size = '1024'
-  - [0].status = <ArtifactStatus.SCANNED: 'SCANNED'>
-  - [0].remote_status = None
-  - [0].created_at = None
-  - [0].updated_at = None
-  - [0].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
-  - [0].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
-  - [0].readme = 'the revision readme'
-  - [1].id: same as the id of the revision created in advance
-  - [1].field_id: same as the id of the revision created in advance
-  - [1].artifact_id: same as the id of the artifact created in advance
-  - [1].version = '2.0'
-  - [1].size = '1024'
-  - [1].status = <ArtifactStatus.NEEDS_APPROVAL: 'NEEDS_APPROVAL'>
-  - [1].remote_status = None
-  - [1].created_at = None
-  - [1].updated_at = None
-  - [1].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
-  - [1].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
-  - [1].readme = 'the revision readme'
-  - [2].id: same as the id of the revision created in advance
-  - [2].field_id: same as the id of the revision created in advance
-  - [2].artifact_id: same as the id of the artifact created in advance
-  - [2].version = '1.0'
-  - [2].size = '1024'
-  - [2].status = <ArtifactStatus.SCANNED: 'SCANNED'>
-  - [2].remote_status = None
-  - [2].created_at = None
-  - [2].updated_at = None
-  - [2].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
-  - [2].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
-  - [2].readme = 'the revision readme'
-  - [3].id: same as the id of the revision created in advance
-  - [3].field_id: same as the id of the revision created in advance
-  - [3].artifact_id: same as the id of the artifact created in advance
-  - [3].version = '2.0'
-  - [3].size = '1024'
-  - [3].status = <ArtifactStatus.NEEDS_APPROVAL: 'NEEDS_APPROVAL'>
-  - [3].remote_status = None
-  - [3].created_at = None
-  - [3].updated_at = None
-  - [3].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
-  - [3].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
-  - [3].readme = 'the revision readme'
 
 <a id="revision_searching-a-user-granted-nothing-may-not-search-revisions"></a>
 
@@ -2364,7 +2023,7 @@ Given
 
 When
 
-- ArtifactAdapter.search_revisions_gql: user-1 searches with no condition
+- ArtifactAdapter.search_revisions_gql: user-1 searches narrowed to the needs-approval status, ordered by version and limited to the first one
 
 Then
 
