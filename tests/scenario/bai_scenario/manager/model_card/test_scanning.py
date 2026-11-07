@@ -13,7 +13,7 @@ from ai.backend.common.types import VFolderUsageMode
 from ai.backend.manager.api.adapters.model_card.adapter import ModelCardAdapter
 from ai.backend.manager.data.project.types import ProjectData, ProjectType
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.resource import InvalidProjectTypeForModelCard
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -201,7 +201,7 @@ class ARegularUserMayNotScan(
 
     @override
     def then(self) -> Then[AProjectToScan, Scanned]:
-        return TheCallIsRefused(NotEnoughPermission)
+        return TheCallIsRefused(InsufficientPrivilege)
 
 
 @dataclass(frozen=True)

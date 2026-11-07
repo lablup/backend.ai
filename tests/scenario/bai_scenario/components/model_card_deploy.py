@@ -384,7 +384,14 @@ def _preset_verdicts(
         ),
         Same(f"{prefix}cluster.cluster_size", node.cluster.cluster_size, 1),
         Same(f"{prefix}resource.resource_opts", node.resource.resource_opts, []),
-        Same(f"{prefix}execution.image_id", node.execution.image_id, preset.image_id),
+        Held[UUID](
+            f"{prefix}execution.image_id",
+            node.execution.image_id,
+            SameAs(
+                preset.image_id,
+                Says("프리셋이 가리키는 이미지", english="the image the preset points at"),
+            ),
+        ),
         Same(f"{prefix}execution.startup_command", node.execution.startup_command, None),
         Same(f"{prefix}execution.bootstrap_script", node.execution.bootstrap_script, None),
         Same(f"{prefix}execution.environ", node.execution.environ, []),
