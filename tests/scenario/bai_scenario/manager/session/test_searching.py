@@ -110,9 +110,7 @@ class SearchingEveryKernel(When[LaidSessionAndCaller, SessionAdapter, Kernels]):
                 AdminSearchKernelsInput(
                     filter=KernelFilter(session_id=UUIDFilter(equals=laid.session.id)),
                     order=[
-                        KernelOrder(
-                            field=KernelOrderField.CREATED_AT, direction=OrderDirection.ASC
-                        )
+                        KernelOrder(field=KernelOrderField.CREATED_AT, direction=OrderDirection.ASC)
                     ],
                     limit=PAGE,
                 )
@@ -139,9 +137,7 @@ class SearchingTheSessionKernels(When[LaidSessionAndCaller, SessionAdapter, Kern
                 SessionId(laid.session.id),
                 AdminSearchKernelsInput(
                     order=[
-                        KernelOrder(
-                            field=KernelOrderField.CREATED_AT, direction=OrderDirection.ASC
-                        )
+                        KernelOrder(field=KernelOrderField.CREATED_AT, direction=OrderDirection.ASC)
                     ],
                     limit=PAGE,
                 ),
@@ -192,9 +188,7 @@ class SearchingTheProject(When[LaidSessionAndCaller, SessionAdapter, Sessions]):
                     scope=SessionScope(project=[UUIDScope(value=laid.project.id)]),
                     filter=SessionFilter(name=StringFilter(equals=laid.session.name)),
                     order=[
-                        SessionOrder(
-                            field=SessionOrderField.NAME, direction=OrderDirection.ASC
-                        )
+                        SessionOrder(field=SessionOrderField.NAME, direction=OrderDirection.ASC)
                     ],
                     limit=PAGE,
                 )

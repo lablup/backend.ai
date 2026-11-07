@@ -229,9 +229,7 @@ async def lay_the_same_shape(
         place.group,
     )
     group = await seeding.adding(TestSeedMainKernelGroupOf(image=image, slots=slots), session)
-    await seeding.adding(
-        TestSeedKernelGroupEnvironOf(key=ENVIRON_KEY, value=ENVIRON_VALUE), group
-    )
+    await seeding.adding(TestSeedKernelGroupEnvironOf(key=ENVIRON_KEY, value=ENVIRON_VALUE), group)
     await seeding.adding(
         TestSeedKernelGroupResourceSlotOf(slot_name=slots[0][0], quantity=slots[0][1]), group
     )
