@@ -48,20 +48,21 @@ Scenario: incomplete 11 / 37
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin searches every permission, every permission row seeded in advance comes back](#searching_permissions-the-superadmin-searches-every-permission) | answered |
+| [when the superadmin searches every permission filtered to one entity type, every permission row the filter keeps comes back. The global role gates this search](#searching_permissions-the-superadmin-searches-every-permission) | answered |
 | [a user granted nothing cannot search every permission](#searching_permissions-a-user-granted-nothing-may-not-search-every-permission) | rejected |
 
 **admin_search_roles_gql**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin searches every role, every role seeded in advance comes back in name order](#searching-the-superadmin-searches-every-role) | answered |
+| [when the superadmin searches roles leaving one role's name out, the roles the filter keeps come back in name order. The global role gates this search](#searching-the-superadmin-searches-every-role) | answered |
 | [a user granted nothing cannot search every role](#searching-a-user-granted-nothing-may-not-search-every-role) | rejected |
 
 **batch_load_permissions_by_ids**
 
 | scenario | verdict |
 |---|---|
+| [when a user granted nothing loads two permission rows and one missing id in one call, every entry comes back empty](#loading-a-user-granted-nothing-loads-permissions-and-gets-empty-entries) | answered |
 | [when the superadmin loads two permission rows and one missing id in one call, the two rows come back as nodes and the missing id as an empty value](#loading-the-superadmin-loads-two-permissions-and-a-missing-id) | answered |
 
 **batch_load_permissions_by_role_ids**
@@ -84,13 +85,13 @@ Scenario: incomplete 11 / 37
 |---|---|
 | [when a user granted role read and update permissions in a domain adds a permission the role already holds and a new one in one call, only the new one is added and the one already held comes back failed](#permission_writing-a-user-granted-role-write-adds-one-permission-it-already-holds) | answered |
 | [when a user granted role read and update permissions in a domain adds two permissions in one call, every row added comes back and nothing failed](#permission_writing-a-user-granted-role-write-adds-several-permissions) | answered |
-| [a user granted nothing cannot add permissions in one call](#permission_writing-a-user-granted-nothing-may-not-add-permissions) | rejected |
+| [a user granted only role read permission in a domain cannot add permissions in one call](#permission_writing-a-user-granted-read-only-may-not-add-permissions) | rejected |
 
 **bulk_remove_role_permissions**
 
 | scenario | verdict |
 |---|---|
-| [when a user granted nothing removes two permissions in one call, none is removed and both come back in the failed list](#permission_writing-a-user-granted-nothing-removes-no-permission) | answered |
+| [when a user granted only role read permission in a domain removes two permissions in one call, none is removed and both come back in the failed list](#permission_writing-a-user-granted-read-only-removes-no-permission) | answered |
 | [when a user granted role read and update permissions in a domain removes two permissions in one call, every row removed comes back and nothing failed](#permission_writing-a-user-granted-role-write-removes-several-permissions) | answered |
 
 **create**
@@ -105,7 +106,7 @@ Scenario: incomplete 11 / 37
 | scenario | verdict |
 |---|---|
 | [when a user granted role read and update permissions in a domain creates a permission, the whole permission row just created comes back](#permission_writing-a-user-granted-role-write-creates-a-permission) | answered |
-| [a user granted nothing cannot create a permission](#permission_writing-a-user-granted-nothing-may-not-create-a-permission) | rejected |
+| [a user granted only role read permission in a domain cannot create a permission](#permission_writing-a-user-granted-read-only-may-not-create-a-permission) | rejected |
 
 **delete**
 
@@ -119,7 +120,7 @@ Scenario: incomplete 11 / 37
 
 | scenario | verdict |
 |---|---|
-| [when a user holding a role with role read permission in their own scope searches the roles they hold, that role comes back](#searching-a-user-holding-a-role-searches-it) | answered |
+| [when a user holding a role with role read permission in their own scope searches the roles they hold by one name, that role comes back and neither the other user's role nor the other held role is listed](#searching-a-user-holding-a-role-searches-it) | answered |
 | [a user holding no role cannot search the roles they hold](#searching-a-user-granted-nothing-may-not-search-their-roles) | rejected |
 
 **partial_bulk_delete**
@@ -163,7 +164,7 @@ Scenario: incomplete 11 / 37
 | scenario | verdict |
 |---|---|
 | [when a user granted role read and update permissions in a domain purges a permission, the id of that permission row comes back](#permission_writing-a-user-granted-role-write-purges-a-permission) | answered |
-| [a user granted nothing cannot purge a permission](#permission_writing-a-user-granted-nothing-may-not-purge-a-permission) | rejected |
+| [a user granted only role read permission in a domain cannot purge a permission](#permission_writing-a-user-granted-read-only-may-not-purge-a-permission) | rejected |
 
 **restore**
 
@@ -176,14 +177,14 @@ Scenario: incomplete 11 / 37
 
 | scenario | verdict |
 |---|---|
-| [when a user granted role read permission in a domain searches the permissions a role holds, every permission row of that role comes back](#searching_permissions-a-user-granted-role-read-searches-the-permissions-of-a-role) | answered |
+| [when a user granted role read permission in a domain searches the permissions a role holds filtered to one entity type, every permission row the filter keeps comes back](#searching_permissions-a-user-granted-role-read-searches-the-permissions-of-a-role) | answered |
 | [a user granted nothing cannot search the permissions a role holds](#searching_permissions-a-user-granted-nothing-may-not-search-the-permissions-of-a-role) | rejected |
 
 **search_roles_in_scope**
 
 | scenario | verdict |
 |---|---|
-| [when a user granted role read permission in a domain searches the roles of that domain, every role of that domain comes back](#searching-a-user-granted-role-read-searches-a-domain) | answered |
+| [when a user granted role read permission in a domain searches the roles of that domain leaving one role's name out, the roles the filter keeps come back in name order](#searching-a-user-granted-role-read-searches-a-domain) | answered |
 | [a user granted nothing cannot search the roles of a domain](#searching-a-user-granted-nothing-may-not-search-a-domain) | rejected |
 
 **update**
@@ -193,20 +194,19 @@ Scenario: incomplete 11 / 37
 | [when the superadmin changes the status of a role to DELETED, it is soft deleted and comes back in the deleted state](#editing-editing-status-to-deleted-soft-deletes-the-role) | answered |
 | [when the superadmin changes the description of a role, the whole role carrying the new description comes back](#editing-the-superadmin-edits-a-role) | answered |
 | [a user granted nothing cannot edit a role](#editing-a-user-granted-nothing-may-not-edit-a-role) | rejected |
-| [a user granted only role read permission in a domain cannot edit a role](#editing-a-user-granted-read-only-may-not-edit-a-role) | rejected |
 
 **update_permission**
 
 | scenario | verdict |
 |---|---|
 | [when a user granted role read and update permissions in a domain changes a permission, the whole permission row just changed comes back](#permission_writing-a-user-granted-role-write-updates-a-permission) | answered |
-| [a user granted nothing cannot change a permission](#permission_writing-a-user-granted-nothing-may-not-update-a-permission) | rejected |
+| [a user granted only role read permission in a domain cannot change a permission](#permission_writing-a-user-granted-read-only-may-not-update-a-permission) | rejected |
 
 **admin_search_role_assignments**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin searches every role assignment, the assignment of every user seeded in advance comes back](#searching_assignments-the-superadmin-searches-every-role-assignment) | answered |
+| [when the superadmin searches role assignments naming one seeded user, only that user's assignment comes back. The global role gates this search](#searching_assignments-the-superadmin-searches-every-role-assignment) | answered |
 | [a user granted nothing cannot search every role assignment](#searching_assignments-a-user-granted-nothing-may-not-search-every-role-assignment) | rejected |
 
 **assign_role**
@@ -282,7 +282,7 @@ Scenario: incomplete 11 / 37
 
 | scenario | verdict |
 |---|---|
-| [when a user holding a role with role read permission in their own scope searches their own role assignments, that assignment comes back](#searching_assignments-a-user-holding-a-role-searches-their-assignment) | answered |
+| [when a user holding a role with role read permission in their own scope searches their own role assignments filtered to one role, that assignment comes back and neither their other role nor another user's assignment is listed](#searching_assignments-a-user-holding-a-role-searches-their-assignment) | answered |
 | [a user holding no role cannot search their own role assignments](#searching_assignments-a-user-granted-nothing-may-not-search-their-role-assignment) | rejected |
 
 **replace_role_permissions**
@@ -290,7 +290,7 @@ Scenario: incomplete 11 / 37
 | scenario | verdict |
 |---|---|
 | [when a user granted role read and update permissions in a domain replaces the permission set of a role, every new permission row comes back and nothing failed](#permission_writing-a-user-granted-role-write-replaces-the-permissions) | answered |
-| [a user granted nothing cannot replace the permission set of a role](#permission_writing-a-user-granted-nothing-may-not-replace-the-permissions) | rejected |
+| [a user granted only role read permission in a domain cannot replace the permission set of a role](#permission_writing-a-user-granted-read-only-may-not-replace-the-permissions) | rejected |
 | [when the request names one role and an entry names another, the whole request is rejected](#permission_writing-replacing-with-an-entry-of-another-role-is-refused) | rejected |
 
 **revoke_role**
@@ -305,7 +305,7 @@ Scenario: incomplete 11 / 37
 
 | scenario | verdict |
 |---|---|
-| [when a user granted role read permission in a domain searches the assignments of one role, the assignment of every user holding it comes back](#searching_assignments-a-user-granted-role-read-searches-the-assignments-of-a-role) | answered |
+| [when a user granted role read permission in a domain searches the assignments of one role naming one seeded user, only that user's assignment comes back](#searching_assignments-a-user-granted-role-read-searches-the-assignments-of-a-role) | answered |
 | [a user granted nothing cannot search the assignments of a role](#searching_assignments-a-user-granted-nothing-may-not-search-the-assignments-of-a-role) | rejected |
 
 ### admin_search_permissions_gql
@@ -314,7 +314,7 @@ Scenario: incomplete 11 / 37
 
 #### [the-superadmin-searches-every-permission](/tests/scenario/bai_scenario/manager/rbac/test_searching_permissions.py): pass
 
-when the superadmin searches every permission, every permission row seeded in advance comes back
+when the superadmin searches every permission filtered to one entity type, every permission row the filter keeps comes back. The global role gates this search
 
 Given
 
@@ -336,9 +336,9 @@ When
 
 Then
 
-- every permission row seeded in advance comes back
-  - items count = 2
-  - total_count = 2
+- every permission row the filter keeps comes back
+  - items count = 1
+  - total_count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: skipped: the database generates it
@@ -347,12 +347,6 @@ Then
   - items[0].entity_type = 'session'
   - items[0].permission = <PermissionBitDTO.READ: 'read'>
   - items[0].created_at: the time this run wrote
-  - items[1].id: skipped: the database generates it
-  - items[1].field_id: skipped: the database generates it
-  - items[1].role_id: same as the id of the role seeded in advance
-  - items[1].entity_type = 'vfolder'
-  - items[1].permission = <PermissionBitDTO.UPDATE: 'update'>
-  - items[1].created_at: the time this run wrote
 
 <a id="searching_permissions-a-user-granted-nothing-may-not-search-every-permission"></a>
 
@@ -388,7 +382,7 @@ Then
 
 #### [the-superadmin-searches-every-role](/tests/scenario/bai_scenario/manager/rbac/test_searching.py): pass
 
-when the superadmin searches every role, every role seeded in advance comes back in name order
+when the superadmin searches roles leaving one role's name out, the roles the filter keeps come back in name order. The global role gates this search
 
 Given
 
@@ -397,6 +391,7 @@ Given
   - Domain target-1
   - Role role-1: applies only within the scope it is granted in
   - Role role-2: applies only within the scope it is granted in
+  - Role excluded-1: applies only within the scope it is granted in
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
@@ -409,7 +404,7 @@ When
 
 Then
 
-- every role seeded in advance comes back in name order
+- the roles the filter keeps come back in name order
   - items count = 2
   - total_count = 2
   - has_next_page = False
@@ -469,6 +464,44 @@ Then
   - rejected: InsufficientPrivilege
 
 ### batch_load_permissions_by_ids
+
+<a id="loading-a-user-granted-nothing-loads-permissions-and-gets-empty-entries"></a>
+
+#### [a-user-granted-nothing-loads-permissions-and-gets-empty-entries](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
+
+when a user granted nothing loads two permission rows and one missing id in one call, every entry comes back empty
+
+Given
+
+- 2 custom roles in one domain and one user in another domain
+  - Domain home-1
+  - Domain target-1
+  - Role role-1: applies only within the scope it is granted in
+  - Role role-2: applies only within the scope it is granted in
+  - Role role-1: READ allowed on every session
+  - Role role-1: UPDATE allowed on every vfolder
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-3: has their own keypair and personal project
+  - regular user user-2: holds Role role-1
+  - regular user user-3: holds Role role-1
+
+When
+
+- RBACAdapter.batch_load_permissions_by_ids: user-1 loads two permission rows and one missing id in one call
+
+Then
+
+- every entry comes back empty
+  - loaded = [None, None, None]
 
 <a id="loading-the-superadmin-loads-two-permissions-and-a-missing-id"></a>
 
@@ -811,11 +844,11 @@ Then
   - items[1].created_at: the time this run wrote
   - failed = []
 
-<a id="permission_writing-a-user-granted-nothing-may-not-add-permissions"></a>
+<a id="permission_writing-a-user-granted-read-only-may-not-add-permissions"></a>
 
-#### [a-user-granted-nothing-may-not-add-permissions](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
+#### [a-user-granted-read-only-may-not-add-permissions](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
 
-a user granted nothing cannot add permissions in one call
+a user granted only role read permission in a domain cannot add permissions in one call
 
 Given
 
@@ -830,6 +863,9 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
+  - Role grant-1: applies only within the scope it is granted in
+  - Role grant-1: READ allowed on every role
+  - regular user user-1: holds Role grant-1
 
 When
 
@@ -842,11 +878,11 @@ Then
 
 ### bulk_remove_role_permissions
 
-<a id="permission_writing-a-user-granted-nothing-removes-no-permission"></a>
+<a id="permission_writing-a-user-granted-read-only-removes-no-permission"></a>
 
-#### [a-user-granted-nothing-removes-no-permission](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
+#### [a-user-granted-read-only-removes-no-permission](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
 
-when a user granted nothing removes two permissions in one call, none is removed and both come back in the failed list
+when a user granted only role read permission in a domain removes two permissions in one call, none is removed and both come back in the failed list
 
 Given
 
@@ -861,6 +897,9 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
+  - Role grant-1: applies only within the scope it is granted in
+  - Role grant-1: READ allowed on every role
+  - regular user user-1: holds Role grant-1
 
 When
 
@@ -1033,11 +1072,11 @@ Then
   - permission = <PermissionBitDTO.SOFT_DELETE: 'soft_delete'>
   - created_at: the time this run wrote
 
-<a id="permission_writing-a-user-granted-nothing-may-not-create-a-permission"></a>
+<a id="permission_writing-a-user-granted-read-only-may-not-create-a-permission"></a>
 
-#### [a-user-granted-nothing-may-not-create-a-permission](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
+#### [a-user-granted-read-only-may-not-create-a-permission](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
 
-a user granted nothing cannot create a permission
+a user granted only role read permission in a domain cannot create a permission
 
 Given
 
@@ -1052,6 +1091,9 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
+  - Role grant-1: applies only within the scope it is granted in
+  - Role grant-1: READ allowed on every role
+  - regular user user-1: holds Role grant-1
 
 When
 
@@ -1154,7 +1196,7 @@ Then
 
 #### [a-user-holding-a-role-searches-it](/tests/scenario/bai_scenario/manager/rbac/test_searching.py): pass
 
-when a user holding a role with role read permission in their own scope searches the roles they hold, that role comes back
+when a user holding a role with role read permission in their own scope searches the roles they hold by one name, that role comes back and neither the other user's role nor the other held role is listed
 
 Given
 
@@ -1167,9 +1209,16 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - regular user user-2: holds Role role-1
   - Role self-role-1: applies only within the scope it is granted in
   - Role self-role-1: READ allowed on every role
   - regular user user-1: holds Role self-role-1
+  - Role self-role-2: applies only within the scope it is granted in
+  - Role self-role-2: READ allowed on every role
+  - regular user user-1: holds Role self-role-2
 
 When
 
@@ -1729,11 +1778,11 @@ Then
   - id: same as the id of the permission row seeded in advance
   - field_id: same as the id of the permission row seeded in advance
 
-<a id="permission_writing-a-user-granted-nothing-may-not-purge-a-permission"></a>
+<a id="permission_writing-a-user-granted-read-only-may-not-purge-a-permission"></a>
 
-#### [a-user-granted-nothing-may-not-purge-a-permission](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
+#### [a-user-granted-read-only-may-not-purge-a-permission](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
 
-a user granted nothing cannot purge a permission
+a user granted only role read permission in a domain cannot purge a permission
 
 Given
 
@@ -1748,6 +1797,9 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
+  - Role grant-1: applies only within the scope it is granted in
+  - Role grant-1: READ allowed on every role
+  - regular user user-1: holds Role grant-1
 
 When
 
@@ -1756,7 +1808,7 @@ When
 Then
 
 - the call is rejected
-  - rejected: GenericBadRequest
+  - rejected: NotEnoughPermission
 
 ### restore
 
@@ -1820,16 +1872,18 @@ Then
 
 #### [a-user-granted-role-read-searches-the-permissions-of-a-role](/tests/scenario/bai_scenario/manager/rbac/test_searching_permissions.py): pass
 
-when a user granted role read permission in a domain searches the permissions a role holds, every permission row of that role comes back
+when a user granted role read permission in a domain searches the permissions a role holds filtered to one entity type, every permission row the filter keeps comes back
 
 Given
 
-- 1 custom roles in one domain and one user in another domain
+- 2 custom roles in one domain and one user in another domain
   - Domain home-1
   - Domain target-1
   - Role role-1: applies only within the scope it is granted in
+  - Role role-2: applies only within the scope it is granted in
   - Role role-1: READ allowed on every session
   - Role role-1: UPDATE allowed on every vfolder
+  - Role role-2: READ allowed on every project
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
@@ -1845,9 +1899,9 @@ When
 
 Then
 
-- every permission row that role holds comes back
-  - items count = 2
-  - total_count = 2
+- every permission row the filter keeps comes back
+  - items count = 1
+  - total_count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: skipped: the database generates it
@@ -1856,12 +1910,6 @@ Then
   - items[0].entity_type = 'session'
   - items[0].permission = <PermissionBitDTO.READ: 'read'>
   - items[0].created_at: the time this run wrote
-  - items[1].id: skipped: the database generates it
-  - items[1].field_id: skipped: the database generates it
-  - items[1].role_id: same as the id of the role seeded in advance
-  - items[1].entity_type = 'vfolder'
-  - items[1].permission = <PermissionBitDTO.UPDATE: 'update'>
-  - items[1].created_at: the time this run wrote
 
 <a id="searching_permissions-a-user-granted-nothing-may-not-search-the-permissions-of-a-role"></a>
 
@@ -1897,7 +1945,7 @@ Then
 
 #### [a-user-granted-role-read-searches-a-domain](/tests/scenario/bai_scenario/manager/rbac/test_searching.py): pass
 
-when a user granted role read permission in a domain searches the roles of that domain, every role of that domain comes back
+when a user granted role read permission in a domain searches the roles of that domain leaving one role's name out, the roles the filter keeps come back in name order
 
 Given
 
@@ -1906,6 +1954,8 @@ Given
   - Domain target-1
   - Role role-1: applies only within the scope it is granted in
   - Role role-2: applies only within the scope it is granted in
+  - Role beyond-1: applies only within the scope it is granted in
+  - Role excluded-1: applies only within the scope it is granted in
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
@@ -1921,7 +1971,7 @@ When
 
 Then
 
-- every role seeded in advance comes back in name order
+- the roles the filter keeps come back in name order
   - items count = 3
   - total_count = 3
   - has_next_page = False
@@ -2100,36 +2150,6 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-<a id="editing-a-user-granted-read-only-may-not-edit-a-role"></a>
-
-#### [a-user-granted-read-only-may-not-edit-a-role](/tests/scenario/bai_scenario/manager/rbac/test_editing.py): pass
-
-a user granted only role read permission in a domain cannot edit a role
-
-Given
-
-- 1 custom roles in one domain and one user in another domain
-  - Domain home-1
-  - Domain target-1
-  - Role role-1: applies only within the scope it is granted in
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - Role grant-1: applies only within the scope it is granted in
-  - Role grant-1: READ allowed on every role
-  - regular user user-1: holds Role grant-1
-
-When
-
-- RBACAdapter.update: user-1 edits the description of role-1
-
-Then
-
-- the call is rejected
-  - rejected: NotEnoughPermission
-
 ### update_permission
 
 <a id="permission_writing-a-user-granted-role-write-updates-a-permission"></a>
@@ -2170,11 +2190,11 @@ Then
   - permission = <PermissionBitDTO.SOFT_DELETE: 'soft_delete'>
   - created_at: the time this run wrote
 
-<a id="permission_writing-a-user-granted-nothing-may-not-update-a-permission"></a>
+<a id="permission_writing-a-user-granted-read-only-may-not-update-a-permission"></a>
 
-#### [a-user-granted-nothing-may-not-update-a-permission](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
+#### [a-user-granted-read-only-may-not-update-a-permission](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
 
-a user granted nothing cannot change a permission
+a user granted only role read permission in a domain cannot change a permission
 
 Given
 
@@ -2189,6 +2209,9 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
+  - Role grant-1: applies only within the scope it is granted in
+  - Role grant-1: READ allowed on every role
+  - regular user user-1: holds Role grant-1
 
 When
 
@@ -2197,7 +2220,7 @@ When
 Then
 
 - the call is rejected
-  - rejected: GenericBadRequest
+  - rejected: NotEnoughPermission
 
 ### admin_search_role_assignments
 
@@ -2205,7 +2228,7 @@ Then
 
 #### [the-superadmin-searches-every-role-assignment](/tests/scenario/bai_scenario/manager/rbac/test_searching_assignments.py): pass
 
-when the superadmin searches every role assignment, the assignment of every user seeded in advance comes back
+when the superadmin searches role assignments naming one seeded user, only that user's assignment comes back. The global role gates this search
 
 Given
 
@@ -2233,9 +2256,9 @@ When
 
 Then
 
-- the assignment of every user seeded in advance comes back
-  - items count = 2
-  - total_count = 2
+- only the assignment of the user the filter names comes back
+  - items count = 1
+  - total_count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: skipped: the database generates it
@@ -2243,11 +2266,6 @@ Then
   - items[0].role_id: same as the id of the role seeded in advance
   - items[0].granted_by = None
   - items[0].granted_at: the time this run wrote
-  - items[1].id: skipped: the database generates it
-  - items[1].user_id: same as the id of the user seeded in advance
-  - items[1].role_id: same as the id of the role seeded in advance
-  - items[1].granted_by = None
-  - items[1].granted_at: the time this run wrote
 
 <a id="searching_assignments-a-user-granted-nothing-may-not-search-every-role-assignment"></a>
 
@@ -2991,7 +3009,7 @@ Then
 
 #### [a-user-holding-a-role-searches-their-assignment](/tests/scenario/bai_scenario/manager/rbac/test_searching_assignments.py): pass
 
-when a user holding a role with role read permission in their own scope searches their own role assignments, that assignment comes back
+when a user holding a role with role read permission in their own scope searches their own role assignments filtered to one role, that assignment comes back and neither their other role nor another user's assignment is listed
 
 Given
 
@@ -3004,9 +3022,16 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - regular user user-2: holds Role role-1
   - Role self-role-1: applies only within the scope it is granted in
   - Role self-role-1: READ allowed on every role
   - regular user user-1: holds Role self-role-1
+  - Role self-role-2: applies only within the scope it is granted in
+  - Role self-role-2: READ allowed on every role
+  - regular user user-1: holds Role self-role-2
 
 When
 
@@ -3100,11 +3125,11 @@ Then
   - items[1].created_at: the time this run wrote
   - failed = []
 
-<a id="permission_writing-a-user-granted-nothing-may-not-replace-the-permissions"></a>
+<a id="permission_writing-a-user-granted-read-only-may-not-replace-the-permissions"></a>
 
-#### [a-user-granted-nothing-may-not-replace-the-permissions](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
+#### [a-user-granted-read-only-may-not-replace-the-permissions](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
 
-a user granted nothing cannot replace the permission set of a role
+a user granted only role read permission in a domain cannot replace the permission set of a role
 
 Given
 
@@ -3119,6 +3144,9 @@ Given
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
+  - Role grant-1: applies only within the scope it is granted in
+  - Role grant-1: READ allowed on every role
+  - regular user user-1: holds Role grant-1
 
 When
 
@@ -3274,7 +3302,7 @@ Then
 
 #### [a-user-granted-role-read-searches-the-assignments-of-a-role](/tests/scenario/bai_scenario/manager/rbac/test_searching_assignments.py): pass
 
-when a user granted role read permission in a domain searches the assignments of one role, the assignment of every user holding it comes back
+when a user granted role read permission in a domain searches the assignments of one role naming one seeded user, only that user's assignment comes back
 
 Given
 
@@ -3298,6 +3326,9 @@ Given
   - Role grant-1: applies only within the scope it is granted in
   - Role grant-1: READ allowed on every role
   - regular user user-1: holds Role grant-1
+  - Role self-role-1: applies only within the scope it is granted in
+  - Role self-role-1: READ allowed on every role
+  - regular user user-1: holds Role self-role-1
 
 When
 
@@ -3305,9 +3336,9 @@ When
 
 Then
 
-- the assignment of every user holding that role comes back
-  - items count = 2
-  - total_count = 2
+- only the assignment of the user the filter names comes back
+  - items count = 1
+  - total_count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: skipped: the database generates it
@@ -3315,11 +3346,6 @@ Then
   - items[0].role_id: same as the id of the role seeded in advance
   - items[0].granted_by = None
   - items[0].granted_at: the time this run wrote
-  - items[1].id: skipped: the database generates it
-  - items[1].user_id: same as the id of the user seeded in advance
-  - items[1].role_id: same as the id of the role seeded in advance
-  - items[1].granted_by = None
-  - items[1].granted_at: the time this run wrote
 
 <a id="searching_assignments-a-user-granted-nothing-may-not-search-the-assignments-of-a-role"></a>
 

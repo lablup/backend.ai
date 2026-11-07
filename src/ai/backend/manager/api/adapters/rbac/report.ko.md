@@ -48,20 +48,21 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 모든 권한을 검색하면, 미리 저장한 권한 행이 모두 옵니다](#searching_permissions-the-superadmin-searches-every-permission) | 성공 |
+| [superadmin 이 한 엔티티 종류로 권한을 검색하면, 필터가 남긴 권한 행이 모두 옵니다. 이 검색은 전역 역할이 막습니다](#searching_permissions-the-superadmin-searches-every-permission) | 성공 |
 | [아무 권한도 받지 않은 사용자는 모든 권한을 검색할 수 없습니다](#searching_permissions-a-user-granted-nothing-may-not-search-every-permission) | 거부 |
 
 **admin_search_roles_gql**
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 모든 역할을 검색하면, 미리 저장한 역할이 이름 순으로 모두 옵니다](#searching-the-superadmin-searches-every-role) | 성공 |
+| [superadmin 이 한 역할의 이름을 빼는 조건으로 역할을 검색하면, 필터가 남긴 역할이 이름 순으로 옵니다. 이 검색은 전역 역할이 막습니다](#searching-the-superadmin-searches-every-role) | 성공 |
 | [아무 권한도 받지 않은 사용자는 모든 역할을 검색할 수 없습니다](#searching-a-user-granted-nothing-may-not-search-every-role) | 거부 |
 
 **batch_load_permissions_by_ids**
 
 | 시나리오 | 판정 |
 |---|---|
+| [아무 권한도 받지 않은 사용자가 권한 둘과 없는 id 하나를 한 번에 읽으면, 모든 자리가 빈 값으로 옵니다](#loading-a-user-granted-nothing-loads-permissions-and-gets-empty-entries) | 성공 |
 | [superadmin 이 권한 둘과 없는 id 하나를 한 번에 읽으면, 권한 둘은 노드로, 없는 id 자리는 빈 값으로 옵니다](#loading-the-superadmin-loads-two-permissions-and-a-missing-id) | 성공 |
 
 **batch_load_permissions_by_role_ids**
@@ -84,13 +85,13 @@
 |---|---|
 | [대상 도메인에서 역할 읽기와 수정 권한을 받은 사용자가 이미 가진 권한과 새 권한을 한 번에 더하면, 새 권한만 더해지고 이미 가진 권한은 실패 목록에 옵니다](#permission_writing-a-user-granted-role-write-adds-one-permission-it-already-holds) | 성공 |
 | [대상 도메인에서 역할 읽기와 수정 권한을 받은 사용자가 권한 둘을 한 번에 더하면, 더한 권한 행이 모두 오고 실패가 없습니다](#permission_writing-a-user-granted-role-write-adds-several-permissions) | 성공 |
-| [아무 권한도 받지 않은 사용자는 권한을 한 번에 더할 수 없습니다](#permission_writing-a-user-granted-nothing-may-not-add-permissions) | 거부 |
+| [대상 도메인에서 역할 읽기 권한만 받은 사용자는 권한을 한 번에 더할 수 없습니다](#permission_writing-a-user-granted-read-only-may-not-add-permissions) | 거부 |
 
 **bulk_remove_role_permissions**
 
 | 시나리오 | 판정 |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 권한 둘을 한 번에 빼면, 하나도 빠지지 않고 모두 실패 목록에 옵니다](#permission_writing-a-user-granted-nothing-removes-no-permission) | 성공 |
+| [대상 도메인에서 역할 읽기 권한만 받은 사용자가 권한 둘을 한 번에 빼면, 하나도 빠지지 않고 모두 실패 목록에 옵니다](#permission_writing-a-user-granted-read-only-removes-no-permission) | 성공 |
 | [대상 도메인에서 역할 읽기와 수정 권한을 받은 사용자가 권한 둘을 한 번에 빼면, 뺀 권한 행이 모두 오고 실패가 없습니다](#permission_writing-a-user-granted-role-write-removes-several-permissions) | 성공 |
 
 **create**
@@ -105,7 +106,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [대상 도메인에서 역할 읽기와 수정 권한을 받은 사용자가 권한을 만들면, 만든 권한 행 전체가 옵니다](#permission_writing-a-user-granted-role-write-creates-a-permission) | 성공 |
-| [아무 권한도 받지 않은 사용자는 권한을 만들 수 없습니다](#permission_writing-a-user-granted-nothing-may-not-create-a-permission) | 거부 |
+| [대상 도메인에서 역할 읽기 권한만 받은 사용자는 권한을 만들 수 없습니다](#permission_writing-a-user-granted-read-only-may-not-create-a-permission) | 거부 |
 
 **delete**
 
@@ -119,7 +120,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [자기 스코프의 역할 읽기 권한을 가진 역할을 가진 사용자가 가진 역할을 검색하면, 그 역할이 옵니다](#searching-a-user-holding-a-role-searches-it) | 성공 |
+| [자기 스코프의 역할 읽기 권한을 가진 역할을 가진 사용자가 자기 이름으로 가진 역할을 검색하면, 그 역할만 오고 다른 사람이 가진 역할과 다른 하나는 빠집니다](#searching-a-user-holding-a-role-searches-it) | 성공 |
 | [아무 역할도 가진 것이 없는 사용자는 자기가 가진 역할을 검색할 수 없습니다](#searching-a-user-granted-nothing-may-not-search-their-roles) | 거부 |
 
 **partial_bulk_delete**
@@ -163,7 +164,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [대상 도메인에서 역할 읽기와 수정 권한을 받은 사용자가 권한을 purge 하면, 그 권한 행의 id 가 옵니다](#permission_writing-a-user-granted-role-write-purges-a-permission) | 성공 |
-| [아무 권한도 받지 않은 사용자는 권한을 purge 할 수 없습니다](#permission_writing-a-user-granted-nothing-may-not-purge-a-permission) | 거부 |
+| [대상 도메인에서 역할 읽기 권한만 받은 사용자는 권한을 purge 할 수 없습니다](#permission_writing-a-user-granted-read-only-may-not-purge-a-permission) | 거부 |
 
 **restore**
 
@@ -176,14 +177,14 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [대상 도메인에서 역할 읽기 권한을 받은 사용자가 역할이 가진 권한을 검색하면, 그 역할의 권한 행이 모두 옵니다](#searching_permissions-a-user-granted-role-read-searches-the-permissions-of-a-role) | 성공 |
+| [대상 도메인에서 역할 읽기 권한을 받은 사용자가 역할이 가진 권한을 한 엔티티 종류로 검색하면, 필터가 남긴 권한 행이 모두 옵니다](#searching_permissions-a-user-granted-role-read-searches-the-permissions-of-a-role) | 성공 |
 | [아무 권한도 받지 않은 사용자는 역할이 가진 권한을 검색할 수 없습니다](#searching_permissions-a-user-granted-nothing-may-not-search-the-permissions-of-a-role) | 거부 |
 
 **search_roles_in_scope**
 
 | 시나리오 | 판정 |
 |---|---|
-| [대상 도메인에서 역할 읽기 권한을 받은 사용자가 그 도메인의 역할을 검색하면, 그 도메인의 역할이 모두 옵니다](#searching-a-user-granted-role-read-searches-a-domain) | 성공 |
+| [대상 도메인에서 역할 읽기 권한을 받은 사용자가 한 역할의 이름을 빼는 조건으로 그 도메인의 역할을 검색하면, 필터가 남긴 역할이 이름 순으로 옵니다](#searching-a-user-granted-role-read-searches-a-domain) | 성공 |
 | [아무 권한도 받지 않은 사용자는 도메인의 역할을 검색할 수 없습니다](#searching-a-user-granted-nothing-may-not-search-a-domain) | 거부 |
 
 **update**
@@ -193,20 +194,19 @@
 | [superadmin 이 역할의 status 를 DELETED 로 변경하면, soft delete 되어 삭제 상태로 옵니다](#editing-editing-status-to-deleted-soft-deletes-the-role) | 성공 |
 | [superadmin 이 역할의 설명을 변경하면, 새 설명을 담은 역할 전체가 응답으로 옵니다](#editing-the-superadmin-edits-a-role) | 성공 |
 | [아무 권한도 받지 않은 사용자는 역할을 수정할 수 없습니다](#editing-a-user-granted-nothing-may-not-edit-a-role) | 거부 |
-| [대상 도메인에서 역할 조회 권한만 받은 사용자는 역할을 수정할 수 없습니다](#editing-a-user-granted-read-only-may-not-edit-a-role) | 거부 |
 
 **update_permission**
 
 | 시나리오 | 판정 |
 |---|---|
 | [대상 도메인에서 역할 읽기와 수정 권한을 받은 사용자가 권한을 고치면, 고친 권한 행 전체가 옵니다](#permission_writing-a-user-granted-role-write-updates-a-permission) | 성공 |
-| [아무 권한도 받지 않은 사용자는 권한을 고칠 수 없습니다](#permission_writing-a-user-granted-nothing-may-not-update-a-permission) | 거부 |
+| [대상 도메인에서 역할 읽기 권한만 받은 사용자는 권한을 고칠 수 없습니다](#permission_writing-a-user-granted-read-only-may-not-update-a-permission) | 거부 |
 
 **admin_search_role_assignments**
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 모든 역할 배정을 검색하면, 미리 저장한 사람들의 배정이 모두 옵니다](#searching_assignments-the-superadmin-searches-every-role-assignment) | 성공 |
+| [superadmin 이 미리 저장한 사람의 이름으로 역할 배정을 검색하면, 그 사람의 배정만 옵니다. 이 검색은 전역 역할이 막습니다](#searching_assignments-the-superadmin-searches-every-role-assignment) | 성공 |
 | [아무 권한도 받지 않은 사용자는 모든 역할 배정을 검색할 수 없습니다](#searching_assignments-a-user-granted-nothing-may-not-search-every-role-assignment) | 거부 |
 
 **assign_role**
@@ -282,7 +282,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [자기 스코프의 역할 읽기 권한을 가진 역할을 가진 사용자가 자기의 역할 배정을 검색하면, 그 배정이 옵니다](#searching_assignments-a-user-holding-a-role-searches-their-assignment) | 성공 |
+| [자기 스코프의 역할 읽기 권한을 가진 역할을 가진 사용자가 자기 역할 배정을 역할 하나의 id 로 검색하면, 그 배정만 오고 다른 역할과 다른 사람의 배정은 빠집니다](#searching_assignments-a-user-holding-a-role-searches-their-assignment) | 성공 |
 | [아무 역할도 가진 것이 없는 사용자는 자기의 역할 배정을 검색할 수 없습니다](#searching_assignments-a-user-granted-nothing-may-not-search-their-role-assignment) | 거부 |
 
 **replace_role_permissions**
@@ -290,7 +290,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [대상 도메인에서 역할 읽기와 수정 권한을 받은 사용자가 역할의 권한을 통째로 바꾸면, 새 권한 행이 모두 오고 실패가 없습니다](#permission_writing-a-user-granted-role-write-replaces-the-permissions) | 성공 |
-| [아무 권한도 받지 않은 사용자는 역할의 권한을 통째로 바꿀 수 없습니다](#permission_writing-a-user-granted-nothing-may-not-replace-the-permissions) | 거부 |
+| [대상 도메인에서 역할 읽기 권한만 받은 사용자는 역할의 권한을 통째로 바꿀 수 없습니다](#permission_writing-a-user-granted-read-only-may-not-replace-the-permissions) | 거부 |
 | [요청한 역할과 다른 역할의 id 를 단 항목으로 권한을 바꾸려 하면, 요청 전체가 거부됩니다](#permission_writing-replacing-with-an-entry-of-another-role-is-refused) | 거부 |
 
 **revoke_role**
@@ -305,7 +305,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [대상 도메인에서 역할 읽기 권한을 받은 사용자가 역할 하나의 배정을 검색하면, 그 역할을 받은 사람들의 배정이 모두 옵니다](#searching_assignments-a-user-granted-role-read-searches-the-assignments-of-a-role) | 성공 |
+| [대상 도메인에서 역할 읽기 권한을 받은 사용자가 역할 하나의 배정을 미리 저장한 사람 하나의 이름으로 검색하면, 그 사람의 배정만 옵니다](#searching_assignments-a-user-granted-role-read-searches-the-assignments-of-a-role) | 성공 |
 | [아무 권한도 받지 않은 사용자는 역할 하나의 배정을 검색할 수 없습니다](#searching_assignments-a-user-granted-nothing-may-not-search-the-assignments-of-a-role) | 거부 |
 
 ### admin_search_permissions_gql
@@ -314,7 +314,7 @@
 
 #### [the-superadmin-searches-every-permission](/tests/scenario/bai_scenario/manager/rbac/test_searching_permissions.py): pass
 
-superadmin 이 모든 권한을 검색하면, 미리 저장한 권한 행이 모두 옵니다
+superadmin 이 한 엔티티 종류로 권한을 검색하면, 필터가 남긴 권한 행이 모두 옵니다. 이 검색은 전역 역할이 막습니다
 
 Given
 
@@ -336,9 +336,9 @@ When
 
 Then
 
-- 미리 저장한 권한 행이 모두 옵니다
-  - items count = 2
-  - total_count = 2
+- 필터가 고른 권한 행이 모두 옵니다
+  - items count = 1
+  - total_count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: 건너뜀: 데이터베이스가 생성합니다
@@ -347,12 +347,6 @@ Then
   - items[0].entity_type = 'session'
   - items[0].permission = <PermissionBitDTO.READ: 'read'>
   - items[0].created_at: 이 실행이 쓴 시각
-  - items[1].id: 건너뜀: 데이터베이스가 생성합니다
-  - items[1].field_id: 건너뜀: 데이터베이스가 생성합니다
-  - items[1].role_id: 미리 저장한 역할의 id 와 같다
-  - items[1].entity_type = 'vfolder'
-  - items[1].permission = <PermissionBitDTO.UPDATE: 'update'>
-  - items[1].created_at: 이 실행이 쓴 시각
 
 <a id="searching_permissions-a-user-granted-nothing-may-not-search-every-permission"></a>
 
@@ -388,7 +382,7 @@ Then
 
 #### [the-superadmin-searches-every-role](/tests/scenario/bai_scenario/manager/rbac/test_searching.py): pass
 
-superadmin 이 모든 역할을 검색하면, 미리 저장한 역할이 이름 순으로 모두 옵니다
+superadmin 이 한 역할의 이름을 빼는 조건으로 역할을 검색하면, 필터가 남긴 역할이 이름 순으로 옵니다. 이 검색은 전역 역할이 막습니다
 
 Given
 
@@ -397,6 +391,7 @@ Given
   - 도메인 target-1
   - 역할 role-1: 부여된 스코프 안에서만 적용됩니다
   - 역할 role-2: 부여된 스코프 안에서만 적용됩니다
+  - 역할 excluded-1: 부여된 스코프 안에서만 적용됩니다
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
@@ -409,7 +404,7 @@ When
 
 Then
 
-- 미리 저장한 역할이 이름 순으로 모두 옵니다
+- 필터가 고른 역할이 이름 순으로 옵니다
   - items count = 2
   - total_count = 2
   - has_next_page = False
@@ -469,6 +464,44 @@ Then
   - 거부: InsufficientPrivilege
 
 ### batch_load_permissions_by_ids
+
+<a id="loading-a-user-granted-nothing-loads-permissions-and-gets-empty-entries"></a>
+
+#### [a-user-granted-nothing-loads-permissions-and-gets-empty-entries](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
+
+아무 권한도 받지 않은 사용자가 권한 둘과 없는 id 하나를 한 번에 읽으면, 모든 자리가 빈 값으로 옵니다
+
+Given
+
+- 한 도메인에 둔 커스텀 역할 2개와, 다른 도메인에 사는 user 한 명
+  - 도메인 home-1
+  - 도메인 target-1
+  - 역할 role-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 role-2: 부여된 스코프 안에서만 적용됩니다
+  - 역할 role-1: session 전체에 READ 허용
+  - 역할 role-1: vfolder 전체에 UPDATE 허용
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-3: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 일반 사용자 user-2: 역할 role-1 보유
+  - 일반 사용자 user-3: 역할 role-1 보유
+
+When
+
+- RBACAdapter.batch_load_permissions_by_ids: user-1이 권한 둘과 없는 id 하나를 한 번에 읽습니다
+
+Then
+
+- 모든 자리가 빈 값으로 옵니다
+  - loaded = [None, None, None]
 
 <a id="loading-the-superadmin-loads-two-permissions-and-a-missing-id"></a>
 
@@ -811,11 +844,11 @@ Then
   - items[1].created_at: 이 실행이 쓴 시각
   - failed = []
 
-<a id="permission_writing-a-user-granted-nothing-may-not-add-permissions"></a>
+<a id="permission_writing-a-user-granted-read-only-may-not-add-permissions"></a>
 
-#### [a-user-granted-nothing-may-not-add-permissions](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
+#### [a-user-granted-read-only-may-not-add-permissions](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
 
-아무 권한도 받지 않은 사용자는 권한을 한 번에 더할 수 없습니다
+대상 도메인에서 역할 읽기 권한만 받은 사용자는 권한을 한 번에 더할 수 없습니다
 
 Given
 
@@ -830,6 +863,9 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 역할 grant-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 grant-1: role 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 grant-1 보유
 
 When
 
@@ -842,11 +878,11 @@ Then
 
 ### bulk_remove_role_permissions
 
-<a id="permission_writing-a-user-granted-nothing-removes-no-permission"></a>
+<a id="permission_writing-a-user-granted-read-only-removes-no-permission"></a>
 
-#### [a-user-granted-nothing-removes-no-permission](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
+#### [a-user-granted-read-only-removes-no-permission](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
 
-아무 권한도 받지 않은 사용자가 권한 둘을 한 번에 빼면, 하나도 빠지지 않고 모두 실패 목록에 옵니다
+대상 도메인에서 역할 읽기 권한만 받은 사용자가 권한 둘을 한 번에 빼면, 하나도 빠지지 않고 모두 실패 목록에 옵니다
 
 Given
 
@@ -861,6 +897,9 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 역할 grant-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 grant-1: role 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 grant-1 보유
 
 When
 
@@ -1033,11 +1072,11 @@ Then
   - permission = <PermissionBitDTO.SOFT_DELETE: 'soft_delete'>
   - created_at: 이 실행이 쓴 시각
 
-<a id="permission_writing-a-user-granted-nothing-may-not-create-a-permission"></a>
+<a id="permission_writing-a-user-granted-read-only-may-not-create-a-permission"></a>
 
-#### [a-user-granted-nothing-may-not-create-a-permission](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
+#### [a-user-granted-read-only-may-not-create-a-permission](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
 
-아무 권한도 받지 않은 사용자는 권한을 만들 수 없습니다
+대상 도메인에서 역할 읽기 권한만 받은 사용자는 권한을 만들 수 없습니다
 
 Given
 
@@ -1052,6 +1091,9 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 역할 grant-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 grant-1: role 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 grant-1 보유
 
 When
 
@@ -1154,7 +1196,7 @@ Then
 
 #### [a-user-holding-a-role-searches-it](/tests/scenario/bai_scenario/manager/rbac/test_searching.py): pass
 
-자기 스코프의 역할 읽기 권한을 가진 역할을 가진 사용자가 가진 역할을 검색하면, 그 역할이 옵니다
+자기 스코프의 역할 읽기 권한을 가진 역할을 가진 사용자가 자기 이름으로 가진 역할을 검색하면, 그 역할만 오고 다른 사람이 가진 역할과 다른 하나는 빠집니다
 
 Given
 
@@ -1167,9 +1209,16 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 일반 사용자 user-2: 역할 role-1 보유
   - 역할 self-role-1: 부여된 스코프 안에서만 적용됩니다
   - 역할 self-role-1: role 전체에 READ 허용
   - 일반 사용자 user-1: 역할 self-role-1 보유
+  - 역할 self-role-2: 부여된 스코프 안에서만 적용됩니다
+  - 역할 self-role-2: role 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 self-role-2 보유
 
 When
 
@@ -1729,11 +1778,11 @@ Then
   - id: 미리 저장한 권한 행의 id 와 같다
   - field_id: 미리 저장한 권한 행의 id 와 같다
 
-<a id="permission_writing-a-user-granted-nothing-may-not-purge-a-permission"></a>
+<a id="permission_writing-a-user-granted-read-only-may-not-purge-a-permission"></a>
 
-#### [a-user-granted-nothing-may-not-purge-a-permission](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
+#### [a-user-granted-read-only-may-not-purge-a-permission](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
 
-아무 권한도 받지 않은 사용자는 권한을 purge 할 수 없습니다
+대상 도메인에서 역할 읽기 권한만 받은 사용자는 권한을 purge 할 수 없습니다
 
 Given
 
@@ -1748,6 +1797,9 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 역할 grant-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 grant-1: role 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 grant-1 보유
 
 When
 
@@ -1756,7 +1808,7 @@ When
 Then
 
 - 거부됩니다
-  - 거부: GenericBadRequest
+  - 거부: NotEnoughPermission
 
 ### restore
 
@@ -1820,16 +1872,18 @@ Then
 
 #### [a-user-granted-role-read-searches-the-permissions-of-a-role](/tests/scenario/bai_scenario/manager/rbac/test_searching_permissions.py): pass
 
-대상 도메인에서 역할 읽기 권한을 받은 사용자가 역할이 가진 권한을 검색하면, 그 역할의 권한 행이 모두 옵니다
+대상 도메인에서 역할 읽기 권한을 받은 사용자가 역할이 가진 권한을 한 엔티티 종류로 검색하면, 필터가 남긴 권한 행이 모두 옵니다
 
 Given
 
-- 한 도메인에 둔 커스텀 역할 1개와, 다른 도메인에 사는 user 한 명
+- 한 도메인에 둔 커스텀 역할 2개와, 다른 도메인에 사는 user 한 명
   - 도메인 home-1
   - 도메인 target-1
   - 역할 role-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 role-2: 부여된 스코프 안에서만 적용됩니다
   - 역할 role-1: session 전체에 READ 허용
   - 역할 role-1: vfolder 전체에 UPDATE 허용
+  - 역할 role-2: project 전체에 READ 허용
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
@@ -1845,9 +1899,9 @@ When
 
 Then
 
-- 그 역할이 가진 권한 행이 모두 옵니다
-  - items count = 2
-  - total_count = 2
+- 필터가 고른 권한 행이 모두 옵니다
+  - items count = 1
+  - total_count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: 건너뜀: 데이터베이스가 생성합니다
@@ -1856,12 +1910,6 @@ Then
   - items[0].entity_type = 'session'
   - items[0].permission = <PermissionBitDTO.READ: 'read'>
   - items[0].created_at: 이 실행이 쓴 시각
-  - items[1].id: 건너뜀: 데이터베이스가 생성합니다
-  - items[1].field_id: 건너뜀: 데이터베이스가 생성합니다
-  - items[1].role_id: 미리 저장한 역할의 id 와 같다
-  - items[1].entity_type = 'vfolder'
-  - items[1].permission = <PermissionBitDTO.UPDATE: 'update'>
-  - items[1].created_at: 이 실행이 쓴 시각
 
 <a id="searching_permissions-a-user-granted-nothing-may-not-search-the-permissions-of-a-role"></a>
 
@@ -1897,7 +1945,7 @@ Then
 
 #### [a-user-granted-role-read-searches-a-domain](/tests/scenario/bai_scenario/manager/rbac/test_searching.py): pass
 
-대상 도메인에서 역할 읽기 권한을 받은 사용자가 그 도메인의 역할을 검색하면, 그 도메인의 역할이 모두 옵니다
+대상 도메인에서 역할 읽기 권한을 받은 사용자가 한 역할의 이름을 빼는 조건으로 그 도메인의 역할을 검색하면, 필터가 남긴 역할이 이름 순으로 옵니다
 
 Given
 
@@ -1906,6 +1954,8 @@ Given
   - 도메인 target-1
   - 역할 role-1: 부여된 스코프 안에서만 적용됩니다
   - 역할 role-2: 부여된 스코프 안에서만 적용됩니다
+  - 역할 beyond-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 excluded-1: 부여된 스코프 안에서만 적용됩니다
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
@@ -1921,7 +1971,7 @@ When
 
 Then
 
-- 미리 저장한 역할이 이름 순으로 모두 옵니다
+- 필터가 고른 역할이 이름 순으로 옵니다
   - items count = 3
   - total_count = 3
   - has_next_page = False
@@ -2100,36 +2150,6 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
-<a id="editing-a-user-granted-read-only-may-not-edit-a-role"></a>
-
-#### [a-user-granted-read-only-may-not-edit-a-role](/tests/scenario/bai_scenario/manager/rbac/test_editing.py): pass
-
-대상 도메인에서 역할 조회 권한만 받은 사용자는 역할을 수정할 수 없습니다
-
-Given
-
-- 한 도메인에 둔 커스텀 역할 1개와, 다른 도메인에 사는 user 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 역할 role-1: 부여된 스코프 안에서만 적용됩니다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 역할 grant-1: 부여된 스코프 안에서만 적용됩니다
-  - 역할 grant-1: role 전체에 READ 허용
-  - 일반 사용자 user-1: 역할 grant-1 보유
-
-When
-
-- RBACAdapter.update: user-1이 role-1 의 설명을 수정합니다
-
-Then
-
-- 거부됩니다
-  - 거부: NotEnoughPermission
-
 ### update_permission
 
 <a id="permission_writing-a-user-granted-role-write-updates-a-permission"></a>
@@ -2170,11 +2190,11 @@ Then
   - permission = <PermissionBitDTO.SOFT_DELETE: 'soft_delete'>
   - created_at: 이 실행이 쓴 시각
 
-<a id="permission_writing-a-user-granted-nothing-may-not-update-a-permission"></a>
+<a id="permission_writing-a-user-granted-read-only-may-not-update-a-permission"></a>
 
-#### [a-user-granted-nothing-may-not-update-a-permission](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
+#### [a-user-granted-read-only-may-not-update-a-permission](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
 
-아무 권한도 받지 않은 사용자는 권한을 고칠 수 없습니다
+대상 도메인에서 역할 읽기 권한만 받은 사용자는 권한을 고칠 수 없습니다
 
 Given
 
@@ -2189,6 +2209,9 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 역할 grant-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 grant-1: role 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 grant-1 보유
 
 When
 
@@ -2197,7 +2220,7 @@ When
 Then
 
 - 거부됩니다
-  - 거부: GenericBadRequest
+  - 거부: NotEnoughPermission
 
 ### admin_search_role_assignments
 
@@ -2205,7 +2228,7 @@ Then
 
 #### [the-superadmin-searches-every-role-assignment](/tests/scenario/bai_scenario/manager/rbac/test_searching_assignments.py): pass
 
-superadmin 이 모든 역할 배정을 검색하면, 미리 저장한 사람들의 배정이 모두 옵니다
+superadmin 이 미리 저장한 사람의 이름으로 역할 배정을 검색하면, 그 사람의 배정만 옵니다. 이 검색은 전역 역할이 막습니다
 
 Given
 
@@ -2233,9 +2256,9 @@ When
 
 Then
 
-- 미리 저장한 사람들의 역할 배정이 모두 옵니다
-  - items count = 2
-  - total_count = 2
+- 필터가 지목한 사람의 배정만 옵니다
+  - items count = 1
+  - total_count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: 건너뜀: 데이터베이스가 생성합니다
@@ -2243,11 +2266,6 @@ Then
   - items[0].role_id: 미리 저장한 역할의 id 와 같다
   - items[0].granted_by = None
   - items[0].granted_at: 이 실행이 쓴 시각
-  - items[1].id: 건너뜀: 데이터베이스가 생성합니다
-  - items[1].user_id: 미리 저장한 사용자의 id 와 같다
-  - items[1].role_id: 미리 저장한 역할의 id 와 같다
-  - items[1].granted_by = None
-  - items[1].granted_at: 이 실행이 쓴 시각
 
 <a id="searching_assignments-a-user-granted-nothing-may-not-search-every-role-assignment"></a>
 
@@ -2991,7 +3009,7 @@ Then
 
 #### [a-user-holding-a-role-searches-their-assignment](/tests/scenario/bai_scenario/manager/rbac/test_searching_assignments.py): pass
 
-자기 스코프의 역할 읽기 권한을 가진 역할을 가진 사용자가 자기의 역할 배정을 검색하면, 그 배정이 옵니다
+자기 스코프의 역할 읽기 권한을 가진 역할을 가진 사용자가 자기 역할 배정을 역할 하나의 id 로 검색하면, 그 배정만 오고 다른 역할과 다른 사람의 배정은 빠집니다
 
 Given
 
@@ -3004,9 +3022,16 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 일반 사용자 user-2: 역할 role-1 보유
   - 역할 self-role-1: 부여된 스코프 안에서만 적용됩니다
   - 역할 self-role-1: role 전체에 READ 허용
   - 일반 사용자 user-1: 역할 self-role-1 보유
+  - 역할 self-role-2: 부여된 스코프 안에서만 적용됩니다
+  - 역할 self-role-2: role 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 self-role-2 보유
 
 When
 
@@ -3100,11 +3125,11 @@ Then
   - items[1].created_at: 이 실행이 쓴 시각
   - failed = []
 
-<a id="permission_writing-a-user-granted-nothing-may-not-replace-the-permissions"></a>
+<a id="permission_writing-a-user-granted-read-only-may-not-replace-the-permissions"></a>
 
-#### [a-user-granted-nothing-may-not-replace-the-permissions](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
+#### [a-user-granted-read-only-may-not-replace-the-permissions](/tests/scenario/bai_scenario/manager/rbac/test_permission_writing.py): pass
 
-아무 권한도 받지 않은 사용자는 역할의 권한을 통째로 바꿀 수 없습니다
+대상 도메인에서 역할 읽기 권한만 받은 사용자는 역할의 권한을 통째로 바꿀 수 없습니다
 
 Given
 
@@ -3119,6 +3144,9 @@ Given
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 역할 grant-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 grant-1: role 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 grant-1 보유
 
 When
 
@@ -3274,7 +3302,7 @@ Then
 
 #### [a-user-granted-role-read-searches-the-assignments-of-a-role](/tests/scenario/bai_scenario/manager/rbac/test_searching_assignments.py): pass
 
-대상 도메인에서 역할 읽기 권한을 받은 사용자가 역할 하나의 배정을 검색하면, 그 역할을 받은 사람들의 배정이 모두 옵니다
+대상 도메인에서 역할 읽기 권한을 받은 사용자가 역할 하나의 배정을 미리 저장한 사람 하나의 이름으로 검색하면, 그 사람의 배정만 옵니다
 
 Given
 
@@ -3298,6 +3326,9 @@ Given
   - 역할 grant-1: 부여된 스코프 안에서만 적용됩니다
   - 역할 grant-1: role 전체에 READ 허용
   - 일반 사용자 user-1: 역할 grant-1 보유
+  - 역할 self-role-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 self-role-1: role 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 self-role-1 보유
 
 When
 
@@ -3305,9 +3336,9 @@ When
 
 Then
 
-- 그 역할을 받은 사람들의 배정이 모두 옵니다
-  - items count = 2
-  - total_count = 2
+- 필터가 지목한 사람의 배정만 옵니다
+  - items count = 1
+  - total_count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: 건너뜀: 데이터베이스가 생성합니다
@@ -3315,11 +3346,6 @@ Then
   - items[0].role_id: 미리 저장한 역할의 id 와 같다
   - items[0].granted_by = None
   - items[0].granted_at: 이 실행이 쓴 시각
-  - items[1].id: 건너뜀: 데이터베이스가 생성합니다
-  - items[1].user_id: 미리 저장한 사용자의 id 와 같다
-  - items[1].role_id: 미리 저장한 역할의 id 와 같다
-  - items[1].granted_by = None
-  - items[1].granted_at: 이 실행이 쓴 시각
 
 <a id="searching_assignments-a-user-granted-nothing-may-not-search-the-assignments-of-a-role"></a>
 
