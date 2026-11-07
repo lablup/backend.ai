@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any, override
 
 import pytest
@@ -35,7 +36,7 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
-from bai_scenario.components.domain import WAS_HERE, SomeoneOf
+from bai_scenario.components.domain import WAS_HERE, DomainLook, SomeoneOf
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
@@ -165,13 +166,16 @@ class FilteringActiveUsersAndOrderingByProjectName(
 class TheFirstInOrderIsLeft(Then[ThreeDomainsAndTheirRows, Searched]):
     """프로젝트 이름이 앞서는 첫째 하나만 오고, 활성 사용자가 없는 셋째는 빠진다."""
 
+    started: datetime
+
     @override
     def says(self) -> str:
         return Says(
-            "프로젝트 이름이 앞서는 첫째 도메인 하나만 오고, 활성 사용자가 없는 셋째는 빠집니다",
+            "프로젝트 이름이 앞서는 첫째 도메인 하나가 전체 필드로 오고, "
+            "활성 사용자가 없는 셋째는 빠집니다",
             english=(
-                "only the first domain, whose project name comes first, comes back, and the "
-                "third domain holding no active user is left out"
+                "only the first domain, whose project name comes first, comes back with every "
+                "field, and the third domain holding no active user is left out"
             ),
         )
 
@@ -180,18 +184,24 @@ class TheFirstInOrderIsLeft(Then[ThreeDomainsAndTheirRows, Searched]):
         payload = answered.response
         if payload is None:
             return [Refused(InsufficientPrivilege, answered.raised)]
-        return [
-            Same("items", [one.basic_info.name for one in payload.items], [laid.first.name]),
+        look = DomainLook(self.started, active=True)
+        verdicts: list[Verdict] = [
+            Same("items count", len(payload.items), 1),
             Same("total_count", payload.total_count, 2),
             Same("has_next_page", payload.has_next_page, True),
             Same("has_previous_page", payload.has_previous_page, False),
         ]
+        for i, node in enumerate(payload.items):
+            verdicts += look.verdicts(f"items[{i}].", node, laid.first)
+        return verdicts
 
 
 @dataclass(frozen=True)
 class AFilterOnNestedFieldsNarrowsAndOrders(
     Scenario[TestSeedingSession, ThreeDomainsAndTheirRows, DomainAdapter, Searched]
 ):
+    started: datetime
+
     @override
     def summary(self) -> str:
         return "a-nested-user-filter-and-project-name-order-narrow-the-first-page"
@@ -220,11 +230,11 @@ class AFilterOnNestedFieldsNarrowsAndOrders(
 
     @override
     def then(self) -> Then[ThreeDomainsAndTheirRows, Searched]:
-        return TheFirstInOrderIsLeft()
+        return TheFirstInOrderIsLeft(started=self.started)
 
 
 SCENARIOS: list[Scenario[TestSeedingSession, ThreeDomainsAndTheirRows, DomainAdapter, Searched]] = [
-    AFilterOnNestedFieldsNarrowsAndOrders(),
+    AFilterOnNestedFieldsNarrowsAndOrders(started=datetime.now(UTC)),
 ]
 
 
