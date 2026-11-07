@@ -23,6 +23,7 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Condition,
     Given,
     Held,
     Same,
@@ -212,6 +213,19 @@ def registry_verdicts(
         Same(f"{prefix}name", node.name, registry.name),
         Same(f"{prefix}type", node.type, HUGGINGFACE),
     ]
+
+
+@dataclass(frozen=True)
+class AnArtifactRegistryNode(Condition[ArtifactRegistryGQLNode | Exception | None]):
+    """이 자리에 레지스트리 노드가 온다. 읽을 수 있는 id 를 읽었으므로 다른 값은 실패다."""
+
+    @override
+    def says(self) -> str:
+        return Says("레지스트리 노드 하나", english="one registry node")
+
+    @override
+    def holds(self, got: ArtifactRegistryGQLNode | Exception | None) -> bool:
+        return isinstance(got, ArtifactRegistryGQLNode)
 
 
 @dataclass(frozen=True)
