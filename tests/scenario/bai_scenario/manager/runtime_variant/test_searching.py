@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
 
 import pytest
 
@@ -38,9 +38,7 @@ from bai_scenario.runner.steps import run_scenario
 DEFAULT_PAGE = 10
 
 type Searched = SearchRuntimeVariantsPayload
-type SearchingStep = Scenario[
-    TestSeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Searched
-]
+type SearchingStep = Scenario[TestSeedingSession, Any, RuntimeVariantAdapter, Searched]
 
 
 @dataclass(frozen=True)
