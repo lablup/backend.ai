@@ -1,4 +1,8 @@
-"""세션의 컨테이너 로그와 서비스 시작과 종료."""
+"""세션의 컨테이너 로그와 서비스 시작과 종료.
+
+서비스 시작의 성공 분기는 커널의 service_ports 와 agent 를 쓰는 write spec 이 없어 닿을 수
+없다. 그래서 거부 두 가지만 둔다.
+"""
 
 from __future__ import annotations
 

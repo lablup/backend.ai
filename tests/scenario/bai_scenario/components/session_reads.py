@@ -33,10 +33,13 @@ from ai.backend.testutils.scenario_steps import Given, Says
 from bai_scenario.components.domain import SomeoneOf
 from bai_scenario.components.resource_allocation import (
     Granted,
+    LaidPlace,
     lay_a_caller_of,
     lay_a_place,
 )
+from bai_scenario.seeds.project.project import TestSeedProject
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
 from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 from bai_scenario.seeds.session.kernel import TestSeedKernelOf, TestSeedMainKernelGroupOf
 from bai_scenario.seeds.session.kernel_group_fields import (
@@ -103,15 +106,28 @@ class ASessionWithAKernelAndSomeone(Given[Any, LaidSessionAndCaller]):
 
     ``granted`` decides where the caller's session read role sits; ``role`` names the
     caller when no role is granted. ``permission`` is the session permission the grant
-    carries when it sits in the project.
+    carries when it sits in the project. ``beside_another_outside`` lays the same shape
+    beside it in the same project and again in another project, so a scoped read can tell
+    them apart from what it returns.
     """
 
     granted: Granted = Granted.THE_PROJECT
     role: UserRole = UserRole.USER
     permission: Permission = Permission.READ
+    beside_another_outside: bool = False
 
     @override
     def describe(self) -> str:
+        if self.beside_another_outside:
+            return Says(
+                "커널 하나와 그 커널 그룹을 가진 대기 세션, 같은 프로젝트의 같은 모양 세션 "
+                "하나와 다른 프로젝트의 같은 모양 세션 하나, 그리고 그것을 읽을 사용자 한 명",
+                english=(
+                    "one pending session with a kernel and its kernel group, the same shape "
+                    "laid beside it in the same project and again in another project, and one "
+                    "user who reads it"
+                ),
+            )
         return Says(
             "커널 하나와 그 커널 그룹을 가진 대기 세션, 그리고 그것을 읽을 사용자 한 명",
             english=(
@@ -157,6 +173,23 @@ class ASessionWithAKernelAndSomeone(Given[Any, LaidSessionAndCaller]):
             )
         else:
             caller = await lay_a_caller_of(seeding, place, role=self.role, granted=self.granted)
+        if self.beside_another_outside:
+            await lay_the_same_shape(
+                seeding,
+                place,
+                place.project,
+                image=image,
+                slots=slots,
+                name_hint="beside-session",
+            )
+            await lay_the_same_shape(
+                seeding,
+                place,
+                None,
+                image=image,
+                slots=slots,
+                name_hint="outside-session",
+            )
         return LaidSessionAndCaller(
             domain=seeding.made(place.domain),
             project=seeding.made(place.project),
@@ -172,6 +205,45 @@ class ASessionWithAKernelAndSomeone(Given[Any, LaidSessionAndCaller]):
             slot_name=slot_name,
             quantity=quantity,
         )
+
+
+async def lay_the_same_shape(
+    seeding: Any,
+    place: LaidPlace,
+    project: Laid[ProjectData] | None,
+    *,
+    image: ImageData,
+    slots: tuple[tuple[str, Decimal], ...],
+    name_hint: str,
+) -> None:
+    """Lay one more session of the same shape, in ``project`` or in a new one."""
+    if project is None:
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(
+            TestSeedProject(name_hint="outside-project"), place.domain, policy
+        )
+    session = await seeding.creating_from_three(
+        TestSeedSession(access_key=place.access_key, name_hint=name_hint),
+        project,
+        place.owner,
+        place.group,
+    )
+    group = await seeding.adding(TestSeedMainKernelGroupOf(image=image, slots=slots), session)
+    await seeding.adding(
+        TestSeedKernelGroupEnvironOf(key=ENVIRON_KEY, value=ENVIRON_VALUE), group
+    )
+    await seeding.adding(
+        TestSeedKernelGroupResourceSlotOf(slot_name=slots[0][0], quantity=slots[0][1]), group
+    )
+    await seeding.adding_with_nested(
+        TestSeedKernelOf(
+            session=seeding.made(session),
+            group=seeding.made(group),
+            image=image,
+            slots=slots,
+        ),
+        session,
+    )
 
 
 def allocation_dump(slot_name: str, quantity: Decimal) -> dict[str, Any]:
