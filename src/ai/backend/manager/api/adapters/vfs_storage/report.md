@@ -19,7 +19,7 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin loads two VFS storages seeded in advance and one id that does not exist at once, the two come back in the requested order and the entry for the id that does not exist is empty](#reading-the-superadmin-reads-several-vfs-storages-in-the-requested-order) | answered |
+| [when a user granted permission to read VFS storages loads two VFS storages seeded in advance at once, the two come back in the requested order](#reading-a-user-granted-read-reads-several-vfs-storages-in-the-requested-order) | answered |
 | [when a user granted nothing loads several VFS storage ids at once, instead of rejecting the whole request, every entry comes back holding a rejection for lack of permission](#reading-a-user-granted-nothing-reading-many-vfs-storage-ids-is-refused-on-every-id) | rejected |
 
 **create**
@@ -33,7 +33,7 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reads one VFS storage, the whole seeded VFS storage comes back](#reading-the-superadmin-gets-a-vfs-storage) | answered |
+| [when a user granted permission to read VFS storages reads one, the whole seeded VFS storage comes back](#reading-a-user-granted-read-gets-a-vfs-storage) | answered |
 | [when a user granted nothing reads one VFS storage, it is rejected for lack of permission](#reading-a-user-granted-nothing-may-not-get-a-vfs-storage) | rejected |
 
 **list_all**
@@ -82,35 +82,46 @@ Scenario: complete
 
 ### batch_load_by_ids
 
-<a id="reading-the-superadmin-reads-several-vfs-storages-in-the-requested-order"></a>
+<a id="reading-a-user-granted-read-reads-several-vfs-storages-in-the-requested-order"></a>
 
-#### [the-superadmin-reads-several-vfs-storages-in-the-requested-order](/tests/scenario/bai_scenario/manager/vfs_storage/test_reading.py): pass
+#### [a-user-granted-read-reads-several-vfs-storages-in-the-requested-order](/tests/scenario/bai_scenario/manager/vfs_storage/test_reading.py): pass
 
-when the superadmin loads two VFS storages seeded in advance and one id that does not exist at once, the two come back in the requested order and the entry for the id that does not exist is empty
+when a user granted permission to read VFS storages loads two VFS storages seeded in advance at once, the two come back in the requested order
 
 Given
 
-- 2 VFS storages and one superadmin
+- 2 VFS storages and one user granted READ on VFS storages
   - VFS storage vfs-storage-1: its base path is /seeded/vfs-storage
   - VFS storage vfs-storage-2: its base path is /seeded/vfs-storage
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted READ on VFS storages in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role storage-keeper-1: applies only within the scope it is granted in
+    - Role storage-keeper-1: READ allowed on every vfs_storage
+    - regular user user-1: holds Role storage-keeper-1
 
 When
 
-- VFSStorageAdapter.batch_load_by_ids: user-1 loads two VFS storages seeded in advance and one id that does not exist at once
+- VFSStorageAdapter.batch_load_by_ids: user-1 loads two VFS storages seeded in advance at once
 
 Then
 
-- the VFS storages seeded in advance come back in the requested order, and the entry for the id that does not exist is empty
-  - length = 3
+- the VFS storages seeded in advance come back in the requested order
+  - length = 2
+  - [0].id: same as the VFS storage seeded in advance
+  - [0].entity_id: same as the VFS storage seeded in advance
   - [0].name = 'vfs-storage-1'
-  - [1] = None
-  - [2].name = 'vfs-storage-2'
+  - [0].host = 'seeded-host'
+  - [0].base_path = '/seeded/vfs-storage'
+  - [1].id: same as the VFS storage seeded in advance
+  - [1].entity_id: same as the VFS storage seeded in advance
+  - [1].name = 'vfs-storage-2'
+  - [1].host = 'seeded-host'
+  - [1].base_path = '/seeded/vfs-storage'
 
 <a id="reading-a-user-granted-nothing-reading-many-vfs-storage-ids-is-refused-on-every-id"></a>
 
@@ -132,13 +143,12 @@ Given
 
 When
 
-- VFSStorageAdapter.batch_load_by_ids: user-1 loads two VFS storages seeded in advance and one id that does not exist at once
+- VFSStorageAdapter.batch_load_by_ids: user-1 loads two VFS storages seeded in advance at once
 
 Then
 
 - every entry comes back holding a rejection for lack of permission
-  - length = 3
-  - rejected: NotEnoughPermission
+  - length = 2
   - rejected: NotEnoughPermission
   - rejected: NotEnoughPermission
 
@@ -200,22 +210,26 @@ Then
 
 ### get
 
-<a id="reading-the-superadmin-gets-a-vfs-storage"></a>
+<a id="reading-a-user-granted-read-gets-a-vfs-storage"></a>
 
-#### [the-superadmin-gets-a-vfs-storage](/tests/scenario/bai_scenario/manager/vfs_storage/test_reading.py): pass
+#### [a-user-granted-read-gets-a-vfs-storage](/tests/scenario/bai_scenario/manager/vfs_storage/test_reading.py): pass
 
-when the superadmin reads one VFS storage, the whole seeded VFS storage comes back
+when a user granted permission to read VFS storages reads one, the whole seeded VFS storage comes back
 
 Given
 
-- one VFS storage and one superadmin
+- one VFS storage and one user granted READ on VFS storages
   - VFS storage vfs-storage-1: its base path is /seeded/vfs-storage
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted READ on VFS storages in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role storage-keeper-1: applies only within the scope it is granted in
+    - Role storage-keeper-1: READ allowed on every vfs_storage
+    - regular user user-1: holds Role storage-keeper-1
 
 When
 

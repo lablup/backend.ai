@@ -13,62 +13,58 @@ Scenario: complete
   - scoped_search: representative success ✓ · representative rejection ✓
   - update: representative success ✓ · representative rejection ✓
 - direct implementation (2)
-  - create: success present 1 · rejection present 4 (scope)
+  - create: success present 1 · rejection present 3 (scope)
   - public_list_value_sources: success present 1 · rejection present 1 (public)
 
 **bulk_get_ids**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin loads two rows seeded in advance and one id that does not exist at once, the two come back in the requested order and the entry for the id that does not exist is empty](#reading-the-superadmin-reads-several-environs-in-the-requested-order) | answered |
+| [when a user granted read permission in public loads two rows seeded in advance at once, the two come back in the requested order](#reading-a-user-granted-read-reads-several-environs-in-the-requested-order) | answered |
 | [when a user granted nothing loads several ids at once, instead of rejecting the whole request, every entry comes back holding a rejection for lack of permission](#reading-a-user-granted-nothing-reading-many-environ-ids-is-refused-on-every-id) | rejected |
 
 **delete**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin deletes a system session environ, the whole row comes back with the deletion time](#deleting-the-superadmin-deletes-an-environ) | answered |
+| [when a user granted delete permission in public deletes a system session environ, the whole row comes back with the deletion time](#deleting-a-user-granted-delete-deletes-an-environ) | answered |
 | [when a user granted nothing tries to delete a system session environ, it is rejected for lack of permission](#deleting-a-user-granted-nothing-may-not-delete-an-environ) | rejected |
-| [when the superadmin deletes an id nothing answers to, it is rejected because the target cannot be found](#deleting-deleting-an-environ-id-nothing-answers-to-is-not-found) | rejected |
 
 **global_search**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin searches across every scope, every row seeded in advance comes back. This call is gated by the global role](#searching-the-superadmin-searching-every-scope-counts-every-row) | answered |
+| [when the superadmin filters by key, orders by key ascending and asks for one page across every scope, only the row with that key comes back. This call is gated by the global role](#searching-the-superadmin-searching-every-scope-finds-the-filtered-row) | answered |
 | [when a user who is not the superadmin searches across every scope, it is rejected for lack of permission. This call is gated by the global role](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-scope) | rejected |
 
 **purge**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin purges a system session environ, the id of the purged row comes back](#purging-the-superadmin-purges-an-environ) | answered |
+| [when a user granted purge permission in public purges a system session environ, the id of the purged row comes back](#purging-a-user-granted-purge-purges-an-environ) | answered |
 | [when a user granted nothing tries to purge a system session environ, it is rejected for lack of permission](#purging-a-user-granted-nothing-may-not-purge-an-environ) | rejected |
-| [when the superadmin purges an id nothing answers to, it is rejected because the target cannot be found](#purging-purging-an-environ-id-nothing-answers-to-is-not-found) | rejected |
 
 **restore**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin restores a deleted system session environ, the whole row comes back with no deletion time](#deleting-the-superadmin-restores-a-deleted-environ) | answered |
+| [when a user granted delete permission in public restores a deleted system session environ, the whole row comes back with no deletion time](#deleting-a-user-granted-delete-restores-a-deleted-environ) | answered |
 | [when a user granted nothing tries to restore a system session environ, it is rejected for lack of permission](#deleting-a-user-granted-nothing-may-not-restore-an-environ) | rejected |
-| [when the superadmin restores an id nothing answers to, it is rejected because the target cannot be found](#deleting-restoring-an-environ-id-nothing-answers-to-is-not-found) | rejected |
 
 **scoped_search**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin searches the public scope, every row seeded in advance there comes back](#searching-the-superadmin-searching-public-counts-the-public-rows) | answered |
+| [when a user granted read permission in public filters by key, orders by key ascending and asks for one page in the public scope, only the public row with that key comes back, and neither the row under the same key in another scope nor the row the filter excludes comes back](#searching-a-user-granted-read-searching-public-counts-the-matching-public-row) | answered |
 | [when a user granted nothing searches the public scope, it is rejected for lack of permission](#searching-a-user-granted-nothing-may-not-search-the-public-scope) | rejected |
 
 **update**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin changes a system session environ key, the whole row comes back with the new key and a last change time this run wrote](#editing-the-superadmin-changes-the-key-of-an-environ) | answered |
+| [when a user granted update permission in public changes a system session environ key, the whole row comes back with the new key and a last change time this run wrote](#editing-a-user-granted-update-changes-the-key-of-an-environ) | answered |
 | [when a user granted nothing tries to change the key, it is rejected for lack of permission](#editing-a-user-granted-nothing-may-not-edit-an-environ) | rejected |
 | [when the key of a soft-deleted row is changed, it is rejected with a demand to restore it first](#editing-editing-a-deleted-environ-is-refused) | rejected |
-| [when the superadmin changes the key of an id nothing answers to, it is rejected because the target cannot be found](#editing-editing-an-environ-id-nothing-answers-to-is-not-found) | rejected |
 | [when a row is changed to a key another row already holds at the same scope, it is rejected](#editing-editing-an-environ-to-a-key-another-row-holds-is-refused) | rejected |
 
 **create**
@@ -77,7 +73,6 @@ Scenario: complete
 |---|---|
 | [when a user granted create permission in public registers a system session environ, the whole registered row comes back](#creating-a-user-granted-create-registers-an-environ-in-public) | answered |
 | [when a user granted nothing tries to register a system session environ, it is rejected for lack of permission](#creating-a-user-granted-nothing-may-not-create-an-environ) | rejected |
-| [when a registration names a domain that does not exist, it is rejected because the target cannot be found](#creating-registering-an-environ-at-a-missing-domain-is-refused) | rejected |
 | [when a registration names a key another row already holds at the same scope, it is rejected](#creating-registering-an-environ-under-a-key-already-held-is-refused) | rejected |
 | [when a registration names a value source the manager does not know, it is rejected](#creating-registering-an-environ-with-an-unknown-value-source-is-refused) | rejected |
 
@@ -90,35 +85,52 @@ Scenario: complete
 
 ### bulk_get_ids
 
-<a id="reading-the-superadmin-reads-several-environs-in-the-requested-order"></a>
+<a id="reading-a-user-granted-read-reads-several-environs-in-the-requested-order"></a>
 
-#### [the-superadmin-reads-several-environs-in-the-requested-order](/tests/scenario/bai_scenario/manager/system_session_environ/test_reading.py): pass
+#### [a-user-granted-read-reads-several-environs-in-the-requested-order](/tests/scenario/bai_scenario/manager/system_session_environ/test_reading.py): pass
 
-when the superadmin loads two rows seeded in advance and one id that does not exist at once, the two come back in the requested order and the entry for the id that does not exist is empty
+when a user granted read permission in public loads two rows seeded in advance at once, the two come back in the requested order
 
 Given
 
-- two system session environs registered at the public scope and one superadmin
+- two system session environs registered at the public scope and one user granted READ on system session environs in the public scope
   - system session environ SCENARIO_SEEDED_KEY: injects the session_id value at the public scope
   - system session environ SCENARIO_OTHER_KEY: injects the session_id value at the public scope
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted READ on system session environs in the public scope
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role environ-writer-1: applies only within the scope it is granted in
+    - Role environ-writer-1: READ allowed on every system_session_environ
+    - regular user user-1: holds Role environ-writer-1
 
 When
 
-- SystemSessionEnvironAdapter.bulk_get_ids: user-1 loads two rows seeded in advance and one id that does not exist at once
+- SystemSessionEnvironAdapter.bulk_get_ids: user-1 loads two rows seeded in advance at once
 
 Then
 
-- the rows seeded in advance come back in the requested order, and the entry for the id that does not exist is empty
-  - length = 3
+- the rows seeded in advance come back in the requested order
+  - length = 2
+  - [0].entity_id: same as the row seeded in advance
   - [0].key = 'SCENARIO_SEEDED_KEY'
-  - [1] = None
-  - [2].key = 'SCENARIO_OTHER_KEY'
+  - [0].value_source = 'session_id'
+  - [0].scope.scope_type = <SystemSessionEnvironScopeType.PUBLIC: 'public'>
+  - [0].scope.scope_id: same as the id of the scope it is bound to
+  - [0].created_at: same as the row's creation time
+  - [0].updated_at: same as the row's last change time
+  - [0].deleted_at = None
+  - [1].entity_id: same as the row seeded in advance
+  - [1].key = 'SCENARIO_OTHER_KEY'
+  - [1].value_source = 'session_id'
+  - [1].scope.scope_type = <SystemSessionEnvironScopeType.PUBLIC: 'public'>
+  - [1].scope.scope_id: same as the id of the scope it is bound to
+  - [1].created_at: same as the row's creation time
+  - [1].updated_at: same as the row's last change time
+  - [1].deleted_at = None
 
 <a id="reading-a-user-granted-nothing-reading-many-environ-ids-is-refused-on-every-id"></a>
 
@@ -140,34 +152,37 @@ Given
 
 When
 
-- SystemSessionEnvironAdapter.bulk_get_ids: user-1 loads two rows seeded in advance and one id that does not exist at once
+- SystemSessionEnvironAdapter.bulk_get_ids: user-1 loads two rows seeded in advance at once
 
 Then
 
 - every entry comes back holding a rejection for lack of permission
-  - length = 3
-  - rejected: NotEnoughPermission
+  - length = 2
   - rejected: NotEnoughPermission
   - rejected: NotEnoughPermission
 
 ### delete
 
-<a id="deleting-the-superadmin-deletes-an-environ"></a>
+<a id="deleting-a-user-granted-delete-deletes-an-environ"></a>
 
-#### [the-superadmin-deletes-an-environ](/tests/scenario/bai_scenario/manager/system_session_environ/test_deleting.py): pass
+#### [a-user-granted-delete-deletes-an-environ](/tests/scenario/bai_scenario/manager/system_session_environ/test_deleting.py): pass
 
-when the superadmin deletes a system session environ, the whole row comes back with the deletion time
+when a user granted delete permission in public deletes a system session environ, the whole row comes back with the deletion time
 
 Given
 
-- one system session environ registered at the public scope and one superadmin
+- one system session environ registered at the public scope and one user granted SOFT_DELETE on system session environs in the public scope
   - system session environ SCENARIO_SEEDED_KEY: injects the session_id value at the public scope
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted SOFT_DELETE on system session environs in the public scope
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role environ-writer-1: applies only within the scope it is granted in
+    - Role environ-writer-1: SOFT_DELETE allowed on every system_session_environ
+    - regular user user-1: holds Role environ-writer-1
 
 When
 
@@ -211,45 +226,21 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-<a id="deleting-deleting-an-environ-id-nothing-answers-to-is-not-found"></a>
-
-#### [deleting-an-environ-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/system_session_environ/test_deleting.py): pass
-
-when the superadmin deletes an id nothing answers to, it is rejected because the target cannot be found
-
-Given
-
-- one system session environ registered at the public scope and one superadmin
-  - system session environ SCENARIO_SEEDED_KEY: injects the session_id value at the public scope
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- SystemSessionEnvironAdapter.delete: user-1 deletes an id nothing answers to
-
-Then
-
-- the call is rejected
-  - rejected: EntityNotFoundError
-
 ### global_search
 
-<a id="searching-the-superadmin-searching-every-scope-counts-every-row"></a>
+<a id="searching-the-superadmin-searching-every-scope-finds-the-filtered-row"></a>
 
-#### [the-superadmin-searching-every-scope-counts-every-row](/tests/scenario/bai_scenario/manager/system_session_environ/test_searching.py): pass
+#### [the-superadmin-searching-every-scope-finds-the-filtered-row](/tests/scenario/bai_scenario/manager/system_session_environ/test_searching.py): pass
 
-when the superadmin searches across every scope, every row seeded in advance comes back. This call is gated by the global role
+when the superadmin filters by key, orders by key ascending and asks for one page across every scope, only the row with that key comes back. This call is gated by the global role
 
 Given
 
-- two system session environs registered at the public scope and one superadmin
+- two system session environs at the public scope, one at a domain scope and one superadmin
   - system session environ SCENARIO_SEEDED_KEY: injects the session_id value at the public scope
   - system session environ SCENARIO_OTHER_KEY: injects the session_id value at the public scope
+  - Domain elsewhere-1
+  - domain-scoped system session environ SCENARIO_OTHER_KEY: injects the session_id value at the domain scope
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -259,13 +250,13 @@ Given
 
 When
 
-- SystemSessionEnvironAdapter.global_search: user-1 searches system session environs across every scope
+- SystemSessionEnvironAdapter.global_search: user-1 filters by key, orders by key ascending and asks for one page while searching system session environs across every scope
 
 Then
 
-- every row seeded in advance comes back
+- only the filtered row comes back, and the row the filter excludes does not come back
   - items: same as the rows seeded in advance
-  - total_count = 2
+  - total_count = 1
   - has_next_page = False
   - has_previous_page = False
 
@@ -289,7 +280,7 @@ Given
 
 When
 
-- SystemSessionEnvironAdapter.global_search: user-1 searches system session environs across every scope
+- SystemSessionEnvironAdapter.global_search: user-1 filters by key, orders by key ascending and asks for one page while searching system session environs across every scope
 
 Then
 
@@ -298,22 +289,26 @@ Then
 
 ### purge
 
-<a id="purging-the-superadmin-purges-an-environ"></a>
+<a id="purging-a-user-granted-purge-purges-an-environ"></a>
 
-#### [the-superadmin-purges-an-environ](/tests/scenario/bai_scenario/manager/system_session_environ/test_purging.py): pass
+#### [a-user-granted-purge-purges-an-environ](/tests/scenario/bai_scenario/manager/system_session_environ/test_purging.py): pass
 
-when the superadmin purges a system session environ, the id of the purged row comes back
+when a user granted purge permission in public purges a system session environ, the id of the purged row comes back
 
 Given
 
-- one system session environ registered at the public scope and one superadmin
+- one system session environ registered at the public scope and one user granted HARD_DELETE on system session environs in the public scope
   - system session environ SCENARIO_SEEDED_KEY: injects the session_id value at the public scope
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted HARD_DELETE on system session environs in the public scope
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role environ-writer-1: applies only within the scope it is granted in
+    - Role environ-writer-1: HARD_DELETE allowed on every system_session_environ
+    - regular user user-1: holds Role environ-writer-1
 
 When
 
@@ -350,51 +345,29 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-<a id="purging-purging-an-environ-id-nothing-answers-to-is-not-found"></a>
-
-#### [purging-an-environ-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/system_session_environ/test_purging.py): pass
-
-when the superadmin purges an id nothing answers to, it is rejected because the target cannot be found
-
-Given
-
-- one system session environ registered at the public scope and one superadmin
-  - system session environ SCENARIO_SEEDED_KEY: injects the session_id value at the public scope
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- SystemSessionEnvironAdapter.purge: user-1 purges an id nothing answers to
-
-Then
-
-- the call is rejected
-  - rejected: EntityNotFoundError
-
 ### restore
 
-<a id="deleting-the-superadmin-restores-a-deleted-environ"></a>
+<a id="deleting-a-user-granted-delete-restores-a-deleted-environ"></a>
 
-#### [the-superadmin-restores-a-deleted-environ](/tests/scenario/bai_scenario/manager/system_session_environ/test_deleting.py): pass
+#### [a-user-granted-delete-restores-a-deleted-environ](/tests/scenario/bai_scenario/manager/system_session_environ/test_deleting.py): pass
 
-when the superadmin restores a deleted system session environ, the whole row comes back with no deletion time
+when a user granted delete permission in public restores a deleted system session environ, the whole row comes back with no deletion time
 
 Given
 
-- one system session environ deleted at the public scope and one superadmin
+- one system session environ deleted at the public scope and one user granted SOFT_DELETE on system session environs in the public scope
   - system session environ SCENARIO_SEEDED_KEY: injects the session_id value at the public scope
   - deleted system session environ deleted-environ-1: its deletion time is recorded
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted SOFT_DELETE on system session environs in the public scope
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role environ-writer-1: applies only within the scope it is granted in
+    - Role environ-writer-1: SOFT_DELETE allowed on every system_session_environ
+    - regular user user-1: holds Role environ-writer-1
 
 When
 
@@ -439,61 +412,41 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-<a id="deleting-restoring-an-environ-id-nothing-answers-to-is-not-found"></a>
-
-#### [restoring-an-environ-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/system_session_environ/test_deleting.py): pass
-
-when the superadmin restores an id nothing answers to, it is rejected because the target cannot be found
-
-Given
-
-- one system session environ registered at the public scope and one superadmin
-  - system session environ SCENARIO_SEEDED_KEY: injects the session_id value at the public scope
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- SystemSessionEnvironAdapter.restore: user-1 restores an id nothing answers to
-
-Then
-
-- the call is rejected
-  - rejected: EntityNotFoundError
-
 ### scoped_search
 
-<a id="searching-the-superadmin-searching-public-counts-the-public-rows"></a>
+<a id="searching-a-user-granted-read-searching-public-counts-the-matching-public-row"></a>
 
-#### [the-superadmin-searching-public-counts-the-public-rows](/tests/scenario/bai_scenario/manager/system_session_environ/test_searching.py): pass
+#### [a-user-granted-read-searching-public-counts-the-matching-public-row](/tests/scenario/bai_scenario/manager/system_session_environ/test_searching.py): pass
 
-when the superadmin searches the public scope, every row seeded in advance there comes back
+when a user granted read permission in public filters by key, orders by key ascending and asks for one page in the public scope, only the public row with that key comes back, and neither the row under the same key in another scope nor the row the filter excludes comes back
 
 Given
 
-- two system session environs registered at the public scope and one superadmin
+- two system session environs at the public scope, one at a domain scope under the same key, and one user granted read permission in the public scope
   - system session environ SCENARIO_SEEDED_KEY: injects the session_id value at the public scope
   - system session environ SCENARIO_OTHER_KEY: injects the session_id value at the public scope
+  - Domain elsewhere-1
+  - domain-scoped system session environ SCENARIO_SEEDED_KEY: injects the session_id value at the domain scope
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted READ on system session environs in the public scope
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role environ-writer-1: applies only within the scope it is granted in
+    - Role environ-writer-1: READ allowed on every system_session_environ
+    - regular user user-1: holds Role environ-writer-1
 
 When
 
-- SystemSessionEnvironAdapter.scoped_search: user-1 searches system session environs in the public scope
+- SystemSessionEnvironAdapter.scoped_search: user-1 filters by key, orders by key ascending and asks for one page while searching system session environs in the public scope
 
 Then
 
-- every row seeded in advance comes back
+- only the filtered row comes back, and neither the row outside the scope nor the row the filter excludes comes back
   - items: same as the rows seeded in advance
-  - total_count = 2
+  - total_count = 1
   - has_next_page = False
   - has_previous_page = False
 
@@ -517,7 +470,7 @@ Given
 
 When
 
-- SystemSessionEnvironAdapter.scoped_search: user-1 searches system session environs in the public scope
+- SystemSessionEnvironAdapter.scoped_search: user-1 filters by key, orders by key ascending and asks for one page while searching system session environs in the public scope
 
 Then
 
@@ -526,22 +479,26 @@ Then
 
 ### update
 
-<a id="editing-the-superadmin-changes-the-key-of-an-environ"></a>
+<a id="editing-a-user-granted-update-changes-the-key-of-an-environ"></a>
 
-#### [the-superadmin-changes-the-key-of-an-environ](/tests/scenario/bai_scenario/manager/system_session_environ/test_editing.py): pass
+#### [a-user-granted-update-changes-the-key-of-an-environ](/tests/scenario/bai_scenario/manager/system_session_environ/test_editing.py): pass
 
-when the superadmin changes a system session environ key, the whole row comes back with the new key and a last change time this run wrote
+when a user granted update permission in public changes a system session environ key, the whole row comes back with the new key and a last change time this run wrote
 
 Given
 
-- one system session environ registered at the public scope and one superadmin
+- one system session environ registered at the public scope and one user granted UPDATE on system session environs in the public scope
   - system session environ SCENARIO_SEEDED_KEY: injects the session_id value at the public scope
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted UPDATE on system session environs in the public scope
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role environ-writer-1: applies only within the scope it is granted in
+    - Role environ-writer-1: UPDATE allowed on every system_session_environ
+    - regular user user-1: holds Role environ-writer-1
 
 When
 
@@ -593,15 +550,19 @@ when the key of a soft-deleted row is changed, it is rejected with a demand to r
 
 Given
 
-- one system session environ deleted at the public scope and one superadmin
+- one system session environ deleted at the public scope and one user granted UPDATE on system session environs in the public scope
   - system session environ SCENARIO_SEEDED_KEY: injects the session_id value at the public scope
   - deleted system session environ deleted-environ-1: its deletion time is recorded
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted UPDATE on system session environs in the public scope
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role environ-writer-1: applies only within the scope it is granted in
+    - Role environ-writer-1: UPDATE allowed on every system_session_environ
+    - regular user user-1: holds Role environ-writer-1
 
 When
 
@@ -612,32 +573,6 @@ Then
 - the call is rejected
   - rejected: SystemSessionEnvironDeleted
 
-<a id="editing-editing-an-environ-id-nothing-answers-to-is-not-found"></a>
-
-#### [editing-an-environ-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/system_session_environ/test_editing.py): pass
-
-when the superadmin changes the key of an id nothing answers to, it is rejected because the target cannot be found
-
-Given
-
-- one system session environ registered at the public scope and one superadmin
-  - system session environ SCENARIO_SEEDED_KEY: injects the session_id value at the public scope
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- SystemSessionEnvironAdapter.update: user-1 changes the key of an id nothing answers to to SCENARIO_EDITED_KEY
-
-Then
-
-- the call is rejected
-  - rejected: EntityNotFoundError
-
 <a id="editing-editing-an-environ-to-a-key-another-row-holds-is-refused"></a>
 
 #### [editing-an-environ-to-a-key-another-row-holds-is-refused](/tests/scenario/bai_scenario/manager/system_session_environ/test_editing.py): pass
@@ -646,15 +581,19 @@ when a row is changed to a key another row already holds at the same scope, it i
 
 Given
 
-- two system session environs registered at the public scope and one superadmin
+- two system session environs registered at the public scope and one user granted UPDATE on system session environs in the public scope
   - system session environ SCENARIO_SEEDED_KEY: injects the session_id value at the public scope
   - system session environ SCENARIO_OTHER_KEY: injects the session_id value at the public scope
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted UPDATE on system session environs in the public scope
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role environ-writer-1: applies only within the scope it is granted in
+    - Role environ-writer-1: UPDATE allowed on every system_session_environ
+    - regular user user-1: holds Role environ-writer-1
 
 When
 
@@ -728,31 +667,6 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-<a id="creating-registering-an-environ-at-a-missing-domain-is-refused"></a>
-
-#### [registering-an-environ-at-a-missing-domain-is-refused](/tests/scenario/bai_scenario/manager/system_session_environ/test_creating.py): pass
-
-when a registration names a domain that does not exist, it is rejected because the target cannot be found
-
-Given
-
-- one superadmin
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- SystemSessionEnvironAdapter.create: user-1 registers a system session environ
-
-Then
-
-- the call is rejected
-  - rejected: DomainNotFound
-
 <a id="creating-registering-an-environ-under-a-key-already-held-is-refused"></a>
 
 #### [registering-an-environ-under-a-key-already-held-is-refused](/tests/scenario/bai_scenario/manager/system_session_environ/test_creating.py): pass
@@ -761,14 +675,18 @@ when a registration names a key another row already holds at the same scope, it 
 
 Given
 
-- one row already registered and one superadmin
+- one row already registered and one user granted create permission in public
   - system session environ SCENARIO_SEEDED_KEY: injects the session_id value at the public scope
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted CREATE on system session environs in the public scope
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role environ-writer-1: applies only within the scope it is granted in
+    - Role environ-writer-1: CREATE allowed on every system_session_environ
+    - regular user user-1: holds Role environ-writer-1
 
 When
 
@@ -787,13 +705,17 @@ when a registration names a value source the manager does not know, it is reject
 
 Given
 
-- one superadmin
+- one user granted CREATE on system session environs in the public scope
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted CREATE on system session environs in the public scope
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role environ-writer-1: applies only within the scope it is granted in
+    - Role environ-writer-1: CREATE allowed on every system_session_environ
+    - regular user user-1: holds Role environ-writer-1
 
 When
 

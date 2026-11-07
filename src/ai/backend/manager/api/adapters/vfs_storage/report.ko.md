@@ -19,7 +19,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 미리 저장한 VFS storage 둘과 존재하지 않는 id 하나를 한 번에 조회하면, 둘은 요청한 순서대로 반환되고 존재하지 않는 id 의 항목은 비어 있습니다](#reading-the-superadmin-reads-several-vfs-storages-in-the-requested-order) | 성공 |
+| [VFS storage 조회 권한을 받은 사용자가 미리 저장한 VFS storage 둘을 한 번에 조회하면, 둘은 요청한 순서대로 반환됩니다](#reading-a-user-granted-read-reads-several-vfs-storages-in-the-requested-order) | 성공 |
 | [아무 권한도 받지 않은 사용자가 VFS storage id 여럿을 한 번에 조회하면, 요청 전체가 거부되는 대신 항목마다 권한 부족 거부가 담겨 반환됩니다](#reading-a-user-granted-nothing-reading-many-vfs-storage-ids-is-refused-on-every-id) | 거부 |
 
 **create**
@@ -33,7 +33,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 VFS storage 하나를 조회하면 미리 저장한 VFS storage 전체가 반환됩니다](#reading-the-superadmin-gets-a-vfs-storage) | 성공 |
+| [VFS storage 조회 권한을 받은 사용자가 하나를 조회하면 미리 저장한 VFS storage 전체가 반환됩니다](#reading-a-user-granted-read-gets-a-vfs-storage) | 성공 |
 | [아무 권한도 받지 않은 사용자가 VFS storage 하나를 조회하면 권한 부족으로 거부됩니다](#reading-a-user-granted-nothing-may-not-get-a-vfs-storage) | 거부 |
 
 **list_all**
@@ -82,35 +82,46 @@
 
 ### batch_load_by_ids
 
-<a id="reading-the-superadmin-reads-several-vfs-storages-in-the-requested-order"></a>
+<a id="reading-a-user-granted-read-reads-several-vfs-storages-in-the-requested-order"></a>
 
-#### [the-superadmin-reads-several-vfs-storages-in-the-requested-order](/tests/scenario/bai_scenario/manager/vfs_storage/test_reading.py): pass
+#### [a-user-granted-read-reads-several-vfs-storages-in-the-requested-order](/tests/scenario/bai_scenario/manager/vfs_storage/test_reading.py): pass
 
-superadmin 이 미리 저장한 VFS storage 둘과 존재하지 않는 id 하나를 한 번에 조회하면, 둘은 요청한 순서대로 반환되고 존재하지 않는 id 의 항목은 비어 있습니다
+VFS storage 조회 권한을 받은 사용자가 미리 저장한 VFS storage 둘을 한 번에 조회하면, 둘은 요청한 순서대로 반환됩니다
 
 Given
 
-- VFS storage 2개와, superadmin 한 명
+- VFS storage 2개와, VFS storage 에 READ 권한을 받은 사용자 한 명
   - VFS storage vfs-storage-1: 기본 경로가 /seeded/vfs-storage 입니다
   - VFS storage vfs-storage-2: 기본 경로가 /seeded/vfs-storage 입니다
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - global 에서 VFS storage 에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 storage-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 storage-keeper-1: vfs_storage 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 storage-keeper-1 보유
 
 When
 
-- VFSStorageAdapter.batch_load_by_ids: user-1이 미리 저장한 VFS storage 둘과 존재하지 않는 id 하나를 한 번에 조회합니다
+- VFSStorageAdapter.batch_load_by_ids: user-1이 미리 저장한 VFS storage 둘을 한 번에 조회합니다
 
 Then
 
-- 미리 저장한 VFS storage 는 요청한 순서대로 반환되고, 존재하지 않는 id 의 항목은 비어 있습니다
-  - length = 3
+- 미리 저장한 VFS storage 는 요청한 순서대로 반환됩니다
+  - length = 2
+  - [0].id: 미리 저장한 VFS storage 와 같다
+  - [0].entity_id: 미리 저장한 VFS storage 와 같다
   - [0].name = 'vfs-storage-1'
-  - [1] = None
-  - [2].name = 'vfs-storage-2'
+  - [0].host = 'seeded-host'
+  - [0].base_path = '/seeded/vfs-storage'
+  - [1].id: 미리 저장한 VFS storage 와 같다
+  - [1].entity_id: 미리 저장한 VFS storage 와 같다
+  - [1].name = 'vfs-storage-2'
+  - [1].host = 'seeded-host'
+  - [1].base_path = '/seeded/vfs-storage'
 
 <a id="reading-a-user-granted-nothing-reading-many-vfs-storage-ids-is-refused-on-every-id"></a>
 
@@ -132,13 +143,12 @@ Given
 
 When
 
-- VFSStorageAdapter.batch_load_by_ids: user-1이 미리 저장한 VFS storage 둘과 존재하지 않는 id 하나를 한 번에 조회합니다
+- VFSStorageAdapter.batch_load_by_ids: user-1이 미리 저장한 VFS storage 둘을 한 번에 조회합니다
 
 Then
 
 - 항목마다 권한 부족 거부가 담겨 반환됩니다
-  - length = 3
-  - 거부: NotEnoughPermission
+  - length = 2
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
 
@@ -200,22 +210,26 @@ Then
 
 ### get
 
-<a id="reading-the-superadmin-gets-a-vfs-storage"></a>
+<a id="reading-a-user-granted-read-gets-a-vfs-storage"></a>
 
-#### [the-superadmin-gets-a-vfs-storage](/tests/scenario/bai_scenario/manager/vfs_storage/test_reading.py): pass
+#### [a-user-granted-read-gets-a-vfs-storage](/tests/scenario/bai_scenario/manager/vfs_storage/test_reading.py): pass
 
-superadmin 이 VFS storage 하나를 조회하면 미리 저장한 VFS storage 전체가 반환됩니다
+VFS storage 조회 권한을 받은 사용자가 하나를 조회하면 미리 저장한 VFS storage 전체가 반환됩니다
 
 Given
 
-- VFS storage 하나와, superadmin 한 명
+- VFS storage 하나와, VFS storage 에 READ 권한을 받은 사용자 한 명
   - VFS storage vfs-storage-1: 기본 경로가 /seeded/vfs-storage 입니다
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - global 에서 VFS storage 에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 storage-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 storage-keeper-1: vfs_storage 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 storage-keeper-1 보유
 
 When
 

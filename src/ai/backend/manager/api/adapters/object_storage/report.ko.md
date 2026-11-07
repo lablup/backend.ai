@@ -21,15 +21,14 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 이름으로 거르면 그 이름의 object storage 만 반환됩니다](#searching-filtering-by-name-leaves-only-the-matching-object-storage) | 성공 |
-| [superadmin 이 조건 없이 object storage 를 검색하면 미리 저장한 object storage 가 모두 반환됩니다. 이 호출은 전역 역할을 검사합니다](#searching-searching-without-a-condition-counts-every-object-storage) | 성공 |
+| [superadmin 이 이름으로 거르고 이름 오름차순으로 정렬해 한 쪽을 요청하면 그 이름의 object storage 하나만 반환됩니다. 이 호출은 전역 역할을 검사합니다](#searching-filtering-by-name-leaves-only-the-matching-object-storage) | 성공 |
 | [superadmin 이 아닌 사용자가 object storage 를 검색하려 하면 권한 부족으로 거부됩니다. 이 호출은 전역 역할을 검사합니다](#searching-a-user-who-is-not-the-superadmin-may-not-search-object-storages) | 거부 |
 
 **batch_load_by_ids**
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 미리 저장한 object storage 둘과 존재하지 않는 id 하나를 한 번에 조회하면, 둘은 요청한 순서대로 반환되고 존재하지 않는 id 의 항목은 비어 있습니다](#reading-the-superadmin-reads-several-object-storages-in-the-requested-order) | 성공 |
+| [object storage 조회 권한을 받은 사용자가 미리 저장한 object storage 둘을 한 번에 조회하면, 둘은 요청한 순서대로 반환됩니다](#reading-a-user-granted-read-reads-several-object-storages-in-the-requested-order) | 성공 |
 | [아무 권한도 받지 않은 사용자가 object storage id 여럿을 한 번에 조회하면, 요청 전체가 거부되는 대신 항목마다 권한 부족 거부가 담겨 반환됩니다](#reading-a-user-granted-nothing-reading-many-object-storage-ids-is-refused-on-every-id) | 거부 |
 
 **create**
@@ -43,7 +42,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 object storage 하나를 조회하면 미리 저장한 object storage 전체가 반환됩니다](#reading-the-superadmin-gets-an-object-storage) | 성공 |
+| [object storage 조회 권한을 받은 사용자가 하나를 조회하면 미리 저장한 object storage 전체가 반환됩니다](#reading-a-user-granted-read-gets-an-object-storage) | 성공 |
 | [아무 권한도 받지 않은 사용자가 object storage 하나를 조회하면 권한 부족으로 거부됩니다](#reading-a-user-granted-nothing-may-not-get-an-object-storage) | 거부 |
 
 **partial_bulk_purge**
@@ -98,7 +97,7 @@
 
 #### [filtering-by-name-leaves-only-the-matching-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_searching.py): pass
 
-superadmin 이 이름으로 거르면 그 이름의 object storage 만 반환됩니다
+superadmin 이 이름으로 거르고 이름 오름차순으로 정렬해 한 쪽을 요청하면 그 이름의 object storage 하나만 반환됩니다. 이 호출은 전역 역할을 검사합니다
 
 Given
 
@@ -114,43 +113,13 @@ Given
 
 When
 
-- ObjectStorageAdapter.admin_search: user-1이 이름이 object-storage-1인 object storage 를 검색합니다
+- ObjectStorageAdapter.admin_search: user-1이 이름으로 object storage 를 거르고 이름 오름차순으로 정렬해 한 쪽을 요청합니다
 
 Then
 
 - 이름이 일치하는 object storage 만 반환됩니다
   - items: 미리 저장한 object storage 와 같다
   - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="searching-searching-without-a-condition-counts-every-object-storage"></a>
-
-#### [searching-without-a-condition-counts-every-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_searching.py): pass
-
-superadmin 이 조건 없이 object storage 를 검색하면 미리 저장한 object storage 가 모두 반환됩니다. 이 호출은 전역 역할을 검사합니다
-
-Given
-
-- object storage 2개와, superadmin 한 명
-  - object storage object-storage-1: 호스트는 seeded.object-storage.test 입니다
-  - object storage object-storage-2: 호스트는 seeded.object-storage.test 입니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- ObjectStorageAdapter.admin_search: user-1이 조건 없이 object storage 를 검색합니다
-
-Then
-
-- 미리 저장한 object storage 가 모두 반환됩니다
-  - items: 미리 저장한 object storage 와 같다
-  - total_count = 2
   - has_next_page = False
   - has_previous_page = False
 
@@ -174,7 +143,7 @@ Given
 
 When
 
-- ObjectStorageAdapter.admin_search: user-1이 조건 없이 object storage 를 검색합니다
+- ObjectStorageAdapter.admin_search: user-1이 이름으로 object storage 를 거르고 이름 오름차순으로 정렬해 한 쪽을 요청합니다
 
 Then
 
@@ -183,35 +152,52 @@ Then
 
 ### batch_load_by_ids
 
-<a id="reading-the-superadmin-reads-several-object-storages-in-the-requested-order"></a>
+<a id="reading-a-user-granted-read-reads-several-object-storages-in-the-requested-order"></a>
 
-#### [the-superadmin-reads-several-object-storages-in-the-requested-order](/tests/scenario/bai_scenario/manager/object_storage/test_reading.py): pass
+#### [a-user-granted-read-reads-several-object-storages-in-the-requested-order](/tests/scenario/bai_scenario/manager/object_storage/test_reading.py): pass
 
-superadmin 이 미리 저장한 object storage 둘과 존재하지 않는 id 하나를 한 번에 조회하면, 둘은 요청한 순서대로 반환되고 존재하지 않는 id 의 항목은 비어 있습니다
+object storage 조회 권한을 받은 사용자가 미리 저장한 object storage 둘을 한 번에 조회하면, 둘은 요청한 순서대로 반환됩니다
 
 Given
 
-- object storage 2개와, superadmin 한 명
+- object storage 2개와, object storage 에 READ 권한을 받은 사용자 한 명
   - object storage object-storage-1: 호스트는 seeded.object-storage.test 입니다
   - object storage object-storage-2: 호스트는 seeded.object-storage.test 입니다
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - global 에서 object storage 에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 storage-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 storage-keeper-1: object_storage 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 storage-keeper-1 보유
 
 When
 
-- ObjectStorageAdapter.batch_load_by_ids: user-1이 미리 저장한 object storage 둘과 존재하지 않는 id 하나를 한 번에 조회합니다
+- ObjectStorageAdapter.batch_load_by_ids: user-1이 미리 저장한 object storage 둘을 한 번에 조회합니다
 
 Then
 
-- 미리 저장한 object storage 는 요청한 순서대로 반환되고, 존재하지 않는 id 의 항목은 비어 있습니다
-  - length = 3
+- 미리 저장한 object storage 는 요청한 순서대로 반환됩니다
+  - length = 2
+  - [0].id: 미리 저장한 object storage 와 같다
+  - [0].entity_id: 미리 저장한 object storage 와 같다
   - [0].name = 'object-storage-1'
-  - [1] = None
-  - [2].name = 'object-storage-2'
+  - [0].host = 'seeded.object-storage.test'
+  - [0].access_key = 'seeded-access-key'
+  - [0].secret_key = 'seeded-secret-key'
+  - [0].endpoint = 'http://seeded.object-storage.test'
+  - [0].region = 'seeded-region'
+  - [1].id: 미리 저장한 object storage 와 같다
+  - [1].entity_id: 미리 저장한 object storage 와 같다
+  - [1].name = 'object-storage-2'
+  - [1].host = 'seeded.object-storage.test'
+  - [1].access_key = 'seeded-access-key'
+  - [1].secret_key = 'seeded-secret-key'
+  - [1].endpoint = 'http://seeded.object-storage.test'
+  - [1].region = 'seeded-region'
 
 <a id="reading-a-user-granted-nothing-reading-many-object-storage-ids-is-refused-on-every-id"></a>
 
@@ -233,13 +219,12 @@ Given
 
 When
 
-- ObjectStorageAdapter.batch_load_by_ids: user-1이 미리 저장한 object storage 둘과 존재하지 않는 id 하나를 한 번에 조회합니다
+- ObjectStorageAdapter.batch_load_by_ids: user-1이 미리 저장한 object storage 둘을 한 번에 조회합니다
 
 Then
 
 - 항목마다 권한 부족 거부가 담겨 반환됩니다
-  - length = 3
-  - 거부: NotEnoughPermission
+  - length = 2
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
 
@@ -304,22 +289,26 @@ Then
 
 ### get
 
-<a id="reading-the-superadmin-gets-an-object-storage"></a>
+<a id="reading-a-user-granted-read-gets-an-object-storage"></a>
 
-#### [the-superadmin-gets-an-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_reading.py): pass
+#### [a-user-granted-read-gets-an-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_reading.py): pass
 
-superadmin 이 object storage 하나를 조회하면 미리 저장한 object storage 전체가 반환됩니다
+object storage 조회 권한을 받은 사용자가 하나를 조회하면 미리 저장한 object storage 전체가 반환됩니다
 
 Given
 
-- object storage 하나와, superadmin 한 명
+- object storage 하나와, object storage 에 READ 권한을 받은 사용자 한 명
   - object storage object-storage-1: 호스트는 seeded.object-storage.test 입니다
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - global 에서 object storage 에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 storage-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 storage-keeper-1: object_storage 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 storage-keeper-1 보유
 
 When
 

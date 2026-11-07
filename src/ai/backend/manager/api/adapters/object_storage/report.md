@@ -21,15 +21,14 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin filters by name, only the object storage with that name comes back](#searching-filtering-by-name-leaves-only-the-matching-object-storage) | answered |
-| [when the superadmin searches object storages with no condition, every object storage seeded in advance comes back. This call is gated by the global role](#searching-searching-without-a-condition-counts-every-object-storage) | answered |
+| [when the superadmin filters by name, orders by name ascending and asks for one page, only the object storage with that name comes back. This call is gated by the global role](#searching-filtering-by-name-leaves-only-the-matching-object-storage) | answered |
 | [when a user who is not the superadmin tries to search object storages, it is rejected for lack of permission. This call is gated by the global role](#searching-a-user-who-is-not-the-superadmin-may-not-search-object-storages) | rejected |
 
 **batch_load_by_ids**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin loads two object storages seeded in advance and one id that does not exist at once, the two come back in the requested order and the entry for the id that does not exist is empty](#reading-the-superadmin-reads-several-object-storages-in-the-requested-order) | answered |
+| [when a user granted permission to read object storages loads two object storages seeded in advance at once, the two come back in the requested order](#reading-a-user-granted-read-reads-several-object-storages-in-the-requested-order) | answered |
 | [when a user granted nothing loads several object storage ids at once, instead of rejecting the whole request, every entry comes back holding a rejection for lack of permission](#reading-a-user-granted-nothing-reading-many-object-storage-ids-is-refused-on-every-id) | rejected |
 
 **create**
@@ -43,7 +42,7 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reads one object storage, the whole seeded object storage comes back](#reading-the-superadmin-gets-an-object-storage) | answered |
+| [when a user granted permission to read object storages reads one, the whole seeded object storage comes back](#reading-a-user-granted-read-gets-an-object-storage) | answered |
 | [when a user granted nothing reads one object storage, it is rejected for lack of permission](#reading-a-user-granted-nothing-may-not-get-an-object-storage) | rejected |
 
 **partial_bulk_purge**
@@ -98,7 +97,7 @@ Scenario: complete
 
 #### [filtering-by-name-leaves-only-the-matching-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_searching.py): pass
 
-when the superadmin filters by name, only the object storage with that name comes back
+when the superadmin filters by name, orders by name ascending and asks for one page, only the object storage with that name comes back. This call is gated by the global role
 
 Given
 
@@ -114,43 +113,13 @@ Given
 
 When
 
-- ObjectStorageAdapter.admin_search: user-1 searches object storages named object-storage-1
+- ObjectStorageAdapter.admin_search: user-1 filters object storages by name, orders them by name ascending and asks for one page
 
 Then
 
 - only the object storage with the matching name comes back
   - items: same as the object storages seeded in advance
   - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="searching-searching-without-a-condition-counts-every-object-storage"></a>
-
-#### [searching-without-a-condition-counts-every-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_searching.py): pass
-
-when the superadmin searches object storages with no condition, every object storage seeded in advance comes back. This call is gated by the global role
-
-Given
-
-- 2 object storages and one superadmin
-  - Object storage object-storage-1: host is seeded.object-storage.test
-  - Object storage object-storage-2: host is seeded.object-storage.test
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- ObjectStorageAdapter.admin_search: user-1 searches object storages with no condition
-
-Then
-
-- every object storage seeded in advance comes back
-  - items: same as the object storages seeded in advance
-  - total_count = 2
   - has_next_page = False
   - has_previous_page = False
 
@@ -174,7 +143,7 @@ Given
 
 When
 
-- ObjectStorageAdapter.admin_search: user-1 searches object storages with no condition
+- ObjectStorageAdapter.admin_search: user-1 filters object storages by name, orders them by name ascending and asks for one page
 
 Then
 
@@ -183,35 +152,52 @@ Then
 
 ### batch_load_by_ids
 
-<a id="reading-the-superadmin-reads-several-object-storages-in-the-requested-order"></a>
+<a id="reading-a-user-granted-read-reads-several-object-storages-in-the-requested-order"></a>
 
-#### [the-superadmin-reads-several-object-storages-in-the-requested-order](/tests/scenario/bai_scenario/manager/object_storage/test_reading.py): pass
+#### [a-user-granted-read-reads-several-object-storages-in-the-requested-order](/tests/scenario/bai_scenario/manager/object_storage/test_reading.py): pass
 
-when the superadmin loads two object storages seeded in advance and one id that does not exist at once, the two come back in the requested order and the entry for the id that does not exist is empty
+when a user granted permission to read object storages loads two object storages seeded in advance at once, the two come back in the requested order
 
 Given
 
-- 2 object storages and one superadmin
+- 2 object storages and one user granted READ on object storages
   - Object storage object-storage-1: host is seeded.object-storage.test
   - Object storage object-storage-2: host is seeded.object-storage.test
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted READ on object storages in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role storage-keeper-1: applies only within the scope it is granted in
+    - Role storage-keeper-1: READ allowed on every object_storage
+    - regular user user-1: holds Role storage-keeper-1
 
 When
 
-- ObjectStorageAdapter.batch_load_by_ids: user-1 loads two object storages seeded in advance and one id that does not exist at once
+- ObjectStorageAdapter.batch_load_by_ids: user-1 loads two object storages seeded in advance at once
 
 Then
 
-- the object storages seeded in advance come back in the requested order, and the entry for the id that does not exist is empty
-  - length = 3
+- the object storages seeded in advance come back in the requested order
+  - length = 2
+  - [0].id: same as the object storage created in advance
+  - [0].entity_id: same as the object storage created in advance
   - [0].name = 'object-storage-1'
-  - [1] = None
-  - [2].name = 'object-storage-2'
+  - [0].host = 'seeded.object-storage.test'
+  - [0].access_key = 'seeded-access-key'
+  - [0].secret_key = 'seeded-secret-key'
+  - [0].endpoint = 'http://seeded.object-storage.test'
+  - [0].region = 'seeded-region'
+  - [1].id: same as the object storage created in advance
+  - [1].entity_id: same as the object storage created in advance
+  - [1].name = 'object-storage-2'
+  - [1].host = 'seeded.object-storage.test'
+  - [1].access_key = 'seeded-access-key'
+  - [1].secret_key = 'seeded-secret-key'
+  - [1].endpoint = 'http://seeded.object-storage.test'
+  - [1].region = 'seeded-region'
 
 <a id="reading-a-user-granted-nothing-reading-many-object-storage-ids-is-refused-on-every-id"></a>
 
@@ -233,13 +219,12 @@ Given
 
 When
 
-- ObjectStorageAdapter.batch_load_by_ids: user-1 loads two object storages seeded in advance and one id that does not exist at once
+- ObjectStorageAdapter.batch_load_by_ids: user-1 loads two object storages seeded in advance at once
 
 Then
 
 - every entry comes back holding a rejection for lack of permission
-  - length = 3
-  - rejected: NotEnoughPermission
+  - length = 2
   - rejected: NotEnoughPermission
   - rejected: NotEnoughPermission
 
@@ -304,22 +289,26 @@ Then
 
 ### get
 
-<a id="reading-the-superadmin-gets-an-object-storage"></a>
+<a id="reading-a-user-granted-read-gets-an-object-storage"></a>
 
-#### [the-superadmin-gets-an-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_reading.py): pass
+#### [a-user-granted-read-gets-an-object-storage](/tests/scenario/bai_scenario/manager/object_storage/test_reading.py): pass
 
-when the superadmin reads one object storage, the whole seeded object storage comes back
+when a user granted permission to read object storages reads one, the whole seeded object storage comes back
 
 Given
 
-- one object storage and one superadmin
+- one object storage and one user granted READ on object storages
   - Object storage object-storage-1: host is seeded.object-storage.test
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted READ on object storages in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role storage-keeper-1: applies only within the scope it is granted in
+    - Role storage-keeper-1: READ allowed on every object_storage
+    - regular user user-1: holds Role storage-keeper-1
 
 When
 

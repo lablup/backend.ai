@@ -20,7 +20,7 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin loads two registries seeded in advance and one id that does not exist at once, the two come back in the requested order and the entry for the id that does not exist is empty](#reading-the-superadmin-loads-several-registries-in-the-requested-order) | answered |
+| [when a user granted permission to read registries loads two registries seeded in advance at once, the two come back in the requested order](#reading-a-user-granted-read-loads-several-registries-in-the-requested-order) | answered |
 | [when a user granted nothing loads several registry ids at once, instead of rejecting the whole request, every entry comes back holding a rejection for lack of permission](#reading-a-user-granted-nothing-loading-many-registry-ids-is-refused-on-every-id) | rejected |
 
 **create**
@@ -82,35 +82,46 @@ Scenario: complete
 
 ### batch_load_by_ids
 
-<a id="reading-the-superadmin-loads-several-registries-in-the-requested-order"></a>
+<a id="reading-a-user-granted-read-loads-several-registries-in-the-requested-order"></a>
 
-#### [the-superadmin-loads-several-registries-in-the-requested-order](/tests/scenario/bai_scenario/manager/huggingface_registry/test_reading.py): pass
+#### [a-user-granted-read-loads-several-registries-in-the-requested-order](/tests/scenario/bai_scenario/manager/huggingface_registry/test_reading.py): pass
 
-when the superadmin loads two registries seeded in advance and one id that does not exist at once, the two come back in the requested order and the entry for the id that does not exist is empty
+when a user granted permission to read registries loads two registries seeded in advance at once, the two come back in the requested order
 
 Given
 
-- 2 HuggingFace registries and one superadmin
+- 2 HuggingFace registries and one regular user granted READ on registries
   - HuggingFace registry registry-1: refers to https://huggingface.co
   - HuggingFace registry registry-2: refers to https://huggingface.co
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted permission on artifact registries in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role registry-keeper-1: applies only within the scope it is granted in
+    - Role registry-keeper-1: READ allowed on every artifact_registry
+    - regular user user-1: holds Role registry-keeper-1
 
 When
 
-- HuggingFaceRegistryAdapter.batch_load_by_ids: user-1 loads two registries seeded in advance and one id that does not exist at once
+- HuggingFaceRegistryAdapter.batch_load_by_ids: user-1 loads two registries seeded in advance by id at once
 
 Then
 
-- the registries seeded in advance come back in the requested order, and the entry for the id that does not exist is empty
-  - length = 3
+- the registries seeded in advance come back in the requested order
+  - length = 2
+  - [0].id: same as the id of the registry created in advance
+  - [0].entity_id: same as the id of the registry created in advance
   - [0].name = 'registry-1'
-  - [1] = None
-  - [2].name = 'registry-2'
+  - [0].url = 'https://huggingface.co'
+  - [0].token = None
+  - [1].id: same as the id of the registry created in advance
+  - [1].entity_id: same as the id of the registry created in advance
+  - [1].name = 'registry-2'
+  - [1].url = 'https://huggingface.co'
+  - [1].token = None
 
 <a id="reading-a-user-granted-nothing-loading-many-registry-ids-is-refused-on-every-id"></a>
 
@@ -132,13 +143,12 @@ Given
 
 When
 
-- HuggingFaceRegistryAdapter.batch_load_by_ids: user-1 loads two registries seeded in advance and one id that does not exist at once
+- HuggingFaceRegistryAdapter.batch_load_by_ids: user-1 loads two registries seeded in advance by id at once
 
 Then
 
 - every entry comes back holding a rejection for lack of permission
-  - length = 3
-  - rejected: NotEnoughPermission
+  - length = 2
   - rejected: NotEnoughPermission
   - rejected: NotEnoughPermission
 
