@@ -1,12 +1,15 @@
 ---
 name: huggingface-registry-adapter-scenarios
 type: reference
-description: what the huggingface registry adapter guarantees for update, purge and their partial bulk forms
+description: what the huggingface registry adapter guarantees for update, purge and their partial bulk forms, and the token it gives only to a superadmin
 scope: src/ai/backend/manager/api/adapters/huggingface_registry
-keywords: [huggingface registry, artifact registry, scenario, adapter, rbac, partial bulk, purge]
+keywords: [huggingface registry, artifact registry, scenario, adapter, rbac, partial bulk, purge, token]
 generated:
   by: claude-code/opus-5
   at: 2026-10-16
+updated:
+  by: claude-code/opus-5
+  at: 2026-11-06
 status: draft
 ---
 # HuggingFace registry adapter: Knowledge
@@ -16,6 +19,10 @@ The rules are in `AGENTS.md` in the parent directory. When this document and a r
 Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 A registry is created in the global scope. One registry is two rows, one carrying the connection settings and one the name, written together and deleted together in one operation. The permission graph checks the calls that update and delete one registry. A user with a granted permission receives the artifact registry permission through a role granted in the global scope.
+
+## Node
+
+Every node the adapter returns carries the stored `token` only when the caller is a superadmin. Any other caller, a monitor or a user granted update included, gets `*****` in its place. A registry without a token returns null to every caller. The field keeps its type, so the schema does not change.
 
 ## Update
 

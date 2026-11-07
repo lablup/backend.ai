@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from typing import Any
 from uuid import UUID
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
@@ -34,6 +35,7 @@ from ai.backend.manager.data.huggingface_registry.types import (
     HuggingFaceRegistryConnectionData,
     HuggingFaceRegistryData,
 )
+from ai.backend.manager.defs import TOKEN_PLACEHOLDER
 from ai.backend.manager.models.huggingface_registry.creators import HuggingFaceRegistryCreator
 from ai.backend.manager.models.huggingface_registry.searchers import HuggingFaceRegistrySearcher
 from ai.backend.manager.models.huggingface_registry.updaters import HuggingFaceRegistryUpdater
@@ -232,7 +234,7 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
             entity_id=connection.entity_id(),
             name=meta.name,
             url=connection.url,
-            token=connection.token,
+            token=self._token_for_caller(connection.token),
         )
 
     async def purge(self, registry_id: UUID) -> PurgeHuggingFaceRegistryPayload:
@@ -269,8 +271,8 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
             if item.error is not None
         ]
 
-    @staticmethod
     def _huggingface_registry_data_to_dto(
+        self,
         data: HuggingFaceRegistryData,
     ) -> HuggingFaceRegistryNode:
         return HuggingFaceRegistryNode(
@@ -278,5 +280,15 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
             entity_id=data.id,
             name=data.name,
             url=data.url,
-            token=data.token,
+            token=self._token_for_caller(data.token),
         )
+
+    @staticmethod
+    def _token_for_caller(token: str | None) -> str | None:
+        """Only a superadmin gets the stored token. A registry without one stays null."""
+        if token is None:
+            return None
+        user = current_user()
+        if user is not None and user.is_superadmin:
+            return token
+        return TOKEN_PLACEHOLDER
