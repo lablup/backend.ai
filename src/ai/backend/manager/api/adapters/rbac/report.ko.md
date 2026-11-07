@@ -62,22 +62,22 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 권한 둘과 없는 id 하나를 한 번에 읽으면, 모든 자리가 빈 값으로 옵니다](#loading-a-user-granted-nothing-loads-permissions-and-gets-empty-entries) | 성공 |
-| [superadmin 이 권한 둘과 없는 id 하나를 한 번에 읽으면, 권한 둘은 노드로, 없는 id 자리는 빈 값으로 옵니다](#loading-the-superadmin-loads-two-permissions-and-a-missing-id) | 성공 |
+| [대상 도메인에서 역할 읽기 권한을 받은 사용자가 권한 둘과 없는 id 하나를 한 번에 읽으면, 권한 둘은 노드로, 없는 id 자리는 빈 값으로 옵니다](#loading-a-user-granted-role-read-loads-two-permissions-and-a-missing-id) | 성공 |
+| [역할 읽기 권한을 받은 사용자가 읽을 수 있는 권한 하나와 읽을 권한이 없는 권한 하나를 한 번에 읽으면, 읽을 수 있는 권한만 노드로 오고 다른 자리는 빈 값으로 옵니다](#loading-a-user-loads-an-unreadable-permission-and-gets-an-empty-entry) | 성공 |
 
 **batch_load_permissions_by_role_ids**
 
 | 시나리오 | 판정 |
 |---|---|
 | [대상 도메인에서 역할 읽기 권한을 받은 사용자가 역할 id 로 권한을 한 번에 읽으면, 그 역할이 가진 권한이 옵니다](#loading-a-user-granted-role-read-loads-the-permissions-of-a-role) | 성공 |
-| [아무 권한도 받지 않은 사용자는 역할 id 로 권한을 한 번에 읽을 수 없습니다](#loading-a-user-granted-nothing-may-not-load-permissions-by-role-id) | 거부 |
+| [역할 읽기 권한을 받은 사용자가 읽을 권한이 없는 역할을 하나 함께 넣어 역할 id 로 권한을 한 번에 읽으면, 호출 전체가 거부됩니다](#loading-a-user-may-not-load-the-permissions-of-an-unreadable-role-by-role-id) | 거부 |
 
 **batch_load_roles_by_ids**
 
 | 시나리오 | 판정 |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 역할 둘과 없는 id 하나를 한 번에 읽으면, 모든 자리가 빈 값으로 옵니다](#loading-a-user-granted-nothing-loads-roles-and-gets-empty-entries) | 성공 |
-| [superadmin 이 역할 둘과 없는 id 하나를 한 번에 읽으면, 역할 둘은 노드로, 없는 id 자리는 빈 값으로 옵니다](#loading-the-superadmin-loads-two-roles-and-a-missing-id) | 성공 |
+| [대상 도메인에서 역할 읽기 권한을 받은 사용자가 역할 둘과 없는 id 하나를 한 번에 읽으면, 역할 둘은 노드로, 없는 id 자리는 빈 값으로 옵니다](#loading-a-user-granted-role-read-loads-two-roles-and-a-missing-id) | 성공 |
+| [역할 읽기 권한을 받은 사용자가 읽을 수 있는 역할 하나와 읽을 권한이 없는 역할 하나를 한 번에 읽으면, 읽을 수 있는 역할만 노드로 오고 다른 자리는 빈 값으로 옵니다](#loading-a-user-loads-an-unreadable-role-and-gets-an-empty-entry) | 성공 |
 
 **bulk_add_role_permissions**
 
@@ -221,7 +221,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 미리 저장한 배정과 없는 id 하나를 한 번에 읽으면, 배정은 노드로, 없는 id 자리는 빈 값으로 옵니다](#loading-the-superadmin-loads-the-assignments-by-id) | 성공 |
+| [superadmin 이 미리 저장한 배정과 없는 id 하나를 한 번에 읽으면, 배정은 노드로, 없는 id 자리는 빈 값으로 옵니다. 배정 id 를 얻는 전역 검색을 전역 역할이 막으므로 superadmin 이 부릅니다. 읽기 자체는 인증만 거칩니다](#loading-the-superadmin-loads-the-assignments-by-id) | 성공 |
 
 **bulk_assign_role**
 
@@ -465,11 +465,11 @@ Then
 
 ### batch_load_permissions_by_ids
 
-<a id="loading-a-user-granted-nothing-loads-permissions-and-gets-empty-entries"></a>
+<a id="loading-a-user-granted-role-read-loads-two-permissions-and-a-missing-id"></a>
 
-#### [a-user-granted-nothing-loads-permissions-and-gets-empty-entries](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
+#### [a-user-granted-role-read-loads-two-permissions-and-a-missing-id](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
 
-아무 권한도 받지 않은 사용자가 권한 둘과 없는 id 하나를 한 번에 읽으면, 모든 자리가 빈 값으로 옵니다
+대상 도메인에서 역할 읽기 권한을 받은 사용자가 권한 둘과 없는 id 하나를 한 번에 읽으면, 권한 둘은 노드로, 없는 id 자리는 빈 값으로 옵니다
 
 Given
 
@@ -493,44 +493,9 @@ Given
     - 일반 사용자 user-3: 자기 키페어와 개인 프로젝트를 갖습니다
   - 일반 사용자 user-2: 역할 role-1 보유
   - 일반 사용자 user-3: 역할 role-1 보유
-
-When
-
-- RBACAdapter.batch_load_permissions_by_ids: user-1이 권한 둘과 없는 id 하나를 한 번에 읽습니다
-
-Then
-
-- 모든 자리가 빈 값으로 옵니다
-  - loaded = [None, None, None]
-
-<a id="loading-the-superadmin-loads-two-permissions-and-a-missing-id"></a>
-
-#### [the-superadmin-loads-two-permissions-and-a-missing-id](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
-
-superadmin 이 권한 둘과 없는 id 하나를 한 번에 읽으면, 권한 둘은 노드로, 없는 id 자리는 빈 값으로 옵니다
-
-Given
-
-- 한 도메인에 둔 커스텀 역할 2개와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 역할 role-1: 부여된 스코프 안에서만 적용됩니다
-  - 역할 role-2: 부여된 스코프 안에서만 적용됩니다
-  - 역할 role-1: session 전체에 READ 허용
-  - 역할 role-1: vfolder 전체에 UPDATE 허용
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 일반 사용자 user-3: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 일반 사용자 user-2: 역할 role-1 보유
-  - 일반 사용자 user-3: 역할 role-1 보유
+  - 역할 grant-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 grant-1: role 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 grant-1 보유
 
 When
 
@@ -553,6 +518,49 @@ Then
   - [1].permission = <PermissionBitDTO.UPDATE: 'update'>
   - [1].created_at: 이 실행이 쓴 시각
   - [2] = None
+
+<a id="loading-a-user-loads-an-unreadable-permission-and-gets-an-empty-entry"></a>
+
+#### [a-user-loads-an-unreadable-permission-and-gets-an-empty-entry](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
+
+역할 읽기 권한을 받은 사용자가 읽을 수 있는 권한 하나와 읽을 권한이 없는 권한 하나를 한 번에 읽으면, 읽을 수 있는 권한만 노드로 오고 다른 자리는 빈 값으로 옵니다
+
+Given
+
+- 한 도메인에 둔 커스텀 역할 2개와, 다른 도메인에 사는 user 한 명
+  - 도메인 home-1
+  - 도메인 target-1
+  - 역할 role-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 role-2: 부여된 스코프 안에서만 적용됩니다
+  - 역할 beyond-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 role-1: session 전체에 READ 허용
+  - 역할 role-1: vfolder 전체에 UPDATE 허용
+  - 역할 beyond-1: session 전체에 READ 허용
+  - 역할 beyond-1: vfolder 전체에 UPDATE 허용
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 역할 grant-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 grant-1: role 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 grant-1 보유
+
+When
+
+- RBACAdapter.batch_load_permissions_by_ids: user-1이 읽을 수 있는 권한 하나와 읽을 수 없는 권한 하나를 한 번에 읽습니다
+
+Then
+
+- 읽을 수 있는 권한은 노드로, 읽을 수 없는 권한 자리는 빈 값으로 옵니다
+  - length = 2
+  - [0].id: 건너뜀: 데이터베이스가 생성합니다
+  - [0].field_id: 건너뜀: 데이터베이스가 생성합니다
+  - [0].role_id: 미리 저장한 역할의 id 와 같다
+  - [0].entity_type = 'session'
+  - [0].permission = <PermissionBitDTO.READ: 'read'>
+  - [0].created_at: 이 실행이 쓴 시각
+  - [1] = None
 
 ### batch_load_permissions_by_role_ids
 
@@ -610,11 +618,11 @@ Then
   - [0][1].permission = <PermissionBitDTO.UPDATE: 'update'>
   - [0][1].created_at: 이 실행이 쓴 시각
 
-<a id="loading-a-user-granted-nothing-may-not-load-permissions-by-role-id"></a>
+<a id="loading-a-user-may-not-load-the-permissions-of-an-unreadable-role-by-role-id"></a>
 
-#### [a-user-granted-nothing-may-not-load-permissions-by-role-id](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
+#### [a-user-may-not-load-the-permissions-of-an-unreadable-role-by-role-id](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
 
-아무 권한도 받지 않은 사용자는 역할 id 로 권한을 한 번에 읽을 수 없습니다
+역할 읽기 권한을 받은 사용자가 읽을 권한이 없는 역할을 하나 함께 넣어 역할 id 로 권한을 한 번에 읽으면, 호출 전체가 거부됩니다
 
 Given
 
@@ -623,25 +631,23 @@ Given
   - 도메인 target-1
   - 역할 role-1: 부여된 스코프 안에서만 적용됩니다
   - 역할 role-2: 부여된 스코프 안에서만 적용됩니다
+  - 역할 beyond-1: 부여된 스코프 안에서만 적용됩니다
   - 역할 role-1: session 전체에 READ 허용
   - 역할 role-1: vfolder 전체에 UPDATE 허용
+  - 역할 beyond-1: session 전체에 READ 허용
+  - 역할 beyond-1: vfolder 전체에 UPDATE 허용
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 일반 사용자 user-3: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 일반 사용자 user-2: 역할 role-1 보유
-  - 일반 사용자 user-3: 역할 role-1 보유
+  - 역할 grant-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 grant-1: role 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 grant-1 보유
 
 When
 
-- RBACAdapter.batch_load_permissions_by_role_ids: user-1이 role-1 이 가진 권한을 역할 id 로 한 번에 읽습니다
+- RBACAdapter.batch_load_permissions_by_role_ids: user-1이 읽을 수 있는 역할과 읽을 수 없는 역할이 가진 권한을 역할 id 로 한 번에 읽습니다
 
 Then
 
@@ -650,11 +656,11 @@ Then
 
 ### batch_load_roles_by_ids
 
-<a id="loading-a-user-granted-nothing-loads-roles-and-gets-empty-entries"></a>
+<a id="loading-a-user-granted-role-read-loads-two-roles-and-a-missing-id"></a>
 
-#### [a-user-granted-nothing-loads-roles-and-gets-empty-entries](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
+#### [a-user-granted-role-read-loads-two-roles-and-a-missing-id](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
 
-아무 권한도 받지 않은 사용자가 역할 둘과 없는 id 하나를 한 번에 읽으면, 모든 자리가 빈 값으로 옵니다
+대상 도메인에서 역할 읽기 권한을 받은 사용자가 역할 둘과 없는 id 하나를 한 번에 읽으면, 역할 둘은 노드로, 없는 id 자리는 빈 값으로 옵니다
 
 Given
 
@@ -678,44 +684,9 @@ Given
     - 일반 사용자 user-3: 자기 키페어와 개인 프로젝트를 갖습니다
   - 일반 사용자 user-2: 역할 role-1 보유
   - 일반 사용자 user-3: 역할 role-1 보유
-
-When
-
-- RBACAdapter.batch_load_roles_by_ids: user-1이 역할 둘과 없는 id 하나를 한 번에 읽습니다
-
-Then
-
-- 모든 자리가 빈 값으로 옵니다
-  - loaded = [None, None, None]
-
-<a id="loading-the-superadmin-loads-two-roles-and-a-missing-id"></a>
-
-#### [the-superadmin-loads-two-roles-and-a-missing-id](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
-
-superadmin 이 역할 둘과 없는 id 하나를 한 번에 읽으면, 역할 둘은 노드로, 없는 id 자리는 빈 값으로 옵니다
-
-Given
-
-- 한 도메인에 둔 커스텀 역할 2개와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 역할 role-1: 부여된 스코프 안에서만 적용됩니다
-  - 역할 role-2: 부여된 스코프 안에서만 적용됩니다
-  - 역할 role-1: session 전체에 READ 허용
-  - 역할 role-1: vfolder 전체에 UPDATE 허용
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 일반 사용자 user-3: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 일반 사용자 user-2: 역할 role-1 보유
-  - 일반 사용자 user-3: 역할 role-1 보유
+  - 역할 grant-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 grant-1: role 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 grant-1 보유
 
 When
 
@@ -752,6 +723,56 @@ Then
   - [1].updated_at: 이 실행이 쓴 시각
   - [1].deleted_at = None
   - [2] = None
+
+<a id="loading-a-user-loads-an-unreadable-role-and-gets-an-empty-entry"></a>
+
+#### [a-user-loads-an-unreadable-role-and-gets-an-empty-entry](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
+
+역할 읽기 권한을 받은 사용자가 읽을 수 있는 역할 하나와 읽을 권한이 없는 역할 하나를 한 번에 읽으면, 읽을 수 있는 역할만 노드로 오고 다른 자리는 빈 값으로 옵니다
+
+Given
+
+- 한 도메인에 둔 커스텀 역할 2개와, 다른 도메인에 사는 user 한 명
+  - 도메인 home-1
+  - 도메인 target-1
+  - 역할 role-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 role-2: 부여된 스코프 안에서만 적용됩니다
+  - 역할 beyond-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 role-1: session 전체에 READ 허용
+  - 역할 role-1: vfolder 전체에 UPDATE 허용
+  - 역할 beyond-1: session 전체에 READ 허용
+  - 역할 beyond-1: vfolder 전체에 UPDATE 허용
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 역할 grant-1: 부여된 스코프 안에서만 적용됩니다
+  - 역할 grant-1: role 전체에 READ 허용
+  - 일반 사용자 user-1: 역할 grant-1 보유
+
+When
+
+- RBACAdapter.batch_load_roles_by_ids: user-1이 읽을 수 있는 역할 하나와 읽을 수 없는 역할 하나를 한 번에 읽습니다
+
+Then
+
+- 읽을 수 있는 역할은 노드로, 읽을 수 없는 역할 자리는 빈 값으로 옵니다
+  - length = 2
+  - [0].name = 'role-1'
+  - [0].description = None
+  - [0].source = <RoleSourceDTO.CUSTOM: 'custom'>
+  - [0].status = <RoleStatusDTO.ACTIVE: 'active'>
+  - [0].auto_assign = False
+  - [0].scope_type = 'domain'
+  - [0].scope_id: 역할을 둔 도메인의 id 와 같다
+  - [0].role_preset_id = None
+  - [0].id: 건너뜀: 데이터베이스가 생성합니다
+  - [0].entity_id: 미리 저장한 역할의 id 와 같다
+  - [0].created_at: 이 실행이 쓴 시각
+  - [0].updated_at: 이 실행이 쓴 시각
+  - [0].deleted_at = None
+  - [1] = None
 
 ### bulk_add_role_permissions
 
@@ -2409,7 +2430,7 @@ Then
 
 #### [the-superadmin-loads-the-assignments-by-id](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
 
-superadmin 이 미리 저장한 배정과 없는 id 하나를 한 번에 읽으면, 배정은 노드로, 없는 id 자리는 빈 값으로 옵니다
+superadmin 이 미리 저장한 배정과 없는 id 하나를 한 번에 읽으면, 배정은 노드로, 없는 id 자리는 빈 값으로 옵니다. 배정 id 를 얻는 전역 검색을 전역 역할이 막으므로 superadmin 이 부릅니다. 읽기 자체는 인증만 거칩니다
 
 Given
 

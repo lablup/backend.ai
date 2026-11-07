@@ -62,22 +62,22 @@ Scenario: incomplete 11 / 37
 
 | scenario | verdict |
 |---|---|
-| [when a user granted nothing loads two permission rows and one missing id in one call, every entry comes back empty](#loading-a-user-granted-nothing-loads-permissions-and-gets-empty-entries) | answered |
-| [when the superadmin loads two permission rows and one missing id in one call, the two rows come back as nodes and the missing id as an empty value](#loading-the-superadmin-loads-two-permissions-and-a-missing-id) | answered |
+| [when a user granted role read permission in a domain loads two permission rows and one missing id in one call, the two rows come back as nodes and the missing id as an empty value](#loading-a-user-granted-role-read-loads-two-permissions-and-a-missing-id) | answered |
+| [when a user granted role read permission loads one readable permission row and one row it has no permission on in one call, only the readable row comes back as a node and the other entry comes back empty](#loading-a-user-loads-an-unreadable-permission-and-gets-an-empty-entry) | answered |
 
 **batch_load_permissions_by_role_ids**
 
 | scenario | verdict |
 |---|---|
 | [when a user granted role read permission in a domain loads permissions by role id, the permissions that role holds come back](#loading-a-user-granted-role-read-loads-the-permissions-of-a-role) | answered |
-| [a user granted nothing cannot load permissions by role id](#loading-a-user-granted-nothing-may-not-load-permissions-by-role-id) | rejected |
+| [when a user granted role read permission adds one role it has no permission on and loads permissions by role id, the whole call is refused](#loading-a-user-may-not-load-the-permissions-of-an-unreadable-role-by-role-id) | rejected |
 
 **batch_load_roles_by_ids**
 
 | scenario | verdict |
 |---|---|
-| [when a user granted nothing loads two roles and one missing id in one call, every entry comes back empty](#loading-a-user-granted-nothing-loads-roles-and-gets-empty-entries) | answered |
-| [when the superadmin loads two roles and one missing id in one call, the two roles come back as nodes and the missing id as an empty value](#loading-the-superadmin-loads-two-roles-and-a-missing-id) | answered |
+| [when a user granted role read permission in a domain loads two roles and one missing id in one call, the two roles come back as nodes and the missing id as an empty value](#loading-a-user-granted-role-read-loads-two-roles-and-a-missing-id) | answered |
+| [when a user granted role read permission loads one readable role and one role it has no permission on in one call, only the readable role comes back as a node and the other entry comes back empty](#loading-a-user-loads-an-unreadable-role-and-gets-an-empty-entry) | answered |
 
 **bulk_add_role_permissions**
 
@@ -221,7 +221,7 @@ Scenario: incomplete 11 / 37
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin loads the assignments seeded in advance and one missing id in one call, the assignments come back as nodes and the missing id as an empty value](#loading-the-superadmin-loads-the-assignments-by-id) | answered |
+| [when the superadmin loads the assignments seeded in advance and one missing id in one call, the assignments come back as nodes and the missing id as an empty value. The global role gates the search that collects the assignment ids, so the superadmin calls it. The load itself needs authentication only](#loading-the-superadmin-loads-the-assignments-by-id) | answered |
 
 **bulk_assign_role**
 
@@ -465,11 +465,11 @@ Then
 
 ### batch_load_permissions_by_ids
 
-<a id="loading-a-user-granted-nothing-loads-permissions-and-gets-empty-entries"></a>
+<a id="loading-a-user-granted-role-read-loads-two-permissions-and-a-missing-id"></a>
 
-#### [a-user-granted-nothing-loads-permissions-and-gets-empty-entries](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
+#### [a-user-granted-role-read-loads-two-permissions-and-a-missing-id](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
 
-when a user granted nothing loads two permission rows and one missing id in one call, every entry comes back empty
+when a user granted role read permission in a domain loads two permission rows and one missing id in one call, the two rows come back as nodes and the missing id as an empty value
 
 Given
 
@@ -493,44 +493,9 @@ Given
     - regular user user-3: has their own keypair and personal project
   - regular user user-2: holds Role role-1
   - regular user user-3: holds Role role-1
-
-When
-
-- RBACAdapter.batch_load_permissions_by_ids: user-1 loads two permission rows and one missing id in one call
-
-Then
-
-- every entry comes back empty
-  - loaded = [None, None, None]
-
-<a id="loading-the-superadmin-loads-two-permissions-and-a-missing-id"></a>
-
-#### [the-superadmin-loads-two-permissions-and-a-missing-id](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
-
-when the superadmin loads two permission rows and one missing id in one call, the two rows come back as nodes and the missing id as an empty value
-
-Given
-
-- 2 custom roles in one domain and one superadmin in another domain
-  - Domain home-1
-  - Domain target-1
-  - Role role-1: applies only within the scope it is granted in
-  - Role role-2: applies only within the scope it is granted in
-  - Role role-1: READ allowed on every session
-  - Role role-1: UPDATE allowed on every vfolder
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-    - User resource policy user-policy-3: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - regular user user-3: has their own keypair and personal project
-  - regular user user-2: holds Role role-1
-  - regular user user-3: holds Role role-1
+  - Role grant-1: applies only within the scope it is granted in
+  - Role grant-1: READ allowed on every role
+  - regular user user-1: holds Role grant-1
 
 When
 
@@ -553,6 +518,49 @@ Then
   - [1].permission = <PermissionBitDTO.UPDATE: 'update'>
   - [1].created_at: the time this run wrote
   - [2] = None
+
+<a id="loading-a-user-loads-an-unreadable-permission-and-gets-an-empty-entry"></a>
+
+#### [a-user-loads-an-unreadable-permission-and-gets-an-empty-entry](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
+
+when a user granted role read permission loads one readable permission row and one row it has no permission on in one call, only the readable row comes back as a node and the other entry comes back empty
+
+Given
+
+- 2 custom roles in one domain and one user in another domain
+  - Domain home-1
+  - Domain target-1
+  - Role role-1: applies only within the scope it is granted in
+  - Role role-2: applies only within the scope it is granted in
+  - Role beyond-1: applies only within the scope it is granted in
+  - Role role-1: READ allowed on every session
+  - Role role-1: UPDATE allowed on every vfolder
+  - Role beyond-1: READ allowed on every session
+  - Role beyond-1: UPDATE allowed on every vfolder
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Role grant-1: applies only within the scope it is granted in
+  - Role grant-1: READ allowed on every role
+  - regular user user-1: holds Role grant-1
+
+When
+
+- RBACAdapter.batch_load_permissions_by_ids: user-1 loads one readable permission row and one unreadable permission row in one call
+
+Then
+
+- the readable permission row comes back as a node and the unreadable row as an empty value
+  - length = 2
+  - [0].id: skipped: the database generates it
+  - [0].field_id: skipped: the database generates it
+  - [0].role_id: same as the id of the role seeded in advance
+  - [0].entity_type = 'session'
+  - [0].permission = <PermissionBitDTO.READ: 'read'>
+  - [0].created_at: the time this run wrote
+  - [1] = None
 
 ### batch_load_permissions_by_role_ids
 
@@ -610,11 +618,11 @@ Then
   - [0][1].permission = <PermissionBitDTO.UPDATE: 'update'>
   - [0][1].created_at: the time this run wrote
 
-<a id="loading-a-user-granted-nothing-may-not-load-permissions-by-role-id"></a>
+<a id="loading-a-user-may-not-load-the-permissions-of-an-unreadable-role-by-role-id"></a>
 
-#### [a-user-granted-nothing-may-not-load-permissions-by-role-id](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
+#### [a-user-may-not-load-the-permissions-of-an-unreadable-role-by-role-id](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
 
-a user granted nothing cannot load permissions by role id
+when a user granted role read permission adds one role it has no permission on and loads permissions by role id, the whole call is refused
 
 Given
 
@@ -623,25 +631,23 @@ Given
   - Domain target-1
   - Role role-1: applies only within the scope it is granted in
   - Role role-2: applies only within the scope it is granted in
+  - Role beyond-1: applies only within the scope it is granted in
   - Role role-1: READ allowed on every session
   - Role role-1: UPDATE allowed on every vfolder
+  - Role beyond-1: READ allowed on every session
+  - Role beyond-1: UPDATE allowed on every vfolder
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
     - Keypair policy keypair-policy-1: up to 5 concurrent sessions
     - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-    - User resource policy user-policy-3: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - regular user user-3: has their own keypair and personal project
-  - regular user user-2: holds Role role-1
-  - regular user user-3: holds Role role-1
+  - Role grant-1: applies only within the scope it is granted in
+  - Role grant-1: READ allowed on every role
+  - regular user user-1: holds Role grant-1
 
 When
 
-- RBACAdapter.batch_load_permissions_by_role_ids: user-1 loads the permissions of role-1 by role id in one call
+- RBACAdapter.batch_load_permissions_by_role_ids: user-1 loads the permissions of one readable role and one unreadable role by role id in one call
 
 Then
 
@@ -650,11 +656,11 @@ Then
 
 ### batch_load_roles_by_ids
 
-<a id="loading-a-user-granted-nothing-loads-roles-and-gets-empty-entries"></a>
+<a id="loading-a-user-granted-role-read-loads-two-roles-and-a-missing-id"></a>
 
-#### [a-user-granted-nothing-loads-roles-and-gets-empty-entries](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
+#### [a-user-granted-role-read-loads-two-roles-and-a-missing-id](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
 
-when a user granted nothing loads two roles and one missing id in one call, every entry comes back empty
+when a user granted role read permission in a domain loads two roles and one missing id in one call, the two roles come back as nodes and the missing id as an empty value
 
 Given
 
@@ -678,44 +684,9 @@ Given
     - regular user user-3: has their own keypair and personal project
   - regular user user-2: holds Role role-1
   - regular user user-3: holds Role role-1
-
-When
-
-- RBACAdapter.batch_load_roles_by_ids: user-1 loads two roles and one missing id in one call
-
-Then
-
-- every entry comes back empty
-  - loaded = [None, None, None]
-
-<a id="loading-the-superadmin-loads-two-roles-and-a-missing-id"></a>
-
-#### [the-superadmin-loads-two-roles-and-a-missing-id](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
-
-when the superadmin loads two roles and one missing id in one call, the two roles come back as nodes and the missing id as an empty value
-
-Given
-
-- 2 custom roles in one domain and one superadmin in another domain
-  - Domain home-1
-  - Domain target-1
-  - Role role-1: applies only within the scope it is granted in
-  - Role role-2: applies only within the scope it is granted in
-  - Role role-1: READ allowed on every session
-  - Role role-1: UPDATE allowed on every vfolder
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-    - User resource policy user-policy-3: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - regular user user-3: has their own keypair and personal project
-  - regular user user-2: holds Role role-1
-  - regular user user-3: holds Role role-1
+  - Role grant-1: applies only within the scope it is granted in
+  - Role grant-1: READ allowed on every role
+  - regular user user-1: holds Role grant-1
 
 When
 
@@ -752,6 +723,56 @@ Then
   - [1].updated_at: the time this run wrote
   - [1].deleted_at = None
   - [2] = None
+
+<a id="loading-a-user-loads-an-unreadable-role-and-gets-an-empty-entry"></a>
+
+#### [a-user-loads-an-unreadable-role-and-gets-an-empty-entry](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
+
+when a user granted role read permission loads one readable role and one role it has no permission on in one call, only the readable role comes back as a node and the other entry comes back empty
+
+Given
+
+- 2 custom roles in one domain and one user in another domain
+  - Domain home-1
+  - Domain target-1
+  - Role role-1: applies only within the scope it is granted in
+  - Role role-2: applies only within the scope it is granted in
+  - Role beyond-1: applies only within the scope it is granted in
+  - Role role-1: READ allowed on every session
+  - Role role-1: UPDATE allowed on every vfolder
+  - Role beyond-1: READ allowed on every session
+  - Role beyond-1: UPDATE allowed on every vfolder
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Role grant-1: applies only within the scope it is granted in
+  - Role grant-1: READ allowed on every role
+  - regular user user-1: holds Role grant-1
+
+When
+
+- RBACAdapter.batch_load_roles_by_ids: user-1 loads one readable role and one unreadable role in one call
+
+Then
+
+- the readable role comes back as a node and the unreadable role as an empty value
+  - length = 2
+  - [0].name = 'role-1'
+  - [0].description = None
+  - [0].source = <RoleSourceDTO.CUSTOM: 'custom'>
+  - [0].status = <RoleStatusDTO.ACTIVE: 'active'>
+  - [0].auto_assign = False
+  - [0].scope_type = 'domain'
+  - [0].scope_id: same as the id of the domain the role sits in
+  - [0].role_preset_id = None
+  - [0].id: skipped: the database generates it
+  - [0].entity_id: same as the id of the role seeded in advance
+  - [0].created_at: the time this run wrote
+  - [0].updated_at: the time this run wrote
+  - [0].deleted_at = None
+  - [1] = None
 
 ### bulk_add_role_permissions
 
@@ -2409,7 +2430,7 @@ Then
 
 #### [the-superadmin-loads-the-assignments-by-id](/tests/scenario/bai_scenario/manager/rbac/test_loading.py): pass
 
-when the superadmin loads the assignments seeded in advance and one missing id in one call, the assignments come back as nodes and the missing id as an empty value
+when the superadmin loads the assignments seeded in advance and one missing id in one call, the assignments come back as nodes and the missing id as an empty value. The global role gates the search that collects the assignment ids, so the superadmin calls it. The load itself needs authentication only
 
 Given
 
