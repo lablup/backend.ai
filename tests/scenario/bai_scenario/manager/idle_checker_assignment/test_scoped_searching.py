@@ -13,12 +13,14 @@ from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     IdleCheckerAssignmentFilter,
     IdleCheckerAssignmentOrder,
-    IdleCheckerAssignmentOrderField,
     IdleCheckerAssignmentScopeDTO,
     IdleCheckerScopeRefDTO,
     ScopedSearchIdleCheckerAssignmentsInput,
 )
-from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import IdleCheckerScopeTypeDTO
+from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import (
+    IdleCheckerAssignmentOrderField,
+    IdleCheckerScopeTypeDTO,
+)
 from ai.backend.manager.api.adapters.idle_checker_assignment.adapter import (
     IdleCheckerAssignmentAdapter,
 )
@@ -29,8 +31,8 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.idle_checker import (
     AssignmentsAndACaller,
     AssignmentsAnswered,
-    OnlyTheScopedAssignmentsAreListed,
     OneCheckerOnSomeDomains,
+    OnlyTheScopedAssignmentsAreListed,
     assignment_ids,
 )
 from bai_scenario.runner.acting import ActingAs
@@ -82,9 +84,7 @@ class SearchingInTwoDomains(When[AssignmentsAndACaller, IdleCheckerAssignmentAda
                         idle_checker_id=UUIDFilter(equals=laid.checker.id)
                     ),
                     order=[
-                        IdleCheckerAssignmentOrder(
-                            field=IdleCheckerAssignmentOrderField.CREATED_AT
-                        )
+                        IdleCheckerAssignmentOrder(field=IdleCheckerAssignmentOrderField.CREATED_AT)
                     ],
                     first=10,
                 )

@@ -13,8 +13,10 @@ from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     IdleCheckerAssignmentFilter,
     IdleCheckerAssignmentOrder,
-    IdleCheckerAssignmentOrderField,
     SearchIdleCheckerAssignmentsInput,
+)
+from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import (
+    IdleCheckerAssignmentOrderField,
 )
 from ai.backend.manager.api.adapters.idle_checker_assignment.adapter import (
     IdleCheckerAssignmentAdapter,
@@ -71,9 +73,7 @@ class SearchingByTheChecker(When[AssignmentsAndACaller, IdleCheckerAssignmentAda
                         idle_checker_id=UUIDFilter(equals=laid.checker.id)
                     ),
                     order=[
-                        IdleCheckerAssignmentOrder(
-                            field=IdleCheckerAssignmentOrderField.CREATED_AT
-                        )
+                        IdleCheckerAssignmentOrder(field=IdleCheckerAssignmentOrderField.CREATED_AT)
                     ],
                     first=10,
                 )
