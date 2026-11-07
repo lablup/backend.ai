@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from dataclasses import dataclass
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -51,6 +52,23 @@ from ai.backend.manager.services.template.actions.update_task_template import (
     UpdateTaskTemplateAction,
 )
 from ai.backend.manager.services.template.service import TemplateService
+
+_CLUSTER_TEMPLATE_OWNER_UUID = uuid.UUID(int=1)
+_OTHER_USER_UUID = uuid.UUID(int=2)
+_CLUSTER_TEMPLATE_DOMAIN = "template-domain"
+_OTHER_DOMAIN = "other-domain"
+_CLUSTER_TEMPLATE_OWNER = {
+    "user_uuid": _CLUSTER_TEMPLATE_OWNER_UUID,
+    "domain_name": _CLUSTER_TEMPLATE_DOMAIN,
+}
+
+
+@dataclass(frozen=True)
+class _ClusterTemplateRequesterCase:
+    label: str
+    requester_uuid: uuid.UUID
+    requester_role: UserRole
+    requester_domain: str
 
 
 def _make_valid_task_template(name: str = "my-task") -> dict[str, Any]:
@@ -868,9 +886,15 @@ class TestGetClusterTemplateAction:
         mock_repo: MagicMock,
     ) -> None:
         template_data = {"spec": {"nodes": []}, "metadata": {"name": "test"}}
+        mock_repo.get_cluster_template_owner = AsyncMock(return_value=_CLUSTER_TEMPLATE_OWNER)
         mock_repo.get_cluster_template = AsyncMock(return_value=template_data)
 
-        action = GetClusterTemplateAction(template_id="cluster-1")
+        action = GetClusterTemplateAction(
+            template_id="cluster-1",
+            requester_uuid=_CLUSTER_TEMPLATE_OWNER_UUID,
+            requester_role=UserRole.USER,
+            requester_domain=_CLUSTER_TEMPLATE_DOMAIN,
+        )
         result = await service.get_cluster_template(action)
 
         assert result.template == template_data
@@ -880,9 +904,14 @@ class TestGetClusterTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        mock_repo.get_cluster_template = AsyncMock(return_value=None)
+        mock_repo.get_cluster_template_owner = AsyncMock(return_value=None)
 
-        action = GetClusterTemplateAction(template_id="nonexistent")
+        action = GetClusterTemplateAction(
+            template_id="nonexistent",
+            requester_uuid=_CLUSTER_TEMPLATE_OWNER_UUID,
+            requester_role=UserRole.USER,
+            requester_domain=_CLUSTER_TEMPLATE_DOMAIN,
+        )
         with pytest.raises(TaskTemplateNotFound):
             await service.get_cluster_template(action)
 
@@ -990,12 +1019,15 @@ class TestUpdateClusterTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        mock_repo.cluster_template_exists = AsyncMock(return_value=True)
+        mock_repo.get_cluster_template_owner = AsyncMock(return_value=_CLUSTER_TEMPLATE_OWNER)
         mock_repo.update_cluster_template = AsyncMock(return_value=1)
 
         action = UpdateClusterTemplateAction(
             template_id="cluster-1",
             template_data=_make_valid_cluster_template("updated-cluster"),
+            requester_uuid=_CLUSTER_TEMPLATE_OWNER_UUID,
+            requester_role=UserRole.USER,
+            requester_domain=_CLUSTER_TEMPLATE_DOMAIN,
         )
         result = await service.update_cluster_template(action)
 
@@ -1007,11 +1039,14 @@ class TestUpdateClusterTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        mock_repo.cluster_template_exists = AsyncMock(return_value=False)
+        mock_repo.get_cluster_template_owner = AsyncMock(return_value=None)
 
         action = UpdateClusterTemplateAction(
             template_id="nonexistent",
             template_data=_make_valid_cluster_template(),
+            requester_uuid=_CLUSTER_TEMPLATE_OWNER_UUID,
+            requester_role=UserRole.USER,
+            requester_domain=_CLUSTER_TEMPLATE_DOMAIN,
         )
         with pytest.raises(TaskTemplateNotFound):
             await service.update_cluster_template(action)
@@ -1021,7 +1056,7 @@ class TestUpdateClusterTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        mock_repo.cluster_template_exists = AsyncMock(return_value=True)
+        mock_repo.get_cluster_template_owner = AsyncMock(return_value=_CLUSTER_TEMPLATE_OWNER)
 
         template = _make_valid_cluster_template()
         template["spec"]["nodes"] = [
@@ -1031,6 +1066,9 @@ class TestUpdateClusterTemplateAction:
         action = UpdateClusterTemplateAction(
             template_id="cluster-1",
             template_data=template,
+            requester_uuid=_CLUSTER_TEMPLATE_OWNER_UUID,
+            requester_role=UserRole.USER,
+            requester_domain=_CLUSTER_TEMPLATE_DOMAIN,
         )
         with pytest.raises(InvalidArgument, match="main"):
             await service.update_cluster_template(action)
@@ -1040,12 +1078,15 @@ class TestUpdateClusterTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        mock_repo.cluster_template_exists = AsyncMock(return_value=True)
+        mock_repo.get_cluster_template_owner = AsyncMock(return_value=_CLUSTER_TEMPLATE_OWNER)
         mock_repo.update_cluster_template = AsyncMock(return_value=0)
 
         action = UpdateClusterTemplateAction(
             template_id="cluster-1",
             template_data=_make_valid_cluster_template(),
+            requester_uuid=_CLUSTER_TEMPLATE_OWNER_UUID,
+            requester_role=UserRole.USER,
+            requester_domain=_CLUSTER_TEMPLATE_DOMAIN,
         )
         with pytest.raises(DBOperationFailed):
             await service.update_cluster_template(action)
@@ -1065,10 +1106,15 @@ class TestDeleteClusterTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        mock_repo.cluster_template_exists = AsyncMock(return_value=True)
+        mock_repo.get_cluster_template_owner = AsyncMock(return_value=_CLUSTER_TEMPLATE_OWNER)
         mock_repo.soft_delete_template = AsyncMock(return_value=1)
 
-        action = DeleteClusterTemplateAction(template_id="cluster-to-delete")
+        action = DeleteClusterTemplateAction(
+            template_id="cluster-to-delete",
+            requester_uuid=_CLUSTER_TEMPLATE_OWNER_UUID,
+            requester_role=UserRole.USER,
+            requester_domain=_CLUSTER_TEMPLATE_DOMAIN,
+        )
         result = await service.delete_cluster_template(action)
 
         assert result is not None
@@ -1081,9 +1127,14 @@ class TestDeleteClusterTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        mock_repo.cluster_template_exists = AsyncMock(return_value=False)
+        mock_repo.get_cluster_template_owner = AsyncMock(return_value=None)
 
-        action = DeleteClusterTemplateAction(template_id="nonexistent")
+        action = DeleteClusterTemplateAction(
+            template_id="nonexistent",
+            requester_uuid=_CLUSTER_TEMPLATE_OWNER_UUID,
+            requester_role=UserRole.USER,
+            requester_domain=_CLUSTER_TEMPLATE_DOMAIN,
+        )
         with pytest.raises(TaskTemplateNotFound):
             await service.delete_cluster_template(action)
 
@@ -1092,9 +1143,143 @@ class TestDeleteClusterTemplateAction:
         service: TemplateService,
         mock_repo: MagicMock,
     ) -> None:
-        mock_repo.cluster_template_exists = AsyncMock(return_value=True)
+        mock_repo.get_cluster_template_owner = AsyncMock(return_value=_CLUSTER_TEMPLATE_OWNER)
         mock_repo.soft_delete_template = AsyncMock(return_value=0)
 
-        action = DeleteClusterTemplateAction(template_id="cluster-x")
+        action = DeleteClusterTemplateAction(
+            template_id="cluster-x",
+            requester_uuid=_CLUSTER_TEMPLATE_OWNER_UUID,
+            requester_role=UserRole.USER,
+            requester_domain=_CLUSTER_TEMPLATE_DOMAIN,
+        )
         with pytest.raises(DBOperationFailed):
             await service.delete_cluster_template(action)
+
+
+class TestClusterTemplateAccess:
+    @pytest.fixture
+    def mock_repo_holding_a_cluster_template(self) -> MagicMock:
+        mock_repo = MagicMock(spec=TemplateRepository)
+        mock_repo.get_cluster_template_owner = AsyncMock(return_value=_CLUSTER_TEMPLATE_OWNER)
+        mock_repo.get_cluster_template = AsyncMock(return_value={"metadata": {"name": "test"}})
+        mock_repo.update_cluster_template = AsyncMock(return_value=1)
+        mock_repo.soft_delete_template = AsyncMock(return_value=1)
+        return mock_repo
+
+    @pytest.fixture
+    def service(self, mock_repo_holding_a_cluster_template: MagicMock) -> TemplateService:
+        return TemplateService(repository=mock_repo_holding_a_cluster_template)
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ClusterTemplateRequesterCase(
+                label="owner",
+                requester_uuid=_CLUSTER_TEMPLATE_OWNER_UUID,
+                requester_role=UserRole.USER,
+                requester_domain=_CLUSTER_TEMPLATE_DOMAIN,
+            ),
+            _ClusterTemplateRequesterCase(
+                label="admin-of-the-template-domain",
+                requester_uuid=_OTHER_USER_UUID,
+                requester_role=UserRole.ADMIN,
+                requester_domain=_CLUSTER_TEMPLATE_DOMAIN,
+            ),
+            _ClusterTemplateRequesterCase(
+                label="superadmin-of-another-domain",
+                requester_uuid=_OTHER_USER_UUID,
+                requester_role=UserRole.SUPERADMIN,
+                requester_domain=_OTHER_DOMAIN,
+            ),
+        ],
+        ids=lambda case: case.label,
+    )
+    async def test_get_passes_for_allowed_requester(
+        self,
+        service: TemplateService,
+        case: _ClusterTemplateRequesterCase,
+    ) -> None:
+        action = GetClusterTemplateAction(
+            template_id="cluster-1",
+            requester_uuid=case.requester_uuid,
+            requester_role=case.requester_role,
+            requester_domain=case.requester_domain,
+        )
+
+        result = await service.get_cluster_template(action)
+
+        assert result.template == {"metadata": {"name": "test"}}
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ClusterTemplateRequesterCase(
+                label="another-user-of-the-domain",
+                requester_uuid=_OTHER_USER_UUID,
+                requester_role=UserRole.USER,
+                requester_domain=_CLUSTER_TEMPLATE_DOMAIN,
+            ),
+            _ClusterTemplateRequesterCase(
+                label="monitor-of-the-domain",
+                requester_uuid=_OTHER_USER_UUID,
+                requester_role=UserRole.MONITOR,
+                requester_domain=_CLUSTER_TEMPLATE_DOMAIN,
+            ),
+            _ClusterTemplateRequesterCase(
+                label="admin-of-another-domain",
+                requester_uuid=_OTHER_USER_UUID,
+                requester_role=UserRole.ADMIN,
+                requester_domain=_OTHER_DOMAIN,
+            ),
+        ],
+        ids=lambda case: case.label,
+    )
+    async def test_get_rejects_other_requester(
+        self,
+        service: TemplateService,
+        case: _ClusterTemplateRequesterCase,
+    ) -> None:
+        action = GetClusterTemplateAction(
+            template_id="cluster-1",
+            requester_uuid=case.requester_uuid,
+            requester_role=case.requester_role,
+            requester_domain=case.requester_domain,
+        )
+
+        with pytest.raises(NotEnoughPermission):
+            await service.get_cluster_template(action)
+
+    async def test_update_rejects_another_user_without_writing(
+        self,
+        service: TemplateService,
+        mock_repo_holding_a_cluster_template: MagicMock,
+    ) -> None:
+        action = UpdateClusterTemplateAction(
+            template_id="cluster-1",
+            template_data=_make_valid_cluster_template(),
+            requester_uuid=_OTHER_USER_UUID,
+            requester_role=UserRole.USER,
+            requester_domain=_CLUSTER_TEMPLATE_DOMAIN,
+        )
+
+        with pytest.raises(NotEnoughPermission):
+            await service.update_cluster_template(action)
+
+        mock_repo_holding_a_cluster_template.update_cluster_template.assert_not_called()
+
+    async def test_delete_rejects_another_user_without_writing(
+        self,
+        service: TemplateService,
+        mock_repo_holding_a_cluster_template: MagicMock,
+    ) -> None:
+        action = DeleteClusterTemplateAction(
+            template_id="cluster-1",
+            requester_uuid=_OTHER_USER_UUID,
+            requester_role=UserRole.USER,
+            requester_domain=_CLUSTER_TEMPLATE_DOMAIN,
+        )
+
+        with pytest.raises(NotEnoughPermission):
+            await service.delete_cluster_template(action)
+
+        mock_repo_holding_a_cluster_template.soft_delete_template.assert_not_called()

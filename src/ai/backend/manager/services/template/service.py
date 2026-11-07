@@ -266,10 +266,36 @@ class TemplateService:
             )
         return ListClusterTemplatesActionResult(entries=entries)
 
+    async def _check_cluster_template_access(
+        self,
+        template_id: str,
+        requester_uuid: uuid.UUID,
+        requester_role: UserRole,
+        requester_domain: str,
+    ) -> None:
+        """Pass the owner, an admin of the template's domain and a superadmin."""
+        owner = await self._repository.get_cluster_template_owner(template_id)
+        if owner is None:
+            raise TaskTemplateNotFound
+        match requester_role:
+            case UserRole.SUPERADMIN:
+                return
+            case UserRole.ADMIN if owner["domain_name"] == requester_domain:
+                return
+            case _ if owner["user_uuid"] == requester_uuid:
+                return
+        raise NotEnoughPermission(f"User {requester_uuid} may not access this cluster template")
+
     async def get_cluster_template(
         self, action: GetClusterTemplateAction
     ) -> GetClusterTemplateActionResult:
         """Get a single cluster template by ID."""
+        await self._check_cluster_template_access(
+            action.template_id,
+            action.requester_uuid,
+            action.requester_role,
+            action.requester_domain,
+        )
         template = await self._repository.get_cluster_template(action.template_id)
         if template is None:
             raise TaskTemplateNotFound
@@ -279,9 +305,12 @@ class TemplateService:
         self, action: UpdateClusterTemplateAction
     ) -> UpdateClusterTemplateActionResult:
         """Validate and update an existing cluster template."""
-        exists = await self._repository.cluster_template_exists(action.template_id)
-        if not exists:
-            raise TaskTemplateNotFound
+        await self._check_cluster_template_access(
+            action.template_id,
+            action.requester_uuid,
+            action.requester_role,
+            action.requester_domain,
+        )
         template_data = check_cluster_template(action.template_data)
         name = template_data["metadata"]["name"]
         rowcount = await self._repository.update_cluster_template(
@@ -295,9 +324,12 @@ class TemplateService:
         self, action: DeleteClusterTemplateAction
     ) -> DeleteClusterTemplateActionResult:
         """Soft-delete a cluster template."""
-        exists = await self._repository.cluster_template_exists(action.template_id)
-        if not exists:
-            raise TaskTemplateNotFound
+        await self._check_cluster_template_access(
+            action.template_id,
+            action.requester_uuid,
+            action.requester_role,
+            action.requester_domain,
+        )
         rowcount = await self._repository.soft_delete_template(
             action.template_id, TemplateType.CLUSTER
         )
