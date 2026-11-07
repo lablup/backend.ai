@@ -12,7 +12,7 @@ Scenario: incomplete 2 / 8
   - partial_bulk_update: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - update: representative success ✓ · representative rejection ✓
 - direct implementation (2)
-  - partial_bulk_purge: success present 2 · rejection absent (partial_bulk): SCENARIO-GAP
+  - partial_bulk_purge: success present 3 · rejection absent (partial_bulk): SCENARIO-GAP
   - purge: success present 2 · rejection present 2 (single_entity)
 
 **admin_create**
@@ -59,6 +59,7 @@ Scenario: incomplete 2 / 8
 | scenario | verdict |
 |---|---|
 | [when a plain user without permission tries to change the rank of both allow_lists in one call, none is changed and both come back in the failed list for lack of permission](#partial_bulk_editing-a-user-granted-nothing-reranks-none-of-several-entries) | answered |
+| [when a regular user granted the update permission on allow-list entries in the global scope changes the rank of both allow_lists in one call, both come back with the new rank and none failed](#partial_bulk_editing-a-user-granted-update-in-global-reranks-both-entries-at-once) | answered |
 | [when the superadmin changes the rank of both allow_lists in one call, both come back with the new rank and none failed](#partial_bulk_editing-the-superadmin-reranks-several-entries-at-once) | answered |
 
 **update**
@@ -75,6 +76,7 @@ Scenario: incomplete 2 / 8
 | scenario | verdict |
 |---|---|
 | [when a plain user without permission tries to purge both allow_lists in one call, none is deleted and both come back in the failed list for lack of permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-entries) | answered |
+| [when a regular user granted the purge permission on allow-list entries in the global scope purges both allow_lists in one call, both come back in the processed list and none failed](#partial_bulk_purging-a-user-granted-purge-in-global-purges-both-entries-at-once) | answered |
 | [when the superadmin purges both allow_lists and a missing ID in one call, the two come back in the processed list and the missing ID comes back in the failed list because there is no such target](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | answered |
 
 **purge**
@@ -694,6 +696,49 @@ Then
   - failed[1].id: same as the ID seeded in advance
   - failed[1].message: a reason containing 'Insufficient permission'
 
+<a id="partial_bulk_editing-a-user-granted-update-in-global-reranks-both-entries-at-once"></a>
+
+#### [a-user-granted-update-in-global-reranks-both-entries-at-once](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_editing.py): pass
+
+when a regular user granted the update permission on allow-list entries in the global scope changes the rank of both allow_lists in one call, both come back with the new rank and none failed
+
+Given
+
+- the PUBLIC and USER allow-list entries of one config name, and one regular user granted the UPDATE permission on allow-list entries in the global scope
+  - Domain home-1
+  - Config definition config-1: the config of this name is registered
+  - Allow-list entry first-1: the config of this name can be set in the public scope, rank is the default of the scope kind
+  - Allow-list entry second-1: the config of this name can be set in the user scope, rank is the default of the scope kind
+  - Prepare a user granted the UPDATE permission on allow-list entry in the global scope
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role global-1: applies only within the scope it is granted in
+    - Role global-1: UPDATE allowed on every app_config_allow_list
+    - regular user user-1: holds Role global-1
+
+When
+
+- AppConfigAllowListAdapter.partial_bulk_update: user-1 changes the rank of both allow_lists to 150 in one call
+
+Then
+
+- both allow_lists come back with the new rank and none failed
+  - successes count = 2
+  - failed = []
+  - successes[0].id: same as the ID seeded in advance
+  - successes[0].config_name = 'config-1'
+  - successes[0].scope_type = <AppConfigScopeType.PUBLIC: 'public'>
+  - successes[0].rank = 150
+  - successes[0].updated_at: the time this run wrote
+  - successes[1].id: same as the ID seeded in advance
+  - successes[1].config_name = 'config-1'
+  - successes[1].scope_type = <AppConfigScopeType.USER: 'user'>
+  - successes[1].rank = 150
+  - successes[1].updated_at: the time this run wrote
+
 <a id="partial_bulk_editing-the-superadmin-reranks-several-entries-at-once"></a>
 
 #### [the-superadmin-reranks-several-entries-at-once](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_editing.py): pass
@@ -887,6 +932,40 @@ Then
   - failed[0].message: a reason containing 'Insufficient permission'
   - failed[1].id: same as the ID seeded in advance
   - failed[1].message: a reason containing 'Insufficient permission'
+
+<a id="partial_bulk_purging-a-user-granted-purge-in-global-purges-both-entries-at-once"></a>
+
+#### [a-user-granted-purge-in-global-purges-both-entries-at-once](/tests/scenario/bai_scenario/manager/app_config_allow_list/test_partial_bulk_purging.py): pass
+
+when a regular user granted the purge permission on allow-list entries in the global scope purges both allow_lists in one call, both come back in the processed list and none failed
+
+Given
+
+- the PUBLIC and USER allow-list entries of one config name, and one regular user granted the HARD_DELETE permission on allow-list entries in the global scope
+  - Domain home-1
+  - Config definition config-1: the config of this name is registered
+  - Allow-list entry first-1: the config of this name can be set in the public scope, rank is the default of the scope kind
+  - Allow-list entry second-1: the config of this name can be set in the user scope, rank is the default of the scope kind
+  - Prepare a user granted the HARD_DELETE permission on allow-list entry in the global scope
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role global-1: applies only within the scope it is granted in
+    - Role global-1: HARD_DELETE allowed on every app_config_allow_list
+    - regular user user-1: holds Role global-1
+
+When
+
+- AppConfigAllowListAdapter.partial_bulk_purge: user-1 purges both allow_lists in one call
+
+Then
+
+- both allow_lists come back in the processed list and none failed
+  - successes count = 2
+  - successes: same as the two IDs seeded in advance
+  - failed = []
 
 <a id="partial_bulk_purging-purging-several-answers-for-the-missing-one"></a>
 
