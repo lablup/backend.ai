@@ -21,6 +21,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Held,
     Refused,
     Same,
     Says,
@@ -33,6 +34,8 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.artifact import (
     AnArtifactAndACaller,
     AnArtifactAndSomeone,
+    AnArtifactNode,
+    AnArtifactRevisionNode,
     AnArtifactWithRevisionsAndACaller,
     AnArtifactWithRevisionsAndSomeone,
     ArtifactLook,
@@ -108,9 +111,10 @@ class ReadingTheRevision(
 
 @dataclass(frozen=True)
 class LoadingArtifacts(When[ManyArtifactsAndACaller, ArtifactAdapter, LoadedArtifacts]):
-    """미리 저장한 아티팩트 둘과 없는 id 하나를 한 번에 읽는다."""
+    """미리 저장한 아티팩트 둘을 한 번에 읽는다. ``include_missing`` 이면 없는 id 하나를 끼운다."""
 
     empty: bool = False
+    include_missing: bool = True
 
     @override
     def operation(self) -> str:
@@ -124,18 +128,25 @@ class LoadingArtifacts(When[ManyArtifactsAndACaller, ArtifactAdapter, LoadedArti
                 f"{who}이 빈 id 목록으로 읽습니다",
                 english=f"{who} loads with an empty id list",
             )
+        if self.include_missing:
+            return Says(
+                f"{who}이 미리 저장한 아티팩트 {len(laid.laid)}개와 없는 id 하나를 한 번에 읽습니다",
+                english=(
+                    f"{who} loads {len(laid.laid)} artifacts made in advance and one id that does "
+                    "not exist at once"
+                ),
+            )
         return Says(
-            f"{who}이 미리 저장한 아티팩트 {len(laid.laid)}개와 없는 id 하나를 한 번에 읽습니다",
-            english=(
-                f"{who} loads {len(laid.laid)} artifacts made in advance and one id that does "
-                "not exist at once"
-            ),
+            f"{who}이 미리 저장한 아티팩트 {len(laid.laid)}개를 한 번에 읽습니다",
+            english=f"{who} loads {len(laid.laid)} artifacts made in advance at once",
         )
 
     def ids(self, laid: ManyArtifactsAndACaller) -> list[UUID]:
         if self.empty:
             return []
-        return [laid.laid[0].id, MISSING, laid.laid[1].id]
+        if self.include_missing:
+            return [laid.laid[0].id, MISSING, laid.laid[1].id]
+        return [laid.laid[0].id, laid.laid[1].id]
 
     @override
     async def call(
@@ -149,9 +160,10 @@ class LoadingArtifacts(When[ManyArtifactsAndACaller, ArtifactAdapter, LoadedArti
 class LoadingRevisions(
     When[ManyArtifactsWithRevisionsAndACaller, ArtifactAdapter, LoadedRevisions]
 ):
-    """아티팩트마다 하나씩 있는 리비전 둘과 없는 id 하나를 한 번에 읽는다."""
+    """아티팩트마다 하나씩 있는 리비전 둘을 한 번에 읽는다. ``include_missing`` 이면 없는 id 하나를 끼운다."""
 
     empty: bool = False
+    include_missing: bool = True
 
     @override
     def operation(self) -> str:
@@ -165,21 +177,29 @@ class LoadingRevisions(
                 f"{who}이 빈 id 목록으로 읽습니다",
                 english=f"{who} loads with an empty id list",
             )
+        if self.include_missing:
+            return Says(
+                f"{who}이 미리 저장한 리비전 둘과 없는 id 하나를 한 번에 읽습니다",
+                english=(
+                    f"{who} loads two revisions made in advance and one id that does not exist "
+                    "at once"
+                ),
+            )
         return Says(
-            f"{who}이 미리 저장한 리비전 둘과 없는 id 하나를 한 번에 읽습니다",
-            english=(
-                f"{who} loads two revisions made in advance and one id that does not exist at once"
-            ),
+            f"{who}이 미리 저장한 리비전 둘을 한 번에 읽습니다",
+            english=f"{who} loads two revisions made in advance at once",
         )
 
     def ids(self, laid: ManyArtifactsWithRevisionsAndACaller) -> list[ArtifactRevisionID]:
         if self.empty:
             return []
-        return [
-            laid.laid[0].revisions[0].id,
-            ArtifactRevisionID(MISSING),
-            laid.laid[1].revisions[0].id,
-        ]
+        if self.include_missing:
+            return [
+                laid.laid[0].revisions[0].id,
+                ArtifactRevisionID(MISSING),
+                laid.laid[1].revisions[0].id,
+            ]
+        return [laid.laid[0].revisions[0].id, laid.laid[1].revisions[0].id]
 
     @override
     async def call(
@@ -191,18 +211,15 @@ class LoadingRevisions(
 
 @dataclass(frozen=True)
 class TheLoadedArtifacts(Then[ManyArtifactsAndACaller, LoadedArtifacts]):
-    """자리마다 아티팩트 노드가 오고, 없는 id 자리는 비어 있다."""
+    """자리마다 아티팩트 노드가 요청한 순서대로 온다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
         return Says(
-            "자리마다 미리 저장한 아티팩트 전체가 오고, 없는 id 자리는 비어 있습니다",
-            english=(
-                "every position holds a whole artifact made in advance, and the position of "
-                "the id that does not exist is empty"
-            ),
+            "자리마다 미리 저장한 아티팩트 전체가 요청한 순서대로 옵니다",
+            english="every position holds a whole artifact made in advance, in the requested order",
         )
 
     @override
@@ -212,34 +229,26 @@ class TheLoadedArtifacts(Then[ManyArtifactsAndACaller, LoadedArtifacts]):
         got = answered.response
         if got is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        if len(got) != 3:
-            return [Same("length", len(got), 3)]
-        first, missing, second = got
-        verdicts: list[Verdict] = [Same("length", len(got), 3)]
-        if isinstance(first, ArtifactNode):
-            verdicts += ArtifactLook().verdicts("[0].", first, laid.laid[0], self.started)
-        else:
-            verdicts.append(Same("[0].artifact", first, None))
-        verdicts.append(Same("[1]", missing, None))
-        if isinstance(second, ArtifactNode):
-            verdicts += ArtifactLook().verdicts("[2].", second, laid.laid[1], self.started)
-        else:
-            verdicts.append(Same("[2].artifact", second, None))
+        verdicts: list[Verdict] = [Same("length", len(got), len(laid.laid))]
+        if len(got) != len(laid.laid):
+            return verdicts
+        for i, (one, artifact) in enumerate(zip(got, laid.laid, strict=False)):
+            if isinstance(one, ArtifactNode):
+                verdicts += ArtifactLook().verdicts(f"[{i}].", one, artifact, self.started)
+            else:
+                verdicts.append(Held(f"[{i}].artifact", one, AnArtifactNode()))
         return verdicts
 
 
 @dataclass(frozen=True)
 class TheLoadedRevisions(Then[ManyArtifactsWithRevisionsAndACaller, LoadedRevisions]):
-    """자리마다 리비전 노드가 오고, 없는 id 자리는 비어 있다."""
+    """자리마다 리비전 노드가 요청한 순서대로 온다."""
 
     @override
     def says(self) -> str:
         return Says(
-            "자리마다 미리 저장한 리비전 전체가 오고, 없는 id 자리는 비어 있습니다",
-            english=(
-                "every position holds a whole revision made in advance, and the position of "
-                "the id that does not exist is empty"
-            ),
+            "자리마다 미리 저장한 리비전 전체가 요청한 순서대로 옵니다",
+            english="every position holds a whole revision made in advance, in the requested order",
         )
 
     @override
@@ -251,23 +260,15 @@ class TheLoadedRevisions(Then[ManyArtifactsWithRevisionsAndACaller, LoadedRevisi
         got = answered.response
         if got is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        if len(got) != 3:
-            return [Same("length", len(got), 3)]
-        first, missing, second = got
-        verdicts: list[Verdict] = [Same("length", len(got), 3)]
-        if isinstance(first, ArtifactRevisionNode):
-            verdicts += revision_verdicts(
-                "[0].", first, laid.laid[0].artifact, laid.laid[0].revisions[0]
-            )
-        else:
-            verdicts.append(Same("[0].revision", first, None))
-        verdicts.append(Same("[1]", missing, None))
-        if isinstance(second, ArtifactRevisionNode):
-            verdicts += revision_verdicts(
-                "[2].", second, laid.laid[1].artifact, laid.laid[1].revisions[0]
-            )
-        else:
-            verdicts.append(Same("[2].revision", second, None))
+        entries = [(one.artifact, one.revisions[0]) for one in laid.laid]
+        verdicts: list[Verdict] = [Same("length", len(got), len(entries))]
+        if len(got) != len(entries):
+            return verdicts
+        for i, (one, (artifact, revision)) in enumerate(zip(got, entries, strict=False)):
+            if isinstance(one, ArtifactRevisionNode):
+                verdicts += revision_verdicts(f"[{i}].", one, artifact, revision)
+            else:
+                verdicts.append(Held(f"[{i}].revision", one, AnArtifactRevisionNode()))
         return verdicts
 
 
@@ -544,22 +545,22 @@ class LoadingKeepsThePositions(
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 미리 저장한 아티팩트 둘과 없는 id 하나를 한 번에 읽으면, 자리마다 "
-            "미리 저장한 아티팩트 전체가 오고 없는 id 자리는 비어 있습니다",
+            "global 에서 아티팩트 읽기 권한을 받은 사용자가 미리 저장한 아티팩트 둘을 한 번에 "
+            "읽으면, 자리마다 미리 저장한 아티팩트 전체가 요청한 순서대로 옵니다",
             english=(
-                "when the superadmin loads two artifacts made in advance and one id that does "
-                "not exist at once, every position holds a whole artifact made in advance and "
-                "the position of the id that does not exist is empty"
+                "when a user granted read permission on artifacts in global loads the two "
+                "artifacts made in advance at once, every position holds a whole artifact made "
+                "in advance in the requested order"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyArtifactsAndACaller]:
-        return ManyArtifactsAndSomeone(role=UserRole.SUPERADMIN)
+        return ManyArtifactsAndSomeone(role=UserRole.USER, granted=(Permission.READ,))
 
     @override
     def when(self) -> When[ManyArtifactsAndACaller, ArtifactAdapter, LoadedArtifacts]:
-        return LoadingArtifacts()
+        return LoadingArtifacts(include_missing=False)
 
     @override
     def then(self) -> Then[ManyArtifactsAndACaller, LoadedArtifacts]:
@@ -586,7 +587,7 @@ class AnEmptyArtifactListAsksNothing(
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyArtifactsAndACaller]:
-        return ManyArtifactsAndSomeone(role=UserRole.SUPERADMIN)
+        return ManyArtifactsAndSomeone(role=UserRole.USER, granted=(Permission.READ,))
 
     @override
     def when(self) -> When[ManyArtifactsAndACaller, ArtifactAdapter, LoadedArtifacts]:
@@ -646,19 +647,20 @@ class RevisionLoadingKeepsThePositions(
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 미리 저장한 리비전 둘과 없는 id 하나를 한 번에 읽으면, 자리마다 미리 "
-            "저장한 리비전 전체가 오고 없는 id 자리는 비어 있습니다",
+            "global 에서 아티팩트 읽기 권한을 받은 사용자가 미리 저장한 리비전 둘을 한 번에 "
+            "읽으면, 자리마다 미리 저장한 리비전 전체가 요청한 순서대로 옵니다",
             english=(
-                "when the superadmin loads two revisions made in advance and one id that does "
-                "not exist at once, every position holds a whole revision made in advance and "
-                "the position of the id that does not exist is empty"
+                "when a user granted read permission on artifacts in global loads the two "
+                "revisions made in advance at once, every position holds a whole revision made "
+                "in advance in the requested order"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyArtifactsWithRevisionsAndACaller]:
         return ManyArtifactsWithRevisionsAndSomeone(
-            role=UserRole.SUPERADMIN,
+            role=UserRole.USER,
+            granted=(Permission.READ,),
             revisions=(("1.0", DataStatus.SCANNED),),
         )
 
@@ -666,7 +668,7 @@ class RevisionLoadingKeepsThePositions(
     def when(
         self,
     ) -> When[ManyArtifactsWithRevisionsAndACaller, ArtifactAdapter, LoadedRevisions]:
-        return LoadingRevisions()
+        return LoadingRevisions(include_missing=False)
 
     @override
     def then(self) -> Then[ManyArtifactsWithRevisionsAndACaller, LoadedRevisions]:
@@ -699,7 +701,8 @@ class AnEmptyRevisionListAsksNothing(
     @override
     def given(self) -> Given[TestSeedingSession, ManyArtifactsWithRevisionsAndACaller]:
         return ManyArtifactsWithRevisionsAndSomeone(
-            role=UserRole.SUPERADMIN,
+            role=UserRole.USER,
+            granted=(Permission.READ,),
             revisions=(("1.0", DataStatus.SCANNED),),
         )
 

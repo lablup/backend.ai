@@ -48,6 +48,7 @@ from ai.backend.manager.errors.artifact import ArtifactNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Condition,
     Given,
     Held,
     Refused,
@@ -405,6 +406,32 @@ class AnArtifactWithRevisionsAndACaller:
     artifact: ArtifactData
     revisions: tuple[ArtifactRevisionData, ...]
     caller: UserData
+
+
+@dataclass(frozen=True)
+class AnArtifactNode(Condition[ArtifactNode | Exception | None]):
+    """이 자리에 아티팩트 노드가 온다. 읽을 수 있는 id 를 읽었으므로 다른 값은 실패다."""
+
+    @override
+    def says(self) -> str:
+        return Says("아티팩트 노드 하나", english="one artifact node")
+
+    @override
+    def holds(self, got: ArtifactNode | Exception | None) -> bool:
+        return isinstance(got, ArtifactNode)
+
+
+@dataclass(frozen=True)
+class AnArtifactRevisionNode(Condition[ArtifactRevisionNode | Exception | None]):
+    """이 자리에 리비전 노드가 온다. 읽을 수 있는 id 를 읽었으므로 다른 값은 실패다."""
+
+    @override
+    def says(self) -> str:
+        return Says("리비전 노드 하나", english="one revision node")
+
+    @override
+    def holds(self, got: ArtifactRevisionNode | Exception | None) -> bool:
+        return isinstance(got, ArtifactRevisionNode)
 
 
 @dataclass(frozen=True)

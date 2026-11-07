@@ -18,6 +18,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Held,
     Refused,
     Same,
     Says,
@@ -27,6 +28,7 @@ from ai.backend.testutils.scenario_steps import (
     When,
 )
 from bai_scenario.components.artifact_registry import (
+    AnArtifactRegistryNode,
     ManyRegistriesAndACaller,
     ManyRegistriesAndSomeone,
     registry_verdicts,
@@ -83,9 +85,10 @@ class ReadingManyMetas(When[ManyRegistriesAndACaller, ArtifactRegistryAdapter, R
 
 @dataclass(frozen=True)
 class LoadingMany(When[ManyRegistriesAndACaller, ArtifactRegistryAdapter, Loaded]):
-    """미리 저장한 레지스트리 둘과 없는 id 하나를 DataLoader 모양으로 읽는다."""
+    """미리 저장한 레지스트리 둘을 DataLoader 모양으로 읽는다. ``include_missing`` 이면 없는 id 하나를 끼운다."""
 
     empty: bool = False
+    include_missing: bool = True
 
     @override
     def operation(self) -> str:
@@ -99,19 +102,30 @@ class LoadingMany(When[ManyRegistriesAndACaller, ArtifactRegistryAdapter, Loaded
                 f"{who}이 빈 id 목록으로 읽습니다",
                 english=f"{who} loads with an empty id list",
             )
+        if self.include_missing:
+            return Says(
+                f"{who}이 미리 저장한 레지스트리 둘과 없는 id 하나를 한 번에 읽습니다",
+                english=(
+                    f"{who} loads two registries made in advance and one id that does not exist "
+                    "at once"
+                ),
+            )
         return Says(
-            f"{who}이 미리 저장한 레지스트리 둘과 없는 id 하나를 한 번에 읽습니다",
-            english=(
-                f"{who} loads two registries made in advance and one id that does not exist at once"
-            ),
+            f"{who}이 미리 저장한 레지스트리 둘을 한 번에 읽습니다",
+            english=f"{who} loads two registries made in advance at once",
         )
 
     def ids(self, laid: ManyRegistriesAndACaller) -> list[ArtifactRegistryID]:
         if self.empty:
             return []
+        if self.include_missing:
+            return [
+                ArtifactRegistryID(laid.laid[0].id),
+                ArtifactRegistryID(MISSING),
+                ArtifactRegistryID(laid.laid[1].id),
+            ]
         return [
             ArtifactRegistryID(laid.laid[0].id),
-            ArtifactRegistryID(MISSING),
             ArtifactRegistryID(laid.laid[1].id),
         ]
 
@@ -170,11 +184,8 @@ class TheLoadedPositions(Then[ManyRegistriesAndACaller, Loaded]):
     @override
     def says(self) -> str:
         return Says(
-            "자리마다 미리 저장한 레지스트리 전체가 오고, 없는 id 자리는 비어 있습니다",
-            english=(
-                "every position holds a whole registry made in advance, and the position of "
-                "the id that does not exist is empty"
-            ),
+            "자리마다 미리 저장한 레지스트리 전체가 요청한 순서대로 옵니다",
+            english="every position holds a whole registry made in advance, in the requested order",
         )
 
     @override
@@ -182,19 +193,14 @@ class TheLoadedPositions(Then[ManyRegistriesAndACaller, Loaded]):
         got = answered.response
         if got is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        if len(got) != 3:
-            return [Same("length", len(got), 3)]
-        first, missing, second = got
-        verdicts: list[Verdict] = [Same("length", len(got), 3)]
-        if isinstance(first, ArtifactRegistryGQLNode):
-            verdicts += registry_verdicts("[0].", first, laid.laid[0])
-        else:
-            verdicts.append(Same("[0].registry", first, None))
-        verdicts.append(Same("[1]", missing, None))
-        if isinstance(second, ArtifactRegistryGQLNode):
-            verdicts += registry_verdicts("[2].", second, laid.laid[1])
-        else:
-            verdicts.append(Same("[2].registry", second, None))
+        verdicts: list[Verdict] = [Same("length", len(got), len(laid.laid))]
+        if len(got) != len(laid.laid):
+            return verdicts
+        for i, (one, registry) in enumerate(zip(got, laid.laid, strict=False)):
+            if isinstance(one, ArtifactRegistryGQLNode):
+                verdicts += registry_verdicts(f"[{i}].", one, registry)
+            else:
+                verdicts.append(Held(f"[{i}].registry", one, AnArtifactRegistryNode()))
         return verdicts
 
 
@@ -318,22 +324,22 @@ class LoadingKeepsThePositions(
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 미리 저장한 레지스트리 둘과 없는 id 하나를 한 번에 읽으면, 자리마다 "
-            "미리 저장한 레지스트리 전체가 오고 없는 id 자리는 비어 있습니다",
+            "global 에서 아티팩트 레지스트리 읽기 권한을 받은 사용자가 미리 저장한 레지스트리 "
+            "둘을 한 번에 읽으면, 자리마다 미리 저장한 레지스트리 전체가 요청한 순서대로 옵니다",
             english=(
-                "when the superadmin loads two registries made in advance and one id that does "
-                "not exist at once, every position holds a whole registry made in advance and "
-                "the position of the id that does not exist is empty"
+                "when a user granted read permission on artifact registries in global loads the "
+                "two registries made in advance at once, every position holds a whole registry "
+                "made in advance in the requested order"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyRegistriesAndACaller]:
-        return ManyRegistriesAndSomeone(role=UserRole.SUPERADMIN)
+        return ManyRegistriesAndSomeone(role=UserRole.USER, granted=(Permission.READ,))
 
     @override
     def when(self) -> When[ManyRegistriesAndACaller, ArtifactRegistryAdapter, Loaded]:
-        return LoadingMany()
+        return LoadingMany(include_missing=False)
 
     @override
     def then(self) -> Then[ManyRegistriesAndACaller, Loaded]:
@@ -360,7 +366,7 @@ class AnEmptyListAsksNothing(
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyRegistriesAndACaller]:
-        return ManyRegistriesAndSomeone(role=UserRole.SUPERADMIN)
+        return ManyRegistriesAndSomeone(role=UserRole.USER, granted=(Permission.READ,))
 
     @override
     def when(self) -> When[ManyRegistriesAndACaller, ArtifactRegistryAdapter, Loaded]:
