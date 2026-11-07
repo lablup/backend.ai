@@ -352,6 +352,7 @@ Then
 
 - the whole keypair policy just created comes back
   - id = 'fresh-policy'
+  - entity_id: skipped: the database generates it
   - name = 'fresh-policy'
   - created_at: the time this run wrote
   - default_for_unspecified = <DefaultForUnspecified.LIMITED: 'LIMITED'>
@@ -391,6 +392,7 @@ Then
 
 - the whole keypair policy just created comes back
   - id = 'fresh-policy'
+  - entity_id: skipped: the database generates it
   - name = 'fresh-policy'
   - created_at: the time this run wrote
   - default_for_unspecified = <DefaultForUnspecified.LIMITED: 'LIMITED'>
@@ -430,6 +432,7 @@ Then
 
 - the whole keypair policy just created comes back
   - id = 'fresh-policy'
+  - entity_id: skipped: the database generates it
   - name = 'fresh-policy'
   - created_at: the time this run wrote
   - default_for_unspecified = <DefaultForUnspecified.LIMITED: 'LIMITED'>
@@ -601,6 +604,7 @@ Then
 
 - the whole project policy just created comes back
   - id = 'fresh-policy'
+  - entity_id: skipped: the database generates it
   - name = 'fresh-policy'
   - created_at: the time this run wrote
   - max_vfolder_count = 20
@@ -738,6 +742,7 @@ Then
 
 - the whole user policy just created comes back
   - id = 'fresh-policy'
+  - entity_id: skipped: the database generates it
   - name = 'fresh-policy'
   - created_at: the time this run wrote
   - max_vfolder_count = 20
@@ -771,6 +776,7 @@ Then
 
 - the whole user policy just created comes back
   - id = 'fresh-policy'
+  - entity_id: skipped: the database generates it
   - name = 'fresh-policy'
   - created_at: the time this run wrote
   - max_vfolder_count = 20
@@ -910,6 +916,7 @@ Then
 
 - the whole keypair policy seeded in advance comes back
   - id = 'keypair-policy-2'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'keypair-policy-2'
   - created_at: the time this run wrote
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -949,6 +956,7 @@ Then
 
 - the whole keypair policy seeded in advance comes back
   - id = 'keypair-policy-2'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'keypair-policy-2'
   - created_at: the time this run wrote
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -1042,6 +1050,7 @@ Then
 
 - the whole project policy seeded in advance comes back
   - id = 'project-policy-1'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'project-policy-1'
   - created_at: the time this run wrote
   - max_vfolder_count = 10
@@ -1073,6 +1082,7 @@ Then
 
 - the whole project policy seeded in advance comes back
   - id = 'project-policy-1'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'project-policy-1'
   - created_at: the time this run wrote
   - max_vfolder_count = 10
@@ -1158,6 +1168,7 @@ Then
 
 - the whole user policy seeded in advance comes back
   - id = 'user-policy-2'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'user-policy-2'
   - created_at: the time this run wrote
   - max_vfolder_count = 10
@@ -1191,6 +1202,7 @@ Then
 
 - the whole user policy seeded in advance comes back
   - id = 'user-policy-2'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'user-policy-2'
   - created_at: the time this run wrote
   - max_vfolder_count = 10
@@ -1650,6 +1662,7 @@ Then
 - the whole policy seeded in advance comes back for the item asked
   - len(items) = 1
   - items[0].id = 'keypair-policy-2'
+  - items[0].entity_id: same as the id of the policy seeded in advance
   - items[0].name = 'keypair-policy-2'
   - items[0].created_at: the time this run wrote
   - items[0].default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -1722,6 +1735,7 @@ Then
 - the whole policy seeded in advance comes back for the item asked
   - len(items) = 1
   - items[0].id = 'project-policy-1'
+  - items[0].entity_id: same as the id of the policy seeded in advance
   - items[0].name = 'project-policy-1'
   - items[0].created_at: the time this run wrote
   - items[0].max_vfolder_count = 10
@@ -1786,6 +1800,7 @@ Then
 - the whole policy seeded in advance comes back for the item asked
   - len(items) = 1
   - items[0].id = 'user-policy-2'
+  - items[0].entity_id: same as the id of the policy seeded in advance
   - items[0].name = 'user-policy-2'
   - items[0].created_at: the time this run wrote
   - items[0].max_vfolder_count = 10
@@ -2015,6 +2030,7 @@ Then
 
 - the whole keypair policy seeded in advance comes back
   - id = 'keypair-policy-1'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'keypair-policy-1'
   - created_at: the time this run wrote
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -2059,6 +2075,7 @@ Then
 
 - the whole keypair policy seeded in advance comes back
   - id = 'keypair-policy-1'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'keypair-policy-1'
   - created_at: the time this run wrote
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -2103,6 +2120,7 @@ Then
 
 - the whole keypair policy seeded in advance comes back
   - id = 'other-1'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'other-1'
   - created_at: the time this run wrote
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -2141,6 +2159,7 @@ Then
 
 - the whole keypair policy seeded in advance comes back
   - id = 'keypair-policy-1'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'keypair-policy-1'
   - created_at: the time this run wrote
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -2239,6 +2258,7 @@ Then
 
 - the whole user policy seeded in advance comes back
   - id = 'user-policy-1'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'user-policy-1'
   - created_at: the time this run wrote
   - max_vfolder_count = 10
@@ -2271,6 +2291,7 @@ Then
 
 - the whole user policy seeded in advance comes back
   - id = 'user-policy-1'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'user-policy-1'
   - created_at: the time this run wrote
   - max_vfolder_count = 10
@@ -2334,6 +2355,7 @@ Then
 
 - the whole project policy that project follows comes back
   - id = 'default'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'default'
   - created_at: the time this run wrote
   - max_vfolder_count = 10
@@ -2691,6 +2713,7 @@ Then
 - every target keypair policy comes back in the processed list and an unknown id comes back in the failed list because no target answers to it
   - successes count = 2
   - successes[0].id = 'target-1'
+  - successes[0].entity_id: same as the id of the policy seeded in advance
   - successes[0].name = 'target-1'
   - successes[0].created_at: the time this run wrote
   - successes[0].default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -2705,6 +2728,7 @@ Then
   - successes[0].idle_timeout = 3600
   - successes[0].allowed_vfolder_hosts = []
   - successes[1].id = 'target-2'
+  - successes[1].entity_id: same as the id of the policy seeded in advance
   - successes[1].name = 'target-2'
   - successes[1].created_at: the time this run wrote
   - successes[1].default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -2748,6 +2772,7 @@ Then
 - the unused keypair policy comes back in the processed list and the one still assigned comes back in the failed list because it is still referenced
   - successes count = 1
   - successes[0].id = 'target-1'
+  - successes[0].entity_id: same as the id of the policy seeded in advance
   - successes[0].name = 'target-1'
   - successes[0].created_at: the time this run wrote
   - successes[0].default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -2826,12 +2851,14 @@ Then
 - every target project policy comes back in the processed list and an unknown id comes back in the failed list because no target answers to it
   - successes count = 2
   - successes[0].id = 'target-1'
+  - successes[0].entity_id: same as the id of the policy seeded in advance
   - successes[0].name = 'target-1'
   - successes[0].created_at: the time this run wrote
   - successes[0].max_vfolder_count = 10
   - successes[0].max_quota_scope_size = ('-1', '-1')
   - successes[0].max_network_count = 3
   - successes[1].id = 'target-2'
+  - successes[1].entity_id: same as the id of the policy seeded in advance
   - successes[1].name = 'target-2'
   - successes[1].created_at: the time this run wrote
   - successes[1].max_vfolder_count = 10
@@ -2867,6 +2894,7 @@ Then
 - the unused project policy comes back in the processed list and the one still assigned comes back in the failed list because it is still referenced
   - successes count = 1
   - successes[0].id = 'target-1'
+  - successes[0].entity_id: same as the id of the policy seeded in advance
   - successes[0].name = 'target-1'
   - successes[0].created_at: the time this run wrote
   - successes[0].max_vfolder_count = 10
@@ -2937,6 +2965,7 @@ Then
 - every target user policy comes back in the processed list and an unknown id comes back in the failed list because no target answers to it
   - successes count = 2
   - successes[0].id = 'target-1'
+  - successes[0].entity_id: same as the id of the policy seeded in advance
   - successes[0].name = 'target-1'
   - successes[0].created_at: the time this run wrote
   - successes[0].max_vfolder_count = 10
@@ -2945,6 +2974,7 @@ Then
   - successes[0].max_session_count_per_model_session = 10
   - successes[0].max_customized_image_count = 3
   - successes[1].id = 'target-2'
+  - successes[1].entity_id: same as the id of the policy seeded in advance
   - successes[1].name = 'target-2'
   - successes[1].created_at: the time this run wrote
   - successes[1].max_vfolder_count = 10
@@ -2982,6 +3012,7 @@ Then
 - the unused user policy comes back in the processed list and the one still assigned comes back in the failed list because it is still referenced
   - successes count = 1
   - successes[0].id = 'target-1'
+  - successes[0].entity_id: same as the id of the policy seeded in advance
   - successes[0].name = 'target-1'
   - successes[0].created_at: the time this run wrote
   - successes[0].max_vfolder_count = 10
@@ -3054,6 +3085,7 @@ Then
 - every target keypair policy comes back in the processed list and nothing failed
   - successes count = 2
   - successes[0].id = 'target-1'
+  - successes[0].entity_id: same as the id of the policy seeded in advance
   - successes[0].name = 'target-1'
   - successes[0].created_at: the time this run wrote
   - successes[0].default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -3068,6 +3100,7 @@ Then
   - successes[0].idle_timeout = 3600
   - successes[0].allowed_vfolder_hosts = []
   - successes[1].id = 'target-2'
+  - successes[1].entity_id: same as the id of the policy seeded in advance
   - successes[1].name = 'target-2'
   - successes[1].created_at: the time this run wrote
   - successes[1].default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -3144,12 +3177,14 @@ Then
 - every target project policy comes back in the processed list and nothing failed
   - successes count = 2
   - successes[0].id = 'target-1'
+  - successes[0].entity_id: same as the id of the policy seeded in advance
   - successes[0].name = 'target-1'
   - successes[0].created_at: the time this run wrote
   - successes[0].max_vfolder_count = 20
   - successes[0].max_quota_scope_size = ('-1', '-1')
   - successes[0].max_network_count = 3
   - successes[1].id = 'target-2'
+  - successes[1].entity_id: same as the id of the policy seeded in advance
   - successes[1].name = 'target-2'
   - successes[1].created_at: the time this run wrote
   - successes[1].max_vfolder_count = 20
@@ -3218,6 +3253,7 @@ Then
 - every target user policy comes back in the processed list and nothing failed
   - successes count = 2
   - successes[0].id = 'target-1'
+  - successes[0].entity_id: same as the id of the policy seeded in advance
   - successes[0].name = 'target-1'
   - successes[0].created_at: the time this run wrote
   - successes[0].max_vfolder_count = 20
@@ -3226,6 +3262,7 @@ Then
   - successes[0].max_session_count_per_model_session = 10
   - successes[0].max_customized_image_count = 3
   - successes[1].id = 'target-2'
+  - successes[1].entity_id: same as the id of the policy seeded in advance
   - successes[1].name = 'target-2'
   - successes[1].created_at: the time this run wrote
   - successes[1].max_vfolder_count = 20
@@ -3580,6 +3617,7 @@ Then
 
 - the whole keypair policy seeded in advance comes back
   - id = 'keypair-policy-2'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'keypair-policy-2'
   - created_at: the time this run wrote
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -3619,6 +3657,7 @@ Then
 
 - the whole keypair policy seeded in advance comes back
   - id = 'keypair-policy-2'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'keypair-policy-2'
   - created_at: the time this run wrote
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -3658,6 +3697,7 @@ Then
 
 - the whole keypair policy seeded in advance comes back
   - id = 'keypair-policy-2'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'keypair-policy-2'
   - created_at: the time this run wrote
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -3697,6 +3737,7 @@ Then
 
 - the whole keypair policy seeded in advance comes back
   - id = 'keypair-policy-2'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'keypair-policy-2'
   - created_at: the time this run wrote
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -3816,6 +3857,7 @@ Then
 
 - the whole project policy seeded in advance comes back
   - id = 'project-policy-1'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'project-policy-1'
   - created_at: the time this run wrote
   - max_vfolder_count = 10
@@ -3847,6 +3889,7 @@ Then
 
 - the whole project policy seeded in advance comes back
   - id = 'project-policy-1'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'project-policy-1'
   - created_at: the time this run wrote
   - max_vfolder_count = 10
@@ -3878,6 +3921,7 @@ Then
 
 - the whole project policy seeded in advance comes back
   - id = 'project-policy-1'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'project-policy-1'
   - created_at: the time this run wrote
   - max_vfolder_count = 20
@@ -3963,6 +4007,7 @@ Then
 
 - the whole user policy seeded in advance comes back
   - id = 'user-policy-2'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'user-policy-2'
   - created_at: the time this run wrote
   - max_vfolder_count = 10
@@ -3996,6 +4041,7 @@ Then
 
 - the whole user policy seeded in advance comes back
   - id = 'user-policy-2'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'user-policy-2'
   - created_at: the time this run wrote
   - max_vfolder_count = 10
@@ -4029,6 +4075,7 @@ Then
 
 - the whole user policy seeded in advance comes back
   - id = 'user-policy-2'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'user-policy-2'
   - created_at: the time this run wrote
   - max_vfolder_count = 10
@@ -4062,6 +4109,7 @@ Then
 
 - the whole user policy seeded in advance comes back
   - id = 'user-policy-2'
+  - entity_id: same as the id of the policy seeded in advance
   - name = 'user-policy-2'
   - created_at: the time this run wrote
   - max_vfolder_count = 20

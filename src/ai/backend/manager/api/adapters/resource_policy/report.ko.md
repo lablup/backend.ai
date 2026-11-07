@@ -352,6 +352,7 @@ Then
 
 - 생성한 키페어 정책 전체가 반환됩니다
   - id = 'fresh-policy'
+  - entity_id: 건너뜀: the database generates it
   - name = 'fresh-policy'
   - created_at: 이 실행이 쓴 시각
   - default_for_unspecified = <DefaultForUnspecified.LIMITED: 'LIMITED'>
@@ -391,6 +392,7 @@ Then
 
 - 생성한 키페어 정책 전체가 반환됩니다
   - id = 'fresh-policy'
+  - entity_id: 건너뜀: the database generates it
   - name = 'fresh-policy'
   - created_at: 이 실행이 쓴 시각
   - default_for_unspecified = <DefaultForUnspecified.LIMITED: 'LIMITED'>
@@ -430,6 +432,7 @@ Then
 
 - 생성한 키페어 정책 전체가 반환됩니다
   - id = 'fresh-policy'
+  - entity_id: 건너뜀: the database generates it
   - name = 'fresh-policy'
   - created_at: 이 실행이 쓴 시각
   - default_for_unspecified = <DefaultForUnspecified.LIMITED: 'LIMITED'>
@@ -601,6 +604,7 @@ Then
 
 - 생성한 프로젝트 정책 전체가 반환됩니다
   - id = 'fresh-policy'
+  - entity_id: 건너뜀: the database generates it
   - name = 'fresh-policy'
   - created_at: 이 실행이 쓴 시각
   - max_vfolder_count = 20
@@ -738,6 +742,7 @@ Then
 
 - 생성한 사용자 정책 전체가 반환됩니다
   - id = 'fresh-policy'
+  - entity_id: 건너뜀: the database generates it
   - name = 'fresh-policy'
   - created_at: 이 실행이 쓴 시각
   - max_vfolder_count = 20
@@ -771,6 +776,7 @@ Then
 
 - 생성한 사용자 정책 전체가 반환됩니다
   - id = 'fresh-policy'
+  - entity_id: 건너뜀: the database generates it
   - name = 'fresh-policy'
   - created_at: 이 실행이 쓴 시각
   - max_vfolder_count = 20
@@ -910,6 +916,7 @@ Then
 
 - 미리 저장한 키페어 정책 전체가 반환됩니다
   - id = 'keypair-policy-2'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'keypair-policy-2'
   - created_at: 이 실행이 쓴 시각
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -949,6 +956,7 @@ Then
 
 - 미리 저장한 키페어 정책 전체가 반환됩니다
   - id = 'keypair-policy-2'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'keypair-policy-2'
   - created_at: 이 실행이 쓴 시각
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -1042,6 +1050,7 @@ Then
 
 - 미리 저장한 프로젝트 정책 전체가 반환됩니다
   - id = 'project-policy-1'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'project-policy-1'
   - created_at: 이 실행이 쓴 시각
   - max_vfolder_count = 10
@@ -1073,6 +1082,7 @@ Then
 
 - 미리 저장한 프로젝트 정책 전체가 반환됩니다
   - id = 'project-policy-1'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'project-policy-1'
   - created_at: 이 실행이 쓴 시각
   - max_vfolder_count = 10
@@ -1158,6 +1168,7 @@ Then
 
 - 미리 저장한 사용자 정책 전체가 반환됩니다
   - id = 'user-policy-2'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'user-policy-2'
   - created_at: 이 실행이 쓴 시각
   - max_vfolder_count = 10
@@ -1191,6 +1202,7 @@ Then
 
 - 미리 저장한 사용자 정책 전체가 반환됩니다
   - id = 'user-policy-2'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'user-policy-2'
   - created_at: 이 실행이 쓴 시각
   - max_vfolder_count = 10
@@ -1650,6 +1662,7 @@ Then
 - 물은 항목에 미리 저장한 정책 전체가 응답으로 옵니다
   - len(items) = 1
   - items[0].id = 'keypair-policy-2'
+  - items[0].entity_id: 미리 저장한 정책의 id 와 같다
   - items[0].name = 'keypair-policy-2'
   - items[0].created_at: 이 실행이 쓴 시각
   - items[0].default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -1722,6 +1735,7 @@ Then
 - 물은 항목에 미리 저장한 정책 전체가 응답으로 옵니다
   - len(items) = 1
   - items[0].id = 'project-policy-1'
+  - items[0].entity_id: 미리 저장한 정책의 id 와 같다
   - items[0].name = 'project-policy-1'
   - items[0].created_at: 이 실행이 쓴 시각
   - items[0].max_vfolder_count = 10
@@ -1786,6 +1800,7 @@ Then
 - 물은 항목에 미리 저장한 정책 전체가 응답으로 옵니다
   - len(items) = 1
   - items[0].id = 'user-policy-2'
+  - items[0].entity_id: 미리 저장한 정책의 id 와 같다
   - items[0].name = 'user-policy-2'
   - items[0].created_at: 이 실행이 쓴 시각
   - items[0].max_vfolder_count = 10
@@ -2015,6 +2030,7 @@ Then
 
 - 미리 저장한 키페어 정책 전체가 반환됩니다
   - id = 'keypair-policy-1'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'keypair-policy-1'
   - created_at: 이 실행이 쓴 시각
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -2059,6 +2075,7 @@ Then
 
 - 미리 저장한 키페어 정책 전체가 반환됩니다
   - id = 'keypair-policy-1'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'keypair-policy-1'
   - created_at: 이 실행이 쓴 시각
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -2103,6 +2120,7 @@ Then
 
 - 미리 저장한 키페어 정책 전체가 반환됩니다
   - id = 'other-1'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'other-1'
   - created_at: 이 실행이 쓴 시각
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -2141,6 +2159,7 @@ Then
 
 - 미리 저장한 키페어 정책 전체가 반환됩니다
   - id = 'keypair-policy-1'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'keypair-policy-1'
   - created_at: 이 실행이 쓴 시각
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -2239,6 +2258,7 @@ Then
 
 - 미리 저장한 사용자 정책 전체가 반환됩니다
   - id = 'user-policy-1'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'user-policy-1'
   - created_at: 이 실행이 쓴 시각
   - max_vfolder_count = 10
@@ -2271,6 +2291,7 @@ Then
 
 - 미리 저장한 사용자 정책 전체가 반환됩니다
   - id = 'user-policy-1'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'user-policy-1'
   - created_at: 이 실행이 쓴 시각
   - max_vfolder_count = 10
@@ -2334,6 +2355,7 @@ Then
 
 - 그 프로젝트가 따르는 프로젝트 정책 전체가 반환됩니다
   - id = 'default'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'default'
   - created_at: 이 실행이 쓴 시각
   - max_vfolder_count = 10
@@ -2691,6 +2713,7 @@ Then
 - 대상 키페어 정책이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
   - successes count = 2
   - successes[0].id = 'target-1'
+  - successes[0].entity_id: 미리 저장한 정책의 id 와 같다
   - successes[0].name = 'target-1'
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -2705,6 +2728,7 @@ Then
   - successes[0].idle_timeout = 3600
   - successes[0].allowed_vfolder_hosts = []
   - successes[1].id = 'target-2'
+  - successes[1].entity_id: 미리 저장한 정책의 id 와 같다
   - successes[1].name = 'target-2'
   - successes[1].created_at: 이 실행이 쓴 시각
   - successes[1].default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -2748,6 +2772,7 @@ Then
 - 아무도 사용하지 않는 키페어 정책은 처리된 목록에 오고, 아직 할당된 것은 참조 중이라는 이유로 실패 목록에 옵니다
   - successes count = 1
   - successes[0].id = 'target-1'
+  - successes[0].entity_id: 미리 저장한 정책의 id 와 같다
   - successes[0].name = 'target-1'
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -2826,12 +2851,14 @@ Then
 - 대상 프로젝트 정책이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
   - successes count = 2
   - successes[0].id = 'target-1'
+  - successes[0].entity_id: 미리 저장한 정책의 id 와 같다
   - successes[0].name = 'target-1'
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].max_vfolder_count = 10
   - successes[0].max_quota_scope_size = ('-1', '-1')
   - successes[0].max_network_count = 3
   - successes[1].id = 'target-2'
+  - successes[1].entity_id: 미리 저장한 정책의 id 와 같다
   - successes[1].name = 'target-2'
   - successes[1].created_at: 이 실행이 쓴 시각
   - successes[1].max_vfolder_count = 10
@@ -2867,6 +2894,7 @@ Then
 - 아무도 사용하지 않는 프로젝트 정책은 처리된 목록에 오고, 아직 할당된 것은 참조 중이라는 이유로 실패 목록에 옵니다
   - successes count = 1
   - successes[0].id = 'target-1'
+  - successes[0].entity_id: 미리 저장한 정책의 id 와 같다
   - successes[0].name = 'target-1'
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].max_vfolder_count = 10
@@ -2937,6 +2965,7 @@ Then
 - 대상 사용자 정책이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
   - successes count = 2
   - successes[0].id = 'target-1'
+  - successes[0].entity_id: 미리 저장한 정책의 id 와 같다
   - successes[0].name = 'target-1'
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].max_vfolder_count = 10
@@ -2945,6 +2974,7 @@ Then
   - successes[0].max_session_count_per_model_session = 10
   - successes[0].max_customized_image_count = 3
   - successes[1].id = 'target-2'
+  - successes[1].entity_id: 미리 저장한 정책의 id 와 같다
   - successes[1].name = 'target-2'
   - successes[1].created_at: 이 실행이 쓴 시각
   - successes[1].max_vfolder_count = 10
@@ -2982,6 +3012,7 @@ Then
 - 아무도 사용하지 않는 사용자 정책은 처리된 목록에 오고, 아직 할당된 것은 참조 중이라는 이유로 실패 목록에 옵니다
   - successes count = 1
   - successes[0].id = 'target-1'
+  - successes[0].entity_id: 미리 저장한 정책의 id 와 같다
   - successes[0].name = 'target-1'
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].max_vfolder_count = 10
@@ -3054,6 +3085,7 @@ Then
 - 대상 키페어 정책이 모두 처리된 목록에 오고, 실패한 것은 없습니다
   - successes count = 2
   - successes[0].id = 'target-1'
+  - successes[0].entity_id: 미리 저장한 정책의 id 와 같다
   - successes[0].name = 'target-1'
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -3068,6 +3100,7 @@ Then
   - successes[0].idle_timeout = 3600
   - successes[0].allowed_vfolder_hosts = []
   - successes[1].id = 'target-2'
+  - successes[1].entity_id: 미리 저장한 정책의 id 와 같다
   - successes[1].name = 'target-2'
   - successes[1].created_at: 이 실행이 쓴 시각
   - successes[1].default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -3144,12 +3177,14 @@ Then
 - 대상 프로젝트 정책이 모두 처리된 목록에 오고, 실패한 것은 없습니다
   - successes count = 2
   - successes[0].id = 'target-1'
+  - successes[0].entity_id: 미리 저장한 정책의 id 와 같다
   - successes[0].name = 'target-1'
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].max_vfolder_count = 20
   - successes[0].max_quota_scope_size = ('-1', '-1')
   - successes[0].max_network_count = 3
   - successes[1].id = 'target-2'
+  - successes[1].entity_id: 미리 저장한 정책의 id 와 같다
   - successes[1].name = 'target-2'
   - successes[1].created_at: 이 실행이 쓴 시각
   - successes[1].max_vfolder_count = 20
@@ -3218,6 +3253,7 @@ Then
 - 대상 사용자 정책이 모두 처리된 목록에 오고, 실패한 것은 없습니다
   - successes count = 2
   - successes[0].id = 'target-1'
+  - successes[0].entity_id: 미리 저장한 정책의 id 와 같다
   - successes[0].name = 'target-1'
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].max_vfolder_count = 20
@@ -3226,6 +3262,7 @@ Then
   - successes[0].max_session_count_per_model_session = 10
   - successes[0].max_customized_image_count = 3
   - successes[1].id = 'target-2'
+  - successes[1].entity_id: 미리 저장한 정책의 id 와 같다
   - successes[1].name = 'target-2'
   - successes[1].created_at: 이 실행이 쓴 시각
   - successes[1].max_vfolder_count = 20
@@ -3580,6 +3617,7 @@ Then
 
 - 미리 저장한 키페어 정책 전체가 반환됩니다
   - id = 'keypair-policy-2'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'keypair-policy-2'
   - created_at: 이 실행이 쓴 시각
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -3619,6 +3657,7 @@ Then
 
 - 미리 저장한 키페어 정책 전체가 반환됩니다
   - id = 'keypair-policy-2'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'keypair-policy-2'
   - created_at: 이 실행이 쓴 시각
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -3658,6 +3697,7 @@ Then
 
 - 미리 저장한 키페어 정책 전체가 반환됩니다
   - id = 'keypair-policy-2'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'keypair-policy-2'
   - created_at: 이 실행이 쓴 시각
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -3697,6 +3737,7 @@ Then
 
 - 미리 저장한 키페어 정책 전체가 반환됩니다
   - id = 'keypair-policy-2'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'keypair-policy-2'
   - created_at: 이 실행이 쓴 시각
   - default_for_unspecified = <DefaultForUnspecified.UNLIMITED: 'UNLIMITED'>
@@ -3816,6 +3857,7 @@ Then
 
 - 미리 저장한 프로젝트 정책 전체가 반환됩니다
   - id = 'project-policy-1'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'project-policy-1'
   - created_at: 이 실행이 쓴 시각
   - max_vfolder_count = 10
@@ -3847,6 +3889,7 @@ Then
 
 - 미리 저장한 프로젝트 정책 전체가 반환됩니다
   - id = 'project-policy-1'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'project-policy-1'
   - created_at: 이 실행이 쓴 시각
   - max_vfolder_count = 10
@@ -3878,6 +3921,7 @@ Then
 
 - 미리 저장한 프로젝트 정책 전체가 반환됩니다
   - id = 'project-policy-1'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'project-policy-1'
   - created_at: 이 실행이 쓴 시각
   - max_vfolder_count = 20
@@ -3963,6 +4007,7 @@ Then
 
 - 미리 저장한 사용자 정책 전체가 반환됩니다
   - id = 'user-policy-2'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'user-policy-2'
   - created_at: 이 실행이 쓴 시각
   - max_vfolder_count = 10
@@ -3996,6 +4041,7 @@ Then
 
 - 미리 저장한 사용자 정책 전체가 반환됩니다
   - id = 'user-policy-2'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'user-policy-2'
   - created_at: 이 실행이 쓴 시각
   - max_vfolder_count = 10
@@ -4029,6 +4075,7 @@ Then
 
 - 미리 저장한 사용자 정책 전체가 반환됩니다
   - id = 'user-policy-2'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'user-policy-2'
   - created_at: 이 실행이 쓴 시각
   - max_vfolder_count = 10
@@ -4062,6 +4109,7 @@ Then
 
 - 미리 저장한 사용자 정책 전체가 반환됩니다
   - id = 'user-policy-2'
+  - entity_id: 미리 저장한 정책의 id 와 같다
   - name = 'user-policy-2'
   - created_at: 이 실행이 쓴 시각
   - max_vfolder_count = 20
