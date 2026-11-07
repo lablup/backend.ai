@@ -463,7 +463,7 @@ class AWeightOnAnUnreportedResourceIsRejected(
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
-        return AGroupAndSomeone(granted=Permission.UPDATE)
+        return AGroupAndSomeone(granted=Permission.UPDATE, reports_a_slot=True)
 
     @override
     def when(self) -> When[AGroupAndACaller, ResourceGroupAdapter, ResourceGroupDetailNode]:
