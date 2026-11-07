@@ -518,6 +518,104 @@ class ARestoreLeavesThePurgingFolderOut(
         return OnlyTheTrashedFolderComesBack(started=self.started)
 
 
+@dataclass(frozen=True)
+class RestoringOwnAndAnothers(When[TwoOwnFoldersAndAnothers, VFolderAdapter, Processed]):
+    """휴지통에 있는 자기 폴더 하나와 남의 폴더 하나를 한 번에 되살린다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_restore"
+
+    @override
+    def describe(self, laid: TwoOwnFoldersAndAnothers) -> str:
+        return Says(
+            f"{laid.caller.username}이 휴지통에 있는 자기 vfolder 하나와 다른 사용자의 vfolder "
+            "하나를 한 번에 restore 합니다",
+            english=(
+                f"{laid.caller.username} restores their trashed vfolder and another user's "
+                "vfolder in one call"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: VFolderAdapter, laid: TwoOwnFoldersAndAnothers) -> Processed:
+        ids: list[UUID] = [laid.own[0].id, laid.others.id]
+        with ActingAs(laid.caller):
+            return await adapter.partial_bulk_restore(PartialBulkRestoreVFoldersInput(ids=ids))
+
+
+@dataclass(frozen=True)
+class TheRestoredFolderAlone(Then[TwoOwnFoldersAndAnothers, Processed]):
+    """휴지통에 있던 자기 폴더만 되살아나고, 남의 폴더는 권한 부족으로 실패 목록에 온다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "휴지통에 있던 자기 폴더만 사용할 수 있는 상태로 오고, 다른 사용자의 폴더는 권한이 "
+            "없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "only their trashed folder comes back ready for use, and the other user's folder "
+                "comes back in the failed list for lack of permission"
+            ),
+        )
+
+    @override
+    def look(self, laid: TwoOwnFoldersAndAnothers, answered: Answered[Processed]) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        verdicts: list[Verdict] = [Same("successes count", len(payload.successes), 1)]
+        if payload.successes:
+            verdicts.extend(
+                VFolderNodeLook(self.started).verdicts(
+                    payload.successes[0], laid.own[0], at="successes[0]."
+                )
+            )
+        return [*verdicts, *DeniedLook((laid.others,)).verdicts(payload)]
+
+
+@dataclass(frozen=True)
+class ARestoreLeavesAnothersFolderOut(
+    Scenario[TestSeedingSession, TwoOwnFoldersAndAnothers, VFolderAdapter, Processed]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "restoring-several-folders-leaves-anothers-out"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "vfolder soft delete 권한을 받은 사용자가 휴지통에 있는 자기 폴더와 다른 사용자의 "
+            "폴더를 한 번에 restore 하면, 자기 폴더만 되살아나고 다른 사용자의 폴더는 권한 부족 "
+            "으로 실패 목록에 옵니다",
+            english=(
+                "when a user granted vfolder soft delete restores their trashed folder and another "
+                "user's folder in one call, only their folder comes back and the other user's "
+                "folder comes back in the failed list for lack of permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, TwoOwnFoldersAndAnothers]:
+        return SomeoneWithTwoFoldersAndAnothers(
+            permissions=(Permission.SOFT_DELETE,),
+            first_status=VFolderOperationStatus.DELETE_PENDING,
+            second_status=VFolderOperationStatus.DELETE_PENDING,
+        )
+
+    @override
+    def when(self) -> When[TwoOwnFoldersAndAnothers, VFolderAdapter, Processed]:
+        return RestoringOwnAndAnothers()
+
+    @override
+    def then(self) -> Then[TwoOwnFoldersAndAnothers, Processed]:
+        return TheRestoredFolderAlone(started=self.started)
+
+
 SCENARIOS: list[FolderStep] = [
     AGrantedOwnerUpdatesTheirsOnly(started=datetime.now(UTC)),
     AUserGrantedNothingUpdatesNone(),
@@ -525,6 +623,7 @@ SCENARIOS: list[FolderStep] = [
     AUserGrantedNothingSoftDeletesNone(),
     RestoringBringsSeveralBack(started=datetime.now(UTC)),
     ARestoreLeavesThePurgingFolderOut(started=datetime.now(UTC)),
+    ARestoreLeavesAnothersFolderOut(started=datetime.now(UTC)),
 ]
 
 

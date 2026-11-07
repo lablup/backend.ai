@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import override
+from uuid import UUID
 
 import pytest
 
@@ -23,13 +25,14 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderScope,
 )
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
-from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
+    Condition,
     Given,
+    Held,
     Refused,
     Same,
     Says,
@@ -41,10 +44,10 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.vfolder import (
     AFolderAndItsReader,
-    ATwoFoldersAndPeople,
+    AReaderAndFoldersToSearch,
     SomeonesFolderAndTheSuperadmin,
     SomeoneWithAFolderOfTheirOwn,
-    SomeoneWithTwoOwnFolders,
+    SomeoneWithFoldersToSearch,
     VFolderNodeLook,
 )
 from bai_scenario.runner.acting import ActingAs
@@ -58,7 +61,7 @@ type ScopeStep = Scenario[
     TestSeedingSession, AFolderAndItsReader, VFolderAdapter, SearchVFoldersPayload
 ]
 type PairStep = Scenario[
-    TestSeedingSession, ATwoFoldersAndPeople, VFolderAdapter, SearchVFoldersPayload
+    TestSeedingSession, AReaderAndFoldersToSearch, VFolderAdapter, SearchVFoldersPayload
 ]
 
 
@@ -113,67 +116,42 @@ class SearchingMyOwnScope(When[AFolderAndItsReader, VFolderAdapter, SearchVFolde
 
 
 @dataclass(frozen=True)
-class SearchingByName(When[ATwoFoldersAndPeople, VFolderAdapter, SearchVFoldersPayload]):
-    """이름에 ``wanted``가 든 폴더만 훑는다."""
+class SearchingByFragmentInOrder(
+    When[AReaderAndFoldersToSearch, VFolderAdapter, SearchVFoldersPayload]
+):
+    """이름 조각으로 걸러 이름 오름차순으로, 크기만큼만 훑는다."""
 
-    wanted: str
+    fragment: str
+    limit: int
 
     @override
     def operation(self) -> str:
         return "scoped_search"
 
     @override
-    def describe(self, laid: ATwoFoldersAndPeople) -> str:
+    def describe(self, laid: AReaderAndFoldersToSearch) -> str:
         return Says(
-            f"{laid.caller.username}이 자기 범위에서 이름에 {self.wanted}가 든 vfolder 를 "
-            "조회합니다",
+            f"{laid.caller.username}이 자기 범위에서 이름에 {self.fragment}가 든 vfolder 를 "
+            f"이름 오름차순으로 {self.limit}개까지 조회합니다",
             english=(
-                f"{laid.caller.username} searches their own scope for vfolders whose name "
-                f"contains {self.wanted}"
+                f"{laid.caller.username} searches their own scope for vfolders whose name holds "
+                f"{self.fragment}, ordered by name ascending, up to {self.limit}"
             ),
         )
 
     @override
     async def call(
-        self, adapter: VFolderAdapter, laid: ATwoFoldersAndPeople
+        self, adapter: VFolderAdapter, laid: AReaderAndFoldersToSearch
     ) -> SearchVFoldersPayload:
         with ActingAs(laid.caller):
             return await adapter.scoped_search(
                 ScopedSearchVFoldersInput(
                     scope=VFolderScope(user=[UUIDScope(value=laid.caller.id)]),
-                    filter=VFolderFilter(name=StringFilter(contains=self.wanted)),
-                )
-            )
-
-
-@dataclass(frozen=True)
-class OrderingByName(When[ATwoFoldersAndPeople, VFolderAdapter, SearchVFoldersPayload]):
-    """이름으로 정렬해 훑는다."""
-
-    direction: OrderDirection
-
-    @override
-    def operation(self) -> str:
-        return "scoped_search"
-
-    @override
-    def describe(self, laid: ATwoFoldersAndPeople) -> str:
-        order_ko = "오름차순" if self.direction is OrderDirection.ASC else "내림차순"
-        order_en = "ascending" if self.direction is OrderDirection.ASC else "descending"
-        return Says(
-            f"{laid.caller.username}이 자기 범위의 vfolder 를 이름 {order_ko}으로 정렬해 조회합니다",
-            english=(f"{laid.caller.username} searches their own scope ordered by name {order_en}"),
-        )
-
-    @override
-    async def call(
-        self, adapter: VFolderAdapter, laid: ATwoFoldersAndPeople
-    ) -> SearchVFoldersPayload:
-        with ActingAs(laid.caller):
-            return await adapter.scoped_search(
-                ScopedSearchVFoldersInput(
-                    scope=VFolderScope(user=[UUIDScope(value=laid.caller.id)]),
-                    order=[VFolderOrder(field=VFolderOrderField.NAME, direction=self.direction)],
+                    filter=VFolderFilter(name=StringFilter(contains=self.fragment)),
+                    order=[
+                        VFolderOrder(field=VFolderOrderField.NAME, direction=OrderDirection.ASC)
+                    ],
+                    limit=self.limit,
                 )
             )
 
@@ -212,54 +190,37 @@ class TheSeededFolderAlone(Then[AFolderAndItsReader, SearchVFoldersPayload]):
 
 
 @dataclass(frozen=True)
-class TheMatchingFolderAlone(Then[ATwoFoldersAndPeople, SearchVFoldersPayload]):
-    """걸러낸 결과에 첫 폴더 하나만 실려 온다."""
+class TheseFolders(Condition[Collection[UUID]]):
+    """답에 든 폴더가 정해진 폴더들과 같다. id 는 실행마다 달라 무엇인지로 말한다."""
 
-    started: datetime
+    wanted: frozenset[UUID]
+    named: Says
 
     @override
     def says(self) -> str:
-        return Says(
-            "걸러낸 첫 vfolder 하나만 실린 페이지가 응답으로 옵니다",
-            english="the page holding only the matching first vfolder comes back",
-        )
+        return self.named
 
     @override
-    def look(
-        self, laid: ATwoFoldersAndPeople, answered: Answered[SearchVFoldersPayload]
-    ) -> list[Verdict]:
-        page = answered.response
-        if page is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        verdicts: list[Verdict] = [
-            Same("total_count", page.total_count, 1),
-            Same("has_next_page", page.has_next_page, False),
-            Same("has_previous_page", page.has_previous_page, False),
-            Same("items.length", len(page.items), 1),
-        ]
-        if page.items:
-            verdicts.extend(
-                VFolderNodeLook(self.started).verdicts(page.items[0], laid.first, at="items[0].")
-            )
-        return verdicts
+    def holds(self, got: Collection[UUID]) -> bool:
+        return len(got) == len(self.wanted) and frozenset(got) == self.wanted
 
 
 @dataclass(frozen=True)
-class BothFoldersInOrder(Then[ATwoFoldersAndPeople, SearchVFoldersPayload]):
-    """두 폴더가 첫째, 둘째 순서로 실린 페이지가 온다."""
+class TheMatchingFoldersInOrder(Then[AReaderAndFoldersToSearch, SearchVFoldersPayload]):
+    """걸러진 자기 폴더 둘만 이름 순서로 실린 한 페이지가 온다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
         return Says(
-            "두 vfolder 가 첫째, 둘째 순서로 실린 페이지가 응답으로 옵니다",
-            english=("the page holding the two vfolders with the first one first comes back"),
+            "걸러진 자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 옵니다",
+            english=("one page holding only their two matching vfolders in name order comes back"),
         )
 
     @override
     def look(
-        self, laid: ATwoFoldersAndPeople, answered: Answered[SearchVFoldersPayload]
+        self, laid: AReaderAndFoldersToSearch, answered: Answered[SearchVFoldersPayload]
     ) -> list[Verdict]:
         page = answered.response
         if page is None:
@@ -278,6 +239,16 @@ class BothFoldersInOrder(Then[ATwoFoldersAndPeople, SearchVFoldersPayload]):
             verdicts.extend(
                 VFolderNodeLook(self.started).verdicts(node, folder, at=f"items[{at}].")
             )
+        verdicts.append(
+            Held(
+                "items ids",
+                [node.id for node in page.items],
+                TheseFolders(
+                    frozenset({laid.first.id, laid.second.id}),
+                    Says("걸러진 자기 vfolder 둘", english="their two matching vfolders"),
+                ),
+            )
+        )
         return verdicts
 
 
@@ -379,71 +350,39 @@ class AUserGrantedNothingMayNotSearchTheirScope(
 
 
 @dataclass(frozen=True)
-class ANameFilterLeavesOneFolder(
-    Scenario[TestSeedingSession, ATwoFoldersAndPeople, VFolderAdapter, SearchVFoldersPayload]
+class ASearchNarrowsOrdersAndPages(
+    Scenario[TestSeedingSession, AReaderAndFoldersToSearch, VFolderAdapter, SearchVFoldersPayload]
 ):
     started: datetime
 
     @override
     def summary(self) -> str:
-        return "a-name-filter-leaves-the-matching-folder"
+        return "a-search-narrows-to-the-matching-folder-in-order-and-page"
 
     @override
     def describe(self) -> str:
         return Says(
-            "이름에 어떤 글자가 든 폴더만 걸러 조회하면, 그 글자가 든 폴더 하나만 실린 페이지가 "
-            "응답으로 옵니다",
+            "자기 스코프에서 vfolder 읽기 권한을 받은 사용자가 이름 조각으로 걸러 이름 오름차순으로 "
+            "한 페이지를 조회하면, 걸러진 자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 "
+            "옵니다",
             english=(
-                "when a user searches their own scope filtered by a name fragment, the page "
-                "holding only the matching folder comes back"
+                "when a user granted vfolder read in their own scope searches by a name fragment, "
+                "ordered by name ascending and limited to one page, one page holding only their "
+                "two matching vfolders in name order comes back"
             ),
         )
 
     @override
-    def given(self) -> Given[TestSeedingSession, ATwoFoldersAndPeople]:
-        return SomeoneWithTwoOwnFolders(permissions=(Permission.READ,))
+    def given(self) -> Given[TestSeedingSession, AReaderAndFoldersToSearch]:
+        return SomeoneWithFoldersToSearch(fragment="match")
 
     @override
-    def when(self) -> When[ATwoFoldersAndPeople, VFolderAdapter, SearchVFoldersPayload]:
-        return SearchingByName(wanted="first")
+    def when(self) -> When[AReaderAndFoldersToSearch, VFolderAdapter, SearchVFoldersPayload]:
+        return SearchingByFragmentInOrder(fragment="match", limit=2)
 
     @override
-    def then(self) -> Then[ATwoFoldersAndPeople, SearchVFoldersPayload]:
-        return TheMatchingFolderAlone(started=self.started)
-
-
-@dataclass(frozen=True)
-class ANameOrderPutsTheFirstFolderFirst(
-    Scenario[TestSeedingSession, ATwoFoldersAndPeople, VFolderAdapter, SearchVFoldersPayload]
-):
-    started: datetime
-
-    @override
-    def summary(self) -> str:
-        return "ordering-by-name-ascending-puts-the-first-folder-first"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "이름 오름차순으로 정렬해 조회하면, 이름이 앞서는 폴더가 먼저 실린 페이지가 "
-            "응답으로 옵니다",
-            english=(
-                "when a user searches their own scope ordered by name ascending, the page "
-                "holding the earlier name first comes back"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ATwoFoldersAndPeople]:
-        return SomeoneWithTwoOwnFolders(permissions=(Permission.READ,))
-
-    @override
-    def when(self) -> When[ATwoFoldersAndPeople, VFolderAdapter, SearchVFoldersPayload]:
-        return OrderingByName(direction=OrderDirection.ASC)
-
-    @override
-    def then(self) -> Then[ATwoFoldersAndPeople, SearchVFoldersPayload]:
-        return BothFoldersInOrder(started=self.started)
+    def then(self) -> Then[AReaderAndFoldersToSearch, SearchVFoldersPayload]:
+        return TheMatchingFoldersInOrder(started=self.started)
 
 
 ADMIN: list[AdminStep] = [
@@ -456,8 +395,7 @@ SCOPE: list[ScopeStep] = [
 ]
 
 PAIRS: list[PairStep] = [
-    ANameFilterLeavesOneFolder(started=datetime.now(UTC)),
-    ANameOrderPutsTheFirstFolderFirst(started=datetime.now(UTC)),
+    ASearchNarrowsOrdersAndPages(started=datetime.now(UTC)),
 ]
 
 
