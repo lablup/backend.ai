@@ -505,6 +505,31 @@
   # Added in 26.10.0
   keep-alive-timeout = 3.0
 
+  # TLS settings for the connection to etcd.
+  # Added in 26.10.0
+  [etcd.tls]
+    # Connect to etcd over TLS. Requires ca-cert.
+    # Added in 26.10.0
+    enabled = false
+
+    # PEM file of the CA certificate that signed the etcd server certificate.
+    # Added in 26.10.0
+    ## ca-cert = "/etc/backend.ai/etcd/ca.pem"
+
+    # PEM file of the client certificate, for an etcd started with --client-
+    # cert-auth. Set together with client-key.
+    # Added in 26.10.0
+    ## client-cert = "/etc/backend.ai/etcd/client.pem"
+
+    # PEM file of the client private key. Set together with client-cert.
+    # Added in 26.10.0
+    ## client-key = "/etc/backend.ai/etcd/client-key.pem"
+
+    # Seconds to wait for the TLS handshake with an etcd member. Set to 0 for no
+    # limit. Request timeouts do not end a stalled handshake.
+    # Added in 26.10.0
+    handshake-timeout = 10.0
+
   # Addresses of the etcd cluster members. List every member of an etcd cluster,
   # or a single address of a standalone server.
   # Added in 26.10.0
