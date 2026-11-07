@@ -87,6 +87,8 @@ class RulesOfADeploymentAndACaller:
     deployment: DeploymentInfo
     rules: tuple[ModelDeploymentAutoScalingRuleData, ...]
     caller: UserData
+    excluded: ModelDeploymentAutoScalingRuleData | None = None
+    outside: ModelDeploymentAutoScalingRuleData | None = None
 
 
 @dataclass(frozen=True)
@@ -95,6 +97,8 @@ class RulesOfADeployment(Given[Any, RulesOfADeploymentAndACaller]):
 
     granted: tuple[Permission, ...] = ()
     count: int = 2
+    excluded_metric: str | None = None
+    outside: bool = False
 
     @override
     def describe(self) -> str:
@@ -105,10 +109,15 @@ class RulesOfADeployment(Given[Any, RulesOfADeploymentAndACaller]):
             names = ", ".join(p.name or "" for p in self.granted)
             who_ko = f"배포에 {names} 권한을 받은 사용자"
             who_en = f"a user granted the {names} permission on deployments"
-        return Says(
-            f"자동 스케일링 규칙 {self.count}개가 걸린 배포 하나와, {who_ko} 한 명",
-            english=f"one deployment holding {self.count} auto-scaling rules, and {who_en}",
-        )
+        ko = f"자동 스케일링 규칙 {self.count}개가 걸린 배포 하나와, {who_ko} 한 명"
+        en = f"one deployment holding {self.count} auto-scaling rules, and {who_en}"
+        if self.excluded_metric is not None:
+            ko += ", 같은 배포에 지표 이름이 다른 규칙 하나가 더 걸려 있고"
+            en += ", one more rule with a different metric name on the same deployment"
+        if self.outside:
+            ko += ", 규칙 하나가 다른 배포에 걸려 있고"
+            en += ", and one rule on another deployment"
+        return Says(ko, english=en)
 
     @override
     async def lay(self, seeding: Any) -> RulesOfADeploymentAndACaller:
@@ -118,9 +127,26 @@ class RulesOfADeployment(Given[Any, RulesOfADeploymentAndACaller]):
             await seeding.adding(TestSeedAutoScalingRuleOf(metric_name=LAID_METRIC), deployment)
             for _ in range(self.count)
         ]
+        excluded: ModelDeploymentAutoScalingRuleData | None = None
+        if self.excluded_metric is not None:
+            excluded = seeding.made(
+                await seeding.adding(
+                    TestSeedAutoScalingRuleOf(metric_name=self.excluded_metric), deployment
+                )
+            )
+        outside: ModelDeploymentAutoScalingRuleData | None = None
+        if self.outside:
+            other_deployment = await lay_a_deployment(seeding, place, name_hint="other")
+            outside = seeding.made(
+                await seeding.adding(
+                    TestSeedAutoScalingRuleOf(metric_name=LAID_METRIC), other_deployment
+                )
+            )
         return RulesOfADeploymentAndACaller(
             deployment=seeding.made(deployment),
             rules=tuple(seeding.made(rule) for rule in rules),
+            excluded=excluded,
+            outside=outside,
             caller=seeding.made(place.caller),
         )
 

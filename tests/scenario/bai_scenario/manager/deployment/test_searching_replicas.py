@@ -9,8 +9,14 @@ from typing import override
 import pytest
 
 from ai.backend.common.data.model_deployment.types import RouteTrafficStatus
-from ai.backend.common.dto.manager.v2.deployment.request import SearchReplicasInput
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ReplicaFilter,
+    ReplicaOrder,
+    ReplicaTrafficStatusFilter,
+    SearchReplicasInput,
+)
 from ai.backend.common.dto.manager.v2.deployment.response import SearchReplicasPayload
+from ai.backend.common.dto.manager.v2.deployment.types import OrderDirection, ReplicaOrderField
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.deployment.types import ReplicaOperationScope
 from ai.backend.manager.data.permission.types import Permission
@@ -46,7 +52,7 @@ type ReplicaStep = Scenario[
 class SearchingTheReplicasOfTheDeployment(
     When[ARoutedDeploymentAndACaller, DeploymentAdapter, Answer]
 ):
-    """심은 배포 하나를 스코프로 주고 아무 조건도 주지 않는다."""
+    """트래픽이 꺼진 복제본만 남기고, 생성 시각순으로 한 페이지를 훑는다."""
 
     @override
     def operation(self) -> str:
@@ -55,9 +61,11 @@ class SearchingTheReplicasOfTheDeployment(
     @override
     def describe(self, laid: ARoutedDeploymentAndACaller) -> str:
         return Says(
-            f"{laid.caller.username} 이 {laid.deployment.metadata.name}의 복제본을 조회합니다",
+            f"{laid.caller.username} 이 {laid.deployment.metadata.name}의 복제본을 하나의 "
+            f"기준으로 걸러 순서와 함께 조회합니다",
             english=(
-                f"{laid.caller.username} searches the replicas of {laid.deployment.metadata.name}"
+                f"{laid.caller.username} searches the replicas of "
+                f"{laid.deployment.metadata.name} with one filter, one order and pagination"
             ),
         )
 
@@ -65,7 +73,21 @@ class SearchingTheReplicasOfTheDeployment(
     async def call(self, adapter: DeploymentAdapter, laid: ARoutedDeploymentAndACaller) -> Answer:
         with ActingAs(laid.caller):
             return await adapter.search_replicas(
-                ReplicaOperationScope(deployment_id=laid.deployment.id), SearchReplicasInput()
+                ReplicaOperationScope(deployment_id=laid.deployment.id),
+                SearchReplicasInput(
+                    filter=ReplicaFilter(
+                        traffic_status=ReplicaTrafficStatusFilter(
+                            equals=RouteTrafficStatus.INACTIVE
+                        )
+                    ),
+                    order=[
+                        ReplicaOrder(
+                            field=ReplicaOrderField.CREATED_AT, direction=OrderDirection.ASC
+                        )
+                    ],
+                    limit=10,
+                    offset=0,
+                ),
             )
 
 
@@ -78,9 +100,20 @@ class TheReplicaPageComesBack(Then[ARoutedDeploymentAndACaller, Answer]):
 
     @override
     def says(self) -> str:
+        if self.traffic_status == "active":
+            return Says(
+                "트래픽이 켜진 심은 복제본이 양과 함께 옵니다",
+                english=(
+                    "the replica seeded in advance with traffic enabled comes back with its count"
+                ),
+            )
         return Says(
+            "기준이 제외하는 복제본과 다른 배포에 걸린 복제본은 오지 않고, "
             "심은 복제본이 양과 함께 옵니다",
-            english="the replicas seeded in advance come back with their count",
+            english=(
+                "the replica the filter excludes and the replica on another deployment do "
+                "not come back, and the replicas seeded in advance come back with their count"
+            ),
         )
 
     @override
@@ -90,6 +123,7 @@ class TheReplicaPageComesBack(Then[ARoutedDeploymentAndACaller, Answer]):
             return [MissingResponse(answered.raised)]
         verdicts: list[Verdict] = [
             Same("total_count", page.total_count, len(laid.routes)),
+            Same("items count", len(page.items), len(laid.routes)),
             Same("has_next_page", page.has_next_page, False),
             Same("has_previous_page", page.has_previous_page, False),
         ]
@@ -118,16 +152,17 @@ class AUserGrantedDeploymentReadSearchesTheReplicas(
     @override
     def describe(self) -> str:
         return Says(
-            "배포 조회 권한을 받은 사용자가 배포의 복제본을 조회하면, 심은 복제본이 옵니다",
+            "배포 조회 권한을 받은 사용자가 배포의 복제본을 기준으로 걸러 조회하면, "
+            "심은 복제본이 옵니다",
             english=(
                 "when a user granted deployment read searches the replicas of the "
-                "deployment, the replicas seeded in advance come back"
+                "deployment with a filter, the replicas seeded in advance come back"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ARoutedDeploymentAndACaller]:
-        return ADeploymentWithRoutes(granted=(Permission.READ,))
+        return ADeploymentWithRoutes(granted=(Permission.READ,), excluded_active=True, outside=True)
 
     @override
     def when(self) -> When[ARoutedDeploymentAndACaller, DeploymentAdapter, Answer]:
@@ -136,6 +171,33 @@ class AUserGrantedDeploymentReadSearchesTheReplicas(
     @override
     def then(self) -> Then[ARoutedDeploymentAndACaller, Answer]:
         return TheReplicaPageComesBack(started=self.started)
+
+
+@dataclass(frozen=True)
+class SearchingTheReplicaWithTrafficEnabled(
+    When[ARoutedDeploymentAndACaller, DeploymentAdapter, Answer]
+):
+    """아무 조건 없이 한 페이지를 훑는다."""
+
+    @override
+    def operation(self) -> str:
+        return "search_replicas"
+
+    @override
+    def describe(self, laid: ARoutedDeploymentAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username} 이 {laid.deployment.metadata.name}의 복제본을 조회합니다",
+            english=(
+                f"{laid.caller.username} searches the replicas of {laid.deployment.metadata.name}"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: DeploymentAdapter, laid: ARoutedDeploymentAndACaller) -> Answer:
+        with ActingAs(laid.caller):
+            return await adapter.search_replicas(
+                ReplicaOperationScope(deployment_id=laid.deployment.id), SearchReplicasInput()
+            )
 
 
 @dataclass(frozen=True)
@@ -165,7 +227,7 @@ class AUserGrantedDeploymentReadSearchesTheReplicaWithTrafficEnabled(
 
     @override
     def when(self) -> When[ARoutedDeploymentAndACaller, DeploymentAdapter, Answer]:
-        return SearchingTheReplicasOfTheDeployment()
+        return SearchingTheReplicaWithTrafficEnabled()
 
     @override
     def then(self) -> Then[ARoutedDeploymentAndACaller, Answer]:

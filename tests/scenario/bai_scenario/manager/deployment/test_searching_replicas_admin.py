@@ -8,9 +8,16 @@ from typing import override
 
 import pytest
 
+from ai.backend.common.data.model_deployment.types import RouteTrafficStatus
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.deployment.request import SearchReplicasInput
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ReplicaFilter,
+    ReplicaOrder,
+    ReplicaTrafficStatusFilter,
+    SearchReplicasInput,
+)
 from ai.backend.common.dto.manager.v2.deployment.response import SearchReplicasPayload
+from ai.backend.common.dto.manager.v2.deployment.types import OrderDirection, ReplicaOrderField
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -42,7 +49,7 @@ type ReplicaStep = Scenario[
 
 @dataclass(frozen=True)
 class SearchingEveryReplica(When[ARoutedDeploymentAndACaller, DeploymentAdapter, Answer]):
-    """아무 값도 주지 않는다."""
+    """트래픽이 꺼진 복제본만 남기고, 생성 시각순으로 한 페이지를 훑는다."""
 
     @override
     def operation(self) -> str:
@@ -51,14 +58,32 @@ class SearchingEveryReplica(When[ARoutedDeploymentAndACaller, DeploymentAdapter,
     @override
     def describe(self, laid: ARoutedDeploymentAndACaller) -> str:
         return Says(
-            f"{laid.caller.username} 이 복제본 전체를 조회합니다",
-            english=f"{laid.caller.username} searches every replica",
+            f"{laid.caller.username} 이 복제본 전체를 하나의 기준으로 걸러 순서와 함께 조회합니다",
+            english=(
+                f"{laid.caller.username} searches every replica with one filter, one order "
+                f"and pagination"
+            ),
         )
 
     @override
     async def call(self, adapter: DeploymentAdapter, laid: ARoutedDeploymentAndACaller) -> Answer:
         with ActingAs(laid.caller):
-            return await adapter.admin_search_replicas(SearchReplicasInput())
+            return await adapter.admin_search_replicas(
+                SearchReplicasInput(
+                    filter=ReplicaFilter(
+                        traffic_status=ReplicaTrafficStatusFilter(
+                            equals=RouteTrafficStatus.INACTIVE
+                        )
+                    ),
+                    order=[
+                        ReplicaOrder(
+                            field=ReplicaOrderField.CREATED_AT, direction=OrderDirection.ASC
+                        )
+                    ],
+                    limit=10,
+                    offset=0,
+                )
+            )
 
 
 @dataclass(frozen=True)
@@ -70,8 +95,11 @@ class TheReplicaPageComesBack(Then[ARoutedDeploymentAndACaller, Answer]):
     @override
     def says(self) -> str:
         return Says(
-            "심은 복제본이 양과 함께 옵니다",
-            english="the replicas seeded in advance come back with their count",
+            "기준이 제외하는 복제본은 오지 않고, 심은 복제본이 양과 함께 옵니다",
+            english=(
+                "the replica the filter excludes does not come back, and the replicas "
+                "seeded in advance come back with their count"
+            ),
         )
 
     @override
@@ -81,6 +109,7 @@ class TheReplicaPageComesBack(Then[ARoutedDeploymentAndACaller, Answer]):
             return [MissingResponse(answered.raised)]
         verdicts: list[Verdict] = [
             Same("total_count", page.total_count, len(laid.routes)),
+            Same("items count", len(page.items), len(laid.routes)),
             Same("has_next_page", page.has_next_page, False),
             Same("has_previous_page", page.has_previous_page, False),
         ]
@@ -109,18 +138,19 @@ class TheSuperadminSearchesTheReplicas(
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 복제본 전체를 조회하면, 심은 복제본이 옵니다. 복제본 전체 훑기는 "
-            "전역 권한이 필요한 호출이라 이 행의 요청 사용자는 superadmin 입니다",
+            "superadmin 이 복제본 전체를 기준으로 걸러 조회하면, 심은 복제본이 옵니다. "
+            "복제본 전체 훑기는 전역 권한이 필요한 호출이라 이 행의 요청 사용자는 "
+            "superadmin 입니다",
             english=(
-                "when the superadmin searches every replica, the replicas seeded in "
-                "advance come back. The requesting user of this row is the superadmin "
-                "because the search is gated by the global role"
+                "when the superadmin searches every replica with a filter, the replicas "
+                "seeded in advance come back. The requesting user of this row is the "
+                "superadmin because the search is gated by the global role"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ARoutedDeploymentAndACaller]:
-        return ADeploymentWithRoutes(role=UserRole.SUPERADMIN)
+        return ADeploymentWithRoutes(role=UserRole.SUPERADMIN, excluded_active=True)
 
     @override
     def when(self) -> When[ARoutedDeploymentAndACaller, DeploymentAdapter, Answer]:

@@ -65,6 +65,8 @@ class TokensOfADeploymentAndACaller:
     deployment: DeploymentInfo
     tokens: tuple[ModelDeploymentAccessTokenData, ...]
     caller: UserData
+    excluded: ModelDeploymentAccessTokenData | None = None
+    outside: ModelDeploymentAccessTokenData | None = None
 
 
 @dataclass(frozen=True)
@@ -73,6 +75,8 @@ class TokensOfADeployment(Given[Any, TokensOfADeploymentAndACaller]):
 
     granted: tuple[Permission, ...] = ()
     count: int = 2
+    excluded: bool = False
+    outside: bool = False
 
     @override
     def describe(self) -> str:
@@ -83,10 +87,15 @@ class TokensOfADeployment(Given[Any, TokensOfADeploymentAndACaller]):
             names = ", ".join(p.name or "" for p in self.granted)
             who_ko = f"배포에 {names} 권한을 받은 사용자"
             who_en = f"a user granted the {names} permission on deployments"
-        return Says(
-            f"접근 토큰 {self.count}개가 걸린 배포 하나와, {who_ko} 한 명",
-            english=f"one deployment holding {self.count} access tokens, and {who_en}",
-        )
+        ko = f"접근 토큰 {self.count}개가 걸린 배포 하나와, {who_ko} 한 명"
+        en = f"one deployment holding {self.count} access tokens, and {who_en}"
+        if self.excluded:
+            ko += ", 같은 배포에 토큰 하나가 더 걸려 있고"
+            en += ", one more token on the same deployment"
+        if self.outside:
+            ko += ", 토큰 하나가 다른 배포에 걸려 있고"
+            en += ", and one token on another deployment"
+        return Says(ko, english=en)
 
     @override
     async def lay(self, seeding: Any) -> TokensOfADeploymentAndACaller:
@@ -106,9 +115,37 @@ class TokensOfADeployment(Given[Any, TokensOfADeploymentAndACaller]):
             )
             for _ in range(self.count)
         ]
+        excluded: ModelDeploymentAccessTokenData | None = None
+        if self.excluded:
+            excluded = seeding.made(
+                await seeding.adding(
+                    TestSeedAccessTokenOf(
+                        domain=domain.name,
+                        project_id=ProjectID(project.id),
+                        session_owner_id=UserID(caller.id),
+                        token="scenario-token-excluded",
+                    ),
+                    deployment,
+                )
+            )
+        outside: ModelDeploymentAccessTokenData | None = None
+        if self.outside:
+            other_deployment = await lay_a_deployment(seeding, place, name_hint="other")
+            outside = seeding.made(
+                await seeding.adding(
+                    TestSeedAccessTokenOf(
+                        domain=domain.name,
+                        project_id=ProjectID(project.id),
+                        session_owner_id=UserID(caller.id),
+                    ),
+                    other_deployment,
+                )
+            )
         return TokensOfADeploymentAndACaller(
             deployment=seeding.made(deployment),
             tokens=tuple(seeding.made(token) for token in tokens),
+            excluded=excluded,
+            outside=outside,
             caller=caller,
         )
 

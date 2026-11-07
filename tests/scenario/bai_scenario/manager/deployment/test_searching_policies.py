@@ -9,7 +9,10 @@ from typing import override
 import pytest
 
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.deployment.request import SearchDeploymentPoliciesInput
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeploymentPolicyFilter,
+    SearchDeploymentPoliciesInput,
+)
 from ai.backend.common.dto.manager.v2.deployment.response import (
     SearchDeploymentPoliciesPayload,
 )
@@ -44,7 +47,7 @@ type PolicyStep = Scenario[
 
 @dataclass(frozen=True)
 class SearchingEveryPolicy(When[APolicyOfADeploymentAndACaller, DeploymentAdapter, Answer]):
-    """아무 값도 주지 않는다."""
+    """심은 배포 하나의 정책만 남기고 한 페이지를 훑는다."""
 
     @override
     def operation(self) -> str:
@@ -53,8 +56,11 @@ class SearchingEveryPolicy(When[APolicyOfADeploymentAndACaller, DeploymentAdapte
     @override
     def describe(self, laid: APolicyOfADeploymentAndACaller) -> str:
         return Says(
-            f"{laid.caller.username} 이 배포 정책을 훑습니다",
-            english=f"{laid.caller.username} searches the deployment policies",
+            f"{laid.caller.username} 이 배포 정책을 하나의 기준으로 걸러 훑습니다",
+            english=(
+                f"{laid.caller.username} searches the deployment policies with one filter "
+                f"and pagination"
+            ),
         )
 
     @override
@@ -62,7 +68,13 @@ class SearchingEveryPolicy(When[APolicyOfADeploymentAndACaller, DeploymentAdapte
         self, adapter: DeploymentAdapter, laid: APolicyOfADeploymentAndACaller
     ) -> Answer:
         with ActingAs(laid.caller):
-            return await adapter.search_policies(SearchDeploymentPoliciesInput())
+            return await adapter.search_policies(
+                SearchDeploymentPoliciesInput(
+                    filter=DeploymentPolicyFilter(deployment_id=laid.deployment.id),
+                    limit=10,
+                    offset=0,
+                )
+            )
 
 
 @dataclass(frozen=True)
@@ -74,8 +86,11 @@ class ThePolicyPageComesBack(Then[APolicyOfADeploymentAndACaller, Answer]):
     @override
     def says(self) -> str:
         return Says(
-            "심은 정책이 양과 함께 옵니다",
-            english="the policy seeded in advance comes back with its count",
+            "기준이 제외하는 다른 배포의 정책은 오지 않고, 심은 정책이 양과 함께 옵니다",
+            english=(
+                "the policy on another deployment the filter excludes does not come back, "
+                "and the policy seeded in advance comes back with its count"
+            ),
         )
 
     @override
@@ -87,6 +102,7 @@ class ThePolicyPageComesBack(Then[APolicyOfADeploymentAndACaller, Answer]):
             return [MissingResponse(answered.raised)]
         verdicts: list[Verdict] = [
             Same("total_count", page.total_count, 1),
+            Same("items count", len(page.items), 1),
             Same("has_next_page", page.has_next_page, False),
             Same("has_previous_page", page.has_previous_page, False),
         ]
@@ -108,18 +124,18 @@ class TheSuperadminSearchesThePolicies(
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 배포 정책을 훑으면, 심은 정책이 옵니다. 정책 훑기는 전역 권한이 "
-            "필요한 호출이라 이 행의 요청 사용자는 superadmin 입니다",
+            "superadmin 이 배포 정책을 기준으로 걸러 훑으면, 심은 정책이 옵니다. 정책 훑기는 "
+            "전역 권한이 필요한 호출이라 이 행의 요청 사용자는 superadmin 입니다",
             english=(
-                "when the superadmin searches the deployment policies, the policy seeded "
-                "in advance comes back. The requesting user of this row is the superadmin "
-                "because the search is gated by the global role"
+                "when the superadmin searches the deployment policies with a filter, the "
+                "policy seeded in advance comes back. The requesting user of this row is "
+                "the superadmin because the search is gated by the global role"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, APolicyOfADeploymentAndACaller]:
-        return APolicyAndACaller(role=UserRole.SUPERADMIN)
+        return APolicyAndACaller(role=UserRole.SUPERADMIN, outside=True)
 
     @override
     def when(self) -> When[APolicyOfADeploymentAndACaller, DeploymentAdapter, Answer]:

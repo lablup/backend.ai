@@ -56,6 +56,8 @@ class ARoutedDeploymentAndACaller:
     revision_id: UUID
     routes: tuple[RoutingData, ...]
     caller: UserData
+    active_route: RoutingData | None = None
+    outside_route: RoutingData | None = None
 
 
 @dataclass(frozen=True)
@@ -66,6 +68,8 @@ class ADeploymentWithRoutes(Given[Any, ARoutedDeploymentAndACaller]):
     role: UserRole = UserRole.USER
     routes: int = 1
     active_traffic: bool = False
+    excluded_active: bool = False
+    outside: bool = False
 
     @override
     def describe(self) -> str:
@@ -85,10 +89,15 @@ class ADeploymentWithRoutes(Given[Any, ARoutedDeploymentAndACaller]):
         else:
             routes_ko = f"복제본 라우트 {self.routes}개"
             routes_en = f"{self.routes} replica routes"
-        return Says(
-            f"리비전과 {routes_ko}가 딸린 배포 하나와, {who_ko} 한 명",
-            english=(f"one deployment holding one revision and {routes_en}, and {who_en}"),
-        )
+        ko = f"리비전과 {routes_ko}가 딸린 배포 하나와, {who_ko} 한 명"
+        en = f"one deployment holding one revision and {routes_en}, and {who_en}"
+        if self.excluded_active:
+            ko += ", 트래픽이 켜진 복제본 라우트 하나가 더 걸려 있고"
+            en += ", one more replica route with traffic enabled"
+        if self.outside:
+            ko += ", 복제본 라우트 하나가 다른 배포에 걸려 있고"
+            en += ", and one replica route on another deployment"
+        return Says(ko, english=en)
 
     @override
     async def lay(self, seeding: Any) -> ARoutedDeploymentAndACaller:
@@ -120,11 +129,54 @@ class ADeploymentWithRoutes(Given[Any, ARoutedDeploymentAndACaller]):
                 deployment,
             )
             routes.append(seeding.made(route))
+        active_route: RoutingData | None = None
+        if self.excluded_active:
+            active_route = seeding.made(
+                await seeding.adding(
+                    TestSeedRouteOf(
+                        revision_id=revisions[0].id,
+                        replica_group_id=seeding.made(replica_group).id,
+                        session_owner_id=made.metadata.session_owner,
+                        domain=made.metadata.domain,
+                        project_id=made.metadata.project,
+                        traffic_status=RouteTrafficStatus.ACTIVE,
+                    ),
+                    deployment,
+                )
+            )
+        outside_route: RoutingData | None = None
+        if self.outside:
+            other_deployment = await lay_a_deployment(seeding, place, name_hint="other")
+            other_revisions = await lay_revisions(seeding, place, other_deployment, materials, 1)
+            other_made = seeding.made(other_deployment)
+            other_session_group = await seeding.creating_from(
+                TestSeedDeploymentSessionGroup(), other_deployment
+            )
+            other_replica_group = await seeding.adding(
+                TestSeedPrimaryReplicaGroupOf(
+                    session_group_id=seeding.made(other_session_group).id
+                ),
+                other_deployment,
+            )
+            outside_route = seeding.made(
+                await seeding.adding(
+                    TestSeedRouteOf(
+                        revision_id=other_revisions[0].id,
+                        replica_group_id=seeding.made(other_replica_group).id,
+                        session_owner_id=other_made.metadata.session_owner,
+                        domain=other_made.metadata.domain,
+                        project_id=other_made.metadata.project,
+                    ),
+                    other_deployment,
+                )
+            )
         return ARoutedDeploymentAndACaller(
             place=place,
             deployment=made,
             revision_id=revisions[0].id,
             routes=tuple(routes),
+            active_route=active_route,
+            outside_route=outside_route,
             caller=seeding.made(place.caller),
         )
 

@@ -64,6 +64,7 @@ class PresetsAndACaller:
 
     presets: tuple[DeploymentRevisionPresetData, ...]
     caller: UserData
+    excluded: DeploymentRevisionPresetData | None = None
 
 
 @dataclass(frozen=True)
@@ -72,17 +73,20 @@ class PresetsAndSomeone(Given[Any, PresetsAndACaller]):
 
     role: UserRole = UserRole.USER
     count: int = 2
+    excluded: bool = False
 
     @override
     def describe(self) -> str:
         who = role_named(self.role)
-        return Says(
-            f"변형 하나와 그 변형의 배포 리비전 프리셋 {self.count}개, 그리고 {who} 한 명",
-            english=(
-                f"one runtime variant and {self.count} deployment revision presets of it, "
-                f"and one {in_language(who, Language.ENGLISH)}"
-            ),
+        ko = f"변형 하나와 그 변형의 배포 리비전 프리셋 {self.count}개, 그리고 {who} 한 명"
+        en = (
+            f"one runtime variant and {self.count} deployment revision presets of it, "
+            f"and one {in_language(who, Language.ENGLISH)}"
         )
+        if self.excluded:
+            ko += ", 이름이 다른 프리셋 하나가 더 있고"
+            en += ", one more preset with a different name"
+        return Says(ko, english=en)
 
     @override
     async def lay(self, seeding: Any) -> PresetsAndACaller:
@@ -91,9 +95,17 @@ class PresetsAndSomeone(Given[Any, PresetsAndACaller]):
             await seeding.creating_from(TestSeedDeploymentRevisionPreset(), variant)
             for _ in range(self.count)
         ]
+        excluded: DeploymentRevisionPresetData | None = None
+        if self.excluded:
+            excluded = seeding.made(
+                await seeding.creating_from(
+                    TestSeedDeploymentRevisionPreset(name_hint="other"), variant
+                )
+            )
         caller = await lay_a_public_reader(seeding, DeploymentPresetEntityType(), self.role)
         return PresetsAndACaller(
             presets=tuple(seeding.made(preset) for preset in presets),
+            excluded=excluded,
             caller=seeding.made(caller),
         )
 

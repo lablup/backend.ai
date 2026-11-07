@@ -8,8 +8,17 @@ from typing import override
 
 import pytest
 
-from ai.backend.common.dto.manager.v2.deployment.request import SearchAccessTokensInput
+from ai.backend.common.dto.manager.query import UUIDFilter
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    AccessTokenFilter,
+    AccessTokenOrder,
+    SearchAccessTokensInput,
+)
 from ai.backend.common.dto.manager.v2.deployment.response import SearchAccessTokensPayload
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    AccessTokenOrderField,
+    OrderDirection,
+)
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.deployment.types import AccessTokenOperationScope
 from ai.backend.manager.data.permission.types import Permission
@@ -45,7 +54,7 @@ type TokenStep = Scenario[
 class SearchingTheTokensOfTheDeployment(
     When[TokensOfADeploymentAndACaller, DeploymentAdapter, Answer]
 ):
-    """심은 배포 하나의 id 만 준다."""
+    """걸린 토큰 하나를 기준에서 빼고, 생성 시각순으로 한 페이지를 훑는다."""
 
     @override
     def operation(self) -> str:
@@ -54,16 +63,35 @@ class SearchingTheTokensOfTheDeployment(
     @override
     def describe(self, laid: TokensOfADeploymentAndACaller) -> str:
         return Says(
-            f"{laid.caller.username} 이 배포가 걸린 접근 토큰을 훑습니다",
-            english=f"{laid.caller.username} searches the access tokens the deployment holds",
+            f"{laid.caller.username} 이 배포가 걸린 접근 토큰을 하나의 기준으로 걸러 "
+            f"순서와 함께 훑습니다",
+            english=(
+                f"{laid.caller.username} searches the access tokens the deployment holds "
+                f"with one filter, one order and pagination"
+            ),
         )
 
     @override
     async def call(self, adapter: DeploymentAdapter, laid: TokensOfADeploymentAndACaller) -> Answer:
+        token_filter = (
+            AccessTokenFilter(field_id=UUIDFilter(not_equals=laid.excluded.id))
+            if laid.excluded is not None
+            else None
+        )
         with ActingAs(laid.caller):
             return await adapter.search_access_tokens(
                 AccessTokenOperationScope(deployment_id=laid.deployment.id),
-                SearchAccessTokensInput(),
+                SearchAccessTokensInput(
+                    filter=token_filter,
+                    order=[
+                        AccessTokenOrder(
+                            field=AccessTokenOrderField.CREATED_AT,
+                            direction=OrderDirection.ASC,
+                        )
+                    ],
+                    limit=10,
+                    offset=0,
+                ),
             )
 
 
@@ -76,8 +104,12 @@ class TheTokenPageComesBack(Then[TokensOfADeploymentAndACaller, Answer]):
     @override
     def says(self) -> str:
         return Says(
+            "기준이 제외하는 토큰과 다른 배포에 걸린 토큰은 오지 않고, "
             "배포가 걸린 토큰이 양과 함께 옵니다",
-            english="the tokens the deployment holds come back with their count",
+            english=(
+                "the token the filter excludes and the token on another deployment do not "
+                "come back, and the tokens the deployment holds come back with their count"
+            ),
         )
 
     @override
@@ -89,6 +121,7 @@ class TheTokenPageComesBack(Then[TokensOfADeploymentAndACaller, Answer]):
             return [MissingResponse(answered.raised)]
         verdicts: list[Verdict] = [
             Same("total_count", page.total_count, len(laid.tokens)),
+            Same("items count", len(page.items), len(laid.tokens)),
             Same("has_next_page", page.has_next_page, False),
             Same("has_previous_page", page.has_previous_page, False),
         ]
@@ -115,16 +148,17 @@ class AUserGrantedDeploymentReadSearchesTheTokens(
     @override
     def describe(self) -> str:
         return Says(
-            "배포 조회 권한을 받은 사용자가 배포가 걸린 접근 토큰을 훑으면, 그 토큰들이 옵니다",
+            "배포 조회 권한을 받은 사용자가 배포가 걸린 접근 토큰을 기준으로 걸러 훑으면, "
+            "그 토큰들이 옵니다",
             english=(
                 "when a user granted deployment read searches the access tokens the "
-                "deployment holds, those tokens come back"
+                "deployment holds with a filter, those tokens come back"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, TokensOfADeploymentAndACaller]:
-        return TokensOfADeployment(granted=(Permission.READ,))
+        return TokensOfADeployment(granted=(Permission.READ,), excluded=True, outside=True)
 
     @override
     def when(self) -> When[TokensOfADeploymentAndACaller, DeploymentAdapter, Answer]:

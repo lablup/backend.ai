@@ -10,11 +10,17 @@ import pytest
 
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
+    DeploymentRevisionPresetFilter,
+    DeploymentRevisionPresetOrder,
     SearchDeploymentRevisionPresetsInput,
 )
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
     SearchDeploymentRevisionPresetsPayload,
+)
+from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
+    DeploymentRevisionPresetOrderField,
 )
 from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
     DeploymentRevisionPresetAdapter,
@@ -51,7 +57,7 @@ type SearchStep = Scenario[
 
 @dataclass(frozen=True)
 class SearchingPresets(When[PresetsAndACaller, DeploymentRevisionPresetAdapter, Answer]):
-    """필터 없이 프리셋을 훑는다."""
+    """이름이 다른 프리셋 하나를 기준에서 빼고, 이름순으로 한 페이지를 훑는다."""
 
     @override
     def operation(self) -> str:
@@ -60,16 +66,33 @@ class SearchingPresets(When[PresetsAndACaller, DeploymentRevisionPresetAdapter, 
     @override
     def describe(self, laid: PresetsAndACaller) -> str:
         return Says(
-            f"{laid.caller.username} 이 프리셋을 훑습니다",
-            english=f"{laid.caller.username} searches the presets",
+            f"{laid.caller.username} 이 프리셋을 하나의 기준으로 걸러 순서와 함께 훑습니다",
+            english=(
+                f"{laid.caller.username} searches the presets with one filter, one order "
+                f"and pagination"
+            ),
         )
 
     @override
     async def call(
         self, adapter: DeploymentRevisionPresetAdapter, laid: PresetsAndACaller
     ) -> Answer:
+        preset_filter = (
+            DeploymentRevisionPresetFilter(name=StringFilter(not_equals=laid.excluded.name))
+            if laid.excluded is not None
+            else None
+        )
         with ActingAs(laid.caller):
-            return await adapter.search(SearchDeploymentRevisionPresetsInput())
+            return await adapter.search(
+                SearchDeploymentRevisionPresetsInput(
+                    filter=preset_filter,
+                    order=[
+                        DeploymentRevisionPresetOrder(field=DeploymentRevisionPresetOrderField.NAME)
+                    ],
+                    limit=10,
+                    offset=0,
+                )
+            )
 
 
 @dataclass(frozen=True)
@@ -81,8 +104,11 @@ class TheSeededPresetsComeBack(Then[PresetsAndACaller, Answer]):
     @override
     def says(self) -> str:
         return Says(
-            "심은 프리셋이 전체가 응답으로 옵니다",
-            english="the presets seeded in advance come back",
+            "기준이 제외하는 프리셋은 오지 않고, 심은 프리셋이 전체가 응답으로 옵니다",
+            english=(
+                "the preset the filter excludes does not come back, and the presets seeded "
+                "in advance come back"
+            ),
         )
 
     @override
@@ -121,16 +147,17 @@ class AReaderSearchesEveryPreset(
     @override
     def describe(self) -> str:
         return Says(
-            "프리셋 조회 권한을 받은 사용자가 프리셋을 훑으면, 심은 프리셋이 모두 옵니다",
+            "프리셋 조회 권한을 받은 사용자가 프리셋을 기준으로 걸러 훑으면, "
+            "심은 프리셋이 모두 옵니다",
             english=(
-                "when a user granted preset read searches the presets, every preset seeded "
-                "in advance comes back"
+                "when a user granted preset read searches the presets with a filter, every "
+                "preset seeded in advance comes back"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, PresetsAndACaller]:
-        return PresetsAndSomeone(role=UserRole.USER)
+        return PresetsAndSomeone(role=UserRole.USER, excluded=True)
 
     @override
     def when(self) -> When[PresetsAndACaller, DeploymentRevisionPresetAdapter, Answer]:

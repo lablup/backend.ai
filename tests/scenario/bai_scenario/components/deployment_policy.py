@@ -112,6 +112,7 @@ class APolicyOfADeploymentAndACaller:
     deployment: DeploymentInfo
     policy: DeploymentPolicyData
     caller: UserData
+    outside_policy: DeploymentPolicyData | None = None
 
 
 @dataclass(frozen=True)
@@ -120,6 +121,7 @@ class APolicyAndACaller(Given[Any, APolicyOfADeploymentAndACaller]):
 
     granted: tuple[Permission, ...] = ()
     role: UserRole = UserRole.USER
+    outside: bool = False
 
     @override
     def describe(self) -> str:
@@ -133,18 +135,27 @@ class APolicyAndACaller(Given[Any, APolicyOfADeploymentAndACaller]):
             names = ", ".join(p.name or "" for p in self.granted)
             who_ko = f"배포에 {names} 권한을 받은 사용자"
             who_en = f"a user granted the {names} permission on deployments"
-        return Says(
-            f"정책 하나가 걸린 배포 하나와, {who_ko} 한 명",
-            english=f"one deployment holding one policy, and {who_en}",
-        )
+        ko = f"정책 하나가 걸린 배포 하나와, {who_ko} 한 명"
+        en = f"one deployment holding one policy, and {who_en}"
+        if self.outside:
+            ko += ", 정책 하나가 다른 배포에 걸려 있고"
+            en += ", and one policy on another deployment"
+        return Says(ko, english=en)
 
     @override
     async def lay(self, seeding: Any) -> APolicyOfADeploymentAndACaller:
         place = await lay_a_place(seeding, granted=self.granted, role=self.role)
         deployment = await lay_a_deployment(seeding, place)
         policy = await seeding.adding(TestSeedDeploymentPolicyOf(), deployment)
+        outside_policy: DeploymentPolicyData | None = None
+        if self.outside:
+            other_deployment = await lay_a_deployment(seeding, place, name_hint="other")
+            outside_policy = seeding.made(
+                await seeding.adding(TestSeedDeploymentPolicyOf(), other_deployment)
+            )
         return APolicyOfADeploymentAndACaller(
             deployment=seeding.made(deployment),
             policy=seeding.made(policy),
+            outside_policy=outside_policy,
             caller=seeding.made(place.caller),
         )

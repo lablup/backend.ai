@@ -8,8 +8,17 @@ from typing import override
 
 import pytest
 
-from ai.backend.common.dto.manager.v2.deployment.request import SearchAutoScalingRulesInput
+from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    AutoScalingRuleFilter,
+    AutoScalingRuleOrder,
+    SearchAutoScalingRulesInput,
+)
 from ai.backend.common.dto.manager.v2.deployment.response import SearchAutoScalingRulesPayload
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    AutoScalingRuleOrderField,
+    OrderDirection,
+)
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.deployment.types import AutoScalingRuleOperationScope
 from ai.backend.manager.data.permission.types import Permission
@@ -27,6 +36,7 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.auto_scaling_rule import (
+    LAID_METRIC,
     RulesOfADeployment,
     RulesOfADeploymentAndACaller,
     TheRuleNode,
@@ -45,7 +55,7 @@ type RuleStep = Scenario[
 class SearchingTheRulesOfTheDeployment(
     When[RulesOfADeploymentAndACaller, DeploymentAdapter, Answer]
 ):
-    """심은 배포 하나의 id 만 준다."""
+    """지표 이름이 같은 규칙만 남기고, 생성 시각순으로 한 페이지를 훑는다."""
 
     @override
     def operation(self) -> str:
@@ -54,8 +64,12 @@ class SearchingTheRulesOfTheDeployment(
     @override
     def describe(self, laid: RulesOfADeploymentAndACaller) -> str:
         return Says(
-            f"{laid.caller.username} 이 배포가 걸린 자동 스케일링 규칙을 훑습니다",
-            english=f"{laid.caller.username} searches the auto-scaling rules the deployment holds",
+            f"{laid.caller.username} 이 배포가 걸린 자동 스케일링 규칙을 하나의 기준으로 "
+            f"걸러 순서와 함께 훑습니다",
+            english=(
+                f"{laid.caller.username} searches the auto-scaling rules the deployment "
+                f"holds with one filter, one order and pagination"
+            ),
         )
 
     @override
@@ -63,7 +77,17 @@ class SearchingTheRulesOfTheDeployment(
         with ActingAs(laid.caller):
             return await adapter.search_rules(
                 AutoScalingRuleOperationScope(deployment_id=laid.deployment.id),
-                SearchAutoScalingRulesInput(),
+                SearchAutoScalingRulesInput(
+                    filter=AutoScalingRuleFilter(metric_name=StringFilter(equals=LAID_METRIC)),
+                    order=[
+                        AutoScalingRuleOrder(
+                            field=AutoScalingRuleOrderField.CREATED_AT,
+                            direction=OrderDirection.ASC,
+                        )
+                    ],
+                    limit=10,
+                    offset=0,
+                ),
             )
 
 
@@ -76,8 +100,12 @@ class TheRulePageComesBack(Then[RulesOfADeploymentAndACaller, Answer]):
     @override
     def says(self) -> str:
         return Says(
+            "기준이 제외하는 규칙과 다른 배포에 걸린 규칙은 오지 않고, "
             "배포가 걸린 규칙이 양과 함께 옵니다",
-            english="the auto-scaling rules the deployment holds come back with their count",
+            english=(
+                "the rule the filter excludes and the rule on another deployment do not "
+                "come back, and the rules the deployment holds come back with their count"
+            ),
         )
 
     @override
@@ -87,6 +115,7 @@ class TheRulePageComesBack(Then[RulesOfADeploymentAndACaller, Answer]):
             return [MissingResponse(answered.raised)]
         verdicts: list[Verdict] = [
             Same("total_count", page.total_count, len(laid.rules)),
+            Same("items count", len(page.items), len(laid.rules)),
             Same("has_next_page", page.has_next_page, False),
             Same("has_previous_page", page.has_previous_page, False),
         ]
@@ -113,17 +142,19 @@ class AUserGrantedDeploymentReadSearchesTheRules(
     @override
     def describe(self) -> str:
         return Says(
-            "배포 조회 권한을 받은 사용자가 배포가 걸린 자동 스케일링 규칙을 훑으면, "
-            "그 규칙들이 옵니다",
+            "배포 조회 권한을 받은 사용자가 배포가 걸린 자동 스케일링 규칙을 기준으로 "
+            "걸러 훑으면, 그 규칙들이 옵니다",
             english=(
                 "when a user granted deployment read searches the auto-scaling rules the "
-                "deployment holds, those rules come back"
+                "deployment holds with a filter, those rules come back"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, RulesOfADeploymentAndACaller]:
-        return RulesOfADeployment(granted=(Permission.READ,))
+        return RulesOfADeployment(
+            granted=(Permission.READ,), excluded_metric="mem_util", outside=True
+        )
 
     @override
     def when(self) -> When[RulesOfADeploymentAndACaller, DeploymentAdapter, Answer]:
