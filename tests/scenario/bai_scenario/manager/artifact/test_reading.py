@@ -25,6 +25,7 @@ from ai.backend.testutils.scenario_steps import (
     Same,
     Says,
     Scenario,
+    Skipped,
     Then,
     Verdict,
     When,
@@ -303,16 +304,18 @@ class EveryArtifactPositionIsRefused(Then[ManyArtifactsAndACaller, LoadedArtifac
 
 
 @dataclass(frozen=True)
-class TheRevisionAndTheMissingOne(Then[ManyArtifactsWithRevisionsAndACaller, LoadedRevisions]):
-    """읽을 수 없는 리비전 자리마다 거부가, 없는 id 자리에는 빈 값이 온다."""
+class EveryUnreadableRevisionIsRefused(
+    Then[ManyArtifactsWithRevisionsAndACaller, LoadedRevisions]
+):
+    """읽을 수 없는 리비전 자리마다 거부가 담긴다. 없는 id 자리는 확인하지 않는다."""
 
     @override
     def says(self) -> str:
         return Says(
-            "읽을 수 없는 리비전 자리마다 권한 부족 거부가 담기고, 없는 id 자리는 비어 있습니다",
+            "읽을 수 없는 리비전 자리마다 권한 부족 거부가 담깁니다",
             english=(
                 "every revision the caller may not read comes back with a rejection for lack of "
-                "permission, and the position of the id that does not exist is empty"
+                "permission"
             ),
         )
 
@@ -327,11 +330,24 @@ class TheRevisionAndTheMissingOne(Then[ManyArtifactsWithRevisionsAndACaller, Loa
             return [Refused(NotEnoughPermission, answered.raised)]
         if len(got) != 3:
             return [Same("length", len(got), 3)]
-        first, missing, second = got
+        first, _missing, second = got
         return [
             Same("length", len(got), 3),
             Refused(NotEnoughPermission, first if isinstance(first, Exception) else None),
-            Same("[1]", missing, None),
+            Skipped(
+                "[1]",
+                Says(
+                    "없는 id 는 빈 값으로 오지만 읽을 수 없는 리비전은 거부로 와서, 이 자리가 "
+                    "리비전의 존재 여부를 드러냅니다. 결함 후보로 기록하고 기대값으로 굳히지 "
+                    "않습니다",
+                    english=(
+                        "an id naming no revision comes back empty while a revision the caller "
+                        "may not read comes back as a denial, so this position reveals whether "
+                        "the revision exists. It is recorded as a defect candidate rather than "
+                        "pinned as the expected behavior"
+                    ),
+                ),
+            ),
             Refused(NotEnoughPermission, second if isinstance(second, Exception) else None),
         ]
 
@@ -717,11 +733,10 @@ class APlainUserIsRefusedOnEveryReadableRevision(
     def describe(self) -> str:
         return Says(
             "아무 권한도 받지 않은 사용자가 리비전 id 여럿을 한 번에 읽으면, 읽을 수 없는 리비전 "
-            "자리마다 권한 부족 거부가 담기고 없는 id 자리는 비어 있습니다",
+            "자리마다 권한 부족 거부가 담깁니다",
             english=(
                 "when a user granted nothing loads several revision ids at once, every revision "
-                "the caller may not read comes back with a rejection for lack of permission, "
-                "and the position of the id that does not exist is empty"
+                "the caller may not read comes back with a rejection for lack of permission"
             ),
         )
 
@@ -740,7 +755,7 @@ class APlainUserIsRefusedOnEveryReadableRevision(
 
     @override
     def then(self) -> Then[ManyArtifactsWithRevisionsAndACaller, LoadedRevisions]:
-        return TheRevisionAndTheMissingOne()
+        return EveryUnreadableRevisionIsRefused()
 
 
 SCENARIOS: list[ScenarioStep] = [

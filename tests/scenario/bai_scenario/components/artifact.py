@@ -667,17 +667,23 @@ class TheRevisionNode(Then[AnArtifactWithRevisionsAndACaller, ArtifactRevisionNo
 
 @dataclass(frozen=True)
 class TheArtifactPage(Then[ArtifactsToSearch, AdminSearchArtifactsPayload]):
-    """검색 결과 한 페이지가 통째로 온다. 항목은 id 순서로 견준다."""
+    """검색 결과 한 페이지가 통째로 온다.
+
+    ``ordered_by_name`` 이면 이름 오름차순으로 온 순서를 그대로 견주고, 아니면 id 순서로 맞춰
+    견준다. ``limit`` 은 한 페이지에 담기는 개수다.
+    """
 
     started: datetime
     only_models: bool = False
+    ordered_by_name: bool = False
+    limit: int | None = None
 
     @override
     def says(self) -> str:
         if self.only_models:
             return Says(
-                "모델 아티팩트가 모두 한 페이지로 옵니다",
-                english="every model artifact comes back on one page",
+                "모델 아티팩트만 이름 순서로 한 페이지에 옵니다",
+                english="only model artifacts come back, in name order on one page",
             )
         return Says(
             "미리 저장한 아티팩트가 모두 한 페이지로 옵니다",
@@ -691,13 +697,27 @@ class TheArtifactPage(Then[ArtifactsToSearch, AdminSearchArtifactsPayload]):
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]
-        expected = laid.models if self.only_models else laid.laid
-        answered_in_order = sorted(payload.items, key=lambda node: node.id)
-        laid_in_order = sorted(expected, key=lambda artifact: artifact.id)
+        matched = [
+            one
+            for one in laid.laid
+            if not self.only_models or one.type is DataArtifactType.MODEL
+        ]
+        if self.ordered_by_name:
+            matched.sort(key=lambda artifact: artifact.name)
+        expected = matched if self.limit is None else matched[: self.limit]
+        answered_in_order = list(payload.items)
+        laid_in_order = list(expected)
+        if not self.ordered_by_name:
+            answered_in_order.sort(key=lambda node: node.id)
+            laid_in_order.sort(key=lambda artifact: artifact.id)
         verdicts: list[Verdict] = [
             Same("count", len(payload.items), len(expected)),
-            Same("total_count", payload.total_count, len(expected)),
-            Same("has_next_page", payload.has_next_page, False),
+            Same("total_count", payload.total_count, len(matched)),
+            Same(
+                "has_next_page",
+                payload.has_next_page,
+                self.limit is not None and len(matched) > len(expected),
+            ),
             Same("has_previous_page", payload.has_previous_page, False),
         ]
         for i, (node, artifact) in enumerate(zip(answered_in_order, laid_in_order, strict=False)):
@@ -709,29 +729,37 @@ class TheArtifactPage(Then[ArtifactsToSearch, AdminSearchArtifactsPayload]):
 class TheRevisionPage(
     Then[ManyArtifactsWithRevisionsAndACaller, AdminSearchArtifactRevisionsPayload]
 ):
-    """검색 결과 한 페이지가 통째로 온다. 항목은 id 순서로 견준다."""
+    """검색 결과 한 페이지가 통째로 온다.
+
+    ``ordered_by_version`` 이면 버전 오름차순으로 온 순서를 그대로 견주고, 아니면 id 순서로
+    맞춰 견준다. ``limit`` 은 한 페이지에 담기는 개수다.
+    """
 
     only_status: DataArtifactStatus | None = None
     only_artifact_index: int | None = None
+    ordered_by_version: bool = False
+    limit: int | None = None
 
     @override
     def says(self) -> str:
         if self.only_status is not None:
             return Says(
-                "그 상태의 리비전이 모두 한 페이지로 옵니다",
-                english="every revision in that status comes back on one page",
+                "그 상태의 리비전만 버전 순서로 한 페이지에 옵니다",
+                english=(
+                    "only revisions in that status come back, in version order on one page"
+                ),
             )
         if self.only_artifact_index is not None:
             return Says(
-                "그 아티팩트가 가진 리비전이 모두 한 페이지로 옵니다",
-                english="every revision the artifact holds comes back on one page",
+                "그 아티팩트가 가진 리비전만 한 페이지로 옵니다",
+                english="only the revisions the artifact holds come back on one page",
             )
         return Says(
             "미리 저장한 리비전이 모두 한 페이지로 옵니다",
             english="every revision made in advance comes back on one page",
         )
 
-    def expected(
+    def matched(
         self, laid: ManyArtifactsWithRevisionsAndACaller
     ) -> tuple[tuple[ArtifactData, ArtifactRevisionData], ...]:
         artifacts = (
@@ -753,13 +781,23 @@ class TheRevisionPage(
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]
-        expected = self.expected(laid)
-        answered_in_order = sorted(payload.items, key=lambda node: node.id)
-        laid_in_order = sorted(expected, key=lambda pair: pair[1].id)
+        matched = list(self.matched(laid))
+        if self.ordered_by_version:
+            matched.sort(key=lambda pair: (pair[1].version, pair[1].id))
+        expected = matched if self.limit is None else matched[: self.limit]
+        answered_in_order = list(payload.items)
+        laid_in_order = list(expected)
+        if not self.ordered_by_version:
+            answered_in_order.sort(key=lambda node: node.id)
+            laid_in_order.sort(key=lambda pair: pair[1].id)
         verdicts: list[Verdict] = [
             Same("count", len(payload.items), len(expected)),
-            Same("total_count", payload.total_count, len(expected)),
-            Same("has_next_page", payload.has_next_page, False),
+            Same("total_count", payload.total_count, len(matched)),
+            Same(
+                "has_next_page",
+                payload.has_next_page,
+                self.limit is not None and len(matched) > len(expected),
+            ),
             Same("has_previous_page", payload.has_previous_page, False),
         ]
         for i, (node, (artifact, revision)) in enumerate(
