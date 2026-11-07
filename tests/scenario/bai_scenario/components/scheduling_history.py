@@ -45,7 +45,7 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.domain import SomeoneOf, WrittenByThisRun
-from bai_scenario.components.resource_allocation import lay_a_place
+from bai_scenario.components.resource_allocation import LaidPlace, lay_a_place
 from bai_scenario.seeds.deployment.deployment import TestSeedDeployment
 from bai_scenario.seeds.scheduling_history.history import (
     TestSeedDeploymentHistory,
@@ -127,13 +127,25 @@ class HistoriesAndSomeone(Given[Any, HistoriesAndACaller]):
     """세션 하나와 그 커널, 배포 하나와 그 복제본 그룹과 복제본, 그리고 이력 다섯 줄.
 
     이력 한 줄씩이 세션, 커널, 배포, 라우트, 복제본 그룹에 붙어 있다. ``who``가 부르는
-    사람이다.
+    사람이다. ``outside`` 면 같은 다섯 가지를 한 벌 더 세워, 범위를 대고 훑을 때 걸러지는지
+    볼 수 있게 한다.
     """
 
     who: Side = Side.SUPERADMIN
+    outside: bool = False
 
     @override
     def describe(self) -> str:
+        if self.outside:
+            return Says(
+                "스케줄링 이력이 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 "
+                f"같은 것이 한 벌 더 있고, {_who(self.who)}",
+                english=(
+                    "one set of a session, kernel, deployment, route and replica group carrying "
+                    "a scheduling history row, one more set of each outside the scope, and "
+                    f"{_who_en(self.who)}"
+                ),
+            )
         return Says(
             "스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, "
             f"{_who(self.who)}",
@@ -196,6 +208,8 @@ class HistoriesAndSomeone(Given[Any, HistoriesAndACaller]):
             ),
             deployment,
         )
+        if self.outside:
+            await self._lay_outside(seeding, place)
         caller = await seeding.within(
             SomeoneOf(
                 place.domain,
@@ -214,6 +228,60 @@ class HistoriesAndSomeone(Given[Any, HistoriesAndACaller]):
             route_history=seeding.made(route_history),
             replica_group_history=seeding.made(replica_group_history),
             caller=seeding.made(caller),
+        )
+
+    async def _lay_outside(self, seeding: Any, place: LaidPlace) -> None:
+        """같은 다섯 가지를 한 벌 더 세운다. 범위를 대고 훑으면 이 벌은 걸러져야 한다."""
+        session = await seeding.creating_from_three(
+            TestSeedSession(access_key=place.access_key, name_hint="other-session"),
+            place.project,
+            place.owner,
+            place.group,
+        )
+        kernel_group = await seeding.adding(
+            TestSeedMainKernelGroupOf(image=seeding.made(place.image), slots=()), session
+        )
+        kernel = await seeding.adding_with_nested(
+            TestSeedKernelOf(
+                session=seeding.made(session),
+                group=seeding.made(kernel_group),
+                image=seeding.made(place.image),
+                slots=(),
+            ),
+            session,
+        )
+        await seeding.adding(TestSeedSessionHistory(), session)
+        await seeding.adding(TestSeedKernelHistory(kernel_id=seeding.made(kernel).id), session)
+        deployment = await seeding.creating_from_three(
+            TestSeedDeployment(name_hint="other-deployment"),
+            place.project,
+            place.group,
+            place.owner,
+        )
+        deployment_value = seeding.made(deployment)
+        await seeding.adding(TestSeedDeploymentHistory(), deployment)
+        session_group = await seeding.creating_from(TestSeedDeploymentSessionGroup(), deployment)
+        replica_group = await seeding.adding(
+            TestSeedPrimaryReplicaGroupOf(SessionGroupID(seeding.made(session_group).id)),
+            deployment,
+        )
+        await seeding.adding(
+            TestSeedReplicaGroupHistory(
+                replica_group_id=ReplicaGroupID(seeding.made(replica_group).id)
+            ),
+            deployment,
+        )
+        replica = await seeding.adding(
+            TestSeedReplicaOf(
+                replica_group_id=ReplicaGroupID(seeding.made(replica_group).id),
+                session_owner_id=deployment_value.metadata.session_owner,
+                domain_name=deployment_value.metadata.domain,
+                project_id=deployment_value.metadata.project,
+            ),
+            deployment,
+        )
+        await seeding.adding(
+            TestSeedRouteHistory(route_id=ReplicaID(seeding.made(replica).id)), deployment
         )
 
 

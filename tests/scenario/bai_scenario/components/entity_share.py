@@ -148,12 +148,14 @@ class ASharedFolderAndSomeone(Given[Any, ASharedFolderAndACaller]):
     """프로젝트 폴더 하나와 두 사람.
 
     ``offered`` 면 폴더를 두 번째 사람에게 빌려주는 제안이 서 있고, ``taken`` 면 그 제안을
-    받아들여 공유가 서 있다. ``who`` 가 부르는 사람이다.
+    받아들여 공유가 서 있다. ``elsewhere`` 면 범위 밖의 폴더 하나와, 그 폴더를 세 번째
+    사람에게 빌려주는 제안이 함께 서 있다. ``who`` 가 부르는 사람이다.
     """
 
     who: Side = Side.SHARER
     offered: bool = True
     taken: bool = False
+    elsewhere: bool = False
     cap: Permission | None = None
     sharer_granted: tuple[Permission, ...] = SHARER_ON_PROJECT
     recipient_granted: tuple[Permission, ...] = RECIPIENT_IN_OWN_SCOPE
@@ -167,19 +169,28 @@ class ASharedFolderAndSomeone(Given[Any, ASharedFolderAndACaller]):
             "the person the folder is lent to",
             "someone unrelated",
         )
+        outside_ko = "범위 밖의 폴더 하나와 제안 하나, " if self.elsewhere else ""
+        outside_en = (
+            "one more folder outside the scope with an offer of its own, " if self.elsewhere else ""
+        )
         if self.taken:
             return Says(
-                f"프로젝트 폴더 하나와, 다른 사람에게 빌려준 공유, 그리고 {who_ko}",
-                english=f"one project folder with a share lent to another person, and {who_en}",
+                f"{outside_ko}프로젝트 폴더 하나와, 다른 사람에게 빌려준 공유, 그리고 {who_ko}",
+                english=(
+                    f"{outside_en}one project folder with a share lent to another person, "
+                    f"and {who_en}"
+                ),
             )
         if self.offered:
             return Says(
-                f"프로젝트 폴더 하나와, 다른 사람에게 보낸 제안, 그리고 {who_ko}",
-                english=f"one project folder with an offer to another person, and {who_en}",
+                f"{outside_ko}프로젝트 폴더 하나와, 다른 사람에게 보낸 제안, 그리고 {who_ko}",
+                english=(
+                    f"{outside_en}one project folder with an offer to another person, and {who_en}"
+                ),
             )
         return Says(
-            f"프로젝트 폴더 하나와 두 사람, 그리고 {who_ko}",
-            english=f"one project folder and two people, and {who_en}",
+            f"{outside_ko}프로젝트 폴더 하나와 두 사람, 그리고 {who_ko}",
+            english=f"{outside_en}one project folder and two people, and {who_en}",
         )
 
     @override
@@ -210,6 +221,17 @@ class ASharedFolderAndSomeone(Given[Any, ASharedFolderAndACaller]):
             if share is None:
                 raise LookupError("a taken share needs the offer it settled")
             await seeding.accepting(TestSeedShareTaken(), share)
+        if self.elsewhere:
+            other_folder = await seeding.creating_from_two(
+                TestSeedProjectVFolder(host=HOST, name_hint="other-folder"), project, sharer
+            )
+            other_person = await seeding.within(SomeoneOf(domain))
+            await seeding.creating_from_three(
+                TestSeedVFolderShare(cap=self.cap, name_hint="other-share"),
+                sharer,
+                other_folder,
+                other_person,
+            )
         caller: Laid[UserData]
         match self.who:
             case Side.SHARER:

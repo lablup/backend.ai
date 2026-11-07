@@ -112,13 +112,15 @@ class ReadingDomains(TestSeedNest[Laid[None]]):
 class LabeledDomainsAndSomeone(Given[Any, LabeledDomainsAndACaller]):
     """대상 도메인 여럿과, 다른 도메인에 사는 사용자 한 명.
 
-    ``writable``은 앞에서부터 몇 개의 대상에 수정 권한을 받는지, ``keys``는 대상마다 미리
-    붙여 둘 라벨의 키다.
+    ``writable``은 앞에서부터 몇 개의 대상에 수정 권한을 받는지, ``readable``은 몇 개를
+    읽을 수 있는지, ``keys``는 대상마다 미리 붙여 둘 라벨의 키다. ``elsewhere``는 범위에
+    대지 않지만 읽을 수 있는 도메인 수다.
     """
 
     targets: int = 2
     writable: int = 0
     readable: int = 0
+    elsewhere: int = 0
     keys: Sequence[str] = ()
     role: UserRole = UserRole.USER
 
@@ -128,15 +130,19 @@ class LabeledDomainsAndSomeone(Given[Any, LabeledDomainsAndACaller]):
         labeled = f"라벨 {len(self.keys)}개씩 붙은 " if self.keys else ""
         granted = f"그중 {self.writable}개에 수정 권한을 받은 " if self.writable else ""
         reader = f"그중 {self.readable}개를 읽을 수 있는 " if self.readable else ""
+        outside = (
+            f"범위에 대지 않는 도메인 {self.elsewhere}개도 읽을 수 있는 " if self.elsewhere else ""
+        )
         english = (
             f"{self.targets} domains"
             + (f" with {len(self.keys)} labels each" if self.keys else "")
             + f" and one {role}"
             + (f" granted permission to update {self.writable} of them" if self.writable else "")
             + (f" who can read {self.readable} of them" if self.readable else "")
+            + (f" and {self.elsewhere} domains outside the scope" if self.elsewhere else "")
         )
         return Says(
-            f"{labeled}도메인 {self.targets}개와, {granted}{reader}{role} 한 명",
+            f"{labeled}도메인 {self.targets}개와, {granted}{reader}{outside}{role} 한 명",
             english=english,
         )
 
@@ -157,6 +163,13 @@ class LabeledDomainsAndSomeone(Given[Any, LabeledDomainsAndACaller]):
             await seeding.within(WritingDomains(target, caller))
         for target in targets[: self.readable]:
             await seeding.within(ReadingDomains(target, caller))
+        for _ in range(self.elsewhere):
+            outside = await seeding.creating(
+                TestSeedDomain(name_hint="elsewhere", description=WAS_HERE)
+            )
+            for key in self.keys:
+                await seeding.adding(TestSeedDomainLabel(key=key, value="before"), outside)
+            await seeding.within(ReadingDomains(outside, caller))
         return LabeledDomainsAndACaller(
             targets=tuple(seeding.made(one) for one in targets),
             labels=tuple(seeding.made(one) for one in labels),
