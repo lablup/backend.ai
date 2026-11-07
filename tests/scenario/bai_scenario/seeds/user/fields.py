@@ -100,15 +100,18 @@ class TestSeedLoginSessionOf(TestSeedFieldCreator[UserData, LoginSessionData]):
 
 @dataclass(frozen=True)
 class TestSeedLoginHistoryOf(TestSeedFieldCreator[UserData, LoginHistoryData]):
-    """The record one successful login of the user left, under the user's own domain."""
+    """The record one login attempt of the user left, under the user's own domain."""
 
     domain_name: str
+    result: LoginAttemptResult = LoginAttemptResult.SUCCESS
+    fail_reason: str | None = None
+    client_ip: str | None = None
 
     @override
     def kind(self) -> str:
         return Says(
-            "성공한 로그인 이력 하나를 갖습니다",
-            english="has one successful login record",
+            f"로그인 시도 이력 하나를 갖습니다. 결과는 {self.result.value}",
+            english=f"has one login attempt record whose result is {self.result.value}",
         )
 
     @override
@@ -117,4 +120,9 @@ class TestSeedLoginHistoryOf(TestSeedFieldCreator[UserData, LoginHistoryData]):
 
     @override
     def seed(self) -> LoginHistoryCreator:
-        return LoginHistoryCreator(domain_name=self.domain_name, result=LoginAttemptResult.SUCCESS)
+        return LoginHistoryCreator(
+            domain_name=self.domain_name,
+            result=self.result,
+            fail_reason=self.fail_reason,
+            client_ip=self.client_ip,
+        )
