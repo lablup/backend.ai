@@ -620,7 +620,7 @@ Then
 
 Given
 
-- 커널 하나와 그 커널 그룹을 가진 대기 세션, 그리고 그것을 읽을 사용자 한 명
+- 커널 하나와 그 커널 그룹을 가진 대기 세션, 같은 프로젝트의 같은 모양 세션 하나와 다른 프로젝트의 같은 모양 세션 하나, 그리고 그것을 읽을 사용자 한 명
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -647,6 +647,17 @@ Given
     - 역할 session-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 session-reader-1: session 전체에 READ 허용
     - 일반 사용자 user-2: 역할 session-reader-1 보유
+  - 세션 beside-session-1: 스케줄링을 기다립니다
+  - 세션 beside-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 beside-session-1(main 커널 그룹 하나를 갖습니다): 환경 변수 하나를 갖습니다
+  - 세션 beside-session-1(main 커널 그룹 하나를 갖습니다): slot-1 슬롯 요구량 하나를 갖습니다
+  - 세션 beside-session-1: 요구량이 slot-1 1인 커널 하나를 갖습니다
+  - 프로젝트 outside-project-1
+  - 세션 outside-session-1: 스케줄링을 기다립니다
+  - 세션 outside-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 outside-session-1(main 커널 그룹 하나를 갖습니다): 환경 변수 하나를 갖습니다
+  - 세션 outside-session-1(main 커널 그룹 하나를 갖습니다): slot-1 슬롯 요구량 하나를 갖습니다
+  - 세션 outside-session-1: 요구량이 slot-1 1인 커널 하나를 갖습니다
 
 When
 
@@ -710,7 +721,7 @@ Then
 
 Given
 
-- 커널 하나와 그 커널 그룹을 가진 대기 세션, 그리고 그것을 읽을 사용자 한 명
+- 커널 하나와 그 커널 그룹을 가진 대기 세션, 같은 프로젝트의 같은 모양 세션 하나와 다른 프로젝트의 같은 모양 세션 하나, 그리고 그것을 읽을 사용자 한 명
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -737,6 +748,17 @@ Given
     - 역할 session-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 session-reader-1: session 전체에 READ 허용
     - 일반 사용자 user-2: 역할 session-reader-1 보유
+  - 세션 beside-session-1: 스케줄링을 기다립니다
+  - 세션 beside-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 beside-session-1(main 커널 그룹 하나를 갖습니다): 환경 변수 하나를 갖습니다
+  - 세션 beside-session-1(main 커널 그룹 하나를 갖습니다): slot-1 슬롯 요구량 하나를 갖습니다
+  - 세션 beside-session-1: 요구량이 slot-1 1인 커널 하나를 갖습니다
+  - 프로젝트 outside-project-1
+  - 세션 outside-session-1: 스케줄링을 기다립니다
+  - 세션 outside-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 outside-session-1(main 커널 그룹 하나를 갖습니다): 환경 변수 하나를 갖습니다
+  - 세션 outside-session-1(main 커널 그룹 하나를 갖습니다): slot-1 슬롯 요구량 하나를 갖습니다
+  - 세션 outside-session-1: 요구량이 slot-1 1인 커널 하나를 갖습니다
 
 When
 
@@ -800,7 +822,7 @@ Then
 
 Given
 
-- 커널 하나와 그 커널 그룹을 가진 대기 세션, 그리고 그것을 읽을 사용자 한 명
+- 커널 하나와 그 커널 그룹을 가진 대기 세션, 같은 프로젝트의 같은 모양 세션 하나와 다른 프로젝트의 같은 모양 세션 하나, 그리고 그것을 읽을 사용자 한 명
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -827,6 +849,17 @@ Given
     - 역할 session-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 session-reader-1: session 전체에 READ 허용
     - 일반 사용자 user-2: 역할 session-reader-1 보유
+  - 세션 beside-session-1: 스케줄링을 기다립니다
+  - 세션 beside-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 beside-session-1(main 커널 그룹 하나를 갖습니다): 환경 변수 하나를 갖습니다
+  - 세션 beside-session-1(main 커널 그룹 하나를 갖습니다): slot-1 슬롯 요구량 하나를 갖습니다
+  - 세션 beside-session-1: 요구량이 slot-1 1인 커널 하나를 갖습니다
+  - 프로젝트 outside-project-1
+  - 세션 outside-session-1: 스케줄링을 기다립니다
+  - 세션 outside-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 outside-session-1(main 커널 그룹 하나를 갖습니다): 환경 변수 하나를 갖습니다
+  - 세션 outside-session-1(main 커널 그룹 하나를 갖습니다): slot-1 슬롯 요구량 하나를 갖습니다
+  - 세션 outside-session-1: 요구량이 slot-1 1인 커널 하나를 갖습니다
 
 When
 
@@ -1026,7 +1059,7 @@ Then
 
 Given
 
-- 커널 하나와 그 커널 그룹을 가진 대기 세션, 그리고 그것을 읽을 사용자 한 명
+- 커널 하나와 그 커널 그룹을 가진 대기 세션, 같은 프로젝트의 같은 모양 세션 하나와 다른 프로젝트의 같은 모양 세션 하나, 그리고 그것을 읽을 사용자 한 명
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1048,6 +1081,17 @@ Given
   - 세션 session-1(main 커널 그룹 하나를 갖습니다): 환경 변수 하나를 갖습니다
   - 세션 session-1(main 커널 그룹 하나를 갖습니다): slot-1 슬롯 요구량 하나를 갖습니다
   - 세션 session-1: 요구량이 slot-1 1인 커널 하나를 갖습니다
+  - 세션 beside-session-1: 스케줄링을 기다립니다
+  - 세션 beside-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 beside-session-1(main 커널 그룹 하나를 갖습니다): 환경 변수 하나를 갖습니다
+  - 세션 beside-session-1(main 커널 그룹 하나를 갖습니다): slot-1 슬롯 요구량 하나를 갖습니다
+  - 세션 beside-session-1: 요구량이 slot-1 1인 커널 하나를 갖습니다
+  - 프로젝트 outside-project-1
+  - 세션 outside-session-1: 스케줄링을 기다립니다
+  - 세션 outside-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 outside-session-1(main 커널 그룹 하나를 갖습니다): 환경 변수 하나를 갖습니다
+  - 세션 outside-session-1(main 커널 그룹 하나를 갖습니다): slot-1 슬롯 요구량 하나를 갖습니다
+  - 세션 outside-session-1: 요구량이 slot-1 1인 커널 하나를 갖습니다
 
 When
 
@@ -1289,7 +1333,7 @@ Then
 
 Given
 
-- 커널 하나와 그 커널 그룹을 가진 대기 세션, 그리고 그것을 읽을 사용자 한 명
+- 커널 하나와 그 커널 그룹을 가진 대기 세션, 같은 프로젝트의 같은 모양 세션 하나와 다른 프로젝트의 같은 모양 세션 하나, 그리고 그것을 읽을 사용자 한 명
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1316,6 +1360,17 @@ Given
     - 역할 session-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 session-reader-1: session 전체에 READ 허용
     - 일반 사용자 user-2: 역할 session-reader-1 보유
+  - 세션 beside-session-1: 스케줄링을 기다립니다
+  - 세션 beside-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 beside-session-1(main 커널 그룹 하나를 갖습니다): 환경 변수 하나를 갖습니다
+  - 세션 beside-session-1(main 커널 그룹 하나를 갖습니다): slot-1 슬롯 요구량 하나를 갖습니다
+  - 세션 beside-session-1: 요구량이 slot-1 1인 커널 하나를 갖습니다
+  - 프로젝트 outside-project-1
+  - 세션 outside-session-1: 스케줄링을 기다립니다
+  - 세션 outside-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 outside-session-1(main 커널 그룹 하나를 갖습니다): 환경 변수 하나를 갖습니다
+  - 세션 outside-session-1(main 커널 그룹 하나를 갖습니다): slot-1 슬롯 요구량 하나를 갖습니다
+  - 세션 outside-session-1: 요구량이 slot-1 1인 커널 하나를 갖습니다
 
 When
 
@@ -1379,7 +1434,7 @@ Then
 
 Given
 
-- 커널 하나와 그 커널 그룹을 가진 대기 세션, 그리고 그것을 읽을 사용자 한 명
+- 커널 하나와 그 커널 그룹을 가진 대기 세션, 같은 프로젝트의 같은 모양 세션 하나와 다른 프로젝트의 같은 모양 세션 하나, 그리고 그것을 읽을 사용자 한 명
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1406,6 +1461,17 @@ Given
     - 역할 session-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 session-reader-1: session 전체에 READ 허용
     - 일반 사용자 user-2: 역할 session-reader-1 보유
+  - 세션 beside-session-1: 스케줄링을 기다립니다
+  - 세션 beside-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 beside-session-1(main 커널 그룹 하나를 갖습니다): 환경 변수 하나를 갖습니다
+  - 세션 beside-session-1(main 커널 그룹 하나를 갖습니다): slot-1 슬롯 요구량 하나를 갖습니다
+  - 세션 beside-session-1: 요구량이 slot-1 1인 커널 하나를 갖습니다
+  - 프로젝트 outside-project-1
+  - 세션 outside-session-1: 스케줄링을 기다립니다
+  - 세션 outside-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 outside-session-1(main 커널 그룹 하나를 갖습니다): 환경 변수 하나를 갖습니다
+  - 세션 outside-session-1(main 커널 그룹 하나를 갖습니다): slot-1 슬롯 요구량 하나를 갖습니다
+  - 세션 outside-session-1: 요구량이 slot-1 1인 커널 하나를 갖습니다
 
 When
 
@@ -1469,7 +1535,7 @@ Then
 
 Given
 
-- 커널 하나와 그 커널 그룹을 가진 대기 세션, 그리고 그것을 읽을 사용자 한 명
+- 커널 하나와 그 커널 그룹을 가진 대기 세션, 같은 프로젝트의 같은 모양 세션 하나와 다른 프로젝트의 같은 모양 세션 하나, 그리고 그것을 읽을 사용자 한 명
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1496,6 +1562,17 @@ Given
     - 역할 session-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 session-reader-1: session 전체에 READ 허용
     - 일반 사용자 user-2: 역할 session-reader-1 보유
+  - 세션 beside-session-1: 스케줄링을 기다립니다
+  - 세션 beside-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 beside-session-1(main 커널 그룹 하나를 갖습니다): 환경 변수 하나를 갖습니다
+  - 세션 beside-session-1(main 커널 그룹 하나를 갖습니다): slot-1 슬롯 요구량 하나를 갖습니다
+  - 세션 beside-session-1: 요구량이 slot-1 1인 커널 하나를 갖습니다
+  - 프로젝트 outside-project-1
+  - 세션 outside-session-1: 스케줄링을 기다립니다
+  - 세션 outside-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 outside-session-1(main 커널 그룹 하나를 갖습니다): 환경 변수 하나를 갖습니다
+  - 세션 outside-session-1(main 커널 그룹 하나를 갖습니다): slot-1 슬롯 요구량 하나를 갖습니다
+  - 세션 outside-session-1: 요구량이 slot-1 1인 커널 하나를 갖습니다
 
 When
 
@@ -1649,7 +1726,7 @@ Then
 
 Given
 
-- 커널 하나와 그 커널 그룹을 가진 대기 세션, 그리고 그것을 읽을 사용자 한 명
+- 커널 하나와 그 커널 그룹을 가진 대기 세션, 같은 프로젝트의 같은 모양 세션 하나와 다른 프로젝트의 같은 모양 세션 하나, 그리고 그것을 읽을 사용자 한 명
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1676,6 +1753,17 @@ Given
     - 역할 session-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 session-reader-1: session 전체에 READ 허용
     - 일반 사용자 user-2: 역할 session-reader-1 보유
+  - 세션 beside-session-1: 스케줄링을 기다립니다
+  - 세션 beside-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 beside-session-1(main 커널 그룹 하나를 갖습니다): 환경 변수 하나를 갖습니다
+  - 세션 beside-session-1(main 커널 그룹 하나를 갖습니다): slot-1 슬롯 요구량 하나를 갖습니다
+  - 세션 beside-session-1: 요구량이 slot-1 1인 커널 하나를 갖습니다
+  - 프로젝트 outside-project-1
+  - 세션 outside-session-1: 스케줄링을 기다립니다
+  - 세션 outside-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 outside-session-1(main 커널 그룹 하나를 갖습니다): 환경 변수 하나를 갖습니다
+  - 세션 outside-session-1(main 커널 그룹 하나를 갖습니다): slot-1 슬롯 요구량 하나를 갖습니다
+  - 세션 outside-session-1: 요구량이 slot-1 1인 커널 하나를 갖습니다
 
 When
 
