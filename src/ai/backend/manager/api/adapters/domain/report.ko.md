@@ -603,11 +603,21 @@ When
 
 Then
 
-- 프로젝트 이름이 앞서는 첫째 도메인 하나만 오고, 활성 사용자가 없는 셋째는 빠집니다
-  - items = ['first-1']
+- 프로젝트 이름이 앞서는 첫째 도메인 하나가 전체 필드로 오고, 활성 사용자가 없는 셋째는 빠집니다
+  - items count = 1
   - total_count = 2
   - has_next_page = True
   - has_previous_page = False
+  - items[0].name = 'first-1'
+  - items[0].description = '이미 있던 도메인'
+  - items[0].integration_name = None
+  - items[0].allowed_docker_registries = []
+  - items[0].is_active = True
+  - items[0].is_default = False
+  - items[0].id: 건너뜀: 데이터베이스가 생성합니다
+  - items[0].entity_id: 미리 저장한 도메인의 id 와 같다
+  - items[0].created_at: 이 실행이 쓴 시각
+  - items[0].modified_at: 이 실행이 쓴 시각
 
 <a id="searching-the-answer-counts-every-domain-the-scenario-laid"></a>
 
