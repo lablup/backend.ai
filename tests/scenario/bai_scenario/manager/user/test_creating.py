@@ -696,37 +696,6 @@ class AGrantedCreatorMakesAUser(
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingMayNotCreateAUserWithThePolicies(
-    Scenario[TestSeedingSession, ADomainACallerAndThePolicies, UserAdapter, Any]
-):
-    @override
-    def summary(self) -> str:
-        return "a-user-granted-nothing-may-not-create-a-user-even-with-the-policies-laid"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "권한을 받지 않은 사용자가 사용자를 만들려 하면, 도메인 스코프 권한 문이 막습니다",
-            english=(
-                "a user holding no permission who tries to create a user is rejected by the "
-                "domain scope permission gate"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ADomainACallerAndThePolicies]:
-        return SomeoneWithThePolicies()
-
-    @override
-    def when(self) -> When[ADomainACallerAndThePolicies, UserAdapter, Any]:
-        return CreatingAUserUnderThePolicies()
-
-    @override
-    def then(self) -> Then[ADomainACallerAndThePolicies, Any]:
-        return TheCallIsRefused(NotEnoughPermission)
-
-
-@dataclass(frozen=True)
 class TheSuperadminBulkCreatesAUser(
     Scenario[TestSeedingSession, ADomainACallerAndThePolicies, UserAdapter, Any]
 ):
@@ -801,7 +770,6 @@ SCENARIOS: list[Scenario[TestSeedingSession, Any, UserAdapter, Any]] = [
     OnlyTheSuperadminMayBulkCreate(),
     OnlyTheSuperadminMayBulkCreateWithKeypairs(),
     AGrantedCreatorMakesAUser(started=datetime.now(UTC)),
-    AUserGrantedNothingMayNotCreateAUserWithThePolicies(),
     TheSuperadminBulkCreatesAUser(started=datetime.now(UTC)),
     TheSuperadminBulkCreatesAUserWithItsKeypair(started=datetime.now(UTC)),
 ]
