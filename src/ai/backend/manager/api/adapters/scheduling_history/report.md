@@ -26,96 +26,96 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin pages through deployment histories, the one history laid in advance comes back as one page](#searching-the-superadmin-pages-through-deployment-histories) | answered |
+| [when the superadmin pages through deployment histories with a condition that keeps one history laid in advance, only that history comes back as one page](#searching-the-superadmin-pages-through-deployment-histories) | answered |
 | [when a user other than the superadmin pages through deployment histories, the call is rejected for lack of privilege](#searching-a-user-granted-nothing-may-not-page-through-deployment-histories) | rejected |
 
 **admin_search_kernel_history**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin pages through kernel histories, the one history laid in advance comes back as one page](#searching-the-superadmin-pages-through-kernel-histories) | answered |
+| [when the superadmin pages through kernel histories with a condition that keeps one history laid in advance, only that history comes back as one page](#searching-the-superadmin-pages-through-kernel-histories) | answered |
 | [when a user other than the superadmin pages through kernel histories, the call is rejected for lack of privilege](#searching-a-user-granted-nothing-may-not-page-through-kernel-histories) | rejected |
 
 **admin_search_replica_group_history**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin pages through replica group histories, the one history laid in advance comes back as one page](#searching-the-superadmin-pages-through-replica-group-histories) | answered |
+| [when the superadmin pages through replica group histories with a condition that keeps one history laid in advance, only that history comes back as one page](#searching-the-superadmin-pages-through-replica-group-histories) | answered |
 | [when a user other than the superadmin pages through replica group histories, the call is rejected for lack of privilege](#searching-a-user-granted-nothing-may-not-page-through-replica-group-histories) | rejected |
 
 **admin_search_route_history**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin pages through route histories, the one history laid in advance comes back as one page](#searching-the-superadmin-pages-through-route-histories) | answered |
+| [when the superadmin pages through route histories with a condition that keeps one history laid in advance, only that history comes back as one page](#searching-the-superadmin-pages-through-route-histories) | answered |
 | [when a user other than the superadmin pages through route histories, the call is rejected for lack of privilege](#searching-a-user-granted-nothing-may-not-page-through-route-histories) | rejected |
 
 **admin_search_session_history**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin pages through session histories, the one history laid in advance comes back as one page](#searching-the-superadmin-pages-through-session-histories) | answered |
+| [when the superadmin pages through session histories with a condition that keeps one history laid in advance, only that history comes back as one page](#searching-the-superadmin-pages-through-session-histories) | answered |
 | [when a user other than the superadmin pages through session histories, the call is rejected for lack of privilege](#searching-a-user-granted-nothing-may-not-page-through-session-histories) | rejected |
 
 **batch_load_deployment_histories_by_ids**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reads a deployment history by its id, the history comes back whole as a node](#batch_loading-the-superadmin-loads-the-deployment-history) | answered |
-| [when the superadmin reads deployment histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value](#batch_loading-the-superadmin-loads-the-deployment-history-with-an-unknown-id) | answered |
+| [when a regular user granted permission to read sessions and deployments reads a deployment history by its id, the history comes back whole as a node](#batch_loading-a-reader-loads-the-deployment-history) | answered |
+| [when a regular user granted permission to read sessions and deployments reads deployment histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value](#batch_loading-a-reader-loads-the-deployment-history-with-an-unknown-id) | answered |
 | [when a user granted nothing reads another's deployment history by id, that entry is rejected for lack of permission](#batch_loading-a-user-granted-nothing-may-not-load-the-deployment-history) | rejected |
 
 **batch_load_kernel_histories_by_ids**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reads a kernel history by its id, the history comes back whole as a node](#batch_loading-the-superadmin-loads-the-kernel-history) | answered |
-| [when the superadmin reads kernel histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value](#batch_loading-the-superadmin-loads-the-kernel-history-with-an-unknown-id) | answered |
+| [when a regular user granted permission to read sessions and deployments reads a kernel history by its id, the history comes back whole as a node](#batch_loading-a-reader-loads-the-kernel-history) | answered |
+| [when a regular user granted permission to read sessions and deployments reads kernel histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value](#batch_loading-a-reader-loads-the-kernel-history-with-an-unknown-id) | answered |
 | [when a user granted nothing reads another's kernel history by id, that entry is rejected for lack of permission](#batch_loading-a-user-granted-nothing-may-not-load-the-kernel-history) | rejected |
 
 **batch_load_replica_group_histories_by_ids**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reads a replica group history by its id, the history comes back whole as a node](#batch_loading-the-superadmin-loads-the-replica-group-history) | answered |
-| [when the superadmin reads replica group histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value](#batch_loading-the-superadmin-loads-the-replica-group-history-with-an-unknown-id) | answered |
+| [when a regular user granted permission to read sessions and deployments reads a replica group history by its id, the history comes back whole as a node](#batch_loading-a-reader-loads-the-replica-group-history) | answered |
+| [when a regular user granted permission to read sessions and deployments reads replica group histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value](#batch_loading-a-reader-loads-the-replica-group-history-with-an-unknown-id) | answered |
 | [when a user granted nothing reads another's replica group history by id, that entry is rejected for lack of permission](#batch_loading-a-user-granted-nothing-may-not-load-the-replica-group-history) | rejected |
 
 **batch_load_route_histories_by_ids**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reads a route history by its id, the history comes back whole as a node](#batch_loading-the-superadmin-loads-the-route-history) | answered |
-| [when the superadmin reads route histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value](#batch_loading-the-superadmin-loads-the-route-history-with-an-unknown-id) | answered |
+| [when a regular user granted permission to read sessions and deployments reads a route history by its id, the history comes back whole as a node](#batch_loading-a-reader-loads-the-route-history) | answered |
+| [when a regular user granted permission to read sessions and deployments reads route histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value](#batch_loading-a-reader-loads-the-route-history-with-an-unknown-id) | answered |
 | [when a user granted nothing reads another's route history by id, that entry is rejected for lack of permission](#batch_loading-a-user-granted-nothing-may-not-load-the-route-history) | rejected |
 
 **batch_load_session_histories_by_ids**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reads a session history by its id, the history comes back whole as a node](#batch_loading-the-superadmin-loads-the-session-history) | answered |
-| [when the superadmin reads session histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value](#batch_loading-the-superadmin-loads-the-session-history-with-an-unknown-id) | answered |
+| [when a regular user granted permission to read sessions and deployments reads a session history by its id, the history comes back whole as a node](#batch_loading-a-reader-loads-the-session-history) | answered |
+| [when a regular user granted permission to read sessions and deployments reads session histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value](#batch_loading-a-reader-loads-the-session-history-with-an-unknown-id) | answered |
 | [when a user granted nothing reads another's session history by id, that entry is rejected for lack of permission](#batch_loading-a-user-granted-nothing-may-not-load-the-session-history) | rejected |
 
 **deployment_scoped_search**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin pages through deployment histories of the target laid in advance, the one history comes back as one page](#scoped_searching-the-superadmin-pages-through-the-scoped-deployment-histories) | answered |
+| [when a regular user granted permission to read sessions and deployments pages through deployment histories of the target laid in advance, only that one history comes back as one page](#scoped_searching-a-reader-pages-through-the-scoped-deployment-histories) | answered |
 | [when a user granted nothing pages through deployment histories of a scope, the call is rejected for lack of permission](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-deployment-histories) | rejected |
 
 **route_scoped_search**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin pages through route histories of the target laid in advance, the one history comes back as one page](#scoped_searching-the-superadmin-pages-through-the-scoped-route-histories) | answered |
+| [when a regular user granted permission to read sessions and deployments pages through route histories of the target laid in advance, only that one history comes back as one page](#scoped_searching-a-reader-pages-through-the-scoped-route-histories) | answered |
 | [when a user granted nothing pages through the route histories of a scope, the request is rejected](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-route-histories) | rejected |
 
 **scoped_search_kernel_history**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin pages through kernel histories of the target laid in advance, the one history comes back as one page](#scoped_searching-the-superadmin-pages-through-the-scoped-kernel-histories) | answered |
+| [when a regular user granted permission to read sessions and deployments pages through kernel histories of the target laid in advance, only that one history comes back as one page](#scoped_searching-a-reader-pages-through-the-scoped-kernel-histories) | answered |
 | [when a user granted nothing pages through kernel histories of a scope, the call is rejected for lack of permission](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-kernel-histories) | rejected |
 | [when the superadmin pages through kernel histories naming two scope items, the request is rejected](#scoped_searching-kernel-history-scope-naming-two-items-is-refused) | rejected |
 
@@ -123,7 +123,7 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin pages through replica group histories of the target laid in advance, the one history comes back as one page](#scoped_searching-the-superadmin-pages-through-the-scoped-replica-group-histories) | answered |
+| [when a regular user granted permission to read sessions and deployments pages through replica group histories of the target laid in advance, only that one history comes back as one page](#scoped_searching-a-reader-pages-through-the-scoped-replica-group-histories) | answered |
 | [when a user granted nothing pages through replica group histories of a scope, the call is rejected for lack of permission](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-replica-group-histories) | rejected |
 | [when the superadmin pages through replica group histories naming two scope items, the request is rejected](#scoped_searching-replica-group-history-scope-naming-two-items-is-refused) | rejected |
 
@@ -131,7 +131,7 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin pages through session histories of the target laid in advance, the one history comes back as one page](#scoped_searching-the-superadmin-pages-through-the-scoped-session-histories) | answered |
+| [when a regular user granted permission to read sessions and deployments pages through session histories of the target laid in advance, only that one history comes back as one page](#scoped_searching-a-reader-pages-through-the-scoped-session-histories) | answered |
 | [when a user granted nothing pages through session histories of a scope, the call is rejected for lack of permission](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-session-histories) | rejected |
 
 ### admin_search_deployment_history
@@ -140,11 +140,11 @@ Scenario: complete
 
 #### [the-superadmin-pages-through-deployment-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_searching.py): pass
 
-when the superadmin pages through deployment histories, the one history laid in advance comes back as one page
+when the superadmin pages through deployment histories with a condition that keeps one history laid in advance, only that history comes back as one page
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one set of a session, kernel, deployment, route and replica group carrying a scheduling history row, one more set of each outside the scope, and one superadmin
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -172,10 +172,22 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Session other-session-1: waiting to be scheduled
+  - Session other-session-1: has one main kernel group
+  - Session other-session-1: has one kernel asking for 
+  - Session other-session-1: has one scheduling attempt recorded
+  - Session other-session-1: has one scheduling attempt of a kernel recorded
+  - Deployment other-deployment-1: replica count 1, has no revision yet
+  - Deployment other-deployment-1: has one scheduling attempt of the deployment recorded
+  - Session group of a deployment deployment-session-group-2: the session group a deployment creates with its replica group
+  - Deployment other-deployment-1: has one replica group holding the session group
+  - Deployment other-deployment-1: has one scheduling attempt of the replica group recorded
+  - Deployment other-deployment-1: has one replica
+  - Deployment other-deployment-1: has one scheduling attempt of a route recorded
 
 When
 
-- SchedulingHistoryAdapter.admin_search_deployment_history: user-2 pages through every deployment history without a filter
+- SchedulingHistoryAdapter.admin_search_deployment_history: user-2 pages through deployment histories with a condition that keeps one history laid in advance and an order over one item per page
 
 Then
 
@@ -251,11 +263,11 @@ Then
 
 #### [the-superadmin-pages-through-kernel-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_searching.py): pass
 
-when the superadmin pages through kernel histories, the one history laid in advance comes back as one page
+when the superadmin pages through kernel histories with a condition that keeps one history laid in advance, only that history comes back as one page
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one set of a session, kernel, deployment, route and replica group carrying a scheduling history row, one more set of each outside the scope, and one superadmin
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -283,10 +295,22 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Session other-session-1: waiting to be scheduled
+  - Session other-session-1: has one main kernel group
+  - Session other-session-1: has one kernel asking for 
+  - Session other-session-1: has one scheduling attempt recorded
+  - Session other-session-1: has one scheduling attempt of a kernel recorded
+  - Deployment other-deployment-1: replica count 1, has no revision yet
+  - Deployment other-deployment-1: has one scheduling attempt of the deployment recorded
+  - Session group of a deployment deployment-session-group-2: the session group a deployment creates with its replica group
+  - Deployment other-deployment-1: has one replica group holding the session group
+  - Deployment other-deployment-1: has one scheduling attempt of the replica group recorded
+  - Deployment other-deployment-1: has one replica
+  - Deployment other-deployment-1: has one scheduling attempt of a route recorded
 
 When
 
-- SchedulingHistoryAdapter.admin_search_kernel_history: user-2 pages through every kernel history without a filter
+- SchedulingHistoryAdapter.admin_search_kernel_history: user-2 pages through kernel histories with a condition that keeps one history laid in advance and an order over one item per page
 
 Then
 
@@ -361,11 +385,11 @@ Then
 
 #### [the-superadmin-pages-through-replica-group-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_searching.py): pass
 
-when the superadmin pages through replica group histories, the one history laid in advance comes back as one page
+when the superadmin pages through replica group histories with a condition that keeps one history laid in advance, only that history comes back as one page
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one set of a session, kernel, deployment, route and replica group carrying a scheduling history row, one more set of each outside the scope, and one superadmin
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -393,10 +417,22 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Session other-session-1: waiting to be scheduled
+  - Session other-session-1: has one main kernel group
+  - Session other-session-1: has one kernel asking for 
+  - Session other-session-1: has one scheduling attempt recorded
+  - Session other-session-1: has one scheduling attempt of a kernel recorded
+  - Deployment other-deployment-1: replica count 1, has no revision yet
+  - Deployment other-deployment-1: has one scheduling attempt of the deployment recorded
+  - Session group of a deployment deployment-session-group-2: the session group a deployment creates with its replica group
+  - Deployment other-deployment-1: has one replica group holding the session group
+  - Deployment other-deployment-1: has one scheduling attempt of the replica group recorded
+  - Deployment other-deployment-1: has one replica
+  - Deployment other-deployment-1: has one scheduling attempt of a route recorded
 
 When
 
-- SchedulingHistoryAdapter.admin_search_replica_group_history: user-2 pages through every replica group history without a filter
+- SchedulingHistoryAdapter.admin_search_replica_group_history: user-2 pages through replica group histories with a condition that keeps one history laid in advance and an order over one item per page
 
 Then
 
@@ -472,11 +508,11 @@ Then
 
 #### [the-superadmin-pages-through-route-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_searching.py): pass
 
-when the superadmin pages through route histories, the one history laid in advance comes back as one page
+when the superadmin pages through route histories with a condition that keeps one history laid in advance, only that history comes back as one page
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one set of a session, kernel, deployment, route and replica group carrying a scheduling history row, one more set of each outside the scope, and one superadmin
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -504,10 +540,22 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Session other-session-1: waiting to be scheduled
+  - Session other-session-1: has one main kernel group
+  - Session other-session-1: has one kernel asking for 
+  - Session other-session-1: has one scheduling attempt recorded
+  - Session other-session-1: has one scheduling attempt of a kernel recorded
+  - Deployment other-deployment-1: replica count 1, has no revision yet
+  - Deployment other-deployment-1: has one scheduling attempt of the deployment recorded
+  - Session group of a deployment deployment-session-group-2: the session group a deployment creates with its replica group
+  - Deployment other-deployment-1: has one replica group holding the session group
+  - Deployment other-deployment-1: has one scheduling attempt of the replica group recorded
+  - Deployment other-deployment-1: has one replica
+  - Deployment other-deployment-1: has one scheduling attempt of a route recorded
 
 When
 
-- SchedulingHistoryAdapter.admin_search_route_history: user-2 pages through every route history without a filter
+- SchedulingHistoryAdapter.admin_search_route_history: user-2 pages through route histories with a condition that keeps one history laid in advance and an order over one item per page
 
 Then
 
@@ -586,11 +634,11 @@ Then
 
 #### [the-superadmin-pages-through-session-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_searching.py): pass
 
-when the superadmin pages through session histories, the one history laid in advance comes back as one page
+when the superadmin pages through session histories with a condition that keeps one history laid in advance, only that history comes back as one page
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one set of a session, kernel, deployment, route and replica group carrying a scheduling history row, one more set of each outside the scope, and one superadmin
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -618,10 +666,22 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Session other-session-1: waiting to be scheduled
+  - Session other-session-1: has one main kernel group
+  - Session other-session-1: has one kernel asking for 
+  - Session other-session-1: has one scheduling attempt recorded
+  - Session other-session-1: has one scheduling attempt of a kernel recorded
+  - Deployment other-deployment-1: replica count 1, has no revision yet
+  - Deployment other-deployment-1: has one scheduling attempt of the deployment recorded
+  - Session group of a deployment deployment-session-group-2: the session group a deployment creates with its replica group
+  - Deployment other-deployment-1: has one replica group holding the session group
+  - Deployment other-deployment-1: has one scheduling attempt of the replica group recorded
+  - Deployment other-deployment-1: has one replica
+  - Deployment other-deployment-1: has one scheduling attempt of a route recorded
 
 When
 
-- SchedulingHistoryAdapter.admin_search_session_history: user-2 pages through every session history without a filter
+- SchedulingHistoryAdapter.admin_search_session_history: user-2 pages through session histories with a condition that keeps one history laid in advance and an order over one item per page
 
 Then
 
@@ -692,15 +752,15 @@ Then
 
 ### batch_load_deployment_histories_by_ids
 
-<a id="batch_loading-the-superadmin-loads-the-deployment-history"></a>
+<a id="batch_loading-a-reader-loads-the-deployment-history"></a>
 
-#### [the-superadmin-loads-the-deployment-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-deployment-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-when the superadmin reads a deployment history by its id, the history comes back whole as a node
+when a regular user granted permission to read sessions and deployments reads a deployment history by its id, the history comes back whole as a node
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -711,7 +771,7 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
@@ -728,6 +788,11 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Prepare a user granted permission to read sessions and deployments
+    - Role history-reader-1: applies only within the scope it is granted in
+    - Role history-reader-1: READ allowed on every session
+    - Role history-reader-1: READ allowed on every deployment
+    - regular user user-2: holds Role history-reader-1
 
 When
 
@@ -752,15 +817,15 @@ Then
   - [0].created_at: the time this run wrote
   - [0].updated_at: the time this run wrote
 
-<a id="batch_loading-the-superadmin-loads-the-deployment-history-with-an-unknown-id"></a>
+<a id="batch_loading-a-reader-loads-the-deployment-history-with-an-unknown-id"></a>
 
-#### [the-superadmin-loads-the-deployment-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-deployment-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-when the superadmin reads deployment histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value
+when a regular user granted permission to read sessions and deployments reads deployment histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -771,7 +836,7 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
@@ -788,6 +853,11 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Prepare a user granted permission to read sessions and deployments
+    - Role history-reader-1: applies only within the scope it is granted in
+    - Role history-reader-1: READ allowed on every session
+    - Role history-reader-1: READ allowed on every deployment
+    - regular user user-2: holds Role history-reader-1
 
 When
 
@@ -862,15 +932,15 @@ Then
 
 ### batch_load_kernel_histories_by_ids
 
-<a id="batch_loading-the-superadmin-loads-the-kernel-history"></a>
+<a id="batch_loading-a-reader-loads-the-kernel-history"></a>
 
-#### [the-superadmin-loads-the-kernel-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-kernel-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-when the superadmin reads a kernel history by its id, the history comes back whole as a node
+when a regular user granted permission to read sessions and deployments reads a kernel history by its id, the history comes back whole as a node
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -881,7 +951,7 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
@@ -898,6 +968,11 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Prepare a user granted permission to read sessions and deployments
+    - Role history-reader-1: applies only within the scope it is granted in
+    - Role history-reader-1: READ allowed on every session
+    - Role history-reader-1: READ allowed on every deployment
+    - regular user user-2: holds Role history-reader-1
 
 When
 
@@ -921,15 +996,15 @@ Then
   - [0].created_at: the time this run wrote
   - [0].updated_at: the time this run wrote
 
-<a id="batch_loading-the-superadmin-loads-the-kernel-history-with-an-unknown-id"></a>
+<a id="batch_loading-a-reader-loads-the-kernel-history-with-an-unknown-id"></a>
 
-#### [the-superadmin-loads-the-kernel-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-kernel-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-when the superadmin reads kernel histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value
+when a regular user granted permission to read sessions and deployments reads kernel histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -940,7 +1015,7 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
@@ -957,6 +1032,11 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Prepare a user granted permission to read sessions and deployments
+    - Role history-reader-1: applies only within the scope it is granted in
+    - Role history-reader-1: READ allowed on every session
+    - Role history-reader-1: READ allowed on every deployment
+    - regular user user-2: holds Role history-reader-1
 
 When
 
@@ -1030,15 +1110,15 @@ Then
 
 ### batch_load_replica_group_histories_by_ids
 
-<a id="batch_loading-the-superadmin-loads-the-replica-group-history"></a>
+<a id="batch_loading-a-reader-loads-the-replica-group-history"></a>
 
-#### [the-superadmin-loads-the-replica-group-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-replica-group-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-when the superadmin reads a replica group history by its id, the history comes back whole as a node
+when a regular user granted permission to read sessions and deployments reads a replica group history by its id, the history comes back whole as a node
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1049,7 +1129,7 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
@@ -1066,6 +1146,11 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Prepare a user granted permission to read sessions and deployments
+    - Role history-reader-1: applies only within the scope it is granted in
+    - Role history-reader-1: READ allowed on every session
+    - Role history-reader-1: READ allowed on every deployment
+    - regular user user-2: holds Role history-reader-1
 
 When
 
@@ -1090,15 +1175,15 @@ Then
   - [0].created_at: the time this run wrote
   - [0].updated_at: the time this run wrote
 
-<a id="batch_loading-the-superadmin-loads-the-replica-group-history-with-an-unknown-id"></a>
+<a id="batch_loading-a-reader-loads-the-replica-group-history-with-an-unknown-id"></a>
 
-#### [the-superadmin-loads-the-replica-group-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-replica-group-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-when the superadmin reads replica group histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value
+when a regular user granted permission to read sessions and deployments reads replica group histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1109,7 +1194,7 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
@@ -1126,6 +1211,11 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Prepare a user granted permission to read sessions and deployments
+    - Role history-reader-1: applies only within the scope it is granted in
+    - Role history-reader-1: READ allowed on every session
+    - Role history-reader-1: READ allowed on every deployment
+    - regular user user-2: holds Role history-reader-1
 
 When
 
@@ -1200,15 +1290,15 @@ Then
 
 ### batch_load_route_histories_by_ids
 
-<a id="batch_loading-the-superadmin-loads-the-route-history"></a>
+<a id="batch_loading-a-reader-loads-the-route-history"></a>
 
-#### [the-superadmin-loads-the-route-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-route-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-when the superadmin reads a route history by its id, the history comes back whole as a node
+when a regular user granted permission to read sessions and deployments reads a route history by its id, the history comes back whole as a node
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1219,7 +1309,7 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
@@ -1236,6 +1326,11 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Prepare a user granted permission to read sessions and deployments
+    - Role history-reader-1: applies only within the scope it is granted in
+    - Role history-reader-1: READ allowed on every session
+    - Role history-reader-1: READ allowed on every deployment
+    - regular user user-2: holds Role history-reader-1
 
 When
 
@@ -1263,15 +1358,15 @@ Then
   - [0].created_at: the time this run wrote
   - [0].updated_at: the time this run wrote
 
-<a id="batch_loading-the-superadmin-loads-the-route-history-with-an-unknown-id"></a>
+<a id="batch_loading-a-reader-loads-the-route-history-with-an-unknown-id"></a>
 
-#### [the-superadmin-loads-the-route-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-route-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-when the superadmin reads route histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value
+when a regular user granted permission to read sessions and deployments reads route histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1282,7 +1377,7 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
@@ -1299,6 +1394,11 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Prepare a user granted permission to read sessions and deployments
+    - Role history-reader-1: applies only within the scope it is granted in
+    - Role history-reader-1: READ allowed on every session
+    - Role history-reader-1: READ allowed on every deployment
+    - regular user user-2: holds Role history-reader-1
 
 When
 
@@ -1376,15 +1476,15 @@ Then
 
 ### batch_load_session_histories_by_ids
 
-<a id="batch_loading-the-superadmin-loads-the-session-history"></a>
+<a id="batch_loading-a-reader-loads-the-session-history"></a>
 
-#### [the-superadmin-loads-the-session-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-session-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-when the superadmin reads a session history by its id, the history comes back whole as a node
+when a regular user granted permission to read sessions and deployments reads a session history by its id, the history comes back whole as a node
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1395,7 +1495,7 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
@@ -1412,6 +1512,11 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Prepare a user granted permission to read sessions and deployments
+    - Role history-reader-1: applies only within the scope it is granted in
+    - Role history-reader-1: READ allowed on every session
+    - Role history-reader-1: READ allowed on every deployment
+    - regular user user-2: holds Role history-reader-1
 
 When
 
@@ -1435,15 +1540,15 @@ Then
   - [0].created_at: the time this run wrote
   - [0].updated_at: the time this run wrote
 
-<a id="batch_loading-the-superadmin-loads-the-session-history-with-an-unknown-id"></a>
+<a id="batch_loading-a-reader-loads-the-session-history-with-an-unknown-id"></a>
 
-#### [the-superadmin-loads-the-session-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-session-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-when the superadmin reads session histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value
+when a regular user granted permission to read sessions and deployments reads session histories by a known and an unknown id, the known one comes back as a node and the unknown entry as an empty value
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1454,7 +1559,7 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
@@ -1471,6 +1576,11 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Prepare a user granted permission to read sessions and deployments
+    - Role history-reader-1: applies only within the scope it is granted in
+    - Role history-reader-1: READ allowed on every session
+    - Role history-reader-1: READ allowed on every deployment
+    - regular user user-2: holds Role history-reader-1
 
 When
 
@@ -1544,15 +1654,15 @@ Then
 
 ### deployment_scoped_search
 
-<a id="scoped_searching-the-superadmin-pages-through-the-scoped-deployment-histories"></a>
+<a id="scoped_searching-a-reader-pages-through-the-scoped-deployment-histories"></a>
 
-#### [the-superadmin-pages-through-the-scoped-deployment-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
+#### [a-reader-pages-through-the-scoped-deployment-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-when the superadmin pages through deployment histories of the target laid in advance, the one history comes back as one page
+when a regular user granted permission to read sessions and deployments pages through deployment histories of the target laid in advance, only that one history comes back as one page
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one set of a session, kernel, deployment, route and replica group carrying a scheduling history row, one more set of each outside the scope, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1563,7 +1673,7 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
@@ -1580,6 +1690,23 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Session other-session-1: waiting to be scheduled
+  - Session other-session-1: has one main kernel group
+  - Session other-session-1: has one kernel asking for 
+  - Session other-session-1: has one scheduling attempt recorded
+  - Session other-session-1: has one scheduling attempt of a kernel recorded
+  - Deployment other-deployment-1: replica count 1, has no revision yet
+  - Deployment other-deployment-1: has one scheduling attempt of the deployment recorded
+  - Session group of a deployment deployment-session-group-2: the session group a deployment creates with its replica group
+  - Deployment other-deployment-1: has one replica group holding the session group
+  - Deployment other-deployment-1: has one scheduling attempt of the replica group recorded
+  - Deployment other-deployment-1: has one replica
+  - Deployment other-deployment-1: has one scheduling attempt of a route recorded
+  - Prepare a user granted permission to read sessions and deployments
+    - Role history-reader-1: applies only within the scope it is granted in
+    - Role history-reader-1: READ allowed on every session
+    - Role history-reader-1: READ allowed on every deployment
+    - regular user user-2: holds Role history-reader-1
 
 When
 
@@ -1655,15 +1782,15 @@ Then
 
 ### route_scoped_search
 
-<a id="scoped_searching-the-superadmin-pages-through-the-scoped-route-histories"></a>
+<a id="scoped_searching-a-reader-pages-through-the-scoped-route-histories"></a>
 
-#### [the-superadmin-pages-through-the-scoped-route-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
+#### [a-reader-pages-through-the-scoped-route-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-when the superadmin pages through route histories of the target laid in advance, the one history comes back as one page
+when a regular user granted permission to read sessions and deployments pages through route histories of the target laid in advance, only that one history comes back as one page
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one set of a session, kernel, deployment, route and replica group carrying a scheduling history row, one more set of each outside the scope, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1674,7 +1801,7 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
@@ -1691,6 +1818,23 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Session other-session-1: waiting to be scheduled
+  - Session other-session-1: has one main kernel group
+  - Session other-session-1: has one kernel asking for 
+  - Session other-session-1: has one scheduling attempt recorded
+  - Session other-session-1: has one scheduling attempt of a kernel recorded
+  - Deployment other-deployment-1: replica count 1, has no revision yet
+  - Deployment other-deployment-1: has one scheduling attempt of the deployment recorded
+  - Session group of a deployment deployment-session-group-2: the session group a deployment creates with its replica group
+  - Deployment other-deployment-1: has one replica group holding the session group
+  - Deployment other-deployment-1: has one scheduling attempt of the replica group recorded
+  - Deployment other-deployment-1: has one replica
+  - Deployment other-deployment-1: has one scheduling attempt of a route recorded
+  - Prepare a user granted permission to read sessions and deployments
+    - Role history-reader-1: applies only within the scope it is granted in
+    - Role history-reader-1: READ allowed on every session
+    - Role history-reader-1: READ allowed on every deployment
+    - regular user user-2: holds Role history-reader-1
 
 When
 
@@ -1769,15 +1913,15 @@ Then
 
 ### scoped_search_kernel_history
 
-<a id="scoped_searching-the-superadmin-pages-through-the-scoped-kernel-histories"></a>
+<a id="scoped_searching-a-reader-pages-through-the-scoped-kernel-histories"></a>
 
-#### [the-superadmin-pages-through-the-scoped-kernel-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
+#### [a-reader-pages-through-the-scoped-kernel-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-when the superadmin pages through kernel histories of the target laid in advance, the one history comes back as one page
+when a regular user granted permission to read sessions and deployments pages through kernel histories of the target laid in advance, only that one history comes back as one page
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one set of a session, kernel, deployment, route and replica group carrying a scheduling history row, one more set of each outside the scope, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1788,7 +1932,7 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
@@ -1805,6 +1949,23 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Session other-session-1: waiting to be scheduled
+  - Session other-session-1: has one main kernel group
+  - Session other-session-1: has one kernel asking for 
+  - Session other-session-1: has one scheduling attempt recorded
+  - Session other-session-1: has one scheduling attempt of a kernel recorded
+  - Deployment other-deployment-1: replica count 1, has no revision yet
+  - Deployment other-deployment-1: has one scheduling attempt of the deployment recorded
+  - Session group of a deployment deployment-session-group-2: the session group a deployment creates with its replica group
+  - Deployment other-deployment-1: has one replica group holding the session group
+  - Deployment other-deployment-1: has one scheduling attempt of the replica group recorded
+  - Deployment other-deployment-1: has one replica
+  - Deployment other-deployment-1: has one scheduling attempt of a route recorded
+  - Prepare a user granted permission to read sessions and deployments
+    - Role history-reader-1: applies only within the scope it is granted in
+    - Role history-reader-1: READ allowed on every session
+    - Role history-reader-1: READ allowed on every deployment
+    - regular user user-2: holds Role history-reader-1
 
 When
 
@@ -1925,15 +2086,15 @@ Then
 
 ### scoped_search_replica_group_history
 
-<a id="scoped_searching-the-superadmin-pages-through-the-scoped-replica-group-histories"></a>
+<a id="scoped_searching-a-reader-pages-through-the-scoped-replica-group-histories"></a>
 
-#### [the-superadmin-pages-through-the-scoped-replica-group-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
+#### [a-reader-pages-through-the-scoped-replica-group-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-when the superadmin pages through replica group histories of the target laid in advance, the one history comes back as one page
+when a regular user granted permission to read sessions and deployments pages through replica group histories of the target laid in advance, only that one history comes back as one page
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one set of a session, kernel, deployment, route and replica group carrying a scheduling history row, one more set of each outside the scope, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1944,7 +2105,7 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
@@ -1961,6 +2122,23 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Session other-session-1: waiting to be scheduled
+  - Session other-session-1: has one main kernel group
+  - Session other-session-1: has one kernel asking for 
+  - Session other-session-1: has one scheduling attempt recorded
+  - Session other-session-1: has one scheduling attempt of a kernel recorded
+  - Deployment other-deployment-1: replica count 1, has no revision yet
+  - Deployment other-deployment-1: has one scheduling attempt of the deployment recorded
+  - Session group of a deployment deployment-session-group-2: the session group a deployment creates with its replica group
+  - Deployment other-deployment-1: has one replica group holding the session group
+  - Deployment other-deployment-1: has one scheduling attempt of the replica group recorded
+  - Deployment other-deployment-1: has one replica
+  - Deployment other-deployment-1: has one scheduling attempt of a route recorded
+  - Prepare a user granted permission to read sessions and deployments
+    - Role history-reader-1: applies only within the scope it is granted in
+    - Role history-reader-1: READ allowed on every session
+    - Role history-reader-1: READ allowed on every deployment
+    - regular user user-2: holds Role history-reader-1
 
 When
 
@@ -2082,15 +2260,15 @@ Then
 
 ### session_scoped_search
 
-<a id="scoped_searching-the-superadmin-pages-through-the-scoped-session-histories"></a>
+<a id="scoped_searching-a-reader-pages-through-the-scoped-session-histories"></a>
 
-#### [the-superadmin-pages-through-the-scoped-session-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
+#### [a-reader-pages-through-the-scoped-session-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-when the superadmin pages through session histories of the target laid in advance, the one history comes back as one page
+when a regular user granted permission to read sessions and deployments pages through session histories of the target laid in advance, only that one history comes back as one page
 
 Given
 
-- one session, kernel, deployment, route and replica group each carrying one scheduling history row, and one superadmin
+- one set of a session, kernel, deployment, route and replica group carrying a scheduling history row, one more set of each outside the scope, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -2101,7 +2279,7 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
@@ -2118,6 +2296,23 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Session other-session-1: waiting to be scheduled
+  - Session other-session-1: has one main kernel group
+  - Session other-session-1: has one kernel asking for 
+  - Session other-session-1: has one scheduling attempt recorded
+  - Session other-session-1: has one scheduling attempt of a kernel recorded
+  - Deployment other-deployment-1: replica count 1, has no revision yet
+  - Deployment other-deployment-1: has one scheduling attempt of the deployment recorded
+  - Session group of a deployment deployment-session-group-2: the session group a deployment creates with its replica group
+  - Deployment other-deployment-1: has one replica group holding the session group
+  - Deployment other-deployment-1: has one scheduling attempt of the replica group recorded
+  - Deployment other-deployment-1: has one replica
+  - Deployment other-deployment-1: has one scheduling attempt of a route recorded
+  - Prepare a user granted permission to read sessions and deployments
+    - Role history-reader-1: applies only within the scope it is granted in
+    - Role history-reader-1: READ allowed on every session
+    - Role history-reader-1: READ allowed on every deployment
+    - regular user user-2: holds Role history-reader-1
 
 When
 

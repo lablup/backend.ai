@@ -57,7 +57,7 @@ Scenario: incomplete 1 / 7
 
 | scenario | verdict |
 |---|---|
-| [when a user who can read two domains pages through both at once, both labels come back whole](#searching-a-reader-pages-through-the-labels-of-two-entities) | answered |
+| [when a user who can read two domains pages through both at once narrowed to one key, only that key's labels come back](#searching-a-reader-pages-through-the-labels-of-two-entities) | answered |
 | [when a user with no permission pages through a domain's labels, the call is rejected for lack of permission](#searching-a-user-granted-nothing-cannot-page-through-the-named-scopes) | rejected |
 
 **search_on**
@@ -867,16 +867,18 @@ Then
 
 #### [a-reader-pages-through-the-labels-of-two-entities](/tests/scenario/bai_scenario/manager/entity_label/test_searching.py): pass
 
-when a user who can read two domains pages through both at once, both labels come back whole
+when a user who can read two domains pages through both at once narrowed to one key, only that key's labels come back
 
 Given
 
-- 2 domains with 1 labels each and one user who can read 2 of them
+- 2 domains with 2 labels each and one user who can read 2 of them and 1 domains outside the scope
   - Domain home-1
   - Domain target-1
   - Domain target-2
   - Domain target-1: label team=before
+  - Domain target-1: label tier=before
   - Domain target-2: label team=before
+  - Domain target-2: label tier=before
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
@@ -889,10 +891,16 @@ Given
     - Role domain-reader-2: applies only within the scope it is granted in
     - Role domain-reader-2: READ allowed on every domain
     - regular user user-1: holds Role domain-reader-2
+    - Role domain-reader-3: applies only within the scope it is granted in
+    - Role domain-reader-3: READ allowed on every domain
+    - regular user user-1: holds Role domain-reader-3
+  - Domain elsewhere-1
+  - Domain elsewhere-1: label team=before
+  - Domain elsewhere-1: label tier=before
 
 When
 
-- EntityLabelAdapter.search: user-1 pages through the labels of 2 domains at once
+- EntityLabelAdapter.search: user-1 pages through the labels of 2 domains at once, narrowed to key team
 
 Then
 
@@ -957,7 +965,7 @@ when a user who can read one domain pages through it narrowed to one key, only t
 
 Given
 
-- 1 domains with 2 labels each and one user who can read 1 of them
+- 1 domains with 2 labels each and one user who can read 1 of them and 1 domains outside the scope
   - Domain home-1
   - Domain target-1
   - Domain target-1: label tier=before
@@ -971,6 +979,12 @@ Given
     - Role domain-reader-1: applies only within the scope it is granted in
     - Role domain-reader-1: READ allowed on every domain
     - regular user user-1: holds Role domain-reader-1
+    - Role domain-reader-2: applies only within the scope it is granted in
+    - Role domain-reader-2: READ allowed on every domain
+    - regular user user-1: holds Role domain-reader-2
+  - Domain elsewhere-1
+  - Domain elsewhere-1: label tier=before
+  - Domain elsewhere-1: label team=before
 
 When
 

@@ -5,23 +5,20 @@
 시나리오: 완성
 
 - ops + 직접 구현 (4)
-  - admin_search: 성공 있음 4 · 거부 있음 1 (atomic_bulk_scoped_search_ops, global_searcher_ops, partial_bulk)
+  - admin_search: 성공 있음 1 · 거부 있음 1 (atomic_bulk_scoped_search_ops, global_searcher_ops, partial_bulk)
   - batch_load_by_ids: 성공 있음 2 · 거부 있음 1 (atomic_bulk_scoped_search_ops, partial_bulk, partial_bulk_get_ops)
   - batch_load_by_uuids: 성공 있음 1 · 거부 있음 2 (atomic_bulk_scoped_search_ops, partial_bulk, partial_bulk_get_ops)
   - batch_load_container_counts: 성공 있음 2 · 거부 있음 1 (partial_bulk, partial_bulk_get_ops)
 - 직접 구현 (3)
   - get_total_resources: 성공 있음 1 · 거부 있음 1 (global_scope)
-  - update_resource_group: 성공 있음 2 · 거부 있음 3 (global_scope)
+  - update_resource_group: 성공 있음 1 · 거부 있음 2 (global_scope)
   - update_resource_group_from_body: 성공 있음 1 · 거부 있음 1 (global_scope)
 
 **admin_search**
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 id 오름차순으로 검색해도 미리 등록한 에이전트가 모두 통째로 옵니다](#searching-the-superadmin-orders-the-agents-by-name) | 성공 |
-| [superadmin 이 모든 에이전트를 검색하면 미리 등록한 에이전트가 모두 통째로 옵니다](#searching-the-superadmin-pages-through-every-agent) | 성공 |
-| [superadmin 이 에이전트 이름으로 검색하면 그 에이전트만 옵니다](#searching-the-superadmin-picks-an-agent-by-its-name) | 성공 |
-| [superadmin 이 자원 그룹 이름으로 검색하면 그 그룹의 에이전트만 옵니다](#searching-the-superadmin-picks-the-agents-of-a-resource-group) | 성공 |
+| [superadmin 이 에이전트 하나만 남기는 조건과 순서를 걸어 검색하면 그 에이전트만 한 페이지로 옵니다](#searching-the-superadmin-picks-an-agent-by-its-name) | 성공 |
 | [superadmin 만 부를 수 있는 검색이라, 아무 권한도 없는 일반 사용자가 부르면 권한 부족으로 거부됩니다](#searching-a-user-granted-nothing-may-not-search-the-agents) | 거부 |
 
 **batch_load_by_ids**
@@ -60,10 +57,8 @@
 | 시나리오 | 판정 |
 |---|---|
 | [다른 그룹의 세션이 지정한 에이전트를 강제로 옮기면 지정을 지우고 바뀐 그룹을 담은 응답이 옵니다](#changing_resource_group-force-moves-an-agent-designated-by-another-groups-session) | 성공 |
-| [superadmin 이 에이전트를 다른 자원 그룹으로 옮기면 바뀐 그룹을 담은 응답이 옵니다](#changing_resource_group-the-superadmin-moves-an-agent-to-another-resource-group) | 성공 |
 | [superadmin 만 부를 수 있는 변경이라, 아무 권한도 없는 일반 사용자가 에이전트를 옮기면 권한 부족으로 거부됩니다](#changing_resource_group-a-user-granted-nothing-may-not-move-an-agent) | 거부 |
 | [다른 그룹의 세션이 지정한 에이전트를 강제하지 않고 옮기면 충돌한다는 이유로 거부됩니다](#changing_resource_group-an-agent-designated-by-another-groups-session-needs-force) | 거부 |
-| [superadmin 이 재배치 정책으로 에이전트를 옮기면 아직 지원하지 않는다는 이유로 거부됩니다](#changing_resource_group-asking-to-reschedule-the-conflicting-sessions-is-not-supported) | 거부 |
 
 **update_resource_group_from_body**
 
@@ -74,153 +69,11 @@
 
 ### admin_search
 
-<a id="searching-the-superadmin-orders-the-agents-by-name"></a>
-
-#### [the-superadmin-orders-the-agents-by-name](/tests/scenario/bai_scenario/manager/agent/test_searching.py): pass
-
-superadmin 이 id 오름차순으로 검색해도 미리 등록한 에이전트가 모두 통째로 옵니다
-
-Given
-
-- 에이전트 2개와, superadmin 한 명
-  - 자원 그룹 mine-1: fifo 스케줄러를 사용합니다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없습니다
-  - 에이전트 agent-2: 살아 있고, 아직 보고한 슬롯이 없습니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- AgentAdapter.admin_search: user-1이 에이전트를 id 오름차순으로 검색합니다
-
-Then
-
-- 미리 등록한 에이전트 2개가 통째로 옵니다
-  - items count = 2
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-  - items[0].present = True
-  - items[0].id = 'agent-1'
-  - items[0].entity_id: 미리 등록한 에이전트의 id 와 같다
-  - items[0].uuid: 미리 등록한 에이전트의 id 와 같다
-  - items[0].capacity = {}
-  - items[0].used = {}
-  - items[0].free = {}
-  - items[0].status = 'ALIVE'
-  - items[0].status_changed = None
-  - items[0].first_contact: 이 실행이 쓴 시각
-  - items[0].lost_at = None
-  - items[0].schedulable = True
-  - items[0].architecture = 'x86_64'
-  - items[0].version = '0.0.0'
-  - items[0].auto_terminate_abusing_kernel = False
-  - items[0].compute_plugins = None
-  - items[0].region = 'local'
-  - items[0].addr = 'tcp://agent-1:6001'
-  - items[0].scaling_group = 'mine-1'
-  - items[0].permissions = ['read_attribute', 'update_attribute', 'create_compute_session', 'create_service']
-  - items[1].present = True
-  - items[1].id = 'agent-2'
-  - items[1].entity_id: 미리 등록한 에이전트의 id 와 같다
-  - items[1].uuid: 미리 등록한 에이전트의 id 와 같다
-  - items[1].capacity = {}
-  - items[1].used = {}
-  - items[1].free = {}
-  - items[1].status = 'ALIVE'
-  - items[1].status_changed = None
-  - items[1].first_contact: 이 실행이 쓴 시각
-  - items[1].lost_at = None
-  - items[1].schedulable = True
-  - items[1].architecture = 'x86_64'
-  - items[1].version = '0.0.0'
-  - items[1].auto_terminate_abusing_kernel = False
-  - items[1].compute_plugins = None
-  - items[1].region = 'local'
-  - items[1].addr = 'tcp://agent-2:6001'
-  - items[1].scaling_group = 'mine-1'
-  - items[1].permissions = ['read_attribute', 'update_attribute', 'create_compute_session', 'create_service']
-
-<a id="searching-the-superadmin-pages-through-every-agent"></a>
-
-#### [the-superadmin-pages-through-every-agent](/tests/scenario/bai_scenario/manager/agent/test_searching.py): pass
-
-superadmin 이 모든 에이전트를 검색하면 미리 등록한 에이전트가 모두 통째로 옵니다
-
-Given
-
-- 에이전트 2개와, superadmin 한 명
-  - 자원 그룹 mine-1: fifo 스케줄러를 사용합니다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없습니다
-  - 에이전트 agent-2: 살아 있고, 아직 보고한 슬롯이 없습니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- AgentAdapter.admin_search: user-1이 모든 에이전트를 검색합니다
-
-Then
-
-- 미리 등록한 에이전트 2개가 통째로 옵니다
-  - items count = 2
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-  - items[0].present = True
-  - items[0].id = 'agent-1'
-  - items[0].entity_id: 미리 등록한 에이전트의 id 와 같다
-  - items[0].uuid: 미리 등록한 에이전트의 id 와 같다
-  - items[0].capacity = {}
-  - items[0].used = {}
-  - items[0].free = {}
-  - items[0].status = 'ALIVE'
-  - items[0].status_changed = None
-  - items[0].first_contact: 이 실행이 쓴 시각
-  - items[0].lost_at = None
-  - items[0].schedulable = True
-  - items[0].architecture = 'x86_64'
-  - items[0].version = '0.0.0'
-  - items[0].auto_terminate_abusing_kernel = False
-  - items[0].compute_plugins = None
-  - items[0].region = 'local'
-  - items[0].addr = 'tcp://agent-1:6001'
-  - items[0].scaling_group = 'mine-1'
-  - items[0].permissions = ['read_attribute', 'update_attribute', 'create_compute_session', 'create_service']
-  - items[1].present = True
-  - items[1].id = 'agent-2'
-  - items[1].entity_id: 미리 등록한 에이전트의 id 와 같다
-  - items[1].uuid: 미리 등록한 에이전트의 id 와 같다
-  - items[1].capacity = {}
-  - items[1].used = {}
-  - items[1].free = {}
-  - items[1].status = 'ALIVE'
-  - items[1].status_changed = None
-  - items[1].first_contact: 이 실행이 쓴 시각
-  - items[1].lost_at = None
-  - items[1].schedulable = True
-  - items[1].architecture = 'x86_64'
-  - items[1].version = '0.0.0'
-  - items[1].auto_terminate_abusing_kernel = False
-  - items[1].compute_plugins = None
-  - items[1].region = 'local'
-  - items[1].addr = 'tcp://agent-2:6001'
-  - items[1].scaling_group = 'mine-1'
-  - items[1].permissions = ['read_attribute', 'update_attribute', 'create_compute_session', 'create_service']
-
 <a id="searching-the-superadmin-picks-an-agent-by-its-name"></a>
 
 #### [the-superadmin-picks-an-agent-by-its-name](/tests/scenario/bai_scenario/manager/agent/test_searching.py): pass
 
-superadmin 이 에이전트 이름으로 검색하면 그 에이전트만 옵니다
+superadmin 이 에이전트 하나만 남기는 조건과 순서를 걸어 검색하면 그 에이전트만 한 페이지로 옵니다
 
 Given
 
@@ -237,7 +90,7 @@ Given
 
 When
 
-- AgentAdapter.admin_search: user-1이 에이전트 agent-2 의 이름으로 검색합니다
+- AgentAdapter.admin_search: user-1이 에이전트 agent-1 하나만 남기는 조건과 id 오름차순을 걸어 한 건씩 검색합니다
 
 Then
 
@@ -247,57 +100,6 @@ Then
   - has_next_page = False
   - has_previous_page = False
   - items[0].present = True
-  - items[0].id = 'agent-2'
-  - items[0].entity_id: 미리 등록한 에이전트의 id 와 같다
-  - items[0].uuid: 미리 등록한 에이전트의 id 와 같다
-  - items[0].capacity = {}
-  - items[0].used = {}
-  - items[0].free = {}
-  - items[0].status = 'ALIVE'
-  - items[0].status_changed = None
-  - items[0].first_contact: 이 실행이 쓴 시각
-  - items[0].lost_at = None
-  - items[0].schedulable = True
-  - items[0].architecture = 'x86_64'
-  - items[0].version = '0.0.0'
-  - items[0].auto_terminate_abusing_kernel = False
-  - items[0].compute_plugins = None
-  - items[0].region = 'local'
-  - items[0].addr = 'tcp://agent-2:6001'
-  - items[0].scaling_group = 'mine-1'
-  - items[0].permissions = ['read_attribute', 'update_attribute', 'create_compute_session', 'create_service']
-
-<a id="searching-the-superadmin-picks-the-agents-of-a-resource-group"></a>
-
-#### [the-superadmin-picks-the-agents-of-a-resource-group](/tests/scenario/bai_scenario/manager/agent/test_searching.py): pass
-
-superadmin 이 자원 그룹 이름으로 검색하면 그 그룹의 에이전트만 옵니다
-
-Given
-
-- 에이전트 2개와, superadmin 한 명
-  - 자원 그룹 mine-1: fifo 스케줄러를 사용합니다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없습니다
-  - 에이전트 agent-2: 살아 있고, 아직 보고한 슬롯이 없습니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- AgentAdapter.admin_search: user-1이 자원 그룹 mine-1 의 에이전트를 검색합니다
-
-Then
-
-- 미리 등록한 에이전트 2개가 통째로 옵니다
-  - items count = 2
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-  - items[0].present = True
   - items[0].id = 'agent-1'
   - items[0].entity_id: 미리 등록한 에이전트의 id 와 같다
   - items[0].uuid: 미리 등록한 에이전트의 id 와 같다
@@ -317,26 +119,6 @@ Then
   - items[0].addr = 'tcp://agent-1:6001'
   - items[0].scaling_group = 'mine-1'
   - items[0].permissions = ['read_attribute', 'update_attribute', 'create_compute_session', 'create_service']
-  - items[1].present = True
-  - items[1].id = 'agent-2'
-  - items[1].entity_id: 미리 등록한 에이전트의 id 와 같다
-  - items[1].uuid: 미리 등록한 에이전트의 id 와 같다
-  - items[1].capacity = {}
-  - items[1].used = {}
-  - items[1].free = {}
-  - items[1].status = 'ALIVE'
-  - items[1].status_changed = None
-  - items[1].first_contact: 이 실행이 쓴 시각
-  - items[1].lost_at = None
-  - items[1].schedulable = True
-  - items[1].architecture = 'x86_64'
-  - items[1].version = '0.0.0'
-  - items[1].auto_terminate_abusing_kernel = False
-  - items[1].compute_plugins = None
-  - items[1].region = 'local'
-  - items[1].addr = 'tcp://agent-2:6001'
-  - items[1].scaling_group = 'mine-1'
-  - items[1].permissions = ['read_attribute', 'update_attribute', 'create_compute_session', 'create_service']
 
 <a id="searching-a-user-granted-nothing-may-not-search-the-agents"></a>
 
@@ -358,7 +140,7 @@ Given
 
 When
 
-- AgentAdapter.admin_search: user-1이 모든 에이전트를 검색합니다
+- AgentAdapter.admin_search: user-1이 에이전트 agent-1 하나만 남기는 조건과 id 오름차순을 걸어 한 건씩 검색합니다
 
 Then
 
@@ -855,38 +637,6 @@ Then
   - conflicting_session_ids = []
   - terminating_session_ids = []
 
-<a id="changing_resource_group-the-superadmin-moves-an-agent-to-another-resource-group"></a>
-
-#### [the-superadmin-moves-an-agent-to-another-resource-group](/tests/scenario/bai_scenario/manager/agent/test_changing_resource_group.py): pass
-
-superadmin 이 에이전트를 다른 자원 그룹으로 옮기면 바뀐 그룹을 담은 응답이 옵니다
-
-Given
-
-- 에이전트 하나와 옮길 그룹, 그리고 superadmin 한 명
-  - 자원 그룹 before-1: fifo 스케줄러를 사용합니다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없습니다
-  - 자원 그룹 after-1: fifo 스케줄러를 사용합니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- AgentAdapter.update_resource_group: user-1이 에이전트 agent-1를 after-1 그룹으로 옮깁니다
-
-Then
-
-- 바뀐 리소스 그룹을 담은 응답이 옵니다
-  - agent_id = 'agent-1'
-  - resource_group_id: 미리 만든 옮길 그룹의 id 와 같다
-  - policy = 'terminate'
-  - conflicting_session_ids = []
-  - terminating_session_ids = []
-
 <a id="changing_resource_group-a-user-granted-nothing-may-not-move-an-agent"></a>
 
 #### [a-user-granted-nothing-may-not-move-an-agent](/tests/scenario/bai_scenario/manager/agent/test_changing_resource_group.py): pass
@@ -954,34 +704,6 @@ Then
 
 - 거부됩니다
   - 거부: AgentHasConflictingSessions
-
-<a id="changing_resource_group-asking-to-reschedule-the-conflicting-sessions-is-not-supported"></a>
-
-#### [asking-to-reschedule-the-conflicting-sessions-is-not-supported](/tests/scenario/bai_scenario/manager/agent/test_changing_resource_group.py): pass
-
-superadmin 이 재배치 정책으로 에이전트를 옮기면 아직 지원하지 않는다는 이유로 거부됩니다
-
-Given
-
-- 에이전트 하나와 옮길 그룹, 그리고 superadmin 한 명
-  - 자원 그룹 before-1: fifo 스케줄러를 사용합니다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없습니다
-  - 자원 그룹 after-1: fifo 스케줄러를 사용합니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- AgentAdapter.update_resource_group: user-1이 재배치 정책으로 에이전트 agent-1를 after-1 그룹으로 옮깁니다
-
-Then
-
-- 거부됩니다
-  - 거부: ConflictingSessionRescheduleNotSupported
 
 ### update_resource_group_from_body
 

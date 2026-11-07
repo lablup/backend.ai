@@ -26,96 +26,96 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 배포 이력을 훑으면 미리 만든 이력 하나가 한 페이지로 옵니다](#searching-the-superadmin-pages-through-deployment-histories) | 성공 |
+| [슈퍼관리자가 미리 만든 이력 하나만 남기는 조건과 순서를 걸어 배포 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다](#searching-the-superadmin-pages-through-deployment-histories) | 성공 |
 | [슈퍼관리자가 아닌 사용자가 배포 이력을 훑으면 권한 부족으로 거부됩니다](#searching-a-user-granted-nothing-may-not-page-through-deployment-histories) | 거부 |
 
 **admin_search_kernel_history**
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 커널 이력을 훑으면 미리 만든 이력 하나가 한 페이지로 옵니다](#searching-the-superadmin-pages-through-kernel-histories) | 성공 |
+| [슈퍼관리자가 미리 만든 이력 하나만 남기는 조건과 순서를 걸어 커널 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다](#searching-the-superadmin-pages-through-kernel-histories) | 성공 |
 | [슈퍼관리자가 아닌 사용자가 커널 이력을 훑으면 권한 부족으로 거부됩니다](#searching-a-user-granted-nothing-may-not-page-through-kernel-histories) | 거부 |
 
 **admin_search_replica_group_history**
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 복제본 그룹 이력을 훑으면 미리 만든 이력 하나가 한 페이지로 옵니다](#searching-the-superadmin-pages-through-replica-group-histories) | 성공 |
+| [슈퍼관리자가 미리 만든 이력 하나만 남기는 조건과 순서를 걸어 복제본 그룹 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다](#searching-the-superadmin-pages-through-replica-group-histories) | 성공 |
 | [슈퍼관리자가 아닌 사용자가 복제본 그룹 이력을 훑으면 권한 부족으로 거부됩니다](#searching-a-user-granted-nothing-may-not-page-through-replica-group-histories) | 거부 |
 
 **admin_search_route_history**
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 라우트 이력을 훑으면 미리 만든 이력 하나가 한 페이지로 옵니다](#searching-the-superadmin-pages-through-route-histories) | 성공 |
+| [슈퍼관리자가 미리 만든 이력 하나만 남기는 조건과 순서를 걸어 라우트 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다](#searching-the-superadmin-pages-through-route-histories) | 성공 |
 | [슈퍼관리자가 아닌 사용자가 라우트 이력을 훑으면 권한 부족으로 거부됩니다](#searching-a-user-granted-nothing-may-not-page-through-route-histories) | 거부 |
 
 **admin_search_session_history**
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 세션 이력을 훑으면 미리 만든 이력 하나가 한 페이지로 옵니다](#searching-the-superadmin-pages-through-session-histories) | 성공 |
+| [슈퍼관리자가 미리 만든 이력 하나만 남기는 조건과 순서를 걸어 세션 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다](#searching-the-superadmin-pages-through-session-histories) | 성공 |
 | [슈퍼관리자가 아닌 사용자가 세션 이력을 훑으면 권한 부족으로 거부됩니다](#searching-a-user-granted-nothing-may-not-page-through-session-histories) | 거부 |
 
 **batch_load_deployment_histories_by_ids**
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 배포 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다](#batch_loading-the-superadmin-loads-the-deployment-history) | 성공 |
-| [슈퍼관리자가 있는 id 와 없는 id 로 배포 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다](#batch_loading-the-superadmin-loads-the-deployment-history-with-an-unknown-id) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 배포 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다](#batch_loading-a-reader-loads-the-deployment-history) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 있는 id 와 없는 id 로 배포 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다](#batch_loading-a-reader-loads-the-deployment-history-with-an-unknown-id) | 성공 |
 | [아무 권한도 받지 않은 사용자가 남의 배포 이력을 id 로 읽으면 그 자리가 권한 부족으로 거부됩니다](#batch_loading-a-user-granted-nothing-may-not-load-the-deployment-history) | 거부 |
 
 **batch_load_kernel_histories_by_ids**
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 커널 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다](#batch_loading-the-superadmin-loads-the-kernel-history) | 성공 |
-| [슈퍼관리자가 있는 id 와 없는 id 로 커널 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다](#batch_loading-the-superadmin-loads-the-kernel-history-with-an-unknown-id) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 커널 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다](#batch_loading-a-reader-loads-the-kernel-history) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 있는 id 와 없는 id 로 커널 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다](#batch_loading-a-reader-loads-the-kernel-history-with-an-unknown-id) | 성공 |
 | [아무 권한도 받지 않은 사용자가 남의 커널 이력을 id 로 읽으면 그 자리가 권한 부족으로 거부됩니다](#batch_loading-a-user-granted-nothing-may-not-load-the-kernel-history) | 거부 |
 
 **batch_load_replica_group_histories_by_ids**
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 복제본 그룹 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다](#batch_loading-the-superadmin-loads-the-replica-group-history) | 성공 |
-| [슈퍼관리자가 있는 id 와 없는 id 로 복제본 그룹 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다](#batch_loading-the-superadmin-loads-the-replica-group-history-with-an-unknown-id) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 복제본 그룹 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다](#batch_loading-a-reader-loads-the-replica-group-history) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 있는 id 와 없는 id 로 복제본 그룹 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다](#batch_loading-a-reader-loads-the-replica-group-history-with-an-unknown-id) | 성공 |
 | [아무 권한도 받지 않은 사용자가 남의 복제본 그룹 이력을 id 로 읽으면 그 자리가 권한 부족으로 거부됩니다](#batch_loading-a-user-granted-nothing-may-not-load-the-replica-group-history) | 거부 |
 
 **batch_load_route_histories_by_ids**
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 라우트 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다](#batch_loading-the-superadmin-loads-the-route-history) | 성공 |
-| [슈퍼관리자가 있는 id 와 없는 id 로 라우트 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다](#batch_loading-the-superadmin-loads-the-route-history-with-an-unknown-id) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 라우트 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다](#batch_loading-a-reader-loads-the-route-history) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 있는 id 와 없는 id 로 라우트 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다](#batch_loading-a-reader-loads-the-route-history-with-an-unknown-id) | 성공 |
 | [아무 권한도 받지 않은 사용자가 남의 라우트 이력을 id 로 읽으면 그 자리가 권한 부족으로 거부됩니다](#batch_loading-a-user-granted-nothing-may-not-load-the-route-history) | 거부 |
 
 **batch_load_session_histories_by_ids**
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 세션 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다](#batch_loading-the-superadmin-loads-the-session-history) | 성공 |
-| [슈퍼관리자가 있는 id 와 없는 id 로 세션 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다](#batch_loading-the-superadmin-loads-the-session-history-with-an-unknown-id) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 세션 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다](#batch_loading-a-reader-loads-the-session-history) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 있는 id 와 없는 id 로 세션 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다](#batch_loading-a-reader-loads-the-session-history-with-an-unknown-id) | 성공 |
 | [아무 권한도 받지 않은 사용자가 남의 세션 이력을 id 로 읽으면 그 자리가 권한 부족으로 거부됩니다](#batch_loading-a-user-granted-nothing-may-not-load-the-session-history) | 거부 |
 
 **deployment_scoped_search**
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 미리 만든 대상을 범위로 배포 이력을 훑으면 그 이력 하나가 한 페이지로 옵니다](#scoped_searching-the-superadmin-pages-through-the-scoped-deployment-histories) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 배포 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다](#scoped_searching-a-reader-pages-through-the-scoped-deployment-histories) | 성공 |
 | [아무 권한도 받지 않은 사용자가 배포 이력을 범위로 훑으면 권한 부족으로 거부됩니다](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-deployment-histories) | 거부 |
 
 **route_scoped_search**
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 미리 만든 대상을 범위로 라우트 이력을 훑으면 그 이력 하나가 한 페이지로 옵니다](#scoped_searching-the-superadmin-pages-through-the-scoped-route-histories) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 라우트 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다](#scoped_searching-a-reader-pages-through-the-scoped-route-histories) | 성공 |
 | [아무 권한도 받지 않은 사용자가 라우트 이력을 범위로 훑으면 요청이 거부됩니다](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-route-histories) | 거부 |
 
 **scoped_search_kernel_history**
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 미리 만든 대상을 범위로 커널 이력을 훑으면 그 이력 하나가 한 페이지로 옵니다](#scoped_searching-the-superadmin-pages-through-the-scoped-kernel-histories) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 커널 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다](#scoped_searching-a-reader-pages-through-the-scoped-kernel-histories) | 성공 |
 | [아무 권한도 받지 않은 사용자가 커널 이력을 범위로 훑으면 권한 부족으로 거부됩니다](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-kernel-histories) | 거부 |
 | [슈퍼관리자가 범위 항목 둘을 대고 커널 이력을 훑으면 요청이 거부됩니다](#scoped_searching-kernel-history-scope-naming-two-items-is-refused) | 거부 |
 
@@ -123,7 +123,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 미리 만든 대상을 범위로 복제본 그룹 이력을 훑으면 그 이력 하나가 한 페이지로 옵니다](#scoped_searching-the-superadmin-pages-through-the-scoped-replica-group-histories) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 복제본 그룹 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다](#scoped_searching-a-reader-pages-through-the-scoped-replica-group-histories) | 성공 |
 | [아무 권한도 받지 않은 사용자가 복제본 그룹 이력을 범위로 훑으면 권한 부족으로 거부됩니다](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-replica-group-histories) | 거부 |
 | [슈퍼관리자가 범위 항목 둘을 대고 복제본 그룹 이력을 훑으면 요청이 거부됩니다](#scoped_searching-replica-group-history-scope-naming-two-items-is-refused) | 거부 |
 
@@ -131,7 +131,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 미리 만든 대상을 범위로 세션 이력을 훑으면 그 이력 하나가 한 페이지로 옵니다](#scoped_searching-the-superadmin-pages-through-the-scoped-session-histories) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 세션 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다](#scoped_searching-a-reader-pages-through-the-scoped-session-histories) | 성공 |
 | [아무 권한도 받지 않은 사용자가 세션 이력을 범위로 훑으면 권한 부족으로 거부됩니다](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-session-histories) | 거부 |
 
 ### admin_search_deployment_history
@@ -140,11 +140,11 @@
 
 #### [the-superadmin-pages-through-deployment-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_searching.py): pass
 
-슈퍼관리자가 배포 이력을 훑으면 미리 만든 이력 하나가 한 페이지로 옵니다
+슈퍼관리자가 미리 만든 이력 하나만 남기는 조건과 순서를 걸어 배포 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 같은 것이 한 벌 더 있고, 슈퍼관리자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -172,10 +172,22 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 스케줄링을 기다립니다
+  - 세션 other-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 other-session-1: 요구량이 인 커널 하나를 갖습니다
+  - 세션 other-session-1: 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 커널의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
+  - 배포의 세션 그룹 deployment-session-group-2: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 other-deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 other-deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 하나를 갖습니다
+  - 배포 other-deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
 
 When
 
-- SchedulingHistoryAdapter.admin_search_deployment_history: user-2 이 필터 없이 배포 이력을 훑습니다
+- SchedulingHistoryAdapter.admin_search_deployment_history: user-2 이 미리 만든 배포 이력 하나만 남기는 조건과 순서를 걸어 한 건씩 훑습니다
 
 Then
 
@@ -251,11 +263,11 @@ Then
 
 #### [the-superadmin-pages-through-kernel-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_searching.py): pass
 
-슈퍼관리자가 커널 이력을 훑으면 미리 만든 이력 하나가 한 페이지로 옵니다
+슈퍼관리자가 미리 만든 이력 하나만 남기는 조건과 순서를 걸어 커널 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 같은 것이 한 벌 더 있고, 슈퍼관리자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -283,10 +295,22 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 스케줄링을 기다립니다
+  - 세션 other-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 other-session-1: 요구량이 인 커널 하나를 갖습니다
+  - 세션 other-session-1: 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 커널의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
+  - 배포의 세션 그룹 deployment-session-group-2: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 other-deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 other-deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 하나를 갖습니다
+  - 배포 other-deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
 
 When
 
-- SchedulingHistoryAdapter.admin_search_kernel_history: user-2 이 필터 없이 커널 이력을 훑습니다
+- SchedulingHistoryAdapter.admin_search_kernel_history: user-2 이 미리 만든 커널 이력 하나만 남기는 조건과 순서를 걸어 한 건씩 훑습니다
 
 Then
 
@@ -361,11 +385,11 @@ Then
 
 #### [the-superadmin-pages-through-replica-group-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_searching.py): pass
 
-슈퍼관리자가 복제본 그룹 이력을 훑으면 미리 만든 이력 하나가 한 페이지로 옵니다
+슈퍼관리자가 미리 만든 이력 하나만 남기는 조건과 순서를 걸어 복제본 그룹 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 같은 것이 한 벌 더 있고, 슈퍼관리자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -393,10 +417,22 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 스케줄링을 기다립니다
+  - 세션 other-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 other-session-1: 요구량이 인 커널 하나를 갖습니다
+  - 세션 other-session-1: 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 커널의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
+  - 배포의 세션 그룹 deployment-session-group-2: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 other-deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 other-deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 하나를 갖습니다
+  - 배포 other-deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
 
 When
 
-- SchedulingHistoryAdapter.admin_search_replica_group_history: user-2 이 필터 없이 복제본 그룹 이력을 훑습니다
+- SchedulingHistoryAdapter.admin_search_replica_group_history: user-2 이 미리 만든 복제본 그룹 이력 하나만 남기는 조건과 순서를 걸어 한 건씩 훑습니다
 
 Then
 
@@ -472,11 +508,11 @@ Then
 
 #### [the-superadmin-pages-through-route-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_searching.py): pass
 
-슈퍼관리자가 라우트 이력을 훑으면 미리 만든 이력 하나가 한 페이지로 옵니다
+슈퍼관리자가 미리 만든 이력 하나만 남기는 조건과 순서를 걸어 라우트 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 같은 것이 한 벌 더 있고, 슈퍼관리자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -504,10 +540,22 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 스케줄링을 기다립니다
+  - 세션 other-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 other-session-1: 요구량이 인 커널 하나를 갖습니다
+  - 세션 other-session-1: 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 커널의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
+  - 배포의 세션 그룹 deployment-session-group-2: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 other-deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 other-deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 하나를 갖습니다
+  - 배포 other-deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
 
 When
 
-- SchedulingHistoryAdapter.admin_search_route_history: user-2 이 필터 없이 라우트 이력을 훑습니다
+- SchedulingHistoryAdapter.admin_search_route_history: user-2 이 미리 만든 라우트 이력 하나만 남기는 조건과 순서를 걸어 한 건씩 훑습니다
 
 Then
 
@@ -586,11 +634,11 @@ Then
 
 #### [the-superadmin-pages-through-session-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_searching.py): pass
 
-슈퍼관리자가 세션 이력을 훑으면 미리 만든 이력 하나가 한 페이지로 옵니다
+슈퍼관리자가 미리 만든 이력 하나만 남기는 조건과 순서를 걸어 세션 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 같은 것이 한 벌 더 있고, 슈퍼관리자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -618,10 +666,22 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 스케줄링을 기다립니다
+  - 세션 other-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 other-session-1: 요구량이 인 커널 하나를 갖습니다
+  - 세션 other-session-1: 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 커널의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
+  - 배포의 세션 그룹 deployment-session-group-2: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 other-deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 other-deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 하나를 갖습니다
+  - 배포 other-deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
 
 When
 
-- SchedulingHistoryAdapter.admin_search_session_history: user-2 이 필터 없이 세션 이력을 훑습니다
+- SchedulingHistoryAdapter.admin_search_session_history: user-2 이 미리 만든 세션 이력 하나만 남기는 조건과 순서를 걸어 한 건씩 훑습니다
 
 Then
 
@@ -692,15 +752,15 @@ Then
 
 ### batch_load_deployment_histories_by_ids
 
-<a id="batch_loading-the-superadmin-loads-the-deployment-history"></a>
+<a id="batch_loading-a-reader-loads-the-deployment-history"></a>
 
-#### [the-superadmin-loads-the-deployment-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-deployment-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-슈퍼관리자가 배포 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 배포 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -711,7 +771,7 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
   - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
   - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
@@ -728,6 +788,11 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 프로젝트 범위에서 세션과 배포 조회 권한을 받은 사용자 준비
+    - 역할 history-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 history-reader-1: session 전체에 READ 허용
+    - 역할 history-reader-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 history-reader-1 보유
 
 When
 
@@ -752,15 +817,15 @@ Then
   - [0].created_at: 이 실행이 쓴 시각
   - [0].updated_at: 이 실행이 쓴 시각
 
-<a id="batch_loading-the-superadmin-loads-the-deployment-history-with-an-unknown-id"></a>
+<a id="batch_loading-a-reader-loads-the-deployment-history-with-an-unknown-id"></a>
 
-#### [the-superadmin-loads-the-deployment-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-deployment-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-슈퍼관리자가 있는 id 와 없는 id 로 배포 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 있는 id 와 없는 id 로 배포 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -771,7 +836,7 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
   - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
   - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
@@ -788,6 +853,11 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 프로젝트 범위에서 세션과 배포 조회 권한을 받은 사용자 준비
+    - 역할 history-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 history-reader-1: session 전체에 READ 허용
+    - 역할 history-reader-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 history-reader-1 보유
 
 When
 
@@ -862,15 +932,15 @@ Then
 
 ### batch_load_kernel_histories_by_ids
 
-<a id="batch_loading-the-superadmin-loads-the-kernel-history"></a>
+<a id="batch_loading-a-reader-loads-the-kernel-history"></a>
 
-#### [the-superadmin-loads-the-kernel-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-kernel-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-슈퍼관리자가 커널 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 커널 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -881,7 +951,7 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
   - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
   - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
@@ -898,6 +968,11 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 프로젝트 범위에서 세션과 배포 조회 권한을 받은 사용자 준비
+    - 역할 history-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 history-reader-1: session 전체에 READ 허용
+    - 역할 history-reader-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 history-reader-1 보유
 
 When
 
@@ -921,15 +996,15 @@ Then
   - [0].created_at: 이 실행이 쓴 시각
   - [0].updated_at: 이 실행이 쓴 시각
 
-<a id="batch_loading-the-superadmin-loads-the-kernel-history-with-an-unknown-id"></a>
+<a id="batch_loading-a-reader-loads-the-kernel-history-with-an-unknown-id"></a>
 
-#### [the-superadmin-loads-the-kernel-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-kernel-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-슈퍼관리자가 있는 id 와 없는 id 로 커널 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 있는 id 와 없는 id 로 커널 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -940,7 +1015,7 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
   - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
   - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
@@ -957,6 +1032,11 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 프로젝트 범위에서 세션과 배포 조회 권한을 받은 사용자 준비
+    - 역할 history-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 history-reader-1: session 전체에 READ 허용
+    - 역할 history-reader-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 history-reader-1 보유
 
 When
 
@@ -1030,15 +1110,15 @@ Then
 
 ### batch_load_replica_group_histories_by_ids
 
-<a id="batch_loading-the-superadmin-loads-the-replica-group-history"></a>
+<a id="batch_loading-a-reader-loads-the-replica-group-history"></a>
 
-#### [the-superadmin-loads-the-replica-group-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-replica-group-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-슈퍼관리자가 복제본 그룹 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 복제본 그룹 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1049,7 +1129,7 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
   - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
   - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
@@ -1066,6 +1146,11 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 프로젝트 범위에서 세션과 배포 조회 권한을 받은 사용자 준비
+    - 역할 history-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 history-reader-1: session 전체에 READ 허용
+    - 역할 history-reader-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 history-reader-1 보유
 
 When
 
@@ -1090,15 +1175,15 @@ Then
   - [0].created_at: 이 실행이 쓴 시각
   - [0].updated_at: 이 실행이 쓴 시각
 
-<a id="batch_loading-the-superadmin-loads-the-replica-group-history-with-an-unknown-id"></a>
+<a id="batch_loading-a-reader-loads-the-replica-group-history-with-an-unknown-id"></a>
 
-#### [the-superadmin-loads-the-replica-group-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-replica-group-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-슈퍼관리자가 있는 id 와 없는 id 로 복제본 그룹 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 있는 id 와 없는 id 로 복제본 그룹 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1109,7 +1194,7 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
   - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
   - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
@@ -1126,6 +1211,11 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 프로젝트 범위에서 세션과 배포 조회 권한을 받은 사용자 준비
+    - 역할 history-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 history-reader-1: session 전체에 READ 허용
+    - 역할 history-reader-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 history-reader-1 보유
 
 When
 
@@ -1200,15 +1290,15 @@ Then
 
 ### batch_load_route_histories_by_ids
 
-<a id="batch_loading-the-superadmin-loads-the-route-history"></a>
+<a id="batch_loading-a-reader-loads-the-route-history"></a>
 
-#### [the-superadmin-loads-the-route-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-route-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-슈퍼관리자가 라우트 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 라우트 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1219,7 +1309,7 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
   - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
   - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
@@ -1236,6 +1326,11 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 프로젝트 범위에서 세션과 배포 조회 권한을 받은 사용자 준비
+    - 역할 history-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 history-reader-1: session 전체에 READ 허용
+    - 역할 history-reader-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 history-reader-1 보유
 
 When
 
@@ -1263,15 +1358,15 @@ Then
   - [0].created_at: 이 실행이 쓴 시각
   - [0].updated_at: 이 실행이 쓴 시각
 
-<a id="batch_loading-the-superadmin-loads-the-route-history-with-an-unknown-id"></a>
+<a id="batch_loading-a-reader-loads-the-route-history-with-an-unknown-id"></a>
 
-#### [the-superadmin-loads-the-route-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-route-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-슈퍼관리자가 있는 id 와 없는 id 로 라우트 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 있는 id 와 없는 id 로 라우트 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1282,7 +1377,7 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
   - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
   - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
@@ -1299,6 +1394,11 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 프로젝트 범위에서 세션과 배포 조회 권한을 받은 사용자 준비
+    - 역할 history-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 history-reader-1: session 전체에 READ 허용
+    - 역할 history-reader-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 history-reader-1 보유
 
 When
 
@@ -1376,15 +1476,15 @@ Then
 
 ### batch_load_session_histories_by_ids
 
-<a id="batch_loading-the-superadmin-loads-the-session-history"></a>
+<a id="batch_loading-a-reader-loads-the-session-history"></a>
 
-#### [the-superadmin-loads-the-session-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-session-history](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-슈퍼관리자가 세션 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 세션 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1395,7 +1495,7 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
   - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
   - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
@@ -1412,6 +1512,11 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 프로젝트 범위에서 세션과 배포 조회 권한을 받은 사용자 준비
+    - 역할 history-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 history-reader-1: session 전체에 READ 허용
+    - 역할 history-reader-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 history-reader-1 보유
 
 When
 
@@ -1435,15 +1540,15 @@ Then
   - [0].created_at: 이 실행이 쓴 시각
   - [0].updated_at: 이 실행이 쓴 시각
 
-<a id="batch_loading-the-superadmin-loads-the-session-history-with-an-unknown-id"></a>
+<a id="batch_loading-a-reader-loads-the-session-history-with-an-unknown-id"></a>
 
-#### [the-superadmin-loads-the-session-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
+#### [a-reader-loads-the-session-history-with-an-unknown-id](/tests/scenario/bai_scenario/manager/scheduling_history/test_batch_loading.py): pass
 
-슈퍼관리자가 있는 id 와 없는 id 로 세션 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 있는 id 와 없는 id 로 세션 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1454,7 +1559,7 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
   - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
   - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
@@ -1471,6 +1576,11 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 프로젝트 범위에서 세션과 배포 조회 권한을 받은 사용자 준비
+    - 역할 history-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 history-reader-1: session 전체에 READ 허용
+    - 역할 history-reader-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 history-reader-1 보유
 
 When
 
@@ -1544,15 +1654,15 @@ Then
 
 ### deployment_scoped_search
 
-<a id="scoped_searching-the-superadmin-pages-through-the-scoped-deployment-histories"></a>
+<a id="scoped_searching-a-reader-pages-through-the-scoped-deployment-histories"></a>
 
-#### [the-superadmin-pages-through-the-scoped-deployment-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
+#### [a-reader-pages-through-the-scoped-deployment-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-슈퍼관리자가 미리 만든 대상을 범위로 배포 이력을 훑으면 그 이력 하나가 한 페이지로 옵니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 배포 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 같은 것이 한 벌 더 있고, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1563,7 +1673,7 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
   - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
   - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
@@ -1580,6 +1690,23 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 스케줄링을 기다립니다
+  - 세션 other-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 other-session-1: 요구량이 인 커널 하나를 갖습니다
+  - 세션 other-session-1: 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 커널의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
+  - 배포의 세션 그룹 deployment-session-group-2: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 other-deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 other-deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 하나를 갖습니다
+  - 배포 other-deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
+  - 프로젝트 범위에서 세션과 배포 조회 권한을 받은 사용자 준비
+    - 역할 history-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 history-reader-1: session 전체에 READ 허용
+    - 역할 history-reader-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 history-reader-1 보유
 
 When
 
@@ -1655,15 +1782,15 @@ Then
 
 ### route_scoped_search
 
-<a id="scoped_searching-the-superadmin-pages-through-the-scoped-route-histories"></a>
+<a id="scoped_searching-a-reader-pages-through-the-scoped-route-histories"></a>
 
-#### [the-superadmin-pages-through-the-scoped-route-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
+#### [a-reader-pages-through-the-scoped-route-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-슈퍼관리자가 미리 만든 대상을 범위로 라우트 이력을 훑으면 그 이력 하나가 한 페이지로 옵니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 라우트 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 같은 것이 한 벌 더 있고, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1674,7 +1801,7 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
   - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
   - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
@@ -1691,6 +1818,23 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 스케줄링을 기다립니다
+  - 세션 other-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 other-session-1: 요구량이 인 커널 하나를 갖습니다
+  - 세션 other-session-1: 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 커널의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
+  - 배포의 세션 그룹 deployment-session-group-2: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 other-deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 other-deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 하나를 갖습니다
+  - 배포 other-deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
+  - 프로젝트 범위에서 세션과 배포 조회 권한을 받은 사용자 준비
+    - 역할 history-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 history-reader-1: session 전체에 READ 허용
+    - 역할 history-reader-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 history-reader-1 보유
 
 When
 
@@ -1769,15 +1913,15 @@ Then
 
 ### scoped_search_kernel_history
 
-<a id="scoped_searching-the-superadmin-pages-through-the-scoped-kernel-histories"></a>
+<a id="scoped_searching-a-reader-pages-through-the-scoped-kernel-histories"></a>
 
-#### [the-superadmin-pages-through-the-scoped-kernel-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
+#### [a-reader-pages-through-the-scoped-kernel-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-슈퍼관리자가 미리 만든 대상을 범위로 커널 이력을 훑으면 그 이력 하나가 한 페이지로 옵니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 커널 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 같은 것이 한 벌 더 있고, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1788,7 +1932,7 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
   - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
   - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
@@ -1805,6 +1949,23 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 스케줄링을 기다립니다
+  - 세션 other-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 other-session-1: 요구량이 인 커널 하나를 갖습니다
+  - 세션 other-session-1: 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 커널의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
+  - 배포의 세션 그룹 deployment-session-group-2: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 other-deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 other-deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 하나를 갖습니다
+  - 배포 other-deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
+  - 프로젝트 범위에서 세션과 배포 조회 권한을 받은 사용자 준비
+    - 역할 history-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 history-reader-1: session 전체에 READ 허용
+    - 역할 history-reader-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 history-reader-1 보유
 
 When
 
@@ -1925,15 +2086,15 @@ Then
 
 ### scoped_search_replica_group_history
 
-<a id="scoped_searching-the-superadmin-pages-through-the-scoped-replica-group-histories"></a>
+<a id="scoped_searching-a-reader-pages-through-the-scoped-replica-group-histories"></a>
 
-#### [the-superadmin-pages-through-the-scoped-replica-group-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
+#### [a-reader-pages-through-the-scoped-replica-group-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-슈퍼관리자가 미리 만든 대상을 범위로 복제본 그룹 이력을 훑으면 그 이력 하나가 한 페이지로 옵니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 복제본 그룹 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 같은 것이 한 벌 더 있고, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1944,7 +2105,7 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
   - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
   - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
@@ -1961,6 +2122,23 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 스케줄링을 기다립니다
+  - 세션 other-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 other-session-1: 요구량이 인 커널 하나를 갖습니다
+  - 세션 other-session-1: 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 커널의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
+  - 배포의 세션 그룹 deployment-session-group-2: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 other-deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 other-deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 하나를 갖습니다
+  - 배포 other-deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
+  - 프로젝트 범위에서 세션과 배포 조회 권한을 받은 사용자 준비
+    - 역할 history-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 history-reader-1: session 전체에 READ 허용
+    - 역할 history-reader-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 history-reader-1 보유
 
 When
 
@@ -2082,15 +2260,15 @@ Then
 
 ### session_scoped_search
 
-<a id="scoped_searching-the-superadmin-pages-through-the-scoped-session-histories"></a>
+<a id="scoped_searching-a-reader-pages-through-the-scoped-session-histories"></a>
 
-#### [the-superadmin-pages-through-the-scoped-session-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
+#### [a-reader-pages-through-the-scoped-session-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-슈퍼관리자가 미리 만든 대상을 범위로 세션 이력을 훑으면 그 이력 하나가 한 페이지로 옵니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 세션 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다
 
 Given
 
-- 스케줄링 이력이 하나씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹과, 슈퍼관리자
+- 스케줄링 이력이 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 같은 것이 한 벌 더 있고, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -2101,7 +2279,7 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
   - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
   - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
@@ -2118,6 +2296,23 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 스케줄링을 기다립니다
+  - 세션 other-session-1: main 커널 그룹 하나를 갖습니다
+  - 세션 other-session-1: 요구량이 인 커널 하나를 갖습니다
+  - 세션 other-session-1: 스케줄링 시도 하나를 남깁니다
+  - 세션 other-session-1: 커널의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
+  - 배포의 세션 그룹 deployment-session-group-2: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 other-deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 other-deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 배포 other-deployment-1: 복제본 하나를 갖습니다
+  - 배포 other-deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
+  - 프로젝트 범위에서 세션과 배포 조회 권한을 받은 사용자 준비
+    - 역할 history-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 history-reader-1: session 전체에 READ 허용
+    - 역할 history-reader-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 history-reader-1 보유
 
 When
 
