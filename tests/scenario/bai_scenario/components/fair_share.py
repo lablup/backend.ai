@@ -22,6 +22,8 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.fair_share.response import (
     BulkUpsertDomainFairShareWeightPayload,
+    BulkUpsertProjectFairShareWeightPayload,
+    BulkUpsertUserFairShareWeightPayload,
     DomainFairShareNode,
     ProjectFairShareNode,
     SearchDomainFairSharesPayload,
@@ -1213,3 +1215,315 @@ class TheSecondActiveMember(
             return page
         look = UserRecordLook(self.started, "items[0].")
         return [*page, *look.of(payload.items[0], laid.group, laid.record)]
+
+
+@dataclass(frozen=True)
+class ProjectsInAGroupAndACaller:
+    """리소스 그룹 하나, 한 도메인 아래 가중치를 정할 프로젝트들, 그리고 호출할 사용자. 호출자는 그 도메인에 산다."""
+
+    group: ResourceGroupData
+    domain: DomainData
+    projects: tuple[ProjectData, ...]
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class ProjectsInAGroupAndSomeone(Given[Any, ProjectsInAGroupAndACaller]):
+    """그룹 하나, 한 도메인 아래 프로젝트 ``1 + besides``개, 사용자 한 명. ``granted``를 주면 그 그룹에 앉힌 역할로 그 권한을 받는다."""
+
+    role: UserRole = UserRole.USER
+    granted: Permission | None = None
+    besides: int = 0
+
+    @override
+    def describe(self) -> str:
+        who = role_named(self.role)
+        if self.granted is not None:
+            who_ko = f"그 그룹 범위의 {self.granted.name} 역할을 받은 {who}"
+            who_en = (
+                f"the {in_language(who, Language.ENGLISH)} granted the {self.granted.name} role "
+                "in the resource group scope"
+            )
+        else:
+            who_ko = who
+            who_en = f"one {in_language(who, Language.ENGLISH)}"
+        return Says(
+            f"리소스 그룹 하나와 프로젝트 {1 + self.besides}개, 그리고 {who_ko} 한 명",
+            english=f"one resource group and {1 + self.besides} projects, and {who_en}",
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> ProjectsInAGroupAndACaller:
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        projects = [
+            await seeding.creating_from_two(TestSeedProject(name_hint="team"), home, policy)
+            for _ in range(1 + self.besides)
+        ]
+        group = await seeding.creating(TestSeedResourceGroup())
+        caller = await seeding.within(SomeoneOf(home, role=self.role))
+        if self.granted is not None:
+            await seeding.within(SomeoneGrantedOnTheGroup(group, caller, self.granted))
+        return ProjectsInAGroupAndACaller(
+            group=seeding.made(group),
+            domain=seeding.made(home),
+            projects=tuple(seeding.made(project) for project in projects),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
+class UsersInAGroupAndACaller:
+    """리소스 그룹 하나, 한 도메인 아래 프로젝트 하나, 가중치를 정할 사용자들, 그리고 호출할 사용자."""
+
+    group: ResourceGroupData
+    domain: DomainData
+    project: ProjectData
+    users: tuple[UserData, ...]
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class UsersInAGroupAndSomeone(Given[Any, UsersInAGroupAndACaller]):
+    """그룹 하나, 한 도메인 아래 프로젝트 하나와 사용자 ``1 + besides``명, 호출할 사용자 한 명. ``granted``를 주면 그 그룹에 앉힌 역할로 그 권한을 받는다."""
+
+    role: UserRole = UserRole.USER
+    granted: Permission | None = None
+    besides: int = 0
+
+    @override
+    def describe(self) -> str:
+        who = role_named(self.role)
+        if self.granted is not None:
+            who_ko = f"그 그룹 범위의 {self.granted.name} 역할을 받은 {who}"
+            who_en = (
+                f"the {in_language(who, Language.ENGLISH)} granted the {self.granted.name} role "
+                "in the resource group scope"
+            )
+        else:
+            who_ko = who
+            who_en = f"one {in_language(who, Language.ENGLISH)}"
+        return Says(
+            (
+                f"리소스 그룹 하나와 프로젝트 하나, 사용자 {1 + self.besides}명, 그리고 "
+                f"{who_ko} 한 명"
+            ),
+            english=(f"one resource group, one project and {1 + self.besides} users, and {who_en}"),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> UsersInAGroupAndACaller:
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), home, policy)
+        users = [await seeding.within(SomeoneOf(home)) for _ in range(1 + self.besides)]
+        group = await seeding.creating(TestSeedResourceGroup())
+        caller = await seeding.within(SomeoneOf(home, role=self.role))
+        if self.granted is not None:
+            await seeding.within(SomeoneGrantedOnTheGroup(group, caller, self.granted))
+        return UsersInAGroupAndACaller(
+            group=seeding.made(group),
+            domain=seeding.made(home),
+            project=seeding.made(project),
+            users=tuple(seeding.made(user) for user in users),
+            caller=seeding.made(caller),
+        )
+
+
+def _spec_verdicts(spec: Any, snapshot: Any, written: Any, node: Any) -> list[Verdict]:
+    return [
+        Same("spec.weight", spec.weight, WEIGHT),
+        Same("spec.uses_default", spec.uses_default, False),
+        Same("spec.half_life_days", spec.half_life_days, 7),
+        Same("spec.lookback_days", spec.lookback_days, 28),
+        Same("spec.decay_unit_days", spec.decay_unit_days, 1),
+        Same("spec.resource_weights", list(spec.resource_weights), []),
+        Same("calculation_snapshot.fair_share_factor", snapshot.fair_share_factor, Decimal(1)),
+        Same(
+            "calculation_snapshot.total_decayed_usage",
+            list(snapshot.total_decayed_usage.entries),
+            [],
+        ),
+        Same("calculation_snapshot.normalized_usage", snapshot.normalized_usage, Decimal(0)),
+        Skipped(
+            "calculation_snapshot.lookback_start",
+            Says("쓴 날짜에 따라 달라집니다", english="it depends on the date written"),
+        ),
+        Skipped(
+            "calculation_snapshot.lookback_end",
+            Says("쓴 날짜에 따라 달라집니다", english="it depends on the date written"),
+        ),
+        Held("calculation_snapshot.last_calculated_at", snapshot.last_calculated_at, written),
+        Held("created_at", node.created_at, written),
+        Held("updated_at", node.updated_at, written),
+    ]
+
+
+@dataclass(frozen=True)
+class TheProjectWeight(Then[ProjectsInAGroupAndACaller, ProjectFairShareNode]):
+    """첫 프로젝트의 기록이 정한 가중치를 싣고 온다. 나머지 설정은 그룹 기본값이다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "정한 가중치를 담은 기록이 오고, 나머지 설정은 그룹 기본값입니다",
+            english=(
+                "the record comes back carrying the weight just set and the rest of the settings "
+                "are the group defaults"
+            ),
+        )
+
+    @override
+    def look(
+        self, laid: ProjectsInAGroupAndACaller, answered: Answered[ProjectFairShareNode]
+    ) -> list[Verdict]:
+        node = answered.response
+        if node is None:
+            return [Same("raised", answered.raised, None)]
+        return [
+            Held(
+                "id",
+                node.id,
+                SameAs(
+                    f"{laid.group.name}:{laid.projects[0].id}",
+                    Says(
+                        "그룹 이름과 미리 만든 프로젝트의 id를 잇은 값",
+                        english="the group name joined with the id of the project seeded in advance",
+                    ),
+                ),
+            ),
+            Same("resource_group_name", node.resource_group_name, laid.group.name),
+            Held(
+                "project_id",
+                node.project_id,
+                SameAs(
+                    laid.projects[0].id,
+                    Says(
+                        "미리 만든 프로젝트의 id",
+                        english="the id of the project seeded in advance",
+                    ),
+                ),
+            ),
+            Same("domain_name", node.domain_name, laid.domain.name),
+            *_spec_verdicts(
+                node.spec, node.calculation_snapshot, WrittenByThisRun(self.started), node
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class EveryProjectWeightIsWritten(
+    Then[ProjectsInAGroupAndACaller, BulkUpsertProjectFairShareWeightPayload]
+):
+    """프로젝트마다 가중치가 정해지고 그 개수가 온다."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "프로젝트 수만큼 정했다는 개수가 옵니다",
+            english="a count comes back saying how many projects were set",
+        )
+
+    @override
+    def look(
+        self,
+        laid: ProjectsInAGroupAndACaller,
+        answered: Answered[BulkUpsertProjectFairShareWeightPayload],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Same("raised", answered.raised, None)]
+        return [Same("upserted_count", payload.upserted_count, len(laid.projects))]
+
+
+@dataclass(frozen=True)
+class TheUserWeight(Then[UsersInAGroupAndACaller, UserFairShareNode]):
+    """첫 사용자의 기록이 정한 가중치를 싣고 온다. 나머지 설정은 그룹 기본값이다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "정한 가중치를 담은 기록이 오고, 나머지 설정은 그룹 기본값입니다",
+            english=(
+                "the record comes back carrying the weight just set and the rest of the settings "
+                "are the group defaults"
+            ),
+        )
+
+    @override
+    def look(
+        self, laid: UsersInAGroupAndACaller, answered: Answered[UserFairShareNode]
+    ) -> list[Verdict]:
+        node = answered.response
+        if node is None:
+            return [Same("raised", answered.raised, None)]
+        return [
+            Held(
+                "id",
+                node.id,
+                SameAs(
+                    f"{laid.group.name}:{laid.users[0].uuid}:{laid.project.id}",
+                    Says(
+                        "그룹 이름, 미리 만든 사용자와 프로젝트의 id를 잇은 값",
+                        english=(
+                            "the group name joined with the ids of the user and the project "
+                            "seeded in advance"
+                        ),
+                    ),
+                ),
+            ),
+            Same("resource_group_name", node.resource_group_name, laid.group.name),
+            Held(
+                "user_uuid",
+                node.user_uuid,
+                SameAs(
+                    laid.users[0].uuid,
+                    Says(
+                        "미리 만든 사용자의 id",
+                        english="the id of the user seeded in advance",
+                    ),
+                ),
+            ),
+            Held(
+                "project_id",
+                node.project_id,
+                SameAs(
+                    laid.project.id,
+                    Says(
+                        "미리 만든 프로젝트의 id",
+                        english="the id of the project seeded in advance",
+                    ),
+                ),
+            ),
+            Same("domain_name", node.domain_name, laid.domain.name),
+            *_spec_verdicts(
+                node.spec, node.calculation_snapshot, WrittenByThisRun(self.started), node
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class EveryUserWeightIsWritten(Then[UsersInAGroupAndACaller, BulkUpsertUserFairShareWeightPayload]):
+    """사용자마다 가중치가 정해지고 그 개수가 온다."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "사용자 수만큼 정했다는 개수가 옵니다",
+            english="a count comes back saying how many users were set",
+        )
+
+    @override
+    def look(
+        self,
+        laid: UsersInAGroupAndACaller,
+        answered: Answered[BulkUpsertUserFairShareWeightPayload],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Same("raised", answered.raised, None)]
+        return [Same("upserted_count", payload.upserted_count, len(laid.users))]
