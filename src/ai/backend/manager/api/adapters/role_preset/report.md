@@ -2,23 +2,23 @@
 
 [background](/src/ai/backend/manager/api/adapters/role_preset/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/role_preset/adapter.py)
 
-Scenario: incomplete 16 / 21
+Scenario: incomplete 11 / 21
 
 - built from ops (14)
-  - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - batch_load_permissions_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_by_ids: representative success ✓ · representative rejection ✓
+  - batch_load_permissions_by_ids: representative success ✓ · representative rejection ✓
   - bulk_delete: representative success ✗ · representative rejection ✗: SCENARIO-GAP
   - bulk_purge: representative success ✗ · representative rejection ✗: SCENARIO-GAP
   - bulk_restore: representative success ✗ · representative rejection ✗: SCENARIO-GAP
   - delete: representative success ✓ · representative rejection ✓
-  - get: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - get: representative success ✓ · representative rejection ✓
   - partial_bulk_delete: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - partial_bulk_restore: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - purge: representative success ✓ · representative rejection ✓
   - restore: representative success ✓ · representative rejection ✓
-  - search: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - search_permission_presets: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - search: representative success ✓ · representative rejection ✓
+  - search_permission_presets: representative success ✓ · representative rejection ✓
 - direct implementation (7)
   - atomic_bulk_add_permissions: success present 1 · rejection present 1 (single_entity)
   - bulk_add_permissions: success absent · rejection absent (single_entity): SCENARIO-GAP
@@ -28,12 +28,33 @@ Scenario: incomplete 16 / 21
   - partial_bulk_update: success present 3 · rejection absent (partial_bulk): SCENARIO-GAP
   - update: success present 2 · rejection present 2 (single_entity)
 
+**batch_load_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted read in global loads the ids of two presets at once, both come back whole in the requested order](#reading-a-user-granted-read-loads-many-presets-in-order) | answered |
+| [when a user granted nothing loads the ids of two presets at once, instead of the whole request being rejected, every entry comes back holding a rejection for lack of permission](#reading-a-user-granted-nothing-loading-many-presets-is-denied-on-every-id) | rejected |
+
+**batch_load_permissions_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted read in global loads the ids of two permission entries of a preset at once, both come back whole in the requested order](#permission_reading-a-user-granted-read-loads-permission-entries-in-order) | answered |
+| [when a user granted nothing loads the ids of two permission entries at once, instead of the whole request being rejected, every entry comes back holding a rejection for lack of permission](#permission_reading-a-user-granted-nothing-loading-entries-is-denied-on-every-id) | rejected |
+
 **delete**
 
 | scenario | verdict |
 |---|---|
 | [when the superadmin soft deletes a preset, the whole preset marked deleted comes back](#deleting-the-superadmin-soft-deletes-a-preset) | answered |
 | [when a user granted nothing tries to soft delete a preset, it is rejected for lack of permission](#deleting-a-user-granted-nothing-may-not-soft-delete-a-preset) | rejected |
+
+**get**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted read in global reads by id, the whole preset seeded in advance comes back](#reading-a-user-granted-read-reads-a-preset-by-id) | answered |
+| [when a user granted nothing tries to read by id, it is rejected for lack of permission](#reading-a-user-granted-nothing-may-not-read-a-preset) | rejected |
 
 **partial_bulk_delete**
 
@@ -68,6 +89,20 @@ Scenario: incomplete 16 / 21
 |---|---|
 | [when a soft-deleted preset is restored, the whole preset not marked deleted comes back](#deleting-restoring-a-soft-deleted-preset-brings-it-back) | answered |
 | [when a user granted nothing tries to restore a preset, it is rejected for lack of permission](#deleting-a-user-granted-nothing-may-not-restore-a-preset) | rejected |
+
+**search**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin searches with the project-scope filter, name order and a page size of one, only the first matching preset in the order comes back and the rest do not. The global role gates this call](#searching-the-superadmin-finds-one-page-of-matching-presets) | answered |
+| [when a user without the global role tries to search presets, it is rejected for lack of permission](#searching-a-user-who-is-not-the-superadmin-may-not-search-presets) | rejected |
+
+**search_permission_presets**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted read in global searches permission entries with the read-bit filter, entity-type order and a page size of one, only the first matching entry in the order comes back and neither the other matching entry, the entry the filter excludes nor the entry of the other preset comes back](#permission_reading-a-user-granted-read-finds-one-page-of-matching-entries) | answered |
+| [when a user granted nothing tries to search the permission entries of a preset, the whole request is rejected for lack of permission](#permission_reading-a-user-granted-nothing-may-not-search-permission-entries) | rejected |
 
 **atomic_bulk_add_permissions**
 
@@ -105,6 +140,166 @@ Scenario: incomplete 16 / 21
 | [when the superadmin renames a preset, the whole preset carrying the new name comes back](#editing-the-superadmin-renames-a-preset) | answered |
 | [turning on owner assignment of a preset in a scope other than a project is rejected because there is no owner](#editing-a-domain-preset-refuses-owner-assign) | rejected |
 | [when a user granted nothing tries to rename a preset, it is rejected for lack of permission](#editing-a-user-granted-nothing-may-not-rename-a-preset) | rejected |
+
+### batch_load_by_ids
+
+<a id="reading-a-user-granted-read-loads-many-presets-in-order"></a>
+
+#### [a-user-granted-read-loads-many-presets-in-order](/tests/scenario/bai_scenario/manager/role_preset/test_reading.py): pass
+
+when a user granted read in global loads the ids of two presets at once, both come back whole in the requested order
+
+Given
+
+- 2 presets and one user granted READ in global
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare a user granted the READ permission on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-reader-1: applies only within the scope it is granted in
+    - Role preset-reader-1: READ allowed on every role_preset
+    - regular user user-1: holds Role preset-reader-1
+
+When
+
+- RolePresetAdapter.batch_load_by_ids: user-1 reads the ids of 2 presets seeded in advance at once
+
+Then
+
+- the presets seeded in advance come back in the requested order
+  - length = 2
+  - [0].id: same as the id of the preset seeded in advance
+  - [0].entity_id: same as the id of the preset seeded in advance
+  - [0].name = 'preset-1'
+  - [0].scope_type = 'project'
+  - [0].role_name_template = None
+  - [0].auto_assign = False
+  - [0].auto_assign_to_owner = False
+  - [0].deleted = False
+  - [0].deleted_at = None
+  - [0].created_at: same as the time the preset was seeded
+  - [0].updated_at: same as the time the preset was seeded
+  - [1].id: same as the id of the preset seeded in advance
+  - [1].entity_id: same as the id of the preset seeded in advance
+  - [1].name = 'preset-2'
+  - [1].scope_type = 'project'
+  - [1].role_name_template = None
+  - [1].auto_assign = False
+  - [1].auto_assign_to_owner = False
+  - [1].deleted = False
+  - [1].deleted_at = None
+  - [1].created_at: same as the time the preset was seeded
+  - [1].updated_at: same as the time the preset was seeded
+
+<a id="reading-a-user-granted-nothing-loading-many-presets-is-denied-on-every-id"></a>
+
+#### [a-user-granted-nothing-loading-many-presets-is-denied-on-every-id](/tests/scenario/bai_scenario/manager/role_preset/test_reading.py): pass
+
+when a user granted nothing loads the ids of two presets at once, instead of the whole request being rejected, every entry comes back holding a rejection for lack of permission
+
+Given
+
+- 2 presets and one user
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- RolePresetAdapter.batch_load_by_ids: user-1 reads the ids of 2 presets seeded in advance at once
+
+Then
+
+- every entry comes back holding a rejection for lack of permission
+  - length = 2
+  - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
+
+### batch_load_permissions_by_ids
+
+<a id="permission_reading-a-user-granted-read-loads-permission-entries-in-order"></a>
+
+#### [a-user-granted-read-loads-permission-entries-in-order](/tests/scenario/bai_scenario/manager/role_preset/test_permission_reading.py): pass
+
+when a user granted read in global loads the ids of two permission entries of a preset at once, both come back whole in the requested order
+
+Given
+
+- one preset with two permission entries and one user granted READ in global
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-1: READ allowed on every domain
+  - Role preset preset-1: UPDATE allowed on every project
+  - Domain home-1
+  - Prepare a user granted the READ permission on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-reader-1: applies only within the scope it is granted in
+    - Role preset-reader-1: READ allowed on every role_preset
+    - regular user user-1: holds Role preset-reader-1
+
+When
+
+- RolePresetAdapter.batch_load_permissions_by_ids: user-1 reads the ids of 2 permission entries of preset-1 at once
+
+Then
+
+- the entries seeded in advance come back in the requested order
+  - length = 2
+  - [0].id: same as the id of the entry seeded in advance
+  - [0].field_id: same as the id of the entry seeded in advance
+  - [0].role_preset_id: same as the id of the preset seeded in advance
+  - [0].entity_type = 'domain'
+  - [0].permission = <PermissionBitDTO.READ: 'read'>
+  - [0].created_at: same as the time the entry was seeded
+  - [1].id: same as the id of the entry seeded in advance
+  - [1].field_id: same as the id of the entry seeded in advance
+  - [1].role_preset_id: same as the id of the preset seeded in advance
+  - [1].entity_type = 'project'
+  - [1].permission = <PermissionBitDTO.UPDATE: 'update'>
+  - [1].created_at: same as the time the entry was seeded
+
+<a id="permission_reading-a-user-granted-nothing-loading-entries-is-denied-on-every-id"></a>
+
+#### [a-user-granted-nothing-loading-entries-is-denied-on-every-id](/tests/scenario/bai_scenario/manager/role_preset/test_permission_reading.py): pass
+
+when a user granted nothing loads the ids of two permission entries at once, instead of the whole request being rejected, every entry comes back holding a rejection for lack of permission
+
+Given
+
+- one preset with two permission entries and one user
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-1: READ allowed on every domain
+  - Role preset preset-1: UPDATE allowed on every project
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- RolePresetAdapter.batch_load_permissions_by_ids: user-1 reads the ids of 2 permission entries of preset-1 at once
+
+Then
+
+- every entry comes back holding a rejection for lack of permission
+  - length = 2
+  - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
 
 ### delete
 
@@ -161,6 +356,74 @@ Given
 When
 
 - RolePresetAdapter.delete: user-1 soft deletes preset-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### get
+
+<a id="reading-a-user-granted-read-reads-a-preset-by-id"></a>
+
+#### [a-user-granted-read-reads-a-preset-by-id](/tests/scenario/bai_scenario/manager/role_preset/test_reading.py): pass
+
+when a user granted read in global reads by id, the whole preset seeded in advance comes back
+
+Given
+
+- one preset that already exists and one user granted READ in global
+  - Role preset preset-1: for the project scope, with automatic grant enabled, with owner assignment enabled, carrying a role name template
+  - Domain home-1
+  - Prepare a user granted the READ permission on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-reader-1: applies only within the scope it is granted in
+    - Role preset-reader-1: READ allowed on every role_preset
+    - regular user user-1: holds Role preset-reader-1
+
+When
+
+- RolePresetAdapter.get: user-1 reads preset-1 by id
+
+Then
+
+- the whole preset seeded in advance comes back
+  - id: same as the id of the preset seeded in advance
+  - entity_id: same as the id of the preset seeded in advance
+  - name = 'preset-1'
+  - scope_type = 'project'
+  - role_name_template = 'team-member'
+  - auto_assign = True
+  - auto_assign_to_owner = True
+  - deleted = False
+  - deleted_at = None
+  - created_at: same as the time the preset was seeded
+  - updated_at: same as the time the preset was seeded
+
+<a id="reading-a-user-granted-nothing-may-not-read-a-preset"></a>
+
+#### [a-user-granted-nothing-may-not-read-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_reading.py): pass
+
+when a user granted nothing tries to read by id, it is rejected for lack of permission
+
+Given
+
+- one preset that already exists and one user
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- RolePresetAdapter.get: user-1 reads preset-1 by id
 
 Then
 
@@ -489,6 +752,155 @@ Given
 When
 
 - RolePresetAdapter.restore: user-1 restores preset-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### search
+
+<a id="searching-the-superadmin-finds-one-page-of-matching-presets"></a>
+
+#### [the-superadmin-finds-one-page-of-matching-presets](/tests/scenario/bai_scenario/manager/role_preset/test_searching.py): pass
+
+when the superadmin searches with the project-scope filter, name order and a page size of one, only the first matching preset in the order comes back and the rest do not. The global role gates this call
+
+Given
+
+- two project-scope presets, one domain-scope preset, and one superadmin
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Role preset preset-3: for the domain scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- RolePresetAdapter.search: user-1 searches with the project-scope filter, name order and a page size of one
+
+Then
+
+- of the presets matching the filter, only the first in the order comes back as one page, and neither the other matching preset nor the preset the filter excludes comes back
+  - items count = 1
+  - items[0].id: same as the id of the preset seeded in advance
+  - items[0].entity_id: same as the id of the preset seeded in advance
+  - items[0].name = 'preset-1'
+  - items[0].scope_type = 'project'
+  - items[0].role_name_template = None
+  - items[0].auto_assign = False
+  - items[0].auto_assign_to_owner = False
+  - items[0].deleted = False
+  - items[0].deleted_at = None
+  - items[0].created_at: same as the time the preset was seeded
+  - items[0].updated_at: same as the time the preset was seeded
+  - total_count = 2
+  - has_next_page = True
+  - has_previous_page = False
+
+<a id="searching-a-user-who-is-not-the-superadmin-may-not-search-presets"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-search-presets](/tests/scenario/bai_scenario/manager/role_preset/test_searching.py): pass
+
+when a user without the global role tries to search presets, it is rejected for lack of permission
+
+Given
+
+- two project-scope presets, one domain-scope preset, and one user
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Role preset preset-3: for the domain scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- RolePresetAdapter.search: user-1 searches with the project-scope filter, name order and a page size of one
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+### search_permission_presets
+
+<a id="permission_reading-a-user-granted-read-finds-one-page-of-matching-entries"></a>
+
+#### [a-user-granted-read-finds-one-page-of-matching-entries](/tests/scenario/bai_scenario/manager/role_preset/test_permission_reading.py): pass
+
+when a user granted read in global searches permission entries with the read-bit filter, entity-type order and a page size of one, only the first matching entry in the order comes back and neither the other matching entry, the entry the filter excludes nor the entry of the other preset comes back
+
+Given
+
+- one preset with several permission entries, another preset, and one user granted READ in global
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-1: READ allowed on every domain
+  - Role preset preset-1: READ allowed on every project
+  - Role preset preset-1: UPDATE allowed on every project
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Role preset preset-2: READ allowed on every project
+  - Domain home-1
+  - Prepare a user granted the READ permission on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-reader-1: applies only within the scope it is granted in
+    - Role preset-reader-1: READ allowed on every role_preset
+    - regular user user-1: holds Role preset-reader-1
+
+When
+
+- RolePresetAdapter.search_permission_presets: user-1 searches the permission entries of preset-1 with the read-bit filter, entity-type order and a page size of one
+
+Then
+
+- of the entries matching the filter, only the first in the order comes back as one page, and neither the other matching entry, the entry the filter excludes, nor the entry of the other preset comes back
+  - items count = 1
+  - items[0].id: same as the id of the entry seeded in advance
+  - items[0].field_id: same as the id of the entry seeded in advance
+  - items[0].role_preset_id: same as the id of the preset seeded in advance
+  - items[0].entity_type = 'domain'
+  - items[0].permission = <PermissionBitDTO.READ: 'read'>
+  - items[0].created_at: same as the time the entry was seeded
+  - total_count = 2
+  - has_next_page = True
+  - has_previous_page = False
+
+<a id="permission_reading-a-user-granted-nothing-may-not-search-permission-entries"></a>
+
+#### [a-user-granted-nothing-may-not-search-permission-entries](/tests/scenario/bai_scenario/manager/role_preset/test_permission_reading.py): pass
+
+when a user granted nothing tries to search the permission entries of a preset, the whole request is rejected for lack of permission
+
+Given
+
+- one preset with several permission entries, another preset, and one user
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-1: READ allowed on every domain
+  - Role preset preset-1: READ allowed on every project
+  - Role preset preset-1: UPDATE allowed on every project
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Role preset preset-2: READ allowed on every project
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- RolePresetAdapter.search_permission_presets: user-1 searches the permission entries of preset-1 with the read-bit filter, entity-type order and a page size of one
 
 Then
 

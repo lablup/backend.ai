@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, override
+from typing import Any, cast, override
 from uuid import UUID
 
 from ai.backend.common.data.entity.domain import DomainEntityType
@@ -103,8 +103,11 @@ async def _lay_caller(seeding: Any, role: UserRole, granted: Permission | None) 
     """A user of the given role, granted the permission on role presets when given."""
     home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
     if granted is not None:
-        return await seeding.within(SomeoneGrantedOnPresets(home, granted, role=role))
-    return await seeding.within(SomeoneOf(home, role=role))
+        return cast(
+            "Laid[UserData]",
+            await seeding.within(SomeoneGrantedOnPresets(home, granted, role=role)),
+        )
+    return cast("Laid[UserData]", await seeding.within(SomeoneOf(home, role=role)))
 
 
 @dataclass(frozen=True)
