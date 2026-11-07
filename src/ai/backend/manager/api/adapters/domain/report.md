@@ -2,7 +2,7 @@
 
 [background](/src/ai/backend/manager/api/adapters/domain/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/domain/adapter.py)
 
-Scenario: complete
+Scenario: incomplete 3 / 14
 
 - built from ops (12)
   - bulk_get_ids: representative success ✓ · representative rejection ✓
@@ -11,9 +11,9 @@ Scenario: complete
   - get: representative success ✓ · representative rejection ✓
   - global_search: representative success ✓ · representative rejection ✓
   - lookup_name: representative success ✓ · representative rejection ✓
-  - partial_bulk_delete: representative success ✓ · representative rejection ✓
-  - partial_bulk_restore: representative success ✓ · representative rejection ✓
-  - partial_bulk_update: representative success ✓ · representative rejection ✓
+  - partial_bulk_delete: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_restore: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_update: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - restore: representative success ✓ · representative rejection ✓
   - scoped_search: representative success ✓ · representative rejection ✓
   - update: representative success ✓ · representative rejection ✓
@@ -59,13 +59,7 @@ Scenario: complete
 | scenario | verdict |
 |---|---|
 | [when several domains are searched with a filter on the name of one, only the domain of that name is left in the answer](#searching-a-name-filter-narrows-the-answer-to-the-domain-it-names) | answered |
-| [when domains are searched with a filter on the name of a project one of them holds, only the domain holding that project is left](#nested_searching-a-project-name-filter-narrows-the-answer-to-the-domain-holding-it) | answered |
-| [when domains are searched with a filter on the username of a user living in one of them, only the domain that user lives in is left](#nested_searching-a-username-filter-narrows-the-answer-to-the-domain-the-user-lives-in) | answered |
-| [when domains are searched with a filter on the email of a user living in one of them, only the domain that user lives in is left](#nested_searching-an-email-filter-narrows-the-answer-to-the-domain-the-user-lives-in) | answered |
-| [when domains are searched with a filter on inactive users, only the domain such a user lives in is left](#nested_searching-an-inactive-user-filter-narrows-the-answer-to-the-domain-they-live-in) | answered |
-| [when every domain is searched ordered by the email of its users, the domain whose user's email comes first comes first](#nested_searching-ordering-by-the-email-puts-the-domains-in-that-order) | answered |
-| [when every domain is searched ordered by the name of the project it holds, the domain holding the project whose name comes first comes first](#nested_searching-ordering-by-the-project-name-puts-the-domains-in-that-order) | answered |
-| [when every domain is searched ordered by the username of its users, the domain whose user's name comes first comes first](#nested_searching-ordering-by-the-username-puts-the-domains-in-that-order) | answered |
+| [when the superadmin, the only caller the global role admits, searches the domains holding an active user ordered by project name and takes only the first page, the first domain alone comes back with the remaining count and the third domain holding no active user is left out](#nested_searching-a-nested-user-filter-and-project-name-order-narrow-the-first-page) | answered |
 | [when this scenario seeded four domains, a search without a filter brings back all four](#searching-the-answer-counts-every-domain-the-scenario-laid) | answered |
 | [when one of the domains seeded in advance is soft-deleted and every domain is searched without a filter, that one comes back too](#searching-the-answer-includes-soft-deleted-domains-too) | answered |
 | [when a user who is not the superadmin asks to search every domain, the role rejects it](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-domain) | rejected |
@@ -84,14 +78,13 @@ Scenario: complete
 |---|---|
 | [when a user granted nothing soft-deletes several domains at once, none is soft-deleted and every one comes back in the failed list for lack of permission](#partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-domains) | answered |
 | [when two active domains and one missing id are soft-deleted at once, the two come back inactive and the missing id comes back in the failed list because there is no such target](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | answered |
-| [soft-deleting several domains at once without a login context is rejected with the error saying no user is in the context](#partial_bulk_deleting-soft-deleting-domains-without-login-is-refused) | rejected |
 
 **partial_bulk_restore**
 
 | scenario | verdict |
 |---|---|
+| [when a user granted nothing restores several inactive domains at once, none is restored and every one comes back in the failed list for lack of permission](#partial_bulk_deleting-a-user-granted-nothing-restores-none-of-several-domains) | answered |
 | [when several soft-deleted domains are restored at once, all of them come back active](#partial_bulk_deleting-restoring-several-brings-them-back) | answered |
-| [restoring several domains at once without a login context is rejected with the error saying no user is in the context](#partial_bulk_deleting-restoring-domains-without-login-is-refused) | rejected |
 
 **partial_bulk_update**
 
@@ -100,7 +93,6 @@ Scenario: complete
 | [when a user granted nothing edits several domains at once, none is edited and every one comes back in the failed list for lack of permission](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-domains) | answered |
 | [when several domains are edited at once with a mix of active flags and descriptions, the one deactivated is soft-deleted and the one activated is restored, both come back with the new description, and the missing id comes back in the failed list because there is no such target](#partial_bulk_editing-the-active-flag-soft-deletes-or-restores-each-of-several-domains) | answered |
 | [when the superadmin changes the description of several domains at once, all of them come back with the new description and none failed](#partial_bulk_editing-the-superadmin-edits-several-domains-at-once) | answered |
-| [editing several domains at once without a login context is rejected with the error saying no user is in the context](#partial_bulk_editing-editing-domains-without-login-is-refused) | rejected |
 
 **restore**
 
@@ -575,18 +567,19 @@ Then
   - has_next_page = False
   - has_previous_page = False
 
-<a id="nested_searching-a-project-name-filter-narrows-the-answer-to-the-domain-holding-it"></a>
+<a id="nested_searching-a-nested-user-filter-and-project-name-order-narrow-the-first-page"></a>
 
-#### [a-project-name-filter-narrows-the-answer-to-the-domain-holding-it](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
+#### [a-nested-user-filter-and-project-name-order-narrow-the-first-page](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
 
-when domains are searched with a filter on the name of a project one of them holds, only the domain holding that project is left
+when the superadmin, the only caller the global role admits, searches the domains holding an active user ordered by project name and takes only the first page, the first domain alone comes back with the remaining count and the third domain holding no active user is left out
 
 Given
 
-- two domains, each holding one project of a different name and one user, and the first holds one more superadmin
+- three domains: the first and second hold one project of a different name and one active user, the third holds one inactive user, and the first holds one more superadmin
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Domain first-1
   - Domain second-1
+  - Domain third-1
   - Project alpha-team-1
   - Project beta-team-1
   - Prepare one user in the domain
@@ -596,243 +589,24 @@ Given
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-2: up to 5 concurrent sessions
     - regular user user-2: has their own keypair and personal project
-    - User resource policy user-policy-3: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-3: has their own keypair and personal project
-
-When
-
-- DomainAdapter.global_search: user-3 searches for the domain holding the project named alpha-team-1
-
-Then
-
-- only the first domain is left
-  - items = ['first-1']
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="nested_searching-a-username-filter-narrows-the-answer-to-the-domain-the-user-lives-in"></a>
-
-#### [a-username-filter-narrows-the-answer-to-the-domain-the-user-lives-in](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
-
-when domains are searched with a filter on the username of a user living in one of them, only the domain that user lives in is left
-
-Given
-
-- two domains, each holding one project of a different name and one user, and the first holds one more superadmin
-  - Project resource policy default: the personal project created along with a user looks it up by this name
-  - Domain first-1
-  - Domain second-1
-  - Project alpha-team-1
-  - Project beta-team-1
-  - Prepare one user in the domain
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-    - User resource policy user-policy-3: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-3: has their own keypair and personal project
-
-When
-
-- DomainAdapter.global_search: user-3 searches for the domain where user-1 lives
-
-Then
-
-- only the first domain is left
-  - items = ['first-1']
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="nested_searching-an-email-filter-narrows-the-answer-to-the-domain-the-user-lives-in"></a>
-
-#### [an-email-filter-narrows-the-answer-to-the-domain-the-user-lives-in](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
-
-when domains are searched with a filter on the email of a user living in one of them, only the domain that user lives in is left
-
-Given
-
-- two domains, each holding one project of a different name and one user, and the first holds one more superadmin
-  - Project resource policy default: the personal project created along with a user looks it up by this name
-  - Domain first-1
-  - Domain second-1
-  - Project alpha-team-1
-  - Project beta-team-1
-  - Prepare one user in the domain
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-    - User resource policy user-policy-3: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-3: has their own keypair and personal project
-
-When
-
-- DomainAdapter.global_search: user-3 searches for the domain where the user with the email user-1@scenario.local lives
-
-Then
-
-- only the first domain is left
-  - items = ['first-1']
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="nested_searching-an-inactive-user-filter-narrows-the-answer-to-the-domain-they-live-in"></a>
-
-#### [an-inactive-user-filter-narrows-the-answer-to-the-domain-they-live-in](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
-
-when domains are searched with a filter on inactive users, only the domain such a user lives in is left
-
-Given
-
-- two domains, each holding one project of a different name and one user, the user of the second is inactive, and the first holds one more superadmin
-  - Project resource policy default: the personal project created along with a user looks it up by this name
-  - Domain first-1
-  - Domain second-1
-  - Project alpha-team-1
-  - Project beta-team-1
-  - Prepare one user in the domain
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-3: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-3: has their own keypair and personal project
+    - User resource policy user-policy-4: up to 10 folders per user
+    - Keypair policy keypair-policy-4: up to 5 concurrent sessions
+    - superadmin user-4: has their own keypair and personal project
   - Prepare one inactive user in the domain
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: status inactive, has their own keypair and personal project
-
-When
-
-- DomainAdapter.global_search: user-3 searches for the domain where an inactive user lives
-
-Then
-
-- only the second domain is left
-  - items = ['second-1']
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="nested_searching-ordering-by-the-email-puts-the-domains-in-that-order"></a>
-
-#### [ordering-by-the-email-puts-the-domains-in-that-order](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
-
-when every domain is searched ordered by the email of its users, the domain whose user's email comes first comes first
-
-Given
-
-- two domains, each holding one project of a different name and one user, and the first holds one more superadmin
-  - Project resource policy default: the personal project created along with a user looks it up by this name
-  - Domain first-1
-  - Domain second-1
-  - Project alpha-team-1
-  - Project beta-team-1
-  - Prepare one user in the domain
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
     - User resource policy user-policy-3: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-3: has their own keypair and personal project
+    - regular user user-3: status inactive, has their own keypair and personal project
 
 When
 
-- DomainAdapter.global_search: user-3 searches every domain ordered by the email of its users
+- DomainAdapter.global_search: user-4 searches the domains holding an active user, ordered by project name, taking only the first page
 
 Then
 
-- the domains come back in name order
-  - items = ['first-1', 'second-1']
+- only the first domain, whose project name comes first, comes back, and the third domain holding no active user is left out
+  - items = ['first-1']
   - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="nested_searching-ordering-by-the-project-name-puts-the-domains-in-that-order"></a>
-
-#### [ordering-by-the-project-name-puts-the-domains-in-that-order](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
-
-when every domain is searched ordered by the name of the project it holds, the domain holding the project whose name comes first comes first
-
-Given
-
-- two domains, each holding one project of a different name and one user, and the first holds one more superadmin
-  - Project resource policy default: the personal project created along with a user looks it up by this name
-  - Domain first-1
-  - Domain second-1
-  - Project alpha-team-1
-  - Project beta-team-1
-  - Prepare one user in the domain
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-    - User resource policy user-policy-3: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-3: has their own keypair and personal project
-
-When
-
-- DomainAdapter.global_search: user-3 searches every domain ordered by project name
-
-Then
-
-- the domains come back in name order
-  - items = ['first-1', 'second-1']
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="nested_searching-ordering-by-the-username-puts-the-domains-in-that-order"></a>
-
-#### [ordering-by-the-username-puts-the-domains-in-that-order](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
-
-when every domain is searched ordered by the username of its users, the domain whose user's name comes first comes first
-
-Given
-
-- two domains, each holding one project of a different name and one user, and the first holds one more superadmin
-  - Project resource policy default: the personal project created along with a user looks it up by this name
-  - Domain first-1
-  - Domain second-1
-  - Project alpha-team-1
-  - Project beta-team-1
-  - Prepare one user in the domain
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-    - User resource policy user-policy-3: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-3: has their own keypair and personal project
-
-When
-
-- DomainAdapter.global_search: user-3 searches every domain ordered by the username of its users
-
-Then
-
-- the domains come back in name order
-  - items = ['first-1', 'second-1']
-  - total_count = 2
-  - has_next_page = False
+  - has_next_page = True
   - has_previous_page = False
 
 <a id="searching-the-answer-counts-every-domain-the-scenario-laid"></a>
@@ -1089,18 +863,20 @@ Then
   - failed[0].id: same as the missing id in the request
   - failed[0].message: a reason containing 'not found'
 
-<a id="partial_bulk_deleting-soft-deleting-domains-without-login-is-refused"></a>
+### partial_bulk_restore
 
-#### [soft-deleting-domains-without-login-is-refused](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py): pass
+<a id="partial_bulk_deleting-a-user-granted-nothing-restores-none-of-several-domains"></a>
 
-soft-deleting several domains at once without a login context is rejected with the error saying no user is in the context
+#### [a-user-granted-nothing-restores-none-of-several-domains](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py): pass
+
+when a user granted nothing restores several inactive domains at once, none is restored and every one comes back in the failed list for lack of permission
 
 Given
 
-- 3 domains and one user in one of them
+- 3 domains and one user in one of them, and the target domains the caller does not live in are inactive
   - Domain home-1
-  - Domain wanted-1
-  - Domain other-1
+  - Domain wanted-1: inactive
+  - Domain other-1: inactive
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
@@ -1109,14 +885,17 @@ Given
 
 When
 
-- DomainAdapter.partial_bulk_delete: without a login context, soft deletes 2 domains at once
+- DomainAdapter.partial_bulk_restore: user-1 restores 2 domains at once
 
 Then
 
-- the call is rejected
-  - rejected: UnreachableError
-
-### partial_bulk_restore
+- no domain is processed and every target comes back in the failed list
+  - successes = []
+  - failed count = 2
+  - failed[0].id: same as the id of the target domain
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target domain
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_deleting-restoring-several-brings-them-back"></a>
 
@@ -1165,33 +944,6 @@ Then
   - successes[1].created_at: the time this run wrote
   - successes[1].modified_at: the time this run wrote
   - failed = []
-
-<a id="partial_bulk_deleting-restoring-domains-without-login-is-refused"></a>
-
-#### [restoring-domains-without-login-is-refused](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py): pass
-
-restoring several domains at once without a login context is rejected with the error saying no user is in the context
-
-Given
-
-- 3 domains and one user in one of them
-  - Domain home-1
-  - Domain wanted-1
-  - Domain other-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-
-When
-
-- DomainAdapter.partial_bulk_restore: without a login context, restores 2 domains at once
-
-Then
-
-- the call is rejected
-  - rejected: UnreachableError
 
 ### partial_bulk_update
 
@@ -1324,33 +1076,6 @@ Then
   - successes[1].entity_id: same as the id of the domain seeded in advance
   - successes[1].created_at: the time this run wrote
   - successes[1].modified_at: the time this run wrote
-
-<a id="partial_bulk_editing-editing-domains-without-login-is-refused"></a>
-
-#### [editing-domains-without-login-is-refused](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_editing.py): pass
-
-editing several domains at once without a login context is rejected with the error saying no user is in the context
-
-Given
-
-- 3 domains and one user in one of them
-  - Domain home-1
-  - Domain wanted-1
-  - Domain other-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-
-When
-
-- DomainAdapter.partial_bulk_update: without a login context, edits the description of 2 domains at once
-
-Then
-
-- the call is rejected
-  - rejected: UnreachableError
 
 ### restore
 
