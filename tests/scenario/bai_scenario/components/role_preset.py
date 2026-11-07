@@ -28,6 +28,9 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
     SearchRolePermissionPresetsPayload,
 )
 from ai.backend.common.dto.manager.v2.role_preset.response import (
+    BulkDeleteRolePresetsPayload,
+    BulkPurgeRolePresetsPayload,
+    BulkRestoreRolePresetsPayload,
     RolePresetNode,
     SearchRolePresetsPayload,
 )
@@ -50,6 +53,7 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.domain import WAS_HERE, Mentions, SomeoneOf, WrittenByThisRun
+from bai_scenario.components.system import lay_a_caller
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
 from bai_scenario.seeds.role_preset.preset import TestSeedRolePreset, TestSeedRolePresetPermission
@@ -232,6 +236,75 @@ class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
     async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
         laid = [await seeding.creating(TestSeedRolePreset()) for _ in range(self.count)]
         caller = await lay_a_caller_granted(seeding, self.role, self.granted)
+        return ManyPresetsAndACaller(
+            laid=tuple(seeding.made(one) for one in laid), caller=seeding.made(caller)
+        )
+
+
+@dataclass(frozen=True)
+class SomeoneGrantedOnPresets(TestSeedNest[Laid[UserData]]):
+    """그 사용자에게 global 스코프에서 역할 프리셋에 대한 권한을 준다."""
+
+    domain: Laid[Any]
+    granted: tuple[Permission, ...]
+    role: UserRole = UserRole.USER
+
+    @override
+    def kind(self) -> str:
+        return Says(
+            "global 에서 역할 프리셋 권한을 받은 사용자 준비",
+            english="Prepare a user granted permission on role presets in global",
+        )
+
+    @override
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
+        someone = seed.within(SomeoneOf(self.domain, role=self.role))
+        role = seed.creating_from(
+            TestSeedRole(
+                lambda _: global_entity_id(GlobalEntityName.GLOBAL), name_hint="preset-keeper"
+            ),
+            someone,
+        )
+        for permission in self.granted:
+            seed.adding(
+                TestSeedPermission(entity_type=RolePresetEntityType(), permission=permission), role
+            )
+        seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+        return someone
+
+
+async def lay_a_caller_granted_on_presets(
+    seeding: Any, granted: tuple[Permission, ...], role: UserRole = UserRole.USER
+) -> Laid[UserData]:
+    """A user of the given role granted permission on role presets in global."""
+    home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+    caller: Laid[UserData] = await seeding.within(
+        SomeoneGrantedOnPresets(home, granted, role=role)
+    )
+    return caller
+
+
+@dataclass(frozen=True)
+class ManyPresetsAndAGrantedCaller(Given[Any, ManyPresetsAndACaller]):
+    """프리셋 여럿과, global 에서 프리셋에 권한을 받은 호출자 한 명."""
+
+    granted: tuple[Permission, ...]
+    role: UserRole = UserRole.USER
+    count: int = 2
+
+    @override
+    def describe(self) -> str:
+        names = ", ".join(str(permission.name) for permission in self.granted)
+        role = self.role.value
+        return Says(
+            f"프리셋 {self.count}개와, 프리셋에 {names} 권한을 받은 {role} 한 명",
+            english=f"{self.count} presets and one {role} granted {names} on role presets",
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
+        laid = [await seeding.creating(TestSeedRolePreset()) for _ in range(self.count)]
+        caller = await lay_a_caller_granted_on_presets(seeding, self.granted, self.role)
         return ManyPresetsAndACaller(
             laid=tuple(seeding.made(one) for one in laid), caller=seeding.made(caller)
         )
@@ -515,6 +588,78 @@ def targets_of(laid: Any) -> Sequence[UUID]:
     if isinstance(laid, APresetWithEntriesAndACaller):
         return [entry.id for entry in laid.entries]
     return [preset.id for preset in laid.laid]
+
+
+type BulkPresetsPayload = (
+    BulkDeleteRolePresetsPayload | BulkRestoreRolePresetsPayload | BulkPurgeRolePresetsPayload
+)
+
+
+@dataclass(frozen=True)
+class EveryBulkTargetComesBack(Then[ManyPresetsAndACaller, BulkPresetsPayload]):
+    """대상이 모두 처리된 목록에 온다."""
+
+    expected: PresetLook
+
+    @override
+    def says(self) -> str:
+        if self.expected.deleted:
+            done_ko, done_en = "삭제로 표시된 채", "marked deleted"
+        else:
+            done_ko, done_en = "삭제로 표시되지 않은 채", "not marked deleted"
+        return Says(
+            f"대상 프리셋이 모두 {done_ko} 오고, 실패한 것은 없습니다",
+            english=f"every target preset comes back {done_en}, and nothing failed",
+        )
+
+    @override
+    def look(
+        self,
+        laid: ManyPresetsAndACaller,
+        answered: Answered[BulkPresetsPayload],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        verdicts: list[Verdict] = [Same("items count", len(payload.items), len(laid.laid))]
+        for i, (node, preset) in enumerate(zip(payload.items, laid.laid, strict=False)):
+            verdicts += self.expected.verdicts(f"items[{i}].", node, preset)
+        return [*verdicts, Same("failed", payload.failed, [])]
+
+
+@dataclass(frozen=True)
+class NoBulkTargetProcessed(Then[Any, BulkPresetsPayload]):
+    """처리된 것 없이, 대상이 모두 같은 이유로 실패 목록에 온다."""
+
+    reason: str
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "처리된 것 없이 대상이 모두 실패 목록에 옵니다",
+            english="nothing is processed and every target comes back in the failed list",
+        )
+
+    @override
+    def look(self, laid: Any, answered: Answered[BulkPresetsPayload]) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        targets = targets_of(laid)
+        verdicts: list[Verdict] = [
+            Same("items", payload.items, []),
+            Same("failed count", len(payload.failed), len(targets)),
+        ]
+        for i, (failure, target) in enumerate(zip(payload.failed, targets, strict=False)):
+            verdicts += [
+                Held[UUID](
+                    f"failed[{i}].role_preset_id",
+                    failure.role_preset_id,
+                    SameAs(target, Says("대상의 id", english="the id of the target")),
+                ),
+                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+            ]
+        return verdicts
 
 
 @dataclass(frozen=True)
