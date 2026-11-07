@@ -19,6 +19,7 @@ class TestSeedArtifact(TestSeedRow[ArtifactData]):
 
     name_hint: str = "artifact"
     description: str | None = None
+    type: ArtifactType = ArtifactType.MODEL
     registry_id: uuid.UUID = field(default_factory=uuid.uuid4)
 
     @override
@@ -40,7 +41,7 @@ class TestSeedArtifact(TestSeedRow[ArtifactData]):
     def seed(self, name: str) -> ArtifactCreator:
         return ArtifactCreator(
             name=name,
-            type=ArtifactType.MODEL,
+            type=self.type,
             registry_id=self.registry_id,
             registry_type=ArtifactRegistryType.HUGGINGFACE,
             source_registry_id=self.registry_id,
