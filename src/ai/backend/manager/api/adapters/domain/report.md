@@ -603,11 +603,21 @@ When
 
 Then
 
-- only the first domain, whose project name comes first, comes back, and the third domain holding no active user is left out
-  - items = ['first-1']
+- only the first domain, whose project name comes first, comes back with every field, and the third domain holding no active user is left out
+  - items count = 1
   - total_count = 2
   - has_next_page = True
   - has_previous_page = False
+  - items[0].name = 'first-1'
+  - items[0].description = 'a domain that already existed'
+  - items[0].integration_name = None
+  - items[0].allowed_docker_registries = []
+  - items[0].is_active = True
+  - items[0].is_default = False
+  - items[0].id: skipped: the database generates it
+  - items[0].entity_id: same as the id of the domain seeded in advance
+  - items[0].created_at: the time this run wrote
+  - items[0].modified_at: the time this run wrote
 
 <a id="searching-the-answer-counts-every-domain-the-scenario-laid"></a>
 
