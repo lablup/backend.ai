@@ -50,7 +50,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 심은 프리셋 하나를 purge 하면, 그 프리셋의 id 가 옵니다. purge 는 전역 권한이 필요한 호출이 아니라 이 행의 요청 사용자가 superadmin 입니다](#retiring-the-superadmin-purges-a-preset) | 성공 |
+| [프리셋 영구 삭제 권한을 받은 사용자가 심은 프리셋 하나를 purge 하면, 그 프리셋의 id 가 옵니다](#retiring-a-user-granted-hard-delete-purges-a-preset) | 성공 |
 | [프리셋 조회 권한만 받은 사용자가 심은 프리셋 하나를 purge 하려 하면, 권한이 없다는 이유로 거부됩니다](#retiring-a-preset-reader-purges-no-preset) | 거부 |
 
 **search**
@@ -64,7 +64,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [프리셋 조회 권한을 받은 사용자가 프리셋이 두는 자원 슬롯을 훑으면, 그 슬롯이 옵니다](#searching_slots-a-preset-reader-searches-the-slots-of-a-preset) | 성공 |
+| [프리셋 조회 권한을 받은 사용자가 프리셋이 두는 자원 슬롯을 기준으로 걸러 훑으면, 그 슬롯이 옵니다](#searching_slots-a-preset-reader-searches-the-slots-of-a-preset) | 성공 |
 | [아무 권한도 받지 않은 사용자가 프리셋이 두는 자원 슬롯을 훑으려 하면, 권한이 없다는 이유로 거부됩니다](#searching_slots-a-user-granted-nothing-searches-no-slots) | 거부 |
 
 **partial_bulk_update**
@@ -78,7 +78,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 심은 프리셋 하나의 설명을 고치면, 새 설명이 들어간 프리셋이 옵니다](#updating-the-superadmin-edits-a-preset) | 성공 |
+| [프리셋 수정 권한을 받은 사용자가 심은 프리셋 하나의 설명을 고치면, 새 설명이 들어간 프리셋이 옵니다](#updating-a-user-granted-update-edits-a-preset) | 성공 |
 | [프리셋 조회 권한만 받은 사용자가 심은 프리셋 하나의 설명을 고치려 하면, 권한이 없다는 이유로 거부됩니다](#updating-a-preset-reader-edits-no-preset) | 거부 |
 
 ### batch_load_by_ids
@@ -490,28 +490,28 @@ Then
 
 ### purge
 
-<a id="retiring-the-superadmin-purges-a-preset"></a>
+<a id="retiring-a-user-granted-hard-delete-purges-a-preset"></a>
 
-#### [the-superadmin-purges-a-preset](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_retiring.py): pass
+#### [a-user-granted-hard-delete-purges-a-preset](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_retiring.py): pass
 
-superadmin 이 심은 프리셋 하나를 purge 하면, 그 프리셋의 id 가 옵니다. purge 는 전역 권한이 필요한 호출이 아니라 이 행의 요청 사용자가 superadmin 입니다
+프리셋 영구 삭제 권한을 받은 사용자가 심은 프리셋 하나를 purge 하면, 그 프리셋의 id 가 옵니다
 
 Given
 
-- 변형 하나와 그 변형의 배포 리비전 프리셋 2개, 그리고 superadmin 한 명
+- 변형 하나와 그 변형의 배포 리비전 프리셋 2개, 그리고 일반 사용자 한 명
   - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
   - 배포 리비전 프리셋 preset-1: 단일 노드, 복제본 하나, 롤링 업데이트
   - 배포 리비전 프리셋 preset-2: 단일 노드, 복제본 하나, 롤링 업데이트
   - 도메인 home-1
-  - public 에서 deployment_preset 조회 권한을 받은 사용자 준비
+  - public 에서 deployment_preset HARD_DELETE 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
       - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
       - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
     - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 public-reader-1: deployment_preset 전체에 READ 허용
-    - superadmin user-1: 역할 public-reader-1 보유
+    - 역할 public-reader-1: deployment_preset 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -671,15 +671,19 @@ Then
 
 #### [a-preset-reader-searches-the-slots-of-a-preset](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_searching_slots.py): pass
 
-프리셋 조회 권한을 받은 사용자가 프리셋이 두는 자원 슬롯을 훑으면, 그 슬롯이 옵니다
+프리셋 조회 권한을 받은 사용자가 프리셋이 두는 자원 슬롯을 기준으로 걸러 훑으면, 그 슬롯이 옵니다
 
 Given
 
-- 슬롯 유형 하나와 그 슬롯을 두는 프리셋 하나 (미리 저장한 프리셋), 그것을 읽을 수 있는 사용자 한 명
+- 슬롯 유형 둘과 그 슬롯을 두는 프리셋 둘 (미리 저장한 프리셋), 그것을 읽을 수 있는 사용자 한 명, 같은 프리셋에 슬롯 유형이 다른 슬롯 하나가 더 걸려 있고, 슬롯 하나가 다른 프리셋에 걸려 있고
   - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+  - 자원 슬롯 유형 mem: 리비전이 채우지 않아도 됩니다
   - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
   - 배포 리비전 프리셋 preset-1: 단일 노드, 복제본 하나, 롤링 업데이트
   - 배포 리비전 프리셋 preset-1: cpu 슬롯 하나를 두려 한다
+  - 배포 리비전 프리셋 preset-1: mem 슬롯 하나를 두려 한다
+  - 배포 리비전 프리셋 other-1: 단일 노드, 복제본 하나, 롤링 업데이트
+  - 배포 리비전 프리셋 other-1: cpu 슬롯 하나를 두려 한다
   - 도메인 home-1
   - public 에서 deployment_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
@@ -693,11 +697,11 @@ Given
 
 When
 
-- DeploymentRevisionPresetAdapter.search_resource_slots: user-1 이 프리셋이 두는 자원 슬롯을 훑습니다
+- DeploymentRevisionPresetAdapter.search_resource_slots: user-1 이 프리셋이 두는 자원 슬롯을 하나의 기준으로 걸러 훑습니다
 
 Then
 
-- 프리셋이 두는 슬롯이 양과 함께 옵니다
+- 기준이 제외하는 슬롯과 다른 프리셋에 걸린 슬롯은 오지 않고, 프리셋이 두는 슬롯이 양과 함께 옵니다
   - total_count = 1
   - items count = 1
   - has_next_page = False
@@ -726,7 +730,7 @@ Given
 
 When
 
-- DeploymentRevisionPresetAdapter.search_resource_slots: user-1 이 프리셋이 두는 자원 슬롯을 훑습니다
+- DeploymentRevisionPresetAdapter.search_resource_slots: user-1 이 프리셋이 두는 자원 슬롯을 하나의 기준으로 걸러 훑습니다
 
 Then
 
@@ -811,28 +815,28 @@ Then
 
 ### update
 
-<a id="updating-the-superadmin-edits-a-preset"></a>
+<a id="updating-a-user-granted-update-edits-a-preset"></a>
 
-#### [the-superadmin-edits-a-preset](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_updating.py): pass
+#### [a-user-granted-update-edits-a-preset](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_updating.py): pass
 
-superadmin 이 심은 프리셋 하나의 설명을 고치면, 새 설명이 들어간 프리셋이 옵니다
+프리셋 수정 권한을 받은 사용자가 심은 프리셋 하나의 설명을 고치면, 새 설명이 들어간 프리셋이 옵니다
 
 Given
 
-- 변형 하나와 그 변형의 배포 리비전 프리셋 2개, 그리고 superadmin 한 명
+- 변형 하나와 그 변형의 배포 리비전 프리셋 2개, 그리고 일반 사용자 한 명
   - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
   - 배포 리비전 프리셋 preset-1: 단일 노드, 복제본 하나, 롤링 업데이트
   - 배포 리비전 프리셋 preset-2: 단일 노드, 복제본 하나, 롤링 업데이트
   - 도메인 home-1
-  - public 에서 deployment_preset 조회 권한을 받은 사용자 준비
+  - public 에서 deployment_preset UPDATE 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
       - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
       - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
     - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 public-reader-1: deployment_preset 전체에 READ 허용
-    - superadmin user-1: 역할 public-reader-1 보유
+    - 역할 public-reader-1: deployment_preset 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 

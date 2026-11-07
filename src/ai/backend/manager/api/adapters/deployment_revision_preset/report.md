@@ -50,7 +50,7 @@ Scenario: incomplete 3 / 10
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin purges one of the presets seeded in advance, the id of that preset comes back](#retiring-the-superadmin-purges-a-preset) | answered |
+| [when a user granted preset hard delete purges one of the presets seeded in advance, the id of that preset comes back](#retiring-a-user-granted-hard-delete-purges-a-preset) | answered |
 | [when a user granted only preset read tries to purge one of the presets seeded in advance, the purge is rejected because the user lacks permission](#retiring-a-preset-reader-purges-no-preset) | rejected |
 
 **search**
@@ -64,7 +64,7 @@ Scenario: incomplete 3 / 10
 
 | scenario | verdict |
 |---|---|
-| [when a user granted preset read searches the resource slots the preset declares, that slot comes back](#searching_slots-a-preset-reader-searches-the-slots-of-a-preset) | answered |
+| [when a user granted preset read searches the resource slots the preset declares with a filter, that slot comes back](#searching_slots-a-preset-reader-searches-the-slots-of-a-preset) | answered |
 | [when a user granted nothing tries to search the resource slots the preset declares, the search is rejected because the user lacks permission](#searching_slots-a-user-granted-nothing-searches-no-slots) | rejected |
 
 **partial_bulk_update**
@@ -78,7 +78,7 @@ Scenario: incomplete 3 / 10
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin changes the description of one of the presets seeded in advance, the preset comes back with the new description](#updating-the-superadmin-edits-a-preset) | answered |
+| [when a user granted preset update changes the description of one of the presets seeded in advance, the preset comes back with the new description](#updating-a-user-granted-update-edits-a-preset) | answered |
 | [when a user granted only preset read tries to change the description of one of the presets, the edit is rejected because the user lacks permission](#updating-a-preset-reader-edits-no-preset) | rejected |
 
 ### batch_load_by_ids
@@ -490,28 +490,28 @@ Then
 
 ### purge
 
-<a id="retiring-the-superadmin-purges-a-preset"></a>
+<a id="retiring-a-user-granted-hard-delete-purges-a-preset"></a>
 
-#### [the-superadmin-purges-a-preset](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_retiring.py): pass
+#### [a-user-granted-hard-delete-purges-a-preset](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_retiring.py): pass
 
-when the superadmin purges one of the presets seeded in advance, the id of that preset comes back
+when a user granted preset hard delete purges one of the presets seeded in advance, the id of that preset comes back
 
 Given
 
-- one runtime variant and 2 deployment revision presets of it, and one superadmin
+- one runtime variant and 2 deployment revision presets of it, and one regular user
   - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
   - Deployment revision preset preset-1: single node, one replica, rolling update
   - Deployment revision preset preset-2: single node, one replica, rolling update
   - Domain home-1
-  - Prepare a user granted read permission on deployment_preset in public
+  - Prepare a user granted the HARD_DELETE permission on deployment_preset in public
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
       - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-      - superadmin user-1: has their own keypair and personal project
+      - regular user user-1: has their own keypair and personal project
     - Role public-reader-1: applies only within the scope it is granted in
-    - Role public-reader-1: READ allowed on every deployment_preset
-    - superadmin user-1: holds Role public-reader-1
+    - Role public-reader-1: HARD_DELETE allowed on every deployment_preset
+    - regular user user-1: holds Role public-reader-1
 
 When
 
@@ -671,15 +671,19 @@ Then
 
 #### [a-preset-reader-searches-the-slots-of-a-preset](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_searching_slots.py): pass
 
-when a user granted preset read searches the resource slots the preset declares, that slot comes back
+when a user granted preset read searches the resource slots the preset declares with a filter, that slot comes back
 
 Given
 
-- one slot type and one preset declaring it (a preset seeded in advance) and one user who can read it
+- two slot types and two presets declaring them (a preset seeded in advance) and one user who can read them, one more slot of a different slot type on the same preset, and one slot on another preset
   - Resource slot type cpu: a revision may leave it unfilled
+  - Resource slot type mem: a revision may leave it unfilled
   - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
   - Deployment revision preset preset-1: single node, one replica, rolling update
   - Deployment revision preset preset-1: declares one cpu slot
+  - Deployment revision preset preset-1: declares one mem slot
+  - Deployment revision preset other-1: single node, one replica, rolling update
+  - Deployment revision preset other-1: declares one cpu slot
   - Domain home-1
   - Prepare a user granted read permission on deployment_preset in public
     - Prepare one user in the domain
@@ -693,11 +697,11 @@ Given
 
 When
 
-- DeploymentRevisionPresetAdapter.search_resource_slots: user-1 searches the resource slots the preset declares
+- DeploymentRevisionPresetAdapter.search_resource_slots: user-1 searches the resource slots the preset declares with one filter, one order and pagination
 
 Then
 
-- the slot the preset declares comes back with its quantity
+- the slot the filter excludes and the slot on another preset do not come back, and the slot the preset declares comes back with its quantity
   - total_count = 1
   - items count = 1
   - has_next_page = False
@@ -726,7 +730,7 @@ Given
 
 When
 
-- DeploymentRevisionPresetAdapter.search_resource_slots: user-1 searches the resource slots the preset declares
+- DeploymentRevisionPresetAdapter.search_resource_slots: user-1 searches the resource slots the preset declares with one filter, one order and pagination
 
 Then
 
@@ -811,28 +815,28 @@ Then
 
 ### update
 
-<a id="updating-the-superadmin-edits-a-preset"></a>
+<a id="updating-a-user-granted-update-edits-a-preset"></a>
 
-#### [the-superadmin-edits-a-preset](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_updating.py): pass
+#### [a-user-granted-update-edits-a-preset](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_updating.py): pass
 
-when the superadmin changes the description of one of the presets seeded in advance, the preset comes back with the new description
+when a user granted preset update changes the description of one of the presets seeded in advance, the preset comes back with the new description
 
 Given
 
-- one runtime variant and 2 deployment revision presets of it, and one superadmin
+- one runtime variant and 2 deployment revision presets of it, and one regular user
   - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
   - Deployment revision preset preset-1: single node, one replica, rolling update
   - Deployment revision preset preset-2: single node, one replica, rolling update
   - Domain home-1
-  - Prepare a user granted read permission on deployment_preset in public
+  - Prepare a user granted the UPDATE permission on deployment_preset in public
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
       - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-      - superadmin user-1: has their own keypair and personal project
+      - regular user user-1: has their own keypair and personal project
     - Role public-reader-1: applies only within the scope it is granted in
-    - Role public-reader-1: READ allowed on every deployment_preset
-    - superadmin user-1: holds Role public-reader-1
+    - Role public-reader-1: UPDATE allowed on every deployment_preset
+    - regular user user-1: holds Role public-reader-1
 
 When
 
