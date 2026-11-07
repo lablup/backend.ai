@@ -1,16 +1,33 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.exception import BackendAIError, DomainNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.data.container_registry.types import DomainContainerRegistryRelationData
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.errors.resource import DomainDeletionFailed
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.domain.purgers import DomainKernelPurger, DomainPurger
 from ai.backend.manager.models.domain.updaters import DomainDotfilesUpdater
+from ai.backend.manager.models.domain_container_registry_relation.creators import (
+    DomainContainerRegistryRelationCreator,
+)
+from ai.backend.manager.models.domain_container_registry_relation.purgers import (
+    DomainContainerRegistryRelationPurger,
+)
+from ai.backend.manager.models.domain_container_registry_relation.scopes import (
+    DomainContainerRegistryRelationTarget,
+)
+from ai.backend.manager.models.domain_container_registry_relation.searchers import (
+    DomainContainerRegistryRelationSearcher,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.db_source.db_source import DomainDBSource
 from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
@@ -64,6 +81,39 @@ class DomainRepository:
             if data is None:
                 raise DomainNotFound(f"Domain not found: {updater.target_id_value()}")
             return data
+
+    @domain_repository_resilience.apply()
+    async def create_container_registry_relations(
+        self, pairs: Sequence[tuple[DomainID, ContainerRegistryID]]
+    ) -> list[bool]:
+        """Link each domain to its registry. Answers per pair whether the link was written;
+        one already standing is left alone."""
+        async with self._v2_ops.write_ops() as w:
+            return await w.create_relations(DomainContainerRegistryRelationCreator(), pairs)
+
+    @domain_repository_resilience.apply()
+    async def purge_container_registry_relations(
+        self, pairs: Sequence[tuple[DomainID, ContainerRegistryID]]
+    ) -> list[bool]:
+        """Unlink each domain from its registry. Answers per pair whether it was linked."""
+        async with self._v2_ops.write_ops() as w:
+            return await w.purge_relations(DomainContainerRegistryRelationPurger(), pairs)
+
+    @domain_repository_resilience.apply()
+    async def search_container_registry_relations(
+        self,
+        scopes: Sequence[DomainContainerRegistryRelationTarget],
+        searcher: DomainContainerRegistryRelationSearcher,
+    ) -> SearchResult[DomainContainerRegistryRelationData]:
+        """Search the relations of any of the scopes' domains (OR), narrowed by ``searcher``."""
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_with_scopes(scopes, searcher)
+        return SearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     @domain_repository_resilience.apply()
     async def get_domain_id_by_name(self, name: DomainName) -> DomainID:

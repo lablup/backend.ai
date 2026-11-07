@@ -11,16 +11,29 @@ from typing import Any
 
 import pytest
 
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
+from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
+    GroupMeta,
+    ProcessorDependencies,
+)
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
+from ai.backend.manager.clients.container_registry.pool import ContainerRegistryQuotaClientPool
+from ai.backend.manager.repositories.container_registry.repository import (
+    ContainerRegistryRepository,
+)
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
+from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
+from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 
@@ -39,9 +52,17 @@ async def adapter(
             repository=OpsRepository(provider),
         )
     )
-    return DomainAdapter(
-        DomainProcessors(
-            registry.group(GroupMeta(DomainEntityType())),
-            DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
+    domain = DomainProcessors(
+        registry.group(GroupMeta(DomainEntityType())),
+        registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
+    )
+    container_registry = ContainerRegistryProcessors(
+        registry.group(GroupMeta(ContainerRegistryEntityType())),
+        ContainerRegistryService(
+            engine,
+            ContainerRegistryRepository(engine, ShareOpsProvider(engine)),
+            ContainerRegistryQuotaClientPool(),
         ),
     )
+    return DomainAdapter(domain, container_registry)

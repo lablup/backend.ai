@@ -159,6 +159,7 @@ def server_module_registries(
     v2_ops = V2DBOpsProvider(database_engine)
     domain = DomainProcessors(
         config_registry.group(GroupMeta(DomainEntityType())),
+        config_registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
         DomainService(DomainRepository(database_engine, DomainOpsProvider(database_engine))),
     )
     project = ProjectProcessors(

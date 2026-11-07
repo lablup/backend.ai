@@ -117,6 +117,7 @@ async def adapter(
         ),
         DomainProcessors(
             registry.group(GroupMeta(DomainEntityType())),
+            registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
             DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
         ),
         FakeDeploymentCoordinator(deployment_handlers),
