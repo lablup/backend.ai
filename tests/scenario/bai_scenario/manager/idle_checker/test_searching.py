@@ -103,6 +103,7 @@ class EveryLaidCheckerComesWhole(Then[CheckersAndACaller, Searched]):
         expected = sorted(laid.laid, key=lambda one: one.id)
         seen: list[Verdict] = [
             Same("total_count", payload.total_count, len(laid.laid)),
+            Same("items count", len(payload.items), len(laid.laid)),
             Same("has_next_page", payload.has_next_page, False),
             Same("has_previous_page", payload.has_previous_page, False),
         ]
@@ -388,6 +389,7 @@ class TheNamedCheckerAloneComesWhole(Then[CheckersAndACaller, Searched]):
         wanted = checker_node_of(laid.laid[0])
         seen: list[Verdict] = [
             Same("total_count", payload.total_count, 1),
+            Same("items count", len(payload.items), 1),
             Same("has_next_page", payload.has_next_page, False),
             Same("has_previous_page", payload.has_previous_page, False),
         ]
@@ -454,6 +456,7 @@ class TheyComeBackInNameOrder(Then[CheckersAndACaller, Searched]):
         expected = sorted(laid.laid, key=lambda one: one.name, reverse=True)
         seen: list[Verdict] = [
             Same("total_count", payload.total_count, len(laid.laid)),
+            Same("items count", len(payload.items), len(laid.laid)),
             Same("has_next_page", payload.has_next_page, False),
             Same("has_previous_page", payload.has_previous_page, False),
         ]

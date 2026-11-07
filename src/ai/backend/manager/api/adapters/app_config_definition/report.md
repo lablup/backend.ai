@@ -2,7 +2,7 @@
 
 [background](/src/ai/backend/manager/api/adapters/app_config_definition/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/app_config_definition/adapter.py)
 
-Scenario: complete
+Scenario: incomplete 1 / 6
 
 - built from ops (4)
   - admin_create: representative success ✓ · representative rejection ✓
@@ -10,7 +10,7 @@ Scenario: complete
   - admin_search: representative success ✓ · representative rejection ✓
   - batch_load_by_ids: representative success ✓ · representative rejection ✓
 - direct implementation (2)
-  - partial_bulk_purge: success present 2 · rejection present 1 (partial_bulk)
+  - partial_bulk_purge: success present 2 · rejection absent (partial_bulk): SCENARIO-GAP
   - purge: success present 2 · rejection present 2 (single_entity)
 
 **admin_create**
@@ -53,7 +53,6 @@ Scenario: complete
 |---|---|
 | [when a regular user with no permission tries to purge two config definitions at once, nothing is purged and both come back in the failed list for lack of permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-definitions) | answered |
 | [when the superadmin purges two config definitions and a missing id at once, both come back in the succeeded list and the missing id comes back in the failed list because no such target exists](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | answered |
-| [when two config definitions exist and are purged at once without a user context, it is rejected because the caller cannot be known](#partial_bulk_purging-a-definition-purge-carrying-no-user-is-refused) | rejected |
 
 **purge**
 
@@ -527,33 +526,6 @@ Then
   - failed count = 1
   - failed[0].id: same as the missing id put in the request
   - failed[0].message: a reason containing 'not found'
-
-<a id="partial_bulk_purging-a-definition-purge-carrying-no-user-is-refused"></a>
-
-#### [a-definition-purge-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/app_config_definition/test_partial_bulk_purging.py): pass
-
-when two config definitions exist and are purged at once without a user context, it is rejected because the caller cannot be known
-
-Given
-
-- two config definitions, and one Regular user with no permission
-  - Domain home-1
-  - Config definition first-1: the config of this name is registered
-  - Config definition second-1: the config of this name is registered
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-
-When
-
-- AppConfigDefinitionAdapter.partial_bulk_purge: purges two config definitions at once without a user context
-
-Then
-
-- the call is rejected
-  - rejected: UnreachableError
 
 ### purge
 

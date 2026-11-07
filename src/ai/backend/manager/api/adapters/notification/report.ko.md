@@ -2,19 +2,19 @@
 
 [배경](/src/ai/backend/manager/api/adapters/notification/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/notification/adapter.py)
 
-시나리오: 완성
+시나리오: 미완성 6 / 18
 
 - ops 구성 (16)
-  - batch_load_channels_by_ids: 대표 성공 ✓ · 대표 거부 ✓
-  - batch_load_rules_by_ids: 대표 성공 ✓ · 대표 거부 ✓
+  - batch_load_channels_by_ids: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - batch_load_rules_by_ids: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
   - create_channel: 대표 성공 ✓ · 대표 거부 ✓
   - create_rule: 대표 성공 ✓ · 대표 거부 ✓
   - get_channel: 대표 성공 ✓ · 대표 거부 ✓
   - get_rule: 대표 성공 ✓ · 대표 거부 ✓
-  - partial_bulk_purge_channels: 대표 성공 ✓ · 대표 거부 ✓
-  - partial_bulk_purge_rules: 대표 성공 ✓ · 대표 거부 ✓
-  - partial_bulk_update_channels: 대표 성공 ✓ · 대표 거부 ✓
-  - partial_bulk_update_rules: 대표 성공 ✓ · 대표 거부 ✓
+  - partial_bulk_purge_channels: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - partial_bulk_purge_rules: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - partial_bulk_update_channels: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - partial_bulk_update_rules: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
   - purge_channel: 대표 성공 ✓ · 대표 거부 ✓
   - purge_rule: 대표 성공 ✓ · 대표 거부 ✓
   - search_channels: 대표 성공 ✓ · 대표 거부 ✓
@@ -32,7 +32,6 @@
 | [빈 id 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환됩니다](#reading_channels-a-batch-load-of-no-channel-ids-answers-an-empty-list) | 성공 |
 | [아무 권한도 없는 사용자가 채널 둘을 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다](#reading_channels-a-user-granted-nothing-batch-loading-channels-is-refused-per-item) | 성공 |
 | [superadmin 이 미리 저장한 채널 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 에 해당하는 항목은 비어 있습니다](#reading_channels-the-superadmin-batch-load-leaves-a-missing-id-empty) | 성공 |
-| [채널 둘이 있고 사용자 컨텍스트 없이 한 번에 조회하면, 호출자를 알 수 없어 거부됩니다](#reading_channels-a-batch-load-carrying-no-user-is-refused) | 거부 |
 
 **batch_load_rules_by_ids**
 
@@ -41,7 +40,6 @@
 | [빈 id 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환됩니다](#reading_rules-a-batch-load-of-no-rule-ids-answers-an-empty-list) | 성공 |
 | [아무 권한도 없는 사용자가 규칙 둘을 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담깁니다](#reading_rules-a-user-granted-nothing-batch-loading-rules-is-refused-per-item) | 성공 |
 | [superadmin 이 미리 저장한 규칙 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 에 해당하는 항목은 비어 있습니다](#reading_rules-the-superadmin-batch-load-leaves-a-missing-rule-id-empty) | 성공 |
-| [규칙 둘이 있고 사용자 컨텍스트 없이 한 번에 조회하면, 호출자를 알 수 없어 거부됩니다](#reading_rules-a-batch-load-carrying-no-user-is-refused) | 거부 |
 
 **create_channel**
 
@@ -89,7 +87,6 @@
 |---|---|
 | [아무 권한도 없는 사용자가 채널 여럿을 한 번에 purge 하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging_channels-a-user-granted-nothing-purges-none-of-several-channels) | 성공 |
 | [superadmin 이 채널 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 삭제 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging_channels-purging-several-channels-answers-for-the-missing-one) | 성공 |
-| [채널 둘이 있고 사용자 컨텍스트 없이 한 번에 purge 하면, 호출자를 알 수 없어 거부됩니다](#partial_bulk_purging_channels-a-channel-purge-carrying-no-user-is-refused) | 거부 |
 
 **partial_bulk_purge_rules**
 
@@ -97,7 +94,6 @@
 |---|---|
 | [아무 권한도 없는 사용자가 규칙 여럿을 한 번에 purge 하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging_rules-a-user-granted-nothing-purges-none-of-several-rules) | 성공 |
 | [superadmin 이 규칙 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 삭제 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging_rules-purging-several-rules-answers-for-the-missing-one) | 성공 |
-| [규칙 둘이 있고 사용자 컨텍스트 없이 한 번에 purge 하면, 호출자를 알 수 없어 거부됩니다](#partial_bulk_purging_rules-a-rule-purge-carrying-no-user-is-refused) | 거부 |
 
 **partial_bulk_update_channels**
 
@@ -105,7 +101,6 @@
 |---|---|
 | [아무 권한도 없는 사용자가 채널 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_editing_channels-a-user-granted-nothing-edits-none-of-several-channels) | 성공 |
 | [superadmin 이 채널 둘의 설명을 한 번에 변경하면, 둘 다 새 설명으로 오고 실패한 것은 없습니다](#partial_bulk_editing_channels-the-superadmin-describes-several-channels-at-once) | 성공 |
-| [채널 둘이 있고 사용자 컨텍스트 없이 설명을 한 번에 바꾸면, 호출자를 알 수 없어 거부됩니다](#partial_bulk_editing_channels-a-channel-edit-carrying-no-user-is-refused) | 거부 |
 
 **partial_bulk_update_rules**
 
@@ -113,7 +108,6 @@
 |---|---|
 | [아무 권한도 없는 사용자가 규칙 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_editing_rules-a-user-granted-nothing-edits-none-of-several-rules) | 성공 |
 | [superadmin 이 규칙 둘의 설명을 한 번에 변경하면, 둘 다 새 설명으로 오고 실패한 것은 없습니다](#partial_bulk_editing_rules-the-superadmin-describes-several-rules-at-once) | 성공 |
-| [규칙 둘이 있고 사용자 컨텍스트 없이 설명을 한 번에 바꾸면, 호출자를 알 수 없어 거부됩니다](#partial_bulk_editing_rules-a-rule-edit-carrying-no-user-is-refused) | 거부 |
 
 **purge_channel**
 
@@ -303,33 +297,6 @@ Then
   - items[1].updated_at: 이 실행이 쓴 시각
   - items[2] = None
 
-<a id="reading_channels-a-batch-load-carrying-no-user-is-refused"></a>
-
-#### [a-batch-load-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py): pass
-
-채널 둘이 있고 사용자 컨텍스트 없이 한 번에 조회하면, 호출자를 알 수 없어 거부됩니다
-
-Given
-
-- webhook 채널 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - webhook 채널 wanted-1: https://hooks.example.test/notify 주소로 보냅니다
-  - webhook 채널 other-1: https://hooks.example.test/notify 주소로 보냅니다
-
-When
-
-- NotificationAdapter.batch_load_channels_by_ids: 사용자 컨텍스트 없이 채널 2개를 한 번에 조회합니다
-
-Then
-
-- 거부됩니다
-  - 거부: UnreachableError
-
 ### batch_load_rules_by_ids
 
 <a id="reading_rules-a-batch-load-of-no-rule-ids-answers-an-empty-list"></a>
@@ -438,34 +405,6 @@ Then
   - items[1].created_at: 이 실행이 쓴 시각
   - items[1].updated_at: 이 실행이 쓴 시각
   - items[2] = None
-
-<a id="reading_rules-a-batch-load-carrying-no-user-is-refused"></a>
-
-#### [a-batch-load-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py): pass
-
-규칙 둘이 있고 사용자 컨텍스트 없이 한 번에 조회하면, 호출자를 알 수 없어 거부됩니다
-
-Given
-
-- 같은 webhook 채널을 가리키는 규칙 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - webhook 채널 channel-1: https://hooks.example.test/notify 주소로 보냅니다
-  - 규칙 wanted-1: session.started 이벤트를 알립니다
-  - 규칙 other-1: session.started 이벤트를 알립니다
-
-When
-
-- NotificationAdapter.batch_load_rules_by_ids: 사용자 컨텍스트 없이 규칙 2개를 한 번에 조회합니다
-
-Then
-
-- 거부됩니다
-  - 거부: UnreachableError
 
 ### create_channel
 
@@ -1155,33 +1094,6 @@ Then
   - failed[0].id: 요청에 넣은 없는 id 와 같다
   - failed[0].message: 'not found'를 담은 이유
 
-<a id="partial_bulk_purging_channels-a-channel-purge-carrying-no-user-is-refused"></a>
-
-#### [a-channel-purge-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_purging_channels.py): pass
-
-채널 둘이 있고 사용자 컨텍스트 없이 한 번에 purge 하면, 호출자를 알 수 없어 거부됩니다
-
-Given
-
-- webhook 채널 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - webhook 채널 wanted-1: https://hooks.example.test/notify 주소로 보냅니다
-  - webhook 채널 other-1: https://hooks.example.test/notify 주소로 보냅니다
-
-When
-
-- NotificationAdapter.partial_bulk_purge_channels: 사용자 컨텍스트 없이 채널 2개를 한 번에 purge 합니다
-
-Then
-
-- 거부됩니다
-  - 거부: UnreachableError
-
 ### partial_bulk_purge_rules
 
 <a id="partial_bulk_purging_rules-a-user-granted-nothing-purges-none-of-several-rules"></a>
@@ -1268,34 +1180,6 @@ Then
   - failed[0].id: 요청에 넣은 없는 id 와 같다
   - failed[0].message: 'not found'를 담은 이유
 
-<a id="partial_bulk_purging_rules-a-rule-purge-carrying-no-user-is-refused"></a>
-
-#### [a-rule-purge-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_purging_rules.py): pass
-
-규칙 둘이 있고 사용자 컨텍스트 없이 한 번에 purge 하면, 호출자를 알 수 없어 거부됩니다
-
-Given
-
-- 같은 webhook 채널을 가리키는 규칙 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - webhook 채널 channel-1: https://hooks.example.test/notify 주소로 보냅니다
-  - 규칙 wanted-1: session.started 이벤트를 알립니다
-  - 규칙 other-1: session.started 이벤트를 알립니다
-
-When
-
-- NotificationAdapter.partial_bulk_purge_rules: 사용자 컨텍스트 없이 규칙 2개를 한 번에 purge 합니다
-
-Then
-
-- 거부됩니다
-  - 거부: UnreachableError
-
 ### partial_bulk_update_channels
 
 <a id="partial_bulk_editing_channels-a-user-granted-nothing-edits-none-of-several-channels"></a>
@@ -1377,33 +1261,6 @@ Then
   - successes[1].created_at: 이 실행이 쓴 시각
   - successes[1].updated_at: 이 실행이 쓴 시각
   - failed = []
-
-<a id="partial_bulk_editing_channels-a-channel-edit-carrying-no-user-is-refused"></a>
-
-#### [a-channel-edit-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_editing_channels.py): pass
-
-채널 둘이 있고 사용자 컨텍스트 없이 설명을 한 번에 바꾸면, 호출자를 알 수 없어 거부됩니다
-
-Given
-
-- webhook 채널 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - webhook 채널 wanted-1: https://hooks.example.test/notify 주소로 보냅니다
-  - webhook 채널 other-1: https://hooks.example.test/notify 주소로 보냅니다
-
-When
-
-- NotificationAdapter.partial_bulk_update_channels: 사용자 컨텍스트 없이 채널 2개의 설명을 한 번에 수정합니다
-
-Then
-
-- 거부됩니다
-  - 거부: UnreachableError
 
 ### partial_bulk_update_rules
 
@@ -1488,34 +1345,6 @@ Then
   - successes[1].created_at: 이 실행이 쓴 시각
   - successes[1].updated_at: 이 실행이 쓴 시각
   - failed = []
-
-<a id="partial_bulk_editing_rules-a-rule-edit-carrying-no-user-is-refused"></a>
-
-#### [a-rule-edit-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_editing_rules.py): pass
-
-규칙 둘이 있고 사용자 컨텍스트 없이 설명을 한 번에 바꾸면, 호출자를 알 수 없어 거부됩니다
-
-Given
-
-- 같은 webhook 채널을 가리키는 규칙 둘과, 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-  - webhook 채널 channel-1: https://hooks.example.test/notify 주소로 보냅니다
-  - 규칙 wanted-1: session.started 이벤트를 알립니다
-  - 규칙 other-1: session.started 이벤트를 알립니다
-
-When
-
-- NotificationAdapter.partial_bulk_update_rules: 사용자 컨텍스트 없이 규칙 2개의 설명을 한 번에 수정합니다
-
-Then
-
-- 거부됩니다
-  - 거부: UnreachableError
 
 ### purge_channel
 

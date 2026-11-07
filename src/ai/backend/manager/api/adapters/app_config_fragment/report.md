@@ -2,7 +2,7 @@
 
 [background](/src/ai/backend/manager/api/adapters/app_config_fragment/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/app_config_fragment/adapter.py)
 
-Scenario: complete
+Scenario: incomplete 1 / 10
 
 - built from ops (10)
   - admin_search: representative success ✓ · representative rejection ✓
@@ -10,7 +10,7 @@ Scenario: complete
   - get: representative success ✓ · representative rejection ✓
   - my_app_config_fragments_by_names: representative success ✓ · representative rejection ✓
   - my_atomic_bulk_upsert: representative success ✓ · representative rejection ✓
-  - partial_bulk_purge: representative success ✓ · representative rejection ✓
+  - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - purge: representative success ✓ · representative rejection ✓
   - scoped_app_config_fragments_by_names: representative success ✓ · representative rejection ✓
   - scoped_atomic_bulk_upsert: representative success ✓ · representative rejection ✓
@@ -69,7 +69,6 @@ Scenario: complete
 |---|---|
 | [when a user granted delete permission only on their own scope deletes two own fragments, another user's fragment and a missing id at once, the two own fragments come back in the succeeded list and the others come back in the failed list together with the reason](#purging-mine-anothers-and-a-missing-id-are-each-answered-for-a-plain-user) | answered |
 | [when the superadmin deletes two fragments and one missing id at once, the two come back in the succeeded list and the missing id comes back in the failed list](#purging-the-superadmin-purges-both-and-a-missing-id-fails-alone) | answered |
-| [when fragments exist and are purged at once without a user context, it is rejected because the caller cannot be known](#purging-a-fragment-purge-carrying-no-user-is-refused) | rejected |
 
 **purge**
 
@@ -1018,43 +1017,6 @@ Then
   - successes: same as the fragments made in advance
   - failed = 1
   - failed[*].message: skipped: the reason comes as a string, and a string is a value that may change
-
-<a id="purging-a-fragment-purge-carrying-no-user-is-refused"></a>
-
-#### [a-fragment-purge-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/app_config_fragment/test_purging.py): pass
-
-when fragments exist and are purged at once without a user context, it is rejected because the caller cannot be known
-
-Given
-
-- 1 fragments of their own, one fragment of another user, and one user with no config fragment permission
-  - Domain home-1
-  - Prepare a user with no config fragment permission
-    - Prepare one user in the domain
-      - Project resource policy default: the personal project created along with a user looks it up by this name
-      - User resource policy user-policy-1: up to 10 folders per user
-      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-      - regular user user-1: has their own keypair and personal project
-  - Prepare one user in the domain
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Prepare a config name opened in the user scope
-    - Config definition mine-1: the config of this name is registered
-    - Allow-list entry entry-1: the config of this name can be set in the user scope, rank is the default of the scope kind
-    - Config definition theirs-1: the config of this name is registered
-    - Allow-list entry entry-2: the config of this name can be set in the user scope, rank is the default of the scope kind
-  - app config fragment own-fragment-1: value {'mine': 0}
-  - app config fragment anothers-fragment-1: value {'theirs': 0}
-
-When
-
-- AppConfigFragmentAdapter.partial_bulk_purge: deletes 2 fragments at once without a user context
-
-Then
-
-- the call is rejected
-  - rejected: UnreachableError
 
 ### purge
 

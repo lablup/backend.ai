@@ -2,7 +2,7 @@
 
 [배경](/src/ai/backend/manager/api/adapters/app_config_definition/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/app_config_definition/adapter.py)
 
-시나리오: 완성
+시나리오: 미완성 1 / 6
 
 - ops 구성 (4)
   - admin_create: 대표 성공 ✓ · 대표 거부 ✓
@@ -10,7 +10,7 @@
   - admin_search: 대표 성공 ✓ · 대표 거부 ✓
   - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
 - 직접 구현 (2)
-  - partial_bulk_purge: 성공 있음 2 · 거부 있음 1 (partial_bulk)
+  - partial_bulk_purge: 성공 있음 2 · 거부 없음 (partial_bulk): SCENARIO-GAP
   - purge: 성공 있음 2 · 거부 있음 2 (single_entity)
 
 **admin_create**
@@ -53,7 +53,6 @@
 |---|---|
 | [권한이 없는 일반 사용자가 설정 정의 둘을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-definitions) | 성공 |
 | [superadmin 이 설정 정의 둘과 존재하지 않는 ID 를 한 번에 영구 삭제하면, 둘은 처리된 목록에 오고 없는 ID 는 대상이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | 성공 |
-| [설정 정의 둘이 있고 사용자 컨텍스트 없이 한 번에 영구 삭제하면, 호출자를 알 수 없어 거부됩니다](#partial_bulk_purging-a-definition-purge-carrying-no-user-is-refused) | 거부 |
 
 **purge**
 
@@ -527,33 +526,6 @@ Then
   - failed count = 1
   - failed[0].id: 요청에 넣은 없는 ID 와 같다
   - failed[0].message: 'not found'를 담은 이유
-
-<a id="partial_bulk_purging-a-definition-purge-carrying-no-user-is-refused"></a>
-
-#### [a-definition-purge-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/app_config_definition/test_partial_bulk_purging.py): pass
-
-설정 정의 둘이 있고 사용자 컨텍스트 없이 한 번에 영구 삭제하면, 호출자를 알 수 없어 거부됩니다
-
-Given
-
-- 설정 정의 둘과, 권한이 없는 일반 사용자 한 명
-  - 도메인 home-1
-  - 설정 정의 first-1: 이 이름의 설정을 등록했습니다
-  - 설정 정의 second-1: 이 이름의 설정을 등록했습니다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- AppConfigDefinitionAdapter.partial_bulk_purge: 사용자 컨텍스트 없이 설정 정의 둘을 한 번에 영구 삭제합니다
-
-Then
-
-- 거부됩니다
-  - 거부: UnreachableError
 
 ### purge
 

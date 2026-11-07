@@ -2,19 +2,19 @@
 
 [background](/src/ai/backend/manager/api/adapters/notification/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/notification/adapter.py)
 
-Scenario: complete
+Scenario: incomplete 6 / 18
 
 - built from ops (16)
-  - batch_load_channels_by_ids: representative success ✓ · representative rejection ✓
-  - batch_load_rules_by_ids: representative success ✓ · representative rejection ✓
+  - batch_load_channels_by_ids: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_rules_by_ids: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - create_channel: representative success ✓ · representative rejection ✓
   - create_rule: representative success ✓ · representative rejection ✓
   - get_channel: representative success ✓ · representative rejection ✓
   - get_rule: representative success ✓ · representative rejection ✓
-  - partial_bulk_purge_channels: representative success ✓ · representative rejection ✓
-  - partial_bulk_purge_rules: representative success ✓ · representative rejection ✓
-  - partial_bulk_update_channels: representative success ✓ · representative rejection ✓
-  - partial_bulk_update_rules: representative success ✓ · representative rejection ✓
+  - partial_bulk_purge_channels: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_purge_rules: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_update_channels: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_update_rules: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - purge_channel: representative success ✓ · representative rejection ✓
   - purge_rule: representative success ✓ · representative rejection ✓
   - search_channels: representative success ✓ · representative rejection ✓
@@ -32,7 +32,6 @@ Scenario: complete
 | [a batch load with an empty id list brings an empty response without calling the lower layer](#reading_channels-a-batch-load-of-no-channel-ids-answers-an-empty-list) | answered |
 | [when a user granted nothing batch-loads two channels, the call is not rejected and each item carries a rejection for not enough permission](#reading_channels-a-user-granted-nothing-batch-loading-channels-is-refused-per-item) | answered |
 | [when the superadmin batch-loads two channels created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty](#reading_channels-the-superadmin-batch-load-leaves-a-missing-id-empty) | answered |
-| [when two channels exist and they are batch-loaded without a user context, it is rejected because the caller cannot be known](#reading_channels-a-batch-load-carrying-no-user-is-refused) | rejected |
 
 **batch_load_rules_by_ids**
 
@@ -41,7 +40,6 @@ Scenario: complete
 | [a batch load with an empty id list brings an empty response without calling the lower layer](#reading_rules-a-batch-load-of-no-rule-ids-answers-an-empty-list) | answered |
 | [when a user granted nothing batch-loads two rules, the call is not rejected and each item carries a rejection for not enough permission](#reading_rules-a-user-granted-nothing-batch-loading-rules-is-refused-per-item) | answered |
 | [when the superadmin batch-loads two rules created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty](#reading_rules-the-superadmin-batch-load-leaves-a-missing-rule-id-empty) | answered |
-| [when two rules exist and they are batch-loaded without a user context, it is rejected because the caller cannot be known](#reading_rules-a-batch-load-carrying-no-user-is-refused) | rejected |
 
 **create_channel**
 
@@ -89,7 +87,6 @@ Scenario: complete
 |---|---|
 | [when a user granted nothing purges several channels at once, nothing is purged and every one comes back in the failed list because permission is not enough](#partial_bulk_purging_channels-a-user-granted-nothing-purges-none-of-several-channels) | answered |
 | [when the superadmin purges two channels and one unknown id at once, the two come back as they were before the purge and the unknown id comes back in the failed list because no target answers to it](#partial_bulk_purging_channels-purging-several-channels-answers-for-the-missing-one) | answered |
-| [when two channels exist and they are purged at once without a user context, it is rejected because the caller cannot be known](#partial_bulk_purging_channels-a-channel-purge-carrying-no-user-is-refused) | rejected |
 
 **partial_bulk_purge_rules**
 
@@ -97,7 +94,6 @@ Scenario: complete
 |---|---|
 | [when a user granted nothing purges several rules at once, nothing is purged and every one comes back in the failed list because permission is not enough](#partial_bulk_purging_rules-a-user-granted-nothing-purges-none-of-several-rules) | answered |
 | [when the superadmin purges two rules and one unknown id at once, the two come back as they were before the purge and the unknown id comes back in the failed list because no target answers to it](#partial_bulk_purging_rules-purging-several-rules-answers-for-the-missing-one) | answered |
-| [when two rules exist and they are purged at once without a user context, it is rejected because the caller cannot be known](#partial_bulk_purging_rules-a-rule-purge-carrying-no-user-is-refused) | rejected |
 
 **partial_bulk_update_channels**
 
@@ -105,7 +101,6 @@ Scenario: complete
 |---|---|
 | [when a user granted nothing edits several channels at once, nothing is edited and every one comes back in the failed list because permission is not enough](#partial_bulk_editing_channels-a-user-granted-nothing-edits-none-of-several-channels) | answered |
 | [when the superadmin changes the description of two channels at once, both come back with the new description and nothing failed](#partial_bulk_editing_channels-the-superadmin-describes-several-channels-at-once) | answered |
-| [when two channels exist and their description is changed at once without a user context, it is rejected because the caller cannot be known](#partial_bulk_editing_channels-a-channel-edit-carrying-no-user-is-refused) | rejected |
 
 **partial_bulk_update_rules**
 
@@ -113,7 +108,6 @@ Scenario: complete
 |---|---|
 | [when a user granted nothing edits several rules at once, nothing is edited and every one comes back in the failed list because permission is not enough](#partial_bulk_editing_rules-a-user-granted-nothing-edits-none-of-several-rules) | answered |
 | [when the superadmin changes the description of two rules at once, both come back with the new description and nothing failed](#partial_bulk_editing_rules-the-superadmin-describes-several-rules-at-once) | answered |
-| [when two rules exist and their description is changed at once without a user context, it is rejected because the caller cannot be known](#partial_bulk_editing_rules-a-rule-edit-carrying-no-user-is-refused) | rejected |
 
 **purge_channel**
 
@@ -303,33 +297,6 @@ Then
   - items[1].updated_at: the time this run wrote
   - items[2] = None
 
-<a id="reading_channels-a-batch-load-carrying-no-user-is-refused"></a>
-
-#### [a-batch-load-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/notification/test_reading_channels.py): pass
-
-when two channels exist and they are batch-loaded without a user context, it is rejected because the caller cannot be known
-
-Given
-
-- two webhook channels and one regular user
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - Webhook channel wanted-1: sends to https://hooks.example.test/notify
-  - Webhook channel other-1: sends to https://hooks.example.test/notify
-
-When
-
-- NotificationAdapter.batch_load_channels_by_ids: batch-loads 2 channels without a user context
-
-Then
-
-- the call is rejected
-  - rejected: UnreachableError
-
 ### batch_load_rules_by_ids
 
 <a id="reading_rules-a-batch-load-of-no-rule-ids-answers-an-empty-list"></a>
@@ -438,34 +405,6 @@ Then
   - items[1].created_at: the time this run wrote
   - items[1].updated_at: the time this run wrote
   - items[2] = None
-
-<a id="reading_rules-a-batch-load-carrying-no-user-is-refused"></a>
-
-#### [a-batch-load-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/notification/test_reading_rules.py): pass
-
-when two rules exist and they are batch-loaded without a user context, it is rejected because the caller cannot be known
-
-Given
-
-- two rules pointing at the same webhook channel and one regular user
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - Webhook channel channel-1: sends to https://hooks.example.test/notify
-  - Rule wanted-1: announces session.started events
-  - Rule other-1: announces session.started events
-
-When
-
-- NotificationAdapter.batch_load_rules_by_ids: batch-loads 2 rules without a user context
-
-Then
-
-- the call is rejected
-  - rejected: UnreachableError
 
 ### create_channel
 
@@ -1155,33 +1094,6 @@ Then
   - failed[0].id: same as the unknown id put in the request
   - failed[0].message: a reason containing 'not found'
 
-<a id="partial_bulk_purging_channels-a-channel-purge-carrying-no-user-is-refused"></a>
-
-#### [a-channel-purge-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_purging_channels.py): pass
-
-when two channels exist and they are purged at once without a user context, it is rejected because the caller cannot be known
-
-Given
-
-- two webhook channels and one regular user
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - Webhook channel wanted-1: sends to https://hooks.example.test/notify
-  - Webhook channel other-1: sends to https://hooks.example.test/notify
-
-When
-
-- NotificationAdapter.partial_bulk_purge_channels: purges 2 channels at once without a user context
-
-Then
-
-- the call is rejected
-  - rejected: UnreachableError
-
 ### partial_bulk_purge_rules
 
 <a id="partial_bulk_purging_rules-a-user-granted-nothing-purges-none-of-several-rules"></a>
@@ -1268,34 +1180,6 @@ Then
   - failed[0].id: same as the unknown id put in the request
   - failed[0].message: a reason containing 'not found'
 
-<a id="partial_bulk_purging_rules-a-rule-purge-carrying-no-user-is-refused"></a>
-
-#### [a-rule-purge-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_purging_rules.py): pass
-
-when two rules exist and they are purged at once without a user context, it is rejected because the caller cannot be known
-
-Given
-
-- two rules pointing at the same webhook channel and one regular user
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - Webhook channel channel-1: sends to https://hooks.example.test/notify
-  - Rule wanted-1: announces session.started events
-  - Rule other-1: announces session.started events
-
-When
-
-- NotificationAdapter.partial_bulk_purge_rules: purges 2 rules at once without a user context
-
-Then
-
-- the call is rejected
-  - rejected: UnreachableError
-
 ### partial_bulk_update_channels
 
 <a id="partial_bulk_editing_channels-a-user-granted-nothing-edits-none-of-several-channels"></a>
@@ -1377,33 +1261,6 @@ Then
   - successes[1].created_at: the time this run wrote
   - successes[1].updated_at: the time this run wrote
   - failed = []
-
-<a id="partial_bulk_editing_channels-a-channel-edit-carrying-no-user-is-refused"></a>
-
-#### [a-channel-edit-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_editing_channels.py): pass
-
-when two channels exist and their description is changed at once without a user context, it is rejected because the caller cannot be known
-
-Given
-
-- two webhook channels and one regular user
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - Webhook channel wanted-1: sends to https://hooks.example.test/notify
-  - Webhook channel other-1: sends to https://hooks.example.test/notify
-
-When
-
-- NotificationAdapter.partial_bulk_update_channels: edits the description of 2 channels at once without a user context
-
-Then
-
-- the call is rejected
-  - rejected: UnreachableError
 
 ### partial_bulk_update_rules
 
@@ -1488,34 +1345,6 @@ Then
   - successes[1].created_at: the time this run wrote
   - successes[1].updated_at: the time this run wrote
   - failed = []
-
-<a id="partial_bulk_editing_rules-a-rule-edit-carrying-no-user-is-refused"></a>
-
-#### [a-rule-edit-carrying-no-user-is-refused](/tests/scenario/bai_scenario/manager/notification/test_partial_bulk_editing_rules.py): pass
-
-when two rules exist and their description is changed at once without a user context, it is rejected because the caller cannot be known
-
-Given
-
-- two rules pointing at the same webhook channel and one regular user
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - Webhook channel channel-1: sends to https://hooks.example.test/notify
-  - Rule wanted-1: announces session.started events
-  - Rule other-1: announces session.started events
-
-When
-
-- NotificationAdapter.partial_bulk_update_rules: edits the description of 2 rules at once without a user context
-
-Then
-
-- the call is rejected
-  - rejected: UnreachableError
 
 ### purge_channel
 

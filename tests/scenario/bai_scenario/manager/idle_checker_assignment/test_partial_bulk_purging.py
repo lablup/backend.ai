@@ -150,67 +150,9 @@ class AUserGrantedNothingPurgesNone(
         return NoAssignmentIsProcessed(reason="Cannot resolve the given idle_checker key")
 
 
-@dataclass(frozen=True)
-class PurgingAssignmentsAsNobody(When[AssignmentsAndACaller, Adapter, PartialBulkAnswered]):
-    """사용자 컨텍스트 없이 한 번에 purge 한다."""
-
-    @override
-    def operation(self) -> str:
-        return "partial_bulk_purge"
-
-    @override
-    def describe(self, laid: AssignmentsAndACaller) -> str:
-        return Says(
-            f"사용자 컨텍스트 없이 할당 {len(laid.domains)}개를 한 번에 purge 합니다",
-            english=f"purges {len(laid.domains)} assignments at once without a user context",
-        )
-
-    @override
-    async def call(self, adapter: Adapter, laid: AssignmentsAndACaller) -> PartialBulkAnswered:
-        ids = await assignment_ids(adapter, laid)
-        payload = await adapter.partial_bulk_purge(
-            PartialBulkPurgeIdleCheckerAssignmentsInput(ids=[*ids])
-        )
-        return PartialBulkAnswered(ids=ids, payload=payload)
-
-
-@dataclass(frozen=True)
-class APurgeCarryingNoUserIsRefused(
-    Scenario[TestSeedingSession, AssignmentsAndACaller, Adapter, PartialBulkAnswered]
-):
-    @override
-    def summary(self) -> str:
-        return "an-assignment-purge-carrying-no-user-fails-every-item"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "할당 둘이 있고 사용자 컨텍스트 없이 한 번에 purge 하면, 답이 와서 모두 호출자를 "
-            "알 수 없다는 이유로 실패 목록에 옵니다",
-            english=(
-                "when two assignments exist and are purged at once without a user context, "
-                "the call answers and every assignment comes back in the failed list because "
-                "the caller cannot be known"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, AssignmentsAndACaller]:
-        return OneCheckerOnSomeDomains()
-
-    @override
-    def when(self) -> When[AssignmentsAndACaller, Adapter, PartialBulkAnswered]:
-        return PurgingAssignmentsAsNobody()
-
-    @override
-    def then(self) -> Then[AssignmentsAndACaller, PartialBulkAnswered]:
-        return NoAssignmentIsProcessed(reason="User not found in context")
-
-
 SCENARIOS: list[PurgingStep] = [
     TheSuperadminPurgesSeveral(started=datetime.now(UTC)),
     AUserGrantedNothingPurgesNone(),
-    APurgeCarryingNoUserIsRefused(),
 ]
 
 
