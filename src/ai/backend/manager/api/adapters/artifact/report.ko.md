@@ -407,8 +407,8 @@ Then
   - [0].remote_status = None
   - [0].created_at = None
   - [0].updated_at = None
-  - [0].digest: 건너뜀: 어댑터가 리비전 노드에 다이제스트를 담지 않아 응답으로 확인할 수 없습니다
-  - [0].verification_result: 건너뜀: 어댑터가 검증 결과를 리비전 노드에 담지 않아 응답으로 확인할 수 없습니다
+  - [0].digest = None
+  - [0].verification_result = None
   - [0].readme = 'the revision readme'
   - [1].id: 미리 저장한 리비전의 id 와 같다
   - [1].field_id: 미리 저장한 리비전의 id 와 같다
@@ -419,8 +419,8 @@ Then
   - [1].remote_status = None
   - [1].created_at = None
   - [1].updated_at = None
-  - [1].digest: 건너뜀: 어댑터가 리비전 노드에 다이제스트를 담지 않아 응답으로 확인할 수 없습니다
-  - [1].verification_result: 건너뜀: 어댑터가 검증 결과를 리비전 노드에 담지 않아 응답으로 확인할 수 없습니다
+  - [1].digest = None
+  - [1].verification_result = None
   - [1].readme = 'the revision readme'
 
 <a id="reading-a-user-granted-nothing-loading-revisions-is-refused-on-every-readable-one"></a>
@@ -563,8 +563,8 @@ Then
   - remote_status = None
   - created_at = None
   - updated_at = None
-  - digest: 건너뜀: 어댑터가 리비전 노드에 다이제스트를 담지 않아 응답으로 확인할 수 없습니다
-  - verification_result: 건너뜀: 어댑터가 검증 결과를 리비전 노드에 담지 않아 응답으로 확인할 수 없습니다
+  - digest = None
+  - verification_result = None
   - readme = 'the revision readme'
 
 <a id="reading-a-user-granted-nothing-may-not-read-a-revision"></a>
@@ -958,8 +958,8 @@ Then
   - [0].remote_status = None
   - [0].created_at = None
   - [0].updated_at = None
-  - [0].digest: 건너뜀: 어댑터가 리비전 노드에 다이제스트를 담지 않아 응답으로 확인할 수 없습니다
-  - [0].verification_result: 건너뜀: 어댑터가 검증 결과를 리비전 노드에 담지 않아 응답으로 확인할 수 없습니다
+  - [0].digest = None
+  - [0].verification_result = None
   - [0].readme = 'the revision readme'
 
 <a id="revision_searching-a-user-granted-nothing-may-not-search-one-artifacts-revisions"></a>
@@ -1226,8 +1226,8 @@ Then
   - remote_status = None
   - created_at = None
   - updated_at = None
-  - digest: 건너뜀: 어댑터가 리비전 노드에 다이제스트를 담지 않아 응답으로 확인할 수 없습니다
-  - verification_result: 건너뜀: 어댑터가 검증 결과를 리비전 노드에 담지 않아 응답으로 확인할 수 없습니다
+  - digest = None
+  - verification_result = None
   - readme = 'the revision readme'
 
 <a id="revision_transitions-a-revision-not-waiting-for-approval-is-not-approved"></a>
@@ -1334,8 +1334,8 @@ Then
   - remote_status = None
   - created_at = None
   - updated_at = None
-  - digest: 건너뜀: 어댑터가 리비전 노드에 다이제스트를 담지 않아 응답으로 확인할 수 없습니다
-  - verification_result: 건너뜀: 어댑터가 검증 결과를 리비전 노드에 담지 않아 응답으로 확인할 수 없습니다
+  - digest = None
+  - verification_result = None
   - readme = 'the revision readme'
 
 <a id="revision_transitions-a-user-granted-read-but-not-update-may-not-cancel-an-import"></a>
@@ -1786,8 +1786,8 @@ Then
   - remote_status = None
   - created_at = None
   - updated_at = None
-  - digest: 건너뜀: 어댑터가 리비전 노드에 다이제스트를 담지 않아 응답으로 확인할 수 없습니다
-  - verification_result: 건너뜀: 어댑터가 검증 결과를 리비전 노드에 담지 않아 응답으로 확인할 수 없습니다
+  - digest = None
+  - verification_result = None
   - readme = 'the revision readme'
 
 <a id="revision_transitions-a-user-granted-read-but-not-update-may-not-reject-a-revision"></a>
@@ -2009,8 +2009,8 @@ Then
   - [0].remote_status = None
   - [0].created_at = None
   - [0].updated_at = None
-  - [0].digest: 건너뜀: 어댑터가 리비전 노드에 다이제스트를 담지 않아 응답으로 확인할 수 없습니다
-  - [0].verification_result: 건너뜀: 어댑터가 검증 결과를 리비전 노드에 담지 않아 응답으로 확인할 수 없습니다
+  - [0].digest = None
+  - [0].verification_result = None
   - [0].readme = 'the revision readme'
 
 <a id="revision_searching-a-user-granted-nothing-may-not-search-revisions"></a>
