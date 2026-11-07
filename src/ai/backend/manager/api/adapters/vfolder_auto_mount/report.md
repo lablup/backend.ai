@@ -31,7 +31,7 @@ Scenario: complete
 | scenario | verdict |
 |---|---|
 | [when a user lists the auto-mounts of a project that has none, the answer is empty](#searching-a-project-with-no-auto-mount-answers-an-empty-page) | answered |
-| [when a user granted auto-mount read in a project lists its auto-mounts, that auto-mount comes back](#searching-a-user-granted-auto-mount-read-lists-the-project-auto-mounts) | answered |
+| [when a user granted auto-mount read in a project searches by a destination fragment, ordered by destination and limited to one page, one page holding only the two matching auto-mounts in destination order comes back](#searching-a-user-granted-auto-mount-read-lists-the-project-auto-mounts) | answered |
 | [when a user granted nothing tries to list the auto-mounts of a project, it is rejected for lack of permission](#searching-a-user-granted-nothing-may-not-list-project-auto-mounts) | rejected |
 
 **update**
@@ -232,11 +232,11 @@ Then
 
 #### [a-user-granted-auto-mount-read-lists-the-project-auto-mounts](/tests/scenario/bai_scenario/manager/vfolder_auto_mount/test_searching.py): pass
 
-when a user granted auto-mount read in a project lists its auto-mounts, that auto-mount comes back
+when a user granted auto-mount read in a project searches by a destination fragment, ordered by destination and limited to one page, one page holding only the two matching auto-mounts in destination order comes back
 
 Given
 
-- a project with one vfolder and one user granted the READ permission on auto-mounts, and the folder already auto-mounted
+- a project with two auto-mounts whose destination holds match and one whose does not, one auto-mount outside that project whose destination holds match, and one user granted the READ permission on auto-mounts in that project
   - Domain home-1: vfolders of this domain can be placed on local:volume1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -245,33 +245,50 @@ Given
     - regular user user-1: has their own keypair and personal project
   - Project project-1
   - Project vfolder folder-1: is placed in the project and is ready to use
+  - Vfolder auto-mount auto-mount-1: is mounted at /home/work/match-one with ro
+  - Project vfolder folder-2: is placed in the project and is ready to use
+  - Vfolder auto-mount auto-mount-2: is mounted at /home/work/match-two with ro
+  - Project vfolder folder-3: is placed in the project and is ready to use
+  - Vfolder auto-mount auto-mount-3: is mounted at /home/work/other with ro
+  - Personal vfolder folder-4: is placed in that person's personal project and is ready to use
+  - Vfolder auto-mount auto-mount-4: is mounted at /home/work/match-three with ro
   - Prepare a user granted the READ permission on vfolder auto-mounts in the project
     - Role auto-mount-user-1: applies only within the scope it is granted in
     - Role auto-mount-user-1: READ allowed on every vfolder_auto_mount
     - regular user user-1: holds Role auto-mount-user-1
-  - Vfolder auto-mount auto-mount-1: is mounted at /home/work/extra with ro
 
 When
 
-- VFolderAutoMountAdapter.scoped_search: user-1 lists the auto-mounts of the project-1 project
+- VFolderAutoMountAdapter.scoped_search: user-1 lists up to 2 auto-mounts of the project-1 project whose destination holds match, ordered by destination
 
 Then
 
-- one page holding the one auto-mount comes back
-  - total_count = 1
+- one page holding only the two matching auto-mounts in destination order comes back
+  - total_count = 2
   - has_next_page = False
   - has_previous_page = False
-  - items.length = 1
-  - id: same as the entity_id
-  - scope_type = 'project'
-  - scope_id: same as the project the folder is in
-  - vfolder_id: same as the auto-mounted vfolder
-  - mount_destination = '/home/work/extra'
-  - subpath = '.'
-  - mount_permission = 'ro'
-  - created_at: the time this run wrote
-  - updated_at: the time this run wrote
-  - deleted_at = None
+  - items.length = 2
+  - items[0].id: same as the entity_id
+  - items[0].scope_type = 'project'
+  - items[0].scope_id: same as the project the folder is in
+  - items[0].vfolder_id: same as the auto-mounted vfolder
+  - items[0].mount_destination = '/home/work/match-one'
+  - items[0].subpath = '.'
+  - items[0].mount_permission = 'ro'
+  - items[0].created_at: the time this run wrote
+  - items[0].updated_at: the time this run wrote
+  - items[0].deleted_at = None
+  - items[1].id: same as the entity_id
+  - items[1].scope_type = 'project'
+  - items[1].scope_id: same as the project the folder is in
+  - items[1].vfolder_id: same as the auto-mounted vfolder
+  - items[1].mount_destination = '/home/work/match-two'
+  - items[1].subpath = '.'
+  - items[1].mount_permission = 'ro'
+  - items[1].created_at: the time this run wrote
+  - items[1].updated_at: the time this run wrote
+  - items[1].deleted_at = None
+  - items ids: the two matching auto-mounts
 
 <a id="searching-a-user-granted-nothing-may-not-list-project-auto-mounts"></a>
 

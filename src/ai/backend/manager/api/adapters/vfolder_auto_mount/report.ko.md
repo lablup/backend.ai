@@ -31,7 +31,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [자동 마운트가 하나도 등록되지 않은 프로젝트의 자동 마운트를 조회하면, 응답은 비어 있습니다](#searching-a-project-with-no-auto-mount-answers-an-empty-page) | 성공 |
-| [프로젝트 범위에서 자동 마운트 읽기 권한을 받은 사용자가 그 프로젝트의 자동 마운트를 조회하면, 그 자동 마운트가 응답으로 옵니다](#searching-a-user-granted-auto-mount-read-lists-the-project-auto-mounts) | 성공 |
+| [프로젝트 범위에서 자동 마운트 읽기 권한을 받은 사용자가 주소 조각으로 걸러 주소 오름차순으로 한 페이지를 조회하면, 걸러진 자동 마운트 둘만 주소 순서로 실린 한 페이지가 응답으로 옵니다](#searching-a-user-granted-auto-mount-read-lists-the-project-auto-mounts) | 성공 |
 | [아무 권한도 받지 않은 사용자가 프로젝트의 자동 마운트를 조회하려 하면 권한 부족으로 거부됩니다](#searching-a-user-granted-nothing-may-not-list-project-auto-mounts) | 거부 |
 
 **update**
@@ -232,11 +232,11 @@ Then
 
 #### [a-user-granted-auto-mount-read-lists-the-project-auto-mounts](/tests/scenario/bai_scenario/manager/vfolder_auto_mount/test_searching.py): pass
 
-프로젝트 범위에서 자동 마운트 읽기 권한을 받은 사용자가 그 프로젝트의 자동 마운트를 조회하면, 그 자동 마운트가 응답으로 옵니다
+프로젝트 범위에서 자동 마운트 읽기 권한을 받은 사용자가 주소 조각으로 걸러 주소 오름차순으로 한 페이지를 조회하면, 걸러진 자동 마운트 둘만 주소 순서로 실린 한 페이지가 응답으로 옵니다
 
 Given
 
-- 프로젝트 하나와 그 프로젝트의 vfolder 하나, 그리고 자동 마운트에 READ 권한을 받은 사용자 한 명, 그리고 그 폴더가 자동 마운트된 상태
+- 주소에 match 가 든 자동 마운트 둘과 들지 않는 자동 마운트 하나를 가진 프로젝트 하나, 그 프로젝트 밖에서 주소에 match 가 든 자동 마운트 하나, 그리고 그 프로젝트 범위에서 자동 마운트 READ 권한을 받은 사용자 한 명
   - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
@@ -245,33 +245,50 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 프로젝트 project-1
   - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - vfolder 자동 마운트 auto-mount-1: /home/work/match-one 에 ro 로 마운트됩니다
+  - 프로젝트 vfolder folder-2: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - vfolder 자동 마운트 auto-mount-2: /home/work/match-two 에 ro 로 마운트됩니다
+  - 프로젝트 vfolder folder-3: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - vfolder 자동 마운트 auto-mount-3: /home/work/other 에 ro 로 마운트됩니다
+  - 개인 vfolder folder-4: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - vfolder 자동 마운트 auto-mount-4: /home/work/match-three 에 ro 로 마운트됩니다
   - 프로젝트 범위에서 vfolder 자동 마운트 READ 권한을 받은 사용자 준비
     - 역할 auto-mount-user-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 auto-mount-user-1: vfolder_auto_mount 전체에 READ 허용
     - 일반 사용자 user-1: 역할 auto-mount-user-1 보유
-  - vfolder 자동 마운트 auto-mount-1: /home/work/extra 에 ro 로 마운트됩니다
 
 When
 
-- VFolderAutoMountAdapter.scoped_search: user-1이 project-1 프로젝트 범위의 자동 마운트를 조회합니다
+- VFolderAutoMountAdapter.scoped_search: user-1이 project-1 프로젝트 범위의 자동 마운트를 주소에 match 가 든 것만 주소 오름차순으로 2개까지 조회합니다
 
 Then
 
-- 자동 마운트 하나가 실린 한 페이지가 응답으로 옵니다
-  - total_count = 1
+- 걸러진 자동 마운트 둘만 주소 순서로 실린 한 페이지가 응답으로 옵니다
+  - total_count = 2
   - has_next_page = False
   - has_previous_page = False
-  - items.length = 1
-  - id: 응답의 entity_id 와 같다
-  - scope_type = 'project'
-  - scope_id: 폴더가 놓인 프로젝트와 같다
-  - vfolder_id: 자동 마운트한 vfolder 와 같다
-  - mount_destination = '/home/work/extra'
-  - subpath = '.'
-  - mount_permission = 'ro'
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
-  - deleted_at = None
+  - items.length = 2
+  - items[0].id: 응답의 entity_id 와 같다
+  - items[0].scope_type = 'project'
+  - items[0].scope_id: 폴더가 놓인 프로젝트와 같다
+  - items[0].vfolder_id: 자동 마운트한 vfolder 와 같다
+  - items[0].mount_destination = '/home/work/match-one'
+  - items[0].subpath = '.'
+  - items[0].mount_permission = 'ro'
+  - items[0].created_at: 이 실행이 쓴 시각
+  - items[0].updated_at: 이 실행이 쓴 시각
+  - items[0].deleted_at = None
+  - items[1].id: 응답의 entity_id 와 같다
+  - items[1].scope_type = 'project'
+  - items[1].scope_id: 폴더가 놓인 프로젝트와 같다
+  - items[1].vfolder_id: 자동 마운트한 vfolder 와 같다
+  - items[1].mount_destination = '/home/work/match-two'
+  - items[1].subpath = '.'
+  - items[1].mount_permission = 'ro'
+  - items[1].created_at: 이 실행이 쓴 시각
+  - items[1].updated_at: 이 실행이 쓴 시각
+  - items[1].deleted_at = None
+  - items ids: 걸러진 자동 마운트 둘
 
 <a id="searching-a-user-granted-nothing-may-not-list-project-auto-mounts"></a>
 
