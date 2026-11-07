@@ -729,14 +729,18 @@ Then
   - successes count = 2
   - failed = []
   - successes[0].id: same as the ID seeded in advance
+  - successes[0].entity_id: same as the ID seeded in advance
   - successes[0].config_name = 'config-1'
   - successes[0].scope_type = <AppConfigScopeType.PUBLIC: 'public'>
   - successes[0].rank = 150
+  - successes[0].created_at: the time this run wrote
   - successes[0].updated_at: the time this run wrote
   - successes[1].id: same as the ID seeded in advance
+  - successes[1].entity_id: same as the ID seeded in advance
   - successes[1].config_name = 'config-1'
   - successes[1].scope_type = <AppConfigScopeType.USER: 'user'>
   - successes[1].rank = 150
+  - successes[1].created_at: the time this run wrote
   - successes[1].updated_at: the time this run wrote
 
 <a id="partial_bulk_editing-the-superadmin-reranks-several-entries-at-once"></a>
@@ -768,14 +772,18 @@ Then
   - successes count = 2
   - failed = []
   - successes[0].id: same as the ID seeded in advance
+  - successes[0].entity_id: same as the ID seeded in advance
   - successes[0].config_name = 'config-1'
   - successes[0].scope_type = <AppConfigScopeType.PUBLIC: 'public'>
   - successes[0].rank = 150
+  - successes[0].created_at: the time this run wrote
   - successes[0].updated_at: the time this run wrote
   - successes[1].id: same as the ID seeded in advance
+  - successes[1].entity_id: same as the ID seeded in advance
   - successes[1].config_name = 'config-1'
   - successes[1].scope_type = <AppConfigScopeType.USER: 'user'>
   - successes[1].rank = 150
+  - successes[1].created_at: the time this run wrote
   - successes[1].updated_at: the time this run wrote
 
 ### update
@@ -964,8 +972,21 @@ Then
 
 - both allow_lists come back in the processed list and none failed
   - successes count = 2
-  - successes: same as the two IDs seeded in advance
   - failed = []
+  - successes[0].id: same as the ID seeded in advance
+  - successes[0].entity_id: same as the ID seeded in advance
+  - successes[0].config_name = 'config-1'
+  - successes[0].scope_type = <AppConfigScopeType.PUBLIC: 'public'>
+  - successes[0].rank = 100
+  - successes[0].created_at: the time this run wrote
+  - successes[0].updated_at: the time this run wrote
+  - successes[1].id: same as the ID seeded in advance
+  - successes[1].entity_id: same as the ID seeded in advance
+  - successes[1].config_name = 'config-1'
+  - successes[1].scope_type = <AppConfigScopeType.USER: 'user'>
+  - successes[1].rank = 300
+  - successes[1].created_at: the time this run wrote
+  - successes[1].updated_at: the time this run wrote
 
 <a id="partial_bulk_purging-purging-several-answers-for-the-missing-one"></a>
 

@@ -528,8 +528,17 @@ Then
 
 - 설정 정의 둘은 처리된 목록에 오고, 실패한 것은 없습니다
   - successes count = 2
-  - successes: 준비한 ID 둘와 같다
   - failed = []
+  - successes[0].id: 준비한 ID 와 같다
+  - successes[0].entity_id: 준비한 ID 와 같다
+  - successes[0].config_name = 'first-1'
+  - successes[0].created_at: 이 실행이 쓴 시각
+  - successes[0].updated_at: 이 실행이 쓴 시각
+  - successes[1].id: 준비한 ID 와 같다
+  - successes[1].entity_id: 준비한 ID 와 같다
+  - successes[1].config_name = 'second-1'
+  - successes[1].created_at: 이 실행이 쓴 시각
+  - successes[1].updated_at: 이 실행이 쓴 시각
 
 <a id="partial_bulk_purging-purging-several-answers-for-the-missing-one"></a>
 

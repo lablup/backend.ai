@@ -528,8 +528,17 @@ Then
 
 - both config definitions come back in the succeeded list and none failed
   - successes count = 2
-  - successes: same as the two ids prepared
   - failed = []
+  - successes[0].id: same as the ID seeded in advance
+  - successes[0].entity_id: same as the ID seeded in advance
+  - successes[0].config_name = 'first-1'
+  - successes[0].created_at: the time this run wrote
+  - successes[0].updated_at: the time this run wrote
+  - successes[1].id: same as the ID seeded in advance
+  - successes[1].entity_id: same as the ID seeded in advance
+  - successes[1].config_name = 'second-1'
+  - successes[1].created_at: the time this run wrote
+  - successes[1].updated_at: the time this run wrote
 
 <a id="partial_bulk_purging-purging-several-answers-for-the-missing-one"></a>
 
