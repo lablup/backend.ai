@@ -57,7 +57,7 @@ Scenario: incomplete 3 / 10
 
 | scenario | verdict |
 |---|---|
-| [when a user granted preset read searches the presets, every preset seeded in advance comes back](#searching-a-preset-reader-searches-every-preset) | answered |
+| [when a user granted preset read searches the presets with a filter, every preset seeded in advance comes back](#searching-a-preset-reader-searches-every-preset) | answered |
 | [when a user granted nothing tries to search the presets, the search is rejected because the user lacks permission](#searching-a-user-granted-nothing-searches-no-preset) | rejected |
 
 **search_resource_slots**
@@ -561,14 +561,15 @@ Then
 
 #### [a-preset-reader-searches-every-preset](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_searching.py): pass
 
-when a user granted preset read searches the presets, every preset seeded in advance comes back
+when a user granted preset read searches the presets with a filter, every preset seeded in advance comes back
 
 Given
 
-- one runtime variant and 2 deployment revision presets of it, and one regular user
+- one runtime variant and 2 deployment revision presets of it, and one regular user, one more preset with a different name
   - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
   - Deployment revision preset preset-1: single node, one replica, rolling update
   - Deployment revision preset preset-2: single node, one replica, rolling update
+  - Deployment revision preset other-1: single node, one replica, rolling update
   - Domain home-1
   - Prepare a user granted read permission on deployment_preset in public
     - Prepare one user in the domain
@@ -582,11 +583,11 @@ Given
 
 When
 
-- DeploymentRevisionPresetAdapter.search: user-1 searches the presets
+- DeploymentRevisionPresetAdapter.search: user-1 searches the presets with one filter, one order and pagination
 
 Then
 
-- the presets seeded in advance come back
+- the preset the filter excludes does not come back, and the presets seeded in advance come back
   - total_count = 2
   - items count = 2
   - has_next_page = False
@@ -657,7 +658,7 @@ Given
 
 When
 
-- DeploymentRevisionPresetAdapter.search: user-1 searches the presets
+- DeploymentRevisionPresetAdapter.search: user-1 searches the presets with one filter, one order and pagination
 
 Then
 

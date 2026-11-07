@@ -66,7 +66,7 @@ Scenario: incomplete 12 / 47
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin searches every replica, the replicas seeded in advance come back. The requesting user of this row is the superadmin because the search is gated by the global role](#searching_replicas_admin-the-superadmin-searches-the-replicas) | answered |
+| [when the superadmin searches every replica with a filter, the replicas seeded in advance come back. The requesting user of this row is the superadmin because the search is gated by the global role](#searching_replicas_admin-the-superadmin-searches-the-replicas) | answered |
 | [when a user granted nothing tries to search every replica, the search is rejected because the user lacks the global role](#searching_replicas_admin-a-user-granted-nothing-searches-no-replica) | rejected |
 
 **admin_search_revisions**
@@ -158,14 +158,14 @@ Scenario: incomplete 12 / 47
 
 | scenario | verdict |
 |---|---|
-| [when a user granted deployment read searches the access tokens the deployment holds, those tokens come back](#searching_access_tokens-a-user-granted-deployment-read-searches-the-tokens) | answered |
+| [when a user granted deployment read searches the access tokens the deployment holds with a filter, those tokens come back](#searching_access_tokens-a-user-granted-deployment-read-searches-the-tokens) | answered |
 | [when a user granted nothing tries to search the access tokens the deployment holds, the search is rejected because the user lacks permission](#searching_access_tokens-a-user-granted-nothing-searches-no-token) | rejected |
 
 **search_policies**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin searches the deployment policies, the policy seeded in advance comes back. The requesting user of this row is the superadmin because the search is gated by the global role](#searching_policies-the-superadmin-searches-the-policies) | answered |
+| [when the superadmin searches the deployment policies with a filter, the policy seeded in advance comes back. The requesting user of this row is the superadmin because the search is gated by the global role](#searching_policies-the-superadmin-searches-the-policies) | answered |
 | [when a user granted nothing tries to search the deployment policies, the search is rejected because the user lacks the global role](#searching_policies-a-user-granted-nothing-searches-no-policy) | rejected |
 
 **search_replicas**
@@ -173,7 +173,7 @@ Scenario: incomplete 12 / 47
 | scenario | verdict |
 |---|---|
 | [when a user granted deployment read searches the replica of a route with traffic enabled, the replicas seeded in advance come back](#searching_replicas-a-user-granted-deployment-read-searches-the-replica-with-traffic-enabled) | answered |
-| [when a user granted deployment read searches the replicas of the deployment, the replicas seeded in advance come back](#searching_replicas-a-user-granted-deployment-read-searches-the-replicas) | answered |
+| [when a user granted deployment read searches the replicas of the deployment with a filter, the replicas seeded in advance come back](#searching_replicas-a-user-granted-deployment-read-searches-the-replicas) | answered |
 | [when a user granted nothing tries to search the replicas of the deployment, the search is rejected because the user lacks permission](#searching_replicas-a-user-granted-nothing-searches-no-replica) | rejected |
 
 **search_revisions**
@@ -189,14 +189,14 @@ Scenario: incomplete 12 / 47
 
 | scenario | verdict |
 |---|---|
-| [when a user granted deployment read searches the routes of the deployment, the routes seeded in advance come back](#searching_routes-a-user-granted-deployment-read-searches-the-routes) | answered |
+| [when a user granted deployment read searches the routes of the deployment with a filter, the routes seeded in advance come back](#searching_routes-a-user-granted-deployment-read-searches-the-routes) | answered |
 | [when a user granted nothing tries to search the routes of the deployment, the search is rejected because the user lacks permission](#searching_routes-a-user-granted-nothing-searches-no-route) | rejected |
 
 **search_rules**
 
 | scenario | verdict |
 |---|---|
-| [when a user granted deployment read searches the auto-scaling rules the deployment holds, those rules come back](#searching_rules-a-user-granted-deployment-read-searches-the-rules) | answered |
+| [when a user granted deployment read searches the auto-scaling rules the deployment holds with a filter, those rules come back](#searching_rules-a-user-granted-deployment-read-searches-the-rules) | answered |
 | [when a user granted nothing tries to search the auto-scaling rules the deployment holds, the search is rejected because the user lacks permission](#searching_rules-a-user-granted-nothing-searches-no-rule) | rejected |
 
 **get_current_revision**
@@ -455,11 +455,11 @@ Then
 
 #### [the-superadmin-searches-the-replicas](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas_admin.py): pass
 
-when the superadmin searches every replica, the replicas seeded in advance come back. The requesting user of this row is the superadmin because the search is gated by the global role
+when the superadmin searches every replica with a filter, the replicas seeded in advance come back. The requesting user of this row is the superadmin because the search is gated by the global role
 
 Given
 
-- one deployment holding one revision and 1 replica routes, and the superadmin
+- one deployment holding one revision and 1 replica routes, and the superadmin, one more replica route with traffic enabled
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -485,15 +485,17 @@ Given
   - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
   - Deployment deployment-1: has one replica group holding the session group
   - Deployment deployment-1: has one replica route
+  - Deployment deployment-1: has one replica route
 
 When
 
-- DeploymentAdapter.admin_search_replicas: user-1 searches every replica
+- DeploymentAdapter.admin_search_replicas: user-1 searches every replica with one filter, one order and pagination
 
 Then
 
-- the replicas seeded in advance come back with their count
+- the replica the filter excludes does not come back, and the replicas seeded in advance come back with their count
   - total_count = 1
+  - items count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: same as the id of the route seeded in advance
@@ -546,7 +548,7 @@ Given
 
 When
 
-- DeploymentAdapter.admin_search_replicas: user-1 searches every replica
+- DeploymentAdapter.admin_search_replicas: user-1 searches every replica with one filter, one order and pagination
 
 Then
 
@@ -1691,11 +1693,11 @@ Then
 
 #### [a-user-granted-deployment-read-searches-the-tokens](/tests/scenario/bai_scenario/manager/deployment/test_searching_access_tokens.py): pass
 
-when a user granted deployment read searches the access tokens the deployment holds, those tokens come back
+when a user granted deployment read searches the access tokens the deployment holds with a filter, those tokens come back
 
 Given
 
-- one deployment holding 2 access tokens, and a user granted the READ permission on deployments
+- one deployment holding 2 access tokens, and a user granted the READ permission on deployments, one more token on the same deployment, and one token on another deployment
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1711,15 +1713,19 @@ Given
   - Deployment deployment-1: replica count 1, has no revision yet
   - Deployment deployment-1: has one deployment token
   - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+  - Deployment other-1: replica count 1, has no revision yet
+  - Deployment other-1: has one deployment token
 
 When
 
-- DeploymentAdapter.search_access_tokens: user-1 searches the access tokens the deployment holds
+- DeploymentAdapter.search_access_tokens: user-1 searches the access tokens the deployment holds with one filter, one order and pagination
 
 Then
 
-- the tokens the deployment holds come back with their count
+- the token the filter excludes and the token on another deployment do not come back, and the tokens the deployment holds come back with their count
   - total_count = 2
+  - items count = 2
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: same as the id of the token seeded in advance
@@ -1757,7 +1763,7 @@ Given
 
 When
 
-- DeploymentAdapter.search_access_tokens: user-1 searches the access tokens the deployment holds
+- DeploymentAdapter.search_access_tokens: user-1 searches the access tokens the deployment holds with one filter, one order and pagination
 
 Then
 
@@ -1770,11 +1776,11 @@ Then
 
 #### [the-superadmin-searches-the-policies](/tests/scenario/bai_scenario/manager/deployment/test_searching_policies.py): pass
 
-when the superadmin searches the deployment policies, the policy seeded in advance comes back. The requesting user of this row is the superadmin because the search is gated by the global role
+when the superadmin searches the deployment policies with a filter, the policy seeded in advance comes back. The requesting user of this row is the superadmin because the search is gated by the global role
 
 Given
 
-- one deployment holding one policy, and the superadmin
+- one deployment holding one policy, and the superadmin, and one policy on another deployment
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1786,15 +1792,18 @@ Given
       - superadmin user-1: has their own keypair and personal project
   - Deployment deployment-1: replica count 1, has no revision yet
   - Deployment deployment-1: has one deployment policy
+  - Deployment other-1: replica count 1, has no revision yet
+  - Deployment other-1: has one deployment policy
 
 When
 
-- DeploymentAdapter.search_policies: user-1 searches the deployment policies
+- DeploymentAdapter.search_policies: user-1 searches the deployment policies with one filter and pagination
 
 Then
 
-- the policy seeded in advance comes back with its count
+- the policy on another deployment the filter excludes does not come back, and the policy seeded in advance comes back with its count
   - total_count = 1
+  - items count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: same as the id of the policy seeded in advance
@@ -1829,7 +1838,7 @@ Given
 
 When
 
-- DeploymentAdapter.search_policies: user-1 searches the deployment policies
+- DeploymentAdapter.search_policies: user-1 searches the deployment policies with one filter and pagination
 
 Then
 
@@ -1882,8 +1891,9 @@ When
 
 Then
 
-- the replicas seeded in advance come back with their count
+- the replica seeded in advance with traffic enabled comes back with its count
   - total_count = 1
+  - items count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: same as the id of the route seeded in advance
@@ -1903,11 +1913,11 @@ Then
 
 #### [a-user-granted-deployment-read-searches-the-replicas](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas.py): pass
 
-when a user granted deployment read searches the replicas of the deployment, the replicas seeded in advance come back
+when a user granted deployment read searches the replicas of the deployment with a filter, the replicas seeded in advance come back
 
 Given
 
-- one deployment holding one revision and 1 replica routes, and a user granted the READ permission on deployments
+- one deployment holding one revision and 1 replica routes, and a user granted the READ permission on deployments, one more replica route with traffic enabled, and one replica route on another deployment
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1936,15 +1946,22 @@ Given
   - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
   - Deployment deployment-1: has one replica group holding the session group
   - Deployment deployment-1: has one replica route
+  - Deployment deployment-1: has one replica route
+  - Deployment other-1: replica count 1, has no revision yet
+  - Deployment other-1: has one revision
+  - Session group of a deployment deployment-session-group-2: the session group a deployment creates with its replica group
+  - Deployment other-1: has one replica group holding the session group
+  - Deployment other-1: has one replica route
 
 When
 
-- DeploymentAdapter.search_replicas: user-1 searches the replicas of deployment-1
+- DeploymentAdapter.search_replicas: user-1 searches the replicas of deployment-1 with one filter, one order and pagination
 
 Then
 
-- the replicas seeded in advance come back with their count
+- the replica the filter excludes and the replica on another deployment do not come back, and the replicas seeded in advance come back with their count
   - total_count = 1
+  - items count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: same as the id of the route seeded in advance
@@ -1997,7 +2014,7 @@ Given
 
 When
 
-- DeploymentAdapter.search_replicas: user-1 searches the replicas of deployment-1
+- DeploymentAdapter.search_replicas: user-1 searches the replicas of deployment-1 with one filter, one order and pagination
 
 Then
 
@@ -2205,11 +2222,11 @@ Then
 
 #### [a-user-granted-deployment-read-searches-the-routes](/tests/scenario/bai_scenario/manager/deployment/test_searching_routes.py): pass
 
-when a user granted deployment read searches the routes of the deployment, the routes seeded in advance come back
+when a user granted deployment read searches the routes of the deployment with a filter, the routes seeded in advance come back
 
 Given
 
-- one deployment holding one revision and 1 replica routes, and a user granted the READ permission on deployments
+- one deployment holding one revision and 1 replica routes, and a user granted the READ permission on deployments, one more replica route with traffic enabled, and one replica route on another deployment
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -2238,15 +2255,22 @@ Given
   - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
   - Deployment deployment-1: has one replica group holding the session group
   - Deployment deployment-1: has one replica route
+  - Deployment deployment-1: has one replica route
+  - Deployment other-1: replica count 1, has no revision yet
+  - Deployment other-1: has one revision
+  - Session group of a deployment deployment-session-group-2: the session group a deployment creates with its replica group
+  - Deployment other-1: has one replica group holding the session group
+  - Deployment other-1: has one replica route
 
 When
 
-- DeploymentAdapter.search_routes: user-1 searches the routes of deployment-1
+- DeploymentAdapter.search_routes: user-1 searches the routes of deployment-1 with one filter, one order and pagination
 
 Then
 
-- the routes seeded in advance come back with their count
+- the route the filter excludes and the route on another deployment do not come back, and the routes seeded in advance come back with their count
   - total_count = 1
+  - items count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: same as the id of the route seeded in advance
@@ -2298,7 +2322,7 @@ Given
 
 When
 
-- DeploymentAdapter.search_routes: user-1 searches the routes of deployment-1
+- DeploymentAdapter.search_routes: user-1 searches the routes of deployment-1 with one filter, one order and pagination
 
 Then
 
@@ -2311,11 +2335,11 @@ Then
 
 #### [a-user-granted-deployment-read-searches-the-rules](/tests/scenario/bai_scenario/manager/deployment/test_searching_rules.py): pass
 
-when a user granted deployment read searches the auto-scaling rules the deployment holds, those rules come back
+when a user granted deployment read searches the auto-scaling rules the deployment holds with a filter, those rules come back
 
 Given
 
-- one deployment holding 2 auto-scaling rules, and a user granted the READ permission on deployments
+- one deployment holding 2 auto-scaling rules, and a user granted the READ permission on deployments, one more rule with a different metric name on the same deployment, and one rule on another deployment
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -2331,15 +2355,19 @@ Given
   - Deployment deployment-1: replica count 1, has no revision yet
   - Deployment deployment-1: has one auto-scaling rule
   - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment other-1: replica count 1, has no revision yet
+  - Deployment other-1: has one auto-scaling rule
 
 When
 
-- DeploymentAdapter.search_rules: user-1 searches the auto-scaling rules the deployment holds
+- DeploymentAdapter.search_rules: user-1 searches the auto-scaling rules the deployment holds with one filter, one order and pagination
 
 Then
 
-- the auto-scaling rules the deployment holds come back with their count
+- the rule the filter excludes and the rule on another deployment do not come back, and the rules the deployment holds come back with their count
   - total_count = 2
+  - items count = 2
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: same as the id of the rule seeded in advance
@@ -2395,7 +2423,7 @@ Given
 
 When
 
-- DeploymentAdapter.search_rules: user-1 searches the auto-scaling rules the deployment holds
+- DeploymentAdapter.search_rules: user-1 searches the auto-scaling rules the deployment holds with one filter, one order and pagination
 
 Then
 

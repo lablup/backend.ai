@@ -57,7 +57,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [프리셋 조회 권한을 받은 사용자가 프리셋을 훑으면, 심은 프리셋이 모두 옵니다](#searching-a-preset-reader-searches-every-preset) | 성공 |
+| [프리셋 조회 권한을 받은 사용자가 프리셋을 기준으로 걸러 훑으면, 심은 프리셋이 모두 옵니다](#searching-a-preset-reader-searches-every-preset) | 성공 |
 | [아무 권한도 받지 않은 사용자가 프리셋을 훑으려 하면, 권한이 없다는 이유로 거부됩니다](#searching-a-user-granted-nothing-searches-no-preset) | 거부 |
 
 **search_resource_slots**
@@ -561,14 +561,15 @@ Then
 
 #### [a-preset-reader-searches-every-preset](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_searching.py): pass
 
-프리셋 조회 권한을 받은 사용자가 프리셋을 훑으면, 심은 프리셋이 모두 옵니다
+프리셋 조회 권한을 받은 사용자가 프리셋을 기준으로 걸러 훑으면, 심은 프리셋이 모두 옵니다
 
 Given
 
-- 변형 하나와 그 변형의 배포 리비전 프리셋 2개, 그리고 일반 사용자 한 명
+- 변형 하나와 그 변형의 배포 리비전 프리셋 2개, 그리고 일반 사용자 한 명, 이름이 다른 프리셋 하나가 더 있고
   - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
   - 배포 리비전 프리셋 preset-1: 단일 노드, 복제본 하나, 롤링 업데이트
   - 배포 리비전 프리셋 preset-2: 단일 노드, 복제본 하나, 롤링 업데이트
+  - 배포 리비전 프리셋 other-1: 단일 노드, 복제본 하나, 롤링 업데이트
   - 도메인 home-1
   - public 에서 deployment_preset 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
@@ -582,11 +583,11 @@ Given
 
 When
 
-- DeploymentRevisionPresetAdapter.search: user-1 이 프리셋을 훑습니다
+- DeploymentRevisionPresetAdapter.search: user-1 이 프리셋을 하나의 기준으로 걸러 순서와 함께 훑습니다
 
 Then
 
-- 심은 프리셋이 전체가 응답으로 옵니다
+- 기준이 제외하는 프리셋은 오지 않고, 심은 프리셋이 전체가 응답으로 옵니다
   - total_count = 2
   - items count = 2
   - has_next_page = False
@@ -657,7 +658,7 @@ Given
 
 When
 
-- DeploymentRevisionPresetAdapter.search: user-1 이 프리셋을 훑습니다
+- DeploymentRevisionPresetAdapter.search: user-1 이 프리셋을 하나의 기준으로 걸러 순서와 함께 훑습니다
 
 Then
 

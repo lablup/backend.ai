@@ -66,7 +66,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 복제본 전체를 조회하면, 심은 복제본이 옵니다. 복제본 전체 훑기는 전역 권한이 필요한 호출이라 이 행의 요청 사용자는 superadmin 입니다](#searching_replicas_admin-the-superadmin-searches-the-replicas) | 성공 |
+| [superadmin 이 복제본 전체를 기준으로 걸러 조회하면, 심은 복제본이 옵니다. 복제본 전체 훑기는 전역 권한이 필요한 호출이라 이 행의 요청 사용자는 superadmin 입니다](#searching_replicas_admin-the-superadmin-searches-the-replicas) | 성공 |
 | [아무 권한도 받지 않은 사용자가 복제본 전체를 조회하려 하면, 전역 권한이 없다는 이유로 거부됩니다](#searching_replicas_admin-a-user-granted-nothing-searches-no-replica) | 거부 |
 
 **admin_search_revisions**
@@ -158,14 +158,14 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [배포 조회 권한을 받은 사용자가 배포가 걸린 접근 토큰을 훑으면, 그 토큰들이 옵니다](#searching_access_tokens-a-user-granted-deployment-read-searches-the-tokens) | 성공 |
+| [배포 조회 권한을 받은 사용자가 배포가 걸린 접근 토큰을 기준으로 걸러 훑으면, 그 토큰들이 옵니다](#searching_access_tokens-a-user-granted-deployment-read-searches-the-tokens) | 성공 |
 | [아무 권한도 받지 않은 사용자가 배포가 걸린 접근 토큰을 훑으려 하면, 권한이 없다는 이유로 거부됩니다](#searching_access_tokens-a-user-granted-nothing-searches-no-token) | 거부 |
 
 **search_policies**
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 배포 정책을 훑으면, 심은 정책이 옵니다. 정책 훑기는 전역 권한이 필요한 호출이라 이 행의 요청 사용자는 superadmin 입니다](#searching_policies-the-superadmin-searches-the-policies) | 성공 |
+| [superadmin 이 배포 정책을 기준으로 걸러 훑으면, 심은 정책이 옵니다. 정책 훑기는 전역 권한이 필요한 호출이라 이 행의 요청 사용자는 superadmin 입니다](#searching_policies-the-superadmin-searches-the-policies) | 성공 |
 | [아무 권한도 받지 않은 사용자가 배포 정책을 훑으려 하면, 전역 권한이 없다는 이유로 거부됩니다](#searching_policies-a-user-granted-nothing-searches-no-policy) | 거부 |
 
 **search_replicas**
@@ -173,7 +173,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [배포 조회 권한을 받은 사용자가 트래픽이 켜진 라우트의 복제본을 조회하면, 심은 복제본이 옵니다](#searching_replicas-a-user-granted-deployment-read-searches-the-replica-with-traffic-enabled) | 성공 |
-| [배포 조회 권한을 받은 사용자가 배포의 복제본을 조회하면, 심은 복제본이 옵니다](#searching_replicas-a-user-granted-deployment-read-searches-the-replicas) | 성공 |
+| [배포 조회 권한을 받은 사용자가 배포의 복제본을 기준으로 걸러 조회하면, 심은 복제본이 옵니다](#searching_replicas-a-user-granted-deployment-read-searches-the-replicas) | 성공 |
 | [아무 권한도 받지 않은 사용자가 배포의 복제본을 조회하려 하면, 권한이 없다는 이유로 거부됩니다](#searching_replicas-a-user-granted-nothing-searches-no-replica) | 거부 |
 
 **search_revisions**
@@ -189,14 +189,14 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [배포 조회 권한을 받은 사용자가 배포의 라우트를 조회하면, 심은 라우트가 옵니다](#searching_routes-a-user-granted-deployment-read-searches-the-routes) | 성공 |
+| [배포 조회 권한을 받은 사용자가 배포의 라우트를 기준으로 걸러 조회하면, 심은 라우트가 옵니다](#searching_routes-a-user-granted-deployment-read-searches-the-routes) | 성공 |
 | [아무 권한도 받지 않은 사용자가 배포의 라우트를 조회하려 하면, 권한이 없다는 이유로 거부됩니다](#searching_routes-a-user-granted-nothing-searches-no-route) | 거부 |
 
 **search_rules**
 
 | 시나리오 | 판정 |
 |---|---|
-| [배포 조회 권한을 받은 사용자가 배포가 걸린 자동 스케일링 규칙을 훑으면, 그 규칙들이 옵니다](#searching_rules-a-user-granted-deployment-read-searches-the-rules) | 성공 |
+| [배포 조회 권한을 받은 사용자가 배포가 걸린 자동 스케일링 규칙을 기준으로 걸러 훑으면, 그 규칙들이 옵니다](#searching_rules-a-user-granted-deployment-read-searches-the-rules) | 성공 |
 | [아무 권한도 받지 않은 사용자가 배포가 걸린 자동 스케일링 규칙을 훑으려 하면, 권한이 없다는 이유로 거부됩니다](#searching_rules-a-user-granted-nothing-searches-no-rule) | 거부 |
 
 **get_current_revision**
@@ -455,11 +455,11 @@ Then
 
 #### [the-superadmin-searches-the-replicas](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas_admin.py): pass
 
-superadmin 이 복제본 전체를 조회하면, 심은 복제본이 옵니다. 복제본 전체 훑기는 전역 권한이 필요한 호출이라 이 행의 요청 사용자는 superadmin 입니다
+superadmin 이 복제본 전체를 기준으로 걸러 조회하면, 심은 복제본이 옵니다. 복제본 전체 훑기는 전역 권한이 필요한 호출이라 이 행의 요청 사용자는 superadmin 입니다
 
 Given
 
-- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, superadmin 한 명
+- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, superadmin 한 명, 트래픽이 켜진 복제본 라우트 하나가 더 걸려 있고
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -485,15 +485,17 @@ Given
   - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
   - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
   - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
 
 When
 
-- DeploymentAdapter.admin_search_replicas: user-1 이 복제본 전체를 조회합니다
+- DeploymentAdapter.admin_search_replicas: user-1 이 복제본 전체를 하나의 기준으로 걸러 순서와 함께 조회합니다
 
 Then
 
-- 심은 복제본이 양과 함께 옵니다
+- 기준이 제외하는 복제본은 오지 않고, 심은 복제본이 양과 함께 옵니다
   - total_count = 1
+  - items count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: 미리 저장한 라우트의 id 와 같다
@@ -546,7 +548,7 @@ Given
 
 When
 
-- DeploymentAdapter.admin_search_replicas: user-1 이 복제본 전체를 조회합니다
+- DeploymentAdapter.admin_search_replicas: user-1 이 복제본 전체를 하나의 기준으로 걸러 순서와 함께 조회합니다
 
 Then
 
@@ -1691,11 +1693,11 @@ Then
 
 #### [a-user-granted-deployment-read-searches-the-tokens](/tests/scenario/bai_scenario/manager/deployment/test_searching_access_tokens.py): pass
 
-배포 조회 권한을 받은 사용자가 배포가 걸린 접근 토큰을 훑으면, 그 토큰들이 옵니다
+배포 조회 권한을 받은 사용자가 배포가 걸린 접근 토큰을 기준으로 걸러 훑으면, 그 토큰들이 옵니다
 
 Given
 
-- 접근 토큰 2개가 걸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
+- 접근 토큰 2개가 걸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명, 같은 배포에 토큰 하나가 더 걸려 있고, 토큰 하나가 다른 배포에 걸려 있고
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1711,15 +1713,19 @@ Given
   - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
   - 배포 deployment-1: 배포 토큰 하나를 갖는다
   - 배포 deployment-1: 배포 토큰 하나를 갖는다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+  - 배포 other-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-1: 배포 토큰 하나를 갖는다
 
 When
 
-- DeploymentAdapter.search_access_tokens: user-1 이 배포가 걸린 접근 토큰을 훑습니다
+- DeploymentAdapter.search_access_tokens: user-1 이 배포가 걸린 접근 토큰을 하나의 기준으로 걸러 순서와 함께 훑습니다
 
 Then
 
-- 배포가 걸린 토큰이 양과 함께 옵니다
+- 기준이 제외하는 토큰과 다른 배포에 걸린 토큰은 오지 않고, 배포가 걸린 토큰이 양과 함께 옵니다
   - total_count = 2
+  - items count = 2
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: 미리 저장한 토큰의 id 와 같다
@@ -1757,7 +1763,7 @@ Given
 
 When
 
-- DeploymentAdapter.search_access_tokens: user-1 이 배포가 걸린 접근 토큰을 훑습니다
+- DeploymentAdapter.search_access_tokens: user-1 이 배포가 걸린 접근 토큰을 하나의 기준으로 걸러 순서와 함께 훑습니다
 
 Then
 
@@ -1770,11 +1776,11 @@ Then
 
 #### [the-superadmin-searches-the-policies](/tests/scenario/bai_scenario/manager/deployment/test_searching_policies.py): pass
 
-superadmin 이 배포 정책을 훑으면, 심은 정책이 옵니다. 정책 훑기는 전역 권한이 필요한 호출이라 이 행의 요청 사용자는 superadmin 입니다
+superadmin 이 배포 정책을 기준으로 걸러 훑으면, 심은 정책이 옵니다. 정책 훑기는 전역 권한이 필요한 호출이라 이 행의 요청 사용자는 superadmin 입니다
 
 Given
 
-- 정책 하나가 걸린 배포 하나와, superadmin 한 명
+- 정책 하나가 걸린 배포 하나와, superadmin 한 명, 정책 하나가 다른 배포에 걸려 있고
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1786,15 +1792,18 @@ Given
       - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
   - 배포 deployment-1: 배포 정책 하나를 갖는다
+  - 배포 other-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-1: 배포 정책 하나를 갖는다
 
 When
 
-- DeploymentAdapter.search_policies: user-1 이 배포 정책을 훑습니다
+- DeploymentAdapter.search_policies: user-1 이 배포 정책을 하나의 기준으로 걸러 훑습니다
 
 Then
 
-- 심은 정책이 양과 함께 옵니다
+- 기준이 제외하는 다른 배포의 정책은 오지 않고, 심은 정책이 양과 함께 옵니다
   - total_count = 1
+  - items count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: 미리 저장한 정책의 id 와 같다
@@ -1829,7 +1838,7 @@ Given
 
 When
 
-- DeploymentAdapter.search_policies: user-1 이 배포 정책을 훑습니다
+- DeploymentAdapter.search_policies: user-1 이 배포 정책을 하나의 기준으로 걸러 훑습니다
 
 Then
 
@@ -1882,8 +1891,9 @@ When
 
 Then
 
-- 심은 복제본이 양과 함께 옵니다
+- 트래픽이 켜진 심은 복제본이 양과 함께 옵니다
   - total_count = 1
+  - items count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: 미리 저장한 라우트의 id 와 같다
@@ -1903,11 +1913,11 @@ Then
 
 #### [a-user-granted-deployment-read-searches-the-replicas](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas.py): pass
 
-배포 조회 권한을 받은 사용자가 배포의 복제본을 조회하면, 심은 복제본이 옵니다
+배포 조회 권한을 받은 사용자가 배포의 복제본을 기준으로 걸러 조회하면, 심은 복제본이 옵니다
 
 Given
 
-- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
+- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명, 트래픽이 켜진 복제본 라우트 하나가 더 걸려 있고, 복제본 라우트 하나가 다른 배포에 걸려 있고
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1936,15 +1946,22 @@ Given
   - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
   - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
   - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+  - 배포 other-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-2: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 other-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 other-1: 복제본 라우트 하나를 갖는다
 
 When
 
-- DeploymentAdapter.search_replicas: user-1 이 deployment-1의 복제본을 조회합니다
+- DeploymentAdapter.search_replicas: user-1 이 deployment-1의 복제본을 하나의 기준으로 걸러 순서와 함께 조회합니다
 
 Then
 
-- 심은 복제본이 양과 함께 옵니다
+- 기준이 제외하는 복제본과 다른 배포에 걸린 복제본은 오지 않고, 심은 복제본이 양과 함께 옵니다
   - total_count = 1
+  - items count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: 미리 저장한 라우트의 id 와 같다
@@ -1997,7 +2014,7 @@ Given
 
 When
 
-- DeploymentAdapter.search_replicas: user-1 이 deployment-1의 복제본을 조회합니다
+- DeploymentAdapter.search_replicas: user-1 이 deployment-1의 복제본을 하나의 기준으로 걸러 순서와 함께 조회합니다
 
 Then
 
@@ -2205,11 +2222,11 @@ Then
 
 #### [a-user-granted-deployment-read-searches-the-routes](/tests/scenario/bai_scenario/manager/deployment/test_searching_routes.py): pass
 
-배포 조회 권한을 받은 사용자가 배포의 라우트를 조회하면, 심은 라우트가 옵니다
+배포 조회 권한을 받은 사용자가 배포의 라우트를 기준으로 걸러 조회하면, 심은 라우트가 옵니다
 
 Given
 
-- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
+- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명, 트래픽이 켜진 복제본 라우트 하나가 더 걸려 있고, 복제본 라우트 하나가 다른 배포에 걸려 있고
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -2238,15 +2255,22 @@ Given
   - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
   - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
   - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+  - 배포 other-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-2: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 other-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 other-1: 복제본 라우트 하나를 갖는다
 
 When
 
-- DeploymentAdapter.search_routes: user-1 이 deployment-1의 라우트를 조회합니다
+- DeploymentAdapter.search_routes: user-1 이 deployment-1의 라우트를 하나의 기준으로 걸러 순서와 함께 조회합니다
 
 Then
 
-- 심은 라우트가 양과 함께 옵니다
+- 기준이 제외하는 라우트와 다른 배포에 걸린 라우트는 오지 않고, 심은 라우트가 양과 함께 옵니다
   - total_count = 1
+  - items count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: 미리 저장한 라우트의 id 와 같다
@@ -2298,7 +2322,7 @@ Given
 
 When
 
-- DeploymentAdapter.search_routes: user-1 이 deployment-1의 라우트를 조회합니다
+- DeploymentAdapter.search_routes: user-1 이 deployment-1의 라우트를 하나의 기준으로 걸러 순서와 함께 조회합니다
 
 Then
 
@@ -2311,11 +2335,11 @@ Then
 
 #### [a-user-granted-deployment-read-searches-the-rules](/tests/scenario/bai_scenario/manager/deployment/test_searching_rules.py): pass
 
-배포 조회 권한을 받은 사용자가 배포가 걸린 자동 스케일링 규칙을 훑으면, 그 규칙들이 옵니다
+배포 조회 권한을 받은 사용자가 배포가 걸린 자동 스케일링 규칙을 기준으로 걸러 훑으면, 그 규칙들이 옵니다
 
 Given
 
-- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
+- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명, 같은 배포에 지표 이름이 다른 규칙 하나가 더 걸려 있고, 규칙 하나가 다른 배포에 걸려 있고
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -2331,15 +2355,19 @@ Given
   - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
   - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
   - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+  - 배포 other-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-1: 오토스케일링 규칙 하나를 갖는다
 
 When
 
-- DeploymentAdapter.search_rules: user-1 이 배포가 걸린 자동 스케일링 규칙을 훑습니다
+- DeploymentAdapter.search_rules: user-1 이 배포가 걸린 자동 스케일링 규칙을 하나의 기준으로 걸러 순서와 함께 훑습니다
 
 Then
 
-- 배포가 걸린 규칙이 양과 함께 옵니다
+- 기준이 제외하는 규칙과 다른 배포에 걸린 규칙은 오지 않고, 배포가 걸린 규칙이 양과 함께 옵니다
   - total_count = 2
+  - items count = 2
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: 미리 저장한 규칙의 id 와 같다
@@ -2395,7 +2423,7 @@ Given
 
 When
 
-- DeploymentAdapter.search_rules: user-1 이 배포가 걸린 자동 스케일링 규칙을 훑습니다
+- DeploymentAdapter.search_rules: user-1 이 배포가 걸린 자동 스케일링 규칙을 하나의 기준으로 걸러 순서와 함께 훑습니다
 
 Then
 
