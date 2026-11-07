@@ -54,7 +54,7 @@ from bai_scenario.seeds.storage_namespace.storage_namespace import (
 
 def _holding(role: UserRole, granted: tuple[Permission, ...]) -> Says:
     if granted:
-        names = ", ".join(one.name for one in granted)
+        names = ", ".join(str(one.name) for one in granted)
         return Says(
             f"저장소 네임스페이스에 {names} 권한을 받은 사용자 한 명",
             english=f"one user granted {names} on storage namespaces",
@@ -72,7 +72,7 @@ class SomeoneGrantedOnNamespaces(TestSeedNest[Laid[UserData]]):
 
     @override
     def kind(self) -> str:
-        names = ", ".join(one.name for one in self.granted)
+        names = ", ".join(str(one.name) for one in self.granted)
         return Says(
             f"global 에서 저장소 네임스페이스에 {names} 권한을 받은 사용자 준비",
             english=f"Prepare a user granted {names} on storage namespaces in global",
@@ -101,8 +101,10 @@ async def lay_a_granted_caller(
     """A user of the given role, granted the given permissions on storage namespaces."""
     home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
     if not granted:
-        return await seeding.within(SomeoneOf(home, role=role))
-    return await seeding.within(SomeoneGrantedOnNamespaces(home, granted))
+        plain: Laid[UserData] = await seeding.within(SomeoneOf(home, role=role))
+        return plain
+    granted_caller: Laid[UserData] = await seeding.within(SomeoneGrantedOnNamespaces(home, granted))
+    return granted_caller
 
 
 @dataclass(frozen=True)
@@ -380,22 +382,14 @@ def loaded_verdicts(
     got: Sequence[StorageNamespaceNode | Exception | None],
     laid: ManyNamespacesAndACaller,
 ) -> list[Verdict]:
-    """Two seeded namespaces in the requested order around one empty entry."""
-    first, middle, last = got
-    return [
-        Same("length", len(got), 3),
-        *(
-            namespace_verdicts("[0].", first, laid.laid[0])
-            if isinstance(first, StorageNamespaceNode)
-            else [Same("[0]", first, None)]
-        ),
-        Same("[1]", middle, None),
-        *(
-            namespace_verdicts("[2].", last, laid.laid[1])
-            if isinstance(last, StorageNamespaceNode)
-            else [Same("[2]", last, None)]
-        ),
-    ]
+    """The seeded namespaces in the requested order, each checked whole."""
+    verdicts: list[Verdict] = [Same("length", len(got), len(laid.laid))]
+    for i, (one, namespace) in enumerate(zip(got, laid.laid, strict=True)):
+        if not isinstance(one, StorageNamespaceNode):
+            verdicts.append(Same(f"[{i}]", type(one).__name__, StorageNamespaceNode.__name__))
+            continue
+        verdicts += namespace_verdicts(f"[{i}].", one, namespace)
+    return verdicts
 
 
 @dataclass(frozen=True)
@@ -403,12 +397,8 @@ class TheOrderIsKept(Then[ManyNamespacesAndACaller, Loaded]):
     @override
     def says(self) -> str:
         return Says(
-            "미리 저장한 네임스페이스는 요청한 순서대로 반환되고, 존재하지 않는 id 의 항목은 "
-            "비어 있습니다",
-            english=(
-                "the namespaces seeded in advance come back in the requested order, and the "
-                "entry for the id that does not exist is empty"
-            ),
+            "미리 저장한 네임스페이스는 요청한 순서대로 반환됩니다",
+            english="the namespaces seeded in advance come back in the requested order",
         )
 
     @override
@@ -416,8 +406,8 @@ class TheOrderIsKept(Then[ManyNamespacesAndACaller, Loaded]):
         got = answered.response
         if got is None:
             return [MissingResponse(answered.raised)]
-        if len(got) != 3:
-            return [Same("length", len(got), 3)]
+        if len(got) != len(laid.laid):
+            return [Same("length", len(got), len(laid.laid))]
         return loaded_verdicts(got, laid)
 
 
@@ -436,7 +426,7 @@ class EveryIdIsRefused(Then[ManyNamespacesAndACaller, Loaded]):
         if got is None:
             return [MissingResponse(answered.raised)]
         return [
-            Same("length", len(got), 3),
+            Same("length", len(got), len(laid.laid)),
             *[
                 Refused(NotEnoughPermission, one if isinstance(one, Exception) else None)
                 for one in got

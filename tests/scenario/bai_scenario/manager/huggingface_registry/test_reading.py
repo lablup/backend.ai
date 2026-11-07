@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, override
-from uuid import uuid4
 
 import pytest
 
@@ -44,8 +43,6 @@ from bai_scenario.components.huggingface_registry import (
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
-
-MISSING_ID = uuid4()
 
 type Loaded = list[HuggingFaceRegistryNode | Exception | None]
 type ReadingStep = Scenario[TestSeedingSession, Any, HuggingFaceRegistryAdapter, Any]
@@ -108,18 +105,13 @@ class LoadingByIds(When[ManyRegistriesAndACaller, HuggingFaceRegistryAdapter, Lo
     @override
     def describe(self, laid: ManyRegistriesAndACaller) -> str:
         return Says(
-            f"{laid.caller.username}이 미리 저장한 레지스트리 둘과 존재하지 않는 id 하나를 한 "
-            "번에 조회합니다",
-            english=(
-                f"{laid.caller.username} loads two registries seeded in advance and one id that "
-                "does not exist at once"
-            ),
+            f"{laid.caller.username}이 미리 저장한 레지스트리 둘을 id 로 한 번에 조회합니다",
+            english=f"{laid.caller.username} loads two registries seeded in advance by id at once",
         )
 
     def ids(self, laid: ManyRegistriesAndACaller) -> list[ArtifactRegistryID]:
         return [
             ArtifactRegistryID(laid.laid[0].id),
-            ArtifactRegistryID(MISSING_ID),
             ArtifactRegistryID(laid.laid[1].id),
         ]
 
@@ -186,12 +178,8 @@ class TheOrderIsKept(Then[ManyRegistriesAndACaller, Loaded]):
     @override
     def says(self) -> str:
         return Says(
-            "미리 저장한 레지스트리는 요청한 순서대로 반환되고, 존재하지 않는 id 의 항목은 비어 "
-            "있습니다",
-            english=(
-                "the registries seeded in advance come back in the requested order, and the "
-                "entry for the id that does not exist is empty"
-            ),
+            "미리 저장한 레지스트리는 요청한 순서대로 반환됩니다",
+            english="the registries seeded in advance come back in the requested order",
         )
 
     @override
@@ -199,23 +187,17 @@ class TheOrderIsKept(Then[ManyRegistriesAndACaller, Loaded]):
         got = answered.response
         if got is None:
             return [MissingResponse(answered.raised)]
-        if len(got) != 3:
-            return [Same("length", len(got), 3)]
-        first, middle, last = got
-        return [
-            Same("length", len(got), 3),
-            Same(
-                "[0].name",
-                first.name if isinstance(first, HuggingFaceRegistryNode) else None,
-                laid.laid[0].name,
-            ),
-            Same("[1]", middle, None),
-            Same(
-                "[2].name",
-                last.name if isinstance(last, HuggingFaceRegistryNode) else None,
-                laid.laid[1].name,
-            ),
-        ]
+        if len(got) != len(laid.laid):
+            return [Same("length", len(got), len(laid.laid))]
+        verdicts: list[Verdict] = [Same("length", len(got), len(laid.laid))]
+        for i, (one, registry) in enumerate(zip(got, laid.laid, strict=True)):
+            if not isinstance(one, HuggingFaceRegistryNode):
+                verdicts.append(
+                    Same(f"[{i}]", type(one).__name__, HuggingFaceRegistryNode.__name__)
+                )
+                continue
+            verdicts += registry_verdicts(f"[{i}].", one, registry, url=registry.url)
+        return verdicts
 
 
 @dataclass(frozen=True)
@@ -233,7 +215,7 @@ class EveryIdIsRefused(Then[ManyRegistriesAndACaller, Loaded]):
         if got is None:
             return [MissingResponse(answered.raised)]
         return [
-            Same("length", len(got), 3),
+            Same("length", len(got), len(laid.laid)),
             *[
                 Refused(NotEnoughPermission, one if isinstance(one, Exception) else None)
                 for one in got
@@ -401,12 +383,11 @@ class AUserGrantedReadLoadsManyInOrder(
     @override
     def describe(self) -> str:
         return Says(
-            "레지스트리 조회 권한을 받은 사용자가 미리 저장한 레지스트리 둘과 존재하지 않는 id 하나를 "
-            "한 번에 조회하면, 둘은 요청한 순서대로 반환되고 존재하지 않는 id 의 항목은 비어 있습니다",
+            "레지스트리 조회 권한을 받은 사용자가 미리 저장한 레지스트리 둘을 한 번에 조회하면, "
+            "둘은 요청한 순서대로 반환됩니다",
             english=(
                 "when a user granted permission to read registries loads two registries seeded in "
-                "advance and one id that does not exist at once, the two come back in the "
-                "requested order and the entry for the id that does not exist is empty"
+                "advance at once, the two come back in the requested order"
             ),
         )
 

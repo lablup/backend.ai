@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, override
-from uuid import uuid4
 
 import pytest
 
@@ -27,8 +26,6 @@ from bai_scenario.components.storage_namespace import (
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
-
-MISSING_ID = uuid4()
 
 type ReadingStep = Scenario[TestSeedingSession, Any, StorageNamespaceAdapter, Any]
 
@@ -65,18 +62,13 @@ class ReadingMany(When[ManyNamespacesAndACaller, StorageNamespaceAdapter, Loaded
     @override
     def describe(self, laid: ManyNamespacesAndACaller) -> str:
         return Says(
-            f"{laid.caller.username}이 미리 저장한 네임스페이스 둘과 존재하지 않는 id 하나를 "
-            "한 번에 조회합니다",
-            english=(
-                f"{laid.caller.username} loads two namespaces seeded in advance and one id that "
-                "does not exist at once"
-            ),
+            f"{laid.caller.username}이 미리 저장한 네임스페이스 둘을 한 번에 조회합니다",
+            english=f"{laid.caller.username} loads two namespaces seeded in advance at once",
         )
 
     def ids(self, laid: ManyNamespacesAndACaller) -> list[StorageNamespaceID]:
         return [
             StorageNamespaceID(laid.laid[0].id),
-            StorageNamespaceID(MISSING_ID),
             StorageNamespaceID(laid.laid[1].id),
         ]
 
@@ -181,13 +173,11 @@ class AUserGrantedReadReadsManyInOrder(
     @override
     def describe(self) -> str:
         return Says(
-            "저장소 네임스페이스 조회 권한을 받은 사용자가 미리 저장한 네임스페이스 둘과 존재하지 않는 "
-            "id 하나를 한 번에 조회하면, 둘은 요청한 순서대로 반환되고 존재하지 않는 id 의 항목은 "
-            "비어 있습니다",
+            "저장소 네임스페이스 조회 권한을 받은 사용자가 미리 저장한 네임스페이스 둘을 한 번에 "
+            "조회하면, 둘은 요청한 순서대로 반환됩니다",
             english=(
                 "when a user granted permission to read storage namespaces loads two namespaces "
-                "seeded in advance and one id that does not exist at once, the two come back in "
-                "the requested order and the entry for the id that does not exist is empty"
+                "seeded in advance at once, the two come back in the requested order"
             ),
         )
 

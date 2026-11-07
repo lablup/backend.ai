@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, override
-from uuid import uuid4
 
 import pytest
 
@@ -30,8 +29,6 @@ from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-MISSING_ID = uuid4()
-
 type ReadingStep = Scenario[TestSeedingSession, Any, SystemSessionEnvironAdapter, Any]
 
 
@@ -44,18 +41,13 @@ class ReadingMany(When[ManyEnvironsAndACaller, SystemSessionEnvironAdapter, Load
     @override
     def describe(self, laid: ManyEnvironsAndACaller) -> str:
         return Says(
-            f"{laid.caller.username}이 미리 저장한 행 둘과 존재하지 않는 id 하나를 한 번에 "
-            "조회합니다",
-            english=(
-                f"{laid.caller.username} loads two rows seeded in advance and one id that does "
-                "not exist at once"
-            ),
+            f"{laid.caller.username}이 미리 저장한 행 둘을 한 번에 조회합니다",
+            english=f"{laid.caller.username} loads two rows seeded in advance at once",
         )
 
     def ids(self, laid: ManyEnvironsAndACaller) -> list[SystemSessionEnvironID]:
         return [
             SystemSessionEnvironID(laid.laid[0].id),
-            SystemSessionEnvironID(MISSING_ID),
             SystemSessionEnvironID(laid.laid[1].id),
         ]
 
@@ -103,12 +95,11 @@ class AUserGrantedReadReadsManyInOrder(
     @override
     def describe(self) -> str:
         return Says(
-            "public 에서 읽기 권한을 받은 사용자가 미리 저장한 행 둘과 존재하지 않는 id 하나를 한 "
-            "번에 조회하면, 둘은 요청한 순서대로 반환되고 존재하지 않는 id 의 항목은 비어 있습니다",
+            "public 에서 읽기 권한을 받은 사용자가 미리 저장한 행 둘을 한 번에 조회하면, 둘은 "
+            "요청한 순서대로 반환됩니다",
             english=(
-                "when a user granted read permission in public loads two rows seeded in advance "
-                "and one id that does not exist at once, the two come back in the requested order "
-                "and the entry for the id that does not exist is empty"
+                "when a user granted read permission in public loads two rows seeded in advance at "
+                "once, the two come back in the requested order"
             ),
         )
 

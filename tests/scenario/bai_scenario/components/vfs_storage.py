@@ -49,7 +49,7 @@ from bai_scenario.seeds.vfs_storage.vfs_storage import TestSeedVFSStorage
 
 def _holding(role: UserRole, granted: tuple[Permission, ...]) -> Says:
     if granted:
-        names = ", ".join(one.name for one in granted)
+        names = ", ".join(str(one.name) for one in granted)
         return Says(
             f"VFS storage 에 {names} 권한을 받은 사용자 한 명",
             english=f"one user granted {names} on VFS storages",
@@ -67,7 +67,7 @@ class SomeoneGrantedOnStorages(TestSeedNest[Laid[UserData]]):
 
     @override
     def kind(self) -> str:
-        names = ", ".join(one.name for one in self.granted)
+        names = ", ".join(str(one.name) for one in self.granted)
         return Says(
             f"global 에서 VFS storage 에 {names} 권한을 받은 사용자 준비",
             english=f"Prepare a user granted {names} on VFS storages in global",
@@ -96,8 +96,10 @@ async def lay_a_granted_caller(
     """A user of the given role, granted the given permissions on VFS storages."""
     home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
     if not granted:
-        return await seeding.within(SomeoneOf(home, role=role))
-    return await seeding.within(SomeoneGrantedOnStorages(home, granted))
+        plain: Laid[UserData] = await seeding.within(SomeoneOf(home, role=role))
+        return plain
+    granted_caller: Laid[UserData] = await seeding.within(SomeoneGrantedOnStorages(home, granted))
+    return granted_caller
 
 
 @dataclass(frozen=True)

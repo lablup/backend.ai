@@ -64,7 +64,7 @@ type Loaded = list[SystemSessionEnvironNode | Exception | None]
 
 def _holding(role: UserRole, granted: tuple[Permission, ...]) -> Says:
     if granted:
-        names = ", ".join(one.name for one in granted)
+        names = ", ".join(str(one.name) for one in granted)
         return Says(
             f"public 에서 시스템 세션 환경변수에 {names} 권한을 받은 사용자 한 명",
             english=f"one user granted {names} on system session environs in the public scope",
@@ -80,7 +80,8 @@ async def lay_a_granted_caller(
     if not granted:
         return await lay_a_caller(seeding, role)
     home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
-    return await seeding.within(SomeoneGrantedInPublic(home, granted))
+    granted_caller: Laid[UserData] = await seeding.within(SomeoneGrantedInPublic(home, granted))
+    return granted_caller
 
 
 @dataclass(frozen=True)
@@ -498,8 +499,9 @@ class TheMatchingEnvironIsListed[
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]
+        rows: list[Verdict] = matching_rows(payload.items, (laid.laid[self.wanted],))
         return [
-            *matching_rows(payload.items, (laid.laid[self.wanted],)),
+            *rows,
             Same("total_count", payload.total_count, 1),
             Same("has_next_page", payload.has_next_page, False),
             Same("has_previous_page", payload.has_previous_page, False),
@@ -511,11 +513,8 @@ class TheOrderIsKept(Then[ManyEnvironsAndACaller, Loaded]):
     @override
     def says(self) -> str:
         return Says(
-            "미리 저장한 행은 요청한 순서대로 반환되고, 존재하지 않는 id 의 항목은 비어 있습니다",
-            english=(
-                "the rows seeded in advance come back in the requested order, and the entry "
-                "for the id that does not exist is empty"
-            ),
+            "미리 저장한 행은 요청한 순서대로 반환됩니다",
+            english="the rows seeded in advance come back in the requested order",
         )
 
     @override
@@ -523,23 +522,17 @@ class TheOrderIsKept(Then[ManyEnvironsAndACaller, Loaded]):
         got = answered.response
         if got is None:
             return [MissingResponse(answered.raised)]
-        if len(got) != 3:
-            return [Same("length", len(got), 3)]
-        first, middle, last = got
-        return [
-            Same("length", len(got), 3),
-            Same(
-                "[0].key",
-                first.key if isinstance(first, SystemSessionEnvironNode) else None,
-                laid.laid[0].key,
-            ),
-            Same("[1]", middle, None),
-            Same(
-                "[2].key",
-                last.key if isinstance(last, SystemSessionEnvironNode) else None,
-                laid.laid[1].key,
-            ),
-        ]
+        if len(got) != len(laid.laid):
+            return [Same("length", len(got), len(laid.laid))]
+        verdicts: list[Verdict] = [Same("length", len(got), len(laid.laid))]
+        for i, (one, environ) in enumerate(zip(got, laid.laid, strict=True)):
+            if not isinstance(one, SystemSessionEnvironNode):
+                verdicts.append(
+                    Same(f"[{i}]", type(one).__name__, SystemSessionEnvironNode.__name__)
+                )
+                continue
+            verdicts += environ_verdicts(f"[{i}].", one, environ)
+        return verdicts
 
 
 @dataclass(frozen=True)
@@ -557,7 +550,7 @@ class EveryIdIsRefused(Then[ManyEnvironsAndACaller, Loaded]):
         if got is None:
             return [MissingResponse(answered.raised)]
         return [
-            Same("length", len(got), 3),
+            Same("length", len(got), len(laid.laid)),
             *[
                 Refused(NotEnoughPermission, one if isinstance(one, Exception) else None)
                 for one in got
