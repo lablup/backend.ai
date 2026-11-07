@@ -339,6 +339,20 @@ class Context(metaclass=ABCMeta):
         path.write_text(content)
 
     @staticmethod
+    def set_toml_values(path: Path, table_keys: Sequence[str], values: dict[str, Any]) -> None:
+        """Set `values` in the table at `table_keys` of the TOML file, creating missing tables."""
+        with path.open("r") as fp:
+            data = tomlkit.load(fp)
+        table: Any = data
+        for key in table_keys:
+            if key not in table:
+                table[key] = tomlkit.table()
+            table = table[key]
+        table.update(values)
+        with path.open("w") as fp:
+            tomlkit.dump(data, fp)
+
+    @staticmethod
     def sed_in_place_multi(path: Path, subs: Sequence[tuple[str | re.Pattern[str], str]]) -> None:
         content = path.read_text()
         for pattern, replacement in subs:
@@ -861,7 +875,6 @@ class Context(metaclass=ABCMeta):
                     "local": {
                         "client_api": f"http://{storage_client_facing_addr.face.host}:{storage_client_facing_addr.face.port}",
                         "manager_api": f"https://{storage_manager_facing_addr.face.host}:{storage_manager_facing_addr.face.port}",
-                        "secret": self.install_info.service_config.storage_proxy_manager_auth_key,
                         "ssl_verify": "false",
                     }
                 },
@@ -877,6 +890,14 @@ class Context(metaclass=ABCMeta):
                 service.sftp_agent.scaling_group
             )
         await self.etcd_put_json("", data)
+        # The manager reads secrets only from manager.toml.
+        self.set_toml_values(
+            toml_path,
+            ["volumes", "proxies", "local"],
+            {"secret": service.storage_proxy_manager_auth_key},
+        )
+        if halfstack.redis_password:
+            self.set_toml_values(toml_path, ["redis"], {"password": halfstack.redis_password})
         data = {}
         # TODO: in dev-mode, enable these.
         data["api"] = {}
@@ -896,8 +917,6 @@ class Context(metaclass=ABCMeta):
                     "reconnect_poll_timeout": 0.3,
                 },
             }
-            if halfstack.redis_password:
-                data["redis"]["password"] = halfstack.redis_password
         else:
             if not halfstack.redis_addr:
                 raise RuntimeError("redis_addr must be configured")
@@ -909,8 +928,6 @@ class Context(metaclass=ABCMeta):
                     "reconnect_poll_timeout": 0.3,
                 },
             }
-            if halfstack.redis_password:
-                data["redis"]["password"] = halfstack.redis_password
         (base_path / "etcd.config.json").write_text(json.dumps(data))
         await self.etcd_put_json("config", data)
         public_addr = self.install_variable.public_facing_address
@@ -968,6 +985,8 @@ class Context(metaclass=ABCMeta):
             ],
         )
         self._ensure_agent_var_base_path()
+        if halfstack.redis_password:
+            self.set_toml_values(toml_path, ["redis"], {"password": halfstack.redis_password})
         if accelerator is not None:
             if accelerator == Accelerator.CUDA:
                 plugin_list = ['"ai.backend.accelerator.cuda_open"']
@@ -1185,6 +1204,8 @@ class Context(metaclass=ABCMeta):
             data["volume"]["volume1"]["path"] = service.vfolder_relpath  # type: ignore
         with toml_path.open("w") as fp:
             tomlkit.dump(data, fp)
+        if halfstack.redis_password:
+            self.set_toml_values(toml_path, ["redis"], {"password": halfstack.redis_password})
         if self.install_variable.otel_endpoint:
             self.sed_in_place(
                 toml_path,
