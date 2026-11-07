@@ -172,7 +172,7 @@ Scenario: incomplete 5 / 30
 | scenario | verdict |
 |---|---|
 | [when a user granted vfolder read lists the mount levels set on the folder, the list holding them comes back](#mount_policies-a-user-granted-folder-read-lists-the-mount-levels) | answered |
-| [when a user granted nothing tries to list the mount levels, it is rejected for lack of permission](#mount_policies-a-user-granted-nothing-may-not-list-the-mount-levels) | rejected |
+| [when a user granted vfolder update sets another user's mount level and then a user holding no permission tries to list the levels set on the folder, it is rejected for lack of permission](#mount_policies-a-user-granted-nothing-may-not-list-the-mount-levels) | rejected |
 
 **mkdir**
 
@@ -238,7 +238,7 @@ Scenario: incomplete 5 / 30
 | scenario | verdict |
 |---|---|
 | [when a user granted vfolder update takes back another user's mount level, its place and that the row is gone come back](#mount_policies-a-user-granted-folder-update-takes-another-users-level-back) | answered |
-| [when a user granted nothing tries to take a mount level back, it is rejected for lack of permission](#mount_policies-a-user-granted-nothing-may-not-take-a-mount-level-back) | rejected |
+| [when a user granted vfolder update sets another user's mount level and then a user holding no permission tries to take it back, it is rejected for lack of permission](#mount_policies-a-user-granted-nothing-may-not-take-a-mount-level-back) | rejected |
 
 **update**
 
@@ -282,6 +282,7 @@ Then
   - has_previous_page = False
   - items.length = 1
   - items[0].id: same as the vfolder seeded in advance
+  - items[0].entity_id: same as the id in the answer
   - items[0].host = 'local:volume1'
   - items[0].status = 'ready'
   - items[0].metadata.name = 'folder-1'
@@ -296,7 +297,8 @@ Then
   - items[0].metadata.usage_mode: skipped: the type already fixes the value
   - items[0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - items[0].access_control.permission: skipped: it is a mount permission, which this table does not check
-  - items[0].quota: skipped: the storage answers it, so it cannot be stated here
+  - items[0].quota.max_size = None
+  - items[0].quota.max_files = 1000
   - items[0].metadata.created_at: the time this run wrote
 
 <a id="searching-a-regular-user-may-not-search-every-folder"></a>
@@ -386,6 +388,7 @@ Then
 - the whole vfolder seeded in advance comes back
   - length = 1
   - [0].id: same as the vfolder seeded in advance
+  - [0].entity_id: same as the id in the answer
   - [0].host = 'local:volume1'
   - [0].status = 'ready'
   - [0].metadata.name = 'folder-1'
@@ -400,7 +403,8 @@ Then
   - [0].metadata.usage_mode: skipped: the type already fixes the value
   - [0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - [0].access_control.permission: skipped: it is a mount permission, which this table does not check
-  - [0].quota: skipped: the storage answers it, so it cannot be stated here
+  - [0].quota.max_size = None
+  - [0].quota.max_files = 1000
   - [0].metadata.created_at: the time this run wrote
 
 <a id="batch_loading-an-accepted-share-loads-someone-elses-folder-by-id"></a>
@@ -438,6 +442,7 @@ Then
 - the whole vfolder seeded in advance comes back
   - length = 1
   - [0].id: same as the vfolder seeded in advance
+  - [0].entity_id: same as the id in the answer
   - [0].host = 'local:volume1'
   - [0].status = 'ready'
   - [0].metadata.name = 'folder-1'
@@ -452,7 +457,8 @@ Then
   - [0].metadata.usage_mode: skipped: the type already fixes the value
   - [0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - [0].access_control.permission: skipped: it is a mount permission, which this table does not check
-  - [0].quota: skipped: the storage answers it, so it cannot be stated here
+  - [0].quota.max_size = None
+  - [0].quota.max_files = 1000
   - [0].metadata.created_at: the time this run wrote
 
 <a id="batch_loading-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
@@ -484,6 +490,7 @@ Then
 - the existing vfolder comes back as a node and the missing id entry as an empty value
   - length = 2
   - [0].id: same as the vfolder seeded in advance
+  - [0].entity_id: same as the id in the answer
   - [0].host = 'local:volume1'
   - [0].status = 'ready'
   - [0].metadata.name = 'folder-1'
@@ -498,7 +505,8 @@ Then
   - [0].metadata.usage_mode: skipped: the type already fixes the value
   - [0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - [0].access_control.permission: skipped: it is a mount permission, which this table does not check
-  - [0].quota: skipped: the storage answers it, so it cannot be stated here
+  - [0].quota.max_size = None
+  - [0].quota.max_files = 1000
   - [0].metadata.created_at: the time this run wrote
   - [1] = None
 
@@ -536,6 +544,7 @@ Then
 - a vfolder or a rejection comes back for each id in input order
   - length = 3
   - [0].id: same as the vfolder seeded in advance
+  - [0].entity_id: same as the id in the answer
   - [0].host = 'local:volume1'
   - [0].status = 'ready'
   - [0].metadata.name = 'folder-1'
@@ -550,7 +559,8 @@ Then
   - [0].metadata.usage_mode: skipped: the type already fixes the value
   - [0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - [0].access_control.permission: skipped: it is a mount permission, which this table does not check
-  - [0].quota: skipped: the storage answers it, so it cannot be stated here
+  - [0].quota.max_size = None
+  - [0].quota.max_files = 1000
   - [0].metadata.created_at: the time this run wrote
   - rejected: NotEnoughPermission
   - rejected: NotEnoughPermission
@@ -653,6 +663,7 @@ Then
   - has_previous_page = False
   - items.length = 1
   - items[0].id: same as the vfolder seeded in advance
+  - items[0].entity_id: same as the id in the answer
   - items[0].host = 'local:volume1'
   - items[0].status = 'ready'
   - items[0].metadata.name = 'folder-1'
@@ -667,7 +678,8 @@ Then
   - items[0].metadata.usage_mode: skipped: the type already fixes the value
   - items[0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - items[0].access_control.permission: skipped: it is a mount permission, which this table does not check
-  - items[0].quota: skipped: the storage answers it, so it cannot be stated here
+  - items[0].quota.max_size = None
+  - items[0].quota.max_files = 1000
   - items[0].metadata.created_at: the time this run wrote
 
 <a id="reaching-a-user-granted-nothing-may-not-list-a-projects-folders"></a>
@@ -738,6 +750,7 @@ Then
   - has_previous_page = False
   - items.length = 2
   - items[0].id: same as the vfolder seeded in advance
+  - items[0].entity_id: same as the id in the answer
   - items[0].host = 'local:volume1'
   - items[0].status = 'ready'
   - items[0].metadata.name = 'match-1'
@@ -752,9 +765,11 @@ Then
   - items[0].metadata.usage_mode: skipped: the type already fixes the value
   - items[0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - items[0].access_control.permission: skipped: it is a mount permission, which this table does not check
-  - items[0].quota: skipped: the storage answers it, so it cannot be stated here
+  - items[0].quota.max_size = None
+  - items[0].quota.max_files = 1000
   - items[0].metadata.created_at: the time this run wrote
   - items[1].id: same as the vfolder seeded in advance
+  - items[1].entity_id: same as the id in the answer
   - items[1].host = 'local:volume1'
   - items[1].status = 'ready'
   - items[1].metadata.name = 'match-2'
@@ -769,7 +784,8 @@ Then
   - items[1].metadata.usage_mode: skipped: the type already fixes the value
   - items[1].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - items[1].access_control.permission: skipped: it is a mount permission, which this table does not check
-  - items[1].quota: skipped: the storage answers it, so it cannot be stated here
+  - items[1].quota.max_size = None
+  - items[1].quota.max_files = 1000
   - items[1].metadata.created_at: the time this run wrote
   - items ids: their two matching vfolders
 
@@ -1355,6 +1371,7 @@ Then
 - the whole vfolder in the delete-pending state comes back
   - id: same as the id of the vfolder called
   - vfolder.id: same as the vfolder seeded in advance
+  - vfolder.entity_id: same as the id in the answer
   - vfolder.host = 'local:volume1'
   - vfolder.status = 'delete-pending'
   - vfolder.metadata.name = 'folder-1'
@@ -1369,7 +1386,8 @@ Then
   - vfolder.metadata.usage_mode: skipped: the type already fixes the value
   - vfolder.metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - vfolder.access_control.permission: skipped: it is a mount permission, which this table does not check
-  - vfolder.quota: skipped: the storage answers it, so it cannot be stated here
+  - vfolder.quota.max_size = None
+  - vfolder.quota.max_files = 1000
   - vfolder.metadata.created_at: the time this run wrote
 
 <a id="deleting-a-user-granted-nothing-may-not-soft-delete-their-folder"></a>
@@ -1600,6 +1618,7 @@ Then
 
 - the whole vfolder seeded in advance comes back
   - id: same as the vfolder seeded in advance
+  - entity_id: same as the id in the answer
   - host = 'local:volume1'
   - status = 'ready'
   - metadata.name = 'folder-1'
@@ -1614,7 +1633,8 @@ Then
   - metadata.usage_mode: skipped: the type already fixes the value
   - metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - access_control.permission: skipped: it is a mount permission, which this table does not check
-  - quota: skipped: the storage answers it, so it cannot be stated here
+  - quota.max_size = None
+  - quota.max_files = 1000
   - metadata.created_at: the time this run wrote
 
 <a id="reaching-an-accepted-share-reads-someone-elses-folder"></a>
@@ -1651,6 +1671,7 @@ Then
 
 - the whole vfolder seeded in advance comes back
   - id: same as the vfolder seeded in advance
+  - entity_id: same as the id in the answer
   - host = 'local:volume1'
   - status = 'ready'
   - metadata.name = 'folder-1'
@@ -1665,7 +1686,8 @@ Then
   - metadata.usage_mode: skipped: the type already fixes the value
   - metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - access_control.permission: skipped: it is a mount permission, which this table does not check
-  - quota: skipped: the storage answers it, so it cannot be stated here
+  - quota.max_size = None
+  - quota.max_files = 1000
   - metadata.created_at: the time this run wrote
 
 <a id="reaching-a-user-granted-nothing-may-not-read-their-own-folder"></a>
@@ -1935,11 +1957,11 @@ Then
 
 #### [a-user-granted-nothing-may-not-list-the-mount-levels](/tests/scenario/bai_scenario/manager/vfolder/test_mount_policies.py): pass
 
-when a user granted nothing tries to list the mount levels, it is rejected for lack of permission
+when a user granted vfolder update sets another user's mount level and then a user holding no permission tries to list the levels set on the folder, it is rejected for lack of permission
 
 Given
 
-- one user with one ready personal vfolder, holding no permission, and one other user who does not use that folder
+- one user with one ready personal vfolder, granted the UPDATE permission on their personal folder, and one other user who does not use that folder
   - Domain home-1: vfolders of this domain can be placed on local:volume1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -1950,10 +1972,14 @@ Given
     - Keypair policy keypair-policy-2: up to 5 concurrent sessions, folders can be placed on local:volume1
     - regular user user-2: has their own keypair and personal project
   - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+  - Grant vfolder permissions
+    - Role folder-writer-1: applies only within the scope it is granted in
+    - Role folder-writer-1: UPDATE allowed on every vfolder
+    - regular user user-1: holds Role folder-writer-1
 
 When
 
-- VFolderAdapter.list_mount_policies: user-1 lists the mount levels set on the folder-1 vfolder
+- VFolderAdapter.list_mount_policies: user-1 sets another user's mount level on the folder-1 vfolder, and then user-2, holding no permission, lists the levels set on it
 
 Then
 
@@ -2114,6 +2140,7 @@ Then
 - both of their vfolders come back in the delete-pending state and the other user's vfolder comes back in the failed list for lack of permission
   - successes count = 2
   - successes[0].id: same as the vfolder seeded in advance
+  - successes[0].entity_id: same as the id in the answer
   - successes[0].host = 'local:volume1'
   - successes[0].status = 'delete-pending'
   - successes[0].metadata.name = 'first-1'
@@ -2128,9 +2155,11 @@ Then
   - successes[0].metadata.usage_mode: skipped: the type already fixes the value
   - successes[0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - successes[0].access_control.permission: skipped: it is a mount permission, which this table does not check
-  - successes[0].quota: skipped: the storage answers it, so it cannot be stated here
+  - successes[0].quota.max_size = None
+  - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: the time this run wrote
   - successes[1].id: same as the vfolder seeded in advance
+  - successes[1].entity_id: same as the id in the answer
   - successes[1].host = 'local:volume1'
   - successes[1].status = 'delete-pending'
   - successes[1].metadata.name = 'second-1'
@@ -2145,7 +2174,8 @@ Then
   - successes[1].metadata.usage_mode: skipped: the type already fixes the value
   - successes[1].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - successes[1].access_control.permission: skipped: it is a mount permission, which this table does not check
-  - successes[1].quota: skipped: the storage answers it, so it cannot be stated here
+  - successes[1].quota.max_size = None
+  - successes[1].quota.max_files = 1000
   - successes[1].metadata.created_at: the time this run wrote
   - failed count = 1
   - failed[0].id: same as the id of the target vfolder
@@ -2226,6 +2256,7 @@ Then
 - both of their vfolders come back in the ready state and nothing failed
   - successes count = 2
   - successes[0].id: same as the vfolder seeded in advance
+  - successes[0].entity_id: same as the id in the answer
   - successes[0].host = 'local:volume1'
   - successes[0].status = 'ready'
   - successes[0].metadata.name = 'first-1'
@@ -2240,9 +2271,11 @@ Then
   - successes[0].metadata.usage_mode: skipped: the type already fixes the value
   - successes[0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - successes[0].access_control.permission: skipped: it is a mount permission, which this table does not check
-  - successes[0].quota: skipped: the storage answers it, so it cannot be stated here
+  - successes[0].quota.max_size = None
+  - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: the time this run wrote
   - successes[1].id: same as the vfolder seeded in advance
+  - successes[1].entity_id: same as the id in the answer
   - successes[1].host = 'local:volume1'
   - successes[1].status = 'ready'
   - successes[1].metadata.name = 'second-1'
@@ -2257,7 +2290,8 @@ Then
   - successes[1].metadata.usage_mode: skipped: the type already fixes the value
   - successes[1].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - successes[1].access_control.permission: skipped: it is a mount permission, which this table does not check
-  - successes[1].quota: skipped: the storage answers it, so it cannot be stated here
+  - successes[1].quota.max_size = None
+  - successes[1].quota.max_files = 1000
   - successes[1].metadata.created_at: the time this run wrote
   - failed = []
 
@@ -2296,6 +2330,7 @@ Then
 - only their trashed folder comes back ready for use, and the other user's folder comes back in the failed list for lack of permission
   - successes count = 1
   - successes[0].id: same as the vfolder seeded in advance
+  - successes[0].entity_id: same as the id in the answer
   - successes[0].host = 'local:volume1'
   - successes[0].status = 'ready'
   - successes[0].metadata.name = 'first-1'
@@ -2310,7 +2345,8 @@ Then
   - successes[0].metadata.usage_mode: skipped: the type already fixes the value
   - successes[0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - successes[0].access_control.permission: skipped: it is a mount permission, which this table does not check
-  - successes[0].quota: skipped: the storage answers it, so it cannot be stated here
+  - successes[0].quota.max_size = None
+  - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: the time this run wrote
   - failed count = 1
   - failed[0].id: same as the id of the target vfolder
@@ -2351,6 +2387,7 @@ Then
 - only the trashed folder comes back ready for use, and the folder whose deletion is in progress comes back in the failed list
   - successes count = 1
   - successes[0].id: same as the vfolder seeded in advance
+  - successes[0].entity_id: same as the id in the answer
   - successes[0].host = 'local:volume1'
   - successes[0].status = 'ready'
   - successes[0].metadata.name = 'first-1'
@@ -2365,7 +2402,8 @@ Then
   - successes[0].metadata.usage_mode: skipped: the type already fixes the value
   - successes[0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - successes[0].access_control.permission: skipped: it is a mount permission, which this table does not check
-  - successes[0].quota: skipped: the storage answers it, so it cannot be stated here
+  - successes[0].quota.max_size = None
+  - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: the time this run wrote
   - failed count = 1
   - failed[0].id: same as the vfolder whose deletion is in progress
@@ -2408,6 +2446,7 @@ Then
 - both of their vfolders come back cloneable and the other user's vfolder comes back in the failed list for lack of permission
   - successes count = 2
   - successes[0].id: same as the vfolder seeded in advance
+  - successes[0].entity_id: same as the id in the answer
   - successes[0].host = 'local:volume1'
   - successes[0].status = 'ready'
   - successes[0].metadata.name = 'first-1'
@@ -2422,9 +2461,11 @@ Then
   - successes[0].metadata.usage_mode: skipped: the type already fixes the value
   - successes[0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - successes[0].access_control.permission: skipped: it is a mount permission, which this table does not check
-  - successes[0].quota: skipped: the storage answers it, so it cannot be stated here
+  - successes[0].quota.max_size = None
+  - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: the time this run wrote
   - successes[1].id: same as the vfolder seeded in advance
+  - successes[1].entity_id: same as the id in the answer
   - successes[1].host = 'local:volume1'
   - successes[1].status = 'ready'
   - successes[1].metadata.name = 'second-1'
@@ -2439,7 +2480,8 @@ Then
   - successes[1].metadata.usage_mode: skipped: the type already fixes the value
   - successes[1].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - successes[1].access_control.permission: skipped: it is a mount permission, which this table does not check
-  - successes[1].quota: skipped: the storage answers it, so it cannot be stated here
+  - successes[1].quota.max_size = None
+  - successes[1].quota.max_files = 1000
   - successes[1].metadata.created_at: the time this run wrote
   - failed count = 1
   - failed[0].id: same as the id of the target vfolder
@@ -2515,6 +2557,7 @@ Then
 - the whole vfolder in the delete-ongoing state comes back
   - id: same as the id of the vfolder called
   - vfolder.id: same as the vfolder seeded in advance
+  - vfolder.entity_id: same as the id in the answer
   - vfolder.host = 'local:volume1'
   - vfolder.status = 'delete-ongoing'
   - vfolder.metadata.name = 'folder-1'
@@ -2529,7 +2572,8 @@ Then
   - vfolder.metadata.usage_mode: skipped: the type already fixes the value
   - vfolder.metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - vfolder.access_control.permission: skipped: it is a mount permission, which this table does not check
-  - vfolder.quota: skipped: the storage answers it, so it cannot be stated here
+  - vfolder.quota.max_size = None
+  - vfolder.quota.max_files = 1000
   - vfolder.metadata.created_at: the time this run wrote
 
 <a id="purging-a-user-granted-nothing-may-not-purge-their-folder"></a>
@@ -2790,11 +2834,11 @@ Then
 
 #### [a-user-granted-nothing-may-not-take-a-mount-level-back](/tests/scenario/bai_scenario/manager/vfolder/test_mount_policies.py): pass
 
-when a user granted nothing tries to take a mount level back, it is rejected for lack of permission
+when a user granted vfolder update sets another user's mount level and then a user holding no permission tries to take it back, it is rejected for lack of permission
 
 Given
 
-- one user with one ready personal vfolder, holding no permission, and one other user who does not use that folder
+- one user with one ready personal vfolder, granted the UPDATE permission on their personal folder, and one other user who does not use that folder
   - Domain home-1: vfolders of this domain can be placed on local:volume1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -2805,10 +2849,14 @@ Given
     - Keypair policy keypair-policy-2: up to 5 concurrent sessions, folders can be placed on local:volume1
     - regular user user-2: has their own keypair and personal project
   - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+  - Grant vfolder permissions
+    - Role folder-writer-1: applies only within the scope it is granted in
+    - Role folder-writer-1: UPDATE allowed on every vfolder
+    - regular user user-1: holds Role folder-writer-1
 
 When
 
-- VFolderAdapter.unset_mount_policy: user-1 sets and then takes back another user's mount level on the folder-1 vfolder
+- VFolderAdapter.unset_mount_policy: user-1 sets another user's mount level on the folder-1 vfolder, and then user-2, holding no permission, takes it back
 
 Then
 
@@ -2851,6 +2899,7 @@ Then
 
 - the first vfolder comes back named renamed and cloneable
   - vfolder.id: same as the vfolder seeded in advance
+  - vfolder.entity_id: same as the id in the answer
   - vfolder.host = 'local:volume1'
   - vfolder.status = 'ready'
   - vfolder.metadata.name = 'renamed'
@@ -2865,7 +2914,8 @@ Then
   - vfolder.metadata.usage_mode: skipped: the type already fixes the value
   - vfolder.metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
   - vfolder.access_control.permission: skipped: it is a mount permission, which this table does not check
-  - vfolder.quota: skipped: the storage answers it, so it cannot be stated here
+  - vfolder.quota.max_size = None
+  - vfolder.quota.max_files = 1000
   - vfolder.metadata.created_at: the time this run wrote
 
 <a id="editing-a-user-granted-nothing-may-not-update-their-folder"></a>
