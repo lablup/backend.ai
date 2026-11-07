@@ -21,6 +21,7 @@ from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
     AppConfigAllowListAdapter,
 )
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -193,6 +194,41 @@ class TheSuperadminReranksBoth(
 
 
 @dataclass(frozen=True)
+class AWriterReranksBoth(
+    Scenario[TestSeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Edited]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-update-in-global-reranks-both-entries-at-once"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "global 스코프에서 허용 목록 항목에 대한 수정 권한을 받은 일반 사용자가 allow_list 둘의 "
+            "순위를 한 번에 변경하면, 둘 다 새 순위로 오고 실패한 것은 없습니다",
+            english=(
+                "when a regular user granted the update permission on allow-list entries in "
+                "the global scope changes the rank of both allow_lists in one call, both come "
+                "back with the new rank and none failed"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, TwoEntriesAndACaller]:
+        return TwoEntriesAndSomeone(granted=(Permission.UPDATE,))
+
+    @override
+    def when(self) -> When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Edited]:
+        return ChangingBothRanks()
+
+    @override
+    def then(self) -> Then[TwoEntriesAndACaller, Edited]:
+        return BothAreReranked(started=self.started)
+
+
+@dataclass(frozen=True)
 class AUserGrantedNothingReranksNone(
     Scenario[TestSeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Edited]
 ):
@@ -227,6 +263,7 @@ class AUserGrantedNothingReranksNone(
 
 SCENARIOS: list[EditingStep] = [
     TheSuperadminReranksBoth(started=datetime.now(UTC)),
+    AWriterReranksBoth(started=datetime.now(UTC)),
     AUserGrantedNothingReranksNone(),
 ]
 

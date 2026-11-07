@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.manager.api.adapters.app_config_allow_list.adapter import (
     AppConfigAllowListAdapter,
 )
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -161,6 +162,36 @@ class NeitherIsPurged(Then[TwoEntriesAndACaller, Purged]):
 
 
 @dataclass(frozen=True)
+class BothArePurged(Then[TwoEntriesAndACaller, Purged]):
+    """둘은 처리된 목록에 오고, 실패 목록은 비어 있다."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "allow_list 둘은 처리된 목록에 오고, 실패한 것은 없습니다",
+            english="both allow_lists come back in the processed list and none failed",
+        )
+
+    @override
+    def look(self, laid: TwoEntriesAndACaller, answered: Answered[Purged]) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        return [
+            Same("successes count", len(payload.successes), 2),
+            Held[list[UUID]](
+                "successes",
+                [node.id for node in payload.successes],
+                SameAs[list[UUID]](
+                    [laid.first.id, laid.second.id],
+                    Says("준비한 ID 둘", english="the two IDs seeded in advance"),
+                ),
+            ),
+            Same("failed", payload.failed, []),
+        ]
+
+
+@dataclass(frozen=True)
 class TheSuperadminPurgesBothAndIsToldOfTheMissing(
     Scenario[TestSeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Purged]
 ):
@@ -191,6 +222,39 @@ class TheSuperadminPurgesBothAndIsToldOfTheMissing(
     @override
     def then(self) -> Then[TwoEntriesAndACaller, Purged]:
         return BothArePurgedTheMissingFails()
+
+
+@dataclass(frozen=True)
+class AWriterPurgesBoth(
+    Scenario[TestSeedingSession, TwoEntriesAndACaller, AppConfigAllowListAdapter, Purged]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-purge-in-global-purges-both-entries-at-once"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "global 스코프에서 허용 목록 항목에 대한 영구 삭제 권한을 받은 일반 사용자가 "
+            "allow_list 둘을 한 번에 영구 삭제하면, 둘 다 처리된 목록에 오고 실패한 것은 없습니다",
+            english=(
+                "when a regular user granted the purge permission on allow-list entries in the "
+                "global scope purges both allow_lists in one call, both come back in the "
+                "processed list and none failed"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, TwoEntriesAndACaller]:
+        return TwoEntriesAndSomeone(granted=(Permission.HARD_DELETE,))
+
+    @override
+    def when(self) -> When[TwoEntriesAndACaller, AppConfigAllowListAdapter, Purged]:
+        return PurgingBoth()
+
+    @override
+    def then(self) -> Then[TwoEntriesAndACaller, Purged]:
+        return BothArePurged()
 
 
 @dataclass(frozen=True)
@@ -228,6 +292,7 @@ class AUserGrantedNothingPurgesNone(
 
 SCENARIOS: list[PurgingStep] = [
     TheSuperadminPurgesBothAndIsToldOfTheMissing(),
+    AWriterPurgesBoth(),
     AUserGrantedNothingPurgesNone(),
 ]
 

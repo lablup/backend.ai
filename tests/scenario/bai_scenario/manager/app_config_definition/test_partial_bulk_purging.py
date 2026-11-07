@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.manager.api.adapters.app_config_definition.adapter import (
     AppConfigDefinitionAdapter,
 )
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -201,6 +202,69 @@ class TheSuperadminPurgesBothAndIsToldOfTheMissing(
 
 
 @dataclass(frozen=True)
+class BothArePurged(Then[TwoDefinitionsAndACaller, Purged]):
+    """둘은 처리된 목록에 오고, 실패 목록은 비어 있다."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "설정 정의 둘은 처리된 목록에 오고, 실패한 것은 없습니다",
+            english="both config definitions come back in the succeeded list and none failed",
+        )
+
+    @override
+    def look(self, laid: TwoDefinitionsAndACaller, answered: Answered[Purged]) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        return [
+            Same("successes count", len(payload.successes), 2),
+            Held[list[UUID]](
+                "successes",
+                [node.id for node in payload.successes],
+                SameAs[list[UUID]](
+                    [laid.first.id, laid.second.id],
+                    Says("준비한 ID 둘", english="the two ids prepared"),
+                ),
+            ),
+            Same("failed", payload.failed, []),
+        ]
+
+
+@dataclass(frozen=True)
+class AWriterPurgesBoth(
+    Scenario[TestSeedingSession, TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Purged]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-purge-in-global-purges-both-definitions-at-once"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "global 스코프에서 설정 정의에 대한 영구 삭제 권한을 받은 일반 사용자가 설정 정의 둘을 "
+            "한 번에 영구 삭제하면, 둘 다 처리된 목록에 오고 실패한 것은 없습니다",
+            english=(
+                "when a regular user granted the purge permission on config definitions in the "
+                "global scope purges two config definitions at once, both come back in the "
+                "succeeded list and none failed"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, TwoDefinitionsAndACaller]:
+        return TwoDefinitionsAndSomeone(granted=(Permission.HARD_DELETE,))
+
+    @override
+    def when(self) -> When[TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Purged]:
+        return PurgingBoth()
+
+    @override
+    def then(self) -> Then[TwoDefinitionsAndACaller, Purged]:
+        return BothArePurged()
+
+
+@dataclass(frozen=True)
 class AUserGrantedNothingPurgesNone(
     Scenario[TestSeedingSession, TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Purged]
 ):
@@ -235,6 +299,7 @@ class AUserGrantedNothingPurgesNone(
 
 SCENARIOS: list[PurgingStep] = [
     TheSuperadminPurgesBothAndIsToldOfTheMissing(),
+    AWriterPurgesBoth(),
     AUserGrantedNothingPurgesNone(),
 ]
 
