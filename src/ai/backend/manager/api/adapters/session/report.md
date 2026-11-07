@@ -100,8 +100,8 @@ Scenario: incomplete 2 / 30
 
 | scenario | verdict |
 |---|---|
-| [when a superadmin holding no permission searches every kernel, the stored kernel comes back; a role checks this operation, so the requesting user is a superadmin](#searching-superadmin-searches-every-kernel) | answered |
-| [when a user who is not a superadmin searches every kernel, the role rejects it](#searching-a-user-who-is-not-a-superadmin-searches-every-kernel) | rejected |
+| [when a superadmin holding no permission searches every kernel filtered by one session, the stored kernel comes back; a role checks this operation, so the requesting user is a superadmin](#searching-superadmin-searches-every-kernel) | answered |
+| [when a user who is not a superadmin searches every kernel filtered by one session, the role rejects it](#searching-a-user-who-is-not-a-superadmin-searches-every-kernel) | rejected |
 
 **batch_load_by_ids**
 
@@ -1055,7 +1055,7 @@ Then
 
 #### [superadmin-searches-every-kernel](/tests/scenario/bai_scenario/manager/session/test_searching.py): pass
 
-when a superadmin holding no permission searches every kernel, the stored kernel comes back; a role checks this operation, so the requesting user is a superadmin
+when a superadmin holding no permission searches every kernel filtered by one session, the stored kernel comes back; a role checks this operation, so the requesting user is a superadmin
 
 Given
 
@@ -1095,7 +1095,7 @@ Given
 
 When
 
-- SessionAdapter.admin_search_kernels: user-2 searches every kernel without a filter
+- SessionAdapter.admin_search_kernels: user-2 searches every kernel filtered by the session session-1, one page at a time
 
 Then
 
@@ -1109,7 +1109,7 @@ Then
 
 #### [a-user-who-is-not-a-superadmin-searches-every-kernel](/tests/scenario/bai_scenario/manager/session/test_searching.py): pass
 
-when a user who is not a superadmin searches every kernel, the role rejects it
+when a user who is not a superadmin searches every kernel filtered by one session, the role rejects it
 
 Given
 
@@ -1138,7 +1138,7 @@ Given
 
 When
 
-- SessionAdapter.admin_search_kernels: user-2 searches every kernel without a filter
+- SessionAdapter.admin_search_kernels: user-2 searches every kernel filtered by the session session-1, one page at a time
 
 Then
 
