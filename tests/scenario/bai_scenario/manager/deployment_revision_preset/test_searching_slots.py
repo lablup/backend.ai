@@ -85,7 +85,7 @@ class PresetsAndSlotsAndSomeone(Given[Any, PresetsAndACaller]):
     @override
     async def lay(self, seeding: Any) -> PresetsAndACaller:
         await seeding.creating(TestSeedSlotType(slot=IntrinsicSlotNames.CPU))
-        await seeding.creating(TestSeedSlotType(slot=IntrinsicSlotNames.MEM))
+        await seeding.creating(TestSeedSlotType(slot=IntrinsicSlotNames.MEMORY))
         variant = await seeding.creating(TestSeedRuntimeVariant())
         preset = await seeding.creating_from(TestSeedDeploymentRevisionPreset(), variant)
         await seeding.adding(TestSeedPresetSlotOf(), preset)
