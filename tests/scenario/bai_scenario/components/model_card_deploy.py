@@ -384,10 +384,10 @@ def _preset_verdicts(
         ),
         Same(f"{prefix}cluster.cluster_size", node.cluster.cluster_size, 1),
         Same(f"{prefix}resource.resource_opts", node.resource.resource_opts, []),
-        Held[UUID](
+        Held[UUID | None](
             f"{prefix}execution.image_id",
             node.execution.image_id,
-            SameAs(
+            SameAs[UUID | None](
                 preset.image_id,
                 Says("프리셋이 가리키는 이미지", english="the image the preset points at"),
             ),

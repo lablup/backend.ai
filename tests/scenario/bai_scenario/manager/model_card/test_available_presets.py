@@ -70,7 +70,8 @@ class FindingPresetsForTheCard(When[PresetsForACard, ModelCardAdapter, Page]):
                             direction=OrderDirection.DESC,
                         )
                     ],
-                    first=1,
+                    limit=1,
+                    offset=0,
                 ),
             )
 
