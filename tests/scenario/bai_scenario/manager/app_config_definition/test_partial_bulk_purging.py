@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import override
 from uuid import UUID
 
@@ -39,7 +40,7 @@ from bai_scenario.components.app_config_definition import (
     TwoDefinitionsAndACaller,
     TwoDefinitionsAndSomeone,
 )
-from bai_scenario.components.domain import Mentions
+from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
@@ -205,6 +206,8 @@ class TheSuperadminPurgesBothAndIsToldOfTheMissing(
 class BothArePurged(Then[TwoDefinitionsAndACaller, Purged]):
     """둘은 처리된 목록에 오고, 실패 목록은 비어 있다."""
 
+    started: datetime
+
     @override
     def says(self) -> str:
         return Says(
@@ -216,25 +219,37 @@ class BothArePurged(Then[TwoDefinitionsAndACaller, Purged]):
     def look(self, laid: TwoDefinitionsAndACaller, answered: Answered[Purged]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
-        return [
-            Same("successes count", len(payload.successes), 2),
-            Held[list[UUID]](
-                "successes",
-                [node.id for node in payload.successes],
-                SameAs[list[UUID]](
-                    [laid.first.id, laid.second.id],
-                    Says("준비한 ID 둘", english="the two ids prepared"),
-                ),
-            ),
+            raise AssertionError(
+                f"the call was refused ({type(answered.raised).__name__}) "
+                "but this row guarantees the success shape"
+            )
+        written = WrittenByThisRun(self.started)
+        targets = (laid.first, laid.second)
+        verdicts: list[Verdict] = [
+            Same("successes count", len(payload.successes), len(targets)),
             Same("failed", payload.failed, []),
         ]
+        for i, (node, definition) in enumerate(zip(payload.successes, targets, strict=False)):
+            verdicts += [
+                Held[UUID](
+                    f"successes[{i}].id",
+                    node.id,
+                    SameAs(definition.id, Says("준비한 ID", english="the ID seeded in advance")),
+                ),
+                Same(f"successes[{i}].entity_id", node.entity_id, definition.id),
+                Same(f"successes[{i}].config_name", node.config_name, definition.config_name),
+                Held(f"successes[{i}].created_at", node.created_at, written),
+                Held(f"successes[{i}].updated_at", node.updated_at, written),
+            ]
+        return verdicts
 
 
 @dataclass(frozen=True)
 class AWriterPurgesBoth(
     Scenario[TestSeedingSession, TwoDefinitionsAndACaller, AppConfigDefinitionAdapter, Purged]
 ):
+    started: datetime
+
     @override
     def summary(self) -> str:
         return "a-user-granted-purge-in-global-purges-both-definitions-at-once"
@@ -261,7 +276,7 @@ class AWriterPurgesBoth(
 
     @override
     def then(self) -> Then[TwoDefinitionsAndACaller, Purged]:
-        return BothArePurged()
+        return BothArePurged(started=self.started)
 
 
 @dataclass(frozen=True)
@@ -299,7 +314,7 @@ class AUserGrantedNothingPurgesNone(
 
 SCENARIOS: list[PurgingStep] = [
     TheSuperadminPurgesBothAndIsToldOfTheMissing(),
-    AWriterPurgesBoth(),
+    AWriterPurgesBoth(started=datetime.now(UTC)),
     AUserGrantedNothingPurgesNone(),
 ]
 

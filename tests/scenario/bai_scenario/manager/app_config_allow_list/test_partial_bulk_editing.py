@@ -101,7 +101,10 @@ class BothAreReranked(Then[TwoEntriesAndACaller, Edited]):
     def look(self, laid: TwoEntriesAndACaller, answered: Answered[Edited]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
-            return [Refused(NotEnoughPermission, answered.raised)]
+            raise AssertionError(
+                f"the call was refused ({type(answered.raised).__name__}) "
+                "but this row guarantees the success shape"
+            )
         written = WrittenByThisRun(self.started)
         targets = (laid.first, laid.second)
         verdicts: list[Verdict] = [
@@ -115,9 +118,11 @@ class BothAreReranked(Then[TwoEntriesAndACaller, Edited]):
                     node.id,
                     SameAs(entry.id, Says("준비한 ID", english="the ID seeded in advance")),
                 ),
+                Same(f"successes[{i}].entity_id", node.entity_id, entry.id),
                 Same(f"successes[{i}].config_name", node.config_name, entry.config_name),
                 Same(f"successes[{i}].scope_type", node.scope_type, entry.scope_type),
                 Same(f"successes[{i}].rank", node.rank, RANK),
+                Held(f"successes[{i}].created_at", node.created_at, written),
                 Held(f"successes[{i}].updated_at", node.updated_at, written),
             ]
         return verdicts
