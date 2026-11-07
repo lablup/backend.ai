@@ -283,13 +283,12 @@ class PresetLook:
 
     def verdicts(self, at: str, node: RolePresetNode, seeded: RolePresetData) -> list[Verdict]:
         written = WrittenByThisRun(self.started)
-        owner_assign: list[Verdict] = (
-            [Same(f"{at}auto_assign_to_owner", node.auto_assign_to_owner, True)]
-            if self.auto_assign_to_owner
-            else []
+        deleted_at: list[Verdict] = (
+            [Held(f"{at}deleted_at", node.deleted_at, written)]
+            if self.deleted
+            else [Same(f"{at}deleted_at", node.deleted_at, None)]
         )
         return [
-            *owner_assign,
             Held[UUID](
                 f"{at}id",
                 node.id,
@@ -319,7 +318,18 @@ class PresetLook:
                 node.auto_assign,
                 self.auto_assign if self.auto_assign is not None else seeded.auto_assign,
             ),
+            Same(f"{at}role_name_template", node.role_name_template, seeded.role_name_template),
+            Same(
+                f"{at}auto_assign_to_owner",
+                node.auto_assign_to_owner,
+                (
+                    self.auto_assign_to_owner
+                    if self.auto_assign_to_owner is not None
+                    else seeded.auto_assign_to_owner
+                ),
+            ),
             Same(f"{at}deleted", node.deleted, self.deleted),
+            *deleted_at,
             Held(f"{at}created_at", node.created_at, written),
             Held(f"{at}updated_at", node.updated_at, written),
         ]
@@ -451,7 +461,7 @@ class OnlyTheFirstPresetComesBack(Then[ManyPresetsAndACaller, PartialBulkPayload
         for node in payload.successes:
             verdicts += self.expected.verdicts("successes[0].", node, laid.laid[0])
         for failure in payload.failed:
-            verdicts.append(
+            verdicts += [
                 Held[UUID](
                     "failed[0].id",
                     failure.id,
@@ -459,8 +469,9 @@ class OnlyTheFirstPresetComesBack(Then[ManyPresetsAndACaller, PartialBulkPayload
                         laid.laid[1].id,
                         Says("두 번째 프리셋의 id", english="the id of the second preset"),
                     ),
-                )
-            )
+                ),
+                Held("failed[0].message", failure.message, Mentions("Only a project role preset")),
+            ]
         return verdicts
 
 
