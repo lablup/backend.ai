@@ -12,6 +12,7 @@ Test Scenarios:
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from contextlib import nullcontext
 from datetime import datetime, timedelta
@@ -43,6 +44,7 @@ from ai.backend.manager.sokovan.scheduler.coordinator import (
 from ai.backend.manager.sokovan.scheduler.post_processors.base import PostProcessorContext
 from ai.backend.manager.sokovan.scheduler.recorder.context import SessionRecorderContext
 from ai.backend.manager.sokovan.scheduler.results import (
+    FailureDisposition,
     KernelExecutionResult,
     KernelTransitionInfo,
     SessionExecutionResult,
@@ -423,6 +425,42 @@ class TestScheduleCoordinatorFailureClassification:
         assert len(result.give_up) == 0
         assert len(result.expired) == 0
         assert len(result.need_retry) == 1
+
+    @pytest.mark.parametrize(
+        ("disposition", "expected"),
+        [
+            (FailureDisposition.ABANDON, "give_up"),
+            # REPLACE stays in the retry budget; PENDING would reset that budget and livelock.
+            (FailureDisposition.REPLACE, "need_retry"),
+            (None, "need_retry"),
+        ],
+    )
+    def test_disposition_decides_before_the_retry_budget(
+        self,
+        disposition: FailureDisposition | None,
+        expected: str,
+    ) -> None:
+        session_id = SessionId(uuid4())
+        failure = dataclasses.replace(
+            _create_session_transition_info(session_id=session_id), disposition=disposition
+        )
+        session = _create_session_with_kernels(
+            session_id=session_id,
+            status=SessionStatus.PREPARED,
+            last_phase=_last_phase(attempts=1),
+            max_retry_count=5,
+        )
+        coordinator = object.__new__(ScheduleCoordinator)
+
+        result = coordinator._classify_failures(
+            failures=[failure],
+            sessions=[session],
+            current_time=datetime.now(tzutc()),
+            handler_name=_TEST_HANDLER_NAME,
+        )
+
+        assert [f.session_id for f in getattr(result, expected)] == [session_id]
+        assert not result.expired
 
 
 # =============================================================================
