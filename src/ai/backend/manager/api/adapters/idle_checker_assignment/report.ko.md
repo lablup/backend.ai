@@ -157,6 +157,7 @@ Then
 
 - 필터가 다른 검사기의 할당을 제외해, 심은 할당이 모두 한 번씩 집계되어 전체가 반환됩니다
   - total_count = 2
+  - items count = 2
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: id 순으로 읽은 미리 저장한 할당와 같다

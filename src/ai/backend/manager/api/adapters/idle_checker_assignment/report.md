@@ -157,6 +157,7 @@ Then
 
 - the filter excludes the other checker's assignment, so every assignment seeded in advance is counted once and each comes back whole
   - total_count = 2
+  - items count = 2
   - has_next_page = False
   - has_previous_page = False
   - items[0].id: same as the seeded assignment in the order read by id
