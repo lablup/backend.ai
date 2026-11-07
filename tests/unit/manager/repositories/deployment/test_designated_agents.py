@@ -13,10 +13,13 @@ from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.types import AgentId, ResourceSlot
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
+from ai.backend.manager.models.agent.searchers import AgentSearcher
 from ai.backend.manager.models.deployment_designated_agent.row import (
     DeploymentDesignatedAgentRow,
 )
@@ -33,6 +36,7 @@ from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
@@ -174,7 +178,7 @@ class TestDeploymentDesignatedAgents:
     ) -> None:
         deployment_id = deployment_ids[0]
 
-        await repository.replace_designated_agents(deployment_id, set(agent_uuids[:2]))
+        await repository.set_designated_agents(deployment_id, set(agent_uuids[:2]))
 
         designated = await repository.fetch_designated_agents_by_deployment_ids({deployment_id})
         assert set(designated[deployment_id]) == set(agent_uuids[:2])
@@ -186,9 +190,9 @@ class TestDeploymentDesignatedAgents:
         agent_uuids: list[AgentUUID],
     ) -> None:
         deployment_id = deployment_ids[0]
-        await repository.replace_designated_agents(deployment_id, set(agent_uuids[:2]))
+        await repository.set_designated_agents(deployment_id, set(agent_uuids[:2]))
 
-        await repository.replace_designated_agents(deployment_id, {agent_uuids[2]})
+        await repository.set_designated_agents(deployment_id, {agent_uuids[2]})
 
         designated = await repository.fetch_designated_agents_by_deployment_ids({deployment_id})
         assert designated[deployment_id] == [agent_uuids[2]]
@@ -200,9 +204,9 @@ class TestDeploymentDesignatedAgents:
         agent_uuids: list[AgentUUID],
     ) -> None:
         deployment_id = deployment_ids[0]
-        await repository.replace_designated_agents(deployment_id, set(agent_uuids[:2]))
+        await repository.set_designated_agents(deployment_id, set(agent_uuids[:2]))
 
-        await repository.replace_designated_agents(deployment_id, set())
+        await repository.set_designated_agents(deployment_id, set())
 
         designated = await repository.fetch_designated_agents_by_deployment_ids({deployment_id})
         assert designated[deployment_id] == []
@@ -218,9 +222,58 @@ class TestDeploymentDesignatedAgents:
         agent_count: int,
     ) -> None:
         with pytest.raises(EndpointNotFound):
-            await repository.replace_designated_agents(
+            await repository.set_designated_agents(
                 DeploymentID(uuid.uuid4()), set(agent_uuids[:agent_count])
             )
+
+    async def test_only_the_agents_of_the_resource_group_are_found(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        repository: DeploymentRepository,
+        resource_group: ResourceGroupRow,
+        agent_uuids: list[AgentUUID],
+    ) -> None:
+        other_group = ResourceGroupRow(
+            id=ResourceGroupID(uuid.uuid4()),
+            name=f"rg-{uuid.uuid4().hex[:8]}",
+            driver="static",
+            scheduler="fifo",
+            scheduler_opts=ResourceGroupOpts(),
+        )
+        outside = AgentUUID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(other_group)
+            await db_sess.flush()
+            db_sess.add(
+                AgentRow(
+                    id=AgentId(f"i-{outside.hex[:12]}"),
+                    uuid=outside,
+                    status=AgentStatus.ALIVE,
+                    status_changed=datetime.now(UTC),
+                    region="local",
+                    scaling_group=other_group.name,
+                    resource_group_id=other_group.id,
+                    schedulable=True,
+                    addr="127.0.0.1:2001",
+                    architecture="x86_64",
+                    version="26.10.0",
+                )
+            )
+
+        agents = await repository.search_agents(
+            searcher=AgentSearcher(
+                pagination=NoPagination(),
+                conditions=[
+                    AgentSearchableFields.own.resource_group.filter.equals(
+                        StringMatchSpec(
+                            value=resource_group.name, case_insensitive=False, negated=False
+                        )
+                    ),
+                ],
+            )
+        )
+
+        assert {agent.uuid for agent in agents} == set(agent_uuids)
 
     async def test_fetching_many_groups_by_deployment_with_an_empty_list_for_none(
         self,
@@ -229,7 +282,7 @@ class TestDeploymentDesignatedAgents:
         agent_uuids: list[AgentUUID],
     ) -> None:
         with_agents, without_agents = deployment_ids
-        await repository.replace_designated_agents(with_agents, set(agent_uuids[:2]))
+        await repository.set_designated_agents(with_agents, set(agent_uuids[:2]))
 
         designated = await repository.fetch_designated_agents_by_deployment_ids(set(deployment_ids))
 
@@ -244,7 +297,7 @@ class TestDeploymentDesignatedAgents:
         agent_uuids: list[AgentUUID],
     ) -> None:
         deployment_id = deployment_ids[0]
-        await repository.replace_designated_agents(deployment_id, set(agent_uuids[:2]))
+        await repository.set_designated_agents(deployment_id, set(agent_uuids[:2]))
 
         async with db_with_cleanup.begin_session() as db_sess:
             await db_sess.execute(sa.delete(EndpointRow).where(EndpointRow.id == deployment_id))
@@ -263,7 +316,7 @@ class TestDeploymentDesignatedAgents:
         agent_uuids: list[AgentUUID],
     ) -> None:
         deployment_id = deployment_ids[0]
-        await repository.replace_designated_agents(deployment_id, set(agent_uuids[:2]))
+        await repository.set_designated_agents(deployment_id, set(agent_uuids[:2]))
 
         async with db_with_cleanup.begin_session() as db_sess:
             await db_sess.execute(sa.delete(AgentRow).where(AgentRow.uuid == agent_uuids[0]))

@@ -32,7 +32,10 @@ from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import (
+    UUIDEqualMatchSpec,
+    UUIDInMatchSpec,
+)
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
@@ -48,7 +51,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
-from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.agent.types import AgentData, AgentStatus
 from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingRule,
@@ -125,6 +128,7 @@ from ai.backend.manager.errors.service import (
 )
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.agent.searchers import AgentSearcher
 from ai.backend.manager.models.deployment_designated_agent.row import (
     DeploymentDesignatedAgentRow,
 )
@@ -2789,14 +2793,14 @@ class DeploymentDBSource:
             stored: DeploymentOptions = row[0]
             return stored
 
-    async def replace_designated_agents(
+    async def set_designated_agents(
         self,
         deployment_id: DeploymentID,
         agent_uuids: set[AgentUUID],
     ) -> None:
-        """Replace the agents a deployment designates with ``agent_uuids``.
+        """Make ``agent_uuids`` the agents the deployment designates.
 
-        Locks the deployment row so concurrent replaces run one after another.
+        Locks the deployment row so concurrent writes run one after another.
         """
         async with self._begin_session_read_committed() as db_sess:
             locked = await db_sess.scalar(
@@ -2817,6 +2821,12 @@ class DeploymentDBSource:
                         for agent_uuid in agent_uuids
                     ],
                 )
+
+    async def search_agents(self, *, searcher: AgentSearcher) -> list[AgentData]:
+        """The agents matching ``searcher``; the caller composes the conditions."""
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return list(result.items)
 
     async def fetch_designated_agents_by_deployment_ids(
         self,

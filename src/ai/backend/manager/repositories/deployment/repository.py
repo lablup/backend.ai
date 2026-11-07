@@ -48,6 +48,7 @@ from ai.backend.manager.clients.valkey_client.statistics import (
     EndpointStatistics,
     KernelStatistics,
 )
+from ai.backend.manager.data.agent.types import AgentData
 from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingAction,
@@ -94,6 +95,7 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.errors.storage import VFolderNotFound, VFolderPermissionError
+from ai.backend.manager.models.agent.searchers import AgentSearcher
 from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
@@ -423,17 +425,22 @@ class DeploymentRepository:
         )
 
     @deployment_repository_resilience.apply()
-    async def replace_designated_agents(
+    async def set_designated_agents(
         self,
         deployment_id: DeploymentID,
         agent_uuids: set[AgentUUID],
     ) -> None:
-        """Replace the agents a deployment designates with ``agent_uuids``.
+        """Make ``agent_uuids`` the agents the deployment designates.
 
         Raises:
             EndpointNotFound: If the deployment does not exist.
         """
-        await self._db_source.replace_designated_agents(deployment_id, agent_uuids)
+        await self._db_source.set_designated_agents(deployment_id, agent_uuids)
+
+    @deployment_repository_resilience.apply()
+    async def search_agents(self, *, searcher: AgentSearcher) -> list[AgentData]:
+        """The agents matching ``searcher``; the caller composes the conditions."""
+        return await self._db_source.search_agents(searcher=searcher)
 
     @deployment_repository_resilience.apply()
     async def fetch_designated_agents_by_deployment_ids(
