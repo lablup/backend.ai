@@ -248,6 +248,7 @@ Then
 - 요청한 순서대로 반환되고, 없는 id 에 해당하는 항목은 비어 있습니다
   - len(items) = 3
   - items[0].id: 건너뜀: 데이터베이스가 생성합니다
+  - items[0].entity_id: 미리 저장한 채널의 id 와 같다
   - items[0].name = 'wanted-1'
   - items[0].description = None
   - items[0].channel_type = 'webhook'
@@ -258,6 +259,7 @@ Then
   - items[0].created_at: 이 실행이 쓴 시각
   - items[0].updated_at: 이 실행이 쓴 시각
   - items[1].id: 건너뜀: 데이터베이스가 생성합니다
+  - items[1].entity_id: 미리 저장한 채널의 id 와 같다
   - items[1].name = 'other-1'
   - items[1].description = None
   - items[1].channel_type = 'webhook'
@@ -356,6 +358,7 @@ Then
 - 요청한 순서대로 반환되고, 없는 id 에 해당하는 항목은 비어 있습니다
   - len(items) = 3
   - items[0].id: 건너뜀: 데이터베이스가 생성합니다
+  - items[0].entity_id: 미리 저장한 규칙의 id 와 같다
   - items[0].name = 'wanted-1'
   - items[0].description = None
   - items[0].rule_type = 'session.started'
@@ -366,6 +369,7 @@ Then
   - items[0].created_at: 이 실행이 쓴 시각
   - items[0].updated_at: 이 실행이 쓴 시각
   - items[1].id: 건너뜀: 데이터베이스가 생성합니다
+  - items[1].entity_id: 미리 저장한 규칙의 id 와 같다
   - items[1].name = 'other-1'
   - items[1].description = None
   - items[1].rule_type = 'session.started'
@@ -433,6 +437,7 @@ Then
 
 - 생성한 채널 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 노드의 id 와 같다
   - name = 'muted'
   - description = None
   - channel_type = 'webhook'
@@ -467,6 +472,7 @@ Then
 
 - 생성한 채널 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 노드의 id 와 같다
   - name = 'alerts'
   - description = None
   - channel_type = 'webhook'
@@ -501,6 +507,7 @@ Then
 
 - 생성한 채널 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 노드의 id 와 같다
   - name = 'mail'
   - description = None
   - channel_type = 'email'
@@ -646,6 +653,7 @@ Then
 
 - 생성한 규칙 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 노드의 id 와 같다
   - name = 'muted'
   - description = None
   - rule_type = 'session.started'
@@ -681,6 +689,7 @@ Then
 
 - 생성한 규칙 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 노드의 id 와 같다
   - name = 'orphan'
   - description = None
   - rule_type = 'session.started'
@@ -716,6 +725,7 @@ Then
 
 - 생성한 규칙 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 노드의 id 와 같다
   - name = 'on-start'
   - description = None
   - rule_type = 'session.started'
@@ -805,6 +815,7 @@ Then
 
 - 미리 저장한 채널 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 채널의 id 와 같다
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -947,6 +958,7 @@ Then
 
 - 미리 저장한 규칙 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 규칙의 id 와 같다
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -1072,6 +1084,7 @@ Then
 - 미리 저장한 채널이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
   - successes count = 2
   - successes[0].id: 건너뜀: 데이터베이스가 생성합니다
+  - successes[0].entity_id: 미리 저장한 채널의 id 와 같다
   - successes[0].name = 'wanted-1'
   - successes[0].description = None
   - successes[0].channel_type = 'webhook'
@@ -1082,6 +1095,7 @@ Then
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].updated_at: 이 실행이 쓴 시각
   - successes[1].id: 건너뜀: 데이터베이스가 생성합니다
+  - successes[1].entity_id: 미리 저장한 채널의 id 와 같다
   - successes[1].name = 'other-1'
   - successes[1].description = None
   - successes[1].channel_type = 'webhook'
@@ -1158,6 +1172,7 @@ Then
 - 미리 저장한 규칙이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
   - successes count = 2
   - successes[0].id: 건너뜀: 데이터베이스가 생성합니다
+  - successes[0].entity_id: 미리 저장한 규칙의 id 와 같다
   - successes[0].name = 'wanted-1'
   - successes[0].description = None
   - successes[0].rule_type = 'session.started'
@@ -1168,6 +1183,7 @@ Then
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].updated_at: 이 실행이 쓴 시각
   - successes[1].id: 건너뜀: 데이터베이스가 생성합니다
+  - successes[1].entity_id: 미리 저장한 규칙의 id 와 같다
   - successes[1].name = 'other-1'
   - successes[1].description = None
   - successes[1].rule_type = 'session.started'
@@ -1242,6 +1258,7 @@ Then
 - 미리 저장한 채널이 모두 처리된 목록에 오고, 실패한 것은 없습니다
   - successes count = 2
   - successes[0].id: 건너뜀: 데이터베이스가 생성합니다
+  - successes[0].entity_id: 미리 저장한 채널의 id 와 같다
   - successes[0].name = 'wanted-1'
   - successes[0].description = '한 번에 변경한 설명'
   - successes[0].channel_type = 'webhook'
@@ -1252,6 +1269,7 @@ Then
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].updated_at: 이 실행이 쓴 시각
   - successes[1].id: 건너뜀: 데이터베이스가 생성합니다
+  - successes[1].entity_id: 미리 저장한 채널의 id 와 같다
   - successes[1].name = 'other-1'
   - successes[1].description = '한 번에 변경한 설명'
   - successes[1].channel_type = 'webhook'
@@ -1353,6 +1371,7 @@ Then
 - 미리 저장한 규칙이 모두 처리된 목록에 오고, 실패한 것은 없습니다
   - successes count = 2
   - successes[0].id: 건너뜀: 데이터베이스가 생성합니다
+  - successes[0].entity_id: 미리 저장한 규칙의 id 와 같다
   - successes[0].name = 'wanted-1'
   - successes[0].description = '한 번에 변경한 설명'
   - successes[0].rule_type = 'session.started'
@@ -1363,6 +1382,7 @@ Then
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].updated_at: 이 실행이 쓴 시각
   - successes[1].id: 건너뜀: 데이터베이스가 생성합니다
+  - successes[1].entity_id: 미리 저장한 규칙의 id 와 같다
   - successes[1].name = 'other-1'
   - successes[1].description = '한 번에 변경한 설명'
   - successes[1].rule_type = 'session.started'
@@ -1402,6 +1422,7 @@ Then
 
 - 삭제한 채널의 id 가 반환됩니다
   - id: 미리 저장한 채널와 같다
+  - entity_id: 미리 저장한 채널와 같다
 
 <a id="retiring_channels-the-superadmin-deletes-a-channel"></a>
 
@@ -1428,6 +1449,7 @@ Then
 
 - 삭제한 채널의 id 가 반환됩니다
   - id: 미리 저장한 채널와 같다
+  - entity_id: 미리 저장한 채널와 같다
 
 <a id="retiring_channels-a-user-granted-nothing-may-not-delete-a-channel"></a>
 
@@ -1509,6 +1531,7 @@ Then
 
 - 삭제한 규칙의 id 가 반환됩니다
   - id: 미리 저장한 규칙와 같다
+  - entity_id: 미리 저장한 규칙와 같다
 
 <a id="retiring_rules-a-user-granted-nothing-may-not-delete-a-rule"></a>
 
@@ -1985,6 +2008,7 @@ Then
 
 - 미리 저장한 채널 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 채널의 id 와 같다
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -2020,6 +2044,7 @@ Then
 
 - 미리 저장한 채널 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 채널의 id 와 같다
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -2055,6 +2080,7 @@ Then
 
 - 미리 저장한 채널 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 채널의 id 와 같다
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -2090,6 +2116,7 @@ Then
 
 - 미리 저장한 채널 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 채널의 id 와 같다
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -2125,6 +2152,7 @@ Then
 
 - 미리 저장한 채널 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 채널의 id 와 같다
   - name = 'renamed'
   - description = None
   - channel_type = 'webhook'
@@ -2241,6 +2269,7 @@ Then
 
 - 미리 저장한 규칙 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 규칙의 id 와 같다
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -2277,6 +2306,7 @@ Then
 
 - 미리 저장한 규칙 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 규칙의 id 와 같다
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -2313,6 +2343,7 @@ Then
 
 - 미리 저장한 규칙 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 규칙의 id 와 같다
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -2349,6 +2380,7 @@ Then
 
 - 미리 저장한 규칙 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 규칙의 id 와 같다
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -2385,6 +2417,7 @@ Then
 
 - 미리 저장한 규칙 전체가 반환됩니다
   - id: 건너뜀: 데이터베이스가 생성합니다
+  - entity_id: 미리 저장한 규칙의 id 와 같다
   - name = 'renamed'
   - description = None
   - rule_type = 'session.started'

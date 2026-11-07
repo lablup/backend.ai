@@ -248,6 +248,7 @@ Then
 - they come back in the order asked and the item for an unknown id is empty
   - len(items) = 3
   - items[0].id: skipped: the database generates it
+  - items[0].entity_id: same as the id of the channel created in advance
   - items[0].name = 'wanted-1'
   - items[0].description = None
   - items[0].channel_type = 'webhook'
@@ -258,6 +259,7 @@ Then
   - items[0].created_at: the time this run wrote
   - items[0].updated_at: the time this run wrote
   - items[1].id: skipped: the database generates it
+  - items[1].entity_id: same as the id of the channel created in advance
   - items[1].name = 'other-1'
   - items[1].description = None
   - items[1].channel_type = 'webhook'
@@ -356,6 +358,7 @@ Then
 - they come back in the order asked and the item for an unknown id is empty
   - len(items) = 3
   - items[0].id: skipped: the database generates it
+  - items[0].entity_id: same as the id of the rule created in advance
   - items[0].name = 'wanted-1'
   - items[0].description = None
   - items[0].rule_type = 'session.started'
@@ -366,6 +369,7 @@ Then
   - items[0].created_at: the time this run wrote
   - items[0].updated_at: the time this run wrote
   - items[1].id: skipped: the database generates it
+  - items[1].entity_id: same as the id of the rule created in advance
   - items[1].name = 'other-1'
   - items[1].description = None
   - items[1].rule_type = 'session.started'
@@ -433,6 +437,7 @@ Then
 
 - the whole channel just created comes back
   - id: skipped: the database generates it
+  - entity_id: same as the node's own id
   - name = 'muted'
   - description = None
   - channel_type = 'webhook'
@@ -467,6 +472,7 @@ Then
 
 - the whole channel just created comes back
   - id: skipped: the database generates it
+  - entity_id: same as the node's own id
   - name = 'alerts'
   - description = None
   - channel_type = 'webhook'
@@ -501,6 +507,7 @@ Then
 
 - the whole channel just created comes back
   - id: skipped: the database generates it
+  - entity_id: same as the node's own id
   - name = 'mail'
   - description = None
   - channel_type = 'email'
@@ -646,6 +653,7 @@ Then
 
 - the whole rule just created comes back
   - id: skipped: the database generates it
+  - entity_id: same as the node's own id
   - name = 'muted'
   - description = None
   - rule_type = 'session.started'
@@ -681,6 +689,7 @@ Then
 
 - the whole rule just created comes back
   - id: skipped: the database generates it
+  - entity_id: same as the node's own id
   - name = 'orphan'
   - description = None
   - rule_type = 'session.started'
@@ -716,6 +725,7 @@ Then
 
 - the whole rule just created comes back
   - id: skipped: the database generates it
+  - entity_id: same as the node's own id
   - name = 'on-start'
   - description = None
   - rule_type = 'session.started'
@@ -805,6 +815,7 @@ Then
 
 - the whole channel created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the channel created in advance
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -947,6 +958,7 @@ Then
 
 - the whole rule created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the rule created in advance
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -1072,6 +1084,7 @@ Then
 - every channel created in advance comes back in the processed list and an unknown id comes back in the failed list because no target answers to it
   - successes count = 2
   - successes[0].id: skipped: the database generates it
+  - successes[0].entity_id: same as the id of the channel created in advance
   - successes[0].name = 'wanted-1'
   - successes[0].description = None
   - successes[0].channel_type = 'webhook'
@@ -1082,6 +1095,7 @@ Then
   - successes[0].created_at: the time this run wrote
   - successes[0].updated_at: the time this run wrote
   - successes[1].id: skipped: the database generates it
+  - successes[1].entity_id: same as the id of the channel created in advance
   - successes[1].name = 'other-1'
   - successes[1].description = None
   - successes[1].channel_type = 'webhook'
@@ -1158,6 +1172,7 @@ Then
 - every rule created in advance comes back in the processed list and an unknown id comes back in the failed list because no target answers to it
   - successes count = 2
   - successes[0].id: skipped: the database generates it
+  - successes[0].entity_id: same as the id of the rule created in advance
   - successes[0].name = 'wanted-1'
   - successes[0].description = None
   - successes[0].rule_type = 'session.started'
@@ -1168,6 +1183,7 @@ Then
   - successes[0].created_at: the time this run wrote
   - successes[0].updated_at: the time this run wrote
   - successes[1].id: skipped: the database generates it
+  - successes[1].entity_id: same as the id of the rule created in advance
   - successes[1].name = 'other-1'
   - successes[1].description = None
   - successes[1].rule_type = 'session.started'
@@ -1242,6 +1258,7 @@ Then
 - every channel created in advance comes back in the processed list and nothing failed
   - successes count = 2
   - successes[0].id: skipped: the database generates it
+  - successes[0].entity_id: same as the id of the channel created in advance
   - successes[0].name = 'wanted-1'
   - successes[0].description = 'the description changed all at once'
   - successes[0].channel_type = 'webhook'
@@ -1252,6 +1269,7 @@ Then
   - successes[0].created_at: the time this run wrote
   - successes[0].updated_at: the time this run wrote
   - successes[1].id: skipped: the database generates it
+  - successes[1].entity_id: same as the id of the channel created in advance
   - successes[1].name = 'other-1'
   - successes[1].description = 'the description changed all at once'
   - successes[1].channel_type = 'webhook'
@@ -1353,6 +1371,7 @@ Then
 - every rule created in advance comes back in the processed list and nothing failed
   - successes count = 2
   - successes[0].id: skipped: the database generates it
+  - successes[0].entity_id: same as the id of the rule created in advance
   - successes[0].name = 'wanted-1'
   - successes[0].description = 'the description changed all at once'
   - successes[0].rule_type = 'session.started'
@@ -1363,6 +1382,7 @@ Then
   - successes[0].created_at: the time this run wrote
   - successes[0].updated_at: the time this run wrote
   - successes[1].id: skipped: the database generates it
+  - successes[1].entity_id: same as the id of the rule created in advance
   - successes[1].name = 'other-1'
   - successes[1].description = 'the description changed all at once'
   - successes[1].rule_type = 'session.started'
@@ -1402,6 +1422,7 @@ Then
 
 - the id of the deleted channel comes back
   - id: same as the channel created in advance
+  - entity_id: same as the channel created in advance
 
 <a id="retiring_channels-the-superadmin-deletes-a-channel"></a>
 
@@ -1428,6 +1449,7 @@ Then
 
 - the id of the deleted channel comes back
   - id: same as the channel created in advance
+  - entity_id: same as the channel created in advance
 
 <a id="retiring_channels-a-user-granted-nothing-may-not-delete-a-channel"></a>
 
@@ -1509,6 +1531,7 @@ Then
 
 - the id of the deleted rule comes back
   - id: same as the rule created in advance
+  - entity_id: same as the rule created in advance
 
 <a id="retiring_rules-a-user-granted-nothing-may-not-delete-a-rule"></a>
 
@@ -1985,6 +2008,7 @@ Then
 
 - the whole channel created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the channel created in advance
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -2020,6 +2044,7 @@ Then
 
 - the whole channel created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the channel created in advance
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -2055,6 +2080,7 @@ Then
 
 - the whole channel created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the channel created in advance
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -2090,6 +2116,7 @@ Then
 
 - the whole channel created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the channel created in advance
   - name = 'channel-1'
   - description = None
   - channel_type = 'webhook'
@@ -2125,6 +2152,7 @@ Then
 
 - the whole channel created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the channel created in advance
   - name = 'renamed'
   - description = None
   - channel_type = 'webhook'
@@ -2241,6 +2269,7 @@ Then
 
 - the whole rule created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the rule created in advance
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -2277,6 +2306,7 @@ Then
 
 - the whole rule created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the rule created in advance
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -2313,6 +2343,7 @@ Then
 
 - the whole rule created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the rule created in advance
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -2349,6 +2380,7 @@ Then
 
 - the whole rule created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the rule created in advance
   - name = 'rule-1'
   - description = None
   - rule_type = 'session.started'
@@ -2385,6 +2417,7 @@ Then
 
 - the whole rule created in advance comes back
   - id: skipped: the database generates it
+  - entity_id: same as the id of the rule created in advance
   - name = 'renamed'
   - description = None
   - rule_type = 'session.started'
