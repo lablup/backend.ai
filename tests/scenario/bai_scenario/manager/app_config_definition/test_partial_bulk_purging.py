@@ -236,7 +236,11 @@ class BothArePurged(Then[TwoDefinitionsAndACaller, Purged]):
                     node.id,
                     SameAs(definition.id, Says("준비한 ID", english="the ID seeded in advance")),
                 ),
-                Same(f"successes[{i}].entity_id", node.entity_id, definition.id),
+                Held[UUID](
+                    f"successes[{i}].entity_id",
+                    node.entity_id,
+                    SameAs(definition.id, Says("준비한 ID", english="the ID seeded in advance")),
+                ),
                 Same(f"successes[{i}].config_name", node.config_name, definition.config_name),
                 Held(f"successes[{i}].created_at", node.created_at, written),
                 Held(f"successes[{i}].updated_at", node.updated_at, written),

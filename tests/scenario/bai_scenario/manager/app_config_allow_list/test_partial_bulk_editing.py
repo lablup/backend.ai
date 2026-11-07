@@ -118,7 +118,11 @@ class BothAreReranked(Then[TwoEntriesAndACaller, Edited]):
                     node.id,
                     SameAs(entry.id, Says("준비한 ID", english="the ID seeded in advance")),
                 ),
-                Same(f"successes[{i}].entity_id", node.entity_id, entry.id),
+                Held[UUID](
+                    f"successes[{i}].entity_id",
+                    node.entity_id,
+                    SameAs(entry.id, Says("준비한 ID", english="the ID seeded in advance")),
+                ),
                 Same(f"successes[{i}].config_name", node.config_name, entry.config_name),
                 Same(f"successes[{i}].scope_type", node.scope_type, entry.scope_type),
                 Same(f"successes[{i}].rank", node.rank, RANK),
