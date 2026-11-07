@@ -101,21 +101,21 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when a regular user granted permission to read sessions and deployments pages through deployment histories of the target laid in advance, only that one history comes back as one page](#scoped_searching-a-reader-pages-through-the-scoped-deployment-histories) | answered |
+| [when a regular user granted permission to read sessions and deployments pages through deployment histories of the target laid in advance with a condition, the history outside the scope and the one the condition drops are left out and only that one history comes back as one page](#scoped_searching-a-reader-pages-through-the-scoped-deployment-histories) | answered |
 | [when a user granted nothing pages through deployment histories of a scope, the call is rejected for lack of permission](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-deployment-histories) | rejected |
 
 **route_scoped_search**
 
 | scenario | verdict |
 |---|---|
-| [when a regular user granted permission to read sessions and deployments pages through route histories of the target laid in advance, only that one history comes back as one page](#scoped_searching-a-reader-pages-through-the-scoped-route-histories) | answered |
+| [when a regular user granted permission to read sessions and deployments pages through route histories of the target laid in advance with a condition, the history outside the scope and the one the condition drops are left out and only that one history comes back as one page](#scoped_searching-a-reader-pages-through-the-scoped-route-histories) | answered |
 | [when a user granted nothing pages through the route histories of a scope, the request is rejected](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-route-histories) | rejected |
 
 **scoped_search_kernel_history**
 
 | scenario | verdict |
 |---|---|
-| [when a regular user granted permission to read sessions and deployments pages through kernel histories of the target laid in advance, only that one history comes back as one page](#scoped_searching-a-reader-pages-through-the-scoped-kernel-histories) | answered |
+| [when a regular user granted permission to read sessions and deployments pages through kernel histories of the target laid in advance with a condition, the history outside the scope and the one the condition drops are left out and only that one history comes back as one page](#scoped_searching-a-reader-pages-through-the-scoped-kernel-histories) | answered |
 | [when a user granted nothing pages through kernel histories of a scope, the call is rejected for lack of permission](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-kernel-histories) | rejected |
 | [when the superadmin pages through kernel histories naming two scope items, the request is rejected](#scoped_searching-kernel-history-scope-naming-two-items-is-refused) | rejected |
 
@@ -123,7 +123,7 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when a regular user granted permission to read sessions and deployments pages through replica group histories of the target laid in advance, only that one history comes back as one page](#scoped_searching-a-reader-pages-through-the-scoped-replica-group-histories) | answered |
+| [when a regular user granted permission to read sessions and deployments pages through replica group histories of the target laid in advance with a condition, the history outside the scope and the one the condition drops are left out and only that one history comes back as one page](#scoped_searching-a-reader-pages-through-the-scoped-replica-group-histories) | answered |
 | [when a user granted nothing pages through replica group histories of a scope, the call is rejected for lack of permission](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-replica-group-histories) | rejected |
 | [when the superadmin pages through replica group histories naming two scope items, the request is rejected](#scoped_searching-replica-group-history-scope-naming-two-items-is-refused) | rejected |
 
@@ -131,7 +131,7 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when a regular user granted permission to read sessions and deployments pages through session histories of the target laid in advance, only that one history comes back as one page](#scoped_searching-a-reader-pages-through-the-scoped-session-histories) | answered |
+| [when a regular user granted permission to read sessions and deployments pages through session histories of the target laid in advance with a condition, the history outside the scope and the one the condition drops are left out and only that one history comes back as one page](#scoped_searching-a-reader-pages-through-the-scoped-session-histories) | answered |
 | [when a user granted nothing pages through session histories of a scope, the call is rejected for lack of permission](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-session-histories) | rejected |
 
 ### admin_search_deployment_history
@@ -1658,11 +1658,11 @@ Then
 
 #### [a-reader-pages-through-the-scoped-deployment-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-when a regular user granted permission to read sessions and deployments pages through deployment histories of the target laid in advance, only that one history comes back as one page
+when a regular user granted permission to read sessions and deployments pages through deployment histories of the target laid in advance with a condition, the history outside the scope and the one the condition drops are left out and only that one history comes back as one page
 
 Given
 
-- one set of a session, kernel, deployment, route and replica group carrying a scheduling history row, one more set of each outside the scope, and one regular user granted permission to read sessions and deployments
+- one set of a session, kernel, deployment, route and replica group carrying two scheduling history rows each, one more set of each outside the scope carrying a history row, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1690,6 +1690,11 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Session session-1: has one scheduling attempt recorded
+  - Session session-1: has one scheduling attempt of a kernel recorded
+  - Deployment deployment-1: has one scheduling attempt of the deployment recorded
+  - Deployment deployment-1: has one scheduling attempt of a route recorded
+  - Deployment deployment-1: has one scheduling attempt of the replica group recorded
   - Session other-session-1: waiting to be scheduled
   - Session other-session-1: has one main kernel group
   - Session other-session-1: has one kernel asking for 
@@ -1710,7 +1715,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.deployment_scoped_search: user-2 pages through deployment histories naming the target laid in advance as the scope
+- SchedulingHistoryAdapter.deployment_scoped_search: user-2 pages through deployment histories naming the target laid in advance as the scope, with a condition that keeps one history laid in advance and an order over one item per page
 
 Then
 
@@ -1773,7 +1778,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.deployment_scoped_search: user-2 pages through deployment histories naming the target laid in advance as the scope
+- SchedulingHistoryAdapter.deployment_scoped_search: user-2 pages through deployment histories naming the target laid in advance as the scope, with a condition that keeps one history laid in advance and an order over one item per page
 
 Then
 
@@ -1786,11 +1791,11 @@ Then
 
 #### [a-reader-pages-through-the-scoped-route-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-when a regular user granted permission to read sessions and deployments pages through route histories of the target laid in advance, only that one history comes back as one page
+when a regular user granted permission to read sessions and deployments pages through route histories of the target laid in advance with a condition, the history outside the scope and the one the condition drops are left out and only that one history comes back as one page
 
 Given
 
-- one set of a session, kernel, deployment, route and replica group carrying a scheduling history row, one more set of each outside the scope, and one regular user granted permission to read sessions and deployments
+- one set of a session, kernel, deployment, route and replica group carrying two scheduling history rows each, one more set of each outside the scope carrying a history row, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1818,6 +1823,11 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Session session-1: has one scheduling attempt recorded
+  - Session session-1: has one scheduling attempt of a kernel recorded
+  - Deployment deployment-1: has one scheduling attempt of the deployment recorded
+  - Deployment deployment-1: has one scheduling attempt of a route recorded
+  - Deployment deployment-1: has one scheduling attempt of the replica group recorded
   - Session other-session-1: waiting to be scheduled
   - Session other-session-1: has one main kernel group
   - Session other-session-1: has one kernel asking for 
@@ -1838,7 +1848,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.route_scoped_search: user-2 pages through route histories naming the target laid in advance as the scope
+- SchedulingHistoryAdapter.route_scoped_search: user-2 pages through route histories naming the target laid in advance as the scope, with a condition that keeps one history laid in advance and an order over one item per page
 
 Then
 
@@ -1904,7 +1914,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.route_scoped_search: user-2 pages through route histories naming the target laid in advance as the scope
+- SchedulingHistoryAdapter.route_scoped_search: user-2 pages through route histories naming the target laid in advance as the scope, with a condition that keeps one history laid in advance and an order over one item per page
 
 Then
 
@@ -1917,11 +1927,11 @@ Then
 
 #### [a-reader-pages-through-the-scoped-kernel-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-when a regular user granted permission to read sessions and deployments pages through kernel histories of the target laid in advance, only that one history comes back as one page
+when a regular user granted permission to read sessions and deployments pages through kernel histories of the target laid in advance with a condition, the history outside the scope and the one the condition drops are left out and only that one history comes back as one page
 
 Given
 
-- one set of a session, kernel, deployment, route and replica group carrying a scheduling history row, one more set of each outside the scope, and one regular user granted permission to read sessions and deployments
+- one set of a session, kernel, deployment, route and replica group carrying two scheduling history rows each, one more set of each outside the scope carrying a history row, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1949,6 +1959,11 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Session session-1: has one scheduling attempt recorded
+  - Session session-1: has one scheduling attempt of a kernel recorded
+  - Deployment deployment-1: has one scheduling attempt of the deployment recorded
+  - Deployment deployment-1: has one scheduling attempt of a route recorded
+  - Deployment deployment-1: has one scheduling attempt of the replica group recorded
   - Session other-session-1: waiting to be scheduled
   - Session other-session-1: has one main kernel group
   - Session other-session-1: has one kernel asking for 
@@ -1969,7 +1984,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.scoped_search_kernel_history: user-2 pages through kernel histories naming the target laid in advance as the scope
+- SchedulingHistoryAdapter.scoped_search_kernel_history: user-2 pages through kernel histories naming the target laid in advance as the scope, with a condition that keeps one history laid in advance and an order over one item per page
 
 Then
 
@@ -2031,7 +2046,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.scoped_search_kernel_history: user-2 pages through kernel histories naming the target laid in advance as the scope
+- SchedulingHistoryAdapter.scoped_search_kernel_history: user-2 pages through kernel histories naming the target laid in advance as the scope, with a condition that keeps one history laid in advance and an order over one item per page
 
 Then
 
@@ -2090,11 +2105,11 @@ Then
 
 #### [a-reader-pages-through-the-scoped-replica-group-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-when a regular user granted permission to read sessions and deployments pages through replica group histories of the target laid in advance, only that one history comes back as one page
+when a regular user granted permission to read sessions and deployments pages through replica group histories of the target laid in advance with a condition, the history outside the scope and the one the condition drops are left out and only that one history comes back as one page
 
 Given
 
-- one set of a session, kernel, deployment, route and replica group carrying a scheduling history row, one more set of each outside the scope, and one regular user granted permission to read sessions and deployments
+- one set of a session, kernel, deployment, route and replica group carrying two scheduling history rows each, one more set of each outside the scope carrying a history row, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -2122,6 +2137,11 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Session session-1: has one scheduling attempt recorded
+  - Session session-1: has one scheduling attempt of a kernel recorded
+  - Deployment deployment-1: has one scheduling attempt of the deployment recorded
+  - Deployment deployment-1: has one scheduling attempt of a route recorded
+  - Deployment deployment-1: has one scheduling attempt of the replica group recorded
   - Session other-session-1: waiting to be scheduled
   - Session other-session-1: has one main kernel group
   - Session other-session-1: has one kernel asking for 
@@ -2142,7 +2162,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.scoped_search_replica_group_history: user-2 pages through replica group histories naming the target laid in advance as the scope
+- SchedulingHistoryAdapter.scoped_search_replica_group_history: user-2 pages through replica group histories naming the target laid in advance as the scope, with a condition that keeps one history laid in advance and an order over one item per page
 
 Then
 
@@ -2205,7 +2225,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.scoped_search_replica_group_history: user-2 pages through replica group histories naming the target laid in advance as the scope
+- SchedulingHistoryAdapter.scoped_search_replica_group_history: user-2 pages through replica group histories naming the target laid in advance as the scope, with a condition that keeps one history laid in advance and an order over one item per page
 
 Then
 
@@ -2264,11 +2284,11 @@ Then
 
 #### [a-reader-pages-through-the-scoped-session-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-when a regular user granted permission to read sessions and deployments pages through session histories of the target laid in advance, only that one history comes back as one page
+when a regular user granted permission to read sessions and deployments pages through session histories of the target laid in advance with a condition, the history outside the scope and the one the condition drops are left out and only that one history comes back as one page
 
 Given
 
-- one set of a session, kernel, deployment, route and replica group carrying a scheduling history row, one more set of each outside the scope, and one regular user granted permission to read sessions and deployments
+- one set of a session, kernel, deployment, route and replica group carrying two scheduling history rows each, one more set of each outside the scope carrying a history row, and one regular user granted permission to read sessions and deployments
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -2296,6 +2316,11 @@ Given
   - Deployment deployment-1: has one scheduling attempt of the deployment recorded
   - Deployment deployment-1: has one scheduling attempt of a route recorded
   - Deployment deployment-1: has one scheduling attempt of the replica group recorded
+  - Session session-1: has one scheduling attempt recorded
+  - Session session-1: has one scheduling attempt of a kernel recorded
+  - Deployment deployment-1: has one scheduling attempt of the deployment recorded
+  - Deployment deployment-1: has one scheduling attempt of a route recorded
+  - Deployment deployment-1: has one scheduling attempt of the replica group recorded
   - Session other-session-1: waiting to be scheduled
   - Session other-session-1: has one main kernel group
   - Session other-session-1: has one kernel asking for 
@@ -2316,7 +2341,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.session_scoped_search: user-2 pages through session histories naming the target laid in advance as the scope
+- SchedulingHistoryAdapter.session_scoped_search: user-2 pages through session histories naming the target laid in advance as the scope, with a condition that keeps one history laid in advance and an order over one item per page
 
 Then
 
@@ -2378,7 +2403,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.session_scoped_search: user-2 pages through session histories naming the target laid in advance as the scope
+- SchedulingHistoryAdapter.session_scoped_search: user-2 pages through session histories naming the target laid in advance as the scope, with a condition that keeps one history laid in advance and an order over one item per page
 
 Then
 

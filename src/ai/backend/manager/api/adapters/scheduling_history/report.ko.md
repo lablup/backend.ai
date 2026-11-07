@@ -101,21 +101,21 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 배포 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다](#scoped_searching-a-reader-pages-through-the-scoped-deployment-histories) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 배포 이력을 조건으로 걸러 훑으면 범위 밖의 이력과 조건에 걸린 이력은 빠지고 그 이력 하나만 한 페이지로 옵니다](#scoped_searching-a-reader-pages-through-the-scoped-deployment-histories) | 성공 |
 | [아무 권한도 받지 않은 사용자가 배포 이력을 범위로 훑으면 권한 부족으로 거부됩니다](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-deployment-histories) | 거부 |
 
 **route_scoped_search**
 
 | 시나리오 | 판정 |
 |---|---|
-| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 라우트 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다](#scoped_searching-a-reader-pages-through-the-scoped-route-histories) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 라우트 이력을 조건으로 걸러 훑으면 범위 밖의 이력과 조건에 걸린 이력은 빠지고 그 이력 하나만 한 페이지로 옵니다](#scoped_searching-a-reader-pages-through-the-scoped-route-histories) | 성공 |
 | [아무 권한도 받지 않은 사용자가 라우트 이력을 범위로 훑으면 요청이 거부됩니다](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-route-histories) | 거부 |
 
 **scoped_search_kernel_history**
 
 | 시나리오 | 판정 |
 |---|---|
-| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 커널 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다](#scoped_searching-a-reader-pages-through-the-scoped-kernel-histories) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 커널 이력을 조건으로 걸러 훑으면 범위 밖의 이력과 조건에 걸린 이력은 빠지고 그 이력 하나만 한 페이지로 옵니다](#scoped_searching-a-reader-pages-through-the-scoped-kernel-histories) | 성공 |
 | [아무 권한도 받지 않은 사용자가 커널 이력을 범위로 훑으면 권한 부족으로 거부됩니다](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-kernel-histories) | 거부 |
 | [슈퍼관리자가 범위 항목 둘을 대고 커널 이력을 훑으면 요청이 거부됩니다](#scoped_searching-kernel-history-scope-naming-two-items-is-refused) | 거부 |
 
@@ -123,7 +123,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 복제본 그룹 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다](#scoped_searching-a-reader-pages-through-the-scoped-replica-group-histories) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 복제본 그룹 이력을 조건으로 걸러 훑으면 범위 밖의 이력과 조건에 걸린 이력은 빠지고 그 이력 하나만 한 페이지로 옵니다](#scoped_searching-a-reader-pages-through-the-scoped-replica-group-histories) | 성공 |
 | [아무 권한도 받지 않은 사용자가 복제본 그룹 이력을 범위로 훑으면 권한 부족으로 거부됩니다](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-replica-group-histories) | 거부 |
 | [슈퍼관리자가 범위 항목 둘을 대고 복제본 그룹 이력을 훑으면 요청이 거부됩니다](#scoped_searching-replica-group-history-scope-naming-two-items-is-refused) | 거부 |
 
@@ -131,7 +131,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 세션 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다](#scoped_searching-a-reader-pages-through-the-scoped-session-histories) | 성공 |
+| [프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 세션 이력을 조건으로 걸러 훑으면 범위 밖의 이력과 조건에 걸린 이력은 빠지고 그 이력 하나만 한 페이지로 옵니다](#scoped_searching-a-reader-pages-through-the-scoped-session-histories) | 성공 |
 | [아무 권한도 받지 않은 사용자가 세션 이력을 범위로 훑으면 권한 부족으로 거부됩니다](#scoped_searching-a-user-granted-nothing-may-not-page-through-the-scoped-session-histories) | 거부 |
 
 ### admin_search_deployment_history
@@ -1658,11 +1658,11 @@ Then
 
 #### [a-reader-pages-through-the-scoped-deployment-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 배포 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 배포 이력을 조건으로 걸러 훑으면 범위 밖의 이력과 조건에 걸린 이력은 빠지고 그 이력 하나만 한 페이지로 옵니다
 
 Given
 
-- 스케줄링 이력이 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 같은 것이 한 벌 더 있고, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
+- 스케줄링 이력이 두 줄씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 이력이 붙은 같은 것이 한 벌 더 있고, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1690,6 +1690,11 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 세션 session-1: 스케줄링 시도 하나를 남깁니다
+  - 세션 session-1: 커널의 스케줄링 시도 하나를 남깁니다
+  - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
+  - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
+  - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
   - 세션 other-session-1: 스케줄링을 기다립니다
   - 세션 other-session-1: main 커널 그룹 하나를 갖습니다
   - 세션 other-session-1: 요구량이 인 커널 하나를 갖습니다
@@ -1710,7 +1715,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.deployment_scoped_search: user-2 이 미리 만든 대상 하나를 범위로 배포 이력을 훑습니다
+- SchedulingHistoryAdapter.deployment_scoped_search: user-2 이 미리 만든 대상 하나를 범위로, 미리 만든 배포 이력 하나만 남기는 조건과 순서를 걸어 한 건씩 훑습니다
 
 Then
 
@@ -1773,7 +1778,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.deployment_scoped_search: user-2 이 미리 만든 대상 하나를 범위로 배포 이력을 훑습니다
+- SchedulingHistoryAdapter.deployment_scoped_search: user-2 이 미리 만든 대상 하나를 범위로, 미리 만든 배포 이력 하나만 남기는 조건과 순서를 걸어 한 건씩 훑습니다
 
 Then
 
@@ -1786,11 +1791,11 @@ Then
 
 #### [a-reader-pages-through-the-scoped-route-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 라우트 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 라우트 이력을 조건으로 걸러 훑으면 범위 밖의 이력과 조건에 걸린 이력은 빠지고 그 이력 하나만 한 페이지로 옵니다
 
 Given
 
-- 스케줄링 이력이 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 같은 것이 한 벌 더 있고, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
+- 스케줄링 이력이 두 줄씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 이력이 붙은 같은 것이 한 벌 더 있고, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1818,6 +1823,11 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 세션 session-1: 스케줄링 시도 하나를 남깁니다
+  - 세션 session-1: 커널의 스케줄링 시도 하나를 남깁니다
+  - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
+  - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
+  - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
   - 세션 other-session-1: 스케줄링을 기다립니다
   - 세션 other-session-1: main 커널 그룹 하나를 갖습니다
   - 세션 other-session-1: 요구량이 인 커널 하나를 갖습니다
@@ -1838,7 +1848,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.route_scoped_search: user-2 이 미리 만든 대상 하나를 범위로 라우트 이력을 훑습니다
+- SchedulingHistoryAdapter.route_scoped_search: user-2 이 미리 만든 대상 하나를 범위로, 미리 만든 라우트 이력 하나만 남기는 조건과 순서를 걸어 한 건씩 훑습니다
 
 Then
 
@@ -1904,7 +1914,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.route_scoped_search: user-2 이 미리 만든 대상 하나를 범위로 라우트 이력을 훑습니다
+- SchedulingHistoryAdapter.route_scoped_search: user-2 이 미리 만든 대상 하나를 범위로, 미리 만든 라우트 이력 하나만 남기는 조건과 순서를 걸어 한 건씩 훑습니다
 
 Then
 
@@ -1917,11 +1927,11 @@ Then
 
 #### [a-reader-pages-through-the-scoped-kernel-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 커널 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 커널 이력을 조건으로 걸러 훑으면 범위 밖의 이력과 조건에 걸린 이력은 빠지고 그 이력 하나만 한 페이지로 옵니다
 
 Given
 
-- 스케줄링 이력이 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 같은 것이 한 벌 더 있고, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
+- 스케줄링 이력이 두 줄씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 이력이 붙은 같은 것이 한 벌 더 있고, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -1949,6 +1959,11 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 세션 session-1: 스케줄링 시도 하나를 남깁니다
+  - 세션 session-1: 커널의 스케줄링 시도 하나를 남깁니다
+  - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
+  - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
+  - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
   - 세션 other-session-1: 스케줄링을 기다립니다
   - 세션 other-session-1: main 커널 그룹 하나를 갖습니다
   - 세션 other-session-1: 요구량이 인 커널 하나를 갖습니다
@@ -1969,7 +1984,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.scoped_search_kernel_history: user-2 이 미리 만든 대상 하나를 범위로 커널 이력을 훑습니다
+- SchedulingHistoryAdapter.scoped_search_kernel_history: user-2 이 미리 만든 대상 하나를 범위로, 미리 만든 커널 이력 하나만 남기는 조건과 순서를 걸어 한 건씩 훑습니다
 
 Then
 
@@ -2031,7 +2046,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.scoped_search_kernel_history: user-2 이 미리 만든 대상 하나를 범위로 커널 이력을 훑습니다
+- SchedulingHistoryAdapter.scoped_search_kernel_history: user-2 이 미리 만든 대상 하나를 범위로, 미리 만든 커널 이력 하나만 남기는 조건과 순서를 걸어 한 건씩 훑습니다
 
 Then
 
@@ -2090,11 +2105,11 @@ Then
 
 #### [a-reader-pages-through-the-scoped-replica-group-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 복제본 그룹 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 복제본 그룹 이력을 조건으로 걸러 훑으면 범위 밖의 이력과 조건에 걸린 이력은 빠지고 그 이력 하나만 한 페이지로 옵니다
 
 Given
 
-- 스케줄링 이력이 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 같은 것이 한 벌 더 있고, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
+- 스케줄링 이력이 두 줄씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 이력이 붙은 같은 것이 한 벌 더 있고, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -2122,6 +2137,11 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 세션 session-1: 스케줄링 시도 하나를 남깁니다
+  - 세션 session-1: 커널의 스케줄링 시도 하나를 남깁니다
+  - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
+  - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
+  - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
   - 세션 other-session-1: 스케줄링을 기다립니다
   - 세션 other-session-1: main 커널 그룹 하나를 갖습니다
   - 세션 other-session-1: 요구량이 인 커널 하나를 갖습니다
@@ -2142,7 +2162,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.scoped_search_replica_group_history: user-2 이 미리 만든 대상 하나를 범위로 복제본 그룹 이력을 훑습니다
+- SchedulingHistoryAdapter.scoped_search_replica_group_history: user-2 이 미리 만든 대상 하나를 범위로, 미리 만든 복제본 그룹 이력 하나만 남기는 조건과 순서를 걸어 한 건씩 훑습니다
 
 Then
 
@@ -2205,7 +2225,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.scoped_search_replica_group_history: user-2 이 미리 만든 대상 하나를 범위로 복제본 그룹 이력을 훑습니다
+- SchedulingHistoryAdapter.scoped_search_replica_group_history: user-2 이 미리 만든 대상 하나를 범위로, 미리 만든 복제본 그룹 이력 하나만 남기는 조건과 순서를 걸어 한 건씩 훑습니다
 
 Then
 
@@ -2264,11 +2284,11 @@ Then
 
 #### [a-reader-pages-through-the-scoped-session-histories](/tests/scenario/bai_scenario/manager/scheduling_history/test_scoped_searching.py): pass
 
-프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 세션 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다
+프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 세션 이력을 조건으로 걸러 훑으면 범위 밖의 이력과 조건에 걸린 이력은 빠지고 그 이력 하나만 한 페이지로 옵니다
 
 Given
 
-- 스케줄링 이력이 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 같은 것이 한 벌 더 있고, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
+- 스케줄링 이력이 두 줄씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 이력이 붙은 같은 것이 한 벌 더 있고, 프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -2296,6 +2316,11 @@ Given
   - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
   - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
+  - 세션 session-1: 스케줄링 시도 하나를 남깁니다
+  - 세션 session-1: 커널의 스케줄링 시도 하나를 남깁니다
+  - 배포 deployment-1: 배포의 스케줄링 시도 하나를 남깁니다
+  - 배포 deployment-1: 라우트의 스케줄링 시도 하나를 남깁니다
+  - 배포 deployment-1: 복제본 그룹의 스케줄링 시도 하나를 남깁니다
   - 세션 other-session-1: 스케줄링을 기다립니다
   - 세션 other-session-1: main 커널 그룹 하나를 갖습니다
   - 세션 other-session-1: 요구량이 인 커널 하나를 갖습니다
@@ -2316,7 +2341,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.session_scoped_search: user-2 이 미리 만든 대상 하나를 범위로 세션 이력을 훑습니다
+- SchedulingHistoryAdapter.session_scoped_search: user-2 이 미리 만든 대상 하나를 범위로, 미리 만든 세션 이력 하나만 남기는 조건과 순서를 걸어 한 건씩 훑습니다
 
 Then
 
@@ -2378,7 +2403,7 @@ Given
 
 When
 
-- SchedulingHistoryAdapter.session_scoped_search: user-2 이 미리 만든 대상 하나를 범위로 세션 이력을 훑습니다
+- SchedulingHistoryAdapter.session_scoped_search: user-2 이 미리 만든 대상 하나를 범위로, 미리 만든 세션 이력 하나만 남기는 조건과 순서를 걸어 한 건씩 훑습니다
 
 Then
 

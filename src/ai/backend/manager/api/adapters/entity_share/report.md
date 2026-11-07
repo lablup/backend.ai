@@ -36,14 +36,14 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when a user who can read shares in their own scope pages through the ones addressed to them, only that share comes back as one page](#searching-the-recipient-pages-through-the-shares-addressed-to-them) | answered |
+| [when a user who can read shares in their own scope pages through the ones addressed to them, the offer they sent and an offer between others are left out and only that share comes back as one page](#searching-the-recipient-pages-through-the-shares-addressed-to-them) | answered |
 | [when a user granted nothing pages through the shares addressed to them, the call is rejected for lack of permission](#searching-a-user-granted-nothing-may-not-page-through-their-shares) | rejected |
 
 **scoped_search**
 
 | scenario | verdict |
 |---|---|
-| [when a user who can read shares in the project pages through a folder, only the shares of that folder come back as one page](#searching-the-sharer-pages-through-the-shares-of-a-folder) | answered |
+| [when a user who can read shares in the project pages through a folder filtered by recipient, the offer of another folder and the offer to someone else are left out and only that share comes back as one page](#searching-the-sharer-pages-through-the-shares-of-a-folder) | answered |
 | [when a user granted nothing pages through a folder, the call is rejected for lack of permission](#searching-a-user-granted-nothing-may-not-page-through-a-folders-shares) | rejected |
 
 **accept**
@@ -379,11 +379,11 @@ Then
 
 #### [the-recipient-pages-through-the-shares-addressed-to-them](/tests/scenario/bai_scenario/manager/entity_share/test_searching.py): pass
 
-when a user who can read shares in their own scope pages through the ones addressed to them, only that share comes back as one page
+when a user who can read shares in their own scope pages through the ones addressed to them, the offer they sent and an offer between others are left out and only that share comes back as one page
 
 Given
 
-- one more folder outside the scope whose offer the recipient makes, one project folder with an offer to another person, and the person the folder is lent to
+- one more folder outside the scope whose offer the recipient makes, one offer of the same folder to a third person, one project folder with an offer to another person, and the person the folder is lent to
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -411,9 +411,13 @@ Given
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-2: up to 5 concurrent sessions
     - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-3: has their own keypair and personal project
   - vfolder share offer share-1: offered with no ceiling on the permissions, not answered yet
   - Project vfolder other-folder-1: is placed in the project and is ready to use
   - vfolder share offer other-share-1: offered with no ceiling on the permissions, not answered yet
+  - vfolder share offer bystander-share-1: offered with no ceiling on the permissions, not answered yet
 
 When
 
@@ -496,11 +500,11 @@ Then
 
 #### [the-sharer-pages-through-the-shares-of-a-folder](/tests/scenario/bai_scenario/manager/entity_share/test_searching.py): pass
 
-when a user who can read shares in the project pages through a folder, only the shares of that folder come back as one page
+when a user who can read shares in the project pages through a folder filtered by recipient, the offer of another folder and the offer to someone else are left out and only that share comes back as one page
 
 Given
 
-- one more folder outside the scope whose offer the recipient makes, one project folder with an offer to another person, and the person lending the folder
+- one more folder outside the scope whose offer the recipient makes, one offer of the same folder to a third person, one project folder with an offer to another person, and the person lending the folder
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -528,13 +532,17 @@ Given
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-2: up to 5 concurrent sessions
     - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-3: has their own keypair and personal project
   - vfolder share offer share-1: offered with no ceiling on the permissions, not answered yet
   - Project vfolder other-folder-1: is placed in the project and is ready to use
   - vfolder share offer other-share-1: offered with no ceiling on the permissions, not answered yet
+  - vfolder share offer bystander-share-1: offered with no ceiling on the permissions, not answered yet
 
 When
 
-- EntityShareAdapter.scoped_search: user-1 pages through the shares of folder folder-1
+- EntityShareAdapter.scoped_search: user-1 pages through the shares of folder folder-1 addressed to user-2
 
 Then
 
@@ -600,7 +608,7 @@ Given
 
 When
 
-- EntityShareAdapter.scoped_search: user-3 pages through the shares of folder folder-1
+- EntityShareAdapter.scoped_search: user-3 pages through the shares of folder folder-1 addressed to user-2
 
 Then
 

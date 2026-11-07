@@ -36,14 +36,14 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [자기 스코프에서 공유를 읽을 수 있는 사용자가 자기에게 온 공유를 훑으면 그 공유만 한 페이지로 옵니다](#searching-the-recipient-pages-through-the-shares-addressed-to-them) | 성공 |
+| [자기 스코프에서 공유를 읽을 수 있는 사용자가 자기에게 온 공유를 훑으면 자기가 보낸 제안과 자기와 무관한 제안은 빠지고 그 공유만 한 페이지로 옵니다](#searching-the-recipient-pages-through-the-shares-addressed-to-them) | 성공 |
 | [아무 권한도 없는 사용자가 자기에게 온 공유를 훑으면 권한 부족으로 거부됩니다](#searching-a-user-granted-nothing-may-not-page-through-their-shares) | 거부 |
 
 **scoped_search**
 
 | 시나리오 | 판정 |
 |---|---|
-| [프로젝트에서 공유를 읽을 수 있는 사용자가 폴더를 범위로 훑으면 그 폴더에 걸린 공유만 한 페이지로 옵니다](#searching-the-sharer-pages-through-the-shares-of-a-folder) | 성공 |
+| [프로젝트에서 공유를 읽을 수 있는 사용자가 폴더를 범위로 받는 사람을 걸러 훑으면 다른 폴더의 제안과 다른 사람에게 간 제안은 빠지고 그 공유만 한 페이지로 옵니다](#searching-the-sharer-pages-through-the-shares-of-a-folder) | 성공 |
 | [아무 권한도 없는 사용자가 폴더를 범위로 훑으면 권한 부족으로 거부됩니다](#searching-a-user-granted-nothing-may-not-page-through-a-folders-shares) | 거부 |
 
 **accept**
@@ -379,11 +379,11 @@ Then
 
 #### [the-recipient-pages-through-the-shares-addressed-to-them](/tests/scenario/bai_scenario/manager/entity_share/test_searching.py): pass
 
-자기 스코프에서 공유를 읽을 수 있는 사용자가 자기에게 온 공유를 훑으면 그 공유만 한 페이지로 옵니다
+자기 스코프에서 공유를 읽을 수 있는 사용자가 자기에게 온 공유를 훑으면 자기가 보낸 제안과 자기와 무관한 제안은 빠지고 그 공유만 한 페이지로 옵니다
 
 Given
 
-- 범위 밖의 폴더 하나와 받는 사람이 내는 제안 하나, 프로젝트 폴더 하나와, 다른 사람에게 보낸 제안, 그리고 폴더를 빌린 사람
+- 범위 밖의 폴더 하나와 받는 사람이 내는 제안 하나, 같은 폴더를 세 번째 사람에게 빌려주는 제안 하나, 프로젝트 폴더 하나와, 다른 사람에게 보낸 제안, 그리고 폴더를 빌린 사람
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -411,9 +411,13 @@ Given
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
     - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-3: 자기 키페어와 개인 프로젝트를 갖습니다
   - vfolder 공유 제안 share-1: 권한 상한 없이 제안되었고, 아직 응답하지 않았습니다
   - 프로젝트 vfolder other-folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
   - vfolder 공유 제안 other-share-1: 권한 상한 없이 제안되었고, 아직 응답하지 않았습니다
+  - vfolder 공유 제안 bystander-share-1: 권한 상한 없이 제안되었고, 아직 응답하지 않았습니다
 
 When
 
@@ -496,11 +500,11 @@ Then
 
 #### [the-sharer-pages-through-the-shares-of-a-folder](/tests/scenario/bai_scenario/manager/entity_share/test_searching.py): pass
 
-프로젝트에서 공유를 읽을 수 있는 사용자가 폴더를 범위로 훑으면 그 폴더에 걸린 공유만 한 페이지로 옵니다
+프로젝트에서 공유를 읽을 수 있는 사용자가 폴더를 범위로 받는 사람을 걸러 훑으면 다른 폴더의 제안과 다른 사람에게 간 제안은 빠지고 그 공유만 한 페이지로 옵니다
 
 Given
 
-- 범위 밖의 폴더 하나와 받는 사람이 내는 제안 하나, 프로젝트 폴더 하나와, 다른 사람에게 보낸 제안, 그리고 폴더를 빌려주는 사람
+- 범위 밖의 폴더 하나와 받는 사람이 내는 제안 하나, 같은 폴더를 세 번째 사람에게 빌려주는 제안 하나, 프로젝트 폴더 하나와, 다른 사람에게 보낸 제안, 그리고 폴더를 빌려주는 사람
   - 도메인 home-1
   - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
   - 프로젝트 team-1
@@ -528,13 +532,17 @@ Given
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
     - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-3: 자기 키페어와 개인 프로젝트를 갖습니다
   - vfolder 공유 제안 share-1: 권한 상한 없이 제안되었고, 아직 응답하지 않았습니다
   - 프로젝트 vfolder other-folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
   - vfolder 공유 제안 other-share-1: 권한 상한 없이 제안되었고, 아직 응답하지 않았습니다
+  - vfolder 공유 제안 bystander-share-1: 권한 상한 없이 제안되었고, 아직 응답하지 않았습니다
 
 When
 
-- EntityShareAdapter.scoped_search: user-1이 폴더 folder-1에 걸린 공유를 훑습니다
+- EntityShareAdapter.scoped_search: user-1이 폴더 folder-1에 걸린 공유 가운데 user-2에게 간 것을 훑습니다
 
 Then
 
@@ -600,7 +608,7 @@ Given
 
 When
 
-- EntityShareAdapter.scoped_search: user-3이 폴더 folder-1에 걸린 공유를 훑습니다
+- EntityShareAdapter.scoped_search: user-3이 폴더 folder-1에 걸린 공유 가운데 user-2에게 간 것을 훑습니다
 
 Then
 
