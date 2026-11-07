@@ -194,14 +194,17 @@ def _vfolder_name_validator(name: str) -> str:
     because we append a timestamp of deletion to the name when VFolders are deleted.
     """
     if (name_len := len(name)) > API_VFOLDER_LENGTH_LIMIT:
-        raise AssertionError(
+        raise InvalidAPIParameters(
             f"The length of VFolder name should be shorter than {API_VFOLDER_LENGTH_LIMIT}. (len: {name_len})"
         )
+    # The name becomes the mount path under /home/work.
+    if "/" in name or name in (".", ".."):
+        raise InvalidAPIParameters(f"VFolder name '{name}' must not contain '/' or be '.' or '..'")
     if name in RESERVED_VFOLDERS:
-        raise AssertionError(f"VFolder name '{name}' is reserved for internal operations")
+        raise InvalidAPIParameters(f"VFolder name '{name}' is reserved for internal operations")
     for pattern in RESERVED_VFOLDER_PATTERNS:
         if pattern.match(name):
-            raise AssertionError(
+            raise InvalidAPIParameters(
                 f"VFolder name '{name}' matches a reserved pattern (pattern: {pattern})"
             )
     return name

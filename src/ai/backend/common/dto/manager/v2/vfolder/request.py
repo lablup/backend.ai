@@ -150,7 +150,7 @@ class CreateVFolderInScopeInput(BaseRequestModel):
 class UpdateVFolderInput(BaseRequestModel):
     """Input for updating a virtual folder."""
 
-    name: str | None | Unset = Field(
+    name: VFolderName | None | Unset = Field(
         default=UNSET,
         description="Updated vfolder name. Omit to leave unchanged.",
     )
@@ -163,9 +163,9 @@ class UpdateVFolderInput(BaseRequestModel):
         description="Updated permission level. Omit to leave unchanged.",
     )
 
-    @field_validator("name")
+    @field_validator("name", mode="before")
     @classmethod
-    def strip_and_validate_name(cls, v: str | None | Unset) -> str | None | Unset:
+    def strip_and_validate_name(cls, v: object) -> object:
         if not isinstance(v, str):
             return v
         stripped = v.strip()
@@ -274,7 +274,7 @@ class CloneVFolderInput(BaseRequestModel):
     The source vfolder is identified by the path parameter {vfolder_id}.
     """
 
-    name: str = Field(min_length=1, max_length=256, description="Name for the cloned vfolder")
+    name: VFolderName = Field(min_length=1, description="Name for the cloned vfolder")
     project_id: UUID | None = Field(
         default=None,
         description="Project ID for the cloned vfolder. If omitted, cloned as user-owned.",
@@ -289,9 +289,11 @@ class CloneVFolderInput(BaseRequestModel):
     )
     cloneable: bool = Field(default=False, description="Whether the cloned vfolder is cloneable")
 
-    @field_validator("name")
+    @field_validator("name", mode="before")
     @classmethod
-    def strip_and_validate_name(cls, v: str) -> str:
+    def strip_and_validate_name(cls, v: object) -> object:
+        if not isinstance(v, str):
+            return v
         stripped = v.strip()
         if not stripped:
             raise ValueError("name must not be blank or whitespace-only")
