@@ -13,12 +13,12 @@ from ai.backend.common.dto.manager.v2.resource_preset.request import (
     ResourcePresetFilter,
     ResourcePresetOrder,
 )
+from ai.backend.common.dto.manager.v2.resource_preset.response import (
+    AdminSearchResourcePresetsPayload,
+)
 from ai.backend.common.dto.manager.v2.resource_preset.types import (
     ResourcePresetOrderDirection,
     ResourcePresetOrderField,
-)
-from ai.backend.common.dto.manager.v2.resource_preset.response import (
-    AdminSearchResourcePresetsPayload,
 )
 from ai.backend.manager.api.adapters.resource_preset.adapter import ResourcePresetAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
@@ -78,9 +78,7 @@ class SearchingEveryPreset(When[ManyPresetsAndACaller, ResourcePresetAdapter, Se
 
 
 @dataclass(frozen=True)
-class SearchingByNameInOrderWithAPage(
-    When[ManyPresetsAndACaller, ResourcePresetAdapter, Searched]
-):
+class SearchingByNameInOrderWithAPage(When[ManyPresetsAndACaller, ResourcePresetAdapter, Searched]):
     """이름이 공유하는 접두사로 좁히고, 이름 내림차순으로 첫 페이지만 읽는다."""
 
     @override
@@ -163,11 +161,12 @@ class ANameFilterNarrows(
         return Says(
             "superadmin 이 이름이 공유하는 접두사로 프리셋을 좁혀 이름 내림차순 첫 페이지를 "
             "조회하면, 그 접두사를 가진 프리셋 중 첫 하나만 반환되고 접두사를 갖지 않는 프리셋은 "
-            "반환되지 않습니다",
+            "반환되지 않습니다. 이 호출은 superadmin 역할이 막습니다",
             english=(
                 "when the superadmin narrows presets by their shared name prefix and asks for the "
                 "first page in descending name order, only the first of the presets holding that "
-                "prefix comes back, and the preset without it does not"
+                "prefix comes back, and the preset without it does not. the superadmin role gates "
+                "this call"
             ),
         )
 

@@ -679,10 +679,10 @@ class TheSuperadminReadsTheResourceGroupUsage(
     def describe(self) -> str:
         return Says(
             "superadmin 이 자원 그룹의 사용량을 읽으면, 에이전트가 없으므로 용량·사용량·여유가 "
-            "모두 비어 있습니다",
+            "모두 비어 있습니다. 이 호출은 superadmin 역할이 막습니다",
             english=(
                 "when the superadmin reads a resource group's usage, capacity, usage and free "
-                "are all empty because no agent exists"
+                "are all empty because no agent exists. the superadmin role gates this call"
             ),
         )
 

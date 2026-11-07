@@ -9,11 +9,11 @@ import pytest
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import BinarySizeInfo, ResourceSlotEntryInfo
-from ai.backend.common.exception import ResourcePresetConflict
 from ai.backend.common.dto.manager.v2.resource_preset.response import (
     CreateResourcePresetPayload,
     ResourcePresetNode,
 )
+from ai.backend.common.exception import ResourcePresetConflict
 from ai.backend.manager.api.adapters.resource_preset.adapter import ResourcePresetAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -91,9 +91,7 @@ class Creating(When[AGroupAndACaller, ResourcePresetAdapter, Created]):
 
 
 @dataclass(frozen=True)
-class CreatingWithATakenName(
-    When[APresetAndACaller, ResourcePresetAdapter, Created]
-):
+class CreatingWithATakenName(When[APresetAndACaller, ResourcePresetAdapter, Created]):
     """이미 있는 프리셋의 이름으로, 어느 자원 그룹에도 묶지 않고 프리셋을 만든다."""
 
     @override
@@ -209,10 +207,10 @@ class TheSuperadminCreatesAPresetInAGroup(
     def describe(self) -> Says:
         return Says(
             "superadmin 이 미리 만들어 둔 자원 그룹에 묶어 프리셋을 만들면, 그 그룹 이름을 가진 "
-            "프리셋 전체가 반환됩니다",
+            "프리셋 전체가 반환됩니다. 이 호출은 superadmin 역할이 막습니다",
             english=(
                 "when the superadmin creates a preset bound to a resource group, the whole preset "
-                "comes back naming that group"
+                "comes back naming that group. the superadmin role gates this call"
             ),
         )
 
