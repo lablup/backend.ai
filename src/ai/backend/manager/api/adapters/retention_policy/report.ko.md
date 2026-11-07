@@ -5,7 +5,7 @@
 시나리오: 미완성 3 / 8
 
 - ops 구성 (8)
-  - batch_load_by_ids: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
+  - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
   - create: 대표 성공 ✓ · 대표 거부 ✓
   - get: 대표 성공 ✓ · 대표 거부 ✓
   - partial_bulk_purge: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
@@ -13,6 +13,12 @@
   - purge: 대표 성공 ✓ · 대표 거부 ✓
   - search: 대표 성공 ✓ · 대표 거부 ✓
   - update: 대표 성공 ✓ · 대표 거부 ✓
+
+**batch_load_by_ids**
+
+| 시나리오 | 판정 |
+|---|---|
+| [정책이 있고 superadmin 이 그 정책과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 에 해당하는 항목은 비어 있습니다](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | 성공 |
 
 **create**
 
@@ -88,6 +94,54 @@
 | [아무 권한도 없는 사용자가 정책을 수정하면 권한 부족으로 거부됩니다](#editing-a-user-granted-nothing-may-not-edit-a-policy) | 거부 |
 | [정책 둘 중 한쪽의 카테고리를 다른 쪽 카테고리로 바꾸면, 카테고리 중복으로 거부됩니다. 생성할 때와 달리 저장소의 제약 위반이 그대로 전파됩니다](#editing-moving-a-policy-to-a-category-already-taken-is-refused) | 거부 |
 | [superadmin 이 존재하지 않는 id 를 수정하면 대상을 찾을 수 없다는 이유로 거부됩니다](#editing-the-superadmin-editing-a-policy-id-nothing-answers-to-is-not-found) | 거부 |
+
+### batch_load_by_ids
+
+<a id="reading-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
+
+#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py): pass
+
+정책이 있고 superadmin 이 그 정책과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 에 해당하는 항목은 비어 있습니다
+
+Given
+
+- 카테고리가 다른 보존 정책 둘과, superadmin 한 명
+  - 보존 정책 logs: 30일 보존
+  - 보존 정책 login: 30일 보존
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- RetentionPolicyAdapter.batch_load_by_ids: user-1이 미리 만들어 둔 정책과 없는 id 하나를 한 번에 조회합니다
+
+Then
+
+- 요청한 순서대로 반환되고, 없는 id 에 해당하는 항목은 비어 있습니다
+  - len(items) = 3
+  - items[0].id: 미리 만들어 둔 정책의 id 와 같다
+  - items[0].entity_id: 미리 만들어 둔 정책의 id 와 같다
+  - id: 건너뜀: 데이터베이스가 생성합니다
+  - category = <RetentionCategory.LOGS: 'logs'>
+  - retention_period_days = 30
+  - enabled = True
+  - last_swept_at = None
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
+  - items[1].id: 미리 만들어 둔 정책의 id 와 같다
+  - items[1].entity_id: 미리 만들어 둔 정책의 id 와 같다
+  - id: 건너뜀: 데이터베이스가 생성합니다
+  - category = <RetentionCategory.LOGIN: 'login'>
+  - retention_period_days = 30
+  - enabled = True
+  - last_swept_at = None
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
+  - items[2] = None
 
 ### create
 

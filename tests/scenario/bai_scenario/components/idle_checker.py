@@ -27,6 +27,7 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
 )
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.response import (
     IdleCheckerAssignmentNode,
+    SearchIdleCheckerAssignmentPayload,
 )
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import IdleCheckerScopeTypeDTO
 from ai.backend.manager.api.adapters.idle_checker_assignment.adapter import (
@@ -89,6 +90,41 @@ class SomeCheckersAndSomeone(Given[Any, CheckersAndACaller]):
 
 
 @dataclass(frozen=True)
+class ACheckerAndADomainAndACaller:
+    """도메인에 켜지 않은 검사기 하나와 도메인 하나, 호출자 한 명."""
+
+    checker: IdleCheckerData
+    domain: DomainData
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class ACheckerAndADomain(Given[Any, ACheckerAndADomainAndACaller]):
+    """검사기 하나와 도메인 하나, 호출자 한 명을 둔다."""
+
+    role: UserRole = UserRole.USER
+
+    @override
+    def describe(self) -> str:
+        who = role_named(self.role)
+        return Says(
+            f"유휴 검사기 하나와 도메인 하나, {who} 한 명",
+            english=(f"one idle checker, one domain and one {in_language(who, Language.ENGLISH)}"),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> ACheckerAndADomainAndACaller:
+        checker = await seeding.creating(TestSeedIdleChecker())
+        domain = await seeding.creating(TestSeedDomain(name_hint="scope", description=WAS_HERE))
+        caller = await lay_a_caller(seeding, self.role)
+        return ACheckerAndADomainAndACaller(
+            checker=seeding.made(checker),
+            domain=seeding.made(domain),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
 class AssignmentsAndACaller:
     """도메인 여럿에 켜 둔 검사기 하나와, 할당 id 를 찾는 슈퍼관리자, 호출자."""
 
@@ -100,19 +136,32 @@ class AssignmentsAndACaller:
 
 @dataclass(frozen=True)
 class OneCheckerOnSomeDomains(Given[Any, AssignmentsAndACaller]):
-    """검사기 하나를 도메인 여럿에 켜 두고, 호출자 한 명을 둔다."""
+    """검사기 하나를 도메인 여럿에 켜 두고, 호출자 한 명을 둔다.
+
+    `another_checker`는 다른 검사기 하나를 첫 도메인에 더 켜 둔다.
+    """
 
     role: UserRole = UserRole.USER
     count: int = 2
+    another_checker: bool = False
 
     @override
     def describe(self) -> str:
         who = role_named(self.role)
+        besides = (
+            Says(
+                ", 다른 검사기 하나가 첫 도메인에 더 켜져 있습니다",
+                english=", and another checker is enabled on the first domain",
+            )
+            if self.another_checker
+            else ""
+        )
         return Says(
-            f"도메인 {self.count}개에 활성화해 둔 유휴 검사기 하나와, {who} 한 명",
+            f"도메인 {self.count}개에 활성화해 둔 유휴 검사기 하나와, {who} 한 명{besides}",
             english=(
                 f"one idle checker enabled on {self.count} domains and one "
                 f"{in_language(who, Language.ENGLISH)}"
+                f"{in_language(besides, Language.ENGLISH)}"
             ),
         )
 
@@ -125,6 +174,9 @@ class OneCheckerOnSomeDomains(Given[Any, AssignmentsAndACaller]):
         ]
         for domain in domains:
             await seeding.linking(AssignToDomain(), domain, checker)
+        if self.another_checker:
+            other = await seeding.creating(TestSeedIdleChecker())
+            await seeding.linking(AssignToDomain(), domains[0], other)
         operator = await lay_a_caller(seeding, UserRole.SUPERADMIN)
         caller = (
             operator if self.role == UserRole.SUPERADMIN else await lay_a_caller(seeding, self.role)
@@ -140,6 +192,14 @@ class OneCheckerOnSomeDomains(Given[Any, AssignmentsAndACaller]):
 @dataclass(frozen=True)
 class AssignmentsAnswered:
     """요청에 넣은 할당 id 와, 그 요청의 답."""
+
+    ids: tuple[IdleCheckerAssignmentID, ...]
+    payload: SearchIdleCheckerAssignmentPayload
+
+
+@dataclass(frozen=True)
+class PartialBulkAnswered:
+    """partial bulk 호출에 넣은 할당 id 와, 그 호출의 답."""
 
     ids: tuple[IdleCheckerAssignmentID, ...]
     payload: PartialBulkPayload[IdleCheckerAssignmentNode]
@@ -289,7 +349,188 @@ class NoCheckerIsPurged(Then[CheckersAndACaller, PartialBulkPayload[IdleCheckerN
 
 
 @dataclass(frozen=True)
-class EveryAssignmentComesBack(Then[AssignmentsAndACaller, AssignmentsAnswered]):
+class EveryAssignmentIsListed(Then[AssignmentsAndACaller, AssignmentsAnswered]):
+    """심은 할당이 모두 한 번씩 집계되고, 각각이 통째로 온다. id 순으로 본다.
+
+    검사기를 필터로 걸 때는 다른 검사기의 할당이 첫 도메인에 켜져 있다고 가정한다.
+    """
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "필터가 다른 검사기의 할당을 제외해, 심은 할당이 모두 한 번씩 집계되어 "
+            "전체가 반환됩니다",
+            english=(
+                "the filter excludes the other checker's assignment, so every assignment "
+                "seeded in advance is counted once and each comes back whole"
+            ),
+        )
+
+    @override
+    def look(
+        self, laid: AssignmentsAndACaller, answered: Answered[AssignmentsAnswered]
+    ) -> list[Verdict]:
+        answer = answered.response
+        if answer is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        payload = answer.payload
+        written = WrittenByThisRun(self.started)
+        got = sorted(payload.items, key=lambda one: one.id)
+        expected = sorted(answer.ids, key=lambda one: one)
+        seen: list[Verdict] = [
+            Same("total_count", payload.total_count, len(laid.domains)),
+            Same("items count", len(payload.items), len(laid.domains)),
+            Same("has_next_page", payload.has_next_page, False),
+            Same("has_previous_page", payload.has_previous_page, False),
+        ]
+        by_scope: dict[UUID, DomainData] = {domain.id: domain for domain in laid.domains}
+        for i, (node, seeded_id) in enumerate(zip(got, expected, strict=False)):
+            seen += [
+                Held[UUID](
+                    f"items[{i}].id",
+                    node.id,
+                    SameAs(
+                        seeded_id,
+                        Says(
+                            "id 순으로 읽은 미리 저장한 할당",
+                            english="the seeded assignment in the order read by id",
+                        ),
+                    ),
+                ),
+            ]
+            domain = by_scope.get(node.scope_id)
+            if domain is None:
+                seen.append(
+                    Same(
+                        f"items[{i}].scope_id",
+                        node.scope_id,
+                        Says("미리 저장한 도메인", english="a domain seeded in advance"),
+                    )
+                )
+                continue
+            seen += [
+                Same(f"items[{i}].scope_type", node.scope_type, IdleCheckerScopeTypeDTO.DOMAIN),
+                Held[UUID](
+                    f"items[{i}].scope_id",
+                    node.scope_id,
+                    SameAs(
+                        domain.id,
+                        Says("미리 저장한 도메인", english="the domain seeded in advance"),
+                    ),
+                ),
+                Held[IdleCheckerID](
+                    f"items[{i}].idle_checker_id",
+                    node.idle_checker_id,
+                    SameAs(
+                        laid.checker.id,
+                        Says("미리 저장한 검사기", english="the checker seeded in advance"),
+                    ),
+                ),
+                Same(f"items[{i}].enabled", node.enabled, True),
+                Held(f"items[{i}].created_at", node.created_at, written),
+                Held(f"items[{i}].updated_at", node.updated_at, written),
+            ]
+        return seen
+
+
+@dataclass(frozen=True)
+class OnlyTheScopedAssignmentsAreListed(Then[AssignmentsAndACaller, AssignmentsAnswered]):
+    """스코프로 지정한 도메인들의 할당만 한 번씩 집계되어 통째로 온다.
+
+    `when`이 도메인 순서의 마지막 하나를 스코프에서 뺀다.
+    """
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "스코프로 지정한 도메인들의 할당만 한 번씩 집계되어 전체가 반환되고, "
+            "스코프 밖 도메인의 할당은 반환되지 않습니다",
+            english=(
+                "only the assignments of the domains named in the scope are counted once and "
+                "each comes back whole, and the assignment of the domain outside the scope "
+                "does not come back"
+            ),
+        )
+
+    @override
+    def look(
+        self, laid: AssignmentsAndACaller, answered: Answered[AssignmentsAnswered]
+    ) -> list[Verdict]:
+        answer = answered.response
+        if answer is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        payload = answer.payload
+        written = WrittenByThisRun(self.started)
+        outside = laid.domains[-1]
+        got = sorted(payload.items, key=lambda one: one.id)
+        expected = sorted(answer.ids[:-1], key=lambda one: one)
+        by_scope: dict[UUID, DomainData] = {domain.id: domain for domain in laid.domains[:-1]}
+        seen: list[Verdict] = [
+            Same("total_count", payload.total_count, len(laid.domains) - 1),
+            Same("items count", len(payload.items), len(laid.domains) - 1),
+            Same("has_next_page", payload.has_next_page, False),
+            Same("has_previous_page", payload.has_previous_page, False),
+            Same(
+                "items in the domain outside the scope",
+                [node.id for node in payload.items if node.scope_id == outside.id],
+                [],
+            ),
+        ]
+        for i, (node, seeded_id) in enumerate(zip(got, expected, strict=False)):
+            seen += [
+                Held[UUID](
+                    f"items[{i}].id",
+                    node.id,
+                    SameAs(
+                        seeded_id,
+                        Says(
+                            "id 순으로 읽은 미리 저장한 할당",
+                            english="the seeded assignment in the order read by id",
+                        ),
+                    ),
+                ),
+            ]
+            domain = by_scope.get(node.scope_id)
+            if domain is None:
+                seen.append(
+                    Same(
+                        f"items[{i}].scope_id",
+                        node.scope_id,
+                        Says("미리 저장한 도메인", english="a domain seeded in advance"),
+                    )
+                )
+                continue
+            seen += [
+                Same(f"items[{i}].scope_type", node.scope_type, IdleCheckerScopeTypeDTO.DOMAIN),
+                Held[UUID](
+                    f"items[{i}].scope_id",
+                    node.scope_id,
+                    SameAs(
+                        domain.id,
+                        Says("미리 저장한 도메인", english="the domain seeded in advance"),
+                    ),
+                ),
+                Held[IdleCheckerID](
+                    f"items[{i}].idle_checker_id",
+                    node.idle_checker_id,
+                    SameAs(
+                        laid.checker.id,
+                        Says("미리 저장한 검사기", english="the checker seeded in advance"),
+                    ),
+                ),
+                Same(f"items[{i}].enabled", node.enabled, True),
+                Held(f"items[{i}].created_at", node.created_at, written),
+                Held(f"items[{i}].updated_at", node.updated_at, written),
+            ]
+        return seen
+
+
+@dataclass(frozen=True)
+class EveryAssignmentComesBack(Then[AssignmentsAndACaller, PartialBulkAnswered]):
     """요청한 할당이 모두 처리된 목록에 온다. `missing`이 있으면 그 id 만 실패 목록에 온다."""
 
     started: datetime
@@ -316,7 +557,7 @@ class EveryAssignmentComesBack(Then[AssignmentsAndACaller, AssignmentsAnswered])
 
     @override
     def look(
-        self, laid: AssignmentsAndACaller, answered: Answered[AssignmentsAnswered]
+        self, laid: AssignmentsAndACaller, answered: Answered[PartialBulkAnswered]
     ) -> list[Verdict]:
         answer = answered.response
         if answer is None:
@@ -386,7 +627,7 @@ class EveryAssignmentComesBack(Then[AssignmentsAndACaller, AssignmentsAnswered])
 
 
 @dataclass(frozen=True)
-class NoAssignmentIsProcessed(Then[AssignmentsAndACaller, AssignmentsAnswered]):
+class NoAssignmentIsProcessed(Then[AssignmentsAndACaller, PartialBulkAnswered]):
     """처리된 할당 없이, 요청한 할당이 모두 같은 이유로 실패 목록에 온다."""
 
     reason: str
@@ -403,7 +644,7 @@ class NoAssignmentIsProcessed(Then[AssignmentsAndACaller, AssignmentsAnswered]):
 
     @override
     def look(
-        self, laid: AssignmentsAndACaller, answered: Answered[AssignmentsAnswered]
+        self, laid: AssignmentsAndACaller, answered: Answered[PartialBulkAnswered]
     ) -> list[Verdict]:
         answer = answered.response
         if answer is None:

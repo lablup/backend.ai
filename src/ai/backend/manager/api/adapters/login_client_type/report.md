@@ -6,7 +6,7 @@ Scenario: incomplete 4 / 8
 
 - built from ops (8)
   - admin_create: representative success ✓ · representative rejection ✓
-  - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_by_ids: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - get: representative success ✓ · representative rejection ✓
   - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - partial_bulk_update: representative success ✓ · representative rejection ✗: SCENARIO-GAP
@@ -23,6 +23,12 @@ Scenario: incomplete 4 / 8
 | [when a login client type with the same name already exists, creating another with that name is rejected as a duplicate name](#creating-a-login-client-type-name-already-taken-is-refused) | rejected |
 | [when a user who is not the superadmin creates a login client type, it is rejected because the role is insufficient](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-login-client-type) | rejected |
 | [turning permission enforcement off still does not let a user who is not the superadmin create a login client type](#creating-turning-enforcement-off-does-not-let-a-user-create-a-login-client-type) | rejected |
+
+**batch_load_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin batch-loads two login client types created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | answered |
 
 **get**
 
@@ -212,6 +218,50 @@ Then
 
 - the call is rejected
   - rejected: InsufficientPrivilege
+
+### batch_load_by_ids
+
+<a id="reading-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
+
+#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/login_client_type/test_reading.py): pass
+
+when the superadmin batch-loads two login client types created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty
+
+Given
+
+- 2 login client types and one superadmin
+  - Login client type wanted-1
+  - Login client type other-1
+  - Domain home-1
+  - Prepare a user granted read permission on login_client_type in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every login_client_type
+    - superadmin user-1: holds Role public-reader-1
+
+When
+
+- LoginClientTypeAdapter.batch_load_by_ids: user-1 batch-loads the 2 login client types created in advance and one unknown id
+
+Then
+
+- they come back in the order asked and the item for an unknown id is empty
+  - len(items) = 3
+  - id: skipped: the database generates it
+  - name = 'wanted-1'
+  - description = 'a login client type created in advance'
+  - created_at: the time this run wrote
+  - modified_at: the time this run wrote
+  - id: skipped: the database generates it
+  - name = 'other-1'
+  - description = 'a login client type created in advance'
+  - created_at: the time this run wrote
+  - modified_at: the time this run wrote
+  - items[2] = None
 
 ### get
 
