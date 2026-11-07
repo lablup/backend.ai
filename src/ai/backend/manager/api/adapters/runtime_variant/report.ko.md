@@ -2,7 +2,7 @@
 
 [배경](/src/ai/backend/manager/api/adapters/runtime_variant/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/runtime_variant/adapter.py)
 
-시나리오: 미완성 4 / 10
+시나리오: 미완성 3 / 10
 
 - ops 구성 (7)
   - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
@@ -10,7 +10,7 @@
   - get: 대표 성공 ✓ · 대표 거부 ✓
   - partial_bulk_update: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
   - resolve_by_name: 대표 성공 ✓ · 대표 거부 ✓
-  - search: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
+  - search: 대표 성공 ✓ · 대표 거부 ✓
   - update: 대표 성공 ✓ · 대표 거부 ✓
 - 직접 구현 (3)
   - bulk_delete: 성공 있음 3 · 거부 없음 (partial_bulk): SCENARIO-GAP
@@ -62,6 +62,7 @@
 | [인퍼런스 런타임 종류 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 인퍼런스 런타임 종류만 남습니다](#searching-a-name-filter-narrows-the-answer-to-the-variant-it-names) | 성공 |
 | [인퍼런스 런타임 종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계됩니다](#searching-a-user-granted-nothing-counts-every-variant-laid) | 성공 |
 | [인퍼런스 런타임 종류 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답합니다](#searching-omitting-the-page-size-answers-ten-variants-and-a-next-page) | 성공 |
+| [인퍼런스 런타임 종류를 읽을 수 있는 사용자가 읽을 수 없는 배포를 사용 필터로 지정해 조회하면, 권한 부족으로 거부됩니다](#searching-naming-a-deployment-the-caller-cannot-read-is-refused) | 거부 |
 
 **update**
 
@@ -649,6 +650,46 @@ Then
   - total_count = 11
   - has_next_page = True
   - has_previous_page = False
+
+<a id="searching-naming-a-deployment-the-caller-cannot-read-is-refused"></a>
+
+#### [naming-a-deployment-the-caller-cannot-read-is-refused](/tests/scenario/bai_scenario/manager/runtime_variant/test_searching.py): pass
+
+인퍼런스 런타임 종류를 읽을 수 있는 사용자가 읽을 수 없는 배포를 사용 필터로 지정해 조회하면, 권한 부족으로 거부됩니다
+
+Given
+
+- 인퍼런스 런타임 종류 2개와, 다른 프로젝트의 배포 하나, 그 배포를 읽을 수 없는 사용자 한 명
+  - 인퍼런스 런타임 종류 wanted-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+  - 인퍼런스 런타임 종류 other-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+  - 도메인 home-1
+  - public 에서 runtime_variant 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 public-reader-1: runtime_variant 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+  - 도메인 home-2
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+      - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 theirs-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+
+When
+
+- RuntimeVariantAdapter.search: user-1이 읽을 수 없는 배포를 사용 필터로 지정해 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
 
 ### update
 
