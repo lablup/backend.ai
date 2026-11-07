@@ -5,23 +5,20 @@
 Scenario: complete
 
 - ops + direct implementation (4)
-  - admin_search: success present 4 · rejection present 1 (atomic_bulk_scoped_search_ops, global_searcher_ops, partial_bulk)
+  - admin_search: success present 1 · rejection present 1 (atomic_bulk_scoped_search_ops, global_searcher_ops, partial_bulk)
   - batch_load_by_ids: success present 2 · rejection present 1 (atomic_bulk_scoped_search_ops, partial_bulk, partial_bulk_get_ops)
   - batch_load_by_uuids: success present 1 · rejection present 2 (atomic_bulk_scoped_search_ops, partial_bulk, partial_bulk_get_ops)
   - batch_load_container_counts: success present 2 · rejection present 1 (partial_bulk, partial_bulk_get_ops)
 - direct implementation (3)
   - get_total_resources: success present 1 · rejection present 1 (global_scope)
-  - update_resource_group: success present 2 · rejection present 3 (global_scope)
+  - update_resource_group: success present 1 · rejection present 2 (global_scope)
   - update_resource_group_from_body: success present 1 · rejection present 1 (global_scope)
 
 **admin_search**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin searches ordered by id ascending, every agent registered in advance comes back whole](#searching-the-superadmin-orders-the-agents-by-name) | answered |
-| [when the superadmin searches every agent, every agent registered in advance comes back whole](#searching-the-superadmin-pages-through-every-agent) | answered |
-| [when the superadmin searches by an agent name, only that agent comes back](#searching-the-superadmin-picks-an-agent-by-its-name) | answered |
-| [when the superadmin searches by a resource group name, only the agents of that group come back](#searching-the-superadmin-picks-the-agents-of-a-resource-group) | answered |
+| [when the superadmin searches with a condition that keeps one agent and an order, only that agent comes back as one page](#searching-the-superadmin-picks-an-agent-by-its-name) | answered |
 | [the search is open to the superadmin alone, so a regular user holding no permission is rejected for lack of privilege](#searching-a-user-granted-nothing-may-not-search-the-agents) | rejected |
 
 **batch_load_by_ids**
@@ -60,10 +57,8 @@ Scenario: complete
 | scenario | verdict |
 |---|---|
 | [when an agent designated by a session of another group is moved with force, the designation is dropped and the answer carrying the new group comes back](#changing_resource_group-force-moves-an-agent-designated-by-another-groups-session) | answered |
-| [when the superadmin moves an agent to another resource group, the answer carrying the new group comes back](#changing_resource_group-the-superadmin-moves-an-agent-to-another-resource-group) | answered |
 | [the move is open to the superadmin alone, so a regular user holding no permission is rejected for lack of privilege](#changing_resource_group-a-user-granted-nothing-may-not-move-an-agent) | rejected |
 | [when an agent designated by a session of another group is moved without force, the call is rejected as conflicting](#changing_resource_group-an-agent-designated-by-another-groups-session-needs-force) | rejected |
-| [when the superadmin moves an agent under the reschedule policy, the call is rejected as not supported yet](#changing_resource_group-asking-to-reschedule-the-conflicting-sessions-is-not-supported) | rejected |
 
 **update_resource_group_from_body**
 
@@ -74,153 +69,11 @@ Scenario: complete
 
 ### admin_search
 
-<a id="searching-the-superadmin-orders-the-agents-by-name"></a>
-
-#### [the-superadmin-orders-the-agents-by-name](/tests/scenario/bai_scenario/manager/agent/test_searching.py): pass
-
-when the superadmin searches ordered by id ascending, every agent registered in advance comes back whole
-
-Given
-
-- 2 agents and one superadmin
-  - Resource group mine-1: uses the fifo scheduler
-  - Agent agent-1: alive, and has not reported any slot yet
-  - Agent agent-2: alive, and has not reported any slot yet
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- AgentAdapter.admin_search: user-1 searches the agents ordered by id ascending
-
-Then
-
-- the 2 agents registered in advance come back whole
-  - items count = 2
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-  - items[0].present = True
-  - items[0].id = 'agent-1'
-  - items[0].entity_id: same as the id of the agent laid in advance
-  - items[0].uuid: same as the id of the agent laid in advance
-  - items[0].capacity = {}
-  - items[0].used = {}
-  - items[0].free = {}
-  - items[0].status = 'ALIVE'
-  - items[0].status_changed = None
-  - items[0].first_contact: the time this run wrote
-  - items[0].lost_at = None
-  - items[0].schedulable = True
-  - items[0].architecture = 'x86_64'
-  - items[0].version = '0.0.0'
-  - items[0].auto_terminate_abusing_kernel = False
-  - items[0].compute_plugins = None
-  - items[0].region = 'local'
-  - items[0].addr = 'tcp://agent-1:6001'
-  - items[0].scaling_group = 'mine-1'
-  - items[0].permissions = ['read_attribute', 'update_attribute', 'create_compute_session', 'create_service']
-  - items[1].present = True
-  - items[1].id = 'agent-2'
-  - items[1].entity_id: same as the id of the agent laid in advance
-  - items[1].uuid: same as the id of the agent laid in advance
-  - items[1].capacity = {}
-  - items[1].used = {}
-  - items[1].free = {}
-  - items[1].status = 'ALIVE'
-  - items[1].status_changed = None
-  - items[1].first_contact: the time this run wrote
-  - items[1].lost_at = None
-  - items[1].schedulable = True
-  - items[1].architecture = 'x86_64'
-  - items[1].version = '0.0.0'
-  - items[1].auto_terminate_abusing_kernel = False
-  - items[1].compute_plugins = None
-  - items[1].region = 'local'
-  - items[1].addr = 'tcp://agent-2:6001'
-  - items[1].scaling_group = 'mine-1'
-  - items[1].permissions = ['read_attribute', 'update_attribute', 'create_compute_session', 'create_service']
-
-<a id="searching-the-superadmin-pages-through-every-agent"></a>
-
-#### [the-superadmin-pages-through-every-agent](/tests/scenario/bai_scenario/manager/agent/test_searching.py): pass
-
-when the superadmin searches every agent, every agent registered in advance comes back whole
-
-Given
-
-- 2 agents and one superadmin
-  - Resource group mine-1: uses the fifo scheduler
-  - Agent agent-1: alive, and has not reported any slot yet
-  - Agent agent-2: alive, and has not reported any slot yet
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- AgentAdapter.admin_search: user-1 searches every agent
-
-Then
-
-- the 2 agents registered in advance come back whole
-  - items count = 2
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-  - items[0].present = True
-  - items[0].id = 'agent-1'
-  - items[0].entity_id: same as the id of the agent laid in advance
-  - items[0].uuid: same as the id of the agent laid in advance
-  - items[0].capacity = {}
-  - items[0].used = {}
-  - items[0].free = {}
-  - items[0].status = 'ALIVE'
-  - items[0].status_changed = None
-  - items[0].first_contact: the time this run wrote
-  - items[0].lost_at = None
-  - items[0].schedulable = True
-  - items[0].architecture = 'x86_64'
-  - items[0].version = '0.0.0'
-  - items[0].auto_terminate_abusing_kernel = False
-  - items[0].compute_plugins = None
-  - items[0].region = 'local'
-  - items[0].addr = 'tcp://agent-1:6001'
-  - items[0].scaling_group = 'mine-1'
-  - items[0].permissions = ['read_attribute', 'update_attribute', 'create_compute_session', 'create_service']
-  - items[1].present = True
-  - items[1].id = 'agent-2'
-  - items[1].entity_id: same as the id of the agent laid in advance
-  - items[1].uuid: same as the id of the agent laid in advance
-  - items[1].capacity = {}
-  - items[1].used = {}
-  - items[1].free = {}
-  - items[1].status = 'ALIVE'
-  - items[1].status_changed = None
-  - items[1].first_contact: the time this run wrote
-  - items[1].lost_at = None
-  - items[1].schedulable = True
-  - items[1].architecture = 'x86_64'
-  - items[1].version = '0.0.0'
-  - items[1].auto_terminate_abusing_kernel = False
-  - items[1].compute_plugins = None
-  - items[1].region = 'local'
-  - items[1].addr = 'tcp://agent-2:6001'
-  - items[1].scaling_group = 'mine-1'
-  - items[1].permissions = ['read_attribute', 'update_attribute', 'create_compute_session', 'create_service']
-
 <a id="searching-the-superadmin-picks-an-agent-by-its-name"></a>
 
 #### [the-superadmin-picks-an-agent-by-its-name](/tests/scenario/bai_scenario/manager/agent/test_searching.py): pass
 
-when the superadmin searches by an agent name, only that agent comes back
+when the superadmin searches with a condition that keeps one agent and an order, only that agent comes back as one page
 
 Given
 
@@ -237,7 +90,7 @@ Given
 
 When
 
-- AgentAdapter.admin_search: user-1 searches the agents naming agent-2
+- AgentAdapter.admin_search: user-1 searches the agents with a condition that keeps agent-1 and orders by id ascending, one item per page
 
 Then
 
@@ -247,57 +100,6 @@ Then
   - has_next_page = False
   - has_previous_page = False
   - items[0].present = True
-  - items[0].id = 'agent-2'
-  - items[0].entity_id: same as the id of the agent laid in advance
-  - items[0].uuid: same as the id of the agent laid in advance
-  - items[0].capacity = {}
-  - items[0].used = {}
-  - items[0].free = {}
-  - items[0].status = 'ALIVE'
-  - items[0].status_changed = None
-  - items[0].first_contact: the time this run wrote
-  - items[0].lost_at = None
-  - items[0].schedulable = True
-  - items[0].architecture = 'x86_64'
-  - items[0].version = '0.0.0'
-  - items[0].auto_terminate_abusing_kernel = False
-  - items[0].compute_plugins = None
-  - items[0].region = 'local'
-  - items[0].addr = 'tcp://agent-2:6001'
-  - items[0].scaling_group = 'mine-1'
-  - items[0].permissions = ['read_attribute', 'update_attribute', 'create_compute_session', 'create_service']
-
-<a id="searching-the-superadmin-picks-the-agents-of-a-resource-group"></a>
-
-#### [the-superadmin-picks-the-agents-of-a-resource-group](/tests/scenario/bai_scenario/manager/agent/test_searching.py): pass
-
-when the superadmin searches by a resource group name, only the agents of that group come back
-
-Given
-
-- 2 agents and one superadmin
-  - Resource group mine-1: uses the fifo scheduler
-  - Agent agent-1: alive, and has not reported any slot yet
-  - Agent agent-2: alive, and has not reported any slot yet
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- AgentAdapter.admin_search: user-1 searches the agents in resource group mine-1
-
-Then
-
-- the 2 agents registered in advance come back whole
-  - items count = 2
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-  - items[0].present = True
   - items[0].id = 'agent-1'
   - items[0].entity_id: same as the id of the agent laid in advance
   - items[0].uuid: same as the id of the agent laid in advance
@@ -317,26 +119,6 @@ Then
   - items[0].addr = 'tcp://agent-1:6001'
   - items[0].scaling_group = 'mine-1'
   - items[0].permissions = ['read_attribute', 'update_attribute', 'create_compute_session', 'create_service']
-  - items[1].present = True
-  - items[1].id = 'agent-2'
-  - items[1].entity_id: same as the id of the agent laid in advance
-  - items[1].uuid: same as the id of the agent laid in advance
-  - items[1].capacity = {}
-  - items[1].used = {}
-  - items[1].free = {}
-  - items[1].status = 'ALIVE'
-  - items[1].status_changed = None
-  - items[1].first_contact: the time this run wrote
-  - items[1].lost_at = None
-  - items[1].schedulable = True
-  - items[1].architecture = 'x86_64'
-  - items[1].version = '0.0.0'
-  - items[1].auto_terminate_abusing_kernel = False
-  - items[1].compute_plugins = None
-  - items[1].region = 'local'
-  - items[1].addr = 'tcp://agent-2:6001'
-  - items[1].scaling_group = 'mine-1'
-  - items[1].permissions = ['read_attribute', 'update_attribute', 'create_compute_session', 'create_service']
 
 <a id="searching-a-user-granted-nothing-may-not-search-the-agents"></a>
 
@@ -358,7 +140,7 @@ Given
 
 When
 
-- AgentAdapter.admin_search: user-1 searches every agent
+- AgentAdapter.admin_search: user-1 searches the agents with a condition that keeps agent-1 and orders by id ascending, one item per page
 
 Then
 
@@ -855,38 +637,6 @@ Then
   - conflicting_session_ids = []
   - terminating_session_ids = []
 
-<a id="changing_resource_group-the-superadmin-moves-an-agent-to-another-resource-group"></a>
-
-#### [the-superadmin-moves-an-agent-to-another-resource-group](/tests/scenario/bai_scenario/manager/agent/test_changing_resource_group.py): pass
-
-when the superadmin moves an agent to another resource group, the answer carrying the new group comes back
-
-Given
-
-- one agent, a group to move it to, and one superadmin
-  - Resource group before-1: uses the fifo scheduler
-  - Agent agent-1: alive, and has not reported any slot yet
-  - Resource group after-1: uses the fifo scheduler
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- AgentAdapter.update_resource_group: user-1 moves agent agent-1 to group after-1
-
-Then
-
-- the answer carrying the new resource group comes back
-  - agent_id = 'agent-1'
-  - resource_group_id: same as the id of the group laid in advance to move to
-  - policy = 'terminate'
-  - conflicting_session_ids = []
-  - terminating_session_ids = []
-
 <a id="changing_resource_group-a-user-granted-nothing-may-not-move-an-agent"></a>
 
 #### [a-user-granted-nothing-may-not-move-an-agent](/tests/scenario/bai_scenario/manager/agent/test_changing_resource_group.py): pass
@@ -954,34 +704,6 @@ Then
 
 - the call is rejected
   - rejected: AgentHasConflictingSessions
-
-<a id="changing_resource_group-asking-to-reschedule-the-conflicting-sessions-is-not-supported"></a>
-
-#### [asking-to-reschedule-the-conflicting-sessions-is-not-supported](/tests/scenario/bai_scenario/manager/agent/test_changing_resource_group.py): pass
-
-when the superadmin moves an agent under the reschedule policy, the call is rejected as not supported yet
-
-Given
-
-- one agent, a group to move it to, and one superadmin
-  - Resource group before-1: uses the fifo scheduler
-  - Agent agent-1: alive, and has not reported any slot yet
-  - Resource group after-1: uses the fifo scheduler
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- AgentAdapter.update_resource_group: user-1 under the reschedule policy moves agent agent-1 to group after-1
-
-Then
-
-- the call is rejected
-  - rejected: ConflictingSessionRescheduleNotSupported
 
 ### update_resource_group_from_body
 

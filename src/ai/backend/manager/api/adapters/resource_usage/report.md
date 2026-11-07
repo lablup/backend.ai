@@ -45,21 +45,21 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reading in the group pages through domain usage buckets where none are laid, an empty page comes back](#searching-domain-search-domain-returns-an-empty-page) | answered |
+| [when a regular user granted permission to read usage in the resource group pages through domain usage buckets where none are laid, an empty page comes back](#searching-domain-search-domain-returns-an-empty-page) | answered |
 | [when a user granted nothing pages through domain usage buckets, the call is rejected](#searching-domain-search-domain-is-refused-to-a-caller-without-permission) | rejected |
 
 **domain_search_project**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reading in the group pages through project usage buckets where none are laid, an empty page comes back](#searching-domain-search-project-returns-an-empty-page) | answered |
+| [when a regular user granted permission to read usage in the resource group pages through project usage buckets where none are laid, an empty page comes back](#searching-domain-search-project-returns-an-empty-page) | answered |
 | [when a user granted nothing pages through project usage buckets, the call is rejected](#searching-domain-search-project-is-refused-to-a-caller-without-permission) | rejected |
 
 **domain_search_user**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reading in the group pages through user usage buckets where none are laid, an empty page comes back](#searching-domain-search-user-returns-an-empty-page) | answered |
+| [when a regular user granted permission to read usage in the resource group pages through user usage buckets where none are laid, an empty page comes back](#searching-domain-search-user-returns-an-empty-page) | answered |
 | [when a user granted nothing pages through user usage buckets, the call is rejected](#searching-domain-search-user-is-refused-to-a-caller-without-permission) | rejected |
 
 **gql_admin_search_domain**
@@ -87,14 +87,14 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin pages through domain usage buckets through the GQL path where none are laid, an empty page comes back](#gql_searching-gql-search-domain-scoped-returns-an-empty-page) | answered |
+| [when a regular user granted permission to read usage in the resource group pages through domain usage buckets through the GQL path where none are laid, an empty page comes back](#gql_searching-gql-search-domain-scoped-returns-an-empty-page) | answered |
 | [when a user granted nothing pages through domain usage buckets through the GQL path, the call is rejected](#gql_searching-gql-search-domain-scoped-is-refused-to-a-caller-without-permission) | rejected |
 
 **gql_search_project_scoped**
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin pages through project usage buckets through the GQL path where none are laid, an empty page comes back](#gql_searching-gql-search-project-scoped-returns-an-empty-page) | answered |
+| [when a regular user granted permission to read usage in the resource group pages through project usage buckets through the GQL path where none are laid, an empty page comes back](#gql_searching-gql-search-project-scoped-returns-an-empty-page) | answered |
 | [when a user granted nothing pages through project usage buckets through the GQL path, the call is rejected](#gql_searching-gql-search-project-scoped-is-refused-to-a-caller-without-permission) | rejected |
 
 **gql_search_project_unscoped**
@@ -108,7 +108,7 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin pages through user usage buckets through the GQL path where none are laid, an empty page comes back](#gql_searching-gql-search-user-scoped-returns-an-empty-page) | answered |
+| [when a regular user granted permission to read usage in the resource group pages through user usage buckets through the GQL path where none are laid, an empty page comes back](#gql_searching-gql-search-user-scoped-returns-an-empty-page) | answered |
 | [when a user granted nothing pages through user usage buckets through the GQL path, the call is rejected](#gql_searching-gql-search-user-scoped-is-refused-to-a-caller-without-permission) | rejected |
 
 **gql_search_user_unscoped**
@@ -343,11 +343,11 @@ Then
 
 #### [domain-search-domain-returns-an-empty-page](/tests/scenario/bai_scenario/manager/resource_usage/test_searching.py): pass
 
-when the superadmin reading in the group pages through domain usage buckets where none are laid, an empty page comes back
+when a regular user granted permission to read usage in the resource group pages through domain usage buckets where none are laid, an empty page comes back
 
 Given
 
-- a domain, resource group, project and user to page usage buckets for, and one superadmin
+- a domain, resource group, project and user to page usage buckets for, and one regular user granted permission to read domain, project and user usage in the resource group
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -358,11 +358,16 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
   - Image image-1: x86_64 image
+  - Role usage-reader-1: applies only within the scope it is granted in
+  - Role usage-reader-1: READ allowed on every domain
+  - Role usage-reader-1: READ allowed on every project
+  - Role usage-reader-1: READ allowed on every user
+  - regular user user-2: holds Role usage-reader-1
 
 When
 
@@ -416,11 +421,11 @@ Then
 
 #### [domain-search-project-returns-an-empty-page](/tests/scenario/bai_scenario/manager/resource_usage/test_searching.py): pass
 
-when the superadmin reading in the group pages through project usage buckets where none are laid, an empty page comes back
+when a regular user granted permission to read usage in the resource group pages through project usage buckets where none are laid, an empty page comes back
 
 Given
 
-- a domain, resource group, project and user to page usage buckets for, and one superadmin
+- a domain, resource group, project and user to page usage buckets for, and one regular user granted permission to read domain, project and user usage in the resource group
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -431,11 +436,16 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
   - Image image-1: x86_64 image
+  - Role usage-reader-1: applies only within the scope it is granted in
+  - Role usage-reader-1: READ allowed on every domain
+  - Role usage-reader-1: READ allowed on every project
+  - Role usage-reader-1: READ allowed on every user
+  - regular user user-2: holds Role usage-reader-1
 
 When
 
@@ -489,11 +499,11 @@ Then
 
 #### [domain-search-user-returns-an-empty-page](/tests/scenario/bai_scenario/manager/resource_usage/test_searching.py): pass
 
-when the superadmin reading in the group pages through user usage buckets where none are laid, an empty page comes back
+when a regular user granted permission to read usage in the resource group pages through user usage buckets where none are laid, an empty page comes back
 
 Given
 
-- a domain, resource group, project and user to page usage buckets for, and one superadmin
+- a domain, resource group, project and user to page usage buckets for, and one regular user granted permission to read domain, project and user usage in the resource group
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -504,11 +514,16 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
   - Image image-1: x86_64 image
+  - Role usage-reader-1: applies only within the scope it is granted in
+  - Role usage-reader-1: READ allowed on every domain
+  - Role usage-reader-1: READ allowed on every project
+  - Role usage-reader-1: READ allowed on every user
+  - regular user user-2: holds Role usage-reader-1
 
 When
 
@@ -781,11 +796,11 @@ Then
 
 #### [gql-search-domain-scoped-returns-an-empty-page](/tests/scenario/bai_scenario/manager/resource_usage/test_gql_searching.py): pass
 
-when the superadmin pages through domain usage buckets through the GQL path where none are laid, an empty page comes back
+when a regular user granted permission to read usage in the resource group pages through domain usage buckets through the GQL path where none are laid, an empty page comes back
 
 Given
 
-- a domain, resource group, project and user to page usage buckets for, and one superadmin
+- a domain, resource group, project and user to page usage buckets for, and one regular user granted permission to read domain, project and user usage in the resource group
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -796,11 +811,16 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
   - Image image-1: x86_64 image
+  - Role usage-reader-1: applies only within the scope it is granted in
+  - Role usage-reader-1: READ allowed on every domain
+  - Role usage-reader-1: READ allowed on every project
+  - Role usage-reader-1: READ allowed on every user
+  - regular user user-2: holds Role usage-reader-1
 
 When
 
@@ -854,11 +874,11 @@ Then
 
 #### [gql-search-project-scoped-returns-an-empty-page](/tests/scenario/bai_scenario/manager/resource_usage/test_gql_searching.py): pass
 
-when the superadmin pages through project usage buckets through the GQL path where none are laid, an empty page comes back
+when a regular user granted permission to read usage in the resource group pages through project usage buckets through the GQL path where none are laid, an empty page comes back
 
 Given
 
-- a domain, resource group, project and user to page usage buckets for, and one superadmin
+- a domain, resource group, project and user to page usage buckets for, and one regular user granted permission to read domain, project and user usage in the resource group
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -869,11 +889,16 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
   - Image image-1: x86_64 image
+  - Role usage-reader-1: applies only within the scope it is granted in
+  - Role usage-reader-1: READ allowed on every domain
+  - Role usage-reader-1: READ allowed on every project
+  - Role usage-reader-1: READ allowed on every user
+  - regular user user-2: holds Role usage-reader-1
 
 When
 
@@ -1000,11 +1025,11 @@ Then
 
 #### [gql-search-user-scoped-returns-an-empty-page](/tests/scenario/bai_scenario/manager/resource_usage/test_gql_searching.py): pass
 
-when the superadmin pages through user usage buckets through the GQL path where none are laid, an empty page comes back
+when a regular user granted permission to read usage in the resource group pages through user usage buckets through the GQL path where none are laid, an empty page comes back
 
 Given
 
-- a domain, resource group, project and user to page usage buckets for, and one superadmin
+- a domain, resource group, project and user to page usage buckets for, and one regular user granted permission to read domain, project and user usage in the resource group
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1015,11 +1040,16 @@ Given
     - regular user user-1: has their own keypair and personal project
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-2: has their own keypair and personal project
+    - regular user user-2: has their own keypair and personal project
   - Keypair policy keypair-policy-2: up to 5 concurrent sessions
   - regular user user-1: has one more active keypair besides the default one
   - Container registry registry-1: image source
   - Image image-1: x86_64 image
+  - Role usage-reader-1: applies only within the scope it is granted in
+  - Role usage-reader-1: READ allowed on every domain
+  - Role usage-reader-1: READ allowed on every project
+  - Role usage-reader-1: READ allowed on every user
+  - regular user user-2: holds Role usage-reader-1
 
 When
 

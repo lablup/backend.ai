@@ -57,7 +57,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [도메인 둘을 읽을 수 있는 사용자가 두 도메인의 라벨을 한 번에 훑으면, 붙인 라벨 둘이 모두 통째로 옵니다](#searching-a-reader-pages-through-the-labels-of-two-entities) | 성공 |
+| [도메인 둘을 읽을 수 있는 사용자가 범위에 댄 두 도메인의 라벨을 키 하나로 좁혀 한 페이지씩 훑으면, 그 키의 라벨만 옵니다](#searching-a-reader-pages-through-the-labels-of-two-entities) | 성공 |
 | [아무 권한도 없는 사용자가 도메인의 라벨을 훑으면 권한 부족으로 거부됩니다](#searching-a-user-granted-nothing-cannot-page-through-the-named-scopes) | 거부 |
 
 **search_on**
@@ -867,16 +867,18 @@ Then
 
 #### [a-reader-pages-through-the-labels-of-two-entities](/tests/scenario/bai_scenario/manager/entity_label/test_searching.py): pass
 
-도메인 둘을 읽을 수 있는 사용자가 두 도메인의 라벨을 한 번에 훑으면, 붙인 라벨 둘이 모두 통째로 옵니다
+도메인 둘을 읽을 수 있는 사용자가 범위에 댄 두 도메인의 라벨을 키 하나로 좁혀 한 페이지씩 훑으면, 그 키의 라벨만 옵니다
 
 Given
 
-- 라벨 1개씩 붙은 도메인 2개와, 그중 2개를 읽을 수 있는 user 한 명
+- 라벨 2개씩 붙은 도메인 2개와, 그중 2개를 읽을 수 있는 범위에 대지 않는 도메인 1개도 읽을 수 있는 user 한 명
   - 도메인 home-1
   - 도메인 target-1
   - 도메인 target-2
   - 도메인 target-1: 라벨 team=before
+  - 도메인 target-1: 라벨 tier=before
   - 도메인 target-2: 라벨 team=before
+  - 도메인 target-2: 라벨 tier=before
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
@@ -889,10 +891,16 @@ Given
     - 역할 domain-reader-2: 부여된 스코프 안에서만 적용됩니다
     - 역할 domain-reader-2: domain 전체에 READ 허용
     - 일반 사용자 user-1: 역할 domain-reader-2 보유
+    - 역할 domain-reader-3: 부여된 스코프 안에서만 적용됩니다
+    - 역할 domain-reader-3: domain 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 domain-reader-3 보유
+  - 도메인 elsewhere-1
+  - 도메인 elsewhere-1: 라벨 team=before
+  - 도메인 elsewhere-1: 라벨 tier=before
 
 When
 
-- EntityLabelAdapter.search: user-1이 도메인 2개의 라벨을 한 번에 훑습니다
+- EntityLabelAdapter.search: user-1이 도메인 2개의 라벨을 한 번에 훑되 team 키만 골라 한 페이지씩 봅니다
 
 Then
 
@@ -957,7 +965,7 @@ Then
 
 Given
 
-- 라벨 2개씩 붙은 도메인 1개와, 그중 1개를 읽을 수 있는 user 한 명
+- 라벨 2개씩 붙은 도메인 1개와, 그중 1개를 읽을 수 있는 범위에 대지 않는 도메인 1개도 읽을 수 있는 user 한 명
   - 도메인 home-1
   - 도메인 target-1
   - 도메인 target-1: 라벨 tier=before
@@ -971,6 +979,12 @@ Given
     - 역할 domain-reader-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 domain-reader-1: domain 전체에 READ 허용
     - 일반 사용자 user-1: 역할 domain-reader-1 보유
+    - 역할 domain-reader-2: 부여된 스코프 안에서만 적용됩니다
+    - 역할 domain-reader-2: domain 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 domain-reader-2 보유
+  - 도메인 elsewhere-1
+  - 도메인 elsewhere-1: 라벨 tier=before
+  - 도메인 elsewhere-1: 라벨 team=before
 
 When
 
