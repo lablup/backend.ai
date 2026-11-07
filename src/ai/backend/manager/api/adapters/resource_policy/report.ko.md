@@ -153,21 +153,21 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 있는 이름과 없는 이름으로 키페어 정책 id 를 여럿 조회하면, 있는 이름에는 그 정책의 id, 없는 이름에는 빈 값이 응답으로 옵니다](#looking_up-the-superadmin-looks-up-several-keypair-policy-names) | 성공 |
+| [아무 권한도 받지 않은 사용자가 있는 이름과 없는 이름으로 키페어 정책 id 를 여럿 조회하면, 있는 이름에는 그 정책의 id, 없는 이름에는 빈 값이 응답으로 옵니다. 이 호출은 인증만 봅니다](#looking_up-a-user-granted-nothing-looks-up-several-keypair-policy-names) | 성공 |
 | [로그인 문맥 없이 이름으로 id 를 여럿 조회하면, 사용자를 찾을 수 없다는 것으로 거부됩니다](#looking_up-looking-up-several-keypair-policy-names-without-login-is-refused) | 거부 |
 
 **bulk_lookup_project_resource_policy_names**
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 있는 이름과 없는 이름으로 프로젝트 정책 id 를 여럿 조회하면, 있는 이름에는 그 정책의 id, 없는 이름에는 빈 값이 응답으로 옵니다](#looking_up-the-superadmin-looks-up-several-project-policy-names) | 성공 |
+| [아무 권한도 받지 않은 사용자가 있는 이름과 없는 이름으로 프로젝트 정책 id 를 여럿 조회하면, 있는 이름에는 그 정책의 id, 없는 이름에는 빈 값이 응답으로 옵니다. 이 호출은 인증만 봅니다](#looking_up-a-user-granted-nothing-looks-up-several-project-policy-names) | 성공 |
 | [로그인 문맥 없이 이름으로 id 를 여럿 조회하면, 사용자를 찾을 수 없다는 것으로 거부됩니다](#looking_up-looking-up-several-project-policy-names-without-login-is-refused) | 거부 |
 
 **bulk_lookup_user_resource_policy_names**
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 있는 이름과 없는 이름으로 사용자 정책 id 를 여럿 조회하면, 있는 이름에는 그 정책의 id, 없는 이름에는 빈 값이 응답으로 옵니다](#looking_up-the-superadmin-looks-up-several-user-policy-names) | 성공 |
+| [아무 권한도 받지 않은 사용자가 있는 이름과 없는 이름으로 사용자 정책 id 를 여럿 조회하면, 있는 이름에는 그 정책의 id, 없는 이름에는 빈 값이 응답으로 옵니다. 이 호출은 인증만 봅니다](#looking_up-a-user-granted-nothing-looks-up-several-user-policy-names) | 성공 |
 | [로그인 문맥 없이 이름으로 id 를 여럿 조회하면, 사용자를 찾을 수 없다는 것으로 거부됩니다](#looking_up-looking-up-several-user-policy-names-without-login-is-refused) | 거부 |
 
 **get_my_keypair_resource_policy**
@@ -200,22 +200,25 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 키페어 정책 이름으로 id 를 찾으면 그 정책의 id 가 반환됩니다](#looking_up-the-superadmin-looks-up-a-keypair-policy-by-name) | 성공 |
-| [superadmin 이 어느 키페어 정책에도 없는 이름으로 id 를 찾으면 대상이 없다는 것으로 거부됩니다](#looking_up-looking-up-a-keypair-policy-name-nothing-answers-to-is-not-found) | 거부 |
+| [global 스코프에서 그 정책을 읽을 수 있는 사용자가 키페어 정책 이름으로 id 를 찾으면 그 정책의 id 가 반환됩니다](#looking_up-a-user-granted-read-looks-up-a-keypair-policy-by-name) | 성공 |
+| [아무 권한도 받지 않은 사용자가 키페어 정책 이름으로 id 를 찾으면 그 정책을 읽을 권한이 없으므로 거부됩니다](#looking_up-a-user-granted-nothing-cannot-look-up-a-keypair-policy-name) | 거부 |
+| [어느 키페어 정책에도 없는 이름으로 id 를 찾으면 읽을 권한이 없을 때와 같은 거부가 오고, 그 이름이 있는지는 드러나지 않습니다](#looking_up-looking-up-a-keypair-policy-name-nothing-answers-to-is-refused) | 거부 |
 
 **lookup_project_resource_policy**
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 프로젝트 정책 이름으로 id 를 찾으면 그 정책의 id 가 반환됩니다](#looking_up-the-superadmin-looks-up-a-project-policy-by-name) | 성공 |
-| [superadmin 이 어느 프로젝트 정책에도 없는 이름으로 id 를 찾으면 대상이 없다는 것으로 거부됩니다](#looking_up-looking-up-a-project-policy-name-nothing-answers-to-is-not-found) | 거부 |
+| [global 스코프에서 그 정책을 읽을 수 있는 사용자가 프로젝트 정책 이름으로 id 를 찾으면 그 정책의 id 가 반환됩니다](#looking_up-a-user-granted-read-looks-up-a-project-policy-by-name) | 성공 |
+| [아무 권한도 받지 않은 사용자가 프로젝트 정책 이름으로 id 를 찾으면 그 정책을 읽을 권한이 없으므로 거부됩니다](#looking_up-a-user-granted-nothing-cannot-look-up-a-project-policy-name) | 거부 |
+| [어느 프로젝트 정책에도 없는 이름으로 id 를 찾으면 읽을 권한이 없을 때와 같은 거부가 오고, 그 이름이 있는지는 드러나지 않습니다](#looking_up-looking-up-a-project-policy-name-nothing-answers-to-is-refused) | 거부 |
 
 **lookup_user_resource_policy**
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 사용자 정책 이름으로 id 를 찾으면 그 정책의 id 가 반환됩니다](#looking_up-the-superadmin-looks-up-a-user-policy-by-name) | 성공 |
-| [superadmin 이 어느 사용자 정책에도 없는 이름으로 id 를 찾으면 대상이 없다는 것으로 거부됩니다](#looking_up-looking-up-a-user-policy-name-nothing-answers-to-is-not-found) | 거부 |
+| [global 스코프에서 그 정책을 읽을 수 있는 사용자가 사용자 정책 이름으로 id 를 찾으면 그 정책의 id 가 반환됩니다](#looking_up-a-user-granted-read-looks-up-a-user-policy-by-name) | 성공 |
+| [아무 권한도 받지 않은 사용자가 사용자 정책 이름으로 id 를 찾으면 그 정책을 읽을 권한이 없으므로 거부됩니다](#looking_up-a-user-granted-nothing-cannot-look-up-a-user-policy-name) | 거부 |
+| [어느 사용자 정책에도 없는 이름으로 id 를 찾으면 읽을 권한이 없을 때와 같은 거부가 오고, 그 이름이 있는지는 드러나지 않습니다](#looking_up-looking-up-a-user-policy-name-nothing-answers-to-is-refused) | 거부 |
 
 **partial_bulk_purge_keypair_resource_policies**
 
@@ -1819,21 +1822,21 @@ Then
 
 ### bulk_lookup_keypair_resource_policy_names
 
-<a id="looking_up-the-superadmin-looks-up-several-keypair-policy-names"></a>
+<a id="looking_up-a-user-granted-nothing-looks-up-several-keypair-policy-names"></a>
 
-#### [the-superadmin-looks-up-several-keypair-policy-names](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+#### [a-user-granted-nothing-looks-up-several-keypair-policy-names](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
 
-superadmin 이 있는 이름과 없는 이름으로 키페어 정책 id 를 여럿 조회하면, 있는 이름에는 그 정책의 id, 없는 이름에는 빈 값이 응답으로 옵니다
+아무 권한도 받지 않은 사용자가 있는 이름과 없는 이름으로 키페어 정책 id 를 여럿 조회하면, 있는 이름에는 그 정책의 id, 없는 이름에는 빈 값이 응답으로 옵니다. 이 호출은 인증만 봅니다
 
 Given
 
-- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
+- 아무도 사용하지 않는 키페어 정책 하나와, user 한 명
   - 도메인 home-1
   - 정책이 할당된 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
 
 When
@@ -1874,21 +1877,21 @@ Then
 
 ### bulk_lookup_project_resource_policy_names
 
-<a id="looking_up-the-superadmin-looks-up-several-project-policy-names"></a>
+<a id="looking_up-a-user-granted-nothing-looks-up-several-project-policy-names"></a>
 
-#### [the-superadmin-looks-up-several-project-policy-names](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+#### [a-user-granted-nothing-looks-up-several-project-policy-names](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
 
-superadmin 이 있는 이름과 없는 이름으로 프로젝트 정책 id 를 여럿 조회하면, 있는 이름에는 그 정책의 id, 없는 이름에는 빈 값이 응답으로 옵니다
+아무 권한도 받지 않은 사용자가 있는 이름과 없는 이름으로 프로젝트 정책 id 를 여럿 조회하면, 있는 이름에는 그 정책의 id, 없는 이름에는 빈 값이 응답으로 옵니다. 이 호출은 인증만 봅니다
 
 Given
 
-- 아무도 사용하지 않는 프로젝트 정책 하나와, superadmin 한 명
+- 아무도 사용하지 않는 프로젝트 정책 하나와, user 한 명
   - 도메인 home-1
   - 정책이 할당된 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 프로젝트 자원 정책 project-policy-1: 프로젝트 하나당 vfolder 10개까지
 
 When
@@ -1929,21 +1932,21 @@ Then
 
 ### bulk_lookup_user_resource_policy_names
 
-<a id="looking_up-the-superadmin-looks-up-several-user-policy-names"></a>
+<a id="looking_up-a-user-granted-nothing-looks-up-several-user-policy-names"></a>
 
-#### [the-superadmin-looks-up-several-user-policy-names](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+#### [a-user-granted-nothing-looks-up-several-user-policy-names](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
 
-superadmin 이 있는 이름과 없는 이름으로 사용자 정책 id 를 여럿 조회하면, 있는 이름에는 그 정책의 id, 없는 이름에는 빈 값이 응답으로 옵니다
+아무 권한도 받지 않은 사용자가 있는 이름과 없는 이름으로 사용자 정책 id 를 여럿 조회하면, 있는 이름에는 그 정책의 id, 없는 이름에는 빈 값이 응답으로 옵니다. 이 호출은 인증만 봅니다
 
 Given
 
-- 아무도 사용하지 않는 사용자 정책 하나와, superadmin 한 명
+- 아무도 사용하지 않는 사용자 정책 하나와, user 한 명
   - 도메인 home-1
   - 정책이 할당된 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
 
 When
@@ -2365,22 +2368,26 @@ Then
 
 ### lookup_keypair_resource_policy
 
-<a id="looking_up-the-superadmin-looks-up-a-keypair-policy-by-name"></a>
+<a id="looking_up-a-user-granted-read-looks-up-a-keypair-policy-by-name"></a>
 
-#### [the-superadmin-looks-up-a-keypair-policy-by-name](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+#### [a-user-granted-read-looks-up-a-keypair-policy-by-name](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
 
-superadmin 이 키페어 정책 이름으로 id 를 찾으면 그 정책의 id 가 반환됩니다
+global 스코프에서 그 정책을 읽을 수 있는 사용자가 키페어 정책 이름으로 id 를 찾으면 그 정책의 id 가 반환됩니다
 
 Given
 
-- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
+- 아무도 사용하지 않는 키페어 정책 하나와, global 스코프에서 그 정책을 읽을 수 있는 user 한 명
   - 도메인 home-1
   - 정책이 할당된 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - global 스코프에서 keypair_resource_policy 읽기 권한을 주는 역할 부여
+    - 역할 policy-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 policy-reader-1: keypair_resource_policy 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 policy-reader-1 보유
 
 When
 
@@ -2391,22 +2398,52 @@ Then
 - 그 정책의 id 가 반환됩니다
   - id: 미리 저장한 정책의 id 와 같다
 
-<a id="looking_up-looking-up-a-keypair-policy-name-nothing-answers-to-is-not-found"></a>
+<a id="looking_up-a-user-granted-nothing-cannot-look-up-a-keypair-policy-name"></a>
 
-#### [looking-up-a-keypair-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+#### [a-user-granted-nothing-cannot-look-up-a-keypair-policy-name](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
 
-superadmin 이 어느 키페어 정책에도 없는 이름으로 id 를 찾으면 대상이 없다는 것으로 거부됩니다
+아무 권한도 받지 않은 사용자가 키페어 정책 이름으로 id 를 찾으면 그 정책을 읽을 권한이 없으므로 거부됩니다
 
 Given
 
-- 아무도 사용하지 않는 키페어 정책 하나와, superadmin 한 명
+- 아무도 사용하지 않는 키페어 정책 하나와, user 한 명
   - 도메인 home-1
   - 정책이 할당된 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+
+When
+
+- ResourcePolicyAdapter.lookup_keypair_resource_policy: user-1이 keypair-policy-2의 id 를 찾습니다
+
+Then
+
+- 거부됩니다
+  - 거부: GenericBadRequest
+
+<a id="looking_up-looking-up-a-keypair-policy-name-nothing-answers-to-is-refused"></a>
+
+#### [looking-up-a-keypair-policy-name-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+
+어느 키페어 정책에도 없는 이름으로 id 를 찾으면 읽을 권한이 없을 때와 같은 거부가 오고, 그 이름이 있는지는 드러나지 않습니다
+
+Given
+
+- 아무도 사용하지 않는 키페어 정책 하나와, global 스코프에서 그 정책을 읽을 수 있는 user 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - global 스코프에서 keypair_resource_policy 읽기 권한을 주는 역할 부여
+    - 역할 policy-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 policy-reader-1: keypair_resource_policy 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 policy-reader-1 보유
 
 When
 
@@ -2415,26 +2452,30 @@ When
 Then
 
 - 거부됩니다
-  - 거부: EntityNotFoundError
+  - 거부: GenericBadRequest
 
 ### lookup_project_resource_policy
 
-<a id="looking_up-the-superadmin-looks-up-a-project-policy-by-name"></a>
+<a id="looking_up-a-user-granted-read-looks-up-a-project-policy-by-name"></a>
 
-#### [the-superadmin-looks-up-a-project-policy-by-name](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+#### [a-user-granted-read-looks-up-a-project-policy-by-name](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
 
-superadmin 이 프로젝트 정책 이름으로 id 를 찾으면 그 정책의 id 가 반환됩니다
+global 스코프에서 그 정책을 읽을 수 있는 사용자가 프로젝트 정책 이름으로 id 를 찾으면 그 정책의 id 가 반환됩니다
 
 Given
 
-- 아무도 사용하지 않는 프로젝트 정책 하나와, superadmin 한 명
+- 아무도 사용하지 않는 프로젝트 정책 하나와, global 스코프에서 그 정책을 읽을 수 있는 user 한 명
   - 도메인 home-1
   - 정책이 할당된 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 프로젝트 자원 정책 project-policy-1: 프로젝트 하나당 vfolder 10개까지
+  - global 스코프에서 project_resource_policy 읽기 권한을 주는 역할 부여
+    - 역할 policy-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 policy-reader-1: project_resource_policy 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 policy-reader-1 보유
 
 When
 
@@ -2445,22 +2486,52 @@ Then
 - 그 정책의 id 가 반환됩니다
   - id: 미리 저장한 정책의 id 와 같다
 
-<a id="looking_up-looking-up-a-project-policy-name-nothing-answers-to-is-not-found"></a>
+<a id="looking_up-a-user-granted-nothing-cannot-look-up-a-project-policy-name"></a>
 
-#### [looking-up-a-project-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+#### [a-user-granted-nothing-cannot-look-up-a-project-policy-name](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
 
-superadmin 이 어느 프로젝트 정책에도 없는 이름으로 id 를 찾으면 대상이 없다는 것으로 거부됩니다
+아무 권한도 받지 않은 사용자가 프로젝트 정책 이름으로 id 를 찾으면 그 정책을 읽을 권한이 없으므로 거부됩니다
 
 Given
 
-- 아무도 사용하지 않는 프로젝트 정책 하나와, superadmin 한 명
+- 아무도 사용하지 않는 프로젝트 정책 하나와, user 한 명
   - 도메인 home-1
   - 정책이 할당된 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 프로젝트 자원 정책 project-policy-1: 프로젝트 하나당 vfolder 10개까지
+
+When
+
+- ResourcePolicyAdapter.lookup_project_resource_policy: user-1이 project-policy-1의 id 를 찾습니다
+
+Then
+
+- 거부됩니다
+  - 거부: GenericBadRequest
+
+<a id="looking_up-looking-up-a-project-policy-name-nothing-answers-to-is-refused"></a>
+
+#### [looking-up-a-project-policy-name-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+
+어느 프로젝트 정책에도 없는 이름으로 id 를 찾으면 읽을 권한이 없을 때와 같은 거부가 오고, 그 이름이 있는지는 드러나지 않습니다
+
+Given
+
+- 아무도 사용하지 않는 프로젝트 정책 하나와, global 스코프에서 그 정책을 읽을 수 있는 user 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 프로젝트 자원 정책 project-policy-1: 프로젝트 하나당 vfolder 10개까지
+  - global 스코프에서 project_resource_policy 읽기 권한을 주는 역할 부여
+    - 역할 policy-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 policy-reader-1: project_resource_policy 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 policy-reader-1 보유
 
 When
 
@@ -2469,26 +2540,30 @@ When
 Then
 
 - 거부됩니다
-  - 거부: EntityNotFoundError
+  - 거부: GenericBadRequest
 
 ### lookup_user_resource_policy
 
-<a id="looking_up-the-superadmin-looks-up-a-user-policy-by-name"></a>
+<a id="looking_up-a-user-granted-read-looks-up-a-user-policy-by-name"></a>
 
-#### [the-superadmin-looks-up-a-user-policy-by-name](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+#### [a-user-granted-read-looks-up-a-user-policy-by-name](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
 
-superadmin 이 사용자 정책 이름으로 id 를 찾으면 그 정책의 id 가 반환됩니다
+global 스코프에서 그 정책을 읽을 수 있는 사용자가 사용자 정책 이름으로 id 를 찾으면 그 정책의 id 가 반환됩니다
 
 Given
 
-- 아무도 사용하지 않는 사용자 정책 하나와, superadmin 한 명
+- 아무도 사용하지 않는 사용자 정책 하나와, global 스코프에서 그 정책을 읽을 수 있는 user 한 명
   - 도메인 home-1
   - 정책이 할당된 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+  - global 스코프에서 user_resource_policy 읽기 권한을 주는 역할 부여
+    - 역할 policy-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 policy-reader-1: user_resource_policy 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 policy-reader-1 보유
 
 When
 
@@ -2499,22 +2574,52 @@ Then
 - 그 정책의 id 가 반환됩니다
   - id: 미리 저장한 정책의 id 와 같다
 
-<a id="looking_up-looking-up-a-user-policy-name-nothing-answers-to-is-not-found"></a>
+<a id="looking_up-a-user-granted-nothing-cannot-look-up-a-user-policy-name"></a>
 
-#### [looking-up-a-user-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+#### [a-user-granted-nothing-cannot-look-up-a-user-policy-name](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
 
-superadmin 이 어느 사용자 정책에도 없는 이름으로 id 를 찾으면 대상이 없다는 것으로 거부됩니다
+아무 권한도 받지 않은 사용자가 사용자 정책 이름으로 id 를 찾으면 그 정책을 읽을 권한이 없으므로 거부됩니다
 
 Given
 
-- 아무도 사용하지 않는 사용자 정책 하나와, superadmin 한 명
+- 아무도 사용하지 않는 사용자 정책 하나와, user 한 명
   - 도메인 home-1
   - 정책이 할당된 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
     - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+
+When
+
+- ResourcePolicyAdapter.lookup_user_resource_policy: user-1이 user-policy-2의 id 를 찾습니다
+
+Then
+
+- 거부됩니다
+  - 거부: GenericBadRequest
+
+<a id="looking_up-looking-up-a-user-policy-name-nothing-answers-to-is-refused"></a>
+
+#### [looking-up-a-user-policy-name-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_looking_up.py): pass
+
+어느 사용자 정책에도 없는 이름으로 id 를 찾으면 읽을 권한이 없을 때와 같은 거부가 오고, 그 이름이 있는지는 드러나지 않습니다
+
+Given
+
+- 아무도 사용하지 않는 사용자 정책 하나와, global 스코프에서 그 정책을 읽을 수 있는 user 한 명
+  - 도메인 home-1
+  - 정책이 할당된 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+  - global 스코프에서 user_resource_policy 읽기 권한을 주는 역할 부여
+    - 역할 policy-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 policy-reader-1: user_resource_policy 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 policy-reader-1 보유
 
 When
 
@@ -2523,7 +2628,7 @@ When
 Then
 
 - 거부됩니다
-  - 거부: EntityNotFoundError
+  - 거부: GenericBadRequest
 
 ### partial_bulk_purge_keypair_resource_policies
 

@@ -12,7 +12,7 @@
   - search: 대표 성공 ✓ · 대표 거부 ✓
 - 직접 구현 (4)
   - apply_resource_group: 성공 있음 1 · 거부 있음 1 (membership)
-  - create: 성공 있음 2 · 거부 있음 1 (global_scope)
+  - create: 성공 있음 1 · 거부 있음 2 (global_scope)
   - purge: 성공 있음 1 · 거부 있음 2 (single_entity)
   - update: 성공 있음 2 · 거부 있음 2 (membership, single_entity)
 
@@ -20,7 +20,6 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 프리셋 여럿과 없는 id 하나를 한 번에 읽으면, 프리셋은 요청한 순서대로 오고 없는 id 의 자리는 비어 있습니다](#reading-a-superadmin-loading-an-unknown-preset-id-finds-it-empty) | 성공 |
 | [public 에서 프리셋을 읽을 수 있는 사용자가 프리셋 여럿을 id 로 한 번에 읽으면, 요청한 순서대로 프리셋이 옵니다](#reading-a-user-reading-presets-reads-several-presets-by-id) | 성공 |
 | [아무 권한도 받지 않은 사용자가 id 여럿으로 프리셋을 읽으면, 호출은 거부되지 않고 물은 자리마다 권한 부족 거부가 옵니다](#reading-a-user-granted-nothing-batch-loading-presets-is-refused-per-item) | 거부 |
 
@@ -29,9 +28,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [public 에서 조회 권한을 받은 사용자가 id 로 프리셋 하나를 읽으면, 그 프리셋 전체가 반환됩니다](#reading-a-user-granted-read-in-public-reads-a-preset) | 성공 |
-| [superadmin 이 id 로 프리셋 하나를 읽으면, 미리 저장한 프리셋 전체가 반환됩니다](#reading-the-superadmin-reads-a-preset-by-id) | 성공 |
 | [아무 권한도 받지 않은 사용자가 id 로 프리셋을 읽으려 하면 권한 부족으로 거부됩니다](#reading-a-user-granted-nothing-may-not-read-a-preset) | 거부 |
-| [superadmin 이 없는 id 의 프리셋을 읽으려 하면 대상이 없다는 것으로 거부됩니다](#reading-reading-an-id-nothing-answers-to-is-not-found) | 거부 |
 
 **partial_bulk_purge**
 
@@ -52,8 +49,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 프리셋 하나의 이름으로 조회하면, 그 이름의 프리셋만 반환됩니다](#searching-filtering-preset-search-by-name-leaves-that-one) | 성공 |
-| [프리셋 여럿이 있고 superadmin 이 필터 없이 조회하면, 미리 저장한 프리셋이 모두 반환됩니다](#searching-the-superadmin-finds-every-preset) | 성공 |
+| [superadmin 이 이름이 공유하는 접두사로 프리셋을 좁혀 이름 내림차순 첫 페이지를 조회하면, 그 접두사를 가진 프리셋 중 첫 하나만 반환되고 접두사를 갖지 않는 프리셋은 반환되지 않습니다. 이 호출은 superadmin 역할이 막습니다](#searching-filtering-and-ordering-preset-search-gives-its-first-page) | 성공 |
 | [superadmin 이 아닌 사용자가 프리셋 전체를 조회하려 하면 역할이 없다는 것으로 거부됩니다](#searching-a-user-who-is-not-the-superadmin-may-not-search-presets) | 거부 |
 
 **apply_resource_group**
@@ -67,9 +63,9 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 미리 만들어 둔 자원 그룹에 묶어 프리셋을 만들면, 그 그룹 이름을 가진 프리셋 전체가 반환됩니다](#creating-the-superadmin-creates-a-preset-bound-to-a-resource-group) | 성공 |
-| [superadmin 이 자원 그룹에 묶지 않고 프리셋을 만들면, 방금 만든 프리셋 전체가 반환됩니다](#creating-the-superadmin-creates-a-preset-in-public) | 성공 |
+| [superadmin 이 미리 만들어 둔 자원 그룹에 묶어 프리셋을 만들면, 그 그룹 이름을 가진 프리셋 전체가 반환됩니다. 이 호출은 superadmin 역할이 막습니다](#creating-the-superadmin-creates-a-preset-bound-to-a-resource-group) | 성공 |
 | [superadmin 이 아닌 사용자가 프리셋을 만들려 하면 역할이 없다는 것으로 거부됩니다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-preset) | 거부 |
+| [superadmin 이 이미 있는 프리셋의 이름으로 프리셋을 만들면 이름이 겹친다는 것으로 거부됩니다](#creating-creating-a-preset-name-another-preset-holds-is-refused) | 거부 |
 
 **purge**
 
@@ -89,46 +85,6 @@
 | [superadmin 이 없는 id 의 프리셋을 수정하려 하면 대상이 없다는 것으로 거부됩니다](#editing-editing-an-id-nothing-answers-to-is-not-found) | 거부 |
 
 ### batch_load_by_ids
-
-<a id="reading-a-superadmin-loading-an-unknown-preset-id-finds-it-empty"></a>
-
-#### [a-superadmin-loading-an-unknown-preset-id-finds-it-empty](/tests/scenario/bai_scenario/manager/resource_preset/test_reading.py): pass
-
-superadmin 이 프리셋 여럿과 없는 id 하나를 한 번에 읽으면, 프리셋은 요청한 순서대로 오고 없는 id 의 자리는 비어 있습니다
-
-Given
-
-- 프리셋 2개와 superadmin 한 명
-  - 자원 프리셋 preset-1: 자원 그룹에 묶이지 않아 public 에 속합니다
-  - 자원 프리셋 preset-2: 자원 그룹에 묶이지 않아 public 에 속합니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- ResourcePresetAdapter.batch_load_by_ids: user-1이 프리셋 2개와 없는 id 하나를 한 번에 읽습니다
-
-Then
-
-- 요청한 순서대로 프리셋 전체가 오고, 없는 id 의 자리는 비어 있습니다
-  - len(items) = 3
-  - items[0].id: 미리 저장한 프리셋의 id 와 같다
-  - items[0].entity_id: 미리 저장한 프리셋의 id 와 같다
-  - items[0].name = 'preset-1'
-  - items[0].resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
-  - items[0].shared_memory = None
-  - items[0].resource_group_name = None
-  - items[1].id: 미리 저장한 프리셋의 id 와 같다
-  - items[1].entity_id: 미리 저장한 프리셋의 id 와 같다
-  - items[1].name = 'preset-2'
-  - items[1].resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
-  - items[1].shared_memory = None
-  - items[1].resource_group_name = None
-  - items[2] = None
 
 <a id="reading-a-user-reading-presets-reads-several-presets-by-id"></a>
 
@@ -193,13 +149,12 @@ Given
 
 When
 
-- ResourcePresetAdapter.batch_load_by_ids: user-1이 프리셋 2개와 없는 id 하나를 한 번에 읽습니다
+- ResourcePresetAdapter.batch_load_by_ids: user-1이 프리셋 2개의 id 로 여럿을 읽습니다
 
 Then
 
 - 물은 자리마다 권한 부족 거부가 응답으로 옵니다
-  - len(items) = 3
-  - 거부: NotEnoughPermission
+  - len(items) = 2
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
 
@@ -240,37 +195,6 @@ Then
   - shared_memory = None
   - resource_group_name = None
 
-<a id="reading-the-superadmin-reads-a-preset-by-id"></a>
-
-#### [the-superadmin-reads-a-preset-by-id](/tests/scenario/bai_scenario/manager/resource_preset/test_reading.py): pass
-
-superadmin 이 id 로 프리셋 하나를 읽으면, 미리 저장한 프리셋 전체가 반환됩니다
-
-Given
-
-- 프리셋 하나와 superadmin 한 명
-  - 자원 프리셋 preset-1: 자원 그룹에 묶이지 않아 public 에 속합니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- ResourcePresetAdapter.get: user-1이 preset-1의 프리셋을 읽습니다
-
-Then
-
-- 미리 저장한 프리셋 전체가 반환됩니다
-  - id: 미리 저장한 프리셋의 id 와 같다
-  - entity_id: 미리 저장한 프리셋의 id 와 같다
-  - name = 'preset-1'
-  - resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
-  - shared_memory = None
-  - resource_group_name = None
-
 <a id="reading-a-user-granted-nothing-may-not-read-a-preset"></a>
 
 #### [a-user-granted-nothing-may-not-read-a-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_reading.py): pass
@@ -296,32 +220,6 @@ Then
 
 - 거부됩니다
   - 거부: NotEnoughPermission
-
-<a id="reading-reading-an-id-nothing-answers-to-is-not-found"></a>
-
-#### [reading-an-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_preset/test_reading.py): pass
-
-superadmin 이 없는 id 의 프리셋을 읽으려 하면 대상이 없다는 것으로 거부됩니다
-
-Given
-
-- 프리셋 하나와 superadmin 한 명
-  - 자원 프리셋 preset-1: 자원 그룹에 묶이지 않아 public 에 속합니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- ResourcePresetAdapter.get: user-1이 없는 id 의 프리셋을 읽습니다
-
-Then
-
-- 거부됩니다
-  - 거부: ResourcePresetNotFound
 
 ### partial_bulk_purge
 
@@ -502,15 +400,16 @@ Then
 
 ### search
 
-<a id="searching-filtering-preset-search-by-name-leaves-that-one"></a>
+<a id="searching-filtering-and-ordering-preset-search-gives-its-first-page"></a>
 
-#### [filtering-preset-search-by-name-leaves-that-one](/tests/scenario/bai_scenario/manager/resource_preset/test_searching.py): pass
+#### [filtering-and-ordering-preset-search-gives-its-first-page](/tests/scenario/bai_scenario/manager/resource_preset/test_searching.py): pass
 
-superadmin 이 프리셋 하나의 이름으로 조회하면, 그 이름의 프리셋만 반환됩니다
+superadmin 이 이름이 공유하는 접두사로 프리셋을 좁혀 이름 내림차순 첫 페이지를 조회하면, 그 접두사를 가진 프리셋 중 첫 하나만 반환되고 접두사를 갖지 않는 프리셋은 반환되지 않습니다. 이 호출은 superadmin 역할이 막습니다
 
 Given
 
-- 프리셋 2개와 superadmin 한 명
+- 이름을 공유하는 프리셋 2개와, 그 이름을 갖지 않는 프리셋 하나, superadmin 한 명
+  - 자원 프리셋 unrelated-1: 자원 그룹에 묶이지 않아 public 에 속합니다
   - 자원 프리셋 preset-1: 자원 그룹에 묶이지 않아 public 에 속합니다
   - 자원 프리셋 preset-2: 자원 그룹에 묶이지 않아 public 에 속합니다
   - 도메인 home-1
@@ -522,61 +421,21 @@ Given
 
 When
 
-- ResourcePresetAdapter.search: user-1이 이름 preset-1으로 프리셋을 조회합니다
+- ResourcePresetAdapter.search: user-1이 이름이 preset 로 시작하는 프리셋을 이름 내림차순으로 첫 페이지만 조회합니다
 
 Then
 
-- 필터가 지목한 이름의 프리셋만 응답으로 옵니다
-  - total_count = 1
-  - len(items) = 1
-  - items[0].id: 미리 저장한 프리셋의 id 와 같다
-  - items[0].entity_id: 미리 저장한 프리셋의 id 와 같다
-  - items[0].name = 'preset-1'
-  - items[0].resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
-  - items[0].shared_memory = None
-  - items[0].resource_group_name = None
-
-<a id="searching-the-superadmin-finds-every-preset"></a>
-
-#### [the-superadmin-finds-every-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_searching.py): pass
-
-프리셋 여럿이 있고 superadmin 이 필터 없이 조회하면, 미리 저장한 프리셋이 모두 반환됩니다
-
-Given
-
-- 프리셋 2개와 superadmin 한 명
-  - 자원 프리셋 preset-1: 자원 그룹에 묶이지 않아 public 에 속합니다
-  - 자원 프리셋 preset-2: 자원 그룹에 묶이지 않아 public 에 속합니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- ResourcePresetAdapter.search: user-1이 필터 없이 프리셋 전체를 조회합니다
-
-Then
-
-- 미리 저장한 프리셋이 모두 응답으로 오고, 그밖의 것은 오지 않습니다
+- 필터를 통과한 프리셋이 이름 내림차순 첫 페이지로 오고, 필터가 제외한 프리셋은 오지 않습니다
   - total_count = 2
-  - has_next_page = False
+  - len(items) = 1
+  - has_next_page = True
   - has_previous_page = False
-  - len(items) = 2
   - items[0].id: 미리 저장한 프리셋의 id 와 같다
   - items[0].entity_id: 미리 저장한 프리셋의 id 와 같다
-  - items[0].name = 'preset-1'
+  - items[0].name = 'preset-2'
   - items[0].resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
   - items[0].shared_memory = None
   - items[0].resource_group_name = None
-  - items[1].id: 미리 저장한 프리셋의 id 와 같다
-  - items[1].entity_id: 미리 저장한 프리셋의 id 와 같다
-  - items[1].name = 'preset-2'
-  - items[1].resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
-  - items[1].shared_memory = None
-  - items[1].resource_group_name = None
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-presets"></a>
 
@@ -676,7 +535,7 @@ Then
 
 #### [the-superadmin-creates-a-preset-bound-to-a-resource-group](/tests/scenario/bai_scenario/manager/resource_preset/test_creating.py): pass
 
-superadmin 이 미리 만들어 둔 자원 그룹에 묶어 프리셋을 만들면, 그 그룹 이름을 가진 프리셋 전체가 반환됩니다
+superadmin 이 미리 만들어 둔 자원 그룹에 묶어 프리셋을 만들면, 그 그룹 이름을 가진 프리셋 전체가 반환됩니다. 이 호출은 superadmin 역할이 막습니다
 
 Given
 
@@ -703,37 +562,6 @@ Then
   - shared_memory = BinarySizeInfo(expr='1073741824', display='1g')
   - resource_group_name = 'group-1'
 
-<a id="creating-the-superadmin-creates-a-preset-in-public"></a>
-
-#### [the-superadmin-creates-a-preset-in-public](/tests/scenario/bai_scenario/manager/resource_preset/test_creating.py): pass
-
-superadmin 이 자원 그룹에 묶지 않고 프리셋을 만들면, 방금 만든 프리셋 전체가 반환됩니다
-
-Given
-
-- 자원 그룹 하나와 superadmin 한 명
-  - 도메인 home-1
-  - 자원 그룹 group-1: fifo 스케줄러를 사용합니다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- ResourcePresetAdapter.create: user-1이 어느 자원 그룹에도 묶지 않고 프리셋 fresh-preset 을 만듭니다
-
-Then
-
-- 방금 만든 프리셋 전체가 응답으로 옵니다
-  - id: 건너뜀: the database generates it
-  - entity_id: 건너뜀: the database generates it
-  - name = 'fresh-preset'
-  - resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
-  - shared_memory = BinarySizeInfo(expr='1073741824', display='1g')
-  - resource_group_name = None
-
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-create-a-preset"></a>
 
 #### [a-user-who-is-not-the-superadmin-may-not-create-a-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_creating.py): pass
@@ -759,6 +587,32 @@ Then
 
 - 거부됩니다
   - 거부: InsufficientPrivilege
+
+<a id="creating-creating-a-preset-name-another-preset-holds-is-refused"></a>
+
+#### [creating-a-preset-name-another-preset-holds-is-refused](/tests/scenario/bai_scenario/manager/resource_preset/test_creating.py): pass
+
+superadmin 이 이미 있는 프리셋의 이름으로 프리셋을 만들면 이름이 겹친다는 것으로 거부됩니다
+
+Given
+
+- 프리셋 하나와 superadmin 한 명
+  - 자원 프리셋 preset-1: 자원 그룹에 묶이지 않아 public 에 속합니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- ResourcePresetAdapter.create: user-1이 이미 있는 이름 preset-1으로 프리셋을 만듭니다
+
+Then
+
+- 거부됩니다
+  - 거부: ResourcePresetConflict
 
 ### purge
 

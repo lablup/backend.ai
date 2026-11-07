@@ -87,7 +87,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 자원 그룹의 사용량을 읽으면, 에이전트가 없으므로 용량·사용량·여유가 모두 비어 있습니다](#usage-the-superadmin-reads-a-resource-groups-usage) | 성공 |
+| [superadmin 이 자원 그룹의 사용량을 읽으면, 에이전트가 없으므로 용량·사용량·여유가 모두 비어 있습니다. 이 호출은 superadmin 역할이 막습니다](#usage-the-superadmin-reads-a-resource-groups-usage) | 성공 |
 | [superadmin 이 아닌 사용자가 자원 그룹 사용량을 읽으려 하면 역할이 없다는 것으로 거부됩니다](#usage-a-user-may-not-read-a-resource-groups-usage) | 거부 |
 
 ### admin_domain_usage
@@ -846,7 +846,7 @@ Then
 
 #### [the-superadmin-reads-a-resource-groups-usage](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
 
-superadmin 이 자원 그룹의 사용량을 읽으면, 에이전트가 없으므로 용량·사용량·여유가 모두 비어 있습니다
+superadmin 이 자원 그룹의 사용량을 읽으면, 에이전트가 없으므로 용량·사용량·여유가 모두 비어 있습니다. 이 호출은 superadmin 역할이 막습니다
 
 Given
 

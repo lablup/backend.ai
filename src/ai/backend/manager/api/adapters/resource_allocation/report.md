@@ -87,7 +87,7 @@ Scenario: incomplete 2 / 12
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin reads a resource group's usage, capacity, usage and free are all empty because no agent exists](#usage-the-superadmin-reads-a-resource-groups-usage) | answered |
+| [when the superadmin reads a resource group's usage, capacity, usage and free are all empty because no agent exists. the superadmin role gates this call](#usage-the-superadmin-reads-a-resource-groups-usage) | answered |
 | [a user who is not the superadmin reading a resource group's usage is rejected for lacking the role](#usage-a-user-may-not-read-a-resource-groups-usage) | rejected |
 
 ### admin_domain_usage
@@ -846,7 +846,7 @@ Then
 
 #### [the-superadmin-reads-a-resource-groups-usage](/tests/scenario/bai_scenario/manager/resource_allocation/test_usage.py): pass
 
-when the superadmin reads a resource group's usage, capacity, usage and free are all empty because no agent exists
+when the superadmin reads a resource group's usage, capacity, usage and free are all empty because no agent exists. the superadmin role gates this call
 
 Given
 

@@ -12,7 +12,7 @@ Scenario: incomplete 1 / 9
   - search: representative success ✓ · representative rejection ✓
 - direct implementation (4)
   - apply_resource_group: success present 1 · rejection present 1 (membership)
-  - create: success present 2 · rejection present 1 (global_scope)
+  - create: success present 1 · rejection present 2 (global_scope)
   - purge: success present 1 · rejection present 2 (single_entity)
   - update: success present 2 · rejection present 2 (membership, single_entity)
 
@@ -20,7 +20,6 @@ Scenario: incomplete 1 / 9
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin batch loads several presets and one unknown id, the presets come back in the order requested and the item for the unknown id is empty](#reading-a-superadmin-loading-an-unknown-preset-id-finds-it-empty) | answered |
 | [when a user who can read presets in public batch loads several presets by id, every preset comes back in the order requested](#reading-a-user-reading-presets-reads-several-presets-by-id) | answered |
 | [a user granted nothing batch loading presets by id is not rejected as a call, and every item asked carries a denial for not enough permission](#reading-a-user-granted-nothing-batch-loading-presets-is-refused-per-item) | rejected |
 
@@ -29,9 +28,7 @@ Scenario: incomplete 1 / 9
 | scenario | verdict |
 |---|---|
 | [a user granted read in public reading one preset by id gets the whole preset](#reading-a-user-granted-read-in-public-reads-a-preset) | answered |
-| [when the superadmin reads one preset by id, the whole preset seeded in advance comes back](#reading-the-superadmin-reads-a-preset-by-id) | answered |
 | [a user granted nothing reading a preset by id is rejected for not enough permission](#reading-a-user-granted-nothing-may-not-read-a-preset) | rejected |
-| [when the superadmin reads the preset of an unknown id, the call is rejected as no such target](#reading-reading-an-id-nothing-answers-to-is-not-found) | rejected |
 
 **partial_bulk_purge**
 
@@ -52,8 +49,7 @@ Scenario: incomplete 1 / 9
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin searches with the name of one preset, only that preset comes back](#searching-filtering-preset-search-by-name-leaves-that-one) | answered |
-| [when several presets exist and the superadmin searches without a filter, every preset seeded in advance comes back](#searching-the-superadmin-finds-every-preset) | answered |
+| [when the superadmin narrows presets by their shared name prefix and asks for the first page in descending name order, only the first of the presets holding that prefix comes back, and the preset without it does not. the superadmin role gates this call](#searching-filtering-and-ordering-preset-search-gives-its-first-page) | answered |
 | [a user who is not the superadmin searching every preset is rejected for lacking the role](#searching-a-user-who-is-not-the-superadmin-may-not-search-presets) | rejected |
 
 **apply_resource_group**
@@ -67,9 +63,9 @@ Scenario: incomplete 1 / 9
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin creates a preset bound to a resource group, the whole preset comes back naming that group](#creating-the-superadmin-creates-a-preset-bound-to-a-resource-group) | answered |
-| [when the superadmin creates a preset bound to no resource group, the whole preset just created comes back](#creating-the-superadmin-creates-a-preset-in-public) | answered |
+| [when the superadmin creates a preset bound to a resource group, the whole preset comes back naming that group. the superadmin role gates this call](#creating-the-superadmin-creates-a-preset-bound-to-a-resource-group) | answered |
 | [a user who is not the superadmin creating a preset is rejected for lacking the role](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-preset) | rejected |
+| [when the superadmin creates a preset with the name another preset already holds, the call is rejected as a duplicate name](#creating-creating-a-preset-name-another-preset-holds-is-refused) | rejected |
 
 **purge**
 
@@ -89,46 +85,6 @@ Scenario: incomplete 1 / 9
 | [when the superadmin tries to edit the preset of an unknown id, the call is rejected as no such target](#editing-editing-an-id-nothing-answers-to-is-not-found) | rejected |
 
 ### batch_load_by_ids
-
-<a id="reading-a-superadmin-loading-an-unknown-preset-id-finds-it-empty"></a>
-
-#### [a-superadmin-loading-an-unknown-preset-id-finds-it-empty](/tests/scenario/bai_scenario/manager/resource_preset/test_reading.py): pass
-
-when the superadmin batch loads several presets and one unknown id, the presets come back in the order requested and the item for the unknown id is empty
-
-Given
-
-- 2 presets and one superadmin
-  - Resource preset preset-1: belongs to public because it is bound to no resource group
-  - Resource preset preset-2: belongs to public because it is bound to no resource group
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- ResourcePresetAdapter.batch_load_by_ids: user-1 reads 2 presets and one unknown id at once
-
-Then
-
-- every preset comes back in the order requested, and the item for the unknown id is empty
-  - len(items) = 3
-  - items[0].id: same as the id of the preset seeded in advance
-  - items[0].entity_id: same as the id of the preset seeded in advance
-  - items[0].name = 'preset-1'
-  - items[0].resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
-  - items[0].shared_memory = None
-  - items[0].resource_group_name = None
-  - items[1].id: same as the id of the preset seeded in advance
-  - items[1].entity_id: same as the id of the preset seeded in advance
-  - items[1].name = 'preset-2'
-  - items[1].resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
-  - items[1].shared_memory = None
-  - items[1].resource_group_name = None
-  - items[2] = None
 
 <a id="reading-a-user-reading-presets-reads-several-presets-by-id"></a>
 
@@ -193,13 +149,12 @@ Given
 
 When
 
-- ResourcePresetAdapter.batch_load_by_ids: user-1 reads 2 presets and one unknown id at once
+- ResourcePresetAdapter.batch_load_by_ids: user-1 reads several presets by the ids of 2
 
 Then
 
 - every item asked comes back carrying a denial for not enough permission
-  - len(items) = 3
-  - rejected: NotEnoughPermission
+  - len(items) = 2
   - rejected: NotEnoughPermission
   - rejected: NotEnoughPermission
 
@@ -240,37 +195,6 @@ Then
   - shared_memory = None
   - resource_group_name = None
 
-<a id="reading-the-superadmin-reads-a-preset-by-id"></a>
-
-#### [the-superadmin-reads-a-preset-by-id](/tests/scenario/bai_scenario/manager/resource_preset/test_reading.py): pass
-
-when the superadmin reads one preset by id, the whole preset seeded in advance comes back
-
-Given
-
-- one preset and one superadmin
-  - Resource preset preset-1: belongs to public because it is bound to no resource group
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- ResourcePresetAdapter.get: user-1 reads the preset of preset-1
-
-Then
-
-- the whole preset seeded in advance comes back
-  - id: same as the id of the preset seeded in advance
-  - entity_id: same as the id of the preset seeded in advance
-  - name = 'preset-1'
-  - resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
-  - shared_memory = None
-  - resource_group_name = None
-
 <a id="reading-a-user-granted-nothing-may-not-read-a-preset"></a>
 
 #### [a-user-granted-nothing-may-not-read-a-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_reading.py): pass
@@ -296,32 +220,6 @@ Then
 
 - the call is rejected
   - rejected: NotEnoughPermission
-
-<a id="reading-reading-an-id-nothing-answers-to-is-not-found"></a>
-
-#### [reading-an-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_preset/test_reading.py): pass
-
-when the superadmin reads the preset of an unknown id, the call is rejected as no such target
-
-Given
-
-- one preset and one superadmin
-  - Resource preset preset-1: belongs to public because it is bound to no resource group
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- ResourcePresetAdapter.get: user-1 reads the preset of an unknown id
-
-Then
-
-- the call is rejected
-  - rejected: ResourcePresetNotFound
 
 ### partial_bulk_purge
 
@@ -502,15 +400,16 @@ Then
 
 ### search
 
-<a id="searching-filtering-preset-search-by-name-leaves-that-one"></a>
+<a id="searching-filtering-and-ordering-preset-search-gives-its-first-page"></a>
 
-#### [filtering-preset-search-by-name-leaves-that-one](/tests/scenario/bai_scenario/manager/resource_preset/test_searching.py): pass
+#### [filtering-and-ordering-preset-search-gives-its-first-page](/tests/scenario/bai_scenario/manager/resource_preset/test_searching.py): pass
 
-when the superadmin searches with the name of one preset, only that preset comes back
+when the superadmin narrows presets by their shared name prefix and asks for the first page in descending name order, only the first of the presets holding that prefix comes back, and the preset without it does not. the superadmin role gates this call
 
 Given
 
-- 2 presets and one superadmin
+- 2 presets sharing a name and one preset not sharing it, and one superadmin
+  - Resource preset unrelated-1: belongs to public because it is bound to no resource group
   - Resource preset preset-1: belongs to public because it is bound to no resource group
   - Resource preset preset-2: belongs to public because it is bound to no resource group
   - Domain home-1
@@ -522,61 +421,21 @@ Given
 
 When
 
-- ResourcePresetAdapter.search: user-1 searches presets with the name preset-1
+- ResourcePresetAdapter.search: user-1 searches the first page of presets whose name starts with preset, in descending name order
 
 Then
 
-- only the preset the filter names comes back
-  - total_count = 1
-  - len(items) = 1
-  - items[0].id: same as the id of the preset seeded in advance
-  - items[0].entity_id: same as the id of the preset seeded in advance
-  - items[0].name = 'preset-1'
-  - items[0].resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
-  - items[0].shared_memory = None
-  - items[0].resource_group_name = None
-
-<a id="searching-the-superadmin-finds-every-preset"></a>
-
-#### [the-superadmin-finds-every-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_searching.py): pass
-
-when several presets exist and the superadmin searches without a filter, every preset seeded in advance comes back
-
-Given
-
-- 2 presets and one superadmin
-  - Resource preset preset-1: belongs to public because it is bound to no resource group
-  - Resource preset preset-2: belongs to public because it is bound to no resource group
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- ResourcePresetAdapter.search: user-1 searches every preset without a filter
-
-Then
-
-- every preset seeded in advance comes back, and only those
+- the presets that pass the filter come back as the first page in descending name order, and the preset the filter excludes does not
   - total_count = 2
-  - has_next_page = False
+  - len(items) = 1
+  - has_next_page = True
   - has_previous_page = False
-  - len(items) = 2
   - items[0].id: same as the id of the preset seeded in advance
   - items[0].entity_id: same as the id of the preset seeded in advance
-  - items[0].name = 'preset-1'
+  - items[0].name = 'preset-2'
   - items[0].resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
   - items[0].shared_memory = None
   - items[0].resource_group_name = None
-  - items[1].id: same as the id of the preset seeded in advance
-  - items[1].entity_id: same as the id of the preset seeded in advance
-  - items[1].name = 'preset-2'
-  - items[1].resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
-  - items[1].shared_memory = None
-  - items[1].resource_group_name = None
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-presets"></a>
 
@@ -676,7 +535,7 @@ Then
 
 #### [the-superadmin-creates-a-preset-bound-to-a-resource-group](/tests/scenario/bai_scenario/manager/resource_preset/test_creating.py): pass
 
-when the superadmin creates a preset bound to a resource group, the whole preset comes back naming that group
+when the superadmin creates a preset bound to a resource group, the whole preset comes back naming that group. the superadmin role gates this call
 
 Given
 
@@ -703,37 +562,6 @@ Then
   - shared_memory = BinarySizeInfo(expr='1073741824', display='1g')
   - resource_group_name = 'group-1'
 
-<a id="creating-the-superadmin-creates-a-preset-in-public"></a>
-
-#### [the-superadmin-creates-a-preset-in-public](/tests/scenario/bai_scenario/manager/resource_preset/test_creating.py): pass
-
-when the superadmin creates a preset bound to no resource group, the whole preset just created comes back
-
-Given
-
-- one resource group and one superadmin
-  - Domain home-1
-  - Resource group group-1: uses the fifo scheduler
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- ResourcePresetAdapter.create: user-1 creates the preset fresh-preset bound to no resource group
-
-Then
-
-- the whole preset just created comes back
-  - id: skipped: the database generates it
-  - entity_id: skipped: the database generates it
-  - name = 'fresh-preset'
-  - resource_slots = [ResourceSlotEntryInfo(resource_type='cpu', quantity=Decimal('1')), ResourceSlotEntryInfo(resource_type='mem', quantity=Decimal('1073741824'))]
-  - shared_memory = BinarySizeInfo(expr='1073741824', display='1g')
-  - resource_group_name = None
-
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-create-a-preset"></a>
 
 #### [a-user-who-is-not-the-superadmin-may-not-create-a-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_creating.py): pass
@@ -759,6 +587,32 @@ Then
 
 - the call is rejected
   - rejected: InsufficientPrivilege
+
+<a id="creating-creating-a-preset-name-another-preset-holds-is-refused"></a>
+
+#### [creating-a-preset-name-another-preset-holds-is-refused](/tests/scenario/bai_scenario/manager/resource_preset/test_creating.py): pass
+
+when the superadmin creates a preset with the name another preset already holds, the call is rejected as a duplicate name
+
+Given
+
+- one preset and one superadmin
+  - Resource preset preset-1: belongs to public because it is bound to no resource group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ResourcePresetAdapter.create: user-1 creates a preset with the name preset-1 that another preset already holds
+
+Then
+
+- the call is rejected
+  - rejected: ResourcePresetConflict
 
 ### purge
 
