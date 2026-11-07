@@ -18,6 +18,7 @@ class TestSeedProject(TestSeedRowFromTwo[DomainData, ProjectResourcePolicyData, 
     """A project of the given domain, under the given policy."""
 
     name_hint: str = "project"
+    is_active: bool = True
 
     @override
     def kind(self) -> str:
@@ -25,7 +26,9 @@ class TestSeedProject(TestSeedRowFromTwo[DomainData, ProjectResourcePolicyData, 
 
     @override
     def detail(self) -> str:
-        return Says("")
+        if self.is_active:
+            return Says("")
+        return Says("비활성 상태", english="inactive")
 
     @override
     def name(self, naming: Naming) -> str:
@@ -41,4 +44,5 @@ class TestSeedProject(TestSeedRowFromTwo[DomainData, ProjectResourcePolicyData, 
             domain_name=first.name,
             description=f"{name} was already here",
             resource_policy=second.name,
+            is_active=self.is_active,
         )

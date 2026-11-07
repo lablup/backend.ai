@@ -53,6 +53,7 @@ from ai.backend.manager.models.specs.creator import (
 from ai.backend.manager.models.specs.relation import RelationCreator
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.specs.upserter import (
+    DanglingFieldUpserter,
     EntityUpserter,
     FieldUpserter,
     GlobalEntityUpserter,
@@ -256,6 +257,19 @@ class TestSeedFieldUpserter[A, D: FieldData](TestSeedField[A, D]):
     @override
     async def write(self, ops: TestSeedOps, owner_id: Any) -> D:
         return await ops.upsert_field_entity(owner_id, self.seed())
+
+
+class TestSeedDanglingFieldUpserter[A, D: FieldData](TestSeedField[A, D]):
+    """A field row the manager upserts whose owner is a value on the row, such as a fair
+    share keyed by a resource group."""
+
+    @abstractmethod
+    def seed(self, owner_id: Any) -> DanglingFieldUpserter[Any, D]:
+        raise NotImplementedError
+
+    @override
+    async def write(self, ops: TestSeedOps, owner_id: Any) -> D:
+        return await ops.upsert_dangling_field(self.seed(owner_id))
 
 
 class TestSeedLink[S, T](ABC):
