@@ -45,7 +45,7 @@ async def adapter(
     monitors: ActionMonitors,
     valkey: ScenarioValkey,
 ) -> LoginSessionAdapter:
-    registry = ProcessorRegistry(
+    registry: ProcessorRegistry[Any] = ProcessorRegistry(
         ProcessorDependencies(
             monitors=monitors,
             validators=validators,
