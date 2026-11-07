@@ -30,7 +30,6 @@ from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
-    Condition,
     Given,
     Held,
     Refused,
@@ -40,7 +39,7 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.components.answers import MissingResponse
+from bai_scenario.components.answers import MissingResponse, RefusedItem
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
 from bai_scenario.components.vfolder import STORAGE_HOST
 from bai_scenario.seeds.domain.domain import TestSeedDomain
@@ -51,6 +50,9 @@ from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
 from bai_scenario.seeds.resource_slot.slot_type import TestSeedSlotType
 from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 from bai_scenario.seeds.vfolder.vfolder import TestSeedProjectVFolder
+
+PERMISSION_REASON = "Insufficient permission"
+"""권한이 없는 항목의 실패 이유가 담는 말."""
 
 CARD_TITLE = Says("이미 있던 카드", english="a card that already existed")
 
@@ -112,6 +114,8 @@ class ModelCardsAndACaller:
 
     cards: tuple[ModelCardData, ...]
     caller: UserData
+    outside: tuple[ModelCardData, ...] = ()
+    """다른 프로젝트에 놓여 호출자가 아무 권한도 받지 않은 카드들."""
 
 
 @dataclass(frozen=True)
@@ -124,6 +128,8 @@ class CardsInAProjectAndSomeone(Given[Any, ModelCardsAndACaller]):
     count: int = 1
     granted: tuple[Permission, ...] = ()
     role: UserRole = UserRole.USER
+    outside: int = 0
+    """다른 프로젝트에 놓아 호출자가 권한을 받지 않은 카드 수."""
 
     @override
     def describe(self) -> str:
@@ -138,10 +144,20 @@ class CardsInAProjectAndSomeone(Given[Any, ModelCardsAndACaller]):
             if self.granted
             else "granted no permission"
         )
-        return Says(
+        said = Says(
             f"모델 카드 {self.count}개가 놓인 프로젝트와, {grant_ko} {self.role.value} 한 명",
             english=(
                 f"a project holding {self.count} model cards and one {self.role.value} {grant_en}"
+            ),
+        )
+        if not self.outside:
+            return said
+        return Says(
+            f"{said}, 그리고 그 사용자가 아무 권한도 받지 않은 다른 프로젝트의 카드 "
+            f"{self.outside}개",
+            english=(
+                f"{said.english}, and {self.outside} card in another project where that user "
+                "was granted nothing"
             ),
         )
 
@@ -155,21 +171,28 @@ class CardsInAProjectAndSomeone(Given[Any, ModelCardsAndACaller]):
         project = await seeding.creating_from_two(
             TestSeedProject(name_hint="model-store"), domain, policy
         )
-        cards = []
-        for _ in range(self.count):
-            folder = await seeding.creating_from_two(
-                TestSeedProjectVFolder(host=STORAGE_HOST), project, owner
+        cards = [await self._card(seeding, project, owner) for _ in range(self.count)]
+        outside = []
+        if self.outside:
+            elsewhere = await seeding.creating_from_two(
+                TestSeedProject(name_hint="model-store"), domain, policy
             )
-            cards.append(
-                await seeding.creating_from_three(
-                    TestSeedModelCard(title=CARD_TITLE), project, folder, owner
-                )
-            )
+            outside = [await self._card(seeding, elsewhere, owner) for _ in range(self.outside)]
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         if self.granted:
             await seeding.within(SomeoneHandlingCardsIn(project, caller, self.granted))
         return ModelCardsAndACaller(
-            tuple(seeding.made(card) for card in cards), seeding.made(caller)
+            tuple(seeding.made(card) for card in cards),
+            seeding.made(caller),
+            tuple(seeding.made(card) for card in outside),
+        )
+
+    async def _card(self, seeding: Any, project: Any, owner: Any) -> Any:
+        folder = await seeding.creating_from_two(
+            TestSeedProjectVFolder(host=STORAGE_HOST), project, owner
+        )
+        return await seeding.creating_from_three(
+            TestSeedModelCard(title=CARD_TITLE), project, folder, owner
         )
 
 
@@ -235,34 +258,22 @@ class ModelCardLook:
 
 
 @dataclass(frozen=True)
-class Mentions(Condition[str]):
-    """이유에 이 말이 들어 있다. 이유의 나머지는 id 를 싣고 있어 실행마다 다르다."""
+class TheOutsideCardIsRefused(Then[ModelCardsAndACaller, PartialBulkPayload[ModelCardNode]]):
+    """권한이 있는 카드는 처리된 목록에 오고, 다른 프로젝트의 카드만 권한이 없다는 이유로 실패
+    목록에 온다."""
 
-    phrase: str
-
-    @override
-    def says(self) -> str:
-        return Says(
-            f"'{self.phrase}'를 담은 이유",
-            english=f"a reason containing '{self.phrase}'",
-        )
-
-    @override
-    def holds(self, got: str) -> bool:
-        return self.phrase in got
-
-
-@dataclass(frozen=True)
-class NoCardIsProcessed(Then[ModelCardsAndACaller, PartialBulkPayload[ModelCardNode]]):
-    """처리된 카드 없이, 대상이 모두 같은 이유로 실패 목록에 온다."""
-
-    reason: str
+    started: datetime
+    title: str = CARD_TITLE
 
     @override
     def says(self) -> str:
         return Says(
-            "처리된 카드 없이 대상이 모두 실패 목록에 옵니다",
-            english="no card is processed and every target comes back in the failed list",
+            "권한이 있는 카드는 모두 처리된 목록에 오고, 다른 프로젝트의 카드만 권한이 없다는 "
+            "이유로 실패 목록에 옵니다",
+            english=(
+                "every card the caller may touch comes back in the processed list, and only the "
+                "card in the other project comes back in the failed list for lack of permission"
+            ),
         )
 
     @override
@@ -274,21 +285,24 @@ class NoCardIsProcessed(Then[ModelCardsAndACaller, PartialBulkPayload[ModelCardN
         payload = answered.response
         if payload is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        verdicts: list[Verdict] = [
-            Same("successes", payload.successes, []),
-            Same("failed count", len(payload.failed), len(laid.cards)),
-        ]
-        for i, (failure, card) in enumerate(zip(payload.failed, laid.cards, strict=False)):
+        look = ModelCardLook(self.started, title=self.title)
+        verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(laid.cards))]
+        for i, (node, card) in enumerate(zip(payload.successes, laid.cards, strict=False)):
+            verdicts += look.verdicts(f"successes[{i}].", node, card)
+        verdicts.append(Same("failed count", len(payload.failed), len(laid.outside)))
+        for i, (failure, card) in enumerate(zip(payload.failed, laid.outside, strict=False)):
             verdicts += [
                 Held[UUID](
                     f"failed[{i}].id",
                     failure.id,
                     SameAs(
                         card.id,
-                        Says("대상 카드의 id", english="the id of the target card"),
+                        Says("다른 프로젝트의 카드", english="the card in the other project"),
                     ),
                 ),
-                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+                RefusedItem(
+                    f"failed[{i}].message", NotEnoughPermission, PERMISSION_REASON, failure.message
+                ),
             ]
         return verdicts
 

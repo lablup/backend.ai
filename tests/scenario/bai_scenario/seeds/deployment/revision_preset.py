@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.common.config import PresetModelDefinition
+from ai.backend.common.config import PresetModelConfig, PresetModelDefinition
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
@@ -16,6 +16,7 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
     ResourceSlotEntryData,
 )
+from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.models.deployment_revision_preset.creators import (
     DeploymentPresetCreator,
@@ -23,7 +24,13 @@ from ai.backend.manager.models.deployment_revision_preset.creators import (
 )
 from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
 from ai.backend.testutils.scenario_steps import Says
-from bai_scenario.seeds.seeder import Naming, TestSeedFieldCreator, TestSeedRowFrom, joined
+from bai_scenario.seeds.seeder import (
+    Naming,
+    TestSeedFieldCreator,
+    TestSeedRowFrom,
+    TestSeedRowFromTwo,
+    joined,
+)
 
 
 @dataclass(frozen=True)
@@ -79,6 +86,68 @@ class TestSeedDeploymentRevisionPreset(
             bootstrap_script=None,
             environ={},
             runtime_variant_preset_values=list(self.preset_values),
+            replica_count=1,
+            deployment_strategy=DeploymentStrategy.ROLLING,
+            deployment_strategy_spec={},
+        )
+
+
+@dataclass(frozen=True)
+class TestSeedDeployablePreset(
+    TestSeedRowFromTwo[RuntimeVariantData, ImageData, DeploymentRevisionPresetData]
+):
+    """A preset of the given variant on the given image, serving one model.
+
+    A revision built from it alone finds an image and a model definition, so a deploy
+    can take everything but the model folder from it.
+    """
+
+    model_name: str
+    name_hint: str = "preset"
+
+    @override
+    def kind(self) -> str:
+        return Says("배포 리비전 프리셋", english="Deployment revision preset")
+
+    @override
+    def detail(self) -> str:
+        return joined(
+            [
+                Says("이미지를 가리킵니다", english="names the image"),
+                Says(
+                    f"모델 '{self.model_name}' 하나를 서빙합니다",
+                    english=f"serves one model '{self.model_name}'",
+                ),
+                Says("단일 노드", english="single node"),
+                Says("복제본 하나", english="one replica"),
+                Says("롤링 업데이트", english="rolling update"),
+            ],
+            ", ",
+        )
+
+    @override
+    def name(self, naming: Naming) -> str:
+        return naming(self.name_hint)
+
+    @override
+    def seed(
+        self, name: str, first: RuntimeVariantData, second: ImageData
+    ) -> DeploymentPresetCreator:
+        return DeploymentPresetCreator(
+            runtime_variant_id=RuntimeVariantID(first.id),
+            name=name,
+            description=None,
+            image_id=ImageID(second.id),
+            model_definition=PresetModelDefinition(
+                models=[PresetModelConfig(name=self.model_name)]
+            ),
+            resource_opts=[],
+            cluster_mode=ClusterMode.SINGLE_NODE.value,
+            cluster_size=1,
+            startup_command=None,
+            bootstrap_script=None,
+            environ={},
+            runtime_variant_preset_values=[],
             replica_count=1,
             deployment_strategy=DeploymentStrategy.ROLLING,
             deployment_strategy_spec={},

@@ -46,6 +46,8 @@ class StorageScript:
     create_folder: BaseException | None = None
     delete_folder: BaseException | None = None
     folder_usage: Mapping[str, int] | None = None
+    files: Mapping[str, bytes] = field(default_factory=dict)
+    """The files at the top of every folder, by name."""
 
 
 class FakeStorageProxyManagerFacingClient(StorageProxyManagerFacingClient):
@@ -108,6 +110,19 @@ class FakeStorageProxyManagerFacingClient(StorageProxyManagerFacingClient):
         if self.script.folder_usage is not None:
             return dict(self.script.folder_usage)
         return dict(self.folders.get((volume, vfid), {"used_bytes": 0, "file_count": 0}))
+
+    @override
+    async def list_files(self, volume: str, vfid: str, relpath: str) -> Mapping[str, Any]:
+        self.calls.append(StorageCall("list_files", volume, vfid, {"relpath": relpath}))
+        return {"items": [{"name": name} for name in self.script.files]}
+
+    @override
+    async def fetch_file_content(self, volume: str, vfid: str, relpath: str) -> bytes:
+        self.calls.append(StorageCall("fetch_file_content", volume, vfid, {"relpath": relpath}))
+        name = relpath.removeprefix("./")
+        if name not in self.script.files:
+            raise VFolderNotFound(extra_data=relpath)
+        return self.script.files[name]
 
     def created(self) -> list[StorageCall]:
         return [c for c in self.calls if c.method == "create_folder"]
