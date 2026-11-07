@@ -8,13 +8,13 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import (
     DeleteDeploymentRevisionPresetPayload,
 )
 from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
     DeploymentRevisionPresetAdapter,
 )
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -90,27 +90,27 @@ class ThePresetIsGone(Then[PresetsAndACaller, Answer]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminPurgesAPreset(
+class AUserGrantedHardDeletePurgesAPreset(
     Scenario[TestSeedingSession, PresetsAndACaller, DeploymentRevisionPresetAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-purges-a-preset"
+        return "a-user-granted-hard-delete-purges-a-preset"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 심은 프리셋 하나를 purge 하면, 그 프리셋의 id 가 옵니다. purge 는 "
-            "전역 권한이 필요한 호출이 아니라 이 행의 요청 사용자가 superadmin 입니다",
+            "프리셋 영구 삭제 권한을 받은 사용자가 심은 프리셋 하나를 purge 하면, 그 프리셋의 "
+            "id 가 옵니다",
             english=(
-                "when the superadmin purges one of the presets seeded in advance, the id of "
-                "that preset comes back"
+                "when a user granted preset hard delete purges one of the presets seeded in "
+                "advance, the id of that preset comes back"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, PresetsAndACaller]:
-        return PresetsAndSomeone(role=UserRole.SUPERADMIN)
+        return PresetsAndSomeone(permission=Permission.HARD_DELETE)
 
     @override
     def when(self) -> When[PresetsAndACaller, DeploymentRevisionPresetAdapter, Answer]:
@@ -142,7 +142,7 @@ class APresetReaderPurgesNoPreset(
 
     @override
     def given(self) -> Given[TestSeedingSession, PresetsAndACaller]:
-        return PresetsAndSomeone(role=UserRole.USER)
+        return PresetsAndSomeone()
 
     @override
     def when(self) -> When[PresetsAndACaller, DeploymentRevisionPresetAdapter, Answer]:
@@ -154,7 +154,7 @@ class APresetReaderPurgesNoPreset(
 
 
 SCENARIOS: list[RetireStep] = [
-    TheSuperadminPurgesAPreset(),
+    AUserGrantedHardDeletePurgesAPreset(),
     APresetReaderPurgesNoPreset(),
 ]
 

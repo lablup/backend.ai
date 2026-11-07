@@ -8,7 +8,6 @@ from typing import override
 
 import pytest
 
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     UpdateDeploymentRevisionPresetInput,
 )
@@ -18,6 +17,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
 from ai.backend.manager.api.adapters.deployment_revision_preset.adapter import (
     DeploymentRevisionPresetAdapter,
 )
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -98,28 +98,29 @@ class TheEditedPresetComesBack(Then[PresetsAndACaller, Answer]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminEditsAPreset(
+class AUserGrantedUpdateEditsAPreset(
     Scenario[TestSeedingSession, PresetsAndACaller, DeploymentRevisionPresetAdapter, Answer]
 ):
     started: datetime
 
     @override
     def summary(self) -> str:
-        return "the-superadmin-edits-a-preset"
+        return "a-user-granted-update-edits-a-preset"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 심은 프리셋 하나의 설명을 고치면, 새 설명이 들어간 프리셋이 옵니다",
+            "프리셋 수정 권한을 받은 사용자가 심은 프리셋 하나의 설명을 고치면, 새 설명이 "
+            "들어간 프리셋이 옵니다",
             english=(
-                "when the superadmin changes the description of one of the presets seeded in "
-                "advance, the preset comes back with the new description"
+                "when a user granted preset update changes the description of one of the presets "
+                "seeded in advance, the preset comes back with the new description"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, PresetsAndACaller]:
-        return PresetsAndSomeone(role=UserRole.SUPERADMIN)
+        return PresetsAndSomeone(permission=Permission.UPDATE)
 
     @override
     def when(self) -> When[PresetsAndACaller, DeploymentRevisionPresetAdapter, Answer]:
@@ -151,7 +152,7 @@ class APresetReaderEditsNoPreset(
 
     @override
     def given(self) -> Given[TestSeedingSession, PresetsAndACaller]:
-        return PresetsAndSomeone(role=UserRole.USER)
+        return PresetsAndSomeone()
 
     @override
     def when(self) -> When[PresetsAndACaller, DeploymentRevisionPresetAdapter, Answer]:
@@ -165,7 +166,7 @@ class APresetReaderEditsNoPreset(
 STARTED = datetime.now(UTC)
 
 SCENARIOS: list[EditStep] = [
-    TheSuperadminEditsAPreset(started=STARTED),
+    AUserGrantedUpdateEditsAPreset(started=STARTED),
     APresetReaderEditsNoPreset(),
 ]
 

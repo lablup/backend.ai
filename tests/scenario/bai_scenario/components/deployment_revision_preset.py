@@ -23,6 +23,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     PresetModelDefinitionInfoDTO,
 )
 from ai.backend.manager.data.deployment_revision_preset.types import DeploymentRevisionPresetData
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -74,6 +75,7 @@ class PresetsAndSomeone(Given[Any, PresetsAndACaller]):
     role: UserRole = UserRole.USER
     count: int = 2
     excluded: bool = False
+    permission: Permission = Permission.READ
 
     @override
     def describe(self) -> str:
@@ -102,7 +104,9 @@ class PresetsAndSomeone(Given[Any, PresetsAndACaller]):
                     TestSeedDeploymentRevisionPreset(name_hint="other"), variant
                 )
             )
-        caller = await lay_a_public_reader(seeding, DeploymentPresetEntityType(), self.role)
+        caller = await lay_a_public_reader(
+            seeding, DeploymentPresetEntityType(), self.role, self.permission
+        )
         return PresetsAndACaller(
             presets=tuple(seeding.made(preset) for preset in presets),
             excluded=excluded,
