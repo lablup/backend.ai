@@ -12,8 +12,14 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.rbac.request import SearchRolesInput
+from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    RoleFilter,
+    RoleOrderBy,
+    SearchRolesInput,
+)
 from ai.backend.common.dto.manager.v2.rbac.response import RoleNode
+from ai.backend.common.dto.manager.v2.rbac.types import OrderDirection
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.role import RoleData
@@ -52,6 +58,21 @@ def _by_name(roles: list[RoleData]) -> list[RoleData]:
     return sorted(roles, key=lambda role: role.name)
 
 
+def _search(laid: RolesAndACaller, limit: int, only: str | None = None) -> SearchRolesInput:
+    """하나의 필터, 하나의 정렬, 페이지 크기를 함께 싣는다."""
+    if only is not None:
+        condition = RoleFilter(name=StringFilter(equals=only))
+    elif laid.excluded_roles:
+        condition = RoleFilter(name=StringFilter(not_equals=laid.excluded_roles[0].name))
+    else:
+        condition = None
+    return SearchRolesInput(
+        filter=condition,
+        order=[RoleOrderBy(field="name", direction=OrderDirection.ASC)],
+        limit=limit,
+    )
+
+
 def _checked(
     started: datetime, laid: RolesAndACaller, page: RolePage, roles: list[RoleData]
 ) -> list[Verdict]:
@@ -88,7 +109,7 @@ class SearchingEveryRole(When[RolesAndACaller, RBACAdapter, RolePage]):
     @override
     async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> RolePage:
         with ActingAs(laid.caller):
-            return await adapter.admin_search_roles_gql(SearchRolesInput())
+            return await adapter.admin_search_roles_gql(_search(laid, len(laid.roles)))
 
 
 @dataclass(frozen=True)
@@ -108,8 +129,9 @@ class SearchingTheRolesIHold(When[RolesAndACaller, RBACAdapter, RolePage]):
 
     @override
     async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> RolePage:
+        name = laid.self_role.name if laid.self_role is not None else laid.caller.username
         with ActingAs(laid.caller):
-            return await adapter.my_search_roles(SearchRolesInput())
+            return await adapter.my_search_roles(_search(laid, 1, only=name))
 
 
 @dataclass(frozen=True)
@@ -129,9 +151,10 @@ class SearchingTheDomain(When[RolesAndACaller, RBACAdapter, RolePage]):
 
     @override
     async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> RolePage:
+        expected = len(laid.roles) + (1 if laid.grant_role is not None else 0)
         with ActingAs(laid.caller):
             return await adapter.search_roles_in_scope(
-                [ScopedRoleTarget(scope=DomainID(laid.domain.id))], SearchRolesInput()
+                [ScopedRoleTarget(scope=DomainID(laid.domain.id))], _search(laid, expected)
             )
 
 
@@ -145,8 +168,8 @@ class EveryRoleInNameOrder(Then[RolesAndACaller, RolePage]):
     @override
     def says(self) -> str:
         return Says(
-            "미리 저장한 역할이 이름 순으로 모두 옵니다",
-            english="every role seeded in advance comes back in name order",
+            "필터가 고른 역할이 이름 순으로 옵니다",
+            english="the roles the filter keeps come back in name order",
         )
 
     @override
@@ -210,16 +233,17 @@ class TheSuperadminSearchesEveryRole(
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 모든 역할을 검색하면, 미리 저장한 역할이 이름 순으로 모두 옵니다",
+            "superadmin 이 한 역할의 이름을 빼는 조건으로 역할을 검색하면, 필터가 남긴 역할이 "
+            "이름 순으로 옵니다. 이 검색은 전역 역할이 막습니다",
             english=(
-                "when the superadmin searches every role, every role seeded in advance comes "
-                "back in name order"
+                "when the superadmin searches roles leaving one role's name out, the roles the "
+                "filter keeps come back in name order. The global role gates this search"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
-        return RolesAndSomeone(role=UserRole.SUPERADMIN, count=2)
+        return RolesAndSomeone(role=UserRole.SUPERADMIN, count=2, excluded=1)
 
     @override
     def when(self) -> When[RolesAndACaller, RBACAdapter, RolePage]:
@@ -271,17 +295,18 @@ class AUserHoldingARoleSearchesIt(
     @override
     def describe(self) -> str:
         return Says(
-            "자기 스코프의 역할 읽기 권한을 가진 역할을 가진 사용자가 가진 역할을 검색하면, "
-            "그 역할이 옵니다",
+            "자기 스코프의 역할 읽기 권한을 가진 역할을 가진 사용자가 자기 이름으로 가진 역할을 "
+            "검색하면, 그 역할만 오고 다른 사람이 가진 역할과 다른 하나는 빠집니다",
             english=(
-                "when a user holding a role with role read permission in their own scope "
-                "searches the roles they hold, that role comes back"
+                "when a user holding a role with role read permission in their own scope searches "
+                "the roles they hold by one name, that role comes back and neither the other "
+                "user's role nor the other held role is listed"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
-        return RolesAndSomeone(self_grant=(Permission.READ,))
+        return RolesAndSomeone(self_grant=(Permission.READ,), self_roles=2, assignees=1, assigned=1)
 
     @override
     def when(self) -> When[RolesAndACaller, RBACAdapter, RolePage]:
@@ -333,17 +358,20 @@ class AUserGrantedRoleReadSearchesADomain(
     @override
     def describe(self) -> str:
         return Says(
-            "대상 도메인에서 역할 읽기 권한을 받은 사용자가 그 도메인의 역할을 검색하면, "
-            "그 도메인의 역할이 모두 옵니다",
+            "대상 도메인에서 역할 읽기 권한을 받은 사용자가 한 역할의 이름을 빼는 조건으로 그 "
+            "도메인의 역할을 검색하면, 필터가 남긴 역할이 이름 순으로 옵니다",
             english=(
                 "when a user granted role read permission in a domain searches the roles of that "
-                "domain, every role of that domain comes back"
+                "domain leaving one role's name out, the roles the filter keeps come back in name "
+                "order"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
-        return RolesAndSomeone(count=2, grant=(Granted(RoleEntityType(), Permission.READ),))
+        return RolesAndSomeone(
+            count=2, excluded=1, beyond=1, grant=(Granted(RoleEntityType(), Permission.READ),)
+        )
 
     @override
     def when(self) -> When[RolesAndACaller, RBACAdapter, RolePage]:

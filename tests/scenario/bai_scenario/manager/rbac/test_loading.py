@@ -252,6 +252,23 @@ class TheTwoPermissionsAndAMiss(Then[RolesAndACaller, PermissionsLoaded]):
 
 
 @dataclass(frozen=True)
+class EveryPermissionIsEmpty(Then[RolesAndACaller, PermissionsLoaded]):
+    @override
+    def says(self) -> str:
+        return Says(
+            "모든 자리가 빈 값으로 옵니다",
+            english="every entry comes back empty",
+        )
+
+    @override
+    def look(self, laid: RolesAndACaller, answered: Answered[PermissionsLoaded]) -> list[Verdict]:
+        loaded = answered.response
+        if loaded is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        return [Same("loaded", loaded, [None, None, None])]
+
+
+@dataclass(frozen=True)
 class ThePermissionsOfTheRole(Then[RolesAndACaller, PermissionListsLoaded]):
     started: datetime
 
@@ -436,6 +453,38 @@ class TheSuperadminLoadsPermissions(
 
 
 @dataclass(frozen=True)
+class AUserGrantedNothingLoadsPermissionsAndGetsEmpty(
+    Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, PermissionsLoaded]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-loads-permissions-and-gets-empty-entries"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "아무 권한도 받지 않은 사용자가 권한 둘과 없는 id 하나를 한 번에 읽으면, 모든 자리가 "
+            "빈 값으로 옵니다",
+            english=(
+                "when a user granted nothing loads two permission rows and one missing id in one "
+                "call, every entry comes back empty"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
+        return _two(False)
+
+    @override
+    def when(self) -> When[RolesAndACaller, RBACAdapter, PermissionsLoaded]:
+        return LoadingPermissions()
+
+    @override
+    def then(self) -> Then[RolesAndACaller, PermissionsLoaded]:
+        return EveryPermissionIsEmpty()
+
+
+@dataclass(frozen=True)
 class AUserGrantedRoleReadLoadsTheRolePermissions(
     Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, PermissionListsLoaded]
 ):
@@ -536,6 +585,7 @@ SCENARIOS: list[LoadStep] = [
     TheSuperadminLoadsRoles(started=datetime.now(UTC)),
     AUserGrantedNothingGetsNothing(),
     TheSuperadminLoadsPermissions(started=datetime.now(UTC)),
+    AUserGrantedNothingLoadsPermissionsAndGetsEmpty(),
     AUserGrantedRoleReadLoadsTheRolePermissions(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotLoadTheRolePermissions(),
     TheSuperadminLoadsAssignments(started=datetime.now(UTC)),

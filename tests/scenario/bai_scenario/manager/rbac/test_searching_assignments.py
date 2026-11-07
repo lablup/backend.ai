@@ -11,10 +11,17 @@ import pytest
 from ai.backend.common.data.entity.role import RoleEntityType, RoleID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.rbac.request import SearchRoleAssignmentsInput
+from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    RoleAssignmentFilter,
+    RoleAssignmentOrderBy,
+    SearchRoleAssignmentsInput,
+)
 from ai.backend.common.dto.manager.v2.rbac.response import RoleAssignmentNode
+from ai.backend.common.dto.manager.v2.rbac.types import OrderDirection
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.rbac_models.user_role.scopes import RoleRoleAssignmentTarget
@@ -52,18 +59,27 @@ def _in_seeded_order(
     return sorted(nodes, key=lambda node: order.get(node.user_id, len(order)))
 
 
+def _search(laid: RolesAndACaller, username: str, limit: int) -> SearchRoleAssignmentsInput:
+    """하나의 필터, 하나의 정렬, 페이지 크기를 함께 싣는다."""
+    return SearchRoleAssignmentsInput(
+        filter=RoleAssignmentFilter(username=StringFilter(equals=username)),
+        order=[RoleAssignmentOrderBy(field="username", direction=OrderDirection.ASC)],
+        limit=limit,
+    )
+
+
 def _checked_assignees(
-    started: datetime, laid: RolesAndACaller, page: AssignmentPage
+    started: datetime, laid: RolesAndACaller, page: AssignmentPage, expected: list[UserData]
 ) -> list[Verdict]:
     verdicts: list[Verdict] = [
-        Same("items count", len(page.items), len(laid.assignees)),
-        Same("total_count", page.total_count, len(laid.assignees)),
+        Same("items count", len(page.items), len(expected)),
+        Same("total_count", page.total_count, len(expected)),
         Same("has_next_page", page.has_next_page, False),
         Same("has_previous_page", page.has_previous_page, False),
     ]
     look = AssignmentLook(started)
     for i, (node, user) in enumerate(
-        zip(_in_seeded_order(laid, page.items), laid.assignees, strict=False)
+        zip(_in_seeded_order(laid, page.items), expected, strict=False)
     ):
         verdicts += look.verdicts(f"items[{i}].", node, user.id, laid.role.id, None)
     return verdicts
@@ -85,7 +101,9 @@ class SearchingEveryAssignment(When[RolesAndACaller, RBACAdapter, AssignmentPage
     @override
     async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> AssignmentPage:
         with ActingAs(laid.caller):
-            return await adapter.admin_search_role_assignments(SearchRoleAssignmentsInput())
+            return await adapter.admin_search_role_assignments(
+                _search(laid, laid.assignees[0].username, 1)
+            )
 
 
 @dataclass(frozen=True)
@@ -104,7 +122,7 @@ class SearchingMyAssignments(When[RolesAndACaller, RBACAdapter, AssignmentPage])
     @override
     async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> AssignmentPage:
         with ActingAs(laid.caller):
-            return await adapter.my_search_role_assignments(SearchRoleAssignmentsInput())
+            return await adapter.my_search_role_assignments(_search(laid, laid.caller.username, 1))
 
 
 @dataclass(frozen=True)
@@ -125,7 +143,7 @@ class SearchingTheAssignmentsOfTheRole(When[RolesAndACaller, RBACAdapter, Assign
         with ActingAs(laid.caller):
             return await adapter.search_role_assignments_in_scope(
                 [RoleRoleAssignmentTarget(role_id=RoleID(laid.role.id))],
-                SearchRoleAssignmentsInput(),
+                _search(laid, laid.assignees[0].username, 1),
             )
 
 
@@ -138,8 +156,8 @@ class EveryAssignmentOfTheRole(Then[RolesAndACaller, AssignmentPage]):
     @override
     def says(self) -> str:
         return Says(
-            "미리 저장한 사람들의 역할 배정이 모두 옵니다",
-            english="the assignment of every user seeded in advance comes back",
+            "필터가 지목한 사람의 배정만 옵니다",
+            english="only the assignment of the user the filter names comes back",
         )
 
     @override
@@ -147,7 +165,7 @@ class EveryAssignmentOfTheRole(Then[RolesAndACaller, AssignmentPage]):
         page = answered.response
         if page is None:
             return [Refused(InsufficientPrivilege, answered.raised)]
-        return _checked_assignees(self.started, laid, page)
+        return _checked_assignees(self.started, laid, page, [laid.assignees[0]])
 
 
 @dataclass(frozen=True)
@@ -159,8 +177,8 @@ class TheAssignmentsOfTheRole(Then[RolesAndACaller, AssignmentPage]):
     @override
     def says(self) -> str:
         return Says(
-            "그 역할을 받은 사람들의 배정이 모두 옵니다",
-            english="the assignment of every user holding that role comes back",
+            "필터가 지목한 사람의 배정만 옵니다",
+            english="only the assignment of the user the filter names comes back",
         )
 
     @override
@@ -168,7 +186,7 @@ class TheAssignmentsOfTheRole(Then[RolesAndACaller, AssignmentPage]):
         page = answered.response
         if page is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        return _checked_assignees(self.started, laid, page)
+        return _checked_assignees(self.started, laid, page, [laid.assignees[0]])
 
 
 @dataclass(frozen=True)
@@ -217,10 +235,11 @@ class TheSuperadminSearchesEveryAssignment(
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 모든 역할 배정을 검색하면, 미리 저장한 사람들의 배정이 모두 옵니다",
+            "superadmin 이 미리 저장한 사람의 이름으로 역할 배정을 검색하면, 그 사람의 배정만 "
+            "옵니다. 이 검색은 전역 역할이 막습니다",
             english=(
-                "when the superadmin searches every role assignment, the assignment of every "
-                "user seeded in advance comes back"
+                "when the superadmin searches role assignments naming one seeded user, only that "
+                "user's assignment comes back. The global role gates this search"
             ),
         )
 
@@ -278,17 +297,18 @@ class AUserHoldingARoleSearchesItsAssignment(
     @override
     def describe(self) -> str:
         return Says(
-            "자기 스코프의 역할 읽기 권한을 가진 역할을 가진 사용자가 자기의 역할 배정을 "
-            "검색하면, 그 배정이 옵니다",
+            "자기 스코프의 역할 읽기 권한을 가진 역할을 가진 사용자가 자기 이름으로 자기의 역할 "
+            "배정을 검색하면, 그 배정만 오고 다른 사람의 배정은 빠집니다",
             english=(
-                "when a user holding a role with role read permission in their own scope "
-                "searches their own role assignments, that assignment comes back"
+                "when a user holding a role with role read permission in their own scope searches "
+                "their own role assignments by their own name, that assignment comes back and "
+                "another user's is left out"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
-        return RolesAndSomeone(self_grant=(Permission.READ,))
+        return RolesAndSomeone(self_grant=(Permission.READ,), assignees=1, assigned=1)
 
     @override
     def when(self) -> When[RolesAndACaller, RBACAdapter, AssignmentPage]:
@@ -340,11 +360,11 @@ class AUserGrantedRoleReadSearchesTheAssignmentsOfARole(
     @override
     def describe(self) -> str:
         return Says(
-            "대상 도메인에서 역할 읽기 권한을 받은 사용자가 역할 하나의 배정을 검색하면, "
-            "그 역할을 받은 사람들의 배정이 모두 옵니다",
+            "대상 도메인에서 역할 읽기 권한을 받은 사용자가 역할 하나의 배정을 미리 저장한 사람 "
+            "하나의 이름으로 검색하면, 그 사람의 배정만 옵니다",
             english=(
-                "when a user granted role read permission in a domain searches the assignments "
-                "of one role, the assignment of every user holding it comes back"
+                "when a user granted role read permission in a domain searches the assignments of "
+                "one role naming one seeded user, only that user's assignment comes back"
             ),
         )
 
@@ -354,6 +374,7 @@ class AUserGrantedRoleReadSearchesTheAssignmentsOfARole(
             assignees=2,
             assigned=2,
             grant=(Granted(RoleEntityType(), Permission.READ),),
+            self_grant=(Permission.READ,),
         )
 
     @override

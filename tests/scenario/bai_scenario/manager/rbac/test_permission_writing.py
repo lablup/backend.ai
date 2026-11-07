@@ -31,7 +31,6 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 )
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
-from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.permission import (
     NotEnoughPermission,
     ReplaceRolePermissionRoleIdMismatch,
@@ -67,6 +66,7 @@ WRITING = (
     Granted(RoleEntityType(), Permission.READ),
     Granted(RoleEntityType(), Permission.UPDATE),
 )
+READ_ONLY = (Granted(RoleEntityType(), Permission.READ),)
 SEEDED = (
     Granted(SessionEntityType(), Permission.READ),
     Granted(VFolderEntityType(), Permission.UPDATE),
@@ -540,9 +540,10 @@ class TheNewPermissionSet(Then[RolesAndACaller, ReplaceRolePermissionsPayload]):
 
 
 def _given(granted: bool) -> RolesAndSomeone:
+    """성공 호출자는 읽기와 수정 권한을, 거부 호출자는 수정만 뺀 권한을 받는다."""
     return RolesAndSomeone(
         permissions=SEEDED,
-        grant=WRITING if granted else (),
+        grant=WRITING if granted else READ_ONLY,
     )
 
 
@@ -581,18 +582,18 @@ class AUserGrantedRoleWriteCreatesAPermission(
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingMayNotCreateAPermission(
+class AUserGrantedReadOnlyMayNotCreateAPermission(
     Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, PermissionNode]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-may-not-create-a-permission"
+        return "a-user-granted-read-only-may-not-create-a-permission"
 
     @override
     def describe(self) -> str:
         return Says(
-            "아무 권한도 받지 않은 사용자는 권한을 만들 수 없습니다",
-            english="a user granted nothing cannot create a permission",
+            "대상 도메인에서 역할 읽기 권한만 받은 사용자는 권한을 만들 수 없습니다",
+            english="a user granted only role read permission in a domain cannot create a permission",
         )
 
     @override
@@ -643,18 +644,18 @@ class AUserGrantedRoleWriteUpdatesAPermission(
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingMayNotUpdateAPermission(
+class AUserGrantedReadOnlyMayNotUpdateAPermission(
     Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, PermissionNode]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-may-not-update-a-permission"
+        return "a-user-granted-read-only-may-not-update-a-permission"
 
     @override
     def describe(self) -> str:
         return Says(
-            "아무 권한도 받지 않은 사용자는 권한을 고칠 수 없습니다",
-            english="a user granted nothing cannot change a permission",
+            "대상 도메인에서 역할 읽기 권한만 받은 사용자는 권한을 고칠 수 없습니다",
+            english="a user granted only role read permission in a domain cannot change a permission",
         )
 
     @override
@@ -667,7 +668,7 @@ class AUserGrantedNothingMayNotUpdateAPermission(
 
     @override
     def then(self) -> Then[RolesAndACaller, PermissionNode]:
-        return TheCallIsRefused(GenericBadRequest)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
@@ -703,18 +704,18 @@ class AUserGrantedRoleWritePurgesAPermission(
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingMayNotPurgeAPermission(
+class AUserGrantedReadOnlyMayNotPurgeAPermission(
     Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, DeletePermissionPayload]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-may-not-purge-a-permission"
+        return "a-user-granted-read-only-may-not-purge-a-permission"
 
     @override
     def describe(self) -> str:
         return Says(
-            "아무 권한도 받지 않은 사용자는 권한을 purge 할 수 없습니다",
-            english="a user granted nothing cannot purge a permission",
+            "대상 도메인에서 역할 읽기 권한만 받은 사용자는 권한을 purge 할 수 없습니다",
+            english="a user granted only role read permission in a domain cannot purge a permission",
         )
 
     @override
@@ -727,7 +728,7 @@ class AUserGrantedNothingMayNotPurgeAPermission(
 
     @override
     def then(self) -> Then[RolesAndACaller, DeletePermissionPayload]:
-        return TheCallIsRefused(GenericBadRequest)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
@@ -800,18 +801,21 @@ class AUserGrantedRoleWriteAddsOneAlreadyHeld(
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingMayNotAddPermissions(
+class AUserGrantedReadOnlyMayNotAddPermissions(
     Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, BulkAddRolePermissionsPayload]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-may-not-add-permissions"
+        return "a-user-granted-read-only-may-not-add-permissions"
 
     @override
     def describe(self) -> str:
         return Says(
-            "아무 권한도 받지 않은 사용자는 권한을 한 번에 더할 수 없습니다",
-            english="a user granted nothing cannot add permissions in one call",
+            "대상 도메인에서 역할 읽기 권한만 받은 사용자는 권한을 한 번에 더할 수 없습니다",
+            english=(
+                "a user granted only role read permission in a domain cannot add permissions in "
+                "one call"
+            ),
         )
 
     @override
@@ -896,18 +900,21 @@ class AUserGrantedRoleWriteReplacesThePermissions(
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingMayNotReplaceThePermissions(
+class AUserGrantedReadOnlyMayNotReplaceThePermissions(
     Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, ReplaceRolePermissionsPayload]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-may-not-replace-the-permissions"
+        return "a-user-granted-read-only-may-not-replace-the-permissions"
 
     @override
     def describe(self) -> str:
         return Says(
-            "아무 권한도 받지 않은 사용자는 역할의 권한을 통째로 바꿀 수 없습니다",
-            english="a user granted nothing cannot replace the permission set of a role",
+            "대상 도메인에서 역할 읽기 권한만 받은 사용자는 역할의 권한을 통째로 바꿀 수 없습니다",
+            english=(
+                "a user granted only role read permission in a domain cannot replace the "
+                "permission set of a role"
+            ),
         )
 
     @override
@@ -956,7 +963,7 @@ class ReplacingWithAnEntryOfAnotherRoleIsRefused(
 
 
 @dataclass(frozen=True)
-class ANothingGrantedUserRemovesNone(Then[RolesAndACaller, BulkRemoveRolePermissionsPayload]):
+class AReadOnlyUserRemovesNone(Then[RolesAndACaller, BulkRemoveRolePermissionsPayload]):
     @override
     def says(self) -> str:
         return Says(
@@ -994,21 +1001,21 @@ class ANothingGrantedUserRemovesNone(Then[RolesAndACaller, BulkRemoveRolePermiss
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingRemovesNoPermission(
+class AUserGrantedReadOnlyRemovesNoPermission(
     Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, BulkRemoveRolePermissionsPayload]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-removes-no-permission"
+        return "a-user-granted-read-only-removes-no-permission"
 
     @override
     def describe(self) -> str:
         return Says(
-            "아무 권한도 받지 않은 사용자가 권한 둘을 한 번에 빼면, 하나도 빠지지 않고 모두 "
-            "실패 목록에 옵니다",
+            "대상 도메인에서 역할 읽기 권한만 받은 사용자가 권한 둘을 한 번에 빼면, 하나도 빠지지 "
+            "않고 모두 실패 목록에 옵니다",
             english=(
-                "when a user granted nothing removes two permissions in one call, none is removed "
-                "and both come back in the failed list"
+                "when a user granted only role read permission in a domain removes two permissions "
+                "in one call, none is removed and both come back in the failed list"
             ),
         )
 
@@ -1022,23 +1029,23 @@ class AUserGrantedNothingRemovesNoPermission(
 
     @override
     def then(self) -> Then[RolesAndACaller, BulkRemoveRolePermissionsPayload]:
-        return ANothingGrantedUserRemovesNone()
+        return AReadOnlyUserRemovesNone()
 
 
 SCENARIOS: list[PermissionStep] = [
     AUserGrantedRoleWriteCreatesAPermission(started=datetime.now(UTC)),
-    AUserGrantedNothingMayNotCreateAPermission(),
+    AUserGrantedReadOnlyMayNotCreateAPermission(),
     AUserGrantedRoleWriteUpdatesAPermission(started=datetime.now(UTC)),
-    AUserGrantedNothingMayNotUpdateAPermission(),
+    AUserGrantedReadOnlyMayNotUpdateAPermission(),
     AUserGrantedRoleWritePurgesAPermission(),
-    AUserGrantedNothingMayNotPurgeAPermission(),
+    AUserGrantedReadOnlyMayNotPurgeAPermission(),
     AUserGrantedRoleWriteAddsSeveralPermissions(started=datetime.now(UTC)),
     AUserGrantedRoleWriteAddsOneAlreadyHeld(started=datetime.now(UTC)),
-    AUserGrantedNothingMayNotAddPermissions(),
+    AUserGrantedReadOnlyMayNotAddPermissions(),
     AUserGrantedRoleWriteRemovesSeveralPermissions(started=datetime.now(UTC)),
-    AUserGrantedNothingRemovesNoPermission(),
+    AUserGrantedReadOnlyRemovesNoPermission(),
     AUserGrantedRoleWriteReplacesThePermissions(started=datetime.now(UTC)),
-    AUserGrantedNothingMayNotReplaceThePermissions(),
+    AUserGrantedReadOnlyMayNotReplaceThePermissions(),
     ReplacingWithAnEntryOfAnotherRoleIsRefused(),
 ]
 

@@ -8,14 +8,12 @@ from typing import override
 
 import pytest
 
-from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.permission.types import RoleStatus
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.rbac.request import UpdateRoleInput
 from ai.backend.common.dto.manager.v2.rbac.response import RoleNode
 from ai.backend.common.dto.manager.v2.rbac.types import RoleStatusDTO
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
-from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -30,7 +28,6 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.domain import TheCallIsRefused
 from bai_scenario.components.rbac import (
-    Granted,
     RoleLook,
     RolesAndACaller,
     RolesAndSomeone,
@@ -194,34 +191,6 @@ class AUserGrantedNothingMayNotEdit(
 
 
 @dataclass(frozen=True)
-class AUserGrantedReadOnlyMayNotEdit(
-    Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, RoleNode]
-):
-    @override
-    def summary(self) -> str:
-        return "a-user-granted-read-only-may-not-edit-a-role"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "대상 도메인에서 역할 조회 권한만 받은 사용자는 역할을 수정할 수 없습니다",
-            english=("a user granted only role read permission in a domain cannot edit a role"),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
-        return RolesAndSomeone(grant=(Granted(RoleEntityType(), Permission.READ),))
-
-    @override
-    def when(self) -> When[RolesAndACaller, RBACAdapter, RoleNode]:
-        return Editing()
-
-    @override
-    def then(self) -> Then[RolesAndACaller, RoleNode]:
-        return TheCallIsRefused(NotEnoughPermission)
-
-
-@dataclass(frozen=True)
 class EditingStatusToDeletedSoftDeletes(
     Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, RoleNode]
 ):
@@ -259,7 +228,6 @@ SCENARIOS: list[RoleStep] = [
     TheSuperadminEditsARole(started=datetime.now(UTC)),
     EditingStatusToDeletedSoftDeletes(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotEdit(),
-    AUserGrantedReadOnlyMayNotEdit(),
 ]
 
 

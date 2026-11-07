@@ -77,6 +77,9 @@ class RolesAndACaller:
     assignees: tuple[UserData, ...] = ()
     self_role: RoleData | None = None
     grant_role: RoleData | None = None
+    beyond_roles: tuple[RoleData, ...] = ()
+    excluded_roles: tuple[RoleData, ...] = ()
+    beyond_permissions: tuple[PermissionData, ...] = ()
 
     @property
     def role(self) -> RoleData:
@@ -108,6 +111,14 @@ class RolesAndSomeone(Given[Any, RolesAndACaller]):
     self_grant: Sequence[Permission] = ()
     assignees: int = 0
     assigned: int = 0
+    beyond: int = 0
+    """호출자의 도메인에 둔 역할. 요청한 스코프 밖에 있다."""
+    excluded: int = 0
+    """요청한 도메인에 두되 필터가 걸러 낼 이름으로 둔 역할."""
+    beyond_permissions: Sequence[Granted] = ()
+    """두 번째 역할이 가진 권한. 요청한 역할 밖에 있다."""
+    self_roles: int = 1
+    """호출자 자신의 스코프에 두는 역할 수. 첫 역할이 ``self_role`` 이다."""
 
     @override
     def describe(self) -> str:
@@ -128,10 +139,27 @@ class RolesAndSomeone(Given[Any, RolesAndACaller]):
             await seeding.creating_from(TestSeedRole(lambda d: d.id, name_hint="role"), target)
             for _ in range(self.count)
         ]
+        beyond_roles = [
+            await seeding.creating_from(TestSeedRole(lambda d: d.id, name_hint="beyond"), home)
+            for _ in range(self.beyond)
+        ]
+        excluded_roles = [
+            await seeding.creating_from(TestSeedRole(lambda d: d.id, name_hint="excluded"), target)
+            for _ in range(self.excluded)
+        ]
         permissions = [
             await seeding.adding(TestSeedPermission(one.entity_type, one.permission), roles[0])
             for one in self.permissions
         ]
+        if self.beyond_permissions:
+            if len(roles) < 2:
+                raise AssertionError("beyond_permissions needs a second role")
+            beyond_permissions = [
+                await seeding.adding(TestSeedPermission(one.entity_type, one.permission), roles[1])
+                for one in self.beyond_permissions
+            ]
+        else:
+            beyond_permissions = []
         caller = await seeding.within(SomeoneOf(home, role=self.role))
         assignees = [await seeding.within(SomeoneOf(target)) for _ in range(self.assignees)]
         for one in assignees[: self.assigned]:
@@ -157,18 +185,22 @@ class RolesAndSomeone(Given[Any, RolesAndACaller]):
                 user_id=lambda one: UserID(one.id),
             )
         self_role = None
+        own_roles: list[Any] = []
         if self.self_grant:
-            self_role = await seeding.creating_from(
-                TestSeedRole(lambda u: UserID(u.id), name_hint="self-role"), caller
-            )
-            for permission in self.self_grant:
-                await seeding.adding(TestSeedPermission(RoleEntityType(), permission), self_role)
-            await seeding.granting(
-                self_role,
-                caller,
-                role_id=lambda one: one.id,
-                user_id=lambda one: UserID(one.id),
-            )
+            for _ in range(self.self_roles):
+                own_role = await seeding.creating_from(
+                    TestSeedRole(lambda u: UserID(u.id), name_hint="self-role"), caller
+                )
+                for permission in self.self_grant:
+                    await seeding.adding(TestSeedPermission(RoleEntityType(), permission), own_role)
+                await seeding.granting(
+                    own_role,
+                    caller,
+                    role_id=lambda one: one.id,
+                    user_id=lambda one: UserID(one.id),
+                )
+                own_roles.append(own_role)
+            self_role = own_roles[0]
         return RolesAndACaller(
             roles=tuple(seeding.made(one) for one in roles),
             domain=seeding.made(target),
@@ -177,6 +209,9 @@ class RolesAndSomeone(Given[Any, RolesAndACaller]):
             assignees=tuple(seeding.made(one) for one in assignees),
             self_role=seeding.made(self_role) if self_role is not None else None,
             grant_role=seeding.made(grant_role) if grant_role is not None else None,
+            beyond_roles=tuple(seeding.made(one) for one in beyond_roles),
+            excluded_roles=tuple(seeding.made(one) for one in excluded_roles),
+            beyond_permissions=tuple(seeding.made(one) for one in beyond_permissions),
         )
 
 

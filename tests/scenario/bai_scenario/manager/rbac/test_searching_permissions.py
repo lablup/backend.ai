@@ -8,14 +8,20 @@ from typing import override
 
 import pytest
 
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.rbac.request import AdminSearchPermissionsGQLInput
+from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    AdminSearchPermissionsGQLInput,
+    PermissionFilter,
+    PermissionOrderBy,
+)
 from ai.backend.common.dto.manager.v2.rbac.response import PermissionNode
-from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
+from ai.backend.common.dto.manager.v2.rbac.types import OrderDirection, PermissionBitDTO
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.permission import PermissionData
@@ -52,10 +58,22 @@ VFOLDER_UPDATE = Granted(VFolderEntityType(), Permission.UPDATE)
 
 
 def _expected(laid: RolesAndACaller) -> list[PermissionData]:
-    """미리 저장한 권한 행을 실은 값 순으로 돌려준다."""
+    """필터가 고른 권한 행을 실은 값 순으로 돌려준다. 첫 행의 엔티티 종류만 남는다."""
+    chosen = str(laid.permissions[0].entity_type)
     return sorted(
-        laid.permissions,
+        (one for one in laid.permissions if str(one.entity_type) == chosen),
         key=lambda one: (str(one.entity_type), PermissionBitDTO.of(one.permission)),
+    )
+
+
+def _search(laid: RolesAndACaller, limit: int) -> AdminSearchPermissionsGQLInput:
+    """하나의 필터, 하나의 정렬, 페이지 크기를 함께 싣는다."""
+    return AdminSearchPermissionsGQLInput(
+        filter=PermissionFilter(
+            entity_type=StringFilter(equals=str(laid.permissions[0].entity_type))
+        ),
+        order=[PermissionOrderBy(field="entity_type", direction=OrderDirection.ASC)],
+        limit=limit,
     )
 
 
@@ -92,7 +110,7 @@ class SearchingEveryPermission(When[RolesAndACaller, RBACAdapter, PermissionPage
     @override
     async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> PermissionPage:
         with ActingAs(laid.caller):
-            return await adapter.admin_search_permissions_gql(AdminSearchPermissionsGQLInput())
+            return await adapter.admin_search_permissions_gql(_search(laid, len(_expected(laid))))
 
 
 @dataclass(frozen=True)
@@ -112,7 +130,7 @@ class SearchingTheRolePermissions(When[RolesAndACaller, RBACAdapter, PermissionP
     async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> PermissionPage:
         with ActingAs(laid.caller):
             return await adapter.search_role_permissions(
-                laid.role.id, AdminSearchPermissionsGQLInput()
+                laid.role.id, _search(laid, len(_expected(laid)))
             )
 
 
@@ -125,8 +143,8 @@ class TheSeededPermissions(Then[RolesAndACaller, PermissionPage]):
     @override
     def says(self) -> str:
         return Says(
-            "미리 저장한 권한 행이 모두 옵니다",
-            english="every permission row seeded in advance comes back",
+            "필터가 고른 권한 행이 모두 옵니다",
+            english="every permission row the filter keeps comes back",
         )
 
     @override
@@ -146,8 +164,8 @@ class TheRolePermissions(Then[RolesAndACaller, PermissionPage]):
     @override
     def says(self) -> str:
         return Says(
-            "그 역할이 가진 권한 행이 모두 옵니다",
-            english="every permission row that role holds comes back",
+            "필터가 고른 권한 행이 모두 옵니다",
+            english="every permission row the filter keeps comes back",
         )
 
     @override
@@ -171,10 +189,11 @@ class TheSuperadminSearchesEveryPermission(
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 모든 권한을 검색하면, 미리 저장한 권한 행이 모두 옵니다",
+            "superadmin 이 한 엔티티 종류로 권한을 검색하면, 필터가 남긴 권한 행이 모두 옵니다. "
+            "이 검색은 전역 역할이 막습니다",
             english=(
-                "when the superadmin searches every permission, every permission row seeded in "
-                "advance comes back"
+                "when the superadmin searches every permission filtered to one entity type, every "
+                "permission row the filter keeps comes back. The global role gates this search"
             ),
         )
 
@@ -232,18 +251,21 @@ class AUserGrantedRoleReadSearchesItsPermissions(
     @override
     def describe(self) -> str:
         return Says(
-            "대상 도메인에서 역할 읽기 권한을 받은 사용자가 역할이 가진 권한을 검색하면, "
-            "그 역할의 권한 행이 모두 옵니다",
+            "대상 도메인에서 역할 읽기 권한을 받은 사용자가 역할이 가진 권한을 한 엔티티 종류로 "
+            "검색하면, 필터가 남긴 권한 행이 모두 옵니다",
             english=(
-                "when a user granted role read permission in a domain searches the permissions "
-                "a role holds, every permission row of that role comes back"
+                "when a user granted role read permission in a domain searches the permissions a "
+                "role holds filtered to one entity type, every permission row the filter keeps "
+                "comes back"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
         return RolesAndSomeone(
+            count=2,
             permissions=(SESSION_READ, VFOLDER_UPDATE),
+            beyond_permissions=(Granted(ProjectEntityType(), Permission.READ),),
             grant=(Granted(RoleEntityType(), Permission.READ),),
         )
 
