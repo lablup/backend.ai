@@ -29,7 +29,7 @@
   - mkdir: 성공 있음 1 · 거부 있음 1 (single_entity)
   - move_file: 성공 있음 1 · 거부 있음 1 (single_entity)
   - partial_bulk_delete: 성공 있음 2 · 거부 없음 (partial_bulk): SCENARIO-GAP
-  - partial_bulk_restore: 성공 있음 2 · 거부 없음 (partial_bulk): SCENARIO-GAP
+  - partial_bulk_restore: 성공 있음 3 · 거부 없음 (partial_bulk): SCENARIO-GAP
   - partial_bulk_update: 성공 있음 2 · 거부 없음 (partial_bulk): SCENARIO-GAP
   - purge: 성공 있음 1 · 거부 있음 2 (single_entity)
   - restore: 성공 있음 1 · 거부 있음 1 (single_entity)
@@ -67,9 +67,8 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [이름에 어떤 글자가 든 폴더만 걸러 조회하면, 그 글자가 든 폴더 하나만 실린 페이지가 응답으로 옵니다](#searching-a-name-filter-leaves-the-matching-folder) | 성공 |
+| [자기 스코프에서 vfolder 읽기 권한을 받은 사용자가 이름 조각으로 걸러 이름 오름차순으로 한 페이지를 조회하면, 걸러진 자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 옵니다](#searching-a-search-narrows-to-the-matching-folder-in-order-and-page) | 성공 |
 | [vfolder 를 하나도 생성하지 않은 사용자가 자기 vfolder 를 조회하면, 응답은 비어 있습니다](#vfolder-a-user-who-has-made-no-folder-lists-none) | 성공 |
-| [이름 오름차순으로 정렬해 조회하면, 이름이 앞서는 폴더가 먼저 실린 페이지가 응답으로 옵니다](#searching-ordering-by-name-ascending-puts-the-first-folder-first) | 성공 |
 | [아무 권한도 받지 않은 사용자가 자기 범위의 vfolder 를 조회하려 하면 권한 부족으로 거부됩니다](#searching-a-user-granted-nothing-may-not-search-their-own-scope) | 거부 |
 
 **batch_load_mount_permissions**
@@ -201,6 +200,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [vfolder soft delete 권한을 받은 사용자가 soft delete 한 자기 vfolder 둘을 한 번에 restore 하면, 둘 다 사용할 수 있는 상태로 옵니다](#partial_bulk-restoring-several-folders-brings-them-back) | 성공 |
+| [vfolder soft delete 권한을 받은 사용자가 휴지통에 있는 자기 폴더와 다른 사용자의 폴더를 한 번에 restore 하면, 자기 폴더만 되살아나고 다른 사용자의 폴더는 권한 부족 으로 실패 목록에 옵니다](#partial_bulk-restoring-several-folders-leaves-anothers-out) | 성공 |
 | [vfolder soft delete 권한을 받은 사용자가 휴지통에 있는 폴더와 삭제가 진행 중인 폴더를 한 번에 restore 하면, 휴지통에 있던 폴더만 되살아나고 삭제 중인 폴더는 실패 목록에 옵니다](#partial_bulk-restoring-several-folders-leaves-the-purging-one-out) | 성공 |
 
 **partial_bulk_update**
@@ -699,15 +699,15 @@ Then
 
 ### scoped_search
 
-<a id="searching-a-name-filter-leaves-the-matching-folder"></a>
+<a id="searching-a-search-narrows-to-the-matching-folder-in-order-and-page"></a>
 
-#### [a-name-filter-leaves-the-matching-folder](/tests/scenario/bai_scenario/manager/vfolder/test_searching.py): pass
+#### [a-search-narrows-to-the-matching-folder-in-order-and-page](/tests/scenario/bai_scenario/manager/vfolder/test_searching.py): pass
 
-이름에 어떤 글자가 든 폴더만 걸러 조회하면, 그 글자가 든 폴더 하나만 실린 페이지가 응답으로 옵니다
+자기 스코프에서 vfolder 읽기 권한을 받은 사용자가 이름 조각으로 걸러 이름 오름차순으로 한 페이지를 조회하면, 걸러진 자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 옵니다
 
 Given
 
-- 자기 개인 vfolder 둘을 가진, 자기 스코프에서 vfolder READ 권한을 받은 사용자 한 명과, 그 사람과 상관없는 다른 사용자 한 명
+- 이름에 match 가 든 자기 개인 vfolder 둘과 들지 않는 자기 개인 vfolder 하나, 그리고 이름에 match 가 들지만 남의 것인 개인 vfolder 하나를 가진, 자기 스코프에서 vfolder READ 권한을 받은 사용자 한 명
   - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
@@ -717,8 +717,10 @@ Given
     - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
     - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 개인 vfolder first-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
-  - 개인 vfolder second-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 개인 vfolder match-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 개인 vfolder match-2: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 개인 vfolder other-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 개인 vfolder match-3: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
   - 자기 스코프에서 vfolder READ 권한을 받은 사용자 준비
     - 역할 folder-holder-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 folder-holder-1: vfolder 전체에 READ 허용
@@ -726,19 +728,19 @@ Given
 
 When
 
-- VFolderAdapter.scoped_search: user-1이 자기 범위에서 이름에 first 가 든 vfolder 를 조회합니다
+- VFolderAdapter.scoped_search: user-1이 자기 범위에서 이름에 match 가 든 vfolder 를 이름 오름차순으로 2개까지 조회합니다
 
 Then
 
-- 걸러낸 첫 vfolder 하나만 실린 페이지가 응답으로 옵니다
-  - total_count = 1
+- 걸러진 자기 vfolder 둘만 이름 순서로 실린 한 페이지가 응답으로 옵니다
+  - total_count = 2
   - has_next_page = False
   - has_previous_page = False
-  - items.length = 1
+  - items.length = 2
   - items[0].id: 미리 저장한 vfolder 와 같다
   - items[0].host = 'local:volume1'
   - items[0].status = 'ready'
-  - items[0].metadata.name = 'first-1'
+  - items[0].metadata.name = 'match-1'
   - items[0].metadata.cloneable = False
   - items[0].metadata.last_used = None
   - items[0].access_control.ownership_type = 'user'
@@ -752,6 +754,24 @@ Then
   - items[0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
   - items[0].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
   - items[0].metadata.created_at: 이 실행이 쓴 시각
+  - items[1].id: 미리 저장한 vfolder 와 같다
+  - items[1].host = 'local:volume1'
+  - items[1].status = 'ready'
+  - items[1].metadata.name = 'match-2'
+  - items[1].metadata.cloneable = False
+  - items[1].metadata.last_used = None
+  - items[1].access_control.ownership_type = 'user'
+  - items[1].ownership.user_id: vfolder 소유자와 같다
+  - items[1].ownership.project_id: vfolder 가 놓인 프로젝트와 같다
+  - items[1].ownership.creator_id: 생성한 사용자와 같다
+  - items[1].ownership.creator_email = 'user-1@scenario.local'
+  - items[1].unmanaged_path = None
+  - items[1].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
+  - items[1].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
+  - items[1].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - items[1].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - items[1].metadata.created_at: 이 실행이 쓴 시각
+  - items ids: 걸러진 자기 vfolder 둘
 
 <a id="vfolder-a-user-who-has-made-no-folder-lists-none"></a>
 
@@ -785,77 +805,6 @@ Then
   - total_count = 0
   - has_next_page = False
   - has_previous_page = False
-
-<a id="searching-ordering-by-name-ascending-puts-the-first-folder-first"></a>
-
-#### [ordering-by-name-ascending-puts-the-first-folder-first](/tests/scenario/bai_scenario/manager/vfolder/test_searching.py): pass
-
-이름 오름차순으로 정렬해 조회하면, 이름이 앞서는 폴더가 먼저 실린 페이지가 응답으로 옵니다
-
-Given
-
-- 자기 개인 vfolder 둘을 가진, 자기 스코프에서 vfolder READ 권한을 받은 사용자 한 명과, 그 사람과 상관없는 다른 사용자 한 명
-  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
-    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
-    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
-  - 개인 vfolder first-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
-  - 개인 vfolder second-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
-  - 자기 스코프에서 vfolder READ 권한을 받은 사용자 준비
-    - 역할 folder-holder-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 folder-holder-1: vfolder 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 folder-holder-1 보유
-
-When
-
-- VFolderAdapter.scoped_search: user-1이 자기 범위의 vfolder 를 이름 오름차순으로 정렬해 조회합니다
-
-Then
-
-- 두 vfolder 가 첫째, 둘째 순서로 실린 페이지가 응답으로 옵니다
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-  - items.length = 2
-  - items[0].id: 미리 저장한 vfolder 와 같다
-  - items[0].host = 'local:volume1'
-  - items[0].status = 'ready'
-  - items[0].metadata.name = 'first-1'
-  - items[0].metadata.cloneable = False
-  - items[0].metadata.last_used = None
-  - items[0].access_control.ownership_type = 'user'
-  - items[0].ownership.user_id: vfolder 소유자와 같다
-  - items[0].ownership.project_id: vfolder 가 놓인 프로젝트와 같다
-  - items[0].ownership.creator_id: 생성한 사용자와 같다
-  - items[0].ownership.creator_email = 'user-1@scenario.local'
-  - items[0].unmanaged_path = None
-  - items[0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - items[0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - items[0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - items[0].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
-  - items[0].metadata.created_at: 이 실행이 쓴 시각
-  - items[1].id: 미리 저장한 vfolder 와 같다
-  - items[1].host = 'local:volume1'
-  - items[1].status = 'ready'
-  - items[1].metadata.name = 'second-1'
-  - items[1].metadata.cloneable = False
-  - items[1].metadata.last_used = None
-  - items[1].access_control.ownership_type = 'user'
-  - items[1].ownership.user_id: vfolder 소유자와 같다
-  - items[1].ownership.project_id: vfolder 가 놓인 프로젝트와 같다
-  - items[1].ownership.creator_id: 생성한 사용자와 같다
-  - items[1].ownership.creator_email = 'user-1@scenario.local'
-  - items[1].unmanaged_path = None
-  - items[1].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - items[1].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - items[1].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - items[1].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
-  - items[1].metadata.created_at: 이 실행이 쓴 시각
 
 <a id="searching-a-user-granted-nothing-may-not-search-their-own-scope"></a>
 
@@ -2311,6 +2260,61 @@ Then
   - successes[1].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
   - successes[1].metadata.created_at: 이 실행이 쓴 시각
   - failed = []
+
+<a id="partial_bulk-restoring-several-folders-leaves-anothers-out"></a>
+
+#### [restoring-several-folders-leaves-anothers-out](/tests/scenario/bai_scenario/manager/vfolder/test_partial_bulk.py): pass
+
+vfolder soft delete 권한을 받은 사용자가 휴지통에 있는 자기 폴더와 다른 사용자의 폴더를 한 번에 restore 하면, 자기 폴더만 되살아나고 다른 사용자의 폴더는 권한 부족 으로 실패 목록에 옵니다
+
+Given
+
+- delete-pending 의 자기 개인 vfolder 하나와 delete-pending 의 자기 개인 vfolder 하나를 가진, 자기 개인 프로젝트에서 폴더에 SOFT_DELETE 권한을 받은 사용자 한 명과, 그 사람에게 공유되지 않은 남의 개인 vfolder 하나
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 개인 vfolder first-1: 그 사람의 개인 프로젝트에 놓입니다, delete-pending 상태입니다
+  - 개인 vfolder second-1: 그 사람의 개인 프로젝트에 놓입니다, delete-pending 상태입니다
+  - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - vfolder 권한 부여
+    - 역할 folder-writer-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 folder-writer-1: vfolder 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 folder-writer-1 보유
+
+When
+
+- VFolderAdapter.partial_bulk_restore: user-1이 휴지통에 있는 자기 vfolder 하나와 다른 사용자의 vfolder 하나를 한 번에 restore 합니다
+
+Then
+
+- 휴지통에 있던 자기 폴더만 사용할 수 있는 상태로 오고, 다른 사용자의 폴더는 권한이 없다는 이유로 실패 목록에 옵니다
+  - successes count = 1
+  - successes[0].id: 미리 저장한 vfolder 와 같다
+  - successes[0].host = 'local:volume1'
+  - successes[0].status = 'ready'
+  - successes[0].metadata.name = 'first-1'
+  - successes[0].metadata.cloneable = False
+  - successes[0].metadata.last_used = None
+  - successes[0].access_control.ownership_type = 'user'
+  - successes[0].ownership.user_id: vfolder 소유자와 같다
+  - successes[0].ownership.project_id: vfolder 가 놓인 프로젝트와 같다
+  - successes[0].ownership.creator_id: 생성한 사용자와 같다
+  - successes[0].ownership.creator_email = 'user-1@scenario.local'
+  - successes[0].unmanaged_path = None
+  - successes[0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
+  - successes[0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
+  - successes[0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - successes[0].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - successes[0].metadata.created_at: 이 실행이 쓴 시각
+  - failed count = 1
+  - failed[0].id: 대상 vfolder 의 id 와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
 
 <a id="partial_bulk-restoring-several-folders-leaves-the-purging-one-out"></a>
 

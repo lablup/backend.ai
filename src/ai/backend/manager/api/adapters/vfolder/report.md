@@ -29,7 +29,7 @@ Scenario: incomplete 5 / 30
   - mkdir: success present 1 · rejection present 1 (single_entity)
   - move_file: success present 1 · rejection present 1 (single_entity)
   - partial_bulk_delete: success present 2 · rejection absent (partial_bulk): SCENARIO-GAP
-  - partial_bulk_restore: success present 2 · rejection absent (partial_bulk): SCENARIO-GAP
+  - partial_bulk_restore: success present 3 · rejection absent (partial_bulk): SCENARIO-GAP
   - partial_bulk_update: success present 2 · rejection absent (partial_bulk): SCENARIO-GAP
   - purge: success present 1 · rejection present 2 (single_entity)
   - restore: success present 1 · rejection present 1 (single_entity)
@@ -67,9 +67,8 @@ Scenario: incomplete 5 / 30
 
 | scenario | verdict |
 |---|---|
-| [when a user searches their own scope filtered by a name fragment, the page holding only the matching folder comes back](#searching-a-name-filter-leaves-the-matching-folder) | answered |
+| [when a user granted vfolder read in their own scope searches by a name fragment, ordered by name ascending and limited to one page, one page holding only their two matching vfolders in name order comes back](#searching-a-search-narrows-to-the-matching-folder-in-order-and-page) | answered |
 | [when a user who has created no vfolder lists their own vfolders, the answer is empty](#vfolder-a-user-who-has-made-no-folder-lists-none) | answered |
-| [when a user searches their own scope ordered by name ascending, the page holding the earlier name first comes back](#searching-ordering-by-name-ascending-puts-the-first-folder-first) | answered |
 | [when a user granted nothing tries to search the vfolders of their own scope, it is rejected for lack of permission](#searching-a-user-granted-nothing-may-not-search-their-own-scope) | rejected |
 
 **batch_load_mount_permissions**
@@ -201,6 +200,7 @@ Scenario: incomplete 5 / 30
 | scenario | verdict |
 |---|---|
 | [when a user granted vfolder soft delete restores their two soft-deleted vfolders in one call, both come back ready for use](#partial_bulk-restoring-several-folders-brings-them-back) | answered |
+| [when a user granted vfolder soft delete restores their trashed folder and another user's folder in one call, only their folder comes back and the other user's folder comes back in the failed list for lack of permission](#partial_bulk-restoring-several-folders-leaves-anothers-out) | answered |
 | [when a user granted vfolder soft delete restores a trashed vfolder and a folder whose deletion is in progress in one call, only the trashed folder comes back and the other comes back in the failed list](#partial_bulk-restoring-several-folders-leaves-the-purging-one-out) | answered |
 
 **partial_bulk_update**
@@ -699,15 +699,15 @@ Then
 
 ### scoped_search
 
-<a id="searching-a-name-filter-leaves-the-matching-folder"></a>
+<a id="searching-a-search-narrows-to-the-matching-folder-in-order-and-page"></a>
 
-#### [a-name-filter-leaves-the-matching-folder](/tests/scenario/bai_scenario/manager/vfolder/test_searching.py): pass
+#### [a-search-narrows-to-the-matching-folder-in-order-and-page](/tests/scenario/bai_scenario/manager/vfolder/test_searching.py): pass
 
-when a user searches their own scope filtered by a name fragment, the page holding only the matching folder comes back
+when a user granted vfolder read in their own scope searches by a name fragment, ordered by name ascending and limited to one page, one page holding only their two matching vfolders in name order comes back
 
 Given
 
-- one user with two personal vfolders of their own, granted the READ permission on vfolders in their own scope, and one other user unrelated to them
+- one user granted the READ permission on vfolders in their own scope, with two personal vfolders whose names hold match, one personal vfolder whose name does not, and one other user's personal vfolder whose name holds match
   - Domain home-1: vfolders of this domain can be placed on local:volume1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -717,8 +717,10 @@ Given
     - User resource policy user-policy-2: up to 10 folders per user
     - Keypair policy keypair-policy-2: up to 5 concurrent sessions, folders can be placed on local:volume1
     - regular user user-2: has their own keypair and personal project
-  - Personal vfolder first-1: is placed in that person's personal project and is ready to use
-  - Personal vfolder second-1: is placed in that person's personal project and is ready to use
+  - Personal vfolder match-1: is placed in that person's personal project and is ready to use
+  - Personal vfolder match-2: is placed in that person's personal project and is ready to use
+  - Personal vfolder other-1: is placed in that person's personal project and is ready to use
+  - Personal vfolder match-3: is placed in that person's personal project and is ready to use
   - Prepare a user granted the READ permission on vfolders in their own scope
     - Role folder-holder-1: applies only within the scope it is granted in
     - Role folder-holder-1: READ allowed on every vfolder
@@ -726,19 +728,19 @@ Given
 
 When
 
-- VFolderAdapter.scoped_search: user-1 searches their own scope for vfolders whose name contains first
+- VFolderAdapter.scoped_search: user-1 searches their own scope for vfolders whose name holds match, ordered by name ascending, up to 2
 
 Then
 
-- the page holding only the matching first vfolder comes back
-  - total_count = 1
+- one page holding only their two matching vfolders in name order comes back
+  - total_count = 2
   - has_next_page = False
   - has_previous_page = False
-  - items.length = 1
+  - items.length = 2
   - items[0].id: same as the vfolder seeded in advance
   - items[0].host = 'local:volume1'
   - items[0].status = 'ready'
-  - items[0].metadata.name = 'first-1'
+  - items[0].metadata.name = 'match-1'
   - items[0].metadata.cloneable = False
   - items[0].metadata.last_used = None
   - items[0].access_control.ownership_type = 'user'
@@ -752,6 +754,24 @@ Then
   - items[0].access_control.permission: skipped: it is a mount permission, which this table does not check
   - items[0].quota: skipped: the storage answers it, so it cannot be stated here
   - items[0].metadata.created_at: the time this run wrote
+  - items[1].id: same as the vfolder seeded in advance
+  - items[1].host = 'local:volume1'
+  - items[1].status = 'ready'
+  - items[1].metadata.name = 'match-2'
+  - items[1].metadata.cloneable = False
+  - items[1].metadata.last_used = None
+  - items[1].access_control.ownership_type = 'user'
+  - items[1].ownership.user_id: same as the vfolder owner
+  - items[1].ownership.project_id: same as the project the vfolder is placed in
+  - items[1].ownership.creator_id: same as the user who created the vfolder
+  - items[1].ownership.creator_email = 'user-1@scenario.local'
+  - items[1].unmanaged_path = None
+  - items[1].metadata.usage_mode: skipped: the type already fixes the value
+  - items[1].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
+  - items[1].access_control.permission: skipped: it is a mount permission, which this table does not check
+  - items[1].quota: skipped: the storage answers it, so it cannot be stated here
+  - items[1].metadata.created_at: the time this run wrote
+  - items ids: their two matching vfolders
 
 <a id="vfolder-a-user-who-has-made-no-folder-lists-none"></a>
 
@@ -785,77 +805,6 @@ Then
   - total_count = 0
   - has_next_page = False
   - has_previous_page = False
-
-<a id="searching-ordering-by-name-ascending-puts-the-first-folder-first"></a>
-
-#### [ordering-by-name-ascending-puts-the-first-folder-first](/tests/scenario/bai_scenario/manager/vfolder/test_searching.py): pass
-
-when a user searches their own scope ordered by name ascending, the page holding the earlier name first comes back
-
-Given
-
-- one user with two personal vfolders of their own, granted the READ permission on vfolders in their own scope, and one other user unrelated to them
-  - Domain home-1: vfolders of this domain can be placed on local:volume1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions, folders can be placed on local:volume1
-    - regular user user-2: has their own keypair and personal project
-  - Personal vfolder first-1: is placed in that person's personal project and is ready to use
-  - Personal vfolder second-1: is placed in that person's personal project and is ready to use
-  - Prepare a user granted the READ permission on vfolders in their own scope
-    - Role folder-holder-1: applies only within the scope it is granted in
-    - Role folder-holder-1: READ allowed on every vfolder
-    - regular user user-1: holds Role folder-holder-1
-
-When
-
-- VFolderAdapter.scoped_search: user-1 searches their own scope ordered by name ascending
-
-Then
-
-- the page holding the two vfolders with the first one first comes back
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-  - items.length = 2
-  - items[0].id: same as the vfolder seeded in advance
-  - items[0].host = 'local:volume1'
-  - items[0].status = 'ready'
-  - items[0].metadata.name = 'first-1'
-  - items[0].metadata.cloneable = False
-  - items[0].metadata.last_used = None
-  - items[0].access_control.ownership_type = 'user'
-  - items[0].ownership.user_id: same as the vfolder owner
-  - items[0].ownership.project_id: same as the project the vfolder is placed in
-  - items[0].ownership.creator_id: same as the user who created the vfolder
-  - items[0].ownership.creator_email = 'user-1@scenario.local'
-  - items[0].unmanaged_path = None
-  - items[0].metadata.usage_mode: skipped: the type already fixes the value
-  - items[0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - items[0].access_control.permission: skipped: it is a mount permission, which this table does not check
-  - items[0].quota: skipped: the storage answers it, so it cannot be stated here
-  - items[0].metadata.created_at: the time this run wrote
-  - items[1].id: same as the vfolder seeded in advance
-  - items[1].host = 'local:volume1'
-  - items[1].status = 'ready'
-  - items[1].metadata.name = 'second-1'
-  - items[1].metadata.cloneable = False
-  - items[1].metadata.last_used = None
-  - items[1].access_control.ownership_type = 'user'
-  - items[1].ownership.user_id: same as the vfolder owner
-  - items[1].ownership.project_id: same as the project the vfolder is placed in
-  - items[1].ownership.creator_id: same as the user who created the vfolder
-  - items[1].ownership.creator_email = 'user-1@scenario.local'
-  - items[1].unmanaged_path = None
-  - items[1].metadata.usage_mode: skipped: the type already fixes the value
-  - items[1].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - items[1].access_control.permission: skipped: it is a mount permission, which this table does not check
-  - items[1].quota: skipped: the storage answers it, so it cannot be stated here
-  - items[1].metadata.created_at: the time this run wrote
 
 <a id="searching-a-user-granted-nothing-may-not-search-their-own-scope"></a>
 
@@ -2311,6 +2260,61 @@ Then
   - successes[1].quota: skipped: the storage answers it, so it cannot be stated here
   - successes[1].metadata.created_at: the time this run wrote
   - failed = []
+
+<a id="partial_bulk-restoring-several-folders-leaves-anothers-out"></a>
+
+#### [restoring-several-folders-leaves-anothers-out](/tests/scenario/bai_scenario/manager/vfolder/test_partial_bulk.py): pass
+
+when a user granted vfolder soft delete restores their trashed folder and another user's folder in one call, only their folder comes back and the other user's folder comes back in the failed list for lack of permission
+
+Given
+
+- one user with one delete-pending personal vfolder of their own and one delete-pending personal vfolder of their own, granted the SOFT_DELETE permission on vfolders in their personal project, and one other user's personal vfolder not shared with them
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-2: has their own keypair and personal project
+  - Personal vfolder first-1: is placed in that person's personal project, is delete-pending
+  - Personal vfolder second-1: is placed in that person's personal project, is delete-pending
+  - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+  - Grant vfolder permissions
+    - Role folder-writer-1: applies only within the scope it is granted in
+    - Role folder-writer-1: SOFT_DELETE allowed on every vfolder
+    - regular user user-1: holds Role folder-writer-1
+
+When
+
+- VFolderAdapter.partial_bulk_restore: user-1 restores their trashed vfolder and another user's vfolder in one call
+
+Then
+
+- only their trashed folder comes back ready for use, and the other user's folder comes back in the failed list for lack of permission
+  - successes count = 1
+  - successes[0].id: same as the vfolder seeded in advance
+  - successes[0].host = 'local:volume1'
+  - successes[0].status = 'ready'
+  - successes[0].metadata.name = 'first-1'
+  - successes[0].metadata.cloneable = False
+  - successes[0].metadata.last_used = None
+  - successes[0].access_control.ownership_type = 'user'
+  - successes[0].ownership.user_id: same as the vfolder owner
+  - successes[0].ownership.project_id: same as the project the vfolder is placed in
+  - successes[0].ownership.creator_id: same as the user who created the vfolder
+  - successes[0].ownership.creator_email = 'user-1@scenario.local'
+  - successes[0].unmanaged_path = None
+  - successes[0].metadata.usage_mode: skipped: the type already fixes the value
+  - successes[0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
+  - successes[0].access_control.permission: skipped: it is a mount permission, which this table does not check
+  - successes[0].quota: skipped: the storage answers it, so it cannot be stated here
+  - successes[0].metadata.created_at: the time this run wrote
+  - failed count = 1
+  - failed[0].id: same as the id of the target vfolder
+  - failed[0].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk-restoring-several-folders-leaves-the-purging-one-out"></a>
 
