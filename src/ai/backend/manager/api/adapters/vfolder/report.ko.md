@@ -172,7 +172,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [vfolder 읽기 권한을 받은 사용자가 폴더에 걸린 마운트 레벨을 조회하면, 걸린 레벨이 실린 목록이 응답으로 옵니다](#mount_policies-a-user-granted-folder-read-lists-the-mount-levels) | 성공 |
-| [아무 권한도 받지 않은 사용자가 마운트 레벨을 조회하려 하면 권한 부족으로 거부됩니다](#mount_policies-a-user-granted-nothing-may-not-list-the-mount-levels) | 거부 |
+| [vfolder 수정 권한을 받은 사용자가 다른 사용자의 마운트 레벨을 정한 뒤, 아무 권한도 받지 않은 다른 사용자가 걸린 레벨을 조회하려 하면 권한 부족으로 거부됩니다](#mount_policies-a-user-granted-nothing-may-not-list-the-mount-levels) | 거부 |
 
 **mkdir**
 
@@ -238,7 +238,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [vfolder 수정 권한을 받은 사용자가 다른 사용자의 마운트 레벨을 되돌리면, 그 자리와 지워졌다는 사실이 응답으로 옵니다](#mount_policies-a-user-granted-folder-update-takes-another-users-level-back) | 성공 |
-| [아무 권한도 받지 않은 사용자가 마운트 레벨을 되돌리려 하면 권한 부족으로 거부됩니다](#mount_policies-a-user-granted-nothing-may-not-take-a-mount-level-back) | 거부 |
+| [vfolder 수정 권한을 받은 사용자가 다른 사용자의 마운트 레벨을 정한 뒤, 아무 권한도 받지 않은 다른 사용자가 그것을 되돌리려 하면 권한 부족으로 거부됩니다](#mount_policies-a-user-granted-nothing-may-not-take-a-mount-level-back) | 거부 |
 
 **update**
 
@@ -282,6 +282,7 @@ Then
   - has_previous_page = False
   - items.length = 1
   - items[0].id: 미리 저장한 vfolder 와 같다
+  - items[0].entity_id: 응답의 id 와 같다
   - items[0].host = 'local:volume1'
   - items[0].status = 'ready'
   - items[0].metadata.name = 'folder-1'
@@ -296,7 +297,8 @@ Then
   - items[0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - items[0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - items[0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - items[0].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - items[0].quota.max_size = None
+  - items[0].quota.max_files = 1000
   - items[0].metadata.created_at: 이 실행이 쓴 시각
 
 <a id="searching-a-regular-user-may-not-search-every-folder"></a>
@@ -386,6 +388,7 @@ Then
 - 미리 저장한 vfolder 하나가 전체가 응답으로 옵니다
   - length = 1
   - [0].id: 미리 저장한 vfolder 와 같다
+  - [0].entity_id: 응답의 id 와 같다
   - [0].host = 'local:volume1'
   - [0].status = 'ready'
   - [0].metadata.name = 'folder-1'
@@ -400,7 +403,8 @@ Then
   - [0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - [0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - [0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - [0].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - [0].quota.max_size = None
+  - [0].quota.max_files = 1000
   - [0].metadata.created_at: 이 실행이 쓴 시각
 
 <a id="batch_loading-an-accepted-share-loads-someone-elses-folder-by-id"></a>
@@ -438,6 +442,7 @@ Then
 - 미리 저장한 vfolder 하나가 전체가 응답으로 옵니다
   - length = 1
   - [0].id: 미리 저장한 vfolder 와 같다
+  - [0].entity_id: 응답의 id 와 같다
   - [0].host = 'local:volume1'
   - [0].status = 'ready'
   - [0].metadata.name = 'folder-1'
@@ -452,7 +457,8 @@ Then
   - [0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - [0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - [0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - [0].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - [0].quota.max_size = None
+  - [0].quota.max_files = 1000
   - [0].metadata.created_at: 이 실행이 쓴 시각
 
 <a id="batch_loading-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
@@ -484,6 +490,7 @@ Then
 - 있는 vfolder 는 노드로, 없는 id 항목은 빈 값으로 옵니다
   - length = 2
   - [0].id: 미리 저장한 vfolder 와 같다
+  - [0].entity_id: 응답의 id 와 같다
   - [0].host = 'local:volume1'
   - [0].status = 'ready'
   - [0].metadata.name = 'folder-1'
@@ -498,7 +505,8 @@ Then
   - [0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - [0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - [0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - [0].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - [0].quota.max_size = None
+  - [0].quota.max_files = 1000
   - [0].metadata.created_at: 이 실행이 쓴 시각
   - [1] = None
 
@@ -536,6 +544,7 @@ Then
 - 입력 순서대로 각 항목에 vfolder 또는 거부가 옵니다
   - length = 3
   - [0].id: 미리 저장한 vfolder 와 같다
+  - [0].entity_id: 응답의 id 와 같다
   - [0].host = 'local:volume1'
   - [0].status = 'ready'
   - [0].metadata.name = 'folder-1'
@@ -550,7 +559,8 @@ Then
   - [0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - [0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - [0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - [0].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - [0].quota.max_size = None
+  - [0].quota.max_files = 1000
   - [0].metadata.created_at: 이 실행이 쓴 시각
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
@@ -653,6 +663,7 @@ Then
   - has_previous_page = False
   - items.length = 1
   - items[0].id: 미리 저장한 vfolder 와 같다
+  - items[0].entity_id: 응답의 id 와 같다
   - items[0].host = 'local:volume1'
   - items[0].status = 'ready'
   - items[0].metadata.name = 'folder-1'
@@ -667,7 +678,8 @@ Then
   - items[0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - items[0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - items[0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - items[0].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - items[0].quota.max_size = None
+  - items[0].quota.max_files = 1000
   - items[0].metadata.created_at: 이 실행이 쓴 시각
 
 <a id="reaching-a-user-granted-nothing-may-not-list-a-projects-folders"></a>
@@ -738,6 +750,7 @@ Then
   - has_previous_page = False
   - items.length = 2
   - items[0].id: 미리 저장한 vfolder 와 같다
+  - items[0].entity_id: 응답의 id 와 같다
   - items[0].host = 'local:volume1'
   - items[0].status = 'ready'
   - items[0].metadata.name = 'match-1'
@@ -752,9 +765,11 @@ Then
   - items[0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - items[0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - items[0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - items[0].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - items[0].quota.max_size = None
+  - items[0].quota.max_files = 1000
   - items[0].metadata.created_at: 이 실행이 쓴 시각
   - items[1].id: 미리 저장한 vfolder 와 같다
+  - items[1].entity_id: 응답의 id 와 같다
   - items[1].host = 'local:volume1'
   - items[1].status = 'ready'
   - items[1].metadata.name = 'match-2'
@@ -769,7 +784,8 @@ Then
   - items[1].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - items[1].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - items[1].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - items[1].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - items[1].quota.max_size = None
+  - items[1].quota.max_files = 1000
   - items[1].metadata.created_at: 이 실행이 쓴 시각
   - items ids: 걸러진 자기 vfolder 둘
 
@@ -1355,6 +1371,7 @@ Then
 - 삭제 대기 상태의 vfolder 전체가 응답으로 옵니다
   - id: 부른 vfolder 의 id 와 같다
   - vfolder.id: 미리 저장한 vfolder 와 같다
+  - vfolder.entity_id: 응답의 id 와 같다
   - vfolder.host = 'local:volume1'
   - vfolder.status = 'delete-pending'
   - vfolder.metadata.name = 'folder-1'
@@ -1369,7 +1386,8 @@ Then
   - vfolder.metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - vfolder.metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - vfolder.access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - vfolder.quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - vfolder.quota.max_size = None
+  - vfolder.quota.max_files = 1000
   - vfolder.metadata.created_at: 이 실행이 쓴 시각
 
 <a id="deleting-a-user-granted-nothing-may-not-soft-delete-their-folder"></a>
@@ -1600,6 +1618,7 @@ Then
 
 - 미리 저장한 vfolder 전체가 응답으로 옵니다
   - id: 미리 저장한 vfolder 와 같다
+  - entity_id: 응답의 id 와 같다
   - host = 'local:volume1'
   - status = 'ready'
   - metadata.name = 'folder-1'
@@ -1614,7 +1633,8 @@ Then
   - metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - quota.max_size = None
+  - quota.max_files = 1000
   - metadata.created_at: 이 실행이 쓴 시각
 
 <a id="reaching-an-accepted-share-reads-someone-elses-folder"></a>
@@ -1651,6 +1671,7 @@ Then
 
 - 미리 저장한 vfolder 전체가 응답으로 옵니다
   - id: 미리 저장한 vfolder 와 같다
+  - entity_id: 응답의 id 와 같다
   - host = 'local:volume1'
   - status = 'ready'
   - metadata.name = 'folder-1'
@@ -1665,7 +1686,8 @@ Then
   - metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - quota.max_size = None
+  - quota.max_files = 1000
   - metadata.created_at: 이 실행이 쓴 시각
 
 <a id="reaching-a-user-granted-nothing-may-not-read-their-own-folder"></a>
@@ -1935,11 +1957,11 @@ Then
 
 #### [a-user-granted-nothing-may-not-list-the-mount-levels](/tests/scenario/bai_scenario/manager/vfolder/test_mount_policies.py): pass
 
-아무 권한도 받지 않은 사용자가 마운트 레벨을 조회하려 하면 권한 부족으로 거부됩니다
+vfolder 수정 권한을 받은 사용자가 다른 사용자의 마운트 레벨을 정한 뒤, 아무 권한도 받지 않은 다른 사용자가 걸린 레벨을 조회하려 하면 권한 부족으로 거부됩니다
 
 Given
 
-- 사용할 수 있는 상태의 개인 vfolder 하나를 가진, 아무 권한도 받지 않은 사용자 한 명, 그리고 그 폴더를 쓰지 않는 다른 사용자 한 명
+- 사용할 수 있는 상태의 개인 vfolder 하나를 가진, 자기 개인 폴더에 UPDATE 권한을 받은 사용자 한 명, 그리고 그 폴더를 쓰지 않는 다른 사용자 한 명
   - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
@@ -1950,10 +1972,14 @@ Given
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
     - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
   - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - vfolder 권한 부여
+    - 역할 folder-writer-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 folder-writer-1: vfolder 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 folder-writer-1 보유
 
 When
 
-- VFolderAdapter.list_mount_policies: user-1이 folder-1 vfolder 에 걸린 마운트 레벨을 조회합니다
+- VFolderAdapter.list_mount_policies: user-1이 folder-1 vfolder 에 다른 사용자의 마운트 레벨을 정한 뒤, 권한이 없는 user-2이 걸린 레벨을 조회합니다
 
 Then
 
@@ -2114,6 +2140,7 @@ Then
 - 자기 vfolder 둘이 delete-pending 상태로 오고, 다른 사용자의 vfolder 는 권한이 없다는 이유로 실패 목록에 옵니다
   - successes count = 2
   - successes[0].id: 미리 저장한 vfolder 와 같다
+  - successes[0].entity_id: 응답의 id 와 같다
   - successes[0].host = 'local:volume1'
   - successes[0].status = 'delete-pending'
   - successes[0].metadata.name = 'first-1'
@@ -2128,9 +2155,11 @@ Then
   - successes[0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - successes[0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - successes[0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - successes[0].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - successes[0].quota.max_size = None
+  - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: 이 실행이 쓴 시각
   - successes[1].id: 미리 저장한 vfolder 와 같다
+  - successes[1].entity_id: 응답의 id 와 같다
   - successes[1].host = 'local:volume1'
   - successes[1].status = 'delete-pending'
   - successes[1].metadata.name = 'second-1'
@@ -2145,7 +2174,8 @@ Then
   - successes[1].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - successes[1].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - successes[1].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - successes[1].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - successes[1].quota.max_size = None
+  - successes[1].quota.max_files = 1000
   - successes[1].metadata.created_at: 이 실행이 쓴 시각
   - failed count = 1
   - failed[0].id: 대상 vfolder 의 id 와 같다
@@ -2226,6 +2256,7 @@ Then
 - 자기 vfolder 둘이 ready 상태로 오고, 실패한 것은 없습니다
   - successes count = 2
   - successes[0].id: 미리 저장한 vfolder 와 같다
+  - successes[0].entity_id: 응답의 id 와 같다
   - successes[0].host = 'local:volume1'
   - successes[0].status = 'ready'
   - successes[0].metadata.name = 'first-1'
@@ -2240,9 +2271,11 @@ Then
   - successes[0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - successes[0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - successes[0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - successes[0].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - successes[0].quota.max_size = None
+  - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: 이 실행이 쓴 시각
   - successes[1].id: 미리 저장한 vfolder 와 같다
+  - successes[1].entity_id: 응답의 id 와 같다
   - successes[1].host = 'local:volume1'
   - successes[1].status = 'ready'
   - successes[1].metadata.name = 'second-1'
@@ -2257,7 +2290,8 @@ Then
   - successes[1].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - successes[1].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - successes[1].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - successes[1].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - successes[1].quota.max_size = None
+  - successes[1].quota.max_files = 1000
   - successes[1].metadata.created_at: 이 실행이 쓴 시각
   - failed = []
 
@@ -2296,6 +2330,7 @@ Then
 - 휴지통에 있던 자기 폴더만 사용할 수 있는 상태로 오고, 다른 사용자의 폴더는 권한이 없다는 이유로 실패 목록에 옵니다
   - successes count = 1
   - successes[0].id: 미리 저장한 vfolder 와 같다
+  - successes[0].entity_id: 응답의 id 와 같다
   - successes[0].host = 'local:volume1'
   - successes[0].status = 'ready'
   - successes[0].metadata.name = 'first-1'
@@ -2310,7 +2345,8 @@ Then
   - successes[0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - successes[0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - successes[0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - successes[0].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - successes[0].quota.max_size = None
+  - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: 이 실행이 쓴 시각
   - failed count = 1
   - failed[0].id: 대상 vfolder 의 id 와 같다
@@ -2351,6 +2387,7 @@ Then
 - 휴지통에 있던 폴더만 사용할 수 있는 상태로 오고, 삭제가 진행 중인 폴더는 실패 목록에 옵니다
   - successes count = 1
   - successes[0].id: 미리 저장한 vfolder 와 같다
+  - successes[0].entity_id: 응답의 id 와 같다
   - successes[0].host = 'local:volume1'
   - successes[0].status = 'ready'
   - successes[0].metadata.name = 'first-1'
@@ -2365,7 +2402,8 @@ Then
   - successes[0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - successes[0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - successes[0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - successes[0].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - successes[0].quota.max_size = None
+  - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: 이 실행이 쓴 시각
   - failed count = 1
   - failed[0].id: 삭제가 진행 중인 vfolder 와 같다
@@ -2408,6 +2446,7 @@ Then
 - 자기 vfolder 둘이 복제 가능으로 오고, 다른 사용자의 vfolder 는 권한이 없다는 이유로 실패 목록에 옵니다
   - successes count = 2
   - successes[0].id: 미리 저장한 vfolder 와 같다
+  - successes[0].entity_id: 응답의 id 와 같다
   - successes[0].host = 'local:volume1'
   - successes[0].status = 'ready'
   - successes[0].metadata.name = 'first-1'
@@ -2422,9 +2461,11 @@ Then
   - successes[0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - successes[0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - successes[0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - successes[0].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - successes[0].quota.max_size = None
+  - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: 이 실행이 쓴 시각
   - successes[1].id: 미리 저장한 vfolder 와 같다
+  - successes[1].entity_id: 응답의 id 와 같다
   - successes[1].host = 'local:volume1'
   - successes[1].status = 'ready'
   - successes[1].metadata.name = 'second-1'
@@ -2439,7 +2480,8 @@ Then
   - successes[1].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - successes[1].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - successes[1].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - successes[1].quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - successes[1].quota.max_size = None
+  - successes[1].quota.max_files = 1000
   - successes[1].metadata.created_at: 이 실행이 쓴 시각
   - failed count = 1
   - failed[0].id: 대상 vfolder 의 id 와 같다
@@ -2515,6 +2557,7 @@ Then
 - 삭제 중 상태의 vfolder 전체가 응답으로 옵니다
   - id: 부른 vfolder 의 id 와 같다
   - vfolder.id: 미리 저장한 vfolder 와 같다
+  - vfolder.entity_id: 응답의 id 와 같다
   - vfolder.host = 'local:volume1'
   - vfolder.status = 'delete-ongoing'
   - vfolder.metadata.name = 'folder-1'
@@ -2529,7 +2572,8 @@ Then
   - vfolder.metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - vfolder.metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - vfolder.access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - vfolder.quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - vfolder.quota.max_size = None
+  - vfolder.quota.max_files = 1000
   - vfolder.metadata.created_at: 이 실행이 쓴 시각
 
 <a id="purging-a-user-granted-nothing-may-not-purge-their-folder"></a>
@@ -2790,11 +2834,11 @@ Then
 
 #### [a-user-granted-nothing-may-not-take-a-mount-level-back](/tests/scenario/bai_scenario/manager/vfolder/test_mount_policies.py): pass
 
-아무 권한도 받지 않은 사용자가 마운트 레벨을 되돌리려 하면 권한 부족으로 거부됩니다
+vfolder 수정 권한을 받은 사용자가 다른 사용자의 마운트 레벨을 정한 뒤, 아무 권한도 받지 않은 다른 사용자가 그것을 되돌리려 하면 권한 부족으로 거부됩니다
 
 Given
 
-- 사용할 수 있는 상태의 개인 vfolder 하나를 가진, 아무 권한도 받지 않은 사용자 한 명, 그리고 그 폴더를 쓰지 않는 다른 사용자 한 명
+- 사용할 수 있는 상태의 개인 vfolder 하나를 가진, 자기 개인 폴더에 UPDATE 권한을 받은 사용자 한 명, 그리고 그 폴더를 쓰지 않는 다른 사용자 한 명
   - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
@@ -2805,10 +2849,14 @@ Given
     - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
     - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
   - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - vfolder 권한 부여
+    - 역할 folder-writer-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 folder-writer-1: vfolder 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 folder-writer-1 보유
 
 When
 
-- VFolderAdapter.unset_mount_policy: user-1이 folder-1 vfolder 에서 다른 사용자의 마운트 레벨을 정했다가 되돌립니다
+- VFolderAdapter.unset_mount_policy: user-1이 folder-1 vfolder 에서 다른 사용자의 마운트 레벨을 정한 뒤, 권한이 없는 user-2이 그것을 되돌립니다
 
 Then
 
@@ -2851,6 +2899,7 @@ Then
 
 - 첫 vfolder 가 renamed 이라는 이름과 복제 가능으로 응답으로 옵니다
   - vfolder.id: 미리 저장한 vfolder 와 같다
+  - vfolder.entity_id: 응답의 id 와 같다
   - vfolder.host = 'local:volume1'
   - vfolder.status = 'ready'
   - vfolder.metadata.name = 'renamed'
@@ -2865,7 +2914,8 @@ Then
   - vfolder.metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
   - vfolder.metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
   - vfolder.access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - vfolder.quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - vfolder.quota.max_size = None
+  - vfolder.quota.max_files = 1000
   - vfolder.metadata.created_at: 이 실행이 쓴 시각
 
 <a id="editing-a-user-granted-nothing-may-not-update-their-folder"></a>
