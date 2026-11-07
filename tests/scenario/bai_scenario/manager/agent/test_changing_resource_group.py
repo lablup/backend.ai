@@ -14,13 +14,9 @@ from ai.backend.common.dto.manager.v2.agent.request import (
     UpdateAgentResourceGroupInput,
 )
 from ai.backend.common.dto.manager.v2.agent.response import UpdateAgentResourceGroupPayload
-from ai.backend.common.dto.manager.v2.agent.types import ConflictingSessionCleanupPolicyEnum
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.adapters.agent.adapter import AgentAdapter
-from ai.backend.manager.errors.agent import (
-    AgentHasConflictingSessions,
-    ConflictingSessionRescheduleNotSupported,
-)
+from ai.backend.manager.errors.agent import AgentHasConflictingSessions
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -44,7 +40,6 @@ class MovingTheAgent(When[AnAgentToMoveAndACaller, AgentAdapter, Moved]):
     """에이전트를 옮긴다. ``from_body`` 면 REST 가 지나는 경로로 부른다."""
 
     force: bool = False
-    reschedule: bool = False
     from_body: bool = False
 
     @override
@@ -60,9 +55,6 @@ class MovingTheAgent(When[AnAgentToMoveAndACaller, AgentAdapter, Moved]):
         if self.from_body:
             ko += "REST 본문으로 "
             en += "through the REST body "
-        if self.reschedule:
-            ko += "재배치 정책으로 "
-            en += "under the reschedule policy "
         if self.force:
             ko += "강제로 "
             en += "with force "
@@ -72,7 +64,6 @@ class MovingTheAgent(When[AnAgentToMoveAndACaller, AgentAdapter, Moved]):
 
     @override
     async def call(self, adapter: AgentAdapter, laid: AnAgentToMoveAndACaller) -> Moved:
-        policy = ConflictingSessionCleanupPolicyEnum.RESCHEDULE if self.reschedule else None
         agent_id = AgentId(laid.agent.agent_id)
         with ActingAs(laid.caller):
             if self.from_body:
@@ -80,7 +71,6 @@ class MovingTheAgent(When[AnAgentToMoveAndACaller, AgentAdapter, Moved]):
                     agent_id,
                     UpdateAgentResourceGroupBody(
                         resource_group_id=laid.target.id,
-                        policy=policy,
                         force=self.force,
                     ),
                 )
@@ -88,7 +78,6 @@ class MovingTheAgent(When[AnAgentToMoveAndACaller, AgentAdapter, Moved]):
                 UpdateAgentResourceGroupInput(
                     agent_id=agent_id,
                     resource_group_id=laid.target.id,
-                    policy=policy,
                     force=self.force,
                 )
             )
@@ -121,36 +110,6 @@ class MovingRow(Scenario[TestSeedingSession, AnAgentToMoveAndACaller, AgentAdapt
     @override
     def then(self) -> Then[AnAgentToMoveAndACaller, Moved]:
         return TheAgentMoved(policy="terminate")
-
-
-@dataclass(frozen=True)
-class ReschedulingRow(Scenario[TestSeedingSession, AnAgentToMoveAndACaller, AgentAdapter, Moved]):
-    @override
-    def summary(self) -> str:
-        return "asking-to-reschedule-the-conflicting-sessions-is-not-supported"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "superadmin 이 재배치 정책으로 에이전트를 옮기면 아직 지원하지 않는다는 이유로 "
-            "거부됩니다",
-            english=(
-                "when the superadmin moves an agent under the reschedule policy, the call is "
-                "rejected as not supported yet"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, AnAgentToMoveAndACaller]:
-        return AnAgentToMoveAndSomeone()
-
-    @override
-    def when(self) -> When[AnAgentToMoveAndACaller, AgentAdapter, Moved]:
-        return MovingTheAgent(reschedule=True)
-
-    @override
-    def then(self) -> Then[AnAgentToMoveAndACaller, Moved]:
-        return TheCallIsRefused(ConflictingSessionRescheduleNotSupported)
 
 
 @dataclass(frozen=True)
@@ -187,17 +146,6 @@ NOBODY = AnAgentToMoveAndSomeone(role=UserRole.USER)
 WITH_CONFLICT = AnAgentToMoveAndSomeone(conflicting=True)
 
 SCENARIOS: list[MoveStep] = [
-    MovingRow(
-        named="the-superadmin-moves-an-agent-to-another-resource-group",
-        guarantees=Says(
-            "superadmin 이 에이전트를 다른 자원 그룹으로 옮기면 바뀐 그룹을 담은 응답이 옵니다",
-            english=(
-                "when the superadmin moves an agent to another resource group, the answer "
-                "carrying the new group comes back"
-            ),
-        ),
-        situation=SUPERADMIN,
-    ),
     MovingRow(
         named="the-superadmin-moves-an-agent-through-the-rest-body",
         guarantees=Says(
@@ -237,7 +185,6 @@ SCENARIOS: list[MoveStep] = [
         situation=NOBODY,
         from_body=True,
     ),
-    ReschedulingRow(),
     RefusedRow(
         named="an-agent-designated-by-another-groups-session-needs-force",
         guarantees=Says(

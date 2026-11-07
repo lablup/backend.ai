@@ -140,6 +140,7 @@ class ScopedRow(Scenario[TestSeedingSession, HistoriesAndACaller, SchedulingHist
     kind: str
     who: Side = Side.SUPERADMIN
     two_items: bool = False
+    outside: bool = False
     expected: type[BaseException] | None = None
 
     @override
@@ -152,7 +153,7 @@ class ScopedRow(Scenario[TestSeedingSession, HistoriesAndACaller, SchedulingHist
 
     @override
     def given(self) -> Given[TestSeedingSession, HistoriesAndACaller]:
-        return HistoriesAndSomeone(who=self.who)
+        return HistoriesAndSomeone(who=self.who, outside=self.outside)
 
     @override
     def when(self) -> When[HistoriesAndACaller, SchedulingHistoryAdapter, Any]:
@@ -216,14 +217,15 @@ def _row(kind: str, *, refused: bool = False, two_items: bool = False) -> Scoped
     return ScopedRow(
         named=f"the-superadmin-pages-through-the-scoped-{slug}-histories",
         guarantees=Says(
-            f"슈퍼관리자가 미리 만든 대상을 범위로 {where} 이력을 훑으면 그 이력 하나가 한 "
+            f"슈퍼관리자가 미리 만든 대상을 범위로 {where} 이력을 훑으면 그 이력 하나만 한 "
             "페이지로 옵니다",
             english=(
                 f"when the superadmin pages through {where_en} histories of the target laid in "
-                "advance, the one history comes back as one page"
+                "advance, only that one history comes back as one page"
             ),
         ),
         kind=kind,
+        outside=True,
     )
 
 

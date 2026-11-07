@@ -8,12 +8,31 @@ from typing import Any, override
 
 import pytest
 
+from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     AdminSearchDeploymentHistoriesInput,
     AdminSearchKernelHistoriesInput,
     AdminSearchReplicaGroupHistoriesInput,
     AdminSearchRouteHistoriesInput,
     AdminSearchSessionHistoriesInput,
+    DeploymentHistoryFilter,
+    DeploymentHistoryOrder,
+    KernelHistoryFilter,
+    KernelHistoryOrder,
+    ReplicaGroupHistoryFilter,
+    ReplicaGroupHistoryOrder,
+    RouteHistoryFilter,
+    RouteHistoryOrder,
+    SessionHistoryFilter,
+    SessionHistoryOrder,
+)
+from ai.backend.common.dto.manager.v2.scheduling_history.types import (
+    DeploymentHistoryOrderField,
+    KernelHistoryOrderField,
+    OrderDirection,
+    ReplicaGroupHistoryOrderField,
+    RouteHistoryOrderField,
+    SessionHistoryOrderField,
 )
 from ai.backend.manager.api.adapters.scheduling_history.adapter import (
     SchedulingHistoryAdapter,
@@ -50,9 +69,10 @@ LABELS: dict[str, tuple[str, str]] = {
 
 @dataclass(frozen=True)
 class SearchingTheHistories(When[HistoriesAndACaller, SchedulingHistoryAdapter, Any]):
-    """``kind`` 의 이력을 필터 없이 훑는다."""
+    """``kind`` 의 이력을 훑는다. ``picked`` 면 그 이력만 남기는 조건을 함께 준다."""
 
     kind: str
+    picked: bool = False
 
     @override
     def operation(self) -> str:
@@ -61,6 +81,15 @@ class SearchingTheHistories(When[HistoriesAndACaller, SchedulingHistoryAdapter, 
     @override
     def describe(self, laid: HistoriesAndACaller) -> str:
         where, where_en = LABELS[self.kind]
+        if self.picked:
+            return Says(
+                f"{laid.caller.username} 이 미리 만든 {where} 이력 하나만 남기는 조건과 순서를 "
+                "걸어 한 건씩 훑습니다",
+                english=(
+                    f"{laid.caller.username} pages through {where_en} histories with a condition "
+                    "that keeps one history laid in advance and an order over one item per page"
+                ),
+            )
         return Says(
             f"{laid.caller.username} 이 필터 없이 {where} 이력을 훑습니다",
             english=f"{laid.caller.username} pages through every {where_en} history without a filter",
@@ -72,23 +101,118 @@ class SearchingTheHistories(When[HistoriesAndACaller, SchedulingHistoryAdapter, 
             match self.kind:
                 case "session":
                     return await adapter.admin_search_session_history(
-                        AdminSearchSessionHistoriesInput()
+                        AdminSearchSessionHistoriesInput(
+                            filter=(
+                                SessionHistoryFilter(
+                                    field_id=UUIDFilter(equals=laid.session_history.id)
+                                )
+                                if self.picked
+                                else None
+                            ),
+                            order=(
+                                [
+                                    SessionHistoryOrder(
+                                        field=SessionHistoryOrderField.CREATED_AT,
+                                        direction=OrderDirection.ASC,
+                                    )
+                                ]
+                                if self.picked
+                                else None
+                            ),
+                            limit=1 if self.picked else None,
+                        )
                     )
                 case "kernel":
                     return await adapter.admin_search_kernel_history(
-                        AdminSearchKernelHistoriesInput()
+                        AdminSearchKernelHistoriesInput(
+                            filter=(
+                                KernelHistoryFilter(
+                                    field_id=UUIDFilter(equals=laid.kernel_history.id)
+                                )
+                                if self.picked
+                                else None
+                            ),
+                            order=(
+                                [
+                                    KernelHistoryOrder(
+                                        field=KernelHistoryOrderField.CREATED_AT,
+                                        direction=OrderDirection.ASC,
+                                    )
+                                ]
+                                if self.picked
+                                else None
+                            ),
+                            limit=1 if self.picked else None,
+                        )
                     )
                 case "deployment":
                     return await adapter.admin_search_deployment_history(
-                        AdminSearchDeploymentHistoriesInput()
+                        AdminSearchDeploymentHistoriesInput(
+                            filter=(
+                                DeploymentHistoryFilter(
+                                    field_id=UUIDFilter(equals=laid.deployment_history.id)
+                                )
+                                if self.picked
+                                else None
+                            ),
+                            order=(
+                                [
+                                    DeploymentHistoryOrder(
+                                        field=DeploymentHistoryOrderField.CREATED_AT,
+                                        direction=OrderDirection.ASC,
+                                    )
+                                ]
+                                if self.picked
+                                else None
+                            ),
+                            limit=1 if self.picked else None,
+                        )
                     )
                 case "route":
                     return await adapter.admin_search_route_history(
-                        AdminSearchRouteHistoriesInput()
+                        AdminSearchRouteHistoriesInput(
+                            filter=(
+                                RouteHistoryFilter(
+                                    field_id=UUIDFilter(equals=laid.route_history.id)
+                                )
+                                if self.picked
+                                else None
+                            ),
+                            order=(
+                                [
+                                    RouteHistoryOrder(
+                                        field=RouteHistoryOrderField.CREATED_AT,
+                                        direction=OrderDirection.ASC,
+                                    )
+                                ]
+                                if self.picked
+                                else None
+                            ),
+                            limit=1 if self.picked else None,
+                        )
                     )
                 case _:
                     return await adapter.admin_search_replica_group_history(
-                        AdminSearchReplicaGroupHistoriesInput()
+                        AdminSearchReplicaGroupHistoriesInput(
+                            filter=(
+                                ReplicaGroupHistoryFilter(
+                                    field_id=UUIDFilter(equals=laid.replica_group_history.id)
+                                )
+                                if self.picked
+                                else None
+                            ),
+                            order=(
+                                [
+                                    ReplicaGroupHistoryOrder(
+                                        field=ReplicaGroupHistoryOrderField.CREATED_AT,
+                                        direction=OrderDirection.ASC,
+                                    )
+                                ]
+                                if self.picked
+                                else None
+                            ),
+                            limit=1 if self.picked else None,
+                        )
                     )
 
 
@@ -98,6 +222,7 @@ class SearchRow(Scenario[TestSeedingSession, HistoriesAndACaller, SchedulingHist
     guarantees: str
     kind: str
     who: Side = Side.SUPERADMIN
+    outside: bool = False
     refused: bool = False
 
     @override
@@ -110,11 +235,11 @@ class SearchRow(Scenario[TestSeedingSession, HistoriesAndACaller, SchedulingHist
 
     @override
     def given(self) -> Given[TestSeedingSession, HistoriesAndACaller]:
-        return HistoriesAndSomeone(who=self.who)
+        return HistoriesAndSomeone(who=self.who, outside=self.outside)
 
     @override
     def when(self) -> When[HistoriesAndACaller, SchedulingHistoryAdapter, Any]:
-        return SearchingTheHistories(kind=self.kind)
+        return SearchingTheHistories(kind=self.kind, picked=self.outside)
 
     @override
     def then(self) -> Then[HistoriesAndACaller, Any]:
@@ -146,13 +271,15 @@ def _row(kind: str, *, refused: bool = False) -> SearchRow:
     return SearchRow(
         named=f"the-superadmin-pages-through-{slug}-histories",
         guarantees=Says(
-            f"슈퍼관리자가 {where} 이력을 훑으면 미리 만든 이력 하나가 한 페이지로 옵니다",
+            f"슈퍼관리자가 미리 만든 이력 하나만 남기는 조건과 순서를 걸어 {where} 이력을 "
+            "훑으면 그 이력 하나만 한 페이지로 옵니다",
             english=(
-                f"when the superadmin pages through {where_en} histories, the one history laid "
-                "in advance comes back as one page"
+                f"when the superadmin pages through {where_en} histories with a condition that "
+                "keeps one history laid in advance, only that history comes back as one page"
             ),
         ),
         kind=kind,
+        outside=True,
     )
 
 

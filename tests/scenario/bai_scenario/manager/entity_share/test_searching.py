@@ -10,14 +10,19 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.entity_share.request import (
+    EntityShareOrderBy,
     EntityShareScope,
     EntityShareTargetScope,
     MySearchEntitySharesInput,
     ScopedSearchEntitySharesInput,
 )
 from ai.backend.common.dto.manager.v2.entity_share.response import SearchEntitySharesPayload
-from ai.backend.common.dto.manager.v2.entity_share.types import EntityShareSideDTO
+from ai.backend.common.dto.manager.v2.entity_share.types import (
+    EntityShareOrderField,
+    EntityShareSideDTO,
+)
 from ai.backend.manager.api.adapters.entity_share.adapter import EntityShareAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -61,10 +66,15 @@ class SearchingTheShares(When[ASharedFolderAndACaller, EntityShareAdapter, Found
 
     @override
     async def call(self, adapter: EntityShareAdapter, laid: ASharedFolderAndACaller) -> Found:
+        order = [
+            EntityShareOrderBy(field=EntityShareOrderField.CREATED_AT, direction=OrderDirection.ASC)
+        ]
         with ActingAs(laid.caller):
             if self.how == "my_search":
                 return await adapter.my_search(
-                    MySearchEntitySharesInput(sides=[EntityShareSideDTO.RECIPIENT])
+                    MySearchEntitySharesInput(
+                        sides=[EntityShareSideDTO.RECIPIENT], order=order, limit=1
+                    )
                 )
             return await adapter.scoped_search(
                 ScopedSearchEntitySharesInput(
@@ -75,7 +85,9 @@ class SearchingTheShares(When[ASharedFolderAndACaller, EntityShareAdapter, Found
                                 entity_id=UUID(str(laid.folder.id)),
                             )
                         ]
-                    )
+                    ),
+                    order=order,
+                    limit=1,
                 )
             )
 
@@ -112,19 +124,19 @@ class SearchRow(Scenario[TestSeedingSession, ASharedFolderAndACaller, EntityShar
 
 
 STARTED = datetime.now(UTC)
-RECIPIENT = ASharedFolderAndSomeone(who=Side.RECIPIENT)
-SHARER = ASharedFolderAndSomeone(who=Side.SHARER)
+RECIPIENT = ASharedFolderAndSomeone(who=Side.RECIPIENT, elsewhere=True)
+SHARER = ASharedFolderAndSomeone(who=Side.SHARER, elsewhere=True)
 SOMEBODY = ASharedFolderAndSomeone(who=Side.SOMEBODY)
 
 SCENARIOS: list[SearchStep] = [
     SearchRow(
         named="the-recipient-pages-through-the-shares-addressed-to-them",
         guarantees=Says(
-            "자기 스코프에서 공유를 읽을 수 있는 사용자가 자기에게 온 공유를 훑으면 그 공유가 "
-            "통째로 옵니다",
+            "자기 스코프에서 공유를 읽을 수 있는 사용자가 자기에게 온 공유를 훑으면 그 공유만 "
+            "한 페이지로 옵니다",
             english=(
                 "when a user who can read shares in their own scope pages through the ones "
-                "addressed to them, the share comes back whole"
+                "addressed to them, only that share comes back as one page"
             ),
         ),
         situation=RECIPIENT,
@@ -133,11 +145,11 @@ SCENARIOS: list[SearchStep] = [
     SearchRow(
         named="the-sharer-pages-through-the-shares-of-a-folder",
         guarantees=Says(
-            "프로젝트에서 공유를 읽을 수 있는 사용자가 폴더를 범위로 훑으면 그 폴더에 걸린 공유가 "
-            "통째로 옵니다",
+            "프로젝트에서 공유를 읽을 수 있는 사용자가 폴더를 범위로 훑으면 그 폴더에 걸린 공유만 "
+            "한 페이지로 옵니다",
             english=(
-                "when a user who can read shares in the project pages through a folder, the "
-                "shares of that folder come back whole"
+                "when a user who can read shares in the project pages through a folder, only "
+                "the shares of that folder come back as one page"
             ),
         ),
         situation=SHARER,

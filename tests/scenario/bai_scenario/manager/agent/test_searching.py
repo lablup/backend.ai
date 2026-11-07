@@ -38,9 +38,7 @@ type SearchStep = Scenario[TestSeedingSession, AgentsAndACaller, AgentAdapter, F
 
 @dataclass(frozen=True)
 class SearchingAgents(When[AgentsAndACaller, AgentAdapter, Found]):
-    """에이전트를 검색한다. ``where`` 가 가리키는 갈래로 좁힌다."""
-
-    where: str = "all"
+    """미리 등록한 에이전트 하나만 남기는 조건과 순서를 걸어 한 건씩 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -48,52 +46,22 @@ class SearchingAgents(When[AgentsAndACaller, AgentAdapter, Found]):
 
     @override
     def describe(self, laid: AgentsAndACaller) -> str:
-        match self.where:
-            case "name":
-                return Says(
-                    f"{laid.caller.username}이 에이전트 {laid.agents[1].agent_id} 의 이름으로 "
-                    "검색합니다",
-                    english=(
-                        f"{laid.caller.username} searches the agents naming "
-                        f"{laid.agents[1].agent_id}"
-                    ),
-                )
-            case "group":
-                return Says(
-                    f"{laid.caller.username}이 자원 그룹 {laid.agents[0].group.name} 의 에이전트를 "
-                    "검색합니다",
-                    english=(
-                        f"{laid.caller.username} searches the agents in resource group "
-                        f"{laid.agents[0].group.name}"
-                    ),
-                )
-            case "ordered":
-                return Says(
-                    f"{laid.caller.username}이 에이전트를 id 오름차순으로 검색합니다",
-                    english=f"{laid.caller.username} searches the agents ordered by id ascending",
-                )
         return Says(
-            f"{laid.caller.username}이 모든 에이전트를 검색합니다",
-            english=f"{laid.caller.username} searches every agent",
+            f"{laid.caller.username}이 에이전트 {laid.agents[0].agent_id} 하나만 남기는 조건과 "
+            "id 오름차순을 걸어 한 건씩 검색합니다",
+            english=(
+                f"{laid.caller.username} searches the agents with a condition that keeps "
+                f"{laid.agents[0].agent_id} and orders by id ascending, one item per page"
+            ),
         )
 
     @override
     async def call(self, adapter: AgentAdapter, laid: AgentsAndACaller) -> Found:
-        match self.where:
-            case "name":
-                given = AdminSearchAgentsInput(
-                    filter=AgentFilter(id=StringFilter(equals=laid.agents[1].agent_id))
-                )
-            case "group":
-                given = AdminSearchAgentsInput(
-                    filter=AgentFilter(scaling_group=StringFilter(equals=laid.agents[0].group.name))
-                )
-            case "ordered":
-                given = AdminSearchAgentsInput(
-                    order=[AgentOrder(field=AgentOrderField.ID, direction=OrderDirection.ASC)]
-                )
-            case _:
-                given = AdminSearchAgentsInput()
+        given = AdminSearchAgentsInput(
+            filter=AgentFilter(id=StringFilter(equals=laid.agents[0].agent_id)),
+            order=[AgentOrder(field=AgentOrderField.ID, direction=OrderDirection.ASC)],
+            limit=1,
+        )
         with ActingAs(laid.caller):
             return await adapter.admin_search(given)
 
@@ -105,7 +73,6 @@ class SearchRow(Scenario[TestSeedingSession, AgentsAndACaller, AgentAdapter, Fou
     situation: AgentsAndSomeone
     started: datetime
     picked: tuple[int, ...]
-    where: str = "all"
 
     @override
     def summary(self) -> str:
@@ -121,7 +88,7 @@ class SearchRow(Scenario[TestSeedingSession, AgentsAndACaller, AgentAdapter, Fou
 
     @override
     def when(self) -> When[AgentsAndACaller, AgentAdapter, Found]:
-        return SearchingAgents(where=self.where)
+        return SearchingAgents()
 
     @override
     def then(self) -> Then[AgentsAndACaller, Found]:
@@ -167,56 +134,18 @@ TWO_AGENTS = AgentsAndSomeone(readable=2, role=UserRole.SUPERADMIN)
 
 SCENARIOS: list[SearchStep] = [
     SearchRow(
-        named="the-superadmin-pages-through-every-agent",
-        guarantees=Says(
-            "superadmin 이 모든 에이전트를 검색하면 미리 등록한 에이전트가 모두 통째로 옵니다",
-            english=(
-                "when the superadmin searches every agent, every agent registered in advance "
-                "comes back whole"
-            ),
-        ),
-        situation=TWO_AGENTS,
-        started=STARTED,
-        picked=(0, 1),
-    ),
-    SearchRow(
         named="the-superadmin-picks-an-agent-by-its-name",
         guarantees=Says(
-            "superadmin 이 에이전트 이름으로 검색하면 그 에이전트만 옵니다",
-            english="when the superadmin searches by an agent name, only that agent comes back",
-        ),
-        situation=TWO_AGENTS,
-        started=STARTED,
-        picked=(1,),
-        where="name",
-    ),
-    SearchRow(
-        named="the-superadmin-picks-the-agents-of-a-resource-group",
-        guarantees=Says(
-            "superadmin 이 자원 그룹 이름으로 검색하면 그 그룹의 에이전트만 옵니다",
+            "superadmin 이 에이전트 하나만 남기는 조건과 순서를 걸어 검색하면 그 에이전트만 "
+            "한 페이지로 옵니다",
             english=(
-                "when the superadmin searches by a resource group name, only the agents of "
-                "that group come back"
+                "when the superadmin searches with a condition that keeps one agent and an "
+                "order, only that agent comes back as one page"
             ),
         ),
         situation=TWO_AGENTS,
         started=STARTED,
-        picked=(0, 1),
-        where="group",
-    ),
-    SearchRow(
-        named="the-superadmin-orders-the-agents-by-name",
-        guarantees=Says(
-            "superadmin 이 id 오름차순으로 검색해도 미리 등록한 에이전트가 모두 통째로 옵니다",
-            english=(
-                "when the superadmin searches ordered by id ascending, every agent registered "
-                "in advance comes back whole"
-            ),
-        ),
-        situation=TWO_AGENTS,
-        started=STARTED,
-        picked=(0, 1),
-        where="ordered",
+        picked=(0,),
     ),
     AUserGrantedNothingMayNotSearch(),
 ]

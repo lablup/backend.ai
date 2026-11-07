@@ -14,11 +14,16 @@ from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.entity.types import EntityTarget
 from ai.backend.common.dto.manager.v2.entity_label.request import (
     EntityLabelFilter,
+    EntityLabelOrder,
     EntityLabelPageInput,
     SearchEntityLabelsInput,
 )
 from ai.backend.common.dto.manager.v2.entity_label.response import (
     SearchEntityLabelsPayload,
+)
+from ai.backend.common.dto.manager.v2.entity_label.types import (
+    EntityLabelOrderField,
+    OrderDirection,
 )
 from ai.backend.manager.api.adapters.entity_label.adapter import EntityLabelAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -50,7 +55,10 @@ type SearchStep = Scenario[TestSeedingSession, LabeledDomainsAndACaller, EntityL
 
 @dataclass(frozen=True)
 class SearchingTheNamedScopes(When[LabeledDomainsAndACaller, EntityLabelAdapter, Found]):
-    """대상 도메인들을 범위로 주고 훑는다."""
+    """대상 도메인들을 범위로 주고 훑는다. ``key`` 가 있으면 그 키로 좁힌다."""
+
+    key: str | None = None
+    limit: int | None = None
 
     @override
     def operation(self) -> str:
@@ -58,6 +66,15 @@ class SearchingTheNamedScopes(When[LabeledDomainsAndACaller, EntityLabelAdapter,
 
     @override
     def describe(self, laid: LabeledDomainsAndACaller) -> str:
+        if self.key is not None:
+            return Says(
+                f"{laid.caller.username}이 도메인 {len(laid.targets)}개의 라벨을 한 번에 훑되 "
+                f"{self.key} 키만 골라 한 페이지씩 봅니다",
+                english=(
+                    f"{laid.caller.username} pages through the labels of "
+                    f"{len(laid.targets)} domains at once, narrowed to key {self.key}"
+                ),
+            )
         return Says(
             f"{laid.caller.username}이 도메인 {len(laid.targets)}개의 라벨을 한 번에 훑습니다",
             english=(
@@ -74,7 +91,23 @@ class SearchingTheNamedScopes(When[LabeledDomainsAndACaller, EntityLabelAdapter,
                     scope=[
                         EntityTarget(entity_type=LABELED, entity_id=target.id)
                         for target in laid.targets
-                    ]
+                    ],
+                    filter=(
+                        EntityLabelFilter(key=StringFilter(equals=self.key))
+                        if self.key is not None
+                        else None
+                    ),
+                    order=(
+                        [
+                            EntityLabelOrder(
+                                field=EntityLabelOrderField.KEY,
+                                direction=OrderDirection.ASC,
+                            )
+                        ]
+                        if self.key is not None
+                        else None
+                    ),
+                    limit=self.limit,
                 )
             )
 
@@ -160,6 +193,9 @@ class SearchRow(Scenario[TestSeedingSession, LabeledDomainsAndACaller, EntityLab
     situation: LabeledDomainsAndSomeone
     started: datetime
     picked: tuple[int, ...]
+    narrowed_key: str | None = None
+    """값이 있으면 범위 검색에 그 키 조건을 함께 준다."""
+    page_size: int | None = None
     held_key: str | None = None
     """값이 있으면 ``search_on`` 으로 그 키만 훑는다."""
 
@@ -179,7 +215,7 @@ class SearchRow(Scenario[TestSeedingSession, LabeledDomainsAndACaller, EntityLab
     def when(self) -> When[LabeledDomainsAndACaller, EntityLabelAdapter, Found]:
         if self.held_key is not None:
             return SearchingOneHeldScope(key=self.held_key)
-        return SearchingTheNamedScopes()
+        return SearchingTheNamedScopes(key=self.narrowed_key, limit=self.page_size)
 
     @override
     def then(self) -> Then[LabeledDomainsAndACaller, Found]:
@@ -225,16 +261,20 @@ SCENARIOS: list[SearchStep] = [
     SearchRow(
         named="a-reader-pages-through-the-labels-of-two-entities",
         guarantees=Says(
-            "도메인 둘을 읽을 수 있는 사용자가 두 도메인의 라벨을 한 번에 훑으면, 붙인 라벨 "
-            "둘이 모두 통째로 옵니다",
+            "도메인 둘을 읽을 수 있는 사용자가 범위에 댄 두 도메인의 라벨을 키 하나로 좁혀 "
+            "한 페이지씩 훑으면, 그 키의 라벨만 옵니다",
             english=(
-                "when a user who can read two domains pages through both at once, both labels "
-                "come back whole"
+                "when a user who can read two domains pages through both at once narrowed to "
+                "one key, only that key's labels come back"
             ),
         ),
-        situation=LabeledDomainsAndSomeone(targets=2, readable=2, keys=("team",)),
+        situation=LabeledDomainsAndSomeone(
+            targets=2, readable=2, keys=("team", "tier"), elsewhere=1
+        ),
         started=STARTED,
-        picked=(0, 1),
+        picked=(0, 2),
+        narrowed_key="team",
+        page_size=2,
     ),
     SearchRow(
         named="a-reader-pages-through-one-entities-labels-under-a-key",
@@ -246,7 +286,9 @@ SCENARIOS: list[SearchStep] = [
                 "only that key's label comes back"
             ),
         ),
-        situation=LabeledDomainsAndSomeone(targets=1, readable=1, keys=("tier", "team")),
+        situation=LabeledDomainsAndSomeone(
+            targets=1, readable=1, keys=("tier", "team"), elsewhere=1
+        ),
         started=STARTED,
         picked=(1,),
         held_key="team",
