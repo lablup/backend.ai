@@ -22,6 +22,8 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
 from ai.backend.common.types import (
+    QuotaScopeID,
+    QuotaScopeType,
     VFolderHostPermission,
     VFolderHostPermissionMap,
     VFolderUsageMode,
@@ -42,7 +44,6 @@ from ai.backend.testutils.scenario_steps import (
     Same,
     SameAs,
     Says,
-    Skipped,
     Then,
     Verdict,
 )
@@ -142,23 +143,22 @@ class VFolderNodeLook:
             ),
             Same(f"{at}ownership.creator_email", node.ownership.creator_email, folder.creator),
             Same(f"{at}unmanaged_path", node.unmanaged_path, None),
-            Skipped(
-                f"{at}metadata.usage_mode",
-                Says("타입이 이미 값을 고정합니다", english="the type already fixes the value"),
-            ),
-            Skipped(
+            Same(f"{at}metadata.usage_mode", node.metadata.usage_mode, folder.usage_mode.value),
+            Held(
                 f"{at}metadata.quota_scope_id",
-                Says(
-                    "소유자의 id 로 생성되어 실행마다 다릅니다",
-                    english="it is made from the owner's id, so it differs per run",
+                node.metadata.quota_scope_id,
+                SameAs[str | None](
+                    None if folder.quota_scope_id is None else str(folder.quota_scope_id),
+                    Says(
+                        "미리 저장한 vfolder 의 quota scope",
+                        english="the quota scope of the vfolder seeded in advance",
+                    ),
                 ),
             ),
-            Skipped(
+            Same(
                 f"{at}access_control.permission",
-                Says(
-                    "마운트 권한이라 이 표가 확인하는 값이 아닙니다",
-                    english="it is a mount permission, which this table does not check",
-                ),
+                node.access_control.permission,
+                folder.default_mount_permission.value,
             ),
             Same(f"{at}quota.max_size", node.quota.max_size, None),
             Same(f"{at}quota.max_files", node.quota.max_files, 1000),
@@ -889,6 +889,11 @@ class TheNewFolderNode(Then[AProjectAndMaker, VFolderNode]):
         if node is None:
             return [Refused(NotEnoughPermission, answered.raised)]
         owner_id = laid.caller.id if self.ownership_type == "user" else None
+        quota_scope = (
+            QuotaScopeID(QuotaScopeType.USER, laid.caller.id)
+            if self.ownership_type == "user"
+            else QuotaScopeID(QuotaScopeType.PROJECT, laid.project.id)
+        )
         return [
             Held(
                 "id",
@@ -925,31 +930,24 @@ class TheNewFolderNode(Then[AProjectAndMaker, VFolderNode]):
             ),
             Same("ownership.creator_email", node.ownership.creator_email, laid.caller.email),
             Same("unmanaged_path", node.unmanaged_path, None),
-            Skipped(
-                "metadata.usage_mode",
-                Says("타입이 이미 값을 고정합니다", english="the type already fixes the value"),
-            ),
-            Skipped(
+            Same("metadata.usage_mode", node.metadata.usage_mode, "general"),
+            Held(
                 "metadata.quota_scope_id",
-                Says(
-                    "소유자의 id 로 만들어져 실행마다 다릅니다",
-                    english="it is made from the owner's id, so it differs per run",
+                node.metadata.quota_scope_id,
+                SameAs[str | None](
+                    str(quota_scope),
+                    Says(
+                        "폴더 소유자의 quota scope", english="the quota scope of the folder owner"
+                    ),
                 ),
             ),
-            Skipped(
+            Same(
                 "access_control.permission",
-                Says(
-                    "마운트 권한이라 이 표가 확인하는 값이 아닙니다",
-                    english="it is a mount permission, which this table does not check",
-                ),
+                node.access_control.permission,
+                "none" if self.ownership_type == "user" else "rw",
             ),
-            Skipped(
-                "quota",
-                Says(
-                    "저장소가 응답하는 값이라 여기서 말할 수 없습니다",
-                    english="the storage answers it, so it cannot be stated here",
-                ),
-            ),
+            Same("quota.max_size", node.quota.max_size, None),
+            Same("quota.max_files", node.quota.max_files, 1000),
             Held("metadata.created_at", node.metadata.created_at, WrittenByThisRun(self.started)),
         ]
 

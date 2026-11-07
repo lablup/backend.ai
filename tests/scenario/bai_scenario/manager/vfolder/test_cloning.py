@@ -12,6 +12,7 @@ import pytest
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.v2.vfolder.request import CloneVFolderInput
 from ai.backend.common.dto.manager.v2.vfolder.response import CloneVFolderPayload
+from ai.backend.common.types import QuotaScopeID, QuotaScopeType
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.errors.common import Forbidden
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -25,7 +26,6 @@ from ai.backend.testutils.scenario_steps import (
     SameAs,
     Says,
     Scenario,
-    Skipped,
     Then,
     Verdict,
     When,
@@ -115,13 +115,14 @@ class TheClonedFolder(Then[AFolderAndPeople, CloneVFolderPayload]):
                 node.ownership.user_id,
                 SameAs[UUID | None](laid.caller.id, Says("복제한 사람", english="the cloner")),
             ),
-            Skipped(
+            Held(
                 "vfolder.ownership.project_id",
-                Says(
-                    "개인 vfolder 는 그 사용자의 개인 프로젝트에 붙고, 그 id 는 실행마다 다릅니다",
-                    english=(
-                        "a personal folder lands in the user's personal project, whose id "
-                        "differs per run"
+                node.ownership.project_id,
+                SameAs[UUID | None](
+                    laid.folder.group,
+                    Says(
+                        "원본 vfolder 가 놓인 복제한 사람의 개인 프로젝트",
+                        english="the cloner's personal project the source vfolder is placed in",
                     ),
                 ),
             ),
@@ -134,31 +135,21 @@ class TheClonedFolder(Then[AFolderAndPeople, CloneVFolderPayload]):
                 "vfolder.ownership.creator_email", node.ownership.creator_email, laid.caller.email
             ),
             Same("vfolder.unmanaged_path", node.unmanaged_path, None),
-            Skipped(
-                "vfolder.metadata.usage_mode",
-                Says("타입이 이미 값을 고정합니다", english="the type already fixes the value"),
-            ),
-            Skipped(
+            Same("vfolder.metadata.usage_mode", node.metadata.usage_mode, "general"),
+            Held(
                 "vfolder.metadata.quota_scope_id",
-                Says(
-                    "복제한 사람의 id 로 만들어져 실행마다 다릅니다",
-                    english="it is made from the cloner's id, so it differs per run",
+                node.metadata.quota_scope_id,
+                SameAs[str | None](
+                    str(QuotaScopeID(QuotaScopeType.USER, laid.caller.id)),
+                    Says(
+                        "복제한 사람의 quota scope",
+                        english="the quota scope of the cloner",
+                    ),
                 ),
             ),
-            Skipped(
-                "vfolder.access_control.permission",
-                Says(
-                    "마운트 권한이라 이 표가 확인하는 값이 아닙니다",
-                    english="it is a mount permission, which this table does not check",
-                ),
-            ),
-            Skipped(
-                "vfolder.quota",
-                Says(
-                    "저장소가 응답하는 값이라 여기서 말할 수 없습니다",
-                    english="the storage answers it, so it cannot be stated here",
-                ),
-            ),
+            Same("vfolder.access_control.permission", node.access_control.permission, "none"),
+            Same("vfolder.quota.max_size", node.quota.max_size, None),
+            Same("vfolder.quota.max_files", node.quota.max_files, 1000),
             Held(
                 "vfolder.metadata.created_at",
                 node.metadata.created_at,
