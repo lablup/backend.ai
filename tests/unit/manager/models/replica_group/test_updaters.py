@@ -4,6 +4,7 @@ import uuid
 
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.manager.data.deployment.types import (
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
@@ -52,6 +53,19 @@ def test_deploy_build_values_nullifies_target_revision_id() -> None:
         "target_revision_id": None,
         "lifecycle": ReplicaGroupLifecycle.STABLE,
     }
+
+
+def test_deploy_build_values_emits_rollout() -> None:
+    rollout = ReplicaGroupRolloutSpec(
+        max_surge=IntOrPercent(count=0),
+        max_unavailable=IntOrPercent(count=1),
+    )
+    updater = ReplicaGroupDeployUpdater(
+        replica_group_id=_group_id(),
+        rollout=OptionalState.update(rollout),
+    )
+
+    assert updater.build_values() == {"rollout": rollout}
 
 
 def test_scaling_build_values_empty_when_no_fields_set() -> None:
