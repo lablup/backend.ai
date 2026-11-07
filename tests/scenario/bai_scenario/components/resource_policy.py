@@ -97,6 +97,7 @@ from ai.backend.testutils.scenario_steps import (
     Same,
     SameAs,
     Says,
+    Skipped,
     Then,
     Verdict,
     in_language,
@@ -292,12 +293,33 @@ class Family[PolicyData, PolicyNode](ABC):
         raise NotImplementedError
 
     def verdicts(
-        self, node: Any, wanted: Mapping[str, Any], started: datetime, prefix: str = ""
+        self,
+        node: Any,
+        wanted: Mapping[str, Any],
+        started: datetime,
+        prefix: str = "",
+        *,
+        entity_id: UUID | None = None,
     ) -> list[Verdict]:
         """응답의 모든 필드를 검사한다. 이름은 id 필드에도 그대로 담긴다."""
         got = self.view(node)
         out: list[Verdict] = [
             Same(f"{prefix}id", node.id, wanted["name"]),
+            (
+                Held[UUID](
+                    f"{prefix}entity_id",
+                    node.entity_id,
+                    SameAs(
+                        entity_id,
+                        Says(
+                            "미리 저장한 정책의 id",
+                            english="the id of the policy seeded in advance",
+                        ),
+                    ),
+                )
+                if entity_id is not None
+                else Skipped(f"{prefix}entity_id", "the database generates it")
+            ),
             Same(f"{prefix}name", node.name, wanted["name"]),
             Held(f"{prefix}created_at", node.created_at, WrittenByThisRun(started)),
         ]
@@ -1491,7 +1513,7 @@ class ThePolicyNode(Then[APolicyAndACaller[Any], Any]):
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
         wanted = {**self.family.seeded_view(laid.policy), **self.changed}
-        return self.family.verdicts(node, wanted, self.started)
+        return self.family.verdicts(node, wanted, self.started, entity_id=laid.policy.entity_id())
 
 
 @dataclass(frozen=True)
@@ -1623,7 +1645,13 @@ class EveryUnusedTargetIsProcessed(Then[SeveralPoliciesAndACaller[Any], PartialB
         verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(targets))]
         for i, (node, policy) in enumerate(zip(payload.successes, targets, strict=False)):
             wanted = {**self.family.seeded_view(policy), **self.changed}
-            verdicts += self.family.verdicts(node, wanted, self.started, prefix=f"successes[{i}].")
+            verdicts += self.family.verdicts(
+                node,
+                wanted,
+                self.started,
+                prefix=f"successes[{i}].",
+                entity_id=policy.entity_id(),
+            )
         if self.missing is None:
             return [*verdicts, Same("failed", payload.failed, [])]
         verdicts.append(Same("failed count", len(payload.failed), 1))
@@ -1674,7 +1702,11 @@ class OnlyTheHeldOneFails(Then[SeveralPoliciesAndACaller[Any], PartialBulkPayloa
         verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(targets))]
         for i, (node, policy) in enumerate(zip(payload.successes, targets, strict=False)):
             verdicts += self.family.verdicts(
-                node, self.family.seeded_view(policy), self.started, prefix=f"successes[{i}]."
+                node,
+                self.family.seeded_view(policy),
+                self.started,
+                prefix=f"successes[{i}].",
+                entity_id=policy.entity_id(),
             )
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
@@ -1799,7 +1831,9 @@ class TheOnlyLoadedPolicy(Then[APolicyAndACaller[Any], list[Any]]):
         wanted = self.family.seeded_view(laid.policy)
         return [
             Same("len(items)", len(items), 1),
-            *self.family.verdicts(node, wanted, self.started, prefix="items[0]."),
+            *self.family.verdicts(
+                node, wanted, self.started, prefix="items[0].", entity_id=laid.policy.entity_id()
+            ),
         ]
 
 
@@ -1943,4 +1977,4 @@ class TheProjectPolicyNode(Then[AProjectPolicyAndACaller, ProjectResourcePolicyN
         if node is None:
             return [MissingResponse(answered.raised)]
         wanted = PROJECT.seeded_view(laid.policy)
-        return PROJECT.verdicts(node, wanted, self.started)
+        return PROJECT.verdicts(node, wanted, self.started, entity_id=laid.policy.entity_id())
