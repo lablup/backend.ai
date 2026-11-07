@@ -15,7 +15,7 @@ Scenario: incomplete 1 / 3
 | scenario | verdict |
 |---|---|
 | [loading registries with an empty id list calls no lower layer and an empty answer comes back](#reading_many-an-empty-registry-id-list-answers-empty) | answered |
-| [when the superadmin loads two registries made in advance and one id that does not exist at once, every position holds a whole registry made in advance and the position of the id that does not exist is empty](#reading_many-loading-many-registry-ids-keeps-the-positions) | answered |
+| [when a user granted read permission on artifact registries in global loads the two registries made in advance at once, every position holds a whole registry made in advance in the requested order](#reading_many-loading-many-registry-ids-keeps-the-positions) | answered |
 | [when a user granted nothing loads several registry ids at once, every position holds a rejection for lack of permission, and the id that does not exist comes back with the same rejection so whether it exists is not revealed](#reading_many-a-user-granted-nothing-loading-registry-ids-is-refused-on-every-position) | rejected |
 
 **get_registry_metas**
@@ -43,15 +43,19 @@ loading registries with an empty id list calls no lower layer and an empty answe
 
 Given
 
-- 2 HuggingFace registries and one superadmin
+- 2 HuggingFace registries and one user granted READ on artifact registries in global
   - Domain home-1
   - HuggingFace registry registry-1: refers to https://huggingface.co
   - HuggingFace registry registry-2: refers to https://huggingface.co
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted permission on artifact registries in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role registry-keeper-1: applies only within the scope it is granted in
+    - Role registry-keeper-1: READ allowed on every artifact_registry
+    - regular user user-1: holds Role registry-keeper-1
 
 When
 
@@ -66,39 +70,42 @@ Then
 
 #### [loading-many-registry-ids-keeps-the-positions](/tests/scenario/bai_scenario/manager/artifact_registry/test_reading_many.py): pass
 
-when the superadmin loads two registries made in advance and one id that does not exist at once, every position holds a whole registry made in advance and the position of the id that does not exist is empty
+when a user granted read permission on artifact registries in global loads the two registries made in advance at once, every position holds a whole registry made in advance in the requested order
 
 Given
 
-- 2 HuggingFace registries and one superadmin
+- 2 HuggingFace registries and one user granted READ on artifact registries in global
   - Domain home-1
   - HuggingFace registry registry-1: refers to https://huggingface.co
   - HuggingFace registry registry-2: refers to https://huggingface.co
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted permission on artifact registries in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role registry-keeper-1: applies only within the scope it is granted in
+    - Role registry-keeper-1: READ allowed on every artifact_registry
+    - regular user user-1: holds Role registry-keeper-1
 
 When
 
-- ArtifactRegistryAdapter.batch_load_by_ids: user-1 loads two registries made in advance and one id that does not exist at once
+- ArtifactRegistryAdapter.batch_load_by_ids: user-1 loads two registries made in advance at once
 
 Then
 
-- every position holds a whole registry made in advance, and the position of the id that does not exist is empty
-  - length = 3
+- every position holds a whole registry made in advance, in the requested order
+  - length = 2
   - [0].id: same as the entity id in the same answer
   - [0].entity_id: same as the id in the same answer
   - [0].registry_id: same as the id of the registry made in advance
   - [0].name = 'registry-1'
   - [0].type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
-  - [1] = None
-  - [2].id: same as the entity id in the same answer
-  - [2].entity_id: same as the id in the same answer
-  - [2].registry_id: same as the id of the registry made in advance
-  - [2].name = 'registry-2'
-  - [2].type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
+  - [1].id: same as the entity id in the same answer
+  - [1].entity_id: same as the id in the same answer
+  - [1].registry_id: same as the id of the registry made in advance
+  - [1].name = 'registry-2'
+  - [1].type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
 
 <a id="reading_many-a-user-granted-nothing-loading-registry-ids-is-refused-on-every-position"></a>
 

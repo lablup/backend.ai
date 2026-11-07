@@ -37,7 +37,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [빈 id 목록으로 아티팩트를 읽으면 하위 계층을 호출하지 않고 빈 응답이 반환됩니다](#reading-an-empty-artifact-id-list-answers-empty) | 성공 |
-| [superadmin 이 미리 저장한 아티팩트 둘과 없는 id 하나를 한 번에 읽으면, 자리마다 미리 저장한 아티팩트 전체가 오고 없는 id 자리는 비어 있습니다](#reading-loading-many-artifact-ids-keeps-the-positions) | 성공 |
+| [global 에서 아티팩트 읽기 권한을 받은 사용자가 미리 저장한 아티팩트 둘을 한 번에 읽으면, 자리마다 미리 저장한 아티팩트 전체가 요청한 순서대로 옵니다](#reading-loading-many-artifact-ids-keeps-the-positions) | 성공 |
 | [아무 권한도 받지 않은 사용자가 아티팩트 id 여럿을 한 번에 읽으면, 항목마다 권한 부족 거부가 담겨 오고 없는 id 도 같은 거부로 와서 있는지 없는지가 드러나지 않습니다](#reading-a-user-granted-nothing-loading-artifacts-is-refused-on-every-position) | 거부 |
 
 **batch_load_revisions_by_ids**
@@ -45,7 +45,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [빈 id 목록으로 리비전을 읽으면 하위 계층을 호출하지 않고 빈 응답이 반환됩니다](#reading-an-empty-revision-id-list-answers-empty) | 성공 |
-| [superadmin 이 미리 저장한 리비전 둘과 없는 id 하나를 한 번에 읽으면, 자리마다 미리 저장한 리비전 전체가 오고 없는 id 자리는 비어 있습니다](#reading-loading-many-revision-ids-keeps-the-positions) | 성공 |
+| [global 에서 아티팩트 읽기 권한을 받은 사용자가 미리 저장한 리비전 둘을 한 번에 읽으면, 자리마다 미리 저장한 리비전 전체가 요청한 순서대로 옵니다](#reading-loading-many-revision-ids-keeps-the-positions) | 성공 |
 | [아무 권한도 받지 않은 사용자가 리비전 id 여럿을 한 번에 읽으면, 읽을 수 없는 리비전 자리마다 권한 부족 거부가 담깁니다](#reading-a-user-granted-nothing-loading-revisions-is-refused-on-every-readable-one) | 거부 |
 
 **delete**
@@ -217,15 +217,19 @@
 
 Given
 
-- 아티팩트 2개와, superadmin 한 명
+- 아티팩트 2개와, 아티팩트에 READ 권한을 받은 user 한 명
   - 도메인 home-1
   - 아티팩트 artifact-1: 허깅 페이스 레지스트리에서 스캔한 모델
   - 아티팩트 artifact-2: 허깅 페이스 레지스트리에서 스캔한 모델
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - global 에서 아티팩트 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 artifact-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 artifact-keeper-1: artifact 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 artifact-keeper-1 보유
 
 When
 
@@ -240,28 +244,32 @@ Then
 
 #### [loading-many-artifact-ids-keeps-the-positions](/tests/scenario/bai_scenario/manager/artifact/test_reading.py): pass
 
-superadmin 이 미리 저장한 아티팩트 둘과 없는 id 하나를 한 번에 읽으면, 자리마다 미리 저장한 아티팩트 전체가 오고 없는 id 자리는 비어 있습니다
+global 에서 아티팩트 읽기 권한을 받은 사용자가 미리 저장한 아티팩트 둘을 한 번에 읽으면, 자리마다 미리 저장한 아티팩트 전체가 요청한 순서대로 옵니다
 
 Given
 
-- 아티팩트 2개와, superadmin 한 명
+- 아티팩트 2개와, 아티팩트에 READ 권한을 받은 user 한 명
   - 도메인 home-1
   - 아티팩트 artifact-1: 허깅 페이스 레지스트리에서 스캔한 모델
   - 아티팩트 artifact-2: 허깅 페이스 레지스트리에서 스캔한 모델
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - global 에서 아티팩트 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 artifact-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 artifact-keeper-1: artifact 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 artifact-keeper-1 보유
 
 When
 
-- ArtifactAdapter.batch_load_by_ids: user-1이 미리 저장한 아티팩트 2개와 없는 id 하나를 한 번에 읽습니다
+- ArtifactAdapter.batch_load_by_ids: user-1이 미리 저장한 아티팩트 2개를 한 번에 읽습니다
 
 Then
 
-- 자리마다 미리 저장한 아티팩트 전체가 오고, 없는 id 자리는 비어 있습니다
-  - length = 3
+- 자리마다 미리 저장한 아티팩트 전체가 요청한 순서대로 옵니다
+  - length = 2
   - [0].name = 'artifact-1'
   - [0].type = <ArtifactType.MODEL: 'MODEL'>
   - [0].description = '이미 있던 아티팩트'
@@ -277,22 +285,21 @@ Then
   - [0].source_registry_id: 미리 저장한 아티팩트의 레지스트리 id 와 같다
   - [0].scanned_at: 이 실행이 쓴 시각
   - [0].updated_at: 이 실행이 쓴 시각
-  - [1] = None
-  - [2].name = 'artifact-2'
-  - [2].type = <ArtifactType.MODEL: 'MODEL'>
-  - [2].description = '이미 있던 아티팩트'
-  - [2].registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
-  - [2].source_registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
-  - [2].availability = <ArtifactAvailability.ALIVE: 'ALIVE'>
-  - [2].readonly = False
-  - [2].extra = None
-  - [2].revisions = []
-  - [2].id: 미리 저장한 아티팩트의 id 와 같다
-  - [2].entity_id: 미리 저장한 아티팩트의 id 와 같다
-  - [2].registry_id: 미리 저장한 아티팩트의 레지스트리 id 와 같다
-  - [2].source_registry_id: 미리 저장한 아티팩트의 레지스트리 id 와 같다
-  - [2].scanned_at: 이 실행이 쓴 시각
-  - [2].updated_at: 이 실행이 쓴 시각
+  - [1].name = 'artifact-2'
+  - [1].type = <ArtifactType.MODEL: 'MODEL'>
+  - [1].description = '이미 있던 아티팩트'
+  - [1].registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
+  - [1].source_registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
+  - [1].availability = <ArtifactAvailability.ALIVE: 'ALIVE'>
+  - [1].readonly = False
+  - [1].extra = None
+  - [1].revisions = []
+  - [1].id: 미리 저장한 아티팩트의 id 와 같다
+  - [1].entity_id: 미리 저장한 아티팩트의 id 와 같다
+  - [1].registry_id: 미리 저장한 아티팩트의 레지스트리 id 와 같다
+  - [1].source_registry_id: 미리 저장한 아티팩트의 레지스트리 id 와 같다
+  - [1].scanned_at: 이 실행이 쓴 시각
+  - [1].updated_at: 이 실행이 쓴 시각
 
 <a id="reading-a-user-granted-nothing-loading-artifacts-is-refused-on-every-position"></a>
 
@@ -334,17 +341,21 @@ Then
 
 Given
 
-- 리비전 1개를 가진 아티팩트 2개와, superadmin 한 명
+- 리비전 1개를 가진 아티팩트 2개와, 아티팩트에 READ 권한을 받은 user 한 명
   - 도메인 home-1
   - 아티팩트 artifact-1: 허깅 페이스 레지스트리에서 스캔한 모델
   - 아티팩트 artifact-1: 리비전 1.0
   - 아티팩트 artifact-2: 허깅 페이스 레지스트리에서 스캔한 모델
   - 아티팩트 artifact-2: 리비전 1.0
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - global 에서 아티팩트 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 artifact-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 artifact-keeper-1: artifact 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 artifact-keeper-1 보유
 
 When
 
@@ -359,30 +370,34 @@ Then
 
 #### [loading-many-revision-ids-keeps-the-positions](/tests/scenario/bai_scenario/manager/artifact/test_reading.py): pass
 
-superadmin 이 미리 저장한 리비전 둘과 없는 id 하나를 한 번에 읽으면, 자리마다 미리 저장한 리비전 전체가 오고 없는 id 자리는 비어 있습니다
+global 에서 아티팩트 읽기 권한을 받은 사용자가 미리 저장한 리비전 둘을 한 번에 읽으면, 자리마다 미리 저장한 리비전 전체가 요청한 순서대로 옵니다
 
 Given
 
-- 리비전 1개를 가진 아티팩트 2개와, superadmin 한 명
+- 리비전 1개를 가진 아티팩트 2개와, 아티팩트에 READ 권한을 받은 user 한 명
   - 도메인 home-1
   - 아티팩트 artifact-1: 허깅 페이스 레지스트리에서 스캔한 모델
   - 아티팩트 artifact-1: 리비전 1.0
   - 아티팩트 artifact-2: 허깅 페이스 레지스트리에서 스캔한 모델
   - 아티팩트 artifact-2: 리비전 1.0
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - global 에서 아티팩트 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 artifact-keeper-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 artifact-keeper-1: artifact 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 artifact-keeper-1 보유
 
 When
 
-- ArtifactAdapter.batch_load_revisions_by_ids: user-1이 미리 저장한 리비전 둘과 없는 id 하나를 한 번에 읽습니다
+- ArtifactAdapter.batch_load_revisions_by_ids: user-1이 미리 저장한 리비전 둘을 한 번에 읽습니다
 
 Then
 
-- 자리마다 미리 저장한 리비전 전체가 오고, 없는 id 자리는 비어 있습니다
-  - length = 3
+- 자리마다 미리 저장한 리비전 전체가 요청한 순서대로 옵니다
+  - length = 2
   - [0].id: 미리 저장한 리비전의 id 와 같다
   - [0].field_id: 미리 저장한 리비전의 id 와 같다
   - [0].artifact_id: 미리 저장한 아티팩트의 id 와 같다
@@ -395,19 +410,18 @@ Then
   - [0].digest: 건너뜀: 어댑터가 리비전 노드에 다이제스트를 담지 않아 응답으로 확인할 수 없습니다
   - [0].verification_result: 건너뜀: 어댑터가 검증 결과를 리비전 노드에 담지 않아 응답으로 확인할 수 없습니다
   - [0].readme = 'the revision readme'
-  - [1] = None
-  - [2].id: 미리 저장한 리비전의 id 와 같다
-  - [2].field_id: 미리 저장한 리비전의 id 와 같다
-  - [2].artifact_id: 미리 저장한 아티팩트의 id 와 같다
-  - [2].version = '1.0'
-  - [2].size = '1024'
-  - [2].status = <ArtifactStatus.SCANNED: 'SCANNED'>
-  - [2].remote_status = None
-  - [2].created_at = None
-  - [2].updated_at = None
-  - [2].digest: 건너뜀: 어댑터가 리비전 노드에 다이제스트를 담지 않아 응답으로 확인할 수 없습니다
-  - [2].verification_result: 건너뜀: 어댑터가 검증 결과를 리비전 노드에 담지 않아 응답으로 확인할 수 없습니다
-  - [2].readme = 'the revision readme'
+  - [1].id: 미리 저장한 리비전의 id 와 같다
+  - [1].field_id: 미리 저장한 리비전의 id 와 같다
+  - [1].artifact_id: 미리 저장한 아티팩트의 id 와 같다
+  - [1].version = '1.0'
+  - [1].size = '1024'
+  - [1].status = <ArtifactStatus.SCANNED: 'SCANNED'>
+  - [1].remote_status = None
+  - [1].created_at = None
+  - [1].updated_at = None
+  - [1].digest: 건너뜀: 어댑터가 리비전 노드에 다이제스트를 담지 않아 응답으로 확인할 수 없습니다
+  - [1].verification_result: 건너뜀: 어댑터가 검증 결과를 리비전 노드에 담지 않아 응답으로 확인할 수 없습니다
+  - [1].readme = 'the revision readme'
 
 <a id="reading-a-user-granted-nothing-loading-revisions-is-refused-on-every-readable-one"></a>
 

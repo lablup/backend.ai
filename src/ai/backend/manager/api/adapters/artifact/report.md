@@ -37,7 +37,7 @@ Scenario: incomplete 9 / 25
 | scenario | verdict |
 |---|---|
 | [loading artifacts with an empty id list calls no lower layer and an empty answer comes back](#reading-an-empty-artifact-id-list-answers-empty) | answered |
-| [when the superadmin loads two artifacts made in advance and one id that does not exist at once, every position holds a whole artifact made in advance and the position of the id that does not exist is empty](#reading-loading-many-artifact-ids-keeps-the-positions) | answered |
+| [when a user granted read permission on artifacts in global loads the two artifacts made in advance at once, every position holds a whole artifact made in advance in the requested order](#reading-loading-many-artifact-ids-keeps-the-positions) | answered |
 | [when a user granted nothing loads several artifact ids at once, every position holds a rejection for lack of permission, and the id that does not exist comes back with the same rejection so whether it exists is not revealed](#reading-a-user-granted-nothing-loading-artifacts-is-refused-on-every-position) | rejected |
 
 **batch_load_revisions_by_ids**
@@ -45,7 +45,7 @@ Scenario: incomplete 9 / 25
 | scenario | verdict |
 |---|---|
 | [loading revisions with an empty id list calls no lower layer and an empty answer comes back](#reading-an-empty-revision-id-list-answers-empty) | answered |
-| [when the superadmin loads two revisions made in advance and one id that does not exist at once, every position holds a whole revision made in advance and the position of the id that does not exist is empty](#reading-loading-many-revision-ids-keeps-the-positions) | answered |
+| [when a user granted read permission on artifacts in global loads the two revisions made in advance at once, every position holds a whole revision made in advance in the requested order](#reading-loading-many-revision-ids-keeps-the-positions) | answered |
 | [when a user granted nothing loads several revision ids at once, every revision the caller may not read comes back with a rejection for lack of permission](#reading-a-user-granted-nothing-loading-revisions-is-refused-on-every-readable-one) | rejected |
 
 **delete**
@@ -217,15 +217,19 @@ loading artifacts with an empty id list calls no lower layer and an empty answer
 
 Given
 
-- 2 artifacts and one superadmin
+- 2 artifacts and one user granted READ on artifacts
   - Domain home-1
   - Artifact artifact-1: a model scanned from a HuggingFace registry
   - Artifact artifact-2: a model scanned from a HuggingFace registry
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted permission on artifacts in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role artifact-keeper-1: applies only within the scope it is granted in
+    - Role artifact-keeper-1: READ allowed on every artifact
+    - regular user user-1: holds Role artifact-keeper-1
 
 When
 
@@ -240,28 +244,32 @@ Then
 
 #### [loading-many-artifact-ids-keeps-the-positions](/tests/scenario/bai_scenario/manager/artifact/test_reading.py): pass
 
-when the superadmin loads two artifacts made in advance and one id that does not exist at once, every position holds a whole artifact made in advance and the position of the id that does not exist is empty
+when a user granted read permission on artifacts in global loads the two artifacts made in advance at once, every position holds a whole artifact made in advance in the requested order
 
 Given
 
-- 2 artifacts and one superadmin
+- 2 artifacts and one user granted READ on artifacts
   - Domain home-1
   - Artifact artifact-1: a model scanned from a HuggingFace registry
   - Artifact artifact-2: a model scanned from a HuggingFace registry
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted permission on artifacts in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role artifact-keeper-1: applies only within the scope it is granted in
+    - Role artifact-keeper-1: READ allowed on every artifact
+    - regular user user-1: holds Role artifact-keeper-1
 
 When
 
-- ArtifactAdapter.batch_load_by_ids: user-1 loads 2 artifacts made in advance and one id that does not exist at once
+- ArtifactAdapter.batch_load_by_ids: user-1 loads 2 artifacts made in advance at once
 
 Then
 
-- every position holds a whole artifact made in advance, and the position of the id that does not exist is empty
-  - length = 3
+- every position holds a whole artifact made in advance, in the requested order
+  - length = 2
   - [0].name = 'artifact-1'
   - [0].type = <ArtifactType.MODEL: 'MODEL'>
   - [0].description = 'an artifact that already existed'
@@ -277,22 +285,21 @@ Then
   - [0].source_registry_id: same as the registry id of the artifact made in advance
   - [0].scanned_at: the time this run wrote
   - [0].updated_at: the time this run wrote
-  - [1] = None
-  - [2].name = 'artifact-2'
-  - [2].type = <ArtifactType.MODEL: 'MODEL'>
-  - [2].description = 'an artifact that already existed'
-  - [2].registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
-  - [2].source_registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
-  - [2].availability = <ArtifactAvailability.ALIVE: 'ALIVE'>
-  - [2].readonly = False
-  - [2].extra = None
-  - [2].revisions = []
-  - [2].id: same as the id of the artifact made in advance
-  - [2].entity_id: same as the id of the artifact made in advance
-  - [2].registry_id: same as the registry id of the artifact made in advance
-  - [2].source_registry_id: same as the registry id of the artifact made in advance
-  - [2].scanned_at: the time this run wrote
-  - [2].updated_at: the time this run wrote
+  - [1].name = 'artifact-2'
+  - [1].type = <ArtifactType.MODEL: 'MODEL'>
+  - [1].description = 'an artifact that already existed'
+  - [1].registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
+  - [1].source_registry_type = <ArtifactRegistryType.HUGGINGFACE: 'huggingface'>
+  - [1].availability = <ArtifactAvailability.ALIVE: 'ALIVE'>
+  - [1].readonly = False
+  - [1].extra = None
+  - [1].revisions = []
+  - [1].id: same as the id of the artifact made in advance
+  - [1].entity_id: same as the id of the artifact made in advance
+  - [1].registry_id: same as the registry id of the artifact made in advance
+  - [1].source_registry_id: same as the registry id of the artifact made in advance
+  - [1].scanned_at: the time this run wrote
+  - [1].updated_at: the time this run wrote
 
 <a id="reading-a-user-granted-nothing-loading-artifacts-is-refused-on-every-position"></a>
 
@@ -334,17 +341,21 @@ loading revisions with an empty id list calls no lower layer and an empty answer
 
 Given
 
-- 2 artifacts with 1 revisions each and one superadmin
+- 2 artifacts with 1 revisions each and one user granted READ on artifacts
   - Domain home-1
   - Artifact artifact-1: a model scanned from a HuggingFace registry
   - Artifact artifact-1: revision 1.0
   - Artifact artifact-2: a model scanned from a HuggingFace registry
   - Artifact artifact-2: revision 1.0
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted permission on artifacts in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role artifact-keeper-1: applies only within the scope it is granted in
+    - Role artifact-keeper-1: READ allowed on every artifact
+    - regular user user-1: holds Role artifact-keeper-1
 
 When
 
@@ -359,30 +370,34 @@ Then
 
 #### [loading-many-revision-ids-keeps-the-positions](/tests/scenario/bai_scenario/manager/artifact/test_reading.py): pass
 
-when the superadmin loads two revisions made in advance and one id that does not exist at once, every position holds a whole revision made in advance and the position of the id that does not exist is empty
+when a user granted read permission on artifacts in global loads the two revisions made in advance at once, every position holds a whole revision made in advance in the requested order
 
 Given
 
-- 2 artifacts with 1 revisions each and one superadmin
+- 2 artifacts with 1 revisions each and one user granted READ on artifacts
   - Domain home-1
   - Artifact artifact-1: a model scanned from a HuggingFace registry
   - Artifact artifact-1: revision 1.0
   - Artifact artifact-2: a model scanned from a HuggingFace registry
   - Artifact artifact-2: revision 1.0
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted permission on artifacts in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role artifact-keeper-1: applies only within the scope it is granted in
+    - Role artifact-keeper-1: READ allowed on every artifact
+    - regular user user-1: holds Role artifact-keeper-1
 
 When
 
-- ArtifactAdapter.batch_load_revisions_by_ids: user-1 loads two revisions made in advance and one id that does not exist at once
+- ArtifactAdapter.batch_load_revisions_by_ids: user-1 loads two revisions made in advance at once
 
 Then
 
-- every position holds a whole revision made in advance, and the position of the id that does not exist is empty
-  - length = 3
+- every position holds a whole revision made in advance, in the requested order
+  - length = 2
   - [0].id: same as the id of the revision created in advance
   - [0].field_id: same as the id of the revision created in advance
   - [0].artifact_id: same as the id of the artifact created in advance
@@ -395,19 +410,18 @@ Then
   - [0].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
   - [0].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
   - [0].readme = 'the revision readme'
-  - [1] = None
-  - [2].id: same as the id of the revision created in advance
-  - [2].field_id: same as the id of the revision created in advance
-  - [2].artifact_id: same as the id of the artifact created in advance
-  - [2].version = '1.0'
-  - [2].size = '1024'
-  - [2].status = <ArtifactStatus.SCANNED: 'SCANNED'>
-  - [2].remote_status = None
-  - [2].created_at = None
-  - [2].updated_at = None
-  - [2].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
-  - [2].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
-  - [2].readme = 'the revision readme'
+  - [1].id: same as the id of the revision created in advance
+  - [1].field_id: same as the id of the revision created in advance
+  - [1].artifact_id: same as the id of the artifact created in advance
+  - [1].version = '1.0'
+  - [1].size = '1024'
+  - [1].status = <ArtifactStatus.SCANNED: 'SCANNED'>
+  - [1].remote_status = None
+  - [1].created_at = None
+  - [1].updated_at = None
+  - [1].digest: skipped: the adapter does not put the digest on the revision node, so it cannot be stated from the response
+  - [1].verification_result: skipped: the adapter does not put the verification result on the revision node, so it cannot be stated from the response
+  - [1].readme = 'the revision readme'
 
 <a id="reading-a-user-granted-nothing-loading-revisions-is-refused-on-every-readable-one"></a>
 
