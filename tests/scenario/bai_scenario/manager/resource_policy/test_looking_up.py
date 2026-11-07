@@ -13,9 +13,8 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePolicyAdapter
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
@@ -121,28 +120,29 @@ class LookingUpSeveralNamesWithoutLogin(
 
 
 @dataclass(frozen=True)
-class TheSuperadminLooksUpAName(
+class AUserGrantedReadLooksUpAName(
     Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, LookedUp]
 ):
     family: Family[Any, Any]
 
     @override
     def summary(self) -> str:
-        return f"the-superadmin-looks-up-a-{self.family.label}-by-name"
+        return f"a-user-granted-read-looks-up-a-{self.family.label}-by-name"
 
     @override
     def describe(self) -> str:
         return Says(
-            f"superadmin 이 {self.family.kind} 이름으로 id 를 찾으면 그 정책의 id 가 반환됩니다",
+            f"global 스코프에서 그 정책을 읽을 수 있는 사용자가 {self.family.kind} 이름으로 id 를 "
+            "찾으면 그 정책의 id 가 반환됩니다",
             english=(
-                f"when the superadmin looks up a {self.family.label} by name, the id of that "
-                "policy comes back"
+                f"a user who can read it in the global scope looks up a {self.family.label} by "
+                "name and gets the id of that policy"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
-        return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
+        return APolicyAndSomeone(self.family, granted=True)
 
     @override
     def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, LookedUp]:
@@ -154,29 +154,63 @@ class TheSuperadminLooksUpAName(
 
 
 @dataclass(frozen=True)
-class ANameNothingAnswersToIsNotFound(
+class AUserGrantedNothingCannotLookUpAName(
     Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, LookedUp]
 ):
     family: Family[Any, Any]
 
     @override
     def summary(self) -> str:
-        return f"looking-up-a-{self.family.label}-name-nothing-answers-to-is-not-found"
+        return f"a-user-granted-nothing-cannot-look-up-a-{self.family.label}-name"
 
     @override
     def describe(self) -> str:
         return Says(
-            f"superadmin 이 어느 {self.family.kind}에도 없는 이름으로 id 를 찾으면 대상이 없다는 "
-            "것으로 거부됩니다",
+            f"아무 권한도 받지 않은 사용자가 {self.family.kind} 이름으로 id 를 찾으면 그 정책을 "
+            "읽을 권한이 없으므로 거부됩니다",
             english=(
-                f"when the superadmin looks up a name no {self.family.label} holds, the call is "
-                "rejected as no such target"
+                f"a user granted nothing looking up a {self.family.label} by name is rejected "
+                "because no permission on that policy is held"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
-        return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
+        return APolicyAndSomeone(self.family)
+
+    @override
+    def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, LookedUp]:
+        return LookingUpTheName(self.family)
+
+    @override
+    def then(self) -> Then[APolicyAndACaller[Any], LookedUp]:
+        return TheCallIsRefused(GenericBadRequest)
+
+
+@dataclass(frozen=True)
+class ANameNothingAnswersToIsRejectedLikeAnUnreadableOne(
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, LookedUp]
+):
+    family: Family[Any, Any]
+
+    @override
+    def summary(self) -> str:
+        return f"looking-up-a-{self.family.label}-name-nothing-answers-to-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            f"어느 {self.family.kind}에도 없는 이름으로 id 를 찾으면 읽을 권한이 없을 때와 같은 "
+            "거부가 오고, 그 이름이 있는지는 드러나지 않습니다",
+            english=(
+                f"looking up a name no {self.family.label} holds is rejected with the same answer "
+                "as lacking the read permission, revealing nothing about whether the name exists"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
+        return APolicyAndSomeone(self.family, granted=True)
 
     @override
     def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, LookedUp]:
@@ -184,34 +218,35 @@ class ANameNothingAnswersToIsNotFound(
 
     @override
     def then(self) -> Then[APolicyAndACaller[Any], LookedUp]:
-        return TheCallIsRefused(EntityNotFoundError)
+        return TheCallIsRefused(GenericBadRequest)
 
 
 @dataclass(frozen=True)
-class TheSuperadminLooksUpSeveralNames(
+class AUserGrantedNothingLooksUpSeveralNames(
     Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, LookedUpSeveral]
 ):
     family: Family[Any, Any]
 
     @override
     def summary(self) -> str:
-        return f"the-superadmin-looks-up-several-{self.family.label}-names"
+        return f"a-user-granted-nothing-looks-up-several-{self.family.label}-names"
 
     @override
     def describe(self) -> str:
         return Says(
-            f"superadmin 이 있는 이름과 없는 이름으로 {self.family.kind} id 를 여럿 조회하면, "
-            "있는 이름에는 그 정책의 id, 없는 이름에는 빈 값이 응답으로 옵니다",
+            f"아무 권한도 받지 않은 사용자가 있는 이름과 없는 이름으로 {self.family.kind} id 를 "
+            "여럿 조회하면, 있는 이름에는 그 정책의 id, 없는 이름에는 빈 값이 응답으로 옵니다. 이 "
+            "호출은 인증만 봅니다",
             english=(
-                f"when the superadmin looks up several ids for a name that exists and one that "
-                f"does not, the {self.family.label} id comes back for the name that exists and an "
-                "empty value for the name that does not"
+                f"a user granted nothing looking up several ids for a name that exists and one "
+                f"that does not gets the {self.family.label} id for the name that exists and an "
+                "empty value for the name that does not. this call checks authentication alone"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
-        return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
+        return APolicyAndSomeone(self.family)
 
     @override
     def when(self) -> When[APolicyAndACaller[Any], ResourcePolicyAdapter, LookedUpSeveral]:
@@ -257,9 +292,10 @@ class LookingUpSeveralNamesWithoutLoginIsRefused(
 
 
 SCENARIOS: list[LookingUpStep] = [
-    *(TheSuperadminLooksUpAName(family) for family in FAMILIES),
-    *(ANameNothingAnswersToIsNotFound(family) for family in FAMILIES),
-    *(TheSuperadminLooksUpSeveralNames(family) for family in FAMILIES),
+    *(AUserGrantedReadLooksUpAName(family) for family in FAMILIES),
+    *(AUserGrantedNothingCannotLookUpAName(family) for family in FAMILIES),
+    *(ANameNothingAnswersToIsRejectedLikeAnUnreadableOne(family) for family in FAMILIES),
+    *(AUserGrantedNothingLooksUpSeveralNames(family) for family in FAMILIES),
     *(LookingUpSeveralNamesWithoutLoginIsRefused(family) for family in FAMILIES),
 ]
 

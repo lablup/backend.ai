@@ -206,6 +206,36 @@ class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
 
 
 @dataclass(frozen=True)
+class ManyPresetsAndAnUnrelatedOne(Given[Any, ManyPresetsAndACaller]):
+    """이름을 공유하는 프리셋 여럿, 그 이름을 갖지 않는 프리셋 하나, superadmin 한 명."""
+
+    count: int = 2
+    role: UserRole = UserRole.SUPERADMIN
+    unrelated_hint: str = "unrelated"
+
+    @override
+    def describe(self) -> Says:
+        return Says(
+            f"이름을 공유하는 프리셋 {self.count}개와, 그 이름을 갖지 않는 프리셋 하나, "
+            f"{role_named(self.role)} 한 명",
+            english=(
+                f"{self.count} presets sharing a name and one preset not sharing it, and one "
+                f"{in_language(role_named(self.role), Language.ENGLISH)}"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
+        await seeding.creating(TestSeedResourcePreset(name_hint=self.unrelated_hint))
+        presets = [await seeding.creating(TestSeedResourcePreset()) for _ in range(self.count)]
+        caller = await _lay_caller(seeding, self.role, None)
+        return ManyPresetsAndACaller(
+            laid=tuple(seeding.made(one) for one in presets),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
 class AGroupAndACaller:
     """프리셋을 묶을 자원 그룹 하나와, 생성을 부를 사용자."""
 

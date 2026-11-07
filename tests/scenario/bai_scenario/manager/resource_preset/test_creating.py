@@ -9,6 +9,7 @@ import pytest
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import BinarySizeInfo, ResourceSlotEntryInfo
+from ai.backend.common.exception import ResourcePresetConflict
 from ai.backend.common.dto.manager.v2.resource_preset.response import (
     CreateResourcePresetPayload,
     ResourcePresetNode,
@@ -31,6 +32,8 @@ from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.resource_preset import (
     AGroupAndACaller,
     AGroupAndSomeone,
+    APresetAndACaller,
+    APresetAndSomeone,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
@@ -42,7 +45,10 @@ SHARED_MEMORY = 1073741824
 
 type Created = ResourcePresetNode
 
-type CreatingStep = Scenario[TestSeedingSession, AGroupAndACaller, ResourcePresetAdapter, Created]
+type CreatingStep = (
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourcePresetAdapter, Created]
+    | Scenario[TestSeedingSession, APresetAndACaller, ResourcePresetAdapter, Created]
+)
 
 
 @dataclass(frozen=True)
@@ -80,6 +86,38 @@ class Creating(When[AGroupAndACaller, ResourcePresetAdapter, Created]):
                 resource_slots=SLOTS,
                 shared_memory=SHARED_MEMORY,
                 resource_group_name=laid.group.name if self.in_group else None,
+            )
+        return payload.resource_preset
+
+
+@dataclass(frozen=True)
+class CreatingWithATakenName(
+    When[APresetAndACaller, ResourcePresetAdapter, Created]
+):
+    """이미 있는 프리셋의 이름으로, 어느 자원 그룹에도 묶지 않고 프리셋을 만든다."""
+
+    @override
+    def operation(self) -> str:
+        return "create"
+
+    @override
+    def describe(self, laid: APresetAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 이미 있는 이름 {laid.preset.name}으로 프리셋을 만듭니다",
+            english=(
+                f"{laid.caller.username} creates a preset with the name {laid.preset.name} that "
+                "another preset already holds"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: ResourcePresetAdapter, laid: APresetAndACaller) -> Created:
+        with ActingAs(laid.caller):
+            payload: CreateResourcePresetPayload = await adapter.create(
+                name=laid.preset.name,
+                resource_slots=SLOTS,
+                shared_memory=SHARED_MEMORY,
+                resource_group_name=None,
             )
         return payload.resource_preset
 
@@ -128,35 +166,35 @@ class ThePresetJustCreated(Then[AGroupAndACaller, Created]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminCreatesAPreset(
-    Scenario[TestSeedingSession, AGroupAndACaller, ResourcePresetAdapter, Created]
+class ANameAnotherPresetHoldsIsRefused(
+    Scenario[TestSeedingSession, APresetAndACaller, ResourcePresetAdapter, Created]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-creates-a-preset-in-public"
+        return "creating-a-preset-name-another-preset-holds-is-refused"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 자원 그룹에 묶지 않고 프리셋을 만들면, 방금 만든 프리셋 전체가 "
-            "반환됩니다",
+            "superadmin 이 이미 있는 프리셋의 이름으로 프리셋을 만들면 이름이 겹친다는 것으로 "
+            "거부됩니다",
             english=(
-                "when the superadmin creates a preset bound to no resource group, the whole "
-                "preset just created comes back"
+                "when the superadmin creates a preset with the name another preset already holds, "
+                "the call is rejected as a duplicate name"
             ),
         )
 
     @override
-    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
-        return AGroupAndSomeone()
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
+        return APresetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
-    def when(self) -> When[AGroupAndACaller, ResourcePresetAdapter, Created]:
-        return Creating()
+    def when(self) -> When[APresetAndACaller, ResourcePresetAdapter, Created]:
+        return CreatingWithATakenName()
 
     @override
-    def then(self) -> Then[AGroupAndACaller, Created]:
-        return ThePresetJustCreated()
+    def then(self) -> Then[APresetAndACaller, Created]:
+        return TheCallIsRefused(ResourcePresetConflict)
 
 
 @dataclass(frozen=True)
@@ -223,8 +261,8 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
 
 SCENARIOS: list[CreatingStep] = [
-    TheSuperadminCreatesAPreset(),
     TheSuperadminCreatesAPresetInAGroup(),
+    ANameAnotherPresetHoldsIsRefused(),
     AUserWhoIsNotTheSuperadminMayNotCreate(),
 ]
 
