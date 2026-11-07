@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.config import PresetModelDefinition
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
@@ -29,6 +30,7 @@ class TestSeedDeploymentRevisionPreset(
     name_hint: str = "preset"
     description: str | None = Says("미리 저장한 프리셋", english="a preset created in advance")
     image_id: UUID = UUID(int=7)
+    model_definition: PresetModelDefinition | None = None
 
     @override
     def kind(self) -> str:
@@ -36,14 +38,14 @@ class TestSeedDeploymentRevisionPreset(
 
     @override
     def detail(self) -> str:
-        return joined(
-            [
-                Says("단일 노드", english="single node"),
-                Says("복제본 하나", english="one replica"),
-                Says("롤링 업데이트", english="rolling update"),
-            ],
-            ", ",
-        )
+        parts = [
+            Says("단일 노드", english="single node"),
+            Says("복제본 하나", english="one replica"),
+            Says("롤링 업데이트", english="rolling update"),
+        ]
+        if self.model_definition is not None:
+            parts.append(Says("모델 정의가 실려 있습니다", english="carries a model definition"))
+        return joined(parts, ", ")
 
     @override
     def name(self, naming: Naming) -> str:
@@ -56,7 +58,7 @@ class TestSeedDeploymentRevisionPreset(
             name=name,
             description=self.description,
             image_id=ImageID(self.image_id),
-            model_definition=None,
+            model_definition=self.model_definition,
             resource_opts=[],
             cluster_mode=ClusterMode.SINGLE_NODE.value,
             cluster_size=1,

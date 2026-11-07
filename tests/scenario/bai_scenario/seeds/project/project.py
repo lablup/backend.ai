@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.types import VFolderHostPermissionMap
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
@@ -15,9 +16,13 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRowFromTwo
 
 @dataclass(frozen=True)
 class TestSeedProject(TestSeedRowFromTwo[DomainData, ProjectResourcePolicyData, ProjectData]):
-    """A project of the given domain, under the given policy."""
+    """A project of the given domain, under the given policy.
+
+    ``allowed_vfolder_hosts`` are the hosts a folder of this project may land on.
+    """
 
     name_hint: str = "project"
+    allowed_vfolder_hosts: VFolderHostPermissionMap | None = None
 
     @override
     def kind(self) -> str:
@@ -25,7 +30,13 @@ class TestSeedProject(TestSeedRowFromTwo[DomainData, ProjectResourcePolicyData, 
 
     @override
     def detail(self) -> str:
-        return Says("")
+        if self.allowed_vfolder_hosts is None:
+            return Says("")
+        hosts = ", ".join(self.allowed_vfolder_hosts)
+        return Says(
+            f"이 프로젝트의 vfolder 는 {hosts}에 놓을 수 있습니다",
+            english=f"vfolders of this project can be placed on {hosts}",
+        )
 
     @override
     def name(self, naming: Naming) -> str:
@@ -41,4 +52,5 @@ class TestSeedProject(TestSeedRowFromTwo[DomainData, ProjectResourcePolicyData, 
             domain_name=first.name,
             description=f"{name} was already here",
             resource_policy=second.name,
+            allowed_vfolder_hosts=self.allowed_vfolder_hosts,
         )
