@@ -3232,9 +3232,12 @@ assigning a weight to a resource type no agent reports is rejected as an invalid
 
 Given
 
-- one resource group and one regular user granted the UPDATE role in the group scope
+- one resource group and one regular user granted the UPDATE role in the group scope. the group's agent reports one resource slot type with its capacity
   - Domain home-1
   - Resource group resource-group-1: uses the fifo scheduler
+  - Resource slot type slot-1: count type
+  - Agent agent-1: alive, and has not reported any slot yet
+  - Agent agent-1: slot-1 slot capacity 10 reported, 0 in use
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
     - User resource policy user-policy-1: up to 10 folders per user
