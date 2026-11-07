@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
 
 import pytest
 
@@ -13,14 +13,25 @@ from ai.backend.common.dto.manager.v2.storage_namespace.request import (
 )
 from ai.backend.common.dto.manager.v2.storage_namespace.response import (
     AdminSearchStorageNamespacesPayload,
+    StorageNamespaceNode,
 )
 from ai.backend.manager.api.adapters.storage_namespace.adapter import StorageNamespaceAdapter
+from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
-from bai_scenario.components.answers import TheCallIsRefused
+from ai.backend.testutils.scenario_steps import (
+    Answered,
+    Given,
+    Held,
+    Same,
+    Says,
+    Scenario,
+    Then,
+    Verdict,
+    When,
+)
+from bai_scenario.components.answers import MissingResponse, OneOfTheSeeded, TheCallIsRefused
 from bai_scenario.components.storage_namespace import (
-    EveryNamespaceIsSearched,
     ManyNamespacesAndACaller,
     ManyNamespacesAndSomeone,
 )
@@ -36,6 +47,12 @@ type SearchingStep = Scenario[
 ]
 
 
+def namespace_snapshot(one: StorageNamespaceNode | StorageNamespaceData) -> tuple[Any, ...]:
+    if isinstance(one, StorageNamespaceNode):
+        return (one.id, one.entity_id, one.storage_id, one.namespace)
+    return (one.id, one.id, one.storage_id, one.namespace)
+
+
 @dataclass(frozen=True)
 class Searching(
     When[ManyNamespacesAndACaller, StorageNamespaceAdapter, AdminSearchStorageNamespacesPayload]
@@ -47,8 +64,8 @@ class Searching(
     @override
     def describe(self, laid: ManyNamespacesAndACaller) -> str:
         return Says(
-            f"{laid.caller.username}이 등록된 네임스페이스를 검색합니다",
-            english=f"{laid.caller.username} searches registered namespaces",
+            f"{laid.caller.username}이 등록된 네임스페이스를 검색해 한 쪽을 요청합니다",
+            english=f"{laid.caller.username} searches registered namespaces and asks for one page",
         )
 
     @override
@@ -56,7 +73,49 @@ class Searching(
         self, adapter: StorageNamespaceAdapter, laid: ManyNamespacesAndACaller
     ) -> AdminSearchStorageNamespacesPayload:
         with ActingAs(laid.caller):
-            return await adapter.search(AdminSearchStorageNamespacesInput())
+            return await adapter.search(AdminSearchStorageNamespacesInput(limit=1, offset=0))
+
+
+@dataclass(frozen=True)
+class OneSeededNamespaceIsOnThePage(
+    Then[ManyNamespacesAndACaller, AdminSearchStorageNamespacesPayload]
+):
+    @override
+    def says(self) -> str:
+        return Says(
+            "미리 저장한 네임스페이스 둘 가운데 하나만 한 쪽에 오고, 남은 하나는 다음 쪽에 있습니다",
+            english=(
+                "only one of the two namespaces seeded in advance comes on the page and the "
+                "other is on the next page"
+            ),
+        )
+
+    @override
+    def look(
+        self,
+        laid: ManyNamespacesAndACaller,
+        answered: Answered[AdminSearchStorageNamespacesPayload],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [MissingResponse(answered.raised)]
+        return [
+            Same("length", len(payload.items), 1),
+            Held(
+                "items",
+                [namespace_snapshot(one) for one in payload.items],
+                OneOfTheSeeded(
+                    frozenset(namespace_snapshot(one) for one in laid.laid),
+                    Says(
+                        "미리 저장한 네임스페이스 가운데 하나",
+                        english="one of the namespaces seeded in advance",
+                    ),
+                ),
+            ),
+            Same("total_count", payload.total_count, len(laid.laid)),
+            Same("has_next_page", payload.has_next_page, True),
+            Same("has_previous_page", payload.has_previous_page, False),
+        ]
 
 
 @dataclass(frozen=True)
@@ -70,16 +129,17 @@ class TheSuperadminSearches(
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-searching-namespaces-counts-every-one"
+        return "the-superadmin-searching-namespaces-gets-one-page"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 네임스페이스를 검색하면 미리 저장한 네임스페이스가 모두 반환됩니다. "
-            "이 호출은 전역 역할을 검사합니다",
+            "superadmin 이 네임스페이스를 검색해 한 쪽을 요청하면 미리 저장한 네임스페이스 둘 "
+            "가운데 하나만 오고, 전체 개수는 둘입니다. 이 호출은 전역 역할을 검사합니다",
             english=(
-                "when the superadmin searches namespaces, every namespace seeded in advance comes "
-                "back. This call is gated by the global role"
+                "when the superadmin searches namespaces and asks for one page, one of the two "
+                "namespaces seeded in advance comes back and the total count is two. This call is "
+                "gated by the global role"
             ),
         )
 
@@ -99,7 +159,7 @@ class TheSuperadminSearches(
     def then(
         self,
     ) -> Then[ManyNamespacesAndACaller, AdminSearchStorageNamespacesPayload]:
-        return EveryNamespaceIsSearched()
+        return OneSeededNamespaceIsOnThePage()
 
 
 @dataclass(frozen=True)

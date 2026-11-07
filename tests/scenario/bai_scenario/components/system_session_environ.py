@@ -369,16 +369,12 @@ def environ_verdicts(
 def matching_rows(
     got: list[SystemSessionEnvironNode], wanted: Sequence[SystemSessionEnvironData]
 ) -> list[Verdict]:
-    return [
-        Held(
-            "items",
-            sorted((one.key, one.entity_id) for one in got),
-            SameAs(
-                sorted((one.key, one.id) for one in wanted),
-                Says("미리 저장한 행", english="the rows seeded in advance"),
-            ),
-        )
-    ]
+    if len(got) != len(wanted):
+        return [Same("length", len(got), len(wanted))]
+    verdicts: list[Verdict] = [Same("length", len(got), len(wanted))]
+    for i, (node, environ) in enumerate(zip(got, wanted, strict=True)):
+        verdicts += environ_verdicts(f"[{i}].", node, environ)
+    return verdicts
 
 
 @dataclass(frozen=True)

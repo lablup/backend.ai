@@ -30,7 +30,7 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     When,
 )
-from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
+from bai_scenario.components.answers import MissingResponse, OneOfTheSeeded, TheCallIsRefused
 from bai_scenario.components.vfs_storage import (
     ManyStoragesAndACaller,
     ManyStoragesAndSomeone,
@@ -77,8 +77,8 @@ class Searching(When[ManyStoragesAndACaller, VFSStorageAdapter, AdminSearchVFSSt
     @override
     def describe(self, laid: ManyStoragesAndACaller) -> str:
         return Says(
-            f"{laid.caller.username}이 VFS storage 를 검색합니다",
-            english=f"{laid.caller.username} searches VFS storages",
+            f"{laid.caller.username}이 VFS storage 를 검색해 한 쪽을 요청합니다",
+            english=f"{laid.caller.username} searches VFS storages and asks for one page",
         )
 
     @override
@@ -86,7 +86,7 @@ class Searching(When[ManyStoragesAndACaller, VFSStorageAdapter, AdminSearchVFSSt
         self, adapter: VFSStorageAdapter, laid: ManyStoragesAndACaller
     ) -> AdminSearchVFSStoragesPayload:
         with ActingAs(laid.caller):
-            return await adapter.search(AdminSearchVFSStoragesInput())
+            return await adapter.search(AdminSearchVFSStoragesInput(limit=1, offset=0))
 
 
 @dataclass(frozen=True)
@@ -111,12 +111,15 @@ class Listing(When[ManyStoragesAndACaller, VFSStorageAdapter, list[VFSStorageNod
 
 
 @dataclass(frozen=True)
-class EverySeededStorageIsReturned(Then[ManyStoragesAndACaller, AdminSearchVFSStoragesPayload]):
+class OneSeededStorageIsOnThePage(Then[ManyStoragesAndACaller, AdminSearchVFSStoragesPayload]):
     @override
     def says(self) -> str:
         return Says(
-            "미리 저장한 VFS storage 가 모두 반환됩니다",
-            english="every VFS storage seeded in advance comes back",
+            "미리 저장한 VFS storage 둘 가운데 하나만 한 쪽에 오고, 남은 하나는 다음 쪽에 있습니다",
+            english=(
+                "only one of the two VFS storages seeded in advance comes on the page and the "
+                "other is on the next page"
+            ),
         )
 
     @override
@@ -129,9 +132,20 @@ class EverySeededStorageIsReturned(Then[ManyStoragesAndACaller, AdminSearchVFSSt
         if payload is None:
             return [MissingResponse(answered.raised)]
         return [
-            *the_seeded_storages(payload.items, laid),
+            Same("length", len(payload.items), 1),
+            Held(
+                "items",
+                [storage_snapshot(one) for one in payload.items],
+                OneOfTheSeeded(
+                    frozenset(storage_snapshot(one) for one in laid.laid),
+                    Says(
+                        "미리 저장한 VFS storage 가운데 하나",
+                        english="one of the VFS storages seeded in advance",
+                    ),
+                ),
+            ),
             Same("total_count", payload.total_count, len(laid.laid)),
-            Same("has_next_page", payload.has_next_page, False),
+            Same("has_next_page", payload.has_next_page, True),
             Same("has_previous_page", payload.has_previous_page, False),
         ]
 
@@ -161,15 +175,16 @@ class TheSuperadminSearches(
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-searching-vfs-storages-counts-every-one"
+        return "the-superadmin-searching-vfs-storages-gets-one-page"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 VFS storage 를 검색하면 미리 저장한 VFS storage 가 모두 반환됩니다",
+            "superadmin 이 VFS storage 를 검색해 한 쪽을 요청하면 미리 저장한 VFS storage 둘 "
+            "가운데 하나만 오고, 전체 개수는 둘입니다",
             english=(
-                "when the superadmin searches VFS storages, every VFS storage seeded in advance "
-                "comes back"
+                "when the superadmin searches VFS storages and asks for one page, one of the two "
+                "VFS storages seeded in advance comes back and the total count is two"
             ),
         )
 
@@ -183,7 +198,7 @@ class TheSuperadminSearches(
 
     @override
     def then(self) -> Then[ManyStoragesAndACaller, Any]:
-        return EverySeededStorageIsReturned()
+        return OneSeededStorageIsOnThePage()
 
 
 @dataclass(frozen=True)

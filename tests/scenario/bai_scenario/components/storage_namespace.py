@@ -16,7 +16,6 @@ from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEnti
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.storage_namespace.response import (
-    AdminSearchStorageNamespacesPayload,
     StorageNamespaceNode,
     UnregisterStorageNamespacePayload,
 )
@@ -317,17 +316,15 @@ class TheUnregisteredStorageId(Then[ANamespaceAndACaller, UnregisterStorageNames
 def the_namespaces(
     got: Sequence[StorageNamespaceNode], laid: ManyNamespacesAndACaller
 ) -> list[Verdict]:
-    wanted = sorted((one.namespace, one.id.int) for one in laid.laid)
-    return [
-        Held(
-            "items",
-            sorted((one.namespace, one.id.int) for one in got),
-            SameAs(
-                wanted,
-                Says("미리 저장한 네임스페이스", english="the namespaces seeded in advance"),
-            ),
-        )
-    ]
+    """The seeded namespaces, each checked whole. The call fixes no order, so ids pair them."""
+    if len(got) != len(laid.laid):
+        return [Same("length", len(got), len(laid.laid))]
+    verdicts: list[Verdict] = [Same("length", len(got), len(laid.laid))]
+    ordered_nodes = sorted(got, key=lambda one: one.id.int)
+    ordered_rows = sorted(laid.laid, key=lambda one: one.id.int)
+    for i, (node, namespace) in enumerate(zip(ordered_nodes, ordered_rows, strict=True)):
+        verdicts += namespace_verdicts(f"[{i}].", node, namespace)
+    return verdicts
 
 
 @dataclass(frozen=True)
@@ -347,32 +344,6 @@ class TheNamespacesAreListed(Then[ManyNamespacesAndACaller, list[StorageNamespac
         if items is None:
             return [MissingResponse(answered.raised)]
         return the_namespaces(items, laid)
-
-
-@dataclass(frozen=True)
-class EveryNamespaceIsSearched(Then[ManyNamespacesAndACaller, AdminSearchStorageNamespacesPayload]):
-    @override
-    def says(self) -> str:
-        return Says(
-            "미리 저장한 네임스페이스가 모두 반환됩니다",
-            english="every namespace seeded in advance comes back",
-        )
-
-    @override
-    def look(
-        self,
-        laid: ManyNamespacesAndACaller,
-        answered: Answered[AdminSearchStorageNamespacesPayload],
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [MissingResponse(answered.raised)]
-        return [
-            *the_namespaces(payload.items, laid),
-            Same("total_count", payload.total_count, len(laid.laid)),
-            Same("has_next_page", payload.has_next_page, False),
-            Same("has_previous_page", payload.has_previous_page, False),
-        ]
 
 
 type Loaded = list[StorageNamespaceNode | Exception | None]
