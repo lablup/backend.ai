@@ -13,12 +13,20 @@ from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     SearchRuntimeVariantsInput,
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.response import SearchRuntimeVariantsPayload
+from ai.backend.common.dto.manager.v2.runtime_variant.types import (
+    RuntimeVariantUsage,
+    RuntimeVariantUsedBy,
+)
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.runtime_variant import (
     EveryLaidVariantIsCounted,
     ManyVariantsAndACaller,
+    ManyVariantsAndADeploymentTheCallerCannotRead,
+    ManyVariantsAndAnUnreadableDeployment,
     ManyVariantsAndSomeone,
     OnlyTheNamedVariantIsLeft,
     TheFirstPageOfVariants,
@@ -77,6 +85,39 @@ class SearchingByName(When[ManyVariantsAndACaller, RuntimeVariantAdapter, Search
             return await adapter.search(
                 SearchRuntimeVariantsInput(
                     filter=RuntimeVariantFilter(name=StringFilter(equals=laid.named.name))
+                )
+            )
+
+
+@dataclass(frozen=True)
+class SearchingByADeploymentTheCallerCannotRead(
+    When[ManyVariantsAndAnUnreadableDeployment, RuntimeVariantAdapter, Searched]
+):
+    """읽을 수 없는 배포를 사용 필터로 지정해 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "search"
+
+    @override
+    def describe(self, laid: ManyVariantsAndAnUnreadableDeployment) -> str:
+        return Says(
+            f"{laid.caller.username}이 읽을 수 없는 배포를 사용 필터로 지정해 조회합니다",
+            english=(
+                f"{laid.caller.username} reads with a deployment they cannot read as the use filter"
+            ),
+        )
+
+    @override
+    async def call(
+        self, adapter: RuntimeVariantAdapter, laid: ManyVariantsAndAnUnreadableDeployment
+    ) -> Searched:
+        with ActingAs(laid.caller):
+            return await adapter.search(
+                SearchRuntimeVariantsInput(
+                    usage=RuntimeVariantUsage(
+                        used_by=RuntimeVariantUsedBy(deployment=[laid.deployment.id])
+                    )
                 )
             )
 
@@ -146,6 +187,45 @@ class ANameFilterNarrows(
 
 
 @dataclass(frozen=True)
+class NamingAnUnreadableDeploymentIsRefused(
+    Scenario[
+        TestSeedingSession,
+        ManyVariantsAndAnUnreadableDeployment,
+        RuntimeVariantAdapter,
+        Searched,
+    ]
+):
+    @override
+    def summary(self) -> str:
+        return "naming-a-deployment-the-caller-cannot-read-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "인퍼런스 런타임 종류를 읽을 수 있는 사용자가 읽을 수 없는 배포를 사용 필터로 "
+            "지정해 조회하면, 권한 부족으로 거부됩니다",
+            english=(
+                "when a user who can read runtime variants reads with a deployment they cannot "
+                "read as the use filter, it is rejected for lack of permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyVariantsAndAnUnreadableDeployment]:
+        return ManyVariantsAndADeploymentTheCallerCannotRead()
+
+    @override
+    def when(
+        self,
+    ) -> When[ManyVariantsAndAnUnreadableDeployment, RuntimeVariantAdapter, Searched]:
+        return SearchingByADeploymentTheCallerCannotRead()
+
+    @override
+    def then(self) -> Then[ManyVariantsAndAnUnreadableDeployment, Searched]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
+@dataclass(frozen=True)
 class OmittingThePageSizeGivesTen(
     Scenario[TestSeedingSession, ManyVariantsAndACaller, RuntimeVariantAdapter, Searched]
 ):
@@ -181,6 +261,7 @@ SCENARIOS: list[SearchingStep] = [
     AUserGrantedNothingCountsEveryVariant(),
     ANameFilterNarrows(),
     OmittingThePageSizeGivesTen(),
+    NamingAnUnreadableDeploymentIsRefused(),
 ]
 
 
