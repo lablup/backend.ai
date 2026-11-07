@@ -13,9 +13,13 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.deployment import DeploymentEntityType
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.deployment.types import (
     DeploymentHistoryData,
@@ -26,6 +30,8 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelSchedulingHistoryData
 from ai.backend.manager.data.model_serving.types import RoutingData
+from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.session.types import (
     SessionEntityData,
     SessionSchedulingHistoryData,
@@ -47,6 +53,7 @@ from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.domain import SomeoneOf, WrittenByThisRun
 from bai_scenario.components.resource_allocation import LaidPlace, lay_a_place
 from bai_scenario.seeds.deployment.deployment import TestSeedDeployment
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
 from bai_scenario.seeds.scheduling_history.history import (
     TestSeedDeploymentHistory,
     TestSeedKernelHistory,
@@ -55,6 +62,7 @@ from bai_scenario.seeds.scheduling_history.history import (
     TestSeedRouteHistory,
     TestSeedSessionHistory,
 )
+from bai_scenario.seeds.seeder import Laid, TestSeedNest
 from bai_scenario.seeds.session.kernel import TestSeedKernelOf, TestSeedMainKernelGroupOf
 from bai_scenario.seeds.session.session import TestSeedSession
 from bai_scenario.seeds.session_group.session_group import (
@@ -73,6 +81,7 @@ class Side(enum.Enum):
     """누가 부르는지."""
 
     SUPERADMIN = "superadmin"
+    READER = "reader"
     NOBODY = "nobody"
 
 
@@ -110,6 +119,8 @@ def _who(side: Side) -> str:
     match side:
         case Side.SUPERADMIN:
             return "슈퍼관리자"
+        case Side.READER:
+            return "프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자"
         case Side.NOBODY:
             return "아무 권한도 받지 않은 일반 사용자"
 
@@ -118,8 +129,36 @@ def _who_en(side: Side) -> str:
     match side:
         case Side.SUPERADMIN:
             return "one superadmin"
+        case Side.READER:
+            return "one regular user granted permission to read sessions and deployments"
         case Side.NOBODY:
             return "one regular user holding no permission"
+
+
+@dataclass(frozen=True)
+class SomeoneReadingHistories(TestSeedNest[None]):
+    """그 프로젝트에서 세션과 배포를 읽을 수 있는 사용자."""
+
+    project: Laid[ProjectData]
+    user: Laid[UserData]
+
+    @override
+    def kind(self) -> str:
+        return Says(
+            "프로젝트 범위에서 세션과 배포 조회 권한을 받은 사용자 준비",
+            english="Prepare a user granted permission to read sessions and deployments",
+        )
+
+    @override
+    def lay(self, seed: Any) -> None:
+        role = seed.creating_from(
+            TestSeedRole(lambda p: ProjectID(p.id), name_hint="history-reader"), self.project
+        )
+        for entity_type in (SessionEntityType(), DeploymentEntityType()):
+            seed.adding(
+                TestSeedPermission(entity_type=entity_type, permission=Permission.READ), role
+            )
+        seed.granting(role, self.user, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
 
 
 @dataclass(frozen=True)
@@ -216,6 +255,8 @@ class HistoriesAndSomeone(Given[Any, HistoriesAndACaller]):
                 role=UserRole.SUPERADMIN if self.who is Side.SUPERADMIN else UserRole.USER,
             )
         )
+        if self.who is Side.READER:
+            await seeding.within(SomeoneReadingHistories(place.project, caller))
         return HistoriesAndACaller(
             session=seeding.made(session),
             kernel=seeding.made(kernel),

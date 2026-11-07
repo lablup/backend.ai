@@ -215,16 +215,18 @@ def _row(kind: str, *, refused: bool = False, two_items: bool = False) -> Scoped
             expected=InvalidAPIParameters,
         )
     return ScopedRow(
-        named=f"the-superadmin-pages-through-the-scoped-{slug}-histories",
+        named=f"a-reader-pages-through-the-scoped-{slug}-histories",
         guarantees=Says(
-            f"슈퍼관리자가 미리 만든 대상을 범위로 {where} 이력을 훑으면 그 이력 하나만 한 "
-            "페이지로 옵니다",
+            "프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 "
+            f"{where} 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다",
             english=(
-                f"when the superadmin pages through {where_en} histories of the target laid in "
-                "advance, only that one history comes back as one page"
+                "when a regular user granted permission to read sessions and deployments pages "
+                f"through {where_en} histories of the target laid in advance, only that one "
+                "history comes back as one page"
             ),
         ),
         kind=kind,
+        who=Side.READER,
         outside=True,
     )
 

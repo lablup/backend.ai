@@ -170,29 +170,32 @@ def _row(kind: str, *, missing: bool = False, refused: bool = False) -> LoadRow:
         )
     if missing:
         return LoadRow(
-            named=(f"the-superadmin-loads-the-{kind.replace('_', '-')}-history-with-an-unknown-id"),
+            named=(f"a-reader-loads-the-{kind.replace('_', '-')}-history-with-an-unknown-id"),
             guarantees=Says(
-                f"슈퍼관리자가 있는 id 와 없는 id 로 {where} 이력을 읽으면, 있는 것은 노드로 "
-                "오고 없는 자리는 빈 값입니다",
+                f"프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 있는 id 와 없는 id 로 "
+                f"{where} 이력을 읽으면, 있는 것은 노드로 오고 없는 자리는 빈 값입니다",
                 english=(
-                    "when the superadmin reads "
-                    f"{where_en} histories by a known and an unknown id, the known one comes "
-                    "back as a node and the unknown entry as an empty value"
+                    "when a regular user granted permission to read sessions and deployments "
+                    f"reads {where_en} histories by a known and an unknown id, the known one "
+                    "comes back as a node and the unknown entry as an empty value"
                 ),
             ),
             kind=kind,
+            who=Side.READER,
             missing=True,
         )
     return LoadRow(
-        named=f"the-superadmin-loads-the-{kind.replace('_', '-')}-history",
+        named=f"a-reader-loads-the-{kind.replace('_', '-')}-history",
         guarantees=Says(
-            f"슈퍼관리자가 {where} 이력을 id 로 읽으면 그 이력이 노드로 통째로 옵니다",
+            f"프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 {where} 이력을 id 로 읽으면 "
+            "그 이력이 노드로 통째로 옵니다",
             english=(
-                f"when the superadmin reads a {where_en} history by its id, the history comes "
-                "back whole as a node"
+                "when a regular user granted permission to read sessions and deployments reads "
+                f"a {where_en} history by its id, the history comes back whole as a node"
             ),
         ),
         kind=kind,
+        who=Side.READER,
     )
 
 
