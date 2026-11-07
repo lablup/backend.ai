@@ -304,9 +304,7 @@ class EveryArtifactPositionIsRefused(Then[ManyArtifactsAndACaller, LoadedArtifac
 
 
 @dataclass(frozen=True)
-class EveryUnreadableRevisionIsRefused(
-    Then[ManyArtifactsWithRevisionsAndACaller, LoadedRevisions]
-):
+class EveryUnreadableRevisionIsRefused(Then[ManyArtifactsWithRevisionsAndACaller, LoadedRevisions]):
     """읽을 수 없는 리비전 자리마다 거부가 담긴다. 없는 id 자리는 확인하지 않는다."""
 
     @override
