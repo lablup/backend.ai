@@ -1,4 +1,4 @@
-"""The user adapter and the two adapters over the fields a user owns, assembled for one row.
+"""The user adapter and the login history adapter, assembled for one row.
 
 What only session or folder work reaches is left unwired, and so is what only the login
 flow itself reaches.
@@ -19,7 +19,6 @@ from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.api.adapters.login_history.adapter import LoginHistoryAdapter
-from ai.backend.manager.api.adapters.login_session.adapter import LoginSessionAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -132,11 +131,6 @@ async def auth(
             key_pool,
         ),
     )
-
-
-@pytest.fixture
-async def login_session_adapter(auth: AuthProcessors) -> LoginSessionAdapter:
-    return LoginSessionAdapter(auth)
 
 
 @pytest.fixture
