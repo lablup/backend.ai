@@ -238,6 +238,17 @@ class ThePurgedStorageId(Then[AStorageAndACaller, PurgeObjectStoragePayload]):
                         english="the object storage created in advance",
                     ),
                 ),
+            ),
+            Held[UUID](
+                "entity_id",
+                payload.entity_id,
+                SameAs[UUID](
+                    laid.storage.id,
+                    Says(
+                        "미리 저장한 object storage",
+                        english="the object storage created in advance",
+                    ),
+                ),
             )
         ]
 

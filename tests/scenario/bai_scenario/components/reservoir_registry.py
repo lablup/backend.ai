@@ -289,6 +289,17 @@ class ThePurgedIdComesBack(Then[ARegistryAndACaller, PurgeReservoirRegistryPaylo
                         english="the id of the registry seeded in advance",
                     ),
                 ),
+            ),
+            Held[UUID](
+                "entity_id",
+                payload.entity_id,
+                SameAs(
+                    laid.registry.id,
+                    Says(
+                        "미리 저장한 레지스트리의 id",
+                        english="the id of the registry seeded in advance",
+                    ),
+                ),
             )
         ]
 

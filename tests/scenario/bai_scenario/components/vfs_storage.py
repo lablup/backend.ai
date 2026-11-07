@@ -247,6 +247,17 @@ class ThePurgedStorageId(Then[AStorageAndACaller, PurgeVFSStoragePayload]):
                         english="the VFS storage seeded in advance",
                     ),
                 ),
+            ),
+            Held[UUID](
+                "entity_id",
+                payload.entity_id,
+                SameAs[UUID](
+                    laid.storage.id,
+                    Says(
+                        "미리 저장한 VFS storage",
+                        english="the VFS storage seeded in advance",
+                    ),
+                ),
             )
         ]
 

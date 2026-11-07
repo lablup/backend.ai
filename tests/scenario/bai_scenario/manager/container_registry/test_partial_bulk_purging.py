@@ -121,6 +121,17 @@ class EveryRegistryIsPurged(Then[ManyRegistriesAndACaller, Purged]):
                         ),
                     ),
                 ),
+                Held[UUID](
+                    f"{at}entity_id",
+                    node.entity_id,
+                    SameAs(
+                        registry.id,
+                        Says(
+                            "미리 저장한 컨테이너 레지스트리의 id",
+                            english="the id of the container registry seeded in advance",
+                        ),
+                    ),
+                ),
                 Same(f"{at}url", node.url, registry.url),
                 Same(f"{at}registry_name", node.registry_name, registry.registry_name),
                 Same(f"{at}type", node.type, registry.type),

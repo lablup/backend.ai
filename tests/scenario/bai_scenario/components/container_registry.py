@@ -34,7 +34,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
+    Held,
     Same,
+    SameAs,
     Says,
     Skipped,
     Then,
@@ -447,6 +449,14 @@ class TheNewRegistryNode(Then[AProjectAndACaller, ContainerRegistryNode]):
         if node is None:
             return [MissingResponse(answered.raised)]
         return [
+            Held[uuid.UUID](
+                "entity_id",
+                node.entity_id,
+                SameAs(
+                    node.id,
+                    Says("응답의 id", english="the id in the response"),
+                ),
+            ),
             Same("url", node.url, self.url),
             Same("registry_name", node.registry_name, self.registry_name),
             Same("type", node.type, self.registry_type),
@@ -483,6 +493,17 @@ class TheUpdatedRegistryNode(Then[ARegistryAndACaller, ContainerRegistryNode]):
         if node.id != laid.registry.id:
             return [Same("id_matches_seeded_registry", node.id == laid.registry.id, True)]
         return [
+            Held[uuid.UUID](
+                "entity_id",
+                node.entity_id,
+                SameAs(
+                    laid.registry.id,
+                    Says(
+                        "미리 저장한 레지스트리의 id",
+                        english="the id of the registry seeded in advance",
+                    ),
+                ),
+            ),
             Same("url", node.url, self.url if self.url is not None else laid.registry.url),
             Same("registry_name", node.registry_name, laid.registry.registry_name),
             Same("type", node.type, laid.registry.type),

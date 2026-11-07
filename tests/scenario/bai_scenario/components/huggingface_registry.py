@@ -287,6 +287,17 @@ class ThePurgedIdComesBack(Then[ARegistryAndACaller, PurgeHuggingFaceRegistryPay
                         english="the id of the registry created in advance",
                     ),
                 ),
+            ),
+            Held[UUID](
+                "entity_id",
+                payload.entity_id,
+                SameAs(
+                    laid.registry.id,
+                    Says(
+                        "미리 저장한 레지스트리의 id",
+                        english="the id of the registry created in advance",
+                    ),
+                ),
             )
         ]
 
