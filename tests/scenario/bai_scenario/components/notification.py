@@ -711,11 +711,7 @@ class EachItemIsRefused(Then[Any, list[Any]]):
         for i in range(self.asked):
             got = items[i] if i < len(items) else None
             seen.append(
-                Same(
-                    f"items[{i}]",
-                    type(got).__name__ if got is not None else None,
-                    NotEnoughPermission.__name__,
-                )
+                Refused(NotEnoughPermission, got if isinstance(got, BaseException) else None)
             )
         return seen
 
