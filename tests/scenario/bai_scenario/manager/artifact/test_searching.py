@@ -1,10 +1,9 @@
-"""아티팩트 검색: 조건 없이, 종류로 좁혀서, 권한 없이."""
+"""아티팩트 검색: 조건과 정렬과 페이지를 한 번에, 그리고 권한 없이."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from enum import StrEnum
 from typing import override
 
 import pytest
@@ -13,9 +12,11 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.artifact.request import (
     AdminSearchArtifactsInput,
     ArtifactFilter,
+    ArtifactOrder,
 )
 from ai.backend.common.dto.manager.v2.artifact.response import AdminSearchArtifactsPayload
 from ai.backend.common.dto.manager.v2.artifact.types import (
+    ArtifactOrderField,
     ArtifactType,
     ArtifactTypeFilter,
 )
@@ -39,16 +40,9 @@ type SearchStep = Scenario[
 ]
 
 
-class Narrowing(StrEnum):
-    NONE = "none"
-    MODEL = "model"
-
-
 @dataclass(frozen=True)
 class Searching(When[ArtifactsToSearch, ArtifactAdapter, AdminSearchArtifactsPayload]):
-    """아티팩트를 검색한다. ``narrowing`` 이 조건을 정한다."""
-
-    narrowing: Narrowing = Narrowing.NONE
+    """모델 종류로 좁히고 이름 순서로 정렬해 첫 두 개만 받는다."""
 
     @override
     def operation(self) -> str:
@@ -56,23 +50,13 @@ class Searching(When[ArtifactsToSearch, ArtifactAdapter, AdminSearchArtifactsPay
 
     @override
     def describe(self, laid: ArtifactsToSearch) -> str:
-        who = laid.caller.username
-        if self.narrowing is Narrowing.NONE:
-            return Says(
-                f"{who}이 조건 없이 검색합니다",
-                english=f"{who} searches with no condition",
-            )
         return Says(
-            f"{who}이 모델 종류로 좁혀 검색합니다",
-            english=f"{who} searches narrowed to the model type",
+            f"{laid.caller.username}이 모델 종류로 좁히고 이름 순서로 정렬해 두 개만 받습니다",
+            english=(
+                f"{laid.caller.username} searches narrowed to the model type, ordered by name "
+                "and limited to two"
+            ),
         )
-
-    def narrowing_filter(self) -> ArtifactFilter | None:
-        match self.narrowing:
-            case Narrowing.NONE:
-                return None
-            case Narrowing.MODEL:
-                return ArtifactFilter(type=ArtifactTypeFilter(equals=ArtifactType.MODEL))
 
     @override
     async def call(
@@ -80,42 +64,12 @@ class Searching(When[ArtifactsToSearch, ArtifactAdapter, AdminSearchArtifactsPay
     ) -> AdminSearchArtifactsPayload:
         with ActingAs(laid.caller):
             return await adapter.admin_search(
-                AdminSearchArtifactsInput(filter=self.narrowing_filter())
+                AdminSearchArtifactsInput(
+                    filter=ArtifactFilter(type=ArtifactTypeFilter(equals=ArtifactType.MODEL)),
+                    order=[ArtifactOrder(field=ArtifactOrderField.NAME)],
+                    limit=2,
+                )
             )
-
-
-@dataclass(frozen=True)
-class SearchingWithoutAConditionReturnsEvery(
-    Scenario[TestSeedingSession, ArtifactsToSearch, ArtifactAdapter, AdminSearchArtifactsPayload]
-):
-    started: datetime
-
-    @override
-    def summary(self) -> str:
-        return "searching-without-a-condition-returns-every-artifact"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "global 에서 아티팩트 읽기 권한을 받은 사용자가 조건 없이 검색하면, 미리 저장한 "
-            "아티팩트가 모두 한 페이지로 옵니다",
-            english=(
-                "when a user granted read permission on artifacts in global searches with no "
-                "condition, every artifact made in advance comes back on one page"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ArtifactsToSearch]:
-        return ArtifactsWorthSearching(role=UserRole.USER, granted=(Permission.READ,))
-
-    @override
-    def when(self) -> When[ArtifactsToSearch, ArtifactAdapter, AdminSearchArtifactsPayload]:
-        return Searching()
-
-    @override
-    def then(self) -> Then[ArtifactsToSearch, AdminSearchArtifactsPayload]:
-        return TheArtifactPage(started=self.started)
 
 
 @dataclass(frozen=True)
@@ -131,25 +85,30 @@ class NarrowingToModelsLeavesOnlyModels(
     @override
     def describe(self) -> str:
         return Says(
-            "global 에서 아티팩트 읽기 권한을 받은 사용자가 모델 종류로 좁혀 검색하면, 모델 "
-            "아티팩트만 남습니다",
+            "global 에서 아티팩트 읽기 권한을 받은 사용자가 모델 종류로 좁혀 이름 순서로 두 개만 "
+            "검색하면, 모델 아티팩트 두 개가 이름 순서로 옵니다",
             english=(
                 "when a user granted read permission on artifacts in global searches narrowed "
-                "to the model type, only model artifacts remain"
+                "to the model type, ordered by name and limited to two, two model artifacts "
+                "come back in name order"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ArtifactsToSearch]:
-        return ArtifactsWorthSearching(role=UserRole.USER, granted=(Permission.READ,))
+        return ArtifactsWorthSearching(
+            role=UserRole.USER, granted=(Permission.READ,), models=3, packages=1
+        )
 
     @override
     def when(self) -> When[ArtifactsToSearch, ArtifactAdapter, AdminSearchArtifactsPayload]:
-        return Searching(narrowing=Narrowing.MODEL)
+        return Searching()
 
     @override
     def then(self) -> Then[ArtifactsToSearch, AdminSearchArtifactsPayload]:
-        return TheArtifactPage(started=self.started, only_models=True)
+        return TheArtifactPage(
+            started=self.started, only_models=True, ordered_by_name=True, limit=2
+        )
 
 
 @dataclass(frozen=True)
@@ -185,7 +144,6 @@ class AUserGrantedNothingMayNotSearch(
 
 
 SCENARIOS: list[SearchStep] = [
-    SearchingWithoutAConditionReturnsEvery(started=datetime.now(UTC)),
     NarrowingToModelsLeavesOnlyModels(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotSearch(),
 ]

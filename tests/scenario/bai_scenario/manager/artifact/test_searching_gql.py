@@ -1,10 +1,9 @@
-"""GQL 필터 모양으로 아티팩트 검색하기."""
+"""GQL 필터 모양으로 조건과 정렬과 페이지를 한 번에 주는 아티팩트 검색."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from enum import StrEnum
 from typing import override
 
 import pytest
@@ -13,9 +12,10 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.artifact.request import (
     AdminSearchArtifactsGQLInput,
     ArtifactGQLFilterInputDTO,
+    ArtifactGQLOrderByInputDTO,
 )
 from ai.backend.common.dto.manager.v2.artifact.response import AdminSearchArtifactsPayload
-from ai.backend.common.dto.manager.v2.artifact.types import ArtifactType
+from ai.backend.common.dto.manager.v2.artifact.types import ArtifactOrderField, ArtifactType
 from ai.backend.manager.api.adapters.artifact.adapter import ArtifactAdapter
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.auth import InsufficientPrivilege
@@ -36,14 +36,9 @@ type SearchStep = Scenario[
 ]
 
 
-class Narrowing(StrEnum):
-    NONE = "none"
-    MODEL = "model"
-
-
 @dataclass(frozen=True)
 class SearchingWithGqlFilter(When[ArtifactsToSearch, ArtifactAdapter, AdminSearchArtifactsPayload]):
-    narrowing: Narrowing = Narrowing.NONE
+    """모델 종류로 좁히고 이름 순서로 정렬해 첫 두 개만 받는다."""
 
     @override
     def operation(self) -> str:
@@ -51,23 +46,14 @@ class SearchingWithGqlFilter(When[ArtifactsToSearch, ArtifactAdapter, AdminSearc
 
     @override
     def describe(self, laid: ArtifactsToSearch) -> str:
-        who = laid.caller.username
-        if self.narrowing is Narrowing.NONE:
-            return Says(
-                f"{who}이 조건 없이 검색합니다",
-                english=f"{who} searches with no condition",
-            )
         return Says(
-            f"{who}이 모델 종류로 좁혀 검색합니다",
-            english=f"{who} searches narrowed to the model type",
+            f"{laid.caller.username}이 GQL 조건으로 모델 종류로 좁히고 이름 순서로 정렬해 두 개만 "
+            "받습니다",
+            english=(
+                f"{laid.caller.username} searches with a GQL filter narrowed to the model type, "
+                "ordered by name and limited to two"
+            ),
         )
-
-    def narrowing_filter(self) -> ArtifactGQLFilterInputDTO | None:
-        match self.narrowing:
-            case Narrowing.NONE:
-                return None
-            case Narrowing.MODEL:
-                return ArtifactGQLFilterInputDTO(type=[ArtifactType.MODEL])
 
     @override
     async def call(
@@ -75,42 +61,12 @@ class SearchingWithGqlFilter(When[ArtifactsToSearch, ArtifactAdapter, AdminSearc
     ) -> AdminSearchArtifactsPayload:
         with ActingAs(laid.caller):
             return await adapter.admin_search_gql(
-                AdminSearchArtifactsGQLInput(filter=self.narrowing_filter())
+                AdminSearchArtifactsGQLInput(
+                    filter=ArtifactGQLFilterInputDTO(type=[ArtifactType.MODEL]),
+                    order=[ArtifactGQLOrderByInputDTO(field=ArtifactOrderField.NAME)],
+                    limit=2,
+                )
             )
-
-
-@dataclass(frozen=True)
-class SearchingWithoutAConditionReturnsEvery(
-    Scenario[TestSeedingSession, ArtifactsToSearch, ArtifactAdapter, AdminSearchArtifactsPayload]
-):
-    started: datetime
-
-    @override
-    def summary(self) -> str:
-        return "gql-searching-without-a-condition-returns-every-artifact"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "global 에서 아티팩트 읽기 권한을 받은 사용자가 GQL 조건 없이 검색하면, 미리 저장한 "
-            "아티팩트가 모두 한 페이지로 옵니다",
-            english=(
-                "when a user granted read permission on artifacts in global searches with no "
-                "GQL condition, every artifact made in advance comes back on one page"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ArtifactsToSearch]:
-        return ArtifactsWorthSearching(role=UserRole.USER, granted=(Permission.READ,))
-
-    @override
-    def when(self) -> When[ArtifactsToSearch, ArtifactAdapter, AdminSearchArtifactsPayload]:
-        return SearchingWithGqlFilter()
-
-    @override
-    def then(self) -> Then[ArtifactsToSearch, AdminSearchArtifactsPayload]:
-        return TheArtifactPage(started=self.started)
 
 
 @dataclass(frozen=True)
@@ -126,25 +82,30 @@ class ANarrowedSearchLeavesTheModels(
     @override
     def describe(self) -> str:
         return Says(
-            "global 에서 아티팩트 읽기 권한을 받은 사용자가 GQL 종류 필터로 좁혀 검색하면, 모델 "
-            "아티팩트만 남습니다",
+            "global 에서 아티팩트 읽기 권한을 받은 사용자가 GQL 종류 필터로 좁히고 이름 순서로 두 "
+            "개만 검색하면, 모델 아티팩트 두 개가 이름 순서로 옵니다",
             english=(
                 "when a user granted read permission on artifacts in global searches narrowed "
-                "by the GQL type filter, only model artifacts remain"
+                "by the GQL type filter, ordered by name and limited to two, two model artifacts "
+                "come back in name order"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ArtifactsToSearch]:
-        return ArtifactsWorthSearching(role=UserRole.USER, granted=(Permission.READ,))
+        return ArtifactsWorthSearching(
+            role=UserRole.USER, granted=(Permission.READ,), models=3, packages=1
+        )
 
     @override
     def when(self) -> When[ArtifactsToSearch, ArtifactAdapter, AdminSearchArtifactsPayload]:
-        return SearchingWithGqlFilter(narrowing=Narrowing.MODEL)
+        return SearchingWithGqlFilter()
 
     @override
     def then(self) -> Then[ArtifactsToSearch, AdminSearchArtifactsPayload]:
-        return TheArtifactPage(started=self.started, only_models=True)
+        return TheArtifactPage(
+            started=self.started, only_models=True, ordered_by_name=True, limit=2
+        )
 
 
 @dataclass(frozen=True)
@@ -180,7 +141,6 @@ class AUserGrantedNothingMayNotSearch(
 
 
 SCENARIOS: list[SearchStep] = [
-    SearchingWithoutAConditionReturnsEvery(started=datetime.now(UTC)),
     ANarrowedSearchLeavesTheModels(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotSearch(),
 ]

@@ -1,4 +1,4 @@
-"""리비전 검색: 전체, 상태로 좁혀서, 아티팩트 하나의 리비전만, 권한 없이."""
+"""리비전 검색: 조건과 정렬과 페이지를 한 번에, 아티팩트 하나의 리비전만, 권한 없이."""
 
 from __future__ import annotations
 
@@ -11,12 +11,16 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.artifact.request import (
     AdminSearchArtifactRevisionsInput,
     ArtifactRevisionGQLFilterInputDTO,
+    ArtifactRevisionGQLOrderByInputDTO,
     ArtifactRevisionStatusFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.artifact.response import (
     AdminSearchArtifactRevisionsPayload,
 )
-from ai.backend.common.dto.manager.v2.artifact.types import ArtifactStatus
+from ai.backend.common.dto.manager.v2.artifact.types import (
+    ArtifactRevisionOrderField,
+    ArtifactStatus,
+)
 from ai.backend.manager.api.adapters.artifact.adapter import ArtifactAdapter
 from ai.backend.manager.data.artifact.types import ArtifactStatus as DataStatus
 from ai.backend.manager.data.permission.types import Permission
@@ -41,35 +45,41 @@ type SearchStep = Scenario[
     AdminSearchArtifactRevisionsPayload,
 ]
 
+REVISIONS: tuple[tuple[str, DataStatus], ...] = (
+    ("1.0", DataStatus.NEEDS_APPROVAL),
+    ("2.0", DataStatus.NEEDS_APPROVAL),
+    ("3.0", DataStatus.SCANNED),
+)
+"""승인 대기 둘과 스캔됨 하나. 하나는 필터가, 나머지는 페이지가 잘라낸다."""
+
+
+def narrowed_input() -> AdminSearchArtifactRevisionsInput:
+    """승인 대기로 좁히고 버전 순서로 정렬해 첫 하나만 받는다."""
+    return AdminSearchArtifactRevisionsInput(
+        filter=ArtifactRevisionGQLFilterInputDTO(
+            status=ArtifactRevisionStatusFilterDTO(in_=[ArtifactStatus.NEEDS_APPROVAL])
+        ),
+        order=[ArtifactRevisionGQLOrderByInputDTO(field=ArtifactRevisionOrderField.VERSION)],
+        limit=1,
+    )
+
 
 @dataclass(frozen=True)
 class SearchingRevisions(
     When[ManyArtifactsWithRevisionsAndACaller, ArtifactAdapter, AdminSearchArtifactRevisionsPayload]
 ):
-    status: ArtifactStatus | None = None
-
     @override
     def operation(self) -> str:
         return "search_revisions_gql"
 
     @override
     def describe(self, laid: ManyArtifactsWithRevisionsAndACaller) -> str:
-        who = laid.caller.username
-        if self.status is None:
-            return Says(
-                f"{who}이 조건 없이 검색합니다",
-                english=f"{who} searches with no condition",
-            )
         return Says(
-            f"{who}이 {self.status.value} 상태로 좁혀 검색합니다",
-            english=f"{who} searches narrowed to the {self.status.value} status",
-        )
-
-    def revision_filter(self) -> ArtifactRevisionGQLFilterInputDTO | None:
-        if self.status is None:
-            return None
-        return ArtifactRevisionGQLFilterInputDTO(
-            status=ArtifactRevisionStatusFilterDTO(in_=[self.status])
+            f"{laid.caller.username}이 승인 대기로 좁히고 버전 순서로 정렬해 첫 하나만 검색합니다",
+            english=(
+                f"{laid.caller.username} searches narrowed to the needs-approval status, "
+                "ordered by version and limited to the first one"
+            ),
         )
 
     @override
@@ -79,16 +89,14 @@ class SearchingRevisions(
         laid: ManyArtifactsWithRevisionsAndACaller,
     ) -> AdminSearchArtifactRevisionsPayload:
         with ActingAs(laid.caller):
-            return await adapter.search_revisions_gql(
-                AdminSearchArtifactRevisionsInput(filter=self.revision_filter())
-            )
+            return await adapter.search_revisions_gql(narrowed_input())
 
 
 @dataclass(frozen=True)
 class SearchingOneArtifactsRevisions(
     When[ManyArtifactsWithRevisionsAndACaller, ArtifactAdapter, AdminSearchArtifactRevisionsPayload]
 ):
-    """미리 저장한 아티팩트 중 하나가 가진 리비전만 검색한다."""
+    """미리 저장한 아티팩트 중 하나가 가진 리비전만, 같은 조건으로 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -97,9 +105,12 @@ class SearchingOneArtifactsRevisions(
     @override
     def describe(self, laid: ManyArtifactsWithRevisionsAndACaller) -> str:
         return Says(
-            f"{laid.caller.username}이 {laid.laid[0].artifact.name}이 가진 리비전을 검색합니다",
+            f"{laid.caller.username}이 {laid.laid[0].artifact.name}이 가진 리비전만 승인 대기로 "
+            "좁히고 버전 순서로 정렬해 첫 하나만 검색합니다",
             english=(
-                f"{laid.caller.username} searches the revisions {laid.laid[0].artifact.name} holds"
+                f"{laid.caller.username} searches only the revisions "
+                f"{laid.laid[0].artifact.name} holds, narrowed to the needs-approval status, "
+                "ordered by version and limited to the first one"
             ),
         )
 
@@ -111,51 +122,8 @@ class SearchingOneArtifactsRevisions(
     ) -> AdminSearchArtifactRevisionsPayload:
         with ActingAs(laid.caller):
             return await adapter.search_revisions_of_artifact_gql(
-                laid.laid[0].artifact.id, AdminSearchArtifactRevisionsInput()
+                laid.laid[0].artifact.id, narrowed_input()
             )
-
-
-@dataclass(frozen=True)
-class SearchingRevisionsWithoutAConditionReturnsEvery(
-    Scenario[
-        TestSeedingSession,
-        ManyArtifactsWithRevisionsAndACaller,
-        ArtifactAdapter,
-        AdminSearchArtifactRevisionsPayload,
-    ]
-):
-    @override
-    def summary(self) -> str:
-        return "searching-revisions-without-a-condition-returns-every"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "읽기만 하는 monitor 가 리비전을 조건 없이 검색하면, 미리 저장한 리비전이 모두 한 "
-            "페이지로 옵니다",
-            english=(
-                "when the read-only monitor searches revisions with no condition, every revision "
-                "made in advance comes back on one page"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ManyArtifactsWithRevisionsAndACaller]:
-        return ManyArtifactsWithRevisionsAndSomeone(role=UserRole.MONITOR)
-
-    @override
-    def when(
-        self,
-    ) -> When[
-        ManyArtifactsWithRevisionsAndACaller, ArtifactAdapter, AdminSearchArtifactRevisionsPayload
-    ]:
-        return SearchingRevisions()
-
-    @override
-    def then(
-        self,
-    ) -> Then[ManyArtifactsWithRevisionsAndACaller, AdminSearchArtifactRevisionsPayload]:
-        return TheRevisionPage()
 
 
 @dataclass(frozen=True)
@@ -174,16 +142,18 @@ class FilteringByStatusLeavesThatStatus(
     @override
     def describe(self) -> str:
         return Says(
-            "읽기만 하는 monitor 가 승인 대기 상태로 좁혀 검색하면, 그 상태의 리비전만 남습니다",
+            "읽기만 하는 monitor 가 승인 대기로 좁히고 버전 순서로 첫 하나만 검색하면, 승인 대기 "
+            "리비전 하나가 옵니다",
             english=(
-                "when the read-only monitor searches revisions narrowed to the needs-approval "
-                "status, only revisions in that status remain"
+                "when the read-only monitor searches narrowed to the needs-approval status, "
+                "ordered by version and limited to the first one, one needs-approval revision "
+                "comes back"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyArtifactsWithRevisionsAndACaller]:
-        return ManyArtifactsWithRevisionsAndSomeone(role=UserRole.MONITOR)
+        return ManyArtifactsWithRevisionsAndSomeone(role=UserRole.MONITOR, revisions=REVISIONS)
 
     @override
     def when(
@@ -191,13 +161,15 @@ class FilteringByStatusLeavesThatStatus(
     ) -> When[
         ManyArtifactsWithRevisionsAndACaller, ArtifactAdapter, AdminSearchArtifactRevisionsPayload
     ]:
-        return SearchingRevisions(status=ArtifactStatus.NEEDS_APPROVAL)
+        return SearchingRevisions()
 
     @override
     def then(
         self,
     ) -> Then[ManyArtifactsWithRevisionsAndACaller, AdminSearchArtifactRevisionsPayload]:
-        return TheRevisionPage(only_status=DataStatus.NEEDS_APPROVAL)
+        return TheRevisionPage(
+            only_status=DataStatus.NEEDS_APPROVAL, ordered_by_version=True, limit=1
+        )
 
 
 @dataclass(frozen=True)
@@ -259,18 +231,21 @@ class OneArtifactsRevisionsAreReturned(
     @override
     def describe(self) -> str:
         return Says(
-            "global 에서 아티팩트 읽기 권한을 받은 사용자가 아티팩트 하나의 리비전을 검색하면, "
-            "그 아티팩트가 가진 리비전만 한 페이지로 옵니다",
+            "global 에서 아티팩트 읽기 권한을 받은 사용자가 아티팩트 하나의 리비전만 승인 대기로 "
+            "좁히고 버전 순서로 첫 하나를 검색하면, 그 아티팩트의 승인 대기 리비전 하나가 옵니다",
             english=(
-                "when a user granted read permission on artifacts in global searches the "
-                "revisions of one artifact, only the revisions that artifact holds come back "
-                "on one page"
+                "when a user granted read permission on artifacts in global searches only the "
+                "revisions of one artifact, narrowed to the needs-approval status, ordered by "
+                "version and limited to the first one, one needs-approval revision of that "
+                "artifact comes back"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyArtifactsWithRevisionsAndACaller]:
-        return ManyArtifactsWithRevisionsAndSomeone(role=UserRole.USER, granted=(Permission.READ,))
+        return ManyArtifactsWithRevisionsAndSomeone(
+            role=UserRole.USER, granted=(Permission.READ,), revisions=REVISIONS
+        )
 
     @override
     def when(
@@ -284,7 +259,12 @@ class OneArtifactsRevisionsAreReturned(
     def then(
         self,
     ) -> Then[ManyArtifactsWithRevisionsAndACaller, AdminSearchArtifactRevisionsPayload]:
-        return TheRevisionPage(only_artifact_index=0)
+        return TheRevisionPage(
+            only_status=DataStatus.NEEDS_APPROVAL,
+            only_artifact_index=0,
+            ordered_by_version=True,
+            limit=1,
+        )
 
 
 @dataclass(frozen=True)
@@ -331,7 +311,6 @@ class AUserGrantedNothingMayNotSearchOneArtifactsRevisions(
 
 
 SCENARIOS: list[SearchStep] = [
-    SearchingRevisionsWithoutAConditionReturnsEvery(),
     FilteringByStatusLeavesThatStatus(),
     AUserGrantedNothingMayNotSearchRevisions(),
     OneArtifactsRevisionsAreReturned(),

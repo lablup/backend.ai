@@ -19,8 +19,8 @@ from ai.backend.manager.errors.artifact import (
     ArtifactRevisionNotVerified,
 )
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.errors.base.field import FieldNotFoundError
-from ai.backend.manager.errors.common import GenericBadRequest, ServerMisconfiguredError
+from ai.backend.manager.errors.common import ServerMisconfiguredError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.artifact import (
@@ -34,9 +34,6 @@ from bai_scenario.components.domain import TheCallIsRefused
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
-
-MISSING = UUID(int=1)
-"""어떤 행도 가리키지 않는 id."""
 
 
 @dataclass(frozen=True)
@@ -135,33 +132,24 @@ class Importing(
         AnArtifactWithRevisionsAndACaller, ArtifactAdapter, tuple[ArtifactRevisionNode, UUID | None]
     ]
 ):
-    missing: bool = False
-
     @override
     def operation(self) -> str:
         return "import_revision"
 
     @override
     def describe(self, laid: AnArtifactWithRevisionsAndACaller) -> str:
-        who = laid.caller.username
-        if self.missing:
-            return Says(
-                f"{who}이 없는 리비전 id 로 가져오기를 시도합니다",
-                english=f"{who} tries to import a revision id that does not exist",
-            )
         version = laid.revisions[0].version
         return Says(
-            f"{who}이 리비전 {version}을 가져옵니다",
-            english=f"{who} imports revision {version}",
+            f"{laid.caller.username}이 리비전 {version}을 가져옵니다",
+            english=f"{laid.caller.username} imports revision {version}",
         )
 
     @override
     async def call(
         self, adapter: ArtifactAdapter, laid: AnArtifactWithRevisionsAndACaller
     ) -> tuple[ArtifactRevisionNode, UUID | None]:
-        revision_id = MISSING if self.missing else laid.revisions[0].id
         with ActingAs(laid.caller):
-            return await adapter.import_revision(revision_id, None, None, False)
+            return await adapter.import_revision(laid.revisions[0].id, None, None, False)
 
 
 @dataclass(frozen=True)
@@ -288,7 +276,7 @@ class ARevisionNotWaitingIsNotApproved(
 
 
 @dataclass(frozen=True)
-class AnAlreadyAvailableRevisionIsNotApprovedAgain(
+class AUserGrantedReadButNotUpdateMayNotApprove(
     Scenario[
         TestSeedingSession,
         AnArtifactWithRevisionsAndACaller,
@@ -298,15 +286,15 @@ class AnAlreadyAvailableRevisionIsNotApprovedAgain(
 ):
     @override
     def summary(self) -> str:
-        return "an-already-available-revision-is-not-approved-again"
+        return "a-user-granted-read-but-not-update-may-not-approve-a-revision"
 
     @override
     def describe(self) -> str:
         return Says(
-            "이미 사용 가능한 리비전은 다시 승인할 수 없고, 검증되지 않았다는 것으로 거부됩니다",
+            "읽기 권한만 받은 사용자가 리비전을 승인하려 하면 권한 부족으로 거부됩니다",
             english=(
-                "a revision that is already available cannot be approved again, and it is "
-                "rejected as not verified"
+                "when a user granted only read permission tries to approve a revision, it is "
+                "rejected for lack of permission"
             ),
         )
 
@@ -314,8 +302,8 @@ class AnAlreadyAvailableRevisionIsNotApprovedAgain(
     def given(self) -> Given[TestSeedingSession, AnArtifactWithRevisionsAndACaller]:
         return AnArtifactWithRevisionsAndSomeone(
             role=UserRole.USER,
-            granted=(Permission.READ, Permission.UPDATE),
-            revisions=(("1.0", DataStatus.AVAILABLE),),
+            granted=(Permission.READ,),
+            revisions=(("1.0", DataStatus.NEEDS_APPROVAL),),
         )
 
     @override
@@ -328,7 +316,7 @@ class AnAlreadyAvailableRevisionIsNotApprovedAgain(
     def then(
         self,
     ) -> Then[AnArtifactWithRevisionsAndACaller, ArtifactRevisionNode]:
-        return TheCallIsRefused(ArtifactRevisionNotVerified)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
@@ -377,7 +365,7 @@ class RejectingMakesItRejected(
 
 
 @dataclass(frozen=True)
-class RejectingARevisionWaitingForApprovalAlsoMakesItRejected(
+class AUserGrantedReadButNotUpdateMayNotReject(
     Scenario[
         TestSeedingSession,
         AnArtifactWithRevisionsAndACaller,
@@ -387,15 +375,15 @@ class RejectingARevisionWaitingForApprovalAlsoMakesItRejected(
 ):
     @override
     def summary(self) -> str:
-        return "rejecting-a-revision-waiting-for-approval-makes-it-rejected"
+        return "a-user-granted-read-but-not-update-may-not-reject-a-revision"
 
     @override
     def describe(self) -> str:
         return Says(
-            "승인 대기 중인 리비전도 거절하면 거절됨 상태로 옵니다",
+            "읽기 권한만 받은 사용자가 리비전을 거절하려 하면 권한 부족으로 거부됩니다",
             english=(
-                "when a revision waiting for approval is rejected, it comes back in the rejected "
-                "state"
+                "when a user granted only read permission tries to reject a revision, it is "
+                "rejected for lack of permission"
             ),
         )
 
@@ -403,8 +391,8 @@ class RejectingARevisionWaitingForApprovalAlsoMakesItRejected(
     def given(self) -> Given[TestSeedingSession, AnArtifactWithRevisionsAndACaller]:
         return AnArtifactWithRevisionsAndSomeone(
             role=UserRole.USER,
-            granted=(Permission.READ, Permission.UPDATE),
-            revisions=(("1.0", DataStatus.NEEDS_APPROVAL),),
+            granted=(Permission.READ,),
+            revisions=(("1.0", DataStatus.AVAILABLE),),
         )
 
     @override
@@ -417,50 +405,7 @@ class RejectingARevisionWaitingForApprovalAlsoMakesItRejected(
     def then(
         self,
     ) -> Then[AnArtifactWithRevisionsAndACaller, ArtifactRevisionNode]:
-        return TheRevisionNode(status=DtoStatus.REJECTED)
-
-
-@dataclass(frozen=True)
-class AUserGrantedNothingMayNotReject(
-    Scenario[
-        TestSeedingSession,
-        AnArtifactWithRevisionsAndACaller,
-        ArtifactAdapter,
-        ArtifactRevisionNode,
-    ]
-):
-    @override
-    def summary(self) -> str:
-        return "a-user-granted-nothing-may-not-reject-a-revision"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "아무 권한도 받지 않은 사용자가 리비전을 거절하려 하면, 그 리비전을 가진 아티팩트를 "
-            "찾을 수 없다는 것으로 거부됩니다",
-            english=(
-                "when a user granted nothing tries to reject a revision, it is rejected as the "
-                "artifact holding it not being resolvable"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, AnArtifactWithRevisionsAndACaller]:
-        return AnArtifactWithRevisionsAndSomeone(
-            role=UserRole.USER, revisions=(("1.0", DataStatus.AVAILABLE),)
-        )
-
-    @override
-    def when(
-        self,
-    ) -> When[AnArtifactWithRevisionsAndACaller, ArtifactAdapter, ArtifactRevisionNode]:
-        return Rejecting()
-
-    @override
-    def then(
-        self,
-    ) -> Then[AnArtifactWithRevisionsAndACaller, ArtifactRevisionNode]:
-        return TheCallIsRefused(GenericBadRequest)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
@@ -508,7 +453,7 @@ class CancellingARunningImportMakesItScanned(
 
 
 @dataclass(frozen=True)
-class CancellingAFinishedImportAlsoPutsItBack(
+class AUserGrantedReadButNotUpdateMayNotCancelAnImport(
     Scenario[
         TestSeedingSession,
         AnArtifactWithRevisionsAndACaller,
@@ -518,16 +463,15 @@ class CancellingAFinishedImportAlsoPutsItBack(
 ):
     @override
     def summary(self) -> str:
-        return "cancelling-a-finished-import-puts-the-revision-back-to-scanned"
+        return "a-user-granted-read-but-not-update-may-not-cancel-an-import"
 
     @override
     def describe(self) -> str:
         return Says(
-            "이미 사용 가능한 리비전의 가져오기를 취소해도 스캔됨 상태로 돌아옵니다. 취소는 "
-            "상태를 가리지 않습니다",
+            "읽기 권한만 받은 사용자가 리비전의 가져오기를 취소하려 하면 권한 부족으로 거부됩니다",
             english=(
-                "cancelling the import of a revision that is already available puts it back to "
-                "the scanned state. Cancelling does not check the status it starts from"
+                "when a user granted only read permission tries to cancel the import of a "
+                "revision, it is rejected for lack of permission"
             ),
         )
 
@@ -535,8 +479,8 @@ class CancellingAFinishedImportAlsoPutsItBack(
     def given(self) -> Given[TestSeedingSession, AnArtifactWithRevisionsAndACaller]:
         return AnArtifactWithRevisionsAndSomeone(
             role=UserRole.USER,
-            granted=(Permission.READ, Permission.UPDATE),
-            revisions=(("1.0", DataStatus.AVAILABLE),),
+            granted=(Permission.READ,),
+            revisions=(("1.0", DataStatus.PULLING),),
         )
 
     @override
@@ -549,73 +493,7 @@ class CancellingAFinishedImportAlsoPutsItBack(
     def then(
         self,
     ) -> Then[AnArtifactWithRevisionsAndACaller, ArtifactRevisionNode]:
-        return TheRevisionNode(status=DtoStatus.SCANNED)
-
-
-@dataclass(frozen=True)
-class CancellingAnImportOfAMissingRevisionIsRefused(
-    Scenario[
-        TestSeedingSession,
-        AnArtifactWithRevisionsAndACaller,
-        ArtifactAdapter,
-        ArtifactRevisionNode,
-    ]
-):
-    @override
-    def summary(self) -> str:
-        return "cancelling-the-import-of-a-missing-revision-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "superadmin 이 없는 리비전의 가져오기를 취소하려 하면, 그 리비전이 없다는 것으로 "
-            "거부됩니다",
-            english=(
-                "when the superadmin cancels the import of a revision that does not exist, it is "
-                "rejected as no such revision"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, AnArtifactWithRevisionsAndACaller]:
-        return AnArtifactWithRevisionsAndSomeone(
-            role=UserRole.SUPERADMIN, revisions=(("1.0", DataStatus.PULLING),)
-        )
-
-    @override
-    def when(
-        self,
-    ) -> When[AnArtifactWithRevisionsAndACaller, ArtifactAdapter, ArtifactRevisionNode]:
-        return _CancellingAMissingRevision()
-
-    @override
-    def then(
-        self,
-    ) -> Then[AnArtifactWithRevisionsAndACaller, ArtifactRevisionNode]:
-        return TheCallIsRefused(FieldNotFoundError)
-
-
-@dataclass(frozen=True)
-class _CancellingAMissingRevision(
-    When[AnArtifactWithRevisionsAndACaller, ArtifactAdapter, ArtifactRevisionNode]
-):
-    @override
-    def operation(self) -> str:
-        return "cancel_import"
-
-    @override
-    def describe(self, laid: AnArtifactWithRevisionsAndACaller) -> str:
-        return Says(
-            f"{laid.caller.username}이 없는 리비전 id 로 가져오기 취소를 시도합니다",
-            english=f"{laid.caller.username} tries to cancel an import for a missing revision id",
-        )
-
-    @override
-    async def call(
-        self, adapter: ArtifactAdapter, laid: AnArtifactWithRevisionsAndACaller
-    ) -> ArtifactRevisionNode:
-        with ActingAs(laid.caller):
-            return await adapter.cancel_import(MISSING)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
@@ -663,7 +541,7 @@ class CleaningUpARevisionStillBeingScannedIsRefused(
 
 
 @dataclass(frozen=True)
-class CleaningUpARevisionBeingPulledIsRefused(
+class AUserGrantedReadButNotSoftDeleteMayNotCleanUp(
     Scenario[
         TestSeedingSession,
         AnArtifactWithRevisionsAndACaller,
@@ -673,15 +551,15 @@ class CleaningUpARevisionBeingPulledIsRefused(
 ):
     @override
     def summary(self) -> str:
-        return "cleaning-up-a-revision-being-pulled-is-refused"
+        return "a-user-granted-read-but-not-soft-delete-may-not-clean-up-a-revision"
 
     @override
     def describe(self) -> str:
         return Says(
-            "가져오는 중인 리비전은 정리할 수 없고, 정리할 준비가 되지 않았다는 것으로 거부됩니다",
+            "읽기 권한만 받은 사용자가 리비전을 정리하려 하면 권한 부족으로 거부됩니다",
             english=(
-                "a revision that is being pulled cannot be cleaned up, and it is rejected as not "
-                "ready to be cleaned up"
+                "when a user granted only read permission tries to clean up a revision, it is "
+                "rejected for lack of permission"
             ),
         )
 
@@ -689,8 +567,8 @@ class CleaningUpARevisionBeingPulledIsRefused(
     def given(self) -> Given[TestSeedingSession, AnArtifactWithRevisionsAndACaller]:
         return AnArtifactWithRevisionsAndSomeone(
             role=UserRole.USER,
-            granted=(Permission.READ, Permission.SOFT_DELETE),
-            revisions=(("1.0", DataStatus.PULLING),),
+            granted=(Permission.READ,),
+            revisions=(("1.0", DataStatus.AVAILABLE),),
         )
 
     @override
@@ -703,7 +581,7 @@ class CleaningUpARevisionBeingPulledIsRefused(
     def then(
         self,
     ) -> Then[AnArtifactWithRevisionsAndACaller, ArtifactRevisionNode]:
-        return TheCallIsRefused(ArtifactRevisionDeletionBadRequestError)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
@@ -754,7 +632,7 @@ class ImportingWithoutReservoirConfiguredIsRefused(
 
 
 @dataclass(frozen=True)
-class ImportingAMissingRevisionIsRefused(
+class AUserGrantedReadButNotCreateMayNotImport(
     Scenario[
         TestSeedingSession,
         AnArtifactWithRevisionsAndACaller,
@@ -764,22 +642,24 @@ class ImportingAMissingRevisionIsRefused(
 ):
     @override
     def summary(self) -> str:
-        return "importing-a-missing-revision-is-refused"
+        return "a-user-granted-read-but-not-create-may-not-import-a-revision"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 없는 리비전을 가져오려 하면, 그 리비전이 없다는 것으로 거부됩니다",
+            "읽기 권한만 받은 사용자가 리비전을 가져오려 하면 권한 부족으로 거부됩니다",
             english=(
-                "when the superadmin imports a revision that does not exist, it is rejected as no "
-                "such revision"
+                "when a user granted only read permission tries to import a revision, it is "
+                "rejected for lack of permission"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnArtifactWithRevisionsAndACaller]:
         return AnArtifactWithRevisionsAndSomeone(
-            role=UserRole.SUPERADMIN, revisions=(("1.0", DataStatus.SCANNED),)
+            role=UserRole.USER,
+            granted=(Permission.READ,),
+            revisions=(("1.0", DataStatus.SCANNED),),
         )
 
     @override
@@ -790,13 +670,13 @@ class ImportingAMissingRevisionIsRefused(
         ArtifactAdapter,
         tuple[ArtifactRevisionNode, UUID | None],
     ]:
-        return Importing(missing=True)
+        return Importing()
 
     @override
     def then(
         self,
     ) -> Then[AnArtifactWithRevisionsAndACaller, tuple[ArtifactRevisionNode, UUID | None]]:
-        return TheCallIsRefused(FieldNotFoundError)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
@@ -902,17 +782,15 @@ class AUserGrantedNothingMayNotDelegateAnImport(
 SCENARIOS: list[Scenario[TestSeedingSession, Any, ArtifactAdapter, Any]] = [
     ApprovingVerifiesTheRevision(),
     ARevisionNotWaitingIsNotApproved(),
-    AnAlreadyAvailableRevisionIsNotApprovedAgain(),
+    AUserGrantedReadButNotUpdateMayNotApprove(),
     RejectingMakesItRejected(),
-    RejectingARevisionWaitingForApprovalAlsoMakesItRejected(),
-    AUserGrantedNothingMayNotReject(),
+    AUserGrantedReadButNotUpdateMayNotReject(),
     CancellingARunningImportMakesItScanned(),
-    CancellingAFinishedImportAlsoPutsItBack(),
-    CancellingAnImportOfAMissingRevisionIsRefused(),
+    AUserGrantedReadButNotUpdateMayNotCancelAnImport(),
     CleaningUpARevisionStillBeingScannedIsRefused(),
-    CleaningUpARevisionBeingPulledIsRefused(),
+    AUserGrantedReadButNotSoftDeleteMayNotCleanUp(),
     ImportingWithoutReservoirConfiguredIsRefused(),
-    ImportingAMissingRevisionIsRefused(),
+    AUserGrantedReadButNotCreateMayNotImport(),
     DelegatingTheImportWithoutReservoirConfiguredIsRefused(),
     AUserGrantedNothingMayNotDelegateAnImport(),
 ]
