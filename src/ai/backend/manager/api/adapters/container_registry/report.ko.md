@@ -146,6 +146,7 @@ Then
 - 미리 저장한 컨테이너 레지스트리가 모두 삭제되기 전 모습으로 오고, 존재하지 않는 id 는 대상이 없다는 이유로 실패 목록에 옵니다
   - successes count = 2
   - successes[0].id: 미리 저장한 컨테이너 레지스트리의 id 와 같다
+  - successes[0].entity_id: 미리 저장한 컨테이너 레지스트리의 id 와 같다
   - successes[0].url = 'https://wanted-1.scenario.local'
   - successes[0].registry_name = 'wanted-1'
   - successes[0].type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -155,6 +156,7 @@ Then
   - successes[0].is_global = True
   - successes[0].extra = None
   - successes[1].id: 미리 저장한 컨테이너 레지스트리의 id 와 같다
+  - successes[1].entity_id: 미리 저장한 컨테이너 레지스트리의 id 와 같다
   - successes[1].url = 'https://other-1.scenario.local'
   - successes[1].registry_name = 'other-1'
   - successes[1].type = <ContainerRegistryType.HARBOR2: 'harbor2'>
@@ -524,6 +526,7 @@ When
 Then
 
 - 생성한 레지스트리 전체가 반환됩니다
+  - entity_id: 응답의 id 와 같다
   - url = 'https://made.scenario.local'
   - registry_name = 'made-registry'
   - type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -558,6 +561,7 @@ When
 Then
 
 - 생성한 레지스트리 전체가 반환됩니다
+  - entity_id: 응답의 id 와 같다
   - url = 'https://made.scenario.local'
   - registry_name = 'made-registry'
   - type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -647,6 +651,7 @@ Then
 
 - 삭제한 id 가 반환됩니다
   - id: 미리 저장한 컨테이너 레지스트리의 id 와 같다
+  - entity_id: 미리 저장한 컨테이너 레지스트리의 id 와 같다
 
 <a id="retiring-deleting-a-registry-takes-its-allowed-projects-with-it"></a>
 
@@ -675,6 +680,7 @@ Then
 
 - 삭제한 id 가 반환됩니다
   - id: 미리 저장한 컨테이너 레지스트리의 id 와 같다
+  - entity_id: 미리 저장한 컨테이너 레지스트리의 id 와 같다
 
 <a id="retiring-a-user-who-is-not-the-superadmin-may-not-delete-a-registry"></a>
 
@@ -754,6 +760,7 @@ When
 Then
 
 - 미리 저장한 레지스트리 전체가 반환됩니다
+  - entity_id: 미리 저장한 레지스트리의 id 와 같다
   - url = 'https://host-1.scenario.local'
   - registry_name = 'host-1'
   - type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -788,6 +795,7 @@ When
 Then
 
 - 미리 저장한 레지스트리 전체가 반환됩니다
+  - entity_id: 미리 저장한 레지스트리의 id 와 같다
   - url = 'https://moved.scenario.local'
   - registry_name = 'host-1'
   - type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -823,6 +831,7 @@ When
 Then
 
 - 미리 저장한 레지스트리 전체가 반환됩니다
+  - entity_id: 미리 저장한 레지스트리의 id 와 같다
   - url = 'https://host-1.scenario.local'
   - registry_name = 'host-1'
   - type = <ContainerRegistryType.DOCKER: 'docker'>

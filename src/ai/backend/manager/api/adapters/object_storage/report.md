@@ -537,6 +537,7 @@ Then
 
 - the id of the purged object storage comes back
   - id: same as the object storage created in advance
+  - entity_id: same as the object storage created in advance
 
 <a id="purging-a-user-granted-nothing-may-not-purge-an-object-storage"></a>
 

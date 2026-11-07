@@ -545,6 +545,7 @@ Then
 
 - the id of the purged registry comes back
   - id: same as the id of the registry seeded in advance
+  - entity_id: same as the id of the registry seeded in advance
 
 <a id="purging-a-user-granted-nothing-may-not-purge-a-registry"></a>
 

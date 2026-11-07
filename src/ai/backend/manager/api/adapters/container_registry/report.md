@@ -146,6 +146,7 @@ Then
 - every container registry seeded in advance comes back as it was before it was purged, and the id that does not exist comes back in the failed list because there is no such target
   - successes count = 2
   - successes[0].id: same as the id of the container registry seeded in advance
+  - successes[0].entity_id: same as the id of the container registry seeded in advance
   - successes[0].url = 'https://wanted-1.scenario.local'
   - successes[0].registry_name = 'wanted-1'
   - successes[0].type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -155,6 +156,7 @@ Then
   - successes[0].is_global = True
   - successes[0].extra = None
   - successes[1].id: same as the id of the container registry seeded in advance
+  - successes[1].entity_id: same as the id of the container registry seeded in advance
   - successes[1].url = 'https://other-1.scenario.local'
   - successes[1].registry_name = 'other-1'
   - successes[1].type = <ContainerRegistryType.HARBOR2: 'harbor2'>
@@ -524,6 +526,7 @@ When
 Then
 
 - the whole created registry comes back
+  - entity_id: same as the id in the response
   - url = 'https://made.scenario.local'
   - registry_name = 'made-registry'
   - type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -558,6 +561,7 @@ When
 Then
 
 - the whole created registry comes back
+  - entity_id: same as the id in the response
   - url = 'https://made.scenario.local'
   - registry_name = 'made-registry'
   - type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -647,6 +651,7 @@ Then
 
 - the id that was deleted comes back
   - id: same as the id of the container registry seeded in advance
+  - entity_id: same as the id of the container registry seeded in advance
 
 <a id="retiring-deleting-a-registry-takes-its-allowed-projects-with-it"></a>
 
@@ -675,6 +680,7 @@ Then
 
 - the id that was deleted comes back
   - id: same as the id of the container registry seeded in advance
+  - entity_id: same as the id of the container registry seeded in advance
 
 <a id="retiring-a-user-who-is-not-the-superadmin-may-not-delete-a-registry"></a>
 
@@ -754,6 +760,7 @@ When
 Then
 
 - the whole registry made in advance comes back
+  - entity_id: same as the id of the registry seeded in advance
   - url = 'https://host-1.scenario.local'
   - registry_name = 'host-1'
   - type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -788,6 +795,7 @@ When
 Then
 
 - the whole registry made in advance comes back
+  - entity_id: same as the id of the registry seeded in advance
   - url = 'https://moved.scenario.local'
   - registry_name = 'host-1'
   - type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -823,6 +831,7 @@ When
 Then
 
 - the whole registry made in advance comes back
+  - entity_id: same as the id of the registry seeded in advance
   - url = 'https://host-1.scenario.local'
   - registry_name = 'host-1'
   - type = <ContainerRegistryType.DOCKER: 'docker'>

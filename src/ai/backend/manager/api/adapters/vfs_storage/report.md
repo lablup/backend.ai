@@ -499,6 +499,7 @@ Then
 
 - the id of the purged VFS storage comes back
   - id: same as the VFS storage seeded in advance
+  - entity_id: same as the VFS storage seeded in advance
 
 <a id="purging-a-user-granted-nothing-may-not-purge-a-vfs-storage"></a>
 

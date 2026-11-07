@@ -499,6 +499,7 @@ Then
 
 - purge 한 VFS storage 의 id 가 반환됩니다
   - id: 미리 저장한 VFS storage 와 같다
+  - entity_id: 미리 저장한 VFS storage 와 같다
 
 <a id="purging-a-user-granted-nothing-may-not-purge-a-vfs-storage"></a>
 
