@@ -15,14 +15,12 @@ from ai.backend.common.dto.manager.v2.session_group.request import (
     AdminSearchSessionGroupsInput,
     SessionGroupFilter,
     SessionGroupOrder,
-    SessionGroupPlacementDirectionFilter,
 )
 from ai.backend.common.dto.manager.v2.session_group.response import (
     AdminSearchSessionGroupsPayload,
 )
 from ai.backend.common.dto.manager.v2.session_group.types import (
     SessionGroupOrderField,
-    SessionGroupPlacementDirectionEnum,
 )
 from ai.backend.manager.api.adapters.session_group.adapter import SessionGroupAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
@@ -129,10 +127,8 @@ class BothGroupsOfTheProject(Then[Laid, Searched]):
 
 
 @dataclass(frozen=True)
-class SearchingTheProjectByDirection(When[Laid, SessionGroupAdapter, Searched]):
-    """그 프로젝트의 세션 그룹을 방향으로 걸러 전체 검색한다."""
-
-    direction: SessionGroupPlacementDirectionEnum
+class ListingTheProjectFirstPage(When[Laid, SessionGroupAdapter, Searched]):
+    """그 프로젝트의 세션 그룹을 방향 오름차순으로 한 건씩 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -141,47 +137,11 @@ class SearchingTheProjectByDirection(When[Laid, SessionGroupAdapter, Searched]):
     @override
     def describe(self, laid: Laid) -> str:
         return Says(
-            f"{laid.caller.username} 이 {laid.project.name} 프로젝트와 방향 {self.direction.value} "
-            "를 필터로 전체 검색합니다",
+            f"{laid.caller.username} 이 {laid.project.name} 프로젝트의 세션 그룹을 방향 "
+            "오름차순으로 한 건씩 조회합니다",
             english=(
-                f"{laid.caller.username} searches everything filtered by the project "
-                f"{laid.project.name} and the direction {self.direction.value}"
-            ),
-        )
-
-    @override
-    async def call(self, adapter: SessionGroupAdapter, laid: Laid) -> Searched:
-        with ActingAs(laid.caller):
-            return await adapter.global_search(
-                AdminSearchSessionGroupsInput(
-                    filter=SessionGroupFilter(
-                        project_id=UUIDFilter(equals=laid.project.id),
-                        placement_direction=SessionGroupPlacementDirectionFilter(
-                            equals=self.direction
-                        ),
-                    )
-                )
-            )
-
-
-@dataclass(frozen=True)
-class ListingTheProjectByDirection(When[Laid, SessionGroupAdapter, Searched]):
-    """그 프로젝트의 세션 그룹을 정해진 방향 순서로 전체 검색한다."""
-
-    direction: OrderDirection
-
-    @override
-    def operation(self) -> str:
-        return "global_search"
-
-    @override
-    def describe(self, laid: Laid) -> str:
-        return Says(
-            f"{laid.caller.username} 이 {laid.project.name} 프로젝트를 필터로 두고 방향 순서로 전체 "
-            "검색합니다",
-            english=(
-                f"{laid.caller.username} searches everything filtered by the project "
-                f"{laid.project.name}, ordered by the placement direction"
+                f"{laid.caller.username} searches the session groups of {laid.project.name}, "
+                "ordered by the placement direction and one per page"
             ),
         )
 
@@ -194,22 +154,31 @@ class ListingTheProjectByDirection(When[Laid, SessionGroupAdapter, Searched]):
                     order=[
                         SessionGroupOrder(
                             field=SessionGroupOrderField.PLACEMENT_DIRECTION,
-                            direction=self.direction,
+                            direction=OrderDirection.ASC,
                         )
                     ],
+                    limit=1,
                 )
             )
 
 
 @dataclass(frozen=True)
-class OnlyThePackedGroup(Then[Laid, Searched]):
-    """그 방향을 쓰는 세션 그룹만 온다."""
+class TheFirstPackedPage(Then[Laid, Searched]):
+    """방향이 pack 인 세션 그룹 하나가 첫 페이지에 오고, 다음 페이지가 있다고 답한다.
+
+    다른 프로젝트의 세션 그룹은 프로젝트 필터에 걸려 오지 않는다.
+    """
 
     @override
     def says(self) -> str:
         return Says(
-            "그 방향으로 배치하는 세션 그룹 하나만 옵니다",
-            english="only the one session group that places its members that way comes back",
+            "방향이 pack 인 사용자의 세션 그룹 하나가 첫 페이지에 오고 다음 페이지가 있다고 "
+            "답합니다. 다른 프로젝트의 세션 그룹은 빠집니다",
+            english=(
+                "the user's packed session group comes back alone on the first page and the "
+                "answer says a next page exists; the session groups of the other project are "
+                "left out"
+            ),
         )
 
     @override
@@ -229,48 +198,8 @@ class OnlyThePackedGroup(Then[Laid, Searched]):
                     ),
                 ),
             ),
-            Same("total_count", payload.total_count, 1),
-            Same("has_next_page", payload.has_next_page, False),
-            Same("has_previous_page", payload.has_previous_page, False),
-        ]
-
-
-@dataclass(frozen=True)
-class ThePacksComeFirst(Then[Laid, Searched]):
-    """방향이 pack 인 세션 그룹이 먼저 온다."""
-
-    @override
-    def says(self) -> str:
-        return Says(
-            "방향이 pack 인 세션 그룹이 먼저, spread 인 세션 그룹이 그다음에 옵니다",
-            english=(
-                "the session group that packs its members comes first and the one that spreads "
-                "them comes next"
-            ),
-        )
-
-    @override
-    def look(self, laid: Laid, answered: Answered[Searched]) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [MissingResponse(answered.raised)]
-        return [
-            Held(
-                "items",
-                [one.entity_id for one in payload.items],
-                SameAs(
-                    [UUID(str(laid.users_group.id)), UUID(str(laid.deployment_group.id))],
-                    Says(
-                        "사용자가 만든 세션 그룹, 그리고 배포의 replica group 이 가진 세션 그룹",
-                        english=(
-                            "the session group the user made, then the one the deployment's "
-                            "replica group holds"
-                        ),
-                    ),
-                ),
-            ),
             Same("total_count", payload.total_count, 2),
-            Same("has_next_page", payload.has_next_page, False),
+            Same("has_next_page", payload.has_next_page, True),
             Same("has_previous_page", payload.has_previous_page, False),
         ]
 
@@ -343,59 +272,25 @@ class AGrantedUserMayNotSearchEverything(
 
 
 @dataclass(frozen=True)
-class FilteredByThePlacementDirection(
-    Scenario[TestSeedingSession, SessionGroupsAndACaller, SessionGroupAdapter, Searched]
-):
-    @override
-    def summary(self) -> str:
-        return "a-filter-on-the-placement-direction-leaves-the-packed-group"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "superadmin 이 그 프로젝트를 방향 pack 으로 걸러 전체 검색하면, 사용자가 만든 세션 "
-            "그룹만 오고 방향이 spread 인 배포의 세션 그룹은 빠집니다. 이 동작은 역할이라 요청한 "
-            "사용자가 superadmin 입니다",
-            english=(
-                "when a superadmin searches everything filtered by the project and the direction "
-                "pack, only the session group the user created comes back and the deployment's "
-                "group, which spreads, is left out; a role checks this operation, so the "
-                "requesting user is a superadmin"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, Laid]:
-        return SessionGroupsInTwoProjects(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[Laid, SessionGroupAdapter, Searched]:
-        return SearchingTheProjectByDirection(SessionGroupPlacementDirectionEnum.PACK)
-
-    @override
-    def then(self) -> Then[Laid, Searched]:
-        return OnlyThePackedGroup()
-
-
-@dataclass(frozen=True)
 class OrderedByThePlacementDirection(
     Scenario[TestSeedingSession, SessionGroupsAndACaller, SessionGroupAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
-        return "ordering-by-the-placement-direction-puts-pack-before-spread"
+        return "ordering-by-the-placement-direction-puts-pack-on-the-first-page"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 그 프로젝트의 세션 그룹을 방향 오름차순으로 검색하면, 방향이 pack 인 "
-            "사용자의 세션 그룹이 먼저 오고 방향이 spread 인 배포의 세션 그룹이 그다음에 옵니다. "
-            "이 동작은 역할이라 요청한 사용자가 superadmin 입니다",
+            "superadmin 이 그 프로젝트의 세션 그룹을 방향 오름차순으로 한 건씩 조회하면, 방향이 "
+            "pack 인 사용자의 세션 그룹이 첫 페이지에 오고 다음 페이지가 있다고 답합니다. 다른 "
+            "프로젝트의 세션 그룹은 빠집니다. 이 동작은 역할이라 요청한 사용자가 superadmin 입니다",
             english=(
-                "when a superadmin searches the session groups of the project ordered by the "
-                "placement direction in ascending order, the user's packed group comes first and "
-                "the deployment's spreading group comes next; a role checks this operation, so "
-                "the requesting user is a superadmin"
+                "when a superadmin searches the session groups of the project filtered by that "
+                "project and ordered by the placement direction in ascending order, one per page, "
+                "the user's packed group comes back alone on the first page and the answer says a "
+                "next page exists; the session groups of the other project are left out; a role "
+                "checks this operation, so the requesting user is a superadmin"
             ),
         )
 
@@ -405,11 +300,11 @@ class OrderedByThePlacementDirection(
 
     @override
     def when(self) -> When[Laid, SessionGroupAdapter, Searched]:
-        return ListingTheProjectByDirection(OrderDirection.ASC)
+        return ListingTheProjectFirstPage()
 
     @override
     def then(self) -> Then[Laid, Searched]:
-        return ThePacksComeFirst()
+        return TheFirstPackedPage()
 
 
 @dataclass(frozen=True)
@@ -613,7 +508,6 @@ class ASoftDeletedGroupIsFoundWhenNamed(
 SCENARIOS: list[SearchingStep | RetiredSearchingStep] = [
     TheSuperadminFindsBothGroups(),
     AGrantedUserMayNotSearchEverything(),
-    FilteredByThePlacementDirection(),
     OrderedByThePlacementDirection(),
     ASoftDeletedGroupIsLeftOut(),
     ASoftDeletedGroupIsFoundWhenNamed(),

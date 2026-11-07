@@ -9,9 +9,19 @@ import pytest
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.kernel.request import (
+    AdminSearchKernelsInput,
+    KernelFilter,
+    KernelOrder,
+)
 from ai.backend.common.dto.manager.v2.kernel.response import AdminSearchKernelsPayload
+from ai.backend.common.dto.manager.v2.kernel.types import KernelOrderField
 from ai.backend.common.dto.manager.v2.kernel_group.request import (
+    KernelGroupEnvironOrder,
+    KernelGroupOrder,
+    KernelGroupResourceSlotOrder,
     ScopedSearchKernelGroupEnvironsInput,
     ScopedSearchKernelGroupResourceSlotsInput,
     ScopedSearchKernelGroupsInput,
@@ -22,7 +32,10 @@ from ai.backend.common.dto.manager.v2.kernel_group.response import (
     ScopedSearchKernelGroupsPayload,
 )
 from ai.backend.common.dto.manager.v2.kernel_group.types import (
+    KernelGroupEnvironOrderField,
     KernelGroupEnvironScope,
+    KernelGroupOrderField,
+    KernelGroupResourceSlotOrderField,
     KernelGroupResourceSlotScope,
     KernelGroupScope,
 )
@@ -30,9 +43,11 @@ from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     ScopedSearchSessionsInput,
+    SessionFilter,
+    SessionOrder,
 )
 from ai.backend.common.dto.manager.v2.session.response import AdminSearchSessionsPayload
-from ai.backend.common.dto.manager.v2.session.types import SessionScope
+from ai.backend.common.dto.manager.v2.session.types import SessionOrderField, SessionScope
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
@@ -71,6 +86,9 @@ type Groups = ScopedSearchKernelGroupsPayload
 type Environs = ScopedSearchKernelGroupEnvironsPayload
 type Slots = ScopedSearchKernelGroupResourceSlotsPayload
 
+PAGE = 10
+"""The page size every search asks for, larger than what the row seeds."""
+
 
 @dataclass(frozen=True)
 class SearchingEveryKernel(When[LaidSessionAndCaller, SessionAdapter, Kernels]):
@@ -88,7 +106,17 @@ class SearchingEveryKernel(When[LaidSessionAndCaller, SessionAdapter, Kernels]):
     @override
     async def call(self, adapter: SessionAdapter, laid: LaidSessionAndCaller) -> Kernels:
         with ActingAs(laid.caller):
-            return await adapter.admin_search_kernels(AdminSearchKernelsInput())
+            return await adapter.admin_search_kernels(
+                AdminSearchKernelsInput(
+                    filter=KernelFilter(session_id=UUIDFilter(equals=laid.session.id)),
+                    order=[
+                        KernelOrder(
+                            field=KernelOrderField.CREATED_AT, direction=OrderDirection.ASC
+                        )
+                    ],
+                    limit=PAGE,
+                )
+            )
 
 
 @dataclass(frozen=True)
@@ -108,7 +136,15 @@ class SearchingTheSessionKernels(When[LaidSessionAndCaller, SessionAdapter, Kern
     async def call(self, adapter: SessionAdapter, laid: LaidSessionAndCaller) -> Kernels:
         with ActingAs(laid.caller):
             return await adapter.search_kernels_by_session(
-                SessionId(laid.session.id), AdminSearchKernelsInput()
+                SessionId(laid.session.id),
+                AdminSearchKernelsInput(
+                    order=[
+                        KernelOrder(
+                            field=KernelOrderField.CREATED_AT, direction=OrderDirection.ASC
+                        )
+                    ],
+                    limit=PAGE,
+                ),
             )
 
 
@@ -147,15 +183,29 @@ class SearchingTheProject(When[LaidSessionAndCaller, SessionAdapter, Sessions]):
         with ActingAs(laid.caller):
             if self.operation_name == "gql_search_by_project":
                 return await adapter.gql_search_by_project(
-                    ProjectID(laid.project.id), AdminSearchSessionsInput()
+                    ProjectID(laid.project.id), self._admin_input(laid)
                 )
             if self.operation_name == "project_search":
-                return await adapter.project_search(laid.project.id, AdminSearchSessionsInput())
+                return await adapter.project_search(laid.project.id, self._admin_input(laid))
             return await adapter.scoped_search(
                 ScopedSearchSessionsInput(
-                    scope=SessionScope(project=[UUIDScope(value=laid.project.id)])
+                    scope=SessionScope(project=[UUIDScope(value=laid.project.id)]),
+                    filter=SessionFilter(name=StringFilter(equals=laid.session.name)),
+                    order=[
+                        SessionOrder(
+                            field=SessionOrderField.NAME, direction=OrderDirection.ASC
+                        )
+                    ],
+                    limit=PAGE,
                 )
             )
+
+    def _admin_input(self, laid: LaidSessionAndCaller) -> AdminSearchSessionsInput:
+        return AdminSearchSessionsInput(
+            filter=SessionFilter(name=StringFilter(equals=laid.session.name)),
+            order=[SessionOrder(field=SessionOrderField.NAME, direction=OrderDirection.ASC)],
+            limit=PAGE,
+        )
 
 
 @dataclass(frozen=True)
@@ -176,7 +226,13 @@ class SearchingTheGroups(When[LaidSessionAndCaller, SessionAdapter, Groups]):
         with ActingAs(laid.caller):
             return await adapter.scoped_search_kernel_groups(
                 ScopedSearchKernelGroupsInput(
-                    scope=KernelGroupScope(session=[UUIDScope(value=laid.session.id)])
+                    scope=KernelGroupScope(session=[UUIDScope(value=laid.session.id)]),
+                    order=[
+                        KernelGroupOrder(
+                            field=KernelGroupOrderField.ROLE, direction=OrderDirection.ASC
+                        )
+                    ],
+                    limit=PAGE,
                 )
             )
 
@@ -202,7 +258,14 @@ class SearchingTheEnvirons(When[LaidSessionAndCaller, SessionAdapter, Environs])
         with ActingAs(laid.caller):
             return await adapter.scoped_search_kernel_group_environs(
                 ScopedSearchKernelGroupEnvironsInput(
-                    scope=KernelGroupEnvironScope(session=[UUIDScope(value=laid.session.id)])
+                    scope=KernelGroupEnvironScope(session=[UUIDScope(value=laid.session.id)]),
+                    order=[
+                        KernelGroupEnvironOrder(
+                            field=KernelGroupEnvironOrderField.KEY,
+                            direction=OrderDirection.ASC,
+                        )
+                    ],
+                    limit=PAGE,
                 )
             )
 
@@ -228,7 +291,14 @@ class SearchingTheGroupSlots(When[LaidSessionAndCaller, SessionAdapter, Slots]):
         with ActingAs(laid.caller):
             return await adapter.scoped_search_kernel_group_resource_slots(
                 ScopedSearchKernelGroupResourceSlotsInput(
-                    scope=KernelGroupResourceSlotScope(session=[UUIDScope(value=laid.session.id)])
+                    scope=KernelGroupResourceSlotScope(session=[UUIDScope(value=laid.session.id)]),
+                    order=[
+                        KernelGroupResourceSlotOrder(
+                            field=KernelGroupResourceSlotOrderField.SLOT_NAME,
+                            direction=OrderDirection.ASC,
+                        )
+                    ],
+                    limit=PAGE,
                 )
             )
 
@@ -389,7 +459,11 @@ class SearchingEveryKernelAsTheSuperadmin(
     @override
     def given(self) -> Given[TestSeedingSession, LaidSessionAndCaller]:
         if self.superadmin:
-            return ASessionWithAKernelAndSomeone(granted=Granted.NOTHING, role=UserRole.SUPERADMIN)
+            return ASessionWithAKernelAndSomeone(
+                granted=Granted.NOTHING,
+                role=UserRole.SUPERADMIN,
+                beside_another_outside=True,
+            )
         return ASessionWithAKernelAndSomeone(granted=Granted.NOTHING)
 
     @override
@@ -434,7 +508,10 @@ class SearchingTheKernelsOfASession(
 
     @override
     def given(self) -> Given[TestSeedingSession, LaidSessionAndCaller]:
-        return ASessionWithAKernelAndSomeone(granted=self.granted)
+        return ASessionWithAKernelAndSomeone(
+            granted=self.granted,
+            beside_another_outside=self.granted is not Granted.NOTHING,
+        )
 
     @override
     def when(self) -> When[LaidSessionAndCaller, SessionAdapter, Kernels]:
@@ -480,7 +557,10 @@ class SearchingTheSessionsOfAProject(
 
     @override
     def given(self) -> Given[TestSeedingSession, LaidSessionAndCaller]:
-        return ASessionWithAKernelAndSomeone(granted=self.granted)
+        return ASessionWithAKernelAndSomeone(
+            granted=self.granted,
+            beside_another_outside=self.granted is not Granted.NOTHING,
+        )
 
     @override
     def when(self) -> When[LaidSessionAndCaller, SessionAdapter, Sessions]:
@@ -525,7 +605,10 @@ class SearchingTheGroupsOfASession(
 
     @override
     def given(self) -> Given[TestSeedingSession, LaidSessionAndCaller]:
-        return ASessionWithAKernelAndSomeone(granted=self.granted)
+        return ASessionWithAKernelAndSomeone(
+            granted=self.granted,
+            beside_another_outside=self.granted is not Granted.NOTHING,
+        )
 
     @override
     def when(self) -> When[LaidSessionAndCaller, SessionAdapter, Groups]:
@@ -571,7 +654,10 @@ class SearchingTheEnvironsOfASession(
 
     @override
     def given(self) -> Given[TestSeedingSession, LaidSessionAndCaller]:
-        return ASessionWithAKernelAndSomeone(granted=self.granted)
+        return ASessionWithAKernelAndSomeone(
+            granted=self.granted,
+            beside_another_outside=self.granted is not Granted.NOTHING,
+        )
 
     @override
     def when(self) -> When[LaidSessionAndCaller, SessionAdapter, Environs]:
@@ -616,7 +702,10 @@ class SearchingTheGroupSlotsOfASession(
 
     @override
     def given(self) -> Given[TestSeedingSession, LaidSessionAndCaller]:
-        return ASessionWithAKernelAndSomeone(granted=self.granted)
+        return ASessionWithAKernelAndSomeone(
+            granted=self.granted,
+            beside_another_outside=self.granted is not Granted.NOTHING,
+        )
 
     @override
     def when(self) -> When[LaidSessionAndCaller, SessionAdapter, Slots]:
