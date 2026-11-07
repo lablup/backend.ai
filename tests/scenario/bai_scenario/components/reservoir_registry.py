@@ -39,6 +39,7 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     in_language,
 )
+from bai_scenario.components.answers import TheFailedItemIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.system import role_named
 from bai_scenario.seeds.artifact_registry.registry import TestSeedReservoirRegistry
@@ -413,6 +414,6 @@ class NothingIsProcessed(Then[ManyRegistriesAndACaller, Any]):
                         Says("대상 레지스트리의 id", english="the id of the target registry"),
                     ),
                 ),
-                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+                TheFailedItemIsRefused(f"failed[{i}]", failure.message, self.reason),
             ]
         return verdicts

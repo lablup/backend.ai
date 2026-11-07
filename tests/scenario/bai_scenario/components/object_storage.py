@@ -10,6 +10,9 @@ from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
+from ai.backend.common.data.entity.object_storage import ObjectStorageEntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.object_storage.response import (
@@ -17,6 +20,8 @@ from ai.backend.common.dto.manager.v2.object_storage.response import (
     PurgeObjectStoragePayload,
 )
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.data.permission.global_entity import global_entity_id
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -33,9 +38,68 @@ from ai.backend.testutils.scenario_steps import (
     Verdict,
     in_language,
 )
-from bai_scenario.components.domain import Mentions
-from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
+from bai_scenario.components.answers import TheFailedItemIsRefused
+from bai_scenario.components.domain import WAS_HERE, Mentions, SomeoneOf
+from bai_scenario.components.system import KEPT, Kept, role_named
+from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.object_storage.object_storage import TestSeedObjectStorage
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
+
+
+def _holding(role: UserRole, granted: tuple[Permission, ...]) -> Says:
+    if granted:
+        names = ", ".join(str(one.name) for one in granted)
+        return Says(
+            f"object storage 에 {names} 권한을 받은 사용자 한 명",
+            english=f"one user granted {names} on object storages",
+        )
+    who = role_named(role)
+    return Says(f"{who} 한 명", english=f"one {in_language(who, Language.ENGLISH)}")
+
+
+@dataclass(frozen=True)
+class SomeoneGrantedOnStorages(TestSeedNest[Laid[UserData]]):
+    """그 사용자에게 global 에서 object storage 권한을 준다."""
+
+    domain: Laid[Any]
+    granted: tuple[Permission, ...]
+
+    @override
+    def kind(self) -> str:
+        names = ", ".join(str(one.name) for one in self.granted)
+        return Says(
+            f"global 에서 object storage 에 {names} 권한을 받은 사용자 준비",
+            english=f"Prepare a user granted {names} on object storages in global",
+        )
+
+    @override
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
+        someone = seed.within(SomeoneOf(self.domain))
+        role = seed.creating_from(
+            TestSeedRole(
+                lambda _: global_entity_id(GlobalEntityName.GLOBAL), name_hint="storage-keeper"
+            ),
+            someone,
+        )
+        for one in self.granted:
+            seed.adding(
+                TestSeedPermission(entity_type=ObjectStorageEntityType(), permission=one), role
+            )
+        seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+        return someone
+
+
+async def lay_a_granted_caller(
+    seeding: Any, role: UserRole = UserRole.USER, granted: tuple[Permission, ...] = ()
+) -> Laid[UserData]:
+    """A user of the given role, granted the given permissions on object storages."""
+    home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+    if not granted:
+        plain: Laid[UserData] = await seeding.within(SomeoneOf(home, role=role))
+        return plain
+    granted_caller: Laid[UserData] = await seeding.within(SomeoneGrantedOnStorages(home, granted))
+    return granted_caller
 
 
 @dataclass(frozen=True)
@@ -59,19 +123,20 @@ class AStorageAndSomeone(Given[Any, AStorageAndACaller]):
     """object storage 하나와 사용자 한 명."""
 
     role: UserRole = UserRole.USER
+    granted: tuple[Permission, ...] = ()
 
     @override
     def describe(self) -> str:
-        who = role_named(self.role)
+        who = _holding(self.role, self.granted)
         return Says(
-            f"object storage 하나와, {who} 한 명",
-            english=f"one object storage and one {in_language(who, Language.ENGLISH)}",
+            f"object storage 하나와, {who}",
+            english=f"one object storage and {in_language(who, Language.ENGLISH)}",
         )
 
     @override
     async def lay(self, seeding: Any) -> AStorageAndACaller:
         storage = await seeding.creating(TestSeedObjectStorage())
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_granted_caller(seeding, self.role, self.granted)
         return AStorageAndACaller(seeding.made(storage), seeding.made(caller))
 
 
@@ -80,20 +145,21 @@ class ManyStoragesAndSomeone(Given[Any, ManyStoragesAndACaller]):
     """object storage 여럿과 사용자 한 명."""
 
     role: UserRole = UserRole.USER
+    granted: tuple[Permission, ...] = ()
     count: int = 2
 
     @override
     def describe(self) -> str:
-        who = role_named(self.role)
+        who = _holding(self.role, self.granted)
         return Says(
-            f"object storage {self.count}개와, {who} 한 명",
-            english=(f"{self.count} object storages and one {in_language(who, Language.ENGLISH)}"),
+            f"object storage {self.count}개와, {who}",
+            english=(f"{self.count} object storages and {in_language(who, Language.ENGLISH)}"),
         )
 
     @override
     async def lay(self, seeding: Any) -> ManyStoragesAndACaller:
         storages = [await seeding.creating(TestSeedObjectStorage()) for _ in range(self.count)]
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_granted_caller(seeding, self.role, self.granted)
         return ManyStoragesAndACaller(
             laid=tuple(seeding.made(one) for one in storages),
             caller=seeding.made(caller),
@@ -271,6 +337,6 @@ class NothingIsProcessed(Then[ManyStoragesAndACaller, PartialBulkPayload[ObjectS
                         ),
                     ),
                 ),
-                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+                TheFailedItemIsRefused(f"failed[{i}]", failure.message, self.reason),
             ]
         return verdicts

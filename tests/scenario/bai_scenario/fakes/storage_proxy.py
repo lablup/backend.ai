@@ -11,11 +11,23 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.dto.storage.request import (
+    PresignedDownloadObjectReq,
+    PresignedUploadObjectReq,
+)
+from ai.backend.common.dto.storage.response import (
+    PresignedDownloadObjectResponse,
+    PresignedUploadObjectResponse,
+)
 from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
     StorageProxyManagerFacingClient,
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.errors.storage import VFolderNotFound
+
+PRESIGNED_DOWNLOAD_BASE = "https://presigned.scenario.local/download"
+PRESIGNED_UPLOAD_BASE = "https://presigned.scenario.local/upload"
+PRESIGNED_UPLOAD_FIELDS = {"policy": "seeded-policy"}
 
 
 @dataclass(frozen=True)
@@ -99,6 +111,29 @@ class FakeStorageProxyManagerFacingClient(StorageProxyManagerFacingClient):
 
     def created(self) -> list[StorageCall]:
         return [c for c in self.calls if c.method == "create_folder"]
+
+    @override
+    async def get_s3_presigned_download_url(
+        self,
+        storage_name: str,
+        bucket_name: str,
+        req: PresignedDownloadObjectReq,
+    ) -> PresignedDownloadObjectResponse:
+        self.calls.append(StorageCall("get_s3_presigned_download_url", storage_name, bucket_name))
+        return PresignedDownloadObjectResponse(url=f"{PRESIGNED_DOWNLOAD_BASE}/{req.key}")
+
+    @override
+    async def get_s3_presigned_upload_url(
+        self,
+        storage_name: str,
+        bucket_name: str,
+        req: PresignedUploadObjectReq,
+    ) -> PresignedUploadObjectResponse:
+        self.calls.append(StorageCall("get_s3_presigned_upload_url", storage_name, bucket_name))
+        return PresignedUploadObjectResponse(
+            url=f"{PRESIGNED_UPLOAD_BASE}/{req.key}",
+            fields=dict(PRESIGNED_UPLOAD_FIELDS),
+        )
 
 
 class FakeStorageSessionManager(StorageSessionManager):

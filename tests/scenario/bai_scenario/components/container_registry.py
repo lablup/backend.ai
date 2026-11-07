@@ -15,13 +15,15 @@ from ai.backend.common.data.entity.container_registry import (
     ContainerRegistryEntityType,
     ContainerRegistryID,
 )
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
-from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, GlobalEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.container_registry.request import AllowedGroupsInput
 from ai.backend.common.dto.manager.v2.container_registry.response import ContainerRegistryNode
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
@@ -111,6 +113,8 @@ class ARegistryAndSomeone(Given[TestSeedingSession, ARegistryAndACaller]):
     name_hint: str = "host"
     with_project: bool = False
     allowed: bool = False
+    keeps_registry: bool = False
+    keeps_public: bool = False
 
     @override
     def describe(self) -> str:
@@ -118,9 +122,46 @@ class ARegistryAndSomeone(Given[TestSeedingSession, ARegistryAndACaller]):
         project_en = ", one project" if self.with_project or self.allowed else ""
         allowed_ko = "가 이미 허용돼 있음" if self.allowed else ""
         allowed_en = " already allowed to it" if self.allowed else ""
+        kept_ko = [
+            place
+            for place, given in (("레지스트리", self.keeps_registry), ("public", self.keeps_public))
+            if given
+        ]
+        missed_ko = [
+            place
+            for place, given in (("레지스트리", self.keeps_registry), ("public", self.keeps_public))
+            if not given
+        ]
+        kept_en = [
+            place
+            for place, given in (
+                ("the registry", self.keeps_registry),
+                ("public", self.keeps_public),
+            )
+            if given
+        ]
+        missed_en = [
+            place
+            for place, given in (
+                ("the registry", self.keeps_registry),
+                ("public", self.keeps_public),
+            )
+            if not given
+        ]
+        if not kept_ko:
+            keeping_ko = ""
+            keeping_en = ""
+        elif not missed_ko:
+            keeping_ko = ", 레지스트리와 public 두 범위에 수정 권한을 받은"
+            keeping_en = ", granted update on the registry and on public"
+        else:
+            keeping_ko = f", {kept_ko[0]}에 수정 권한을 받고 {missed_ko[0]}에는 받지 않은"
+            keeping_en = f", granted update on {kept_en[0]} and not on {missed_en[0]}"
         return Says(
-            f"레지스트리 하나{project_ko}{allowed_ko}, {self.role.value} 한 명",
-            english=f"one registry{project_en}{allowed_en}, and one {self.role.value}",
+            f"레지스트리 하나{project_ko}{allowed_ko}, {self.role.value} 한 명{keeping_ko}",
+            english=(
+                f"one registry{project_en}{allowed_en}, and one {self.role.value}{keeping_en}"
+            ),
         )
 
     @override
@@ -135,11 +176,82 @@ class ARegistryAndSomeone(Given[TestSeedingSession, ARegistryAndACaller]):
             if self.allowed:
                 await seeding.linking(AllowProject(), project, registry)
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
+        if self.keeps_registry or self.keeps_public:
+            await seeding.within(
+                SomeoneKeepingRegistries(
+                    registry, caller, on_registry=self.keeps_registry, on_public=self.keeps_public
+                )
+            )
         return ARegistryAndACaller(
             registry=seeding.made(registry),
             caller=seeding.made(caller),
             project=project_data,
         )
+
+
+@dataclass(frozen=True)
+class SomeoneKeepingRegistries(TestSeedNest[Laid[None]]):
+    """그 사용자에게 지정한 범위에서 레지스트리 수정 권한을 준다."""
+
+    registry: Laid[ContainerRegistryData]
+    someone: Laid[UserData]
+    on_registry: bool = True
+    on_public: bool = True
+
+    @override
+    def kind(self) -> str:
+        held_ko = [
+            place
+            for place, given in (("레지스트리", self.on_registry), ("public", self.on_public))
+            if given
+        ]
+        held_en = [
+            place
+            for place, given in (
+                ("the registry", self.on_registry),
+                ("public", self.on_public),
+            )
+            if given
+        ]
+        return Says(
+            f"{', '.join(held_ko)} 범위에 수정 권한을 받은 사용자 준비",
+            english=f"Prepare a user granted update permission on {', '.join(held_en)}",
+        )
+
+    @override
+    def lay(self, seed: TestSeeder) -> Laid[None]:
+        granted: Laid[None] | None = None
+        if self.on_registry:
+            on_registry = seed.creating_from(
+                TestSeedRole(lambda one: ContainerRegistryID(one.id), name_hint="registry-keeper"),
+                self.registry,
+            )
+            seed.adding(
+                TestSeedPermission(
+                    entity_type=ContainerRegistryEntityType(), permission=Permission.UPDATE
+                ),
+                on_registry,
+            )
+            granted = seed.granting(
+                on_registry, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
+            )
+        if self.on_public:
+            in_public = seed.creating_from(
+                TestSeedRole(
+                    lambda _: global_entity_id(GlobalEntityName.PUBLIC),
+                    name_hint="public-registry-keeper",
+                ),
+                self.someone,
+            )
+            seed.adding(
+                TestSeedPermission(entity_type=GlobalEntityType(), permission=Permission.UPDATE),
+                in_public,
+            )
+            granted = seed.granting(
+                in_public, self.someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id)
+            )
+        assert granted is not None
+        return granted
 
 
 @dataclass(frozen=True)
