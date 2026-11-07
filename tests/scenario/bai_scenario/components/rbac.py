@@ -80,6 +80,7 @@ class RolesAndACaller:
     beyond_roles: tuple[RoleData, ...] = ()
     excluded_roles: tuple[RoleData, ...] = ()
     beyond_permissions: tuple[PermissionData, ...] = ()
+    unreadable_permissions: tuple[PermissionData, ...] = ()
 
     @property
     def role(self) -> RoleData:
@@ -119,6 +120,8 @@ class RolesAndSomeone(Given[Any, RolesAndACaller]):
     """두 번째 역할이 가진 권한. 요청한 역할 밖에 있다."""
     self_roles: int = 1
     """호출자 자신의 스코프에 두는 역할 수. 첫 역할이 ``self_role`` 이다."""
+    unreadable: Sequence[Granted] = ()
+    """호출자의 도메인에 둔 첫 역할이 가진 권한. 호출자가 읽을 수 없다."""
 
     @override
     def describe(self) -> str:
@@ -160,6 +163,16 @@ class RolesAndSomeone(Given[Any, RolesAndACaller]):
             ]
         else:
             beyond_permissions = []
+        unreadable_permissions = []
+        if self.unreadable:
+            if not beyond_roles:
+                raise AssertionError("unreadable needs a beyond role")
+            unreadable_permissions = [
+                await seeding.adding(
+                    TestSeedPermission(one.entity_type, one.permission), beyond_roles[0]
+                )
+                for one in self.unreadable
+            ]
         caller = await seeding.within(SomeoneOf(home, role=self.role))
         assignees = [await seeding.within(SomeoneOf(target)) for _ in range(self.assignees)]
         for one in assignees[: self.assigned]:
@@ -212,6 +225,7 @@ class RolesAndSomeone(Given[Any, RolesAndACaller]):
             beyond_roles=tuple(seeding.made(one) for one in beyond_roles),
             excluded_roles=tuple(seeding.made(one) for one in excluded_roles),
             beyond_permissions=tuple(seeding.made(one) for one in beyond_permissions),
+            unreadable_permissions=tuple(seeding.made(one) for one in unreadable_permissions),
         )
 
 

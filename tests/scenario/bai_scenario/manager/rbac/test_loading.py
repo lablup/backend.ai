@@ -85,6 +85,30 @@ class LoadingRoles(When[RolesAndACaller, RBACAdapter, RolesLoaded]):
 
 
 @dataclass(frozen=True)
+class LoadingRolesWithAnUnreadableOne(When[RolesAndACaller, RBACAdapter, RolesLoaded]):
+    @override
+    def operation(self) -> str:
+        return "batch_load_roles_by_ids"
+
+    @override
+    def describe(self, laid: RolesAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 읽을 수 있는 역할 하나와 읽을 수 없는 역할 하나를 한 번에 읽습니다",
+            english=(
+                f"{laid.caller.username} loads one readable role and one unreadable role in one call"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> RolesLoaded:
+        with ActingAs(laid.caller):
+            return await adapter.batch_load_roles_by_ids([
+                RoleID(laid.roles[0].id),
+                RoleID(laid.beyond_roles[0].id),
+            ])
+
+
+@dataclass(frozen=True)
 class LoadingPermissions(When[RolesAndACaller, RBACAdapter, PermissionsLoaded]):
     @override
     def operation(self) -> str:
@@ -110,6 +134,33 @@ class LoadingPermissions(When[RolesAndACaller, RBACAdapter, PermissionsLoaded]):
 
 
 @dataclass(frozen=True)
+class LoadingPermissionsWithAnUnreadableOne(
+    When[RolesAndACaller, RBACAdapter, PermissionsLoaded]
+):
+    @override
+    def operation(self) -> str:
+        return "batch_load_permissions_by_ids"
+
+    @override
+    def describe(self, laid: RolesAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 읽을 수 있는 권한 하나와 읽을 수 없는 권한 하나를 한 번에 읽습니다",
+            english=(
+                f"{laid.caller.username} loads one readable permission row and one unreadable "
+                "permission row in one call"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> PermissionsLoaded:
+        with ActingAs(laid.caller):
+            return await adapter.batch_load_permissions_by_ids([
+                laid.permissions[0].id,
+                laid.unreadable_permissions[0].id,
+            ])
+
+
+@dataclass(frozen=True)
 class LoadingTheRolePermissions(When[RolesAndACaller, RBACAdapter, PermissionListsLoaded]):
     @override
     def operation(self) -> str:
@@ -129,6 +180,34 @@ class LoadingTheRolePermissions(When[RolesAndACaller, RBACAdapter, PermissionLis
     async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> PermissionListsLoaded:
         with ActingAs(laid.caller):
             return await adapter.batch_load_permissions_by_role_ids([RoleID(laid.role.id)])
+
+
+@dataclass(frozen=True)
+class LoadingTheRolePermissionsWithAnUnreadableRole(
+    When[RolesAndACaller, RBACAdapter, PermissionListsLoaded]
+):
+    @override
+    def operation(self) -> str:
+        return "batch_load_permissions_by_role_ids"
+
+    @override
+    def describe(self, laid: RolesAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 읽을 수 있는 역할과 읽을 수 없는 역할이 가진 권한을 "
+            "역할 id 로 한 번에 읽습니다",
+            english=(
+                f"{laid.caller.username} loads the permissions of one readable role and one "
+                "unreadable role by role id in one call"
+            ),
+        )
+
+    @override
+    async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> PermissionListsLoaded:
+        with ActingAs(laid.caller):
+            return await adapter.batch_load_permissions_by_role_ids([
+                RoleID(laid.roles[0].id),
+                RoleID(laid.beyond_roles[0].id),
+            ])
 
 
 @dataclass(frozen=True)
@@ -194,12 +273,16 @@ class TheTwoRolesAndAMiss(Then[RolesAndACaller, RolesLoaded]):
 
 
 @dataclass(frozen=True)
-class EveryItemIsEmpty(Then[RolesAndACaller, RolesLoaded]):
+class TheReadableRoleAndAnEmptyOne(Then[RolesAndACaller, RolesLoaded]):
+    started: datetime
+
     @override
     def says(self) -> str:
         return Says(
-            "모든 자리가 빈 값으로 옵니다",
-            english="every entry comes back empty",
+            "읽을 수 있는 역할은 노드로, 읽을 수 없는 역할 자리는 빈 값으로 옵니다",
+            english=(
+                "the readable role comes back as a node and the unreadable role as an empty value"
+            ),
         )
 
     @override
@@ -207,7 +290,18 @@ class EveryItemIsEmpty(Then[RolesAndACaller, RolesLoaded]):
         loaded = answered.response
         if loaded is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        return [Same("loaded", loaded, [None, None, None])]
+        verdicts: list[Verdict] = [Same("length", len(loaded), 2)]
+        if len(loaded) != 2:
+            return verdicts
+        first, second = loaded
+        if isinstance(first, RoleNode):
+            verdicts += RoleLook(self.started).verdicts(
+                "[0].", first, laid.roles[0], laid.domain.id
+            )
+        else:
+            verdicts.append(Same("[0]", type(first).__name__, "RoleNode"))
+        verdicts.append(Same("[1]", second, None))
+        return verdicts
 
 
 @dataclass(frozen=True)
@@ -252,12 +346,17 @@ class TheTwoPermissionsAndAMiss(Then[RolesAndACaller, PermissionsLoaded]):
 
 
 @dataclass(frozen=True)
-class EveryPermissionIsEmpty(Then[RolesAndACaller, PermissionsLoaded]):
+class TheReadablePermissionAndAnEmptyOne(Then[RolesAndACaller, PermissionsLoaded]):
+    started: datetime
+
     @override
     def says(self) -> str:
         return Says(
-            "모든 자리가 빈 값으로 옵니다",
-            english="every entry comes back empty",
+            "읽을 수 있는 권한은 노드로, 읽을 수 없는 권한 자리는 빈 값으로 옵니다",
+            english=(
+                "the readable permission row comes back as a node and the unreadable row as an "
+                "empty value"
+            ),
         )
 
     @override
@@ -265,7 +364,19 @@ class EveryPermissionIsEmpty(Then[RolesAndACaller, PermissionsLoaded]):
         loaded = answered.response
         if loaded is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        return [Same("loaded", loaded, [None, None, None])]
+        verdicts: list[Verdict] = [Same("length", len(loaded), 2)]
+        if len(loaded) != 2:
+            return verdicts
+        first, second = loaded
+        one = laid.permissions[0]
+        if isinstance(first, PermissionNode):
+            verdicts += PermissionLook(self.started).verdicts(
+                "[0].", first, laid.role, one.entity_type, one.permission
+            )
+        else:
+            verdicts.append(Same("[0]", type(first).__name__, "PermissionNode"))
+        verdicts.append(Same("[1]", second, None))
+        return verdicts
 
 
 @dataclass(frozen=True)
@@ -352,30 +463,41 @@ def _two(granted: bool, role: UserRole = UserRole.USER) -> RolesAndSomeone:
     )
 
 
+def _two_with_an_unreadable_one() -> RolesAndSomeone:
+    return RolesAndSomeone(
+        count=2,
+        permissions=PERMISSIONS,
+        grant=(Granted(RoleEntityType(), Permission.READ),),
+        beyond=1,
+        unreadable=PERMISSIONS,
+    )
+
+
 @dataclass(frozen=True)
-class TheSuperadminLoadsRoles(
+class AUserGrantedRoleReadLoadsRoles(
     Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, RolesLoaded]
 ):
     started: datetime
 
     @override
     def summary(self) -> str:
-        return "the-superadmin-loads-two-roles-and-a-missing-id"
+        return "a-user-granted-role-read-loads-two-roles-and-a-missing-id"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 역할 둘과 없는 id 하나를 한 번에 읽으면, 역할 둘은 노드로, 없는 id "
-            "자리는 빈 값으로 옵니다",
+            "대상 도메인에서 역할 읽기 권한을 받은 사용자가 역할 둘과 없는 id 하나를 한 번에 "
+            "읽으면, 역할 둘은 노드로, 없는 id 자리는 빈 값으로 옵니다",
             english=(
-                "when the superadmin loads two roles and one missing id in one call, the two roles "
-                "come back as nodes and the missing id as an empty value"
+                "when a user granted role read permission in a domain loads two roles and one "
+                "missing id in one call, the two roles come back as nodes and the missing id as "
+                "an empty value"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
-        return _two(False, UserRole.SUPERADMIN)
+        return _two(True)
 
     @override
     def when(self) -> When[RolesAndACaller, RBACAdapter, RolesLoaded]:
@@ -387,61 +509,65 @@ class TheSuperadminLoadsRoles(
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingGetsNothing(
+class AUserGetsNothingForAnUnreadableRole(
     Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, RolesLoaded]
 ):
+    started: datetime
+
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-loads-roles-and-gets-empty-entries"
+        return "a-user-loads-an-unreadable-role-and-gets-an-empty-entry"
 
     @override
     def describe(self) -> str:
         return Says(
-            "아무 권한도 받지 않은 사용자가 역할 둘과 없는 id 하나를 한 번에 읽으면, 모든 자리가 "
-            "빈 값으로 옵니다",
+            "역할 읽기 권한을 받은 사용자가 읽을 수 있는 역할 하나와 읽을 권한이 없는 역할 하나를 "
+            "한 번에 읽으면, 읽을 수 있는 역할만 노드로 오고 다른 자리는 빈 값으로 옵니다",
             english=(
-                "when a user granted nothing loads two roles and one missing id in one call, every "
-                "entry comes back empty"
+                "when a user granted role read permission loads one readable role and one role "
+                "it has no permission on in one call, only the readable role comes back as a node "
+                "and the other entry comes back empty"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
-        return _two(False)
+        return _two_with_an_unreadable_one()
 
     @override
     def when(self) -> When[RolesAndACaller, RBACAdapter, RolesLoaded]:
-        return LoadingRoles()
+        return LoadingRolesWithAnUnreadableOne()
 
     @override
     def then(self) -> Then[RolesAndACaller, RolesLoaded]:
-        return EveryItemIsEmpty()
+        return TheReadableRoleAndAnEmptyOne(started=self.started)
 
 
 @dataclass(frozen=True)
-class TheSuperadminLoadsPermissions(
+class AUserGrantedRoleReadLoadsPermissions(
     Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, PermissionsLoaded]
 ):
     started: datetime
 
     @override
     def summary(self) -> str:
-        return "the-superadmin-loads-two-permissions-and-a-missing-id"
+        return "a-user-granted-role-read-loads-two-permissions-and-a-missing-id"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 권한 둘과 없는 id 하나를 한 번에 읽으면, 권한 둘은 노드로, 없는 id "
-            "자리는 빈 값으로 옵니다",
+            "대상 도메인에서 역할 읽기 권한을 받은 사용자가 권한 둘과 없는 id 하나를 한 번에 "
+            "읽으면, 권한 둘은 노드로, 없는 id 자리는 빈 값으로 옵니다",
             english=(
-                "when the superadmin loads two permission rows and one missing id in one call, the "
-                "two rows come back as nodes and the missing id as an empty value"
+                "when a user granted role read permission in a domain loads two permission rows "
+                "and one missing id in one call, the two rows come back as nodes and the missing "
+                "id as an empty value"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
-        return _two(False, UserRole.SUPERADMIN)
+        return _two(True)
 
     @override
     def when(self) -> When[RolesAndACaller, RBACAdapter, PermissionsLoaded]:
@@ -453,35 +579,38 @@ class TheSuperadminLoadsPermissions(
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingLoadsPermissionsAndGetsEmpty(
+class AUserGetsNothingForAnUnreadablePermission(
     Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, PermissionsLoaded]
 ):
+    started: datetime
+
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-loads-permissions-and-gets-empty-entries"
+        return "a-user-loads-an-unreadable-permission-and-gets-an-empty-entry"
 
     @override
     def describe(self) -> str:
         return Says(
-            "아무 권한도 받지 않은 사용자가 권한 둘과 없는 id 하나를 한 번에 읽으면, 모든 자리가 "
-            "빈 값으로 옵니다",
+            "역할 읽기 권한을 받은 사용자가 읽을 수 있는 권한 하나와 읽을 권한이 없는 권한 하나를 "
+            "한 번에 읽으면, 읽을 수 있는 권한만 노드로 오고 다른 자리는 빈 값으로 옵니다",
             english=(
-                "when a user granted nothing loads two permission rows and one missing id in one "
-                "call, every entry comes back empty"
+                "when a user granted role read permission loads one readable permission row and "
+                "one row it has no permission on in one call, only the readable row comes back as "
+                "a node and the other entry comes back empty"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
-        return _two(False)
+        return _two_with_an_unreadable_one()
 
     @override
     def when(self) -> When[RolesAndACaller, RBACAdapter, PermissionsLoaded]:
-        return LoadingPermissions()
+        return LoadingPermissionsWithAnUnreadableOne()
 
     @override
     def then(self) -> Then[RolesAndACaller, PermissionsLoaded]:
-        return EveryPermissionIsEmpty()
+        return TheReadablePermissionAndAnEmptyOne(started=self.started)
 
 
 @dataclass(frozen=True)
@@ -519,27 +648,31 @@ class AUserGrantedRoleReadLoadsTheRolePermissions(
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingMayNotLoadTheRolePermissions(
+class AUserMayNotLoadThePermissionsOfAnUnreadableRole(
     Scenario[TestSeedingSession, RolesAndACaller, RBACAdapter, PermissionListsLoaded]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-may-not-load-permissions-by-role-id"
+        return "a-user-may-not-load-the-permissions-of-an-unreadable-role-by-role-id"
 
     @override
     def describe(self) -> str:
         return Says(
-            "아무 권한도 받지 않은 사용자는 역할 id 로 권한을 한 번에 읽을 수 없습니다",
-            english="a user granted nothing cannot load permissions by role id",
+            "역할 읽기 권한을 받은 사용자가 읽을 권한이 없는 역할을 하나 함께 넣어 역할 id 로 "
+            "권한을 한 번에 읽으면, 호출 전체가 거부됩니다",
+            english=(
+                "when a user granted role read permission adds one role it has no permission on "
+                "and loads permissions by role id, the whole call is refused"
+            ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
-        return _two(False)
+        return _two_with_an_unreadable_one()
 
     @override
     def when(self) -> When[RolesAndACaller, RBACAdapter, PermissionListsLoaded]:
-        return LoadingTheRolePermissions()
+        return LoadingTheRolePermissionsWithAnUnreadableRole()
 
     @override
     def then(self) -> Then[RolesAndACaller, PermissionListsLoaded]:
@@ -560,11 +693,13 @@ class TheSuperadminLoadsAssignments(
     def describe(self) -> str:
         return Says(
             "superadmin 이 미리 저장한 배정과 없는 id 하나를 한 번에 읽으면, 배정은 노드로, "
-            "없는 id 자리는 빈 값으로 옵니다",
+            "없는 id 자리는 빈 값으로 옵니다. 배정 id 를 얻는 전역 검색을 전역 역할이 막으므로 "
+            "superadmin 이 부릅니다. 읽기 자체는 인증만 거칩니다",
             english=(
                 "when the superadmin loads the assignments seeded in advance and one missing id "
                 "in one call, the assignments come back as nodes and the missing id as an empty "
-                "value"
+                "value. The global role gates the search that collects the assignment ids, so the "
+                "superadmin calls it. The load itself needs authentication only"
             ),
         )
 
@@ -582,12 +717,12 @@ class TheSuperadminLoadsAssignments(
 
 
 SCENARIOS: list[LoadStep] = [
-    TheSuperadminLoadsRoles(started=datetime.now(UTC)),
-    AUserGrantedNothingGetsNothing(),
-    TheSuperadminLoadsPermissions(started=datetime.now(UTC)),
-    AUserGrantedNothingLoadsPermissionsAndGetsEmpty(),
+    AUserGrantedRoleReadLoadsRoles(started=datetime.now(UTC)),
+    AUserGetsNothingForAnUnreadableRole(started=datetime.now(UTC)),
+    AUserGrantedRoleReadLoadsPermissions(started=datetime.now(UTC)),
+    AUserGetsNothingForAnUnreadablePermission(started=datetime.now(UTC)),
     AUserGrantedRoleReadLoadsTheRolePermissions(started=datetime.now(UTC)),
-    AUserGrantedNothingMayNotLoadTheRolePermissions(),
+    AUserMayNotLoadThePermissionsOfAnUnreadableRole(),
     TheSuperadminLoadsAssignments(started=datetime.now(UTC)),
 ]
 
