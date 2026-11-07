@@ -69,7 +69,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 VFS storage 를 검색하면 미리 저장한 VFS storage 가 모두 반환됩니다](#searching-the-superadmin-searching-vfs-storages-counts-every-one) | 성공 |
+| [superadmin 이 VFS storage 를 검색해 한 쪽을 요청하면 미리 저장한 VFS storage 둘 가운데 하나만 오고, 전체 개수는 둘입니다](#searching-the-superadmin-searching-vfs-storages-gets-one-page) | 성공 |
 | [superadmin 이 아닌 사용자가 VFS storage 를 검색하려 하면 권한 부족으로 거부됩니다. 이 호출은 호출자가 superadmin 인지만 검사하고 부여된 권한은 보지 않습니다](#searching-a-user-who-is-not-the-superadmin-may-not-search-vfs-storages) | 거부 |
 
 **update**
@@ -554,11 +554,11 @@ Then
 
 ### search
 
-<a id="searching-the-superadmin-searching-vfs-storages-counts-every-one"></a>
+<a id="searching-the-superadmin-searching-vfs-storages-gets-one-page"></a>
 
-#### [the-superadmin-searching-vfs-storages-counts-every-one](/tests/scenario/bai_scenario/manager/vfs_storage/test_searching.py): pass
+#### [the-superadmin-searching-vfs-storages-gets-one-page](/tests/scenario/bai_scenario/manager/vfs_storage/test_searching.py): pass
 
-superadmin 이 VFS storage 를 검색하면 미리 저장한 VFS storage 가 모두 반환됩니다
+superadmin 이 VFS storage 를 검색해 한 쪽을 요청하면 미리 저장한 VFS storage 둘 가운데 하나만 오고, 전체 개수는 둘입니다
 
 Given
 
@@ -574,14 +574,15 @@ Given
 
 When
 
-- VFSStorageAdapter.search: user-1이 VFS storage 를 검색합니다
+- VFSStorageAdapter.search: user-1이 VFS storage 를 검색해 한 쪽을 요청합니다
 
 Then
 
-- 미리 저장한 VFS storage 가 모두 반환됩니다
-  - items: 미리 저장한 VFS storage 와 같다
+- 미리 저장한 VFS storage 둘 가운데 하나만 한 쪽에 오고, 남은 하나는 다음 쪽에 있습니다
+  - length = 1
+  - items: 미리 저장한 VFS storage 가운데 하나
   - total_count = 2
-  - has_next_page = False
+  - has_next_page = True
   - has_previous_page = False
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-vfs-storages"></a>
@@ -604,7 +605,7 @@ Given
 
 When
 
-- VFSStorageAdapter.search: user-1이 VFS storage 를 검색합니다
+- VFSStorageAdapter.search: user-1이 VFS storage 를 검색해 한 쪽을 요청합니다
 
 Then
 

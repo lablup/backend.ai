@@ -70,7 +70,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 Reservoir 레지스트리를 검색하면 미리 저장한 레지스트리가 모두 반환됩니다. 이 호출은 전역 역할을 검사합니다](#searching-the-superadmin-searching-reservoir-registries-counts-every-one) | 성공 |
+| [superadmin 이 Reservoir 레지스트리를 검색해 한 쪽을 요청하면 미리 저장한 레지스트리 둘 가운데 하나만 오고, 전체 개수는 둘입니다. 이 호출은 전역 역할을 검사합니다](#searching-the-superadmin-searching-reservoir-registries-gets-one-page) | 성공 |
 | [superadmin 이 아닌 사용자가 Reservoir 레지스트리를 검색하려 하면 권한 부족으로 거부됩니다. 이 호출은 전역 역할을 검사합니다](#searching-a-user-who-is-not-the-superadmin-may-not-search-reservoir-registries) | 거부 |
 
 **update**
@@ -574,11 +574,11 @@ Then
 
 ### search
 
-<a id="searching-the-superadmin-searching-reservoir-registries-counts-every-one"></a>
+<a id="searching-the-superadmin-searching-reservoir-registries-gets-one-page"></a>
 
-#### [the-superadmin-searching-reservoir-registries-counts-every-one](/tests/scenario/bai_scenario/manager/reservoir_registry/test_searching.py): pass
+#### [the-superadmin-searching-reservoir-registries-gets-one-page](/tests/scenario/bai_scenario/manager/reservoir_registry/test_searching.py): pass
 
-superadmin 이 Reservoir 레지스트리를 검색하면 미리 저장한 레지스트리가 모두 반환됩니다. 이 호출은 전역 역할을 검사합니다
+superadmin 이 Reservoir 레지스트리를 검색해 한 쪽을 요청하면 미리 저장한 레지스트리 둘 가운데 하나만 오고, 전체 개수는 둘입니다. 이 호출은 전역 역할을 검사합니다
 
 Given
 
@@ -594,14 +594,15 @@ Given
 
 When
 
-- ReservoirRegistryAdapter.search: user-1이 Reservoir 레지스트리를 검색합니다
+- ReservoirRegistryAdapter.search: user-1이 Reservoir 레지스트리를 검색해 한 쪽을 요청합니다
 
 Then
 
-- 미리 저장한 레지스트리가 모두 반환됩니다
-  - items: 미리 저장한 레지스트리와 같다
+- 미리 저장한 레지스트리 둘 가운데 하나만 한 쪽에 오고, 남은 하나는 다음 쪽에 있습니다
+  - length = 1
+  - items: 미리 저장한 레지스트리 가운데 하나
   - total_count = 2
-  - has_next_page = False
+  - has_next_page = True
   - has_previous_page = False
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-reservoir-registries"></a>
@@ -624,7 +625,7 @@ Given
 
 When
 
-- ReservoirRegistryAdapter.search: user-1이 Reservoir 레지스트리를 검색합니다
+- ReservoirRegistryAdapter.search: user-1이 Reservoir 레지스트리를 검색해 한 쪽을 요청합니다
 
 Then
 

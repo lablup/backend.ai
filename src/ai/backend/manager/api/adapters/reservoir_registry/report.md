@@ -70,7 +70,7 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin searches Reservoir registries, every registry seeded in advance comes back. This call is gated by the global role](#searching-the-superadmin-searching-reservoir-registries-counts-every-one) | answered |
+| [when the superadmin searches Reservoir registries and asks for one page, one of the two registries seeded in advance comes back and the total count is two. This call is gated by the global role](#searching-the-superadmin-searching-reservoir-registries-gets-one-page) | answered |
 | [when a user who is not the superadmin tries to search Reservoir registries, it is rejected for lack of permission. This call is gated by the global role](#searching-a-user-who-is-not-the-superadmin-may-not-search-reservoir-registries) | rejected |
 
 **update**
@@ -574,11 +574,11 @@ Then
 
 ### search
 
-<a id="searching-the-superadmin-searching-reservoir-registries-counts-every-one"></a>
+<a id="searching-the-superadmin-searching-reservoir-registries-gets-one-page"></a>
 
-#### [the-superadmin-searching-reservoir-registries-counts-every-one](/tests/scenario/bai_scenario/manager/reservoir_registry/test_searching.py): pass
+#### [the-superadmin-searching-reservoir-registries-gets-one-page](/tests/scenario/bai_scenario/manager/reservoir_registry/test_searching.py): pass
 
-when the superadmin searches Reservoir registries, every registry seeded in advance comes back. This call is gated by the global role
+when the superadmin searches Reservoir registries and asks for one page, one of the two registries seeded in advance comes back and the total count is two. This call is gated by the global role
 
 Given
 
@@ -594,14 +594,15 @@ Given
 
 When
 
-- ReservoirRegistryAdapter.search: user-1 searches Reservoir registries
+- ReservoirRegistryAdapter.search: user-1 searches Reservoir registries and asks for one page
 
 Then
 
-- every registry seeded in advance comes back
-  - items: same as the registries seeded in advance
+- only one of the two registries seeded in advance comes on the page and the other is on the next page
+  - length = 1
+  - items: one of the registries seeded in advance
   - total_count = 2
-  - has_next_page = False
+  - has_next_page = True
   - has_previous_page = False
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-reservoir-registries"></a>
@@ -624,7 +625,7 @@ Given
 
 When
 
-- ReservoirRegistryAdapter.search: user-1 searches Reservoir registries
+- ReservoirRegistryAdapter.search: user-1 searches Reservoir registries and asks for one page
 
 Then
 

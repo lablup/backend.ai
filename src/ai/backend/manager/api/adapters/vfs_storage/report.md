@@ -69,7 +69,7 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin searches VFS storages, every VFS storage seeded in advance comes back](#searching-the-superadmin-searching-vfs-storages-counts-every-one) | answered |
+| [when the superadmin searches VFS storages and asks for one page, one of the two VFS storages seeded in advance comes back and the total count is two](#searching-the-superadmin-searching-vfs-storages-gets-one-page) | answered |
 | [when a user who is not the superadmin tries to search VFS storages, it is rejected for lack of permission. This call checks only whether the caller is the superadmin and does not look at the permissions granted](#searching-a-user-who-is-not-the-superadmin-may-not-search-vfs-storages) | rejected |
 
 **update**
@@ -554,11 +554,11 @@ Then
 
 ### search
 
-<a id="searching-the-superadmin-searching-vfs-storages-counts-every-one"></a>
+<a id="searching-the-superadmin-searching-vfs-storages-gets-one-page"></a>
 
-#### [the-superadmin-searching-vfs-storages-counts-every-one](/tests/scenario/bai_scenario/manager/vfs_storage/test_searching.py): pass
+#### [the-superadmin-searching-vfs-storages-gets-one-page](/tests/scenario/bai_scenario/manager/vfs_storage/test_searching.py): pass
 
-when the superadmin searches VFS storages, every VFS storage seeded in advance comes back
+when the superadmin searches VFS storages and asks for one page, one of the two VFS storages seeded in advance comes back and the total count is two
 
 Given
 
@@ -574,14 +574,15 @@ Given
 
 When
 
-- VFSStorageAdapter.search: user-1 searches VFS storages
+- VFSStorageAdapter.search: user-1 searches VFS storages and asks for one page
 
 Then
 
-- every VFS storage seeded in advance comes back
-  - items: same as the VFS storages seeded in advance
+- only one of the two VFS storages seeded in advance comes on the page and the other is on the next page
+  - length = 1
+  - items: one of the VFS storages seeded in advance
   - total_count = 2
-  - has_next_page = False
+  - has_next_page = True
   - has_previous_page = False
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-vfs-storages"></a>
@@ -604,7 +605,7 @@ Given
 
 When
 
-- VFSStorageAdapter.search: user-1 searches VFS storages
+- VFSStorageAdapter.search: user-1 searches VFS storages and asks for one page
 
 Then
 

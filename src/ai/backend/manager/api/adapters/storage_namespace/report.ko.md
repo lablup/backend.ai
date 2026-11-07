@@ -36,7 +36,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [superadmin 이 네임스페이스를 검색하면 미리 저장한 네임스페이스가 모두 반환됩니다. 이 호출은 전역 역할을 검사합니다](#searching-the-superadmin-searching-namespaces-counts-every-one) | 성공 |
+| [superadmin 이 네임스페이스를 검색해 한 쪽을 요청하면 미리 저장한 네임스페이스 둘 가운데 하나만 오고, 전체 개수는 둘입니다. 이 호출은 전역 역할을 검사합니다](#searching-the-superadmin-searching-namespaces-gets-one-page) | 성공 |
 | [superadmin 이 아닌 사용자가 네임스페이스를 검색하려 하면 권한 부족으로 거부됩니다. 이 호출은 전역 역할을 검사합니다](#searching-a-user-who-is-not-the-superadmin-may-not-search-namespaces) | 거부 |
 
 **unregister**
@@ -154,7 +154,15 @@ When
 Then
 
 - 그 object storage 에 등록된 네임스페이스가 모두 반환됩니다
-  - items: 미리 저장한 네임스페이스와 같다
+  - length = 2
+  - [0].id: 미리 저장한 네임스페이스와 같다
+  - [0].entity_id: 미리 저장한 네임스페이스와 같다
+  - [0].storage_id: 그 네임스페이스가 등록된 object storage 의 id 와 같다
+  - [0].namespace = 'seeded-bucket'
+  - [1].id: 미리 저장한 네임스페이스와 같다
+  - [1].entity_id: 미리 저장한 네임스페이스와 같다
+  - [1].storage_id: 그 네임스페이스가 등록된 object storage 의 id 와 같다
+  - [1].namespace = 'second-bucket'
 
 <a id="reading-a-user-granted-nothing-may-not-read-the-namespaces-of-an-object-storage"></a>
 
@@ -244,11 +252,11 @@ Then
 
 ### search
 
-<a id="searching-the-superadmin-searching-namespaces-counts-every-one"></a>
+<a id="searching-the-superadmin-searching-namespaces-gets-one-page"></a>
 
-#### [the-superadmin-searching-namespaces-counts-every-one](/tests/scenario/bai_scenario/manager/storage_namespace/test_searching.py): pass
+#### [the-superadmin-searching-namespaces-gets-one-page](/tests/scenario/bai_scenario/manager/storage_namespace/test_searching.py): pass
 
-superadmin 이 네임스페이스를 검색하면 미리 저장한 네임스페이스가 모두 반환됩니다. 이 호출은 전역 역할을 검사합니다
+superadmin 이 네임스페이스를 검색해 한 쪽을 요청하면 미리 저장한 네임스페이스 둘 가운데 하나만 오고, 전체 개수는 둘입니다. 이 호출은 전역 역할을 검사합니다
 
 Given
 
@@ -266,14 +274,15 @@ Given
 
 When
 
-- StorageNamespaceAdapter.search: user-1이 등록된 네임스페이스를 검색합니다
+- StorageNamespaceAdapter.search: user-1이 등록된 네임스페이스를 검색해 한 쪽을 요청합니다
 
 Then
 
-- 미리 저장한 네임스페이스가 모두 반환됩니다
-  - items: 미리 저장한 네임스페이스와 같다
+- 미리 저장한 네임스페이스 둘 가운데 하나만 한 쪽에 오고, 남은 하나는 다음 쪽에 있습니다
+  - length = 1
+  - items: 미리 저장한 네임스페이스 가운데 하나
   - total_count = 2
-  - has_next_page = False
+  - has_next_page = True
   - has_previous_page = False
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-namespaces"></a>
@@ -298,7 +307,7 @@ Given
 
 When
 
-- StorageNamespaceAdapter.search: user-1이 등록된 네임스페이스를 검색합니다
+- StorageNamespaceAdapter.search: user-1이 등록된 네임스페이스를 검색해 한 쪽을 요청합니다
 
 Then
 

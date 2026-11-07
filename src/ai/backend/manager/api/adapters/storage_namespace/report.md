@@ -36,7 +36,7 @@ Scenario: complete
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin searches namespaces, every namespace seeded in advance comes back. This call is gated by the global role](#searching-the-superadmin-searching-namespaces-counts-every-one) | answered |
+| [when the superadmin searches namespaces and asks for one page, one of the two namespaces seeded in advance comes back and the total count is two. This call is gated by the global role](#searching-the-superadmin-searching-namespaces-gets-one-page) | answered |
 | [when a user who is not the superadmin tries to search namespaces, it is rejected for lack of permission. This call is gated by the global role](#searching-a-user-who-is-not-the-superadmin-may-not-search-namespaces) | rejected |
 
 **unregister**
@@ -154,7 +154,15 @@ When
 Then
 
 - every namespace registered on the object storage comes back
-  - items: same as the namespaces seeded in advance
+  - length = 2
+  - [0].id: same as the namespace seeded in advance
+  - [0].entity_id: same as the namespace seeded in advance
+  - [0].storage_id: same as the id of the object storage it is registered on
+  - [0].namespace = 'seeded-bucket'
+  - [1].id: same as the namespace seeded in advance
+  - [1].entity_id: same as the namespace seeded in advance
+  - [1].storage_id: same as the id of the object storage it is registered on
+  - [1].namespace = 'second-bucket'
 
 <a id="reading-a-user-granted-nothing-may-not-read-the-namespaces-of-an-object-storage"></a>
 
@@ -244,11 +252,11 @@ Then
 
 ### search
 
-<a id="searching-the-superadmin-searching-namespaces-counts-every-one"></a>
+<a id="searching-the-superadmin-searching-namespaces-gets-one-page"></a>
 
-#### [the-superadmin-searching-namespaces-counts-every-one](/tests/scenario/bai_scenario/manager/storage_namespace/test_searching.py): pass
+#### [the-superadmin-searching-namespaces-gets-one-page](/tests/scenario/bai_scenario/manager/storage_namespace/test_searching.py): pass
 
-when the superadmin searches namespaces, every namespace seeded in advance comes back. This call is gated by the global role
+when the superadmin searches namespaces and asks for one page, one of the two namespaces seeded in advance comes back and the total count is two. This call is gated by the global role
 
 Given
 
@@ -266,14 +274,15 @@ Given
 
 When
 
-- StorageNamespaceAdapter.search: user-1 searches registered namespaces
+- StorageNamespaceAdapter.search: user-1 searches registered namespaces and asks for one page
 
 Then
 
-- every namespace seeded in advance comes back
-  - items: same as the namespaces seeded in advance
+- only one of the two namespaces seeded in advance comes on the page and the other is on the next page
+  - length = 1
+  - items: one of the namespaces seeded in advance
   - total_count = 2
-  - has_next_page = False
+  - has_next_page = True
   - has_previous_page = False
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-namespaces"></a>
@@ -298,7 +307,7 @@ Given
 
 When
 
-- StorageNamespaceAdapter.search: user-1 searches registered namespaces
+- StorageNamespaceAdapter.search: user-1 searches registered namespaces and asks for one page
 
 Then
 

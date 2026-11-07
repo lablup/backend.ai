@@ -255,7 +255,15 @@ When
 Then
 
 - 거른 행 하나만 반환되고, 필터가 제외하는 행은 오지 않습니다
-  - items: 미리 저장한 행와 같다
+  - length = 1
+  - [0].entity_id: 미리 저장한 행와 같다
+  - [0].key = 'SCENARIO_SEEDED_KEY'
+  - [0].value_source = 'session_id'
+  - [0].scope.scope_type = <SystemSessionEnvironScopeType.PUBLIC: 'public'>
+  - [0].scope.scope_id: 그 행이 묶인 범위의 id 와 같다
+  - [0].created_at: 미리 저장한 행의 생성 시각와 같다
+  - [0].updated_at: 미리 저장한 행의 수정 시각와 같다
+  - [0].deleted_at = None
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
@@ -445,7 +453,15 @@ When
 Then
 
 - 거른 행 하나만 반환되고, 범위 밖 행과 필터가 제외하는 행은 오지 않습니다
-  - items: 미리 저장한 행와 같다
+  - length = 1
+  - [0].entity_id: 미리 저장한 행와 같다
+  - [0].key = 'SCENARIO_SEEDED_KEY'
+  - [0].value_source = 'session_id'
+  - [0].scope.scope_type = <SystemSessionEnvironScopeType.PUBLIC: 'public'>
+  - [0].scope.scope_id: 그 행이 묶인 범위의 id 와 같다
+  - [0].created_at: 미리 저장한 행의 생성 시각와 같다
+  - [0].updated_at: 미리 저장한 행의 수정 시각와 같다
+  - [0].deleted_at = None
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False

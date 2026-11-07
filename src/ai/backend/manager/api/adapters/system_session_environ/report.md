@@ -255,7 +255,15 @@ When
 Then
 
 - only the filtered row comes back, and the row the filter excludes does not come back
-  - items: same as the rows seeded in advance
+  - length = 1
+  - [0].entity_id: same as the row seeded in advance
+  - [0].key = 'SCENARIO_SEEDED_KEY'
+  - [0].value_source = 'session_id'
+  - [0].scope.scope_type = <SystemSessionEnvironScopeType.PUBLIC: 'public'>
+  - [0].scope.scope_id: same as the id of the scope it is bound to
+  - [0].created_at: same as the row's creation time
+  - [0].updated_at: same as the row's last change time
+  - [0].deleted_at = None
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
@@ -445,7 +453,15 @@ When
 Then
 
 - only the filtered row comes back, and neither the row outside the scope nor the row the filter excludes comes back
-  - items: same as the rows seeded in advance
+  - length = 1
+  - [0].entity_id: same as the row seeded in advance
+  - [0].key = 'SCENARIO_SEEDED_KEY'
+  - [0].value_source = 'session_id'
+  - [0].scope.scope_type = <SystemSessionEnvironScopeType.PUBLIC: 'public'>
+  - [0].scope.scope_id: same as the id of the scope it is bound to
+  - [0].created_at: same as the row's creation time
+  - [0].updated_at: same as the row's last change time
+  - [0].deleted_at = None
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
