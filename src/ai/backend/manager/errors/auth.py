@@ -4,7 +4,7 @@ Authentication and user-related exceptions.
 
 from __future__ import annotations
 
-from typing import override
+from typing import Self, override
 
 from aiohttp import web
 
@@ -19,6 +19,7 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.common.plugin.hook import HookResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
 from ai.backend.manager.errors.base.field import FieldError, FieldErrorCode
@@ -75,6 +76,40 @@ class AuthorizationFailed(BackendAIError, web.HTTPUnauthorized):
             domain=ErrorDomain.USER,
             operation=ErrorOperation.AUTH,
             error_detail=ErrorDetail.UNAUTHORIZED,
+        )
+
+
+class LoginRejectedByHook(BackendAIError, web.HTTPUnauthorized):
+    """Raised when a POST_AUTHORIZE hook plugin refuses a login whose password matched."""
+
+    error_type = "https://api.backend.ai/probs/rejected-by-hook"
+    error_title = "Login rejected by a hook plugin."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PLUGIN,
+            operation=ErrorOperation.HOOK,
+            error_detail=ErrorDetail.UNAUTHORIZED,
+        )
+
+    @classmethod
+    def from_hook_result(cls, result: HookResult) -> Self:
+        return cls(extra_msg=result.reason, extra_data={"plugins": result.src_plugin})
+
+
+class PasswordNotExpired(BackendAIError, web.HTTPBadRequest):
+    """Raised when a password change without a login names a password that has not expired."""
+
+    error_type = "https://api.backend.ai/probs/password-not-expired"
+    error_title = "Password has not expired."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
 

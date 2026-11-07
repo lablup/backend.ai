@@ -29,7 +29,13 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
     UnreachableError,
 )
-from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
+from ai.backend.common.plugin.hook import (
+    ALL_COMPLETED,
+    FIRST_COMPLETED,
+    PASSED,
+    REJECTED,
+    HookPluginContext,
+)
 from ai.backend.common.types import AccessKey, SecretKey, SSHPrivateKey, SSHPublicKey
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -43,7 +49,9 @@ from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     EmailAlreadyExistsError,
     GroupMembershipNotFoundError,
+    LoginRejectedByHook,
     PasswordExpired,
+    PasswordNotExpired,
     TooManyConcurrentLoginSessions,
 )
 from ai.backend.manager.errors.common import (
@@ -52,7 +60,11 @@ from ai.backend.manager.errors.common import (
     ObjectNotFound,
     RejectedByHook,
 )
-from ai.backend.manager.errors.user import KeyPairNotFound, UserResourcePolicyNotFound
+from ai.backend.manager.errors.user import (
+    KeyPairNotFound,
+    UserNotActive,
+    UserResourcePolicyNotFound,
+)
 from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
 from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
@@ -128,6 +140,7 @@ _FAILURE_MAP: dict[type[Exception], LoginAttemptResult] = {
     AuthorizationFailed: LoginAttemptResult.FAILED_INVALID_CREDENTIALS,
     PasswordExpired: LoginAttemptResult.FAILED_PASSWORD_EXPIRED,
     RejectedByHook: LoginAttemptResult.FAILED_REJECTED_BY_HOOK,
+    LoginRejectedByHook: LoginAttemptResult.FAILED_REJECTED_BY_HOOK,
     TooManyConcurrentLoginSessions: LoginAttemptResult.FAILED_SESSION_ALREADY_EXISTS,
 }
 
@@ -265,6 +278,7 @@ class AuthService:
             AuthorizationFailed,
             PasswordExpired,
             RejectedByHook,
+            LoginRejectedByHook,
             TooManyConcurrentLoginSessions,
         ) as e:
             await self._record_login_failure(
@@ -339,6 +353,10 @@ class AuthService:
             ),
             return_when=FIRST_COMPLETED,
         )
+        # A plugin refusing the second factor is a failed login, so it answers as
+        # one and counts toward the login attempt limit.
+        if hook_result.status == REJECTED:
+            raise LoginRejectedByHook.from_hook_result(hook_result)
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
         if hook_result.result is not None and isinstance(hook_result.result, web.StreamResponse):
@@ -743,7 +761,8 @@ class AuthService:
         self, action: UpdatePasswordNoAuthAction
     ) -> UpdatePasswordNoAuthActionResult:
         auth_config = self._config_provider.config.auth
-        if auth_config.max_password_age is None:
+        max_password_age = auth_config.max_password_age
+        if max_password_age is None:
             raise GenericBadRequest("Unsupported function.")
         checked_user = await self._auth_repository.check_credential_without_migration(
             action.domain_name,
@@ -755,6 +774,13 @@ class AuthService:
                 salt_size=auth_config.password_hash_salt_size,
             ),
         )
+        # This path skips the login, so it stays open only to an active user whose
+        # password the login refuses as expired.
+        if checked_user.status != UserStatus.ACTIVE:
+            raise UserNotActive(f"User status is {checked_user.status}.")
+        expires_at = checked_user.password_changed_at + max_password_age
+        if expires_at >= await self._auth_repository.get_current_time():
+            raise PasswordNotExpired("Change the password after logging in.")
         new_password = action.new_password
         if compare_to_hashed_password(new_password, checked_user.hashed_password):
             raise AuthorizationFailed("Cannot update to the same password as an existing password.")
