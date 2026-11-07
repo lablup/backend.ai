@@ -26,8 +26,8 @@ from ai.backend.manager.data.fair_share.types import (
     ProjectFairShareData,
     UserFairShareData,
 )
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
@@ -296,7 +296,7 @@ class AnUnknownGroupFails(Scenario[TestSeedingSession, Laid, FairShareAdapter, A
 
     @override
     def then(self) -> Then[Laid, Any]:
-        return TheCallIsRefused(ResourceGroupNotFound)
+        return TheCallIsRefused(EntityNotFoundError)
 
 
 SCENARIOS: list[GettingStep] = [
