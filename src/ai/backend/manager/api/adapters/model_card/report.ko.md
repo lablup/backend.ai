@@ -2,17 +2,17 @@
 
 [배경](/src/ai/backend/manager/api/adapters/model_card/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/model_card/adapter.py)
 
-시나리오: 미완성 13 / 16
+시나리오: 미완성 7 / 16
 
 - ops 구성 (8)
   - admin_search: 대표 성공 ✓ · 대표 거부 ✓
-  - batch_load_by_ids: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
+  - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
   - create: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
-  - get: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
-  - min_resources: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
-  - ownership_search: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
-  - project_search: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
-  - scoped_search: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
+  - get: 대표 성공 ✓ · 대표 거부 ✓
+  - min_resources: 대표 성공 ✓ · 대표 거부 ✓
+  - ownership_search: 대표 성공 ✓ · 대표 거부 ✓
+  - project_search: 대표 성공 ✓ · 대표 거부 ✓
+  - scoped_search: 대표 성공 ✓ · 대표 거부 ✓
 - ops + 직접 구현 (3)
   - deploy: 성공 없음 · 거부 없음 (scope, single_get_ops): SCENARIO-GAP
   - partial_bulk_update: 성공 있음 2 · 거부 없음 (atomic_bulk_scoped_search_ops, partial_bulk): SCENARIO-GAP
@@ -31,6 +31,48 @@
 |---|---|
 | [모델 카드를 하나도 미리 저장하지 않은 상태에서 superadmin 이 전체를 조회하면 응답이 비어 있습니다](#model_card-a-scenario-that-laid-no-model-card-finds-none) | 성공 |
 | [superadmin 이 아닌 사용자가 전체 모델 카드 조회를 요청하면 역할로 차단됩니다](#model_card-a-user-who-is-not-the-superadmin-may-not-search-every-model-card) | 거부 |
+
+**batch_load_by_ids**
+
+| 시나리오 | 판정 |
+|---|---|
+| [프로젝트에서 모델 카드 읽기 권한을 받은 사용자가 그 프로젝트의 카드 둘을 id 로 일괄 조회하면 입력 순서대로 두 카드가 응답으로 옵니다](#batch_loading-a-user-granted-model-card-read-loads-cards-by-id-in-order) | 성공 |
+| [한 프로젝트에서만 모델 카드 읽기 권한을 받은 사용자가 그 프로젝트의 카드와 다른 프로젝트의 카드를 함께 일괄 조회하면, 호출은 성공하되 다른 프로젝트의 카드 항목은 권한 부족으로 거부됩니다](#batch_loading-a-card-of-a-project-without-read-gets-a-rejection-in-the-batch) | 거부 |
+
+**get**
+
+| 시나리오 | 판정 |
+|---|---|
+| [프로젝트에서 모델 카드 읽기 권한을 받은 사용자가 카드를 id 로 조회하면 그 카드 전체가 응답으로 옵니다](#getting-a-user-granted-model-card-read-gets-a-card-by-id) | 성공 |
+| [프로젝트에서 모델 카드 수정 권한만 받고 읽기 권한은 없는 사용자가 카드를 id 로 조회하면 권한 부족으로 거부됩니다](#getting-a-user-without-model-card-read-may-not-get-a-card) | 거부 |
+
+**min_resources**
+
+| 시나리오 | 판정 |
+|---|---|
+| [프로젝트에서 모델 카드 읽기 권한을 받은 사용자가 그 프로젝트의 카드 둘의 최소 자원 요구를 조회하면 카드마다 심은 요구가 응답으로 옵니다](#min_resources-a-user-granted-model-card-read-reads-the-minimum-resources) | 성공 |
+| [한 프로젝트에서만 모델 카드 읽기 권한을 받은 사용자가 그 프로젝트의 카드와 다른 프로젝트의 카드의 최소 자원 요구를 함께 조회하면 호출 전체가 권한 부족으로 거부됩니다](#min_resources-a-card-of-a-project-without-read-refuses-the-whole-call) | 거부 |
+
+**ownership_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [첫 프로젝트에서 모델 카드 읽기 권한을 받은 사용자가 조회하면, 범위 안에서 필터에 걸리는 카드만 요청한 순서와 페이지대로 옵니다](#searching-a-user-granted-model-card-read-finds-cards-by-vfolder-ownership) | 성공 |
+| [첫 프로젝트에서 모델 카드 수정 권한만 받고 읽기 권한은 없는 사용자가 조회하면 권한 부족으로 거부됩니다](#searching-a-user-without-model-card-read-may-not-find-cards-by-vfolder-ownership) | 거부 |
+
+**project_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [첫 프로젝트에서 모델 카드 읽기 권한을 받은 사용자가 조회하면, 범위 안에서 필터에 걸리는 카드만 요청한 순서와 페이지대로 옵니다](#searching-a-user-granted-model-card-read-finds-cards-by-project) | 성공 |
+| [첫 프로젝트에서 모델 카드 수정 권한만 받고 읽기 권한은 없는 사용자가 조회하면 권한 부족으로 거부됩니다](#searching-a-user-without-model-card-read-may-not-find-cards-by-project) | 거부 |
+
+**scoped_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [첫 프로젝트에서 모델 카드 읽기 권한을 받은 사용자가 조회하면, 범위 안에서 필터에 걸리는 카드만 요청한 순서와 페이지대로 옵니다](#searching-a-user-granted-model-card-read-finds-cards-by-scope) | 성공 |
+| [첫 프로젝트에서 모델 카드 수정 권한만 받고 읽기 권한은 없는 사용자가 조회하면 권한 부족으로 거부됩니다](#searching-a-user-without-model-card-read-may-not-find-cards-by-scope) | 거부 |
 
 **partial_bulk_update**
 
@@ -115,6 +157,835 @@ Then
 
 - 거부됩니다
   - 거부: InsufficientPrivilege
+
+### batch_load_by_ids
+
+<a id="batch_loading-a-user-granted-model-card-read-loads-cards-by-id-in-order"></a>
+
+#### [a-user-granted-model-card-read-loads-cards-by-id-in-order](/tests/scenario/bai_scenario/manager/model_card/test_batch_loading.py): pass
+
+프로젝트에서 모델 카드 읽기 권한을 받은 사용자가 그 프로젝트의 카드 둘을 id 로 일괄 조회하면 입력 순서대로 두 카드가 응답으로 옵니다
+
+Given
+
+- 모델 카드가 놓인 프로젝트 둘과, 첫 프로젝트에서 모델 카드에 READ 권한을 받은 user 한 명
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 프로젝트 model-store-1
+  - 프로젝트 other-store-1
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-1: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-2: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-2: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-3: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-3: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-4: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-4: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리지 않는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-5: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-5: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+  - 모델 카드 card-1: cpu 최소 1 요구
+  - 모델 카드 card-2: cpu 최소 2 요구
+  - 모델 카드 card-3: cpu 최소 3 요구
+  - 모델 카드 card-4: cpu 최소 4 요구
+  - 모델 카드 card-5: cpu 최소 5 요구
+  - 모델 카드 권한 부여
+    - 역할 card-handler-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 card-handler-1: model_card 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 card-handler-1 보유
+
+When
+
+- ModelCardAdapter.batch_load_by_ids: user-2이 card-1, card-2 카드를 id 로 일괄 조회합니다
+
+Then
+
+- 카드 둘이 입력 순서대로 선택 항목과 최소 자원 요구까지 채워져 옵니다
+  - length = 2
+  - [0].id: 미리 저장한 카드와 같다
+  - [0].entity_id: 미리 저장한 카드와 같다
+  - [0].name = 'card-1'
+  - [0].vfolder_id: 카드가 놓인 vfolder 와 같다
+  - [0].domain_name = 'home-1'
+  - [0].project_id: 카드가 놓인 프로젝트와 같다
+  - [0].creator_id: 카드를 만든 사람와 같다
+  - [0].metadata.author = 'the-author'
+  - [0].metadata.title = '검색에 걸리는 카드'
+  - [0].metadata.model_version = '1.0'
+  - [0].metadata.description = 'the description'
+  - [0].metadata.task = 'text-generation'
+  - [0].metadata.category = 'llm'
+  - [0].metadata.architecture = 'llama'
+  - [0].metadata.framework = ['pytorch']
+  - [0].metadata.label = ['chat']
+  - [0].metadata.license = 'apache-2.0'
+  - [0].min_resource = [ResourceSlotEntryInfo(resource_type='cpu', quantity='1')]
+  - [0].readme = 'the readme'
+  - [0].access_level = <ModelCardAccessLevel.INTERNAL: 'internal'>
+  - [0].created_at: 이 실행이 쓴 시각
+  - [0].updated_at: 이 실행이 쓴 시각
+  - [1].id: 미리 저장한 카드와 같다
+  - [1].entity_id: 미리 저장한 카드와 같다
+  - [1].name = 'card-2'
+  - [1].vfolder_id: 카드가 놓인 vfolder 와 같다
+  - [1].domain_name = 'home-1'
+  - [1].project_id: 카드가 놓인 프로젝트와 같다
+  - [1].creator_id: 카드를 만든 사람와 같다
+  - [1].metadata.author = 'the-author'
+  - [1].metadata.title = '검색에 걸리는 카드'
+  - [1].metadata.model_version = '1.0'
+  - [1].metadata.description = 'the description'
+  - [1].metadata.task = 'text-generation'
+  - [1].metadata.category = 'llm'
+  - [1].metadata.architecture = 'llama'
+  - [1].metadata.framework = ['pytorch']
+  - [1].metadata.label = ['chat']
+  - [1].metadata.license = 'apache-2.0'
+  - [1].min_resource = [ResourceSlotEntryInfo(resource_type='cpu', quantity='2')]
+  - [1].readme = 'the readme'
+  - [1].access_level = <ModelCardAccessLevel.INTERNAL: 'internal'>
+  - [1].created_at: 이 실행이 쓴 시각
+  - [1].updated_at: 이 실행이 쓴 시각
+
+<a id="batch_loading-a-card-of-a-project-without-read-gets-a-rejection-in-the-batch"></a>
+
+#### [a-card-of-a-project-without-read-gets-a-rejection-in-the-batch](/tests/scenario/bai_scenario/manager/model_card/test_batch_loading.py): pass
+
+한 프로젝트에서만 모델 카드 읽기 권한을 받은 사용자가 그 프로젝트의 카드와 다른 프로젝트의 카드를 함께 일괄 조회하면, 호출은 성공하되 다른 프로젝트의 카드 항목은 권한 부족으로 거부됩니다
+
+Given
+
+- 모델 카드가 놓인 프로젝트 둘과, 첫 프로젝트에서 모델 카드에 READ 권한을 받은 user 한 명
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 프로젝트 model-store-1
+  - 프로젝트 other-store-1
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-1: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-2: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-2: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-3: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-3: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-4: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-4: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리지 않는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-5: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-5: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+  - 모델 카드 card-1: cpu 최소 1 요구
+  - 모델 카드 card-2: cpu 최소 2 요구
+  - 모델 카드 card-3: cpu 최소 3 요구
+  - 모델 카드 card-4: cpu 최소 4 요구
+  - 모델 카드 card-5: cpu 최소 5 요구
+  - 모델 카드 권한 부여
+    - 역할 card-handler-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 card-handler-1: model_card 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 card-handler-1 보유
+
+When
+
+- ModelCardAdapter.batch_load_by_ids: user-2이 card-1, 다른 프로젝트의 card-5 카드를 id 로 일괄 조회합니다
+
+Then
+
+- 읽을 수 있는 카드는 노드로, 권한이 없는 카드 항목은 권한 부족 거부로 옵니다
+  - length = 2
+  - [0].id: 미리 저장한 카드와 같다
+  - [0].entity_id: 미리 저장한 카드와 같다
+  - [0].name = 'card-1'
+  - [0].vfolder_id: 카드가 놓인 vfolder 와 같다
+  - [0].domain_name = 'home-1'
+  - [0].project_id: 카드가 놓인 프로젝트와 같다
+  - [0].creator_id: 카드를 만든 사람와 같다
+  - [0].metadata.author = 'the-author'
+  - [0].metadata.title = '검색에 걸리는 카드'
+  - [0].metadata.model_version = '1.0'
+  - [0].metadata.description = 'the description'
+  - [0].metadata.task = 'text-generation'
+  - [0].metadata.category = 'llm'
+  - [0].metadata.architecture = 'llama'
+  - [0].metadata.framework = ['pytorch']
+  - [0].metadata.label = ['chat']
+  - [0].metadata.license = 'apache-2.0'
+  - [0].min_resource = [ResourceSlotEntryInfo(resource_type='cpu', quantity='1')]
+  - [0].readme = 'the readme'
+  - [0].access_level = <ModelCardAccessLevel.INTERNAL: 'internal'>
+  - [0].created_at: 이 실행이 쓴 시각
+  - [0].updated_at: 이 실행이 쓴 시각
+  - 거부: NotEnoughPermission
+
+### get
+
+<a id="getting-a-user-granted-model-card-read-gets-a-card-by-id"></a>
+
+#### [a-user-granted-model-card-read-gets-a-card-by-id](/tests/scenario/bai_scenario/manager/model_card/test_getting.py): pass
+
+프로젝트에서 모델 카드 읽기 권한을 받은 사용자가 카드를 id 로 조회하면 그 카드 전체가 응답으로 옵니다
+
+Given
+
+- 모델 카드가 놓인 프로젝트 둘과, 첫 프로젝트에서 모델 카드에 READ 권한을 받은 user 한 명
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 프로젝트 model-store-1
+  - 프로젝트 other-store-1
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-1: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-2: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-2: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-3: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-3: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-4: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-4: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리지 않는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-5: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-5: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+  - 모델 카드 card-1: cpu 최소 1 요구
+  - 모델 카드 card-2: cpu 최소 2 요구
+  - 모델 카드 card-3: cpu 최소 3 요구
+  - 모델 카드 card-4: cpu 최소 4 요구
+  - 모델 카드 card-5: cpu 최소 5 요구
+  - 모델 카드 권한 부여
+    - 역할 card-handler-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 card-handler-1: model_card 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 card-handler-1 보유
+
+When
+
+- ModelCardAdapter.get: user-2이 card-1 카드를 id 로 조회합니다
+
+Then
+
+- 선택 항목과 최소 자원 요구까지 채워진 카드 전체가 응답으로 옵니다
+  - id: 미리 저장한 카드와 같다
+  - entity_id: 미리 저장한 카드와 같다
+  - name = 'card-1'
+  - vfolder_id: 카드가 놓인 vfolder 와 같다
+  - domain_name = 'home-1'
+  - project_id: 카드가 놓인 프로젝트와 같다
+  - creator_id: 카드를 만든 사람와 같다
+  - metadata.author = 'the-author'
+  - metadata.title = '검색에 걸리는 카드'
+  - metadata.model_version = '1.0'
+  - metadata.description = 'the description'
+  - metadata.task = 'text-generation'
+  - metadata.category = 'llm'
+  - metadata.architecture = 'llama'
+  - metadata.framework = ['pytorch']
+  - metadata.label = ['chat']
+  - metadata.license = 'apache-2.0'
+  - min_resource = [ResourceSlotEntryInfo(resource_type='cpu', quantity='1')]
+  - readme = 'the readme'
+  - access_level = <ModelCardAccessLevel.INTERNAL: 'internal'>
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
+
+<a id="getting-a-user-without-model-card-read-may-not-get-a-card"></a>
+
+#### [a-user-without-model-card-read-may-not-get-a-card](/tests/scenario/bai_scenario/manager/model_card/test_getting.py): pass
+
+프로젝트에서 모델 카드 수정 권한만 받고 읽기 권한은 없는 사용자가 카드를 id 로 조회하면 권한 부족으로 거부됩니다
+
+Given
+
+- 모델 카드가 놓인 프로젝트 둘과, 첫 프로젝트에서 모델 카드에 UPDATE 권한을 받은 user 한 명
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 프로젝트 model-store-1
+  - 프로젝트 other-store-1
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-1: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-2: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-2: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-3: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-3: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-4: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-4: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리지 않는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-5: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-5: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+  - 모델 카드 card-1: cpu 최소 1 요구
+  - 모델 카드 card-2: cpu 최소 2 요구
+  - 모델 카드 card-3: cpu 최소 3 요구
+  - 모델 카드 card-4: cpu 최소 4 요구
+  - 모델 카드 card-5: cpu 최소 5 요구
+  - 모델 카드 권한 부여
+    - 역할 card-handler-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 card-handler-1: model_card 전체에 UPDATE 허용
+    - 일반 사용자 user-2: 역할 card-handler-1 보유
+
+When
+
+- ModelCardAdapter.get: user-2이 card-1 카드를 id 로 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### min_resources
+
+<a id="min_resources-a-user-granted-model-card-read-reads-the-minimum-resources"></a>
+
+#### [a-user-granted-model-card-read-reads-the-minimum-resources](/tests/scenario/bai_scenario/manager/model_card/test_min_resources.py): pass
+
+프로젝트에서 모델 카드 읽기 권한을 받은 사용자가 그 프로젝트의 카드 둘의 최소 자원 요구를 조회하면 카드마다 심은 요구가 응답으로 옵니다
+
+Given
+
+- 모델 카드가 놓인 프로젝트 둘과, 첫 프로젝트에서 모델 카드에 READ 권한을 받은 user 한 명
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 프로젝트 model-store-1
+  - 프로젝트 other-store-1
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-1: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-2: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-2: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-3: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-3: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-4: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-4: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리지 않는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-5: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-5: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+  - 모델 카드 card-1: cpu 최소 1 요구
+  - 모델 카드 card-2: cpu 최소 2 요구
+  - 모델 카드 card-3: cpu 최소 3 요구
+  - 모델 카드 card-4: cpu 최소 4 요구
+  - 모델 카드 card-5: cpu 최소 5 요구
+  - 모델 카드 권한 부여
+    - 역할 card-handler-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 card-handler-1: model_card 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 card-handler-1 보유
+
+When
+
+- ModelCardAdapter.min_resources: user-2이 card-1, card-2 카드의 최소 자원 요구를 조회합니다
+
+Then
+
+- 요청한 카드마다 심은 최소 자원 요구가 옵니다
+  - length = 2
+  - card-1 = [ResourceSlotEntryInfo(resource_type='cpu', quantity='1')]
+  - card-2 = [ResourceSlotEntryInfo(resource_type='cpu', quantity='2')]
+
+<a id="min_resources-a-card-of-a-project-without-read-refuses-the-whole-call"></a>
+
+#### [a-card-of-a-project-without-read-refuses-the-whole-call](/tests/scenario/bai_scenario/manager/model_card/test_min_resources.py): pass
+
+한 프로젝트에서만 모델 카드 읽기 권한을 받은 사용자가 그 프로젝트의 카드와 다른 프로젝트의 카드의 최소 자원 요구를 함께 조회하면 호출 전체가 권한 부족으로 거부됩니다
+
+Given
+
+- 모델 카드가 놓인 프로젝트 둘과, 첫 프로젝트에서 모델 카드에 READ 권한을 받은 user 한 명
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 프로젝트 model-store-1
+  - 프로젝트 other-store-1
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-1: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-2: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-2: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-3: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-3: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-4: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-4: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리지 않는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-5: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-5: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+  - 모델 카드 card-1: cpu 최소 1 요구
+  - 모델 카드 card-2: cpu 최소 2 요구
+  - 모델 카드 card-3: cpu 최소 3 요구
+  - 모델 카드 card-4: cpu 최소 4 요구
+  - 모델 카드 card-5: cpu 최소 5 요구
+  - 모델 카드 권한 부여
+    - 역할 card-handler-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 card-handler-1: model_card 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 card-handler-1 보유
+
+When
+
+- ModelCardAdapter.min_resources: user-2이 card-1, 다른 프로젝트의 card-5 카드의 최소 자원 요구를 함께 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### ownership_search
+
+<a id="searching-a-user-granted-model-card-read-finds-cards-by-vfolder-ownership"></a>
+
+#### [a-user-granted-model-card-read-finds-cards-by-vfolder-ownership](/tests/scenario/bai_scenario/manager/model_card/test_searching.py): pass
+
+첫 프로젝트에서 모델 카드 읽기 권한을 받은 사용자가 조회하면, 범위 안에서 필터에 걸리는 카드만 요청한 순서와 페이지대로 옵니다
+
+Given
+
+- 모델 카드가 놓인 프로젝트 둘과, 첫 프로젝트에서 모델 카드에 READ 권한을 받은, 그 프로젝트의 vfolder 읽기도 받은 user 한 명
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 프로젝트 model-store-1
+  - 프로젝트 other-store-1
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-1: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-2: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-2: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-3: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-3: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-4: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-4: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리지 않는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-5: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-5: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+  - 모델 카드 card-1: cpu 최소 1 요구
+  - 모델 카드 card-2: cpu 최소 2 요구
+  - 모델 카드 card-3: cpu 최소 3 요구
+  - 모델 카드 card-4: cpu 최소 4 요구
+  - 모델 카드 card-5: cpu 최소 5 요구
+  - 모델 카드 권한 부여
+    - 역할 card-handler-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 card-handler-1: model_card 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 card-handler-1 보유
+  - vfolder 읽기 권한 부여
+    - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 folder-reader-1: vfolder 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 folder-reader-1 보유
+
+When
+
+- ModelCardAdapter.ownership_search: user-2이 model-store-1 프로젝트가 소유한 vfolder 하나를 쓰는 카드를 제목 필터, 이름 내림차순, 두 건 한 페이지로 조회합니다
+
+Then
+
+- 필터에 걸리고 범위 안에 있는 카드만 정렬 순서대로 한 페이지에 옵니다. 범위 밖 카드와 필터에 걸리지 않는 카드는 응답에도 건수에도 없습니다
+  - items count = 1
+  - items[0].id: 미리 저장한 카드와 같다
+  - items[0].entity_id: 미리 저장한 카드와 같다
+  - items[0].name = 'card-1'
+  - items[0].vfolder_id: 카드가 놓인 vfolder 와 같다
+  - items[0].domain_name = 'home-1'
+  - items[0].project_id: 카드가 놓인 프로젝트와 같다
+  - items[0].creator_id: 카드를 만든 사람와 같다
+  - items[0].metadata.author = 'the-author'
+  - items[0].metadata.title = '검색에 걸리는 카드'
+  - items[0].metadata.model_version = '1.0'
+  - items[0].metadata.description = 'the description'
+  - items[0].metadata.task = 'text-generation'
+  - items[0].metadata.category = 'llm'
+  - items[0].metadata.architecture = 'llama'
+  - items[0].metadata.framework = ['pytorch']
+  - items[0].metadata.label = ['chat']
+  - items[0].metadata.license = 'apache-2.0'
+  - items[0].min_resource = [ResourceSlotEntryInfo(resource_type='cpu', quantity='1')]
+  - items[0].readme = 'the readme'
+  - items[0].access_level = <ModelCardAccessLevel.INTERNAL: 'internal'>
+  - items[0].created_at: 이 실행이 쓴 시각
+  - items[0].updated_at: 이 실행이 쓴 시각
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-a-user-without-model-card-read-may-not-find-cards-by-vfolder-ownership"></a>
+
+#### [a-user-without-model-card-read-may-not-find-cards-by-vfolder-ownership](/tests/scenario/bai_scenario/manager/model_card/test_searching.py): pass
+
+첫 프로젝트에서 모델 카드 수정 권한만 받고 읽기 권한은 없는 사용자가 조회하면 권한 부족으로 거부됩니다
+
+Given
+
+- 모델 카드가 놓인 프로젝트 둘과, 첫 프로젝트에서 모델 카드에 UPDATE 권한을 받은, 그 프로젝트의 vfolder 읽기도 받은 user 한 명
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 프로젝트 model-store-1
+  - 프로젝트 other-store-1
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-1: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-2: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-2: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-3: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-3: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-4: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-4: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리지 않는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-5: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-5: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+  - 모델 카드 card-1: cpu 최소 1 요구
+  - 모델 카드 card-2: cpu 최소 2 요구
+  - 모델 카드 card-3: cpu 최소 3 요구
+  - 모델 카드 card-4: cpu 최소 4 요구
+  - 모델 카드 card-5: cpu 최소 5 요구
+  - 모델 카드 권한 부여
+    - 역할 card-handler-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 card-handler-1: model_card 전체에 UPDATE 허용
+    - 일반 사용자 user-2: 역할 card-handler-1 보유
+  - vfolder 읽기 권한 부여
+    - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 folder-reader-1: vfolder 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 folder-reader-1 보유
+
+When
+
+- ModelCardAdapter.ownership_search: user-2이 model-store-1 프로젝트가 소유한 vfolder 하나를 쓰는 카드를 제목 필터, 이름 내림차순, 두 건 한 페이지로 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### project_search
+
+<a id="searching-a-user-granted-model-card-read-finds-cards-by-project"></a>
+
+#### [a-user-granted-model-card-read-finds-cards-by-project](/tests/scenario/bai_scenario/manager/model_card/test_searching.py): pass
+
+첫 프로젝트에서 모델 카드 읽기 권한을 받은 사용자가 조회하면, 범위 안에서 필터에 걸리는 카드만 요청한 순서와 페이지대로 옵니다
+
+Given
+
+- 모델 카드가 놓인 프로젝트 둘과, 첫 프로젝트에서 모델 카드에 READ 권한을 받은 user 한 명
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 프로젝트 model-store-1
+  - 프로젝트 other-store-1
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-1: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-2: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-2: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-3: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-3: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-4: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-4: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리지 않는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-5: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-5: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+  - 모델 카드 card-1: cpu 최소 1 요구
+  - 모델 카드 card-2: cpu 최소 2 요구
+  - 모델 카드 card-3: cpu 최소 3 요구
+  - 모델 카드 card-4: cpu 최소 4 요구
+  - 모델 카드 card-5: cpu 최소 5 요구
+  - 모델 카드 권한 부여
+    - 역할 card-handler-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 card-handler-1: model_card 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 card-handler-1 보유
+
+When
+
+- ModelCardAdapter.project_search: user-2이 model-store-1 프로젝트에서 제목 필터, 이름 내림차순, 두 건 한 페이지로 조회합니다
+
+Then
+
+- 필터에 걸리고 범위 안에 있는 카드만 정렬 순서대로 한 페이지에 옵니다. 범위 밖 카드와 필터에 걸리지 않는 카드는 응답에도 건수에도 없습니다
+  - items count = 2
+  - items[0].id: 미리 저장한 카드와 같다
+  - items[0].entity_id: 미리 저장한 카드와 같다
+  - items[0].name = 'card-3'
+  - items[0].vfolder_id: 카드가 놓인 vfolder 와 같다
+  - items[0].domain_name = 'home-1'
+  - items[0].project_id: 카드가 놓인 프로젝트와 같다
+  - items[0].creator_id: 카드를 만든 사람와 같다
+  - items[0].metadata.author = 'the-author'
+  - items[0].metadata.title = '검색에 걸리는 카드'
+  - items[0].metadata.model_version = '1.0'
+  - items[0].metadata.description = 'the description'
+  - items[0].metadata.task = 'text-generation'
+  - items[0].metadata.category = 'llm'
+  - items[0].metadata.architecture = 'llama'
+  - items[0].metadata.framework = ['pytorch']
+  - items[0].metadata.label = ['chat']
+  - items[0].metadata.license = 'apache-2.0'
+  - items[0].min_resource = [ResourceSlotEntryInfo(resource_type='cpu', quantity='3')]
+  - items[0].readme = 'the readme'
+  - items[0].access_level = <ModelCardAccessLevel.INTERNAL: 'internal'>
+  - items[0].created_at: 이 실행이 쓴 시각
+  - items[0].updated_at: 이 실행이 쓴 시각
+  - items[1].id: 미리 저장한 카드와 같다
+  - items[1].entity_id: 미리 저장한 카드와 같다
+  - items[1].name = 'card-2'
+  - items[1].vfolder_id: 카드가 놓인 vfolder 와 같다
+  - items[1].domain_name = 'home-1'
+  - items[1].project_id: 카드가 놓인 프로젝트와 같다
+  - items[1].creator_id: 카드를 만든 사람와 같다
+  - items[1].metadata.author = 'the-author'
+  - items[1].metadata.title = '검색에 걸리는 카드'
+  - items[1].metadata.model_version = '1.0'
+  - items[1].metadata.description = 'the description'
+  - items[1].metadata.task = 'text-generation'
+  - items[1].metadata.category = 'llm'
+  - items[1].metadata.architecture = 'llama'
+  - items[1].metadata.framework = ['pytorch']
+  - items[1].metadata.label = ['chat']
+  - items[1].metadata.license = 'apache-2.0'
+  - items[1].min_resource = [ResourceSlotEntryInfo(resource_type='cpu', quantity='2')]
+  - items[1].readme = 'the readme'
+  - items[1].access_level = <ModelCardAccessLevel.INTERNAL: 'internal'>
+  - items[1].created_at: 이 실행이 쓴 시각
+  - items[1].updated_at: 이 실행이 쓴 시각
+  - total_count = 3
+  - has_next_page = True
+  - has_previous_page = False
+
+<a id="searching-a-user-without-model-card-read-may-not-find-cards-by-project"></a>
+
+#### [a-user-without-model-card-read-may-not-find-cards-by-project](/tests/scenario/bai_scenario/manager/model_card/test_searching.py): pass
+
+첫 프로젝트에서 모델 카드 수정 권한만 받고 읽기 권한은 없는 사용자가 조회하면 권한 부족으로 거부됩니다
+
+Given
+
+- 모델 카드가 놓인 프로젝트 둘과, 첫 프로젝트에서 모델 카드에 UPDATE 권한을 받은 user 한 명
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 프로젝트 model-store-1
+  - 프로젝트 other-store-1
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-1: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-2: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-2: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-3: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-3: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-4: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-4: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리지 않는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-5: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-5: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+  - 모델 카드 card-1: cpu 최소 1 요구
+  - 모델 카드 card-2: cpu 최소 2 요구
+  - 모델 카드 card-3: cpu 최소 3 요구
+  - 모델 카드 card-4: cpu 최소 4 요구
+  - 모델 카드 card-5: cpu 최소 5 요구
+  - 모델 카드 권한 부여
+    - 역할 card-handler-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 card-handler-1: model_card 전체에 UPDATE 허용
+    - 일반 사용자 user-2: 역할 card-handler-1 보유
+
+When
+
+- ModelCardAdapter.project_search: user-2이 model-store-1 프로젝트에서 제목 필터, 이름 내림차순, 두 건 한 페이지로 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### scoped_search
+
+<a id="searching-a-user-granted-model-card-read-finds-cards-by-scope"></a>
+
+#### [a-user-granted-model-card-read-finds-cards-by-scope](/tests/scenario/bai_scenario/manager/model_card/test_searching.py): pass
+
+첫 프로젝트에서 모델 카드 읽기 권한을 받은 사용자가 조회하면, 범위 안에서 필터에 걸리는 카드만 요청한 순서와 페이지대로 옵니다
+
+Given
+
+- 모델 카드가 놓인 프로젝트 둘과, 첫 프로젝트에서 모델 카드에 READ 권한을 받은 user 한 명
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 프로젝트 model-store-1
+  - 프로젝트 other-store-1
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-1: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-2: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-2: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-3: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-3: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-4: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-4: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리지 않는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-5: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-5: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+  - 모델 카드 card-1: cpu 최소 1 요구
+  - 모델 카드 card-2: cpu 최소 2 요구
+  - 모델 카드 card-3: cpu 최소 3 요구
+  - 모델 카드 card-4: cpu 최소 4 요구
+  - 모델 카드 card-5: cpu 최소 5 요구
+  - 모델 카드 권한 부여
+    - 역할 card-handler-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 card-handler-1: model_card 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 card-handler-1 보유
+
+When
+
+- ModelCardAdapter.scoped_search: user-2이 model-store-1 프로젝트 범위에서 제목 필터, 이름 내림차순, 두 건 한 페이지로 조회합니다
+
+Then
+
+- 필터에 걸리고 범위 안에 있는 카드만 정렬 순서대로 한 페이지에 옵니다. 범위 밖 카드와 필터에 걸리지 않는 카드는 응답에도 건수에도 없습니다
+  - items count = 2
+  - items[0].id: 미리 저장한 카드와 같다
+  - items[0].entity_id: 미리 저장한 카드와 같다
+  - items[0].name = 'card-3'
+  - items[0].vfolder_id: 카드가 놓인 vfolder 와 같다
+  - items[0].domain_name = 'home-1'
+  - items[0].project_id: 카드가 놓인 프로젝트와 같다
+  - items[0].creator_id: 카드를 만든 사람와 같다
+  - items[0].metadata.author = 'the-author'
+  - items[0].metadata.title = '검색에 걸리는 카드'
+  - items[0].metadata.model_version = '1.0'
+  - items[0].metadata.description = 'the description'
+  - items[0].metadata.task = 'text-generation'
+  - items[0].metadata.category = 'llm'
+  - items[0].metadata.architecture = 'llama'
+  - items[0].metadata.framework = ['pytorch']
+  - items[0].metadata.label = ['chat']
+  - items[0].metadata.license = 'apache-2.0'
+  - items[0].min_resource = [ResourceSlotEntryInfo(resource_type='cpu', quantity='3')]
+  - items[0].readme = 'the readme'
+  - items[0].access_level = <ModelCardAccessLevel.INTERNAL: 'internal'>
+  - items[0].created_at: 이 실행이 쓴 시각
+  - items[0].updated_at: 이 실행이 쓴 시각
+  - items[1].id: 미리 저장한 카드와 같다
+  - items[1].entity_id: 미리 저장한 카드와 같다
+  - items[1].name = 'card-2'
+  - items[1].vfolder_id: 카드가 놓인 vfolder 와 같다
+  - items[1].domain_name = 'home-1'
+  - items[1].project_id: 카드가 놓인 프로젝트와 같다
+  - items[1].creator_id: 카드를 만든 사람와 같다
+  - items[1].metadata.author = 'the-author'
+  - items[1].metadata.title = '검색에 걸리는 카드'
+  - items[1].metadata.model_version = '1.0'
+  - items[1].metadata.description = 'the description'
+  - items[1].metadata.task = 'text-generation'
+  - items[1].metadata.category = 'llm'
+  - items[1].metadata.architecture = 'llama'
+  - items[1].metadata.framework = ['pytorch']
+  - items[1].metadata.label = ['chat']
+  - items[1].metadata.license = 'apache-2.0'
+  - items[1].min_resource = [ResourceSlotEntryInfo(resource_type='cpu', quantity='2')]
+  - items[1].readme = 'the readme'
+  - items[1].access_level = <ModelCardAccessLevel.INTERNAL: 'internal'>
+  - items[1].created_at: 이 실행이 쓴 시각
+  - items[1].updated_at: 이 실행이 쓴 시각
+  - total_count = 3
+  - has_next_page = True
+  - has_previous_page = False
+
+<a id="searching-a-user-without-model-card-read-may-not-find-cards-by-scope"></a>
+
+#### [a-user-without-model-card-read-may-not-find-cards-by-scope](/tests/scenario/bai_scenario/manager/model_card/test_searching.py): pass
+
+첫 프로젝트에서 모델 카드 수정 권한만 받고 읽기 권한은 없는 사용자가 조회하면 권한 부족으로 거부됩니다
+
+Given
+
+- 모델 카드가 놓인 프로젝트 둘과, 첫 프로젝트에서 모델 카드에 UPDATE 권한을 받은 user 한 명
+  - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, vfolder 는 local:volume1에 놓을 수 있습니다
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 프로젝트 model-store-1
+  - 프로젝트 other-store-1
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-1: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-2: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-2: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-3: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-3: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-4: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-4: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리지 않는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 프로젝트 vfolder folder-5: 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+  - 모델 카드 card-5: 프로젝트에 놓이고 vfolder 위에 추가됩니다, 제목은 '검색에 걸리는 카드'입니다, 선택 항목도 모두 채웁니다
+  - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+  - 모델 카드 card-1: cpu 최소 1 요구
+  - 모델 카드 card-2: cpu 최소 2 요구
+  - 모델 카드 card-3: cpu 최소 3 요구
+  - 모델 카드 card-4: cpu 최소 4 요구
+  - 모델 카드 card-5: cpu 최소 5 요구
+  - 모델 카드 권한 부여
+    - 역할 card-handler-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 card-handler-1: model_card 전체에 UPDATE 허용
+    - 일반 사용자 user-2: 역할 card-handler-1 보유
+
+When
+
+- ModelCardAdapter.scoped_search: user-2이 model-store-1 프로젝트 범위에서 제목 필터, 이름 내림차순, 두 건 한 페이지로 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
 
 ### partial_bulk_update
 
