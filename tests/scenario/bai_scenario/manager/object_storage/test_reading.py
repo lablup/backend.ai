@@ -9,9 +9,9 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.object_storage.response import ObjectStorageNode
 from ai.backend.manager.api.adapters.object_storage.adapter import ObjectStorageAdapter
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -155,27 +155,27 @@ class EveryIdIsRefused(Then[ManyStoragesAndACaller, Loaded]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminGetsAStorage(
+class AUserGrantedReadGetsAStorage(
     Scenario[TestSeedingSession, AStorageAndACaller, ObjectStorageAdapter, ObjectStorageNode]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-gets-an-object-storage"
+        return "a-user-granted-read-gets-an-object-storage"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 object storage 하나를 조회하면 미리 저장한 object storage 전체가 "
-            "반환됩니다",
+            "object storage 조회 권한을 받은 사용자가 하나를 조회하면 미리 저장한 object storage "
+            "전체가 반환됩니다",
             english=(
-                "when the superadmin reads one object storage, the whole seeded object storage "
-                "comes back"
+                "when a user granted permission to read object storages reads one, the whole "
+                "seeded object storage comes back"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AStorageAndACaller]:
-        return AStorageAndSomeone(role=UserRole.SUPERADMIN)
+        return AStorageAndSomeone(granted=(Permission.READ,))
 
     @override
     def when(self) -> When[AStorageAndACaller, ObjectStorageAdapter, ObjectStorageNode]:
@@ -219,28 +219,29 @@ class AUserGrantedNothingMayNotGet(
 
 
 @dataclass(frozen=True)
-class TheSuperadminReadsManyInOrder(
+class AUserGrantedReadReadsManyInOrder(
     Scenario[TestSeedingSession, ManyStoragesAndACaller, ObjectStorageAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-reads-several-object-storages-in-the-requested-order"
+        return "a-user-granted-read-reads-several-object-storages-in-the-requested-order"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 미리 저장한 object storage 둘과 존재하지 않는 id 하나를 한 번에 "
-            "조회하면, 둘은 요청한 순서대로 반환되고 존재하지 않는 id 의 항목은 비어 있습니다",
+            "object storage 조회 권한을 받은 사용자가 미리 저장한 object storage 둘과 존재하지 않는 "
+            "id 하나를 한 번에 조회하면, 둘은 요청한 순서대로 반환되고 존재하지 않는 id 의 항목은 "
+            "비어 있습니다",
             english=(
-                "when the superadmin loads two object storages seeded in advance and one id that "
-                "does not exist at once, the two come back in the requested order and the entry "
-                "for the id that does not exist is empty"
+                "when a user granted permission to read object storages loads two object storages "
+                "seeded in advance and one id that does not exist at once, the two come back in "
+                "the requested order and the entry for the id that does not exist is empty"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyStoragesAndACaller]:
-        return ManyStoragesAndSomeone(role=UserRole.SUPERADMIN)
+        return ManyStoragesAndSomeone(granted=(Permission.READ,))
 
     @override
     def when(self) -> When[ManyStoragesAndACaller, ObjectStorageAdapter, Loaded]:
@@ -285,9 +286,9 @@ class AUserGrantedNothingIsRefusedOnEveryId(
 
 
 SCENARIOS: list[ReadingStep] = [
-    TheSuperadminGetsAStorage(),
+    AUserGrantedReadGetsAStorage(),
     AUserGrantedNothingMayNotGet(),
-    TheSuperadminReadsManyInOrder(),
+    AUserGrantedReadReadsManyInOrder(),
     AUserGrantedNothingIsRefusedOnEveryId(),
 ]
 

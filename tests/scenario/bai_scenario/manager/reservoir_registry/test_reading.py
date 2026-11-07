@@ -410,28 +410,29 @@ class APlainUserMayNotReadMany(
 
 
 @dataclass(frozen=True)
-class TheSuperadminLoadsManyInOrder(
+class AUserGrantedReadLoadsManyInOrder(
     Scenario[TestSeedingSession, ManyRegistriesAndACaller, ReservoirRegistryAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-loads-several-registries-in-the-requested-order"
+        return "a-user-granted-read-loads-several-reservoir-registries-in-the-requested-order"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 미리 저장한 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 조회하면, "
-            "둘은 요청한 순서대로 반환되고 존재하지 않는 id 의 항목은 비어 있습니다",
+            "Reservoir 레지스트리 조회 권한을 받은 사용자가 미리 저장한 레지스트리 둘과 존재하지 않는 "
+            "id 하나를 한 번에 조회하면, 둘은 요청한 순서대로 반환되고 존재하지 않는 id 의 항목은 "
+            "비어 있습니다",
             english=(
-                "when the superadmin loads two registries seeded in advance and one id that does "
-                "not exist at once, the two come back in the requested order and the entry for "
-                "the id that does not exist is empty"
+                "when a user granted permission to read Reservoir registries loads two registries "
+                "seeded in advance and one id that does not exist at once, the two come back in "
+                "the requested order and the entry for the id that does not exist is empty"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyRegistriesAndACaller]:
-        return ManyRegistriesAndSomeone(role=UserRole.SUPERADMIN)
+        return ManyRegistriesAndSomeone(granted=(Permission.READ,))
 
     @override
     def when(self) -> When[ManyRegistriesAndACaller, ReservoirRegistryAdapter, Loaded]:
@@ -480,7 +481,7 @@ SCENARIOS: list[ReadingStep] = [
     AUserGrantedNothingMayNotGet(),
     TheSuperadminReadsMany(),
     APlainUserMayNotReadMany(),
-    TheSuperadminLoadsManyInOrder(),
+    AUserGrantedReadLoadsManyInOrder(),
     AUserGrantedNothingIsRefusedOnEveryId(),
 ]
 

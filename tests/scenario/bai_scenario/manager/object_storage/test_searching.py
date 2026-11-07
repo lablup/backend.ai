@@ -13,10 +13,15 @@ from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.object_storage.request import (
     AdminSearchObjectStoragesInput,
     ObjectStorageFilter,
+    ObjectStorageOrder,
 )
 from ai.backend.common.dto.manager.v2.object_storage.response import (
     AdminSearchObjectStoragesPayload,
     ObjectStorageNode,
+)
+from ai.backend.common.dto.manager.v2.object_storage.types import (
+    ObjectStorageOrderField,
+    OrderDirection,
 )
 from ai.backend.manager.api.adapters.object_storage.adapter import ObjectStorageAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
@@ -80,61 +85,39 @@ def the_storages(
 class Searching(
     When[ManyStoragesAndACaller, ObjectStorageAdapter, AdminSearchObjectStoragesPayload]
 ):
-    name: str | None = None
-
     @override
     def operation(self) -> str:
         return "admin_search"
 
     @override
     def describe(self, laid: ManyStoragesAndACaller) -> str:
-        if self.name is None:
-            return Says(
-                f"{laid.caller.username}이 조건 없이 object storage 를 검색합니다",
-                english=f"{laid.caller.username} searches object storages with no condition",
-            )
         return Says(
-            f"{laid.caller.username}이 이름이 {self.name}인 object storage 를 검색합니다",
-            english=f"{laid.caller.username} searches object storages named {self.name}",
+            f"{laid.caller.username}이 이름으로 object storage 를 거르고 이름 오름차순으로 "
+            "정렬해 한 쪽을 요청합니다",
+            english=(
+                f"{laid.caller.username} filters object storages by name, orders them by name "
+                "ascending and asks for one page"
+            ),
         )
 
     @override
     async def call(
         self, adapter: ObjectStorageAdapter, laid: ManyStoragesAndACaller
     ) -> AdminSearchObjectStoragesPayload:
-        search = AdminSearchObjectStoragesInput()
-        if self.name is not None:
-            search = AdminSearchObjectStoragesInput(
-                filter=ObjectStorageFilter(name=StringFilter(equals=self.name))
-            )
         with ActingAs(laid.caller):
-            return await adapter.admin_search(search)
-
-
-@dataclass(frozen=True)
-class EveryStorageIsReturned(Then[ManyStoragesAndACaller, AdminSearchObjectStoragesPayload]):
-    @override
-    def says(self) -> str:
-        return Says(
-            "미리 저장한 object storage 가 모두 반환됩니다",
-            english="every object storage seeded in advance comes back",
-        )
-
-    @override
-    def look(
-        self,
-        laid: ManyStoragesAndACaller,
-        answered: Answered[AdminSearchObjectStoragesPayload],
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [MissingResponse(answered.raised)]
-        return [
-            *the_storages(payload.items, laid.laid),
-            Same("total_count", payload.total_count, len(laid.laid)),
-            Same("has_next_page", payload.has_next_page, False),
-            Same("has_previous_page", payload.has_previous_page, False),
-        ]
+            return await adapter.admin_search(
+                AdminSearchObjectStoragesInput(
+                    filter=ObjectStorageFilter(name=StringFilter(equals=laid.laid[0].name)),
+                    order=[
+                        ObjectStorageOrder(
+                            field=ObjectStorageOrderField.NAME,
+                            direction=OrderDirection.ASC,
+                        )
+                    ],
+                    limit=1,
+                    offset=0,
+                )
+            )
 
 
 @dataclass(frozen=True)
@@ -164,7 +147,7 @@ class OnlyTheNamedStorageIsReturned(Then[ManyStoragesAndACaller, AdminSearchObje
 
 
 @dataclass(frozen=True)
-class TheSuperadminSearches(
+class TheSuperadminFiltersByName(
     Scenario[
         TestSeedingSession,
         ManyStoragesAndACaller,
@@ -174,16 +157,17 @@ class TheSuperadminSearches(
 ):
     @override
     def summary(self) -> str:
-        return "searching-without-a-condition-counts-every-object-storage"
+        return "filtering-by-name-leaves-only-the-matching-object-storage"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 조건 없이 object storage 를 검색하면 미리 저장한 object storage 가 "
-            "모두 반환됩니다. 이 호출은 전역 역할을 검사합니다",
+            "superadmin 이 이름으로 거르고 이름 오름차순으로 정렬해 한 쪽을 요청하면 그 이름의 "
+            "object storage 하나만 반환됩니다. 이 호출은 전역 역할을 검사합니다",
             english=(
-                "when the superadmin searches object storages with no condition, every object "
-                "storage seeded in advance comes back. This call is gated by the global role"
+                "when the superadmin filters by name, orders by name ascending and asks for one "
+                "page, only the object storage with that name comes back. This call is gated by "
+                "the global role"
             ),
         )
 
@@ -201,74 +185,7 @@ class TheSuperadminSearches(
     def then(
         self,
     ) -> Then[ManyStoragesAndACaller, AdminSearchObjectStoragesPayload]:
-        return EveryStorageIsReturned()
-
-
-@dataclass(frozen=True)
-class TheSuperadminFiltersByName(
-    Scenario[
-        TestSeedingSession,
-        ManyStoragesAndACaller,
-        ObjectStorageAdapter,
-        AdminSearchObjectStoragesPayload,
-    ]
-):
-    @override
-    def summary(self) -> str:
-        return "filtering-by-name-leaves-only-the-matching-object-storage"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "superadmin 이 이름으로 거르면 그 이름의 object storage 만 반환됩니다",
-            english=(
-                "when the superadmin filters by name, only the object storage with that name "
-                "comes back"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ManyStoragesAndACaller]:
-        return ManyStoragesAndSomeone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(
-        self,
-    ) -> When[ManyStoragesAndACaller, ObjectStorageAdapter, AdminSearchObjectStoragesPayload]:
-        return SearchingByName()
-
-    @override
-    def then(
-        self,
-    ) -> Then[ManyStoragesAndACaller, AdminSearchObjectStoragesPayload]:
         return OnlyTheNamedStorageIsReturned()
-
-
-@dataclass(frozen=True)
-class SearchingByName(
-    When[ManyStoragesAndACaller, ObjectStorageAdapter, AdminSearchObjectStoragesPayload]
-):
-    @override
-    def operation(self) -> str:
-        return "admin_search"
-
-    @override
-    def describe(self, laid: ManyStoragesAndACaller) -> str:
-        return Says(
-            f"{laid.caller.username}이 이름이 {laid.laid[0].name}인 object storage 를 검색합니다",
-            english=(f"{laid.caller.username} searches object storages named {laid.laid[0].name}"),
-        )
-
-    @override
-    async def call(
-        self, adapter: ObjectStorageAdapter, laid: ManyStoragesAndACaller
-    ) -> AdminSearchObjectStoragesPayload:
-        with ActingAs(laid.caller):
-            return await adapter.admin_search(
-                AdminSearchObjectStoragesInput(
-                    filter=ObjectStorageFilter(name=StringFilter(equals=laid.laid[0].name))
-                )
-            )
 
 
 @dataclass(frozen=True)
@@ -313,7 +230,6 @@ class APlainUserMayNotSearch(
 
 
 SCENARIOS: list[SearchStep] = [
-    TheSuperadminSearches(),
     TheSuperadminFiltersByName(),
     APlainUserMayNotSearch(),
 ]

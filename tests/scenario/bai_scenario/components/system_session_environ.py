@@ -6,6 +6,7 @@ domain or a project. A table needs the caller and the rows the call names.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, override
@@ -51,6 +52,7 @@ from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 from bai_scenario.seeds.system_session_environ.environ import (
     SEEDED_KEY,
     TestSeedDeletedSystemSessionEnviron,
+    TestSeedDomainSystemSessionEnviron,
     TestSeedSystemSessionEnviron,
 )
 
@@ -58,6 +60,27 @@ OTHER_KEY = "SCENARIO_OTHER_KEY"
 """The key the second seeded row injects under."""
 
 type Loaded = list[SystemSessionEnvironNode | Exception | None]
+
+
+def _holding(role: UserRole, granted: tuple[Permission, ...]) -> Says:
+    if granted:
+        names = ", ".join(one.name for one in granted)
+        return Says(
+            f"public 에서 시스템 세션 환경변수에 {names} 권한을 받은 사용자 한 명",
+            english=f"one user granted {names} on system session environs in the public scope",
+        )
+    who = role_named(role)
+    return Says(f"{who} 한 명", english=f"one {in_language(who, Language.ENGLISH)}")
+
+
+async def lay_a_granted_caller(
+    seeding: Any, role: UserRole = UserRole.USER, granted: tuple[Permission, ...] = ()
+) -> Laid[UserData]:
+    """A user of the given role, granted the given permissions in the public scope."""
+    if not granted:
+        return await lay_a_caller(seeding, role)
+    home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+    return await seeding.within(SomeoneGrantedInPublic(home, granted))
 
 
 @dataclass(frozen=True)
@@ -70,10 +93,14 @@ class AnEnvironAndACaller:
 
 @dataclass(frozen=True)
 class ManyEnvironsAndACaller:
-    """시스템 세션 환경변수 둘과, 그것들을 한 번에 부를 사용자."""
+    """시스템 세션 환경변수 여럿과, 그것들을 한 번에 부를 사용자.
+
+    ``outside`` holds the rows seeded at another scope, which a scoped call must not return.
+    """
 
     laid: tuple[SystemSessionEnvironData, ...]
     caller: UserData
+    outside: tuple[SystemSessionEnvironData, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -81,14 +108,15 @@ class AnEnvironAndSomeone(Given[Any, AnEnvironAndACaller]):
     """public 범위에 등록된 시스템 세션 환경변수 하나와 사용자 한 명."""
 
     role: UserRole = UserRole.USER
+    granted: tuple[Permission, ...] = ()
 
     @override
     def describe(self) -> str:
-        who = role_named(self.role)
+        who = _holding(self.role, self.granted)
         return Says(
-            f"public 범위에 등록된 시스템 세션 환경변수 하나와, {who} 한 명",
+            f"public 범위에 등록된 시스템 세션 환경변수 하나와, {who}",
             english=(
-                "one system session environ registered at the public scope and one "
+                "one system session environ registered at the public scope and "
                 f"{in_language(who, Language.ENGLISH)}"
             ),
         )
@@ -96,7 +124,7 @@ class AnEnvironAndSomeone(Given[Any, AnEnvironAndACaller]):
     @override
     async def lay(self, seeding: Any) -> AnEnvironAndACaller:
         environ = await seeding.creating(TestSeedSystemSessionEnviron())
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_granted_caller(seeding, self.role, self.granted)
         return AnEnvironAndACaller(seeding.made(environ), seeding.made(caller))
 
 
@@ -105,14 +133,15 @@ class ADeletedEnvironAndSomeone(Given[Any, AnEnvironAndACaller]):
     """public 범위에 등록했다가 지운 시스템 세션 환경변수 하나와 사용자 한 명."""
 
     role: UserRole = UserRole.USER
+    granted: tuple[Permission, ...] = ()
 
     @override
     def describe(self) -> str:
-        who = role_named(self.role)
+        who = _holding(self.role, self.granted)
         return Says(
-            f"public 범위에서 지운 시스템 세션 환경변수 하나와, {who} 한 명",
+            f"public 범위에서 지운 시스템 세션 환경변수 하나와, {who}",
             english=(
-                "one system session environ deleted at the public scope and one "
+                "one system session environ deleted at the public scope and "
                 f"{in_language(who, Language.ENGLISH)}"
             ),
         )
@@ -121,7 +150,7 @@ class ADeletedEnvironAndSomeone(Given[Any, AnEnvironAndACaller]):
     async def lay(self, seeding: Any) -> AnEnvironAndACaller:
         environ = await seeding.creating(TestSeedSystemSessionEnviron())
         deleted = await seeding.creating_from(TestSeedDeletedSystemSessionEnviron(), environ)
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_granted_caller(seeding, self.role, self.granted)
         return AnEnvironAndACaller(seeding.made(deleted), seeding.made(caller))
 
 
@@ -130,14 +159,15 @@ class ManyEnvironsAndSomeone(Given[Any, ManyEnvironsAndACaller]):
     """public 범위에 등록된 시스템 세션 환경변수 둘과 사용자 한 명."""
 
     role: UserRole = UserRole.USER
+    granted: tuple[Permission, ...] = ()
 
     @override
     def describe(self) -> str:
-        who = role_named(self.role)
+        who = _holding(self.role, self.granted)
         return Says(
-            f"public 범위에 등록된 시스템 세션 환경변수 둘과, {who} 한 명",
+            f"public 범위에 등록된 시스템 세션 환경변수 둘과, {who}",
             english=(
-                "two system session environs registered at the public scope and one "
+                "two system session environs registered at the public scope and "
                 f"{in_language(who, Language.ENGLISH)}"
             ),
         )
@@ -146,7 +176,7 @@ class ManyEnvironsAndSomeone(Given[Any, ManyEnvironsAndACaller]):
     async def lay(self, seeding: Any) -> ManyEnvironsAndACaller:
         first = await seeding.creating(TestSeedSystemSessionEnviron(key=SEEDED_KEY))
         second = await seeding.creating(TestSeedSystemSessionEnviron(key=OTHER_KEY))
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_granted_caller(seeding, self.role, self.granted)
         return ManyEnvironsAndACaller(
             laid=(seeding.made(first), seeding.made(second)),
             caller=seeding.made(caller),
@@ -155,6 +185,77 @@ class ManyEnvironsAndSomeone(Given[Any, ManyEnvironsAndACaller]):
 
 def scope_of(environ: SystemSessionEnvironData) -> SystemSessionEnvironScopeType:
     return SystemSessionEnvironScopeType.of_owner(environ.scope_id)
+
+
+@dataclass(frozen=True)
+class ManyEnvironsAndOneOutsidePublic(Given[Any, ManyEnvironsAndACaller]):
+    """public 범위의 시스템 세션 환경변수 둘, 다른 범위의 하나와 사용자 한 명."""
+
+    role: UserRole = UserRole.SUPERADMIN
+    outside_key: str = OTHER_KEY
+
+    @override
+    def describe(self) -> str:
+        who = role_named(self.role)
+        return Says(
+            f"public 범위의 시스템 세션 환경변수 둘, 도메인 범위의 하나와 {who} 한 명",
+            english=(
+                "two system session environs at the public scope, one at a domain scope and one "
+                f"{in_language(who, Language.ENGLISH)}"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> ManyEnvironsAndACaller:
+        first = await seeding.creating(TestSeedSystemSessionEnviron(key=SEEDED_KEY))
+        second = await seeding.creating(TestSeedSystemSessionEnviron(key=OTHER_KEY))
+        elsewhere = await seeding.creating(
+            TestSeedDomain(name_hint="elsewhere", description=WAS_HERE)
+        )
+        outside = await seeding.creating_from(
+            TestSeedDomainSystemSessionEnviron(key=self.outside_key), elsewhere
+        )
+        caller = await lay_a_caller(seeding, self.role)
+        return ManyEnvironsAndACaller(
+            laid=(seeding.made(first), seeding.made(second)),
+            caller=seeding.made(caller),
+            outside=(seeding.made(outside),),
+        )
+
+
+@dataclass(frozen=True)
+class PublicEnvironsAndAnOutsideRow(Given[Any, ManyEnvironsAndACaller]):
+    """public 범위의 시스템 세션 환경변수 둘, 같은 이름을 쓰는 다른 범위의 하나와, public 에서
+    읽기 권한을 받은 사용자 한 명."""
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "public 범위의 시스템 세션 환경변수 둘, 같은 이름을 쓰는 도메인 범위의 하나와, "
+            "public 에서 읽기 권한을 받은 사용자 한 명",
+            english=(
+                "two system session environs at the public scope, one at a domain scope under the "
+                "same key, and one user granted read permission in the public scope"
+            ),
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> ManyEnvironsAndACaller:
+        first = await seeding.creating(TestSeedSystemSessionEnviron(key=SEEDED_KEY))
+        second = await seeding.creating(TestSeedSystemSessionEnviron(key=OTHER_KEY))
+        elsewhere = await seeding.creating(
+            TestSeedDomain(name_hint="elsewhere", description=WAS_HERE)
+        )
+        outside = await seeding.creating_from(
+            TestSeedDomainSystemSessionEnviron(key=SEEDED_KEY), elsewhere
+        )
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        caller = await seeding.within(SomeoneGrantedInPublic(home, (Permission.READ,)))
+        return ManyEnvironsAndACaller(
+            laid=(seeding.made(first), seeding.made(second)),
+            caller=seeding.made(caller),
+            outside=(seeding.made(outside),),
+        )
 
 
 @dataclass(frozen=True)
@@ -264,13 +365,17 @@ def environ_verdicts(
     ]
 
 
-def the_rows(got: list[SystemSessionEnvironNode], laid: ManyEnvironsAndACaller) -> list[Verdict]:
-    wanted = sorted((one.key, one.id) for one in laid.laid)
+def matching_rows(
+    got: list[SystemSessionEnvironNode], wanted: Sequence[SystemSessionEnvironData]
+) -> list[Verdict]:
     return [
         Held(
             "items",
             sorted((one.key, one.entity_id) for one in got),
-            SameAs(wanted, Says("미리 저장한 행", english="the rows seeded in advance")),
+            SameAs(
+                sorted((one.key, one.id) for one in wanted),
+                Says("미리 저장한 행", english="the rows seeded in advance"),
+            ),
         )
     ]
 
@@ -359,54 +464,43 @@ class TheRowIsRestored(Then[AnEnvironAndACaller, SystemSessionEnvironNode]):
 
 
 @dataclass(frozen=True)
-class TheEnvironIsListed(Then[ManyEnvironsAndACaller, AdminSearchSystemSessionEnvironsPayload]):
+class TheMatchingEnvironIsListed[
+    TPayload: (
+        AdminSearchSystemSessionEnvironsPayload,
+        ScopedSearchSystemSessionEnvironsPayload,
+    )
+](Then[ManyEnvironsAndACaller, TPayload]):
+    """거른 행 하나만 응답에 있고, 범위 밖 행과 필터가 제외하는 행은 없습니다."""
+
+    wanted: int
+    outside_scope: bool = True
+
     @override
     def says(self) -> str:
+        if self.outside_scope:
+            return Says(
+                "거른 행 하나만 반환되고, 범위 밖 행과 필터가 제외하는 행은 오지 않습니다",
+                english=(
+                    "only the filtered row comes back, and neither the row outside the scope nor "
+                    "the row the filter excludes comes back"
+                ),
+            )
         return Says(
-            "미리 저장한 행이 모두 반환됩니다",
-            english="every row seeded in advance comes back",
+            "거른 행 하나만 반환되고, 필터가 제외하는 행은 오지 않습니다",
+            english=(
+                "only the filtered row comes back, and the row the filter excludes does not "
+                "come back"
+            ),
         )
 
     @override
-    def look(
-        self,
-        laid: ManyEnvironsAndACaller,
-        answered: Answered[AdminSearchSystemSessionEnvironsPayload],
-    ) -> list[Verdict]:
+    def look(self, laid: ManyEnvironsAndACaller, answered: Answered[TPayload]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [MissingResponse(answered.raised)]
         return [
-            *the_rows(payload.items, laid),
-            Same("total_count", payload.total_count, len(laid.laid)),
-            Same("has_next_page", payload.has_next_page, False),
-            Same("has_previous_page", payload.has_previous_page, False),
-        ]
-
-
-@dataclass(frozen=True)
-class TheScopedEnvironsAreListed(
-    Then[ManyEnvironsAndACaller, ScopedSearchSystemSessionEnvironsPayload]
-):
-    @override
-    def says(self) -> str:
-        return Says(
-            "미리 저장한 행이 모두 반환됩니다",
-            english="every row seeded in advance comes back",
-        )
-
-    @override
-    def look(
-        self,
-        laid: ManyEnvironsAndACaller,
-        answered: Answered[ScopedSearchSystemSessionEnvironsPayload],
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [MissingResponse(answered.raised)]
-        return [
-            *the_rows(payload.items, laid),
-            Same("total_count", payload.total_count, len(laid.laid)),
+            *matching_rows(payload.items, (laid.laid[self.wanted],)),
+            Same("total_count", payload.total_count, 1),
             Same("has_next_page", payload.has_next_page, False),
             Same("has_previous_page", payload.has_previous_page, False),
         ]

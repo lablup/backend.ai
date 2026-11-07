@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import override
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pytest
 
@@ -15,7 +15,6 @@ from ai.backend.common.data.system_session_environ.types import (
     SystemSessionEnvironScopeType,
     SystemSessionEnvironValueSource,
 )
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     CreateSystemSessionEnvironInput,
 )
@@ -27,8 +26,8 @@ from ai.backend.manager.api.adapters.system_session_environ.adapter import (
     SystemSessionEnvironAdapter,
 )
 from ai.backend.manager.data.permission.global_entity import global_entity_id
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.errors.system_session_environ import (
     SystemSessionEnvironKeyConflict,
     UnknownSystemSessionEnvironValueSource,
@@ -48,12 +47,16 @@ from ai.backend.testutils.scenario_steps import (
     When,
 )
 from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
-from bai_scenario.components.domain import WrittenByThisRun
-from bai_scenario.components.system import ACaller, SomeoneAlone, lay_a_caller
-from bai_scenario.components.system_session_environ import ACallerGrantedInPublic
+from bai_scenario.components.domain import WAS_HERE, WrittenByThisRun
+from bai_scenario.components.system import ACaller, SomeoneAlone
+from bai_scenario.components.system_session_environ import (
+    ACallerGrantedInPublic,
+    SomeoneGrantedInPublic,
+)
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
+from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.system_session_environ.environ import (
     SEEDED_KEY,
     TestSeedSystemSessionEnviron,
@@ -233,7 +236,7 @@ class AnUnknownValueSourceIsRefused(
 
     @override
     def given(self) -> Given[TestSeedingSession, ACaller]:
-        return SomeoneAlone(role=UserRole.SUPERADMIN)
+        return ACallerGrantedInPublic()
 
     @override
     def when(self) -> When[ACaller, SystemSessionEnvironAdapter, CreateSystemSessionEnvironPayload]:
@@ -242,42 +245,6 @@ class AnUnknownValueSourceIsRefused(
     @override
     def then(self) -> Then[ACaller, CreateSystemSessionEnvironPayload]:
         return TheCallIsRefused(UnknownSystemSessionEnvironValueSource)
-
-
-@dataclass(frozen=True)
-class ADomainNothingAnswersToIsRefused(
-    Scenario[
-        TestSeedingSession, ACaller, SystemSessionEnvironAdapter, CreateSystemSessionEnvironPayload
-    ]
-):
-    @override
-    def summary(self) -> str:
-        return "registering-an-environ-at-a-missing-domain-is-refused"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "없는 도메인에 등록하려 하면 대상을 찾을 수 없다는 이유로 거부됩니다",
-            english=(
-                "when a registration names a domain that does not exist, it is rejected because "
-                "the target cannot be found"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, ACaller]:
-        return SomeoneAlone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(self) -> When[ACaller, SystemSessionEnvironAdapter, CreateSystemSessionEnvironPayload]:
-        return CreatingAtPublic(
-            scope_type=SystemSessionEnvironScopeType.DOMAIN,
-            scope_id=SystemSessionEnvironScopeID(uuid4()),
-        )
-
-    @override
-    def then(self) -> Then[ACaller, CreateSystemSessionEnvironPayload]:
-        return TheCallIsRefused(DomainNotFound)
 
 
 @dataclass(frozen=True)
@@ -315,19 +282,20 @@ class AKeyAlreadyHeldIsRefused(
 
 @dataclass(frozen=True)
 class ASeededKeyAndACaller(Given[TestSeedingSession, ACaller]):
-    """이미 그 이름으로 등록된 행 하나와 superadmin 한 명."""
+    """이미 그 이름으로 등록된 행 하나와, public 에서 등록 권한을 받은 사용자 한 명."""
 
     @override
     def describe(self) -> str:
         return Says(
-            "이미 등록된 행 하나와 superadmin 한 명",
-            english="one row already registered and one superadmin",
+            "이미 등록된 행 하나와, public 에서 등록 권한을 받은 사용자 한 명",
+            english="one row already registered and one user granted create permission in public",
         )
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> ACaller:
         await seeding.creating(TestSeedSystemSessionEnviron(key=SEEDED_KEY))
-        caller = await lay_a_caller(seeding, UserRole.SUPERADMIN)
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        caller = await seeding.within(SomeoneGrantedInPublic(home, (Permission.CREATE,)))
         return ACaller(seeding.made(caller))
 
 
@@ -335,7 +303,6 @@ SCENARIOS: list[CreatingStep] = [
     AUserGrantedCreateRegisters(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotCreate(),
     AnUnknownValueSourceIsRefused(),
-    ADomainNothingAnswersToIsRefused(),
     AKeyAlreadyHeldIsRefused(),
 ]
 

@@ -11,6 +11,9 @@ from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
+from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.storage_namespace.response import (
     AdminSearchStorageNamespacesPayload,
@@ -18,6 +21,8 @@ from ai.backend.common.dto.manager.v2.storage_namespace.response import (
     UnregisterStorageNamespacePayload,
 )
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.data.permission.global_entity import global_entity_id
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -35,13 +40,69 @@ from ai.backend.testutils.scenario_steps import (
     in_language,
 )
 from bai_scenario.components.answers import MissingResponse
-from bai_scenario.components.system import lay_a_caller, role_named
+from bai_scenario.components.domain import WAS_HERE, SomeoneOf
+from bai_scenario.components.system import role_named
+from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.object_storage.object_storage import TestSeedObjectStorage
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
 from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 from bai_scenario.seeds.storage_namespace.storage_namespace import (
     SEEDED_NAMESPACE,
     TestSeedStorageNamespace,
 )
+
+
+def _holding(role: UserRole, granted: tuple[Permission, ...]) -> Says:
+    if granted:
+        names = ", ".join(one.name for one in granted)
+        return Says(
+            f"저장소 네임스페이스에 {names} 권한을 받은 사용자 한 명",
+            english=f"one user granted {names} on storage namespaces",
+        )
+    who = role_named(role)
+    return Says(f"{who} 한 명", english=f"one {in_language(who, Language.ENGLISH)}")
+
+
+@dataclass(frozen=True)
+class SomeoneGrantedOnNamespaces(TestSeedNest[Laid[UserData]]):
+    """그 사용자에게 global 에서 저장소 네임스페이스 권한을 준다."""
+
+    domain: Laid[Any]
+    granted: tuple[Permission, ...]
+
+    @override
+    def kind(self) -> str:
+        names = ", ".join(one.name for one in self.granted)
+        return Says(
+            f"global 에서 저장소 네임스페이스에 {names} 권한을 받은 사용자 준비",
+            english=f"Prepare a user granted {names} on storage namespaces in global",
+        )
+
+    @override
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
+        someone = seed.within(SomeoneOf(self.domain))
+        role = seed.creating_from(
+            TestSeedRole(
+                lambda _: global_entity_id(GlobalEntityName.GLOBAL), name_hint="namespace-keeper"
+            ),
+            someone,
+        )
+        for one in self.granted:
+            seed.adding(
+                TestSeedPermission(entity_type=StorageNamespaceEntityType(), permission=one), role
+            )
+        seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+        return someone
+
+
+async def lay_a_granted_caller(
+    seeding: Any, role: UserRole = UserRole.USER, granted: tuple[Permission, ...] = ()
+) -> Laid[UserData]:
+    """A user of the given role, granted the given permissions on storage namespaces."""
+    home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+    if not granted:
+        return await seeding.within(SomeoneOf(home, role=role))
+    return await seeding.within(SomeoneGrantedOnNamespaces(home, granted))
 
 
 @dataclass(frozen=True)
@@ -85,19 +146,20 @@ class AStorageAndSomeone(Given[Any, AStorageAndACaller]):
     """object storage 하나와 사용자 한 명."""
 
     role: UserRole = UserRole.USER
+    granted: tuple[Permission, ...] = ()
 
     @override
     def describe(self) -> str:
-        who = role_named(self.role)
+        who = _holding(self.role, self.granted)
         return Says(
-            f"object storage 하나와, {who} 한 명",
-            english=f"one object storage and one {in_language(who, Language.ENGLISH)}",
+            f"object storage 하나와, {who}",
+            english=f"one object storage and {in_language(who, Language.ENGLISH)}",
         )
 
     @override
     async def lay(self, seeding: Any) -> AStorageAndACaller:
         storage = await seeding.creating(TestSeedObjectStorage())
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_granted_caller(seeding, self.role, self.granted)
         return AStorageAndACaller(seeding.made(storage), seeding.made(caller))
 
 
@@ -106,14 +168,15 @@ class ANamespaceAndSomeone(Given[Any, ANamespaceAndACaller]):
     """한 object storage 아래 등록된 네임스페이스 하나와 사용자 한 명."""
 
     role: UserRole = UserRole.USER
+    granted: tuple[Permission, ...] = ()
 
     @override
     def describe(self) -> str:
-        who = role_named(self.role)
+        who = _holding(self.role, self.granted)
         return Says(
-            f"object storage 하나와 그 아래 등록된 네임스페이스 하나, {who} 한 명",
+            f"object storage 하나와 그 아래 등록된 네임스페이스 하나, {who}",
             english=(
-                "one object storage with one namespace registered on it and one "
+                "one object storage with one namespace registered on it and "
                 f"{in_language(who, Language.ENGLISH)}"
             ),
         )
@@ -122,7 +185,7 @@ class ANamespaceAndSomeone(Given[Any, ANamespaceAndACaller]):
     async def lay(self, seeding: Any) -> ANamespaceAndACaller:
         storage = await seeding.creating(TestSeedObjectStorage())
         namespace = await seeding.creating_from(TestSeedStorageNamespace(), storage)
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_granted_caller(seeding, self.role, self.granted)
         return ANamespaceAndACaller(
             seeding.made(namespace), seeding.made(storage), seeding.made(caller)
         )
@@ -151,14 +214,15 @@ class ManyNamespacesAndSomeone(Given[Any, ManyNamespacesAndACaller]):
     """object storage 하나와 그 아래 네임스페이스 둘, 사용자 한 명."""
 
     role: UserRole = UserRole.USER
+    granted: tuple[Permission, ...] = ()
 
     @override
     def describe(self) -> str:
-        who = role_named(self.role)
+        who = _holding(self.role, self.granted)
         return Says(
-            f"object storage 하나와 그 아래 등록된 네임스페이스 둘, {who} 한 명",
+            f"object storage 하나와 그 아래 등록된 네임스페이스 둘, {who}",
             english=(
-                "one object storage with two namespaces registered on it and one "
+                "one object storage with two namespaces registered on it and "
                 f"{in_language(who, Language.ENGLISH)}"
             ),
         )
@@ -167,7 +231,7 @@ class ManyNamespacesAndSomeone(Given[Any, ManyNamespacesAndACaller]):
     async def lay(self, seeding: Any) -> ManyNamespacesAndACaller:
         storage = await seeding.creating(TestSeedObjectStorage())
         namespaces = await seeding.within(ManyNamespacesOnAStorage(storage))
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_granted_caller(seeding, self.role, self.granted)
         return ManyNamespacesAndACaller(
             laid=tuple(seeding.made(one) for one in namespaces),
             storage=seeding.made(storage),

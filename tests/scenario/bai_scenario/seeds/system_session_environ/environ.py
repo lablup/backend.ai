@@ -5,9 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironID
 from ai.backend.common.data.system_session_environ.types import SystemSessionEnvironValueSource
+from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
 from ai.backend.manager.models.specs.soft_delete import SoftDeleteUpdater
@@ -51,6 +53,39 @@ class TestSeedSystemSessionEnviron(TestSeedRow[SystemSessionEnvironData]):
     def seed(self, name: str) -> SystemSessionEnvironCreator:
         return SystemSessionEnvironCreator(
             owner=global_entity_id(GlobalEntityName.PUBLIC),
+            value_source=self.value_source,
+            key=self.key,
+        )
+
+
+@dataclass(frozen=True)
+class TestSeedDomainSystemSessionEnviron(TestSeedRowFrom[DomainData, SystemSessionEnvironData]):
+    """One binding at a domain scope."""
+
+    key: str = SEEDED_KEY
+    value_source: SystemSessionEnvironValueSource = SystemSessionEnvironValueSource.SESSION_ID
+
+    @override
+    def kind(self) -> str:
+        return Says(
+            "도메인 범위의 시스템 세션 환경변수", english="domain-scoped system session environ"
+        )
+
+    @override
+    def detail(self) -> str:
+        return Says(
+            f"도메인 범위에서 {self.value_source.value} 값을 주입합니다",
+            english=f"injects the {self.value_source.value} value at the domain scope",
+        )
+
+    @override
+    def name(self, naming: Naming) -> str:
+        return self.key
+
+    @override
+    def seed(self, name: str, domain: DomainData) -> SystemSessionEnvironCreator:
+        return SystemSessionEnvironCreator(
+            owner=DomainID(domain.id),
             value_source=self.value_source,
             key=self.key,
         )

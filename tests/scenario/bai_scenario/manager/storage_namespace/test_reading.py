@@ -9,9 +9,9 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.storage_namespace.response import StorageNamespaceNode
 from ai.backend.manager.api.adapters.storage_namespace.adapter import StorageNamespaceAdapter
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
@@ -89,7 +89,7 @@ class ReadingMany(When[ManyNamespacesAndACaller, StorageNamespaceAdapter, Loaded
 
 
 @dataclass(frozen=True)
-class TheSuperadminReadsTheNamespaces(
+class AUserGrantedReadReadsTheNamespaces(
     Scenario[
         TestSeedingSession,
         ManyNamespacesAndACaller,
@@ -99,22 +99,22 @@ class TheSuperadminReadsTheNamespaces(
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-reads-every-namespace-of-an-object-storage"
+        return "a-user-granted-read-reads-every-namespace-of-an-object-storage"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 object storage 에 등록된 네임스페이스를 읽으면 등록된 네임스페이스가 "
-            "모두 반환됩니다",
+            "저장소 네임스페이스 조회 권한을 받은 사용자가 object storage 에 등록된 네임스페이스를 "
+            "읽으면 등록된 네임스페이스가 모두 반환됩니다",
             english=(
-                "when the superadmin reads the namespaces of an object storage, every registered "
-                "namespace comes back"
+                "when a user granted permission to read storage namespaces reads the namespaces of "
+                "an object storage, every registered namespace comes back"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyNamespacesAndACaller]:
-        return ManyNamespacesAndSomeone(role=UserRole.SUPERADMIN)
+        return ManyNamespacesAndSomeone(granted=(Permission.READ,))
 
     @override
     def when(
@@ -171,28 +171,29 @@ class AUserGrantedNothingMayNotReadTheNamespaces(
 
 
 @dataclass(frozen=True)
-class TheSuperadminReadsManyInOrder(
+class AUserGrantedReadReadsManyInOrder(
     Scenario[TestSeedingSession, ManyNamespacesAndACaller, StorageNamespaceAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-reads-several-namespaces-in-the-requested-order"
+        return "a-user-granted-read-reads-several-namespaces-in-the-requested-order"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 미리 저장한 네임스페이스 둘과 존재하지 않는 id 하나를 한 번에 "
-            "조회하면, 둘은 요청한 순서대로 반환되고 존재하지 않는 id 의 항목은 비어 있습니다",
+            "저장소 네임스페이스 조회 권한을 받은 사용자가 미리 저장한 네임스페이스 둘과 존재하지 않는 "
+            "id 하나를 한 번에 조회하면, 둘은 요청한 순서대로 반환되고 존재하지 않는 id 의 항목은 "
+            "비어 있습니다",
             english=(
-                "when the superadmin loads two namespaces seeded in advance and one id that does "
-                "not exist at once, the two come back in the requested order and the entry for "
-                "the id that does not exist is empty"
+                "when a user granted permission to read storage namespaces loads two namespaces "
+                "seeded in advance and one id that does not exist at once, the two come back in "
+                "the requested order and the entry for the id that does not exist is empty"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyNamespacesAndACaller]:
-        return ManyNamespacesAndSomeone(role=UserRole.SUPERADMIN)
+        return ManyNamespacesAndSomeone(granted=(Permission.READ,))
 
     @override
     def when(self) -> When[ManyNamespacesAndACaller, StorageNamespaceAdapter, Loaded]:
@@ -237,9 +238,9 @@ class AUserGrantedNothingIsRefusedOnEveryId(
 
 
 SCENARIOS: list[ReadingStep] = [
-    TheSuperadminReadsTheNamespaces(),
+    AUserGrantedReadReadsTheNamespaces(),
     AUserGrantedNothingMayNotReadTheNamespaces(),
-    TheSuperadminReadsManyInOrder(),
+    AUserGrantedReadReadsManyInOrder(),
     AUserGrantedNothingIsRefusedOnEveryId(),
 ]
 

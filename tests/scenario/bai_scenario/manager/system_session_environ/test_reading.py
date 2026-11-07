@@ -9,10 +9,10 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironID
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.system_session_environ.adapter import (
     SystemSessionEnvironAdapter,
 )
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
@@ -93,28 +93,28 @@ class ListingValueSources(When[ACaller, SystemSessionEnvironAdapter, list[str]])
 
 
 @dataclass(frozen=True)
-class TheSuperadminReadsManyInOrder(
+class AUserGrantedReadReadsManyInOrder(
     Scenario[TestSeedingSession, ManyEnvironsAndACaller, SystemSessionEnvironAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-reads-several-environs-in-the-requested-order"
+        return "a-user-granted-read-reads-several-environs-in-the-requested-order"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 미리 저장한 행 둘과 존재하지 않는 id 하나를 한 번에 조회하면, 둘은 "
-            "요청한 순서대로 반환되고 존재하지 않는 id 의 항목은 비어 있습니다",
+            "public 에서 읽기 권한을 받은 사용자가 미리 저장한 행 둘과 존재하지 않는 id 하나를 한 "
+            "번에 조회하면, 둘은 요청한 순서대로 반환되고 존재하지 않는 id 의 항목은 비어 있습니다",
             english=(
-                "when the superadmin loads two rows seeded in advance and one id that does not "
-                "exist at once, the two come back in the requested order and the entry for the "
-                "id that does not exist is empty"
+                "when a user granted read permission in public loads two rows seeded in advance "
+                "and one id that does not exist at once, the two come back in the requested order "
+                "and the entry for the id that does not exist is empty"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyEnvironsAndACaller]:
-        return ManyEnvironsAndSomeone(role=UserRole.SUPERADMIN)
+        return ManyEnvironsAndSomeone(granted=(Permission.READ,))
 
     @override
     def when(self) -> When[ManyEnvironsAndACaller, SystemSessionEnvironAdapter, Loaded]:
@@ -235,7 +235,7 @@ class ACallWithNoCallerIsRefused(
 
 
 SCENARIOS: list[ReadingStep] = [
-    TheSuperadminReadsManyInOrder(),
+    AUserGrantedReadReadsManyInOrder(),
     AUserGrantedNothingIsRefusedOnEveryId(),
     AnyUserReadsTheValueSources(),
     ACallWithNoCallerIsRefused(),

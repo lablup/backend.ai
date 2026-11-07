@@ -5,19 +5,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import override
-from uuid import uuid4
 
 import pytest
 
 from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironID
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.system_session_environ.response import (
     SystemSessionEnvironNode,
 )
 from ai.backend.manager.api.adapters.system_session_environ.adapter import (
     SystemSessionEnvironAdapter,
 )
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
@@ -41,7 +39,6 @@ type DeletingStep = Scenario[
 @dataclass(frozen=True)
 class Deleting(When[AnEnvironAndACaller, SystemSessionEnvironAdapter, SystemSessionEnvironNode]):
     operation_name: str = "delete"
-    unknown: bool = False
 
     @override
     def operation(self) -> str:
@@ -51,22 +48,16 @@ class Deleting(When[AnEnvironAndACaller, SystemSessionEnvironAdapter, SystemSess
     def describe(self, laid: AnEnvironAndACaller) -> str:
         verb_ko = "되살립니다" if self.operation_name == "restore" else "지웁니다"
         verb_en = "restores" if self.operation_name == "restore" else "deletes"
-        target_ko = "존재하지 않는 id" if self.unknown else laid.environ.key
-        target_en = "an id nothing answers to" if self.unknown else laid.environ.key
         return Says(
-            f"{laid.caller.username}이 {target_ko}를 {verb_ko}",
-            english=f"{laid.caller.username} {verb_en} {target_en}",
+            f"{laid.caller.username}이 {laid.environ.key}를 {verb_ko}",
+            english=f"{laid.caller.username} {verb_en} {laid.environ.key}",
         )
 
     @override
     async def call(
         self, adapter: SystemSessionEnvironAdapter, laid: AnEnvironAndACaller
     ) -> SystemSessionEnvironNode:
-        environ_id = (
-            SystemSessionEnvironID(uuid4())
-            if self.unknown
-            else SystemSessionEnvironID(laid.environ.id)
-        )
+        environ_id = SystemSessionEnvironID(laid.environ.id)
         with ActingAs(laid.caller):
             if self.operation_name == "restore":
                 restored = await adapter.restore(environ_id)
@@ -76,7 +67,7 @@ class Deleting(When[AnEnvironAndACaller, SystemSessionEnvironAdapter, SystemSess
 
 
 @dataclass(frozen=True)
-class TheSuperadminDeletes(
+class AUserGrantedDeleteDeletes(
     Scenario[
         TestSeedingSession,
         AnEnvironAndACaller,
@@ -88,21 +79,22 @@ class TheSuperadminDeletes(
 
     @override
     def summary(self) -> str:
-        return "the-superadmin-deletes-an-environ"
+        return "a-user-granted-delete-deletes-an-environ"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 시스템 세션 환경변수를 지우면 지운 시각을 실은 행 전체가 반환됩니다",
+            "public 에서 삭제 권한을 받은 사용자가 시스템 세션 환경변수를 지우면 지운 시각을 실은 행 "
+            "전체가 반환됩니다",
             english=(
-                "when the superadmin deletes a system session environ, the whole row comes back "
-                "with the deletion time"
+                "when a user granted delete permission in public deletes a system session "
+                "environ, the whole row comes back with the deletion time"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnEnvironAndACaller]:
-        return AnEnvironAndSomeone(role=UserRole.SUPERADMIN)
+        return AnEnvironAndSomeone(granted=(Permission.SOFT_DELETE,))
 
     @override
     def when(
@@ -154,45 +146,7 @@ class AUserGrantedNothingMayNotDelete(
 
 
 @dataclass(frozen=True)
-class DeletingAnUnknownIdIsNotFound(
-    Scenario[
-        TestSeedingSession,
-        AnEnvironAndACaller,
-        SystemSessionEnvironAdapter,
-        SystemSessionEnvironNode,
-    ]
-):
-    @override
-    def summary(self) -> str:
-        return "deleting-an-environ-id-nothing-answers-to-is-not-found"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "superadmin 이 존재하지 않는 id 를 지우려 하면 대상을 찾을 수 없다는 이유로 거부됩니다",
-            english=(
-                "when the superadmin deletes an id nothing answers to, it is rejected because "
-                "the target cannot be found"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, AnEnvironAndACaller]:
-        return AnEnvironAndSomeone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(
-        self,
-    ) -> When[AnEnvironAndACaller, SystemSessionEnvironAdapter, SystemSessionEnvironNode]:
-        return Deleting(unknown=True)
-
-    @override
-    def then(self) -> Then[AnEnvironAndACaller, SystemSessionEnvironNode]:
-        return TheCallIsRefused(EntityNotFoundError)
-
-
-@dataclass(frozen=True)
-class TheSuperadminRestores(
+class AUserGrantedDeleteRestores(
     Scenario[
         TestSeedingSession,
         AnEnvironAndACaller,
@@ -204,22 +158,22 @@ class TheSuperadminRestores(
 
     @override
     def summary(self) -> str:
-        return "the-superadmin-restores-a-deleted-environ"
+        return "a-user-granted-delete-restores-a-deleted-environ"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 지운 시스템 세션 환경변수를 되살리면 지운 시각이 비워진 행 전체가 "
-            "반환됩니다",
+            "public 에서 삭제 권한을 받은 사용자가 지운 시스템 세션 환경변수를 되살리면 지운 시각이 "
+            "비워진 행 전체가 반환됩니다",
             english=(
-                "when the superadmin restores a deleted system session environ, the whole row "
-                "comes back with no deletion time"
+                "when a user granted delete permission in public restores a deleted system session "
+                "environ, the whole row comes back with no deletion time"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnEnvironAndACaller]:
-        return ADeletedEnvironAndSomeone(role=UserRole.SUPERADMIN)
+        return ADeletedEnvironAndSomeone(granted=(Permission.SOFT_DELETE,))
 
     @override
     def when(
@@ -270,52 +224,11 @@ class AUserGrantedNothingMayNotRestore(
         return TheCallIsRefused(NotEnoughPermission)
 
 
-@dataclass(frozen=True)
-class RestoringAnUnknownIdIsNotFound(
-    Scenario[
-        TestSeedingSession,
-        AnEnvironAndACaller,
-        SystemSessionEnvironAdapter,
-        SystemSessionEnvironNode,
-    ]
-):
-    @override
-    def summary(self) -> str:
-        return "restoring-an-environ-id-nothing-answers-to-is-not-found"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "superadmin 이 존재하지 않는 id 를 되살리려 하면 대상을 찾을 수 없다는 이유로 "
-            "거부됩니다",
-            english=(
-                "when the superadmin restores an id nothing answers to, it is rejected because "
-                "the target cannot be found"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, AnEnvironAndACaller]:
-        return AnEnvironAndSomeone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(
-        self,
-    ) -> When[AnEnvironAndACaller, SystemSessionEnvironAdapter, SystemSessionEnvironNode]:
-        return Deleting(operation_name="restore", unknown=True)
-
-    @override
-    def then(self) -> Then[AnEnvironAndACaller, SystemSessionEnvironNode]:
-        return TheCallIsRefused(EntityNotFoundError)
-
-
 SCENARIOS: list[DeletingStep] = [
-    TheSuperadminDeletes(started=datetime.now(UTC)),
+    AUserGrantedDeleteDeletes(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotDelete(),
-    DeletingAnUnknownIdIsNotFound(),
-    TheSuperadminRestores(started=datetime.now(UTC)),
+    AUserGrantedDeleteRestores(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotRestore(),
-    RestoringAnUnknownIdIsNotFound(),
 ]
 
 

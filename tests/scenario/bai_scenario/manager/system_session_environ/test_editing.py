@@ -5,12 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, override
-from uuid import uuid4
 
 import pytest
 
 from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironID
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     UpdateSystemSessionEnvironInput,
 )
@@ -21,7 +19,7 @@ from ai.backend.common.dto.manager.v2.system_session_environ.response import (
 from ai.backend.manager.api.adapters.system_session_environ.adapter import (
     SystemSessionEnvironAdapter,
 )
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.system_session_environ import (
     SystemSessionEnvironDeleted,
@@ -53,7 +51,6 @@ type EditingStep = Scenario[
 @dataclass(frozen=True)
 class Editing(When[AnEnvironAndACaller, SystemSessionEnvironAdapter, SystemSessionEnvironNode]):
     key: str = EDITED_KEY
-    unknown: bool = False
 
     @override
     def operation(self) -> str:
@@ -61,31 +58,25 @@ class Editing(When[AnEnvironAndACaller, SystemSessionEnvironAdapter, SystemSessi
 
     @override
     def describe(self, laid: AnEnvironAndACaller) -> str:
-        target_ko = "존재하지 않는 id" if self.unknown else laid.environ.key
-        target_en = "an id nothing answers to" if self.unknown else laid.environ.key
         return Says(
-            f"{laid.caller.username}이 {target_ko}의 이름을 {self.key}로 바꿉니다",
-            english=f"{laid.caller.username} changes the key of {target_en} to {self.key}",
+            f"{laid.caller.username}이 {laid.environ.key}의 이름을 {self.key}로 바꿉니다",
+            english=f"{laid.caller.username} changes the key of {laid.environ.key} to {self.key}",
         )
 
     @override
     async def call(
         self, adapter: SystemSessionEnvironAdapter, laid: AnEnvironAndACaller
     ) -> SystemSessionEnvironNode:
-        environ_id = (
-            SystemSessionEnvironID(uuid4())
-            if self.unknown
-            else SystemSessionEnvironID(laid.environ.id)
-        )
         with ActingAs(laid.caller):
             payload: UpdateSystemSessionEnvironPayload = await adapter.update(
-                environ_id, UpdateSystemSessionEnvironInput(key=self.key)
+                SystemSessionEnvironID(laid.environ.id),
+                UpdateSystemSessionEnvironInput(key=self.key),
             )
         return payload.system_session_environ
 
 
 @dataclass(frozen=True)
-class TheSuperadminEdits(
+class AUserGrantedUpdateEdits(
     Scenario[
         TestSeedingSession,
         AnEnvironAndACaller,
@@ -97,22 +88,23 @@ class TheSuperadminEdits(
 
     @override
     def summary(self) -> str:
-        return "the-superadmin-changes-the-key-of-an-environ"
+        return "a-user-granted-update-changes-the-key-of-an-environ"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 시스템 세션 환경변수의 이름을 바꾸면 새 이름과 이번 실행의 수정 시각을 "
-            "실은 행 전체가 반환됩니다",
+            "public 에서 수정 권한을 받은 사용자가 시스템 세션 환경변수의 이름을 바꾸면 새 이름과 이번 "
+            "실행의 수정 시각을 실은 행 전체가 반환됩니다",
             english=(
-                "when the superadmin changes a system session environ key, the whole row comes "
-                "back with the new key and a last change time this run wrote"
+                "when a user granted update permission in public changes a system session environ "
+                "key, the whole row comes back with the new key and a last change time this run "
+                "wrote"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnEnvironAndACaller]:
-        return AnEnvironAndSomeone(role=UserRole.SUPERADMIN)
+        return AnEnvironAndSomeone(granted=(Permission.UPDATE,))
 
     @override
     def when(
@@ -164,45 +156,6 @@ class AUserGrantedNothingMayNotEdit(
 
 
 @dataclass(frozen=True)
-class AnIdNothingAnswersToIsNotFound(
-    Scenario[
-        TestSeedingSession,
-        AnEnvironAndACaller,
-        SystemSessionEnvironAdapter,
-        SystemSessionEnvironNode,
-    ]
-):
-    @override
-    def summary(self) -> str:
-        return "editing-an-environ-id-nothing-answers-to-is-not-found"
-
-    @override
-    def describe(self) -> str:
-        return Says(
-            "superadmin 이 존재하지 않는 id 의 이름을 바꾸려 하면 대상을 찾을 수 없다는 이유로 "
-            "거부됩니다",
-            english=(
-                "when the superadmin changes the key of an id nothing answers to, it is rejected "
-                "because the target cannot be found"
-            ),
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, AnEnvironAndACaller]:
-        return AnEnvironAndSomeone(role=UserRole.SUPERADMIN)
-
-    @override
-    def when(
-        self,
-    ) -> When[AnEnvironAndACaller, SystemSessionEnvironAdapter, SystemSessionEnvironNode]:
-        return Editing(unknown=True)
-
-    @override
-    def then(self) -> Then[AnEnvironAndACaller, SystemSessionEnvironNode]:
-        return TheCallIsRefused(EntityNotFoundError)
-
-
-@dataclass(frozen=True)
 class ADuplicateKeyIsRefused(
     Scenario[
         TestSeedingSession,
@@ -227,7 +180,7 @@ class ADuplicateKeyIsRefused(
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyEnvironsAndACaller]:
-        return ManyEnvironsAndSomeone(role=UserRole.SUPERADMIN)
+        return ManyEnvironsAndSomeone(granted=(Permission.UPDATE,))
 
     @override
     def when(
@@ -294,7 +247,7 @@ class ADeletedRowMayNotBeEdited(
 
     @override
     def given(self) -> Given[TestSeedingSession, AnEnvironAndACaller]:
-        return ADeletedEnvironAndSomeone(role=UserRole.SUPERADMIN)
+        return ADeletedEnvironAndSomeone(granted=(Permission.UPDATE,))
 
     @override
     def when(
@@ -308,9 +261,8 @@ class ADeletedRowMayNotBeEdited(
 
 
 SCENARIOS: list[EditingStep] = [
-    TheSuperadminEdits(started=datetime.now(UTC)),
+    AUserGrantedUpdateEdits(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotEdit(),
-    AnIdNothingAnswersToIsNotFound(),
     ADuplicateKeyIsRefused(),
     ADeletedRowMayNotBeEdited(),
 ]

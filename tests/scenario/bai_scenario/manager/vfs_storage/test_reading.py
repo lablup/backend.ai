@@ -9,9 +9,9 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.entity.vfs_storage import VFSStorageID
-from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.vfs_storage.response import VFSStorageNode
 from ai.backend.manager.api.adapters.vfs_storage.adapter import VFSStorageAdapter
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
@@ -154,25 +154,27 @@ class EveryIdIsRefused(Then[ManyStoragesAndACaller, Loaded]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminGetsAStorage(
+class AUserGrantedReadGetsAStorage(
     Scenario[TestSeedingSession, AStorageAndACaller, VFSStorageAdapter, Node]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-gets-a-vfs-storage"
+        return "a-user-granted-read-gets-a-vfs-storage"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 VFS storage 하나를 조회하면 미리 저장한 VFS storage 전체가 반환됩니다",
+            "VFS storage 조회 권한을 받은 사용자가 하나를 조회하면 미리 저장한 VFS storage 전체가 "
+            "반환됩니다",
             english=(
-                "when the superadmin reads one VFS storage, the whole seeded VFS storage comes back"
+                "when a user granted permission to read VFS storages reads one, the whole seeded "
+                "VFS storage comes back"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AStorageAndACaller]:
-        return AStorageAndSomeone(role=UserRole.SUPERADMIN)
+        return AStorageAndSomeone(granted=(Permission.READ,))
 
     @override
     def when(self) -> When[AStorageAndACaller, VFSStorageAdapter, Node]:
@@ -215,28 +217,29 @@ class AUserGrantedNothingMayNotGet(
 
 
 @dataclass(frozen=True)
-class TheSuperadminReadsManyInOrder(
+class AUserGrantedReadReadsManyInOrder(
     Scenario[TestSeedingSession, ManyStoragesAndACaller, VFSStorageAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-reads-several-vfs-storages-in-the-requested-order"
+        return "a-user-granted-read-reads-several-vfs-storages-in-the-requested-order"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 미리 저장한 VFS storage 둘과 존재하지 않는 id 하나를 한 번에 조회하면, "
-            "둘은 요청한 순서대로 반환되고 존재하지 않는 id 의 항목은 비어 있습니다",
+            "VFS storage 조회 권한을 받은 사용자가 미리 저장한 VFS storage 둘과 존재하지 않는 id "
+            "하나를 한 번에 조회하면, 둘은 요청한 순서대로 반환되고 존재하지 않는 id 의 항목은 비어 "
+            "있습니다",
             english=(
-                "when the superadmin loads two VFS storages seeded in advance and one id that "
-                "does not exist at once, the two come back in the requested order and the entry "
-                "for the id that does not exist is empty"
+                "when a user granted permission to read VFS storages loads two VFS storages seeded "
+                "in advance and one id that does not exist at once, the two come back in the "
+                "requested order and the entry for the id that does not exist is empty"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyStoragesAndACaller]:
-        return ManyStoragesAndSomeone(role=UserRole.SUPERADMIN)
+        return ManyStoragesAndSomeone(granted=(Permission.READ,))
 
     @override
     def when(self) -> When[ManyStoragesAndACaller, VFSStorageAdapter, Loaded]:
@@ -281,9 +284,9 @@ class AUserGrantedNothingIsRefusedOnEveryId(
 
 
 SCENARIOS: list[ReadingStep] = [
-    TheSuperadminGetsAStorage(),
+    AUserGrantedReadGetsAStorage(),
     AUserGrantedNothingMayNotGet(),
-    TheSuperadminReadsManyInOrder(),
+    AUserGrantedReadReadsManyInOrder(),
     AUserGrantedNothingIsRefusedOnEveryId(),
 ]
 

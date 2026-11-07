@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.storage_namespace.response import (
     UnregisterStorageNamespacePayload,
 )
 from ai.backend.manager.api.adapters.storage_namespace.adapter import StorageNamespaceAdapter
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -73,7 +74,7 @@ class Unregistering(
 
 
 @dataclass(frozen=True)
-class TheSuperadminUnregisters(
+class AUserGrantedReadAndDeleteUnregisters(
     Scenario[
         TestSeedingSession,
         ANamespaceAndACaller,
@@ -83,22 +84,22 @@ class TheSuperadminUnregisters(
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-unregisters-a-namespace-from-an-object-storage"
+        return "a-user-granted-read-and-delete-unregisters-a-namespace-from-an-object-storage"
 
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 네임스페이스를 빼면 그 네임스페이스가 있던 object storage 의 id 가 "
-            "반환됩니다",
+            "저장소 네임스페이스 조회와 완전 삭제 권한을 받은 사용자가 네임스페이스를 빼면 그 "
+            "네임스페이스가 있던 object storage 의 id 가 반환됩니다",
             english=(
-                "when the superadmin unregisters a namespace, the id of the object storage it "
-                "was on comes back"
+                "when a user granted permission to read and purge storage namespaces unregisters a "
+                "namespace, the id of the object storage it was on comes back"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, ANamespaceAndACaller]:
-        return ANamespaceAndSomeone(role=UserRole.SUPERADMIN)
+        return ANamespaceAndSomeone(granted=(Permission.READ, Permission.HARD_DELETE))
 
     @override
     def when(
@@ -198,7 +199,7 @@ class AUserGrantedNothingMayNotUnregister(
 
 
 SCENARIOS: list[UnregisteringStep] = [
-    TheSuperadminUnregisters(),
+    AUserGrantedReadAndDeleteUnregisters(),
     ANamespaceNothingAnswersToIsNotFound(),
     AUserGrantedNothingMayNotUnregister(),
 ]
