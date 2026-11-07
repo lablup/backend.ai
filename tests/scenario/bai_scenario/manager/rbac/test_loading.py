@@ -134,9 +134,7 @@ class LoadingPermissions(When[RolesAndACaller, RBACAdapter, PermissionsLoaded]):
 
 
 @dataclass(frozen=True)
-class LoadingPermissionsWithAnUnreadableOne(
-    When[RolesAndACaller, RBACAdapter, PermissionsLoaded]
-):
+class LoadingPermissionsWithAnUnreadableOne(When[RolesAndACaller, RBACAdapter, PermissionsLoaded]):
     @override
     def operation(self) -> str:
         return "batch_load_permissions_by_ids"
