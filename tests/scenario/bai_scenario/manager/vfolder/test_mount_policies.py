@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import VFolderPermissionField
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.storage import VFolderMountPolicyNotApplicable
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -61,6 +62,12 @@ def _other(laid: AFolderAndPeople) -> UUID:
     if laid.other is None:
         raise LookupError("the second user was not seeded")
     return laid.other.id
+
+
+def _other_user(laid: AFolderAndPeople) -> UserData:
+    if laid.other is None:
+        raise LookupError("the second user was not seeded")
+    return laid.other
 
 
 @dataclass(frozen=True)
@@ -106,7 +113,12 @@ class SettingTheOtherUsersLevel(
 class UnsettingTheOtherUsersLevel(
     When[AFolderAndPeople, VFolderAdapter, UnsetVFolderMountPolicyPayload]
 ):
-    """다른 사용자의 마운트 레벨을 먼저 정하고, 이어서 되돌린다."""
+    """다른 사용자의 마운트 레벨을 먼저 정하고, 이어서 되돌린다.
+
+    ``by_other``이면 레벨은 권한 있는 호출자가 정하고, 권한이 없는 다른 사용자가 되돌린다.
+    """
+
+    by_other: bool = False
 
     @override
     def operation(self) -> str:
@@ -114,6 +126,17 @@ class UnsettingTheOtherUsersLevel(
 
     @override
     def describe(self, laid: AFolderAndPeople) -> str:
+        if self.by_other:
+            other = _other_user(laid)
+            return Says(
+                f"{laid.caller.username}이 {laid.folder.name} vfolder 에서 다른 사용자의 마운트 "
+                f"레벨을 정한 뒤, 권한이 없는 {other.username}이 그것을 되돌립니다",
+                english=(
+                    f"{laid.caller.username} sets another user's mount level on the "
+                    f"{laid.folder.name} vfolder, and then {other.username}, holding no "
+                    "permission, takes it back"
+                ),
+            )
         return Says(
             f"{laid.caller.username}이 {laid.folder.name} vfolder 에서 다른 사용자의 마운트 "
             "레벨을 정했다가 되돌립니다",
@@ -135,6 +158,8 @@ class UnsettingTheOtherUsersLevel(
                     user_id=other_id, permission=VFolderPermissionField.READ_ONLY
                 ),
             )
+        actor = _other_user(laid) if self.by_other else laid.caller
+        with ActingAs(actor):
             return await adapter.unset_mount_policy(
                 laid.folder.id, UnsetVFolderMountPolicyInput(user_id=other_id)
             )
@@ -142,7 +167,12 @@ class UnsettingTheOtherUsersLevel(
 
 @dataclass(frozen=True)
 class ListingTheLevels(When[AFolderAndPeople, VFolderAdapter, VFolderMountPoliciesPayload]):
-    """다른 사용자의 마운트 레벨을 정한 뒤 목록을 읽는다."""
+    """다른 사용자의 마운트 레벨을 정한 뒤 목록을 읽는다.
+
+    ``by_other``이면 레벨은 권한 있는 호출자가 정하고, 권한이 없는 다른 사용자가 목록을 읽는다.
+    """
+
+    by_other: bool = False
 
     @override
     def operation(self) -> str:
@@ -150,6 +180,17 @@ class ListingTheLevels(When[AFolderAndPeople, VFolderAdapter, VFolderMountPolici
 
     @override
     def describe(self, laid: AFolderAndPeople) -> str:
+        if self.by_other:
+            other = _other_user(laid)
+            return Says(
+                f"{laid.caller.username}이 {laid.folder.name} vfolder 에 다른 사용자의 마운트 "
+                f"레벨을 정한 뒤, 권한이 없는 {other.username}이 걸린 레벨을 조회합니다",
+                english=(
+                    f"{laid.caller.username} sets another user's mount level on the "
+                    f"{laid.folder.name} vfolder, and then {other.username}, holding no "
+                    "permission, lists the levels set on it"
+                ),
+            )
         return Says(
             f"{laid.caller.username}이 {laid.folder.name} vfolder 에 걸린 마운트 레벨을 조회합니다",
             english=(
@@ -170,6 +211,8 @@ class ListingTheLevels(When[AFolderAndPeople, VFolderAdapter, VFolderMountPolici
                     user_id=other_id, permission=VFolderPermissionField.READ_ONLY
                 ),
             )
+        actor = _other_user(laid) if self.by_other else laid.caller
+        with ActingAs(actor):
             return await adapter.list_mount_policies(laid.folder.id)
 
 
@@ -449,20 +492,22 @@ class AUserGrantedNothingMayNotTakeALevelBack(
     @override
     def describe(self) -> str:
         return Says(
-            "아무 권한도 받지 않은 사용자가 마운트 레벨을 되돌리려 하면 권한 부족으로 거부됩니다",
+            "vfolder 수정 권한을 받은 사용자가 다른 사용자의 마운트 레벨을 정한 뒤, 아무 권한도 "
+            "받지 않은 다른 사용자가 그것을 되돌리려 하면 권한 부족으로 거부됩니다",
             english=(
-                "when a user granted nothing tries to take a mount level back, it is rejected "
-                "for lack of permission"
+                "when a user granted vfolder update sets another user's mount level and then a "
+                "user holding no permission tries to take it back, it is rejected for lack of "
+                "permission"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AFolderAndPeople]:
-        return SomeoneWithAFolder(with_other=True)
+        return SomeoneWithAFolder(permissions=(Permission.UPDATE,), with_other=True)
 
     @override
     def when(self) -> When[AFolderAndPeople, VFolderAdapter, UnsetVFolderMountPolicyPayload]:
-        return UnsettingTheOtherUsersLevel()
+        return UnsettingTheOtherUsersLevel(by_other=True)
 
     @override
     def then(self) -> Then[AFolderAndPeople, UnsetVFolderMountPolicyPayload]:
@@ -514,20 +559,22 @@ class AUserGrantedNothingMayNotListLevels(
     @override
     def describe(self) -> str:
         return Says(
-            "아무 권한도 받지 않은 사용자가 마운트 레벨을 조회하려 하면 권한 부족으로 거부됩니다",
+            "vfolder 수정 권한을 받은 사용자가 다른 사용자의 마운트 레벨을 정한 뒤, 아무 권한도 "
+            "받지 않은 다른 사용자가 걸린 레벨을 조회하려 하면 권한 부족으로 거부됩니다",
             english=(
-                "when a user granted nothing tries to list the mount levels, it is rejected for "
-                "lack of permission"
+                "when a user granted vfolder update sets another user's mount level and then a "
+                "user holding no permission tries to list the levels set on the folder, it is "
+                "rejected for lack of permission"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AFolderAndPeople]:
-        return SomeoneWithAFolder(with_other=True)
+        return SomeoneWithAFolder(permissions=(Permission.UPDATE,), with_other=True)
 
     @override
     def when(self) -> When[AFolderAndPeople, VFolderAdapter, VFolderMountPoliciesPayload]:
-        return ListingTheLevels()
+        return ListingTheLevels(by_other=True)
 
     @override
     def then(self) -> Then[AFolderAndPeople, VFolderMountPoliciesPayload]:

@@ -95,6 +95,11 @@ class VFolderNodeLook:
                     folder.id, Says("미리 저장한 vfolder", english="the vfolder seeded in advance")
                 ),
             ),
+            Held(
+                f"{at}entity_id",
+                node.entity_id,
+                SameAs[UUID](node.id, Says("응답의 id", english="the id in the answer")),
+            ),
             Same(f"{at}host", node.host, STORAGE_HOST),
             Same(f"{at}status", node.status, self.status),
             Same(
@@ -155,13 +160,8 @@ class VFolderNodeLook:
                     english="it is a mount permission, which this table does not check",
                 ),
             ),
-            Skipped(
-                f"{at}quota",
-                Says(
-                    "저장소가 응답하는 값이라 여기서 말할 수 없습니다",
-                    english="the storage answers it, so it cannot be stated here",
-                ),
-            ),
+            Same(f"{at}quota.max_size", node.quota.max_size, None),
+            Same(f"{at}quota.max_files", node.quota.max_files, 1000),
             Held(
                 f"{at}metadata.created_at", node.metadata.created_at, WrittenByThisRun(self.started)
             ),
