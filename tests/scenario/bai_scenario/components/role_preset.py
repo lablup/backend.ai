@@ -278,9 +278,7 @@ async def lay_a_caller_granted_on_presets(
 ) -> Laid[UserData]:
     """A user of the given role granted permission on role presets in global."""
     home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
-    caller: Laid[UserData] = await seeding.within(
-        SomeoneGrantedOnPresets(home, granted, role=role)
-    )
+    caller: Laid[UserData] = await seeding.within(SomeoneGrantedOnPresets(home, granted, role=role))
     return caller
 
 

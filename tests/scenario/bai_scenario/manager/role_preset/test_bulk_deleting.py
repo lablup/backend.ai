@@ -5,11 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import override
-from uuid import UUID
 
 import pytest
 
-from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.dto.manager.v2.role_preset.request import (
     BulkDeleteRolePresetsInput,
     BulkPurgeRolePresetsInput,
@@ -56,7 +55,7 @@ class BulkSoftDeleting(When[ManyPresetsAndACaller, RolePresetAdapter, BulkPreset
     async def call(
         self, adapter: RolePresetAdapter, laid: ManyPresetsAndACaller
     ) -> BulkPresetsPayload:
-        ids: list[UUID] = [preset.id for preset in laid.laid]
+        ids: list[RolePresetID] = [RolePresetID(preset.id) for preset in laid.laid]
         with ActingAs(laid.caller):
             return await adapter.bulk_delete(BulkDeleteRolePresetsInput(role_preset_ids=ids))
 
@@ -80,7 +79,7 @@ class BulkRestoring(When[ManyPresetsAndACaller, RolePresetAdapter, BulkPresetsPa
     async def call(
         self, adapter: RolePresetAdapter, laid: ManyPresetsAndACaller
     ) -> BulkPresetsPayload:
-        ids: list[UUID] = [preset.id for preset in laid.laid]
+        ids: list[RolePresetID] = [RolePresetID(preset.id) for preset in laid.laid]
         with ActingAs(laid.caller):
             return await adapter.bulk_restore(BulkRestoreRolePresetsInput(role_preset_ids=ids))
 
@@ -110,7 +109,7 @@ class BulkSoftDeletingThenRestoring(
     async def call(
         self, adapter: RolePresetAdapter, laid: ManyPresetsAndACaller
     ) -> BulkPresetsPayload:
-        ids: list[UUID] = [preset.id for preset in laid.laid]
+        ids: list[RolePresetID] = [RolePresetID(preset.id) for preset in laid.laid]
         with ActingAs(laid.caller):
             await adapter.bulk_delete(BulkDeleteRolePresetsInput(role_preset_ids=ids))
             return await adapter.bulk_restore(BulkRestoreRolePresetsInput(role_preset_ids=ids))
@@ -135,7 +134,7 @@ class BulkPurging(When[ManyPresetsAndACaller, RolePresetAdapter, BulkPresetsPayl
     async def call(
         self, adapter: RolePresetAdapter, laid: ManyPresetsAndACaller
     ) -> BulkPresetsPayload:
-        ids: list[UUID] = [preset.id for preset in laid.laid]
+        ids: list[RolePresetID] = [RolePresetID(preset.id) for preset in laid.laid]
         with ActingAs(laid.caller):
             return await adapter.bulk_purge(BulkPurgeRolePresetsInput(role_preset_ids=ids))
 
