@@ -110,7 +110,11 @@ class GqlRow(Scenario[TestSeedingSession, AUsageScopeAndACaller, ResourceUsageAd
 
     @override
     def given(self) -> Given[TestSeedingSession, AUsageScopeAndACaller]:
-        return AUsageScopeAndSomeone(who=Side.NOBODY if self.refused else Side.SUPERADMIN)
+        if self.refused:
+            return AUsageScopeAndSomeone(who=Side.NOBODY)
+        if self.how.endswith("_scoped"):
+            return AUsageScopeAndSomeone(who=Side.READER)
+        return AUsageScopeAndSomeone(who=Side.SUPERADMIN)
 
     @override
     def when(self) -> When[AUsageScopeAndACaller, ResourceUsageAdapter, Any]:
@@ -145,13 +149,19 @@ def _row(how: str, *, refused: bool = False) -> GqlRow:
             how=how,
             refused=True,
         )
+    if how.endswith("_scoped"):
+        caller = "리소스 그룹에서 사용량을 읽을 수 있는 일반 사용자가"
+        caller_en = "a regular user granted permission to read usage in the resource group"
+    else:
+        caller = "슈퍼관리자가"
+        caller_en = "the superadmin"
     return GqlRow(
         named=f"{slug}-returns-an-empty-page",
         guarantees=Says(
-            f"슈퍼관리자가 버킷이 없는 자리에서 GQL 경로로 {where} 사용량 버킷을 훑으면 빈 "
+            f"{caller} 버킷이 없는 자리에서 GQL 경로로 {where} 사용량 버킷을 훑으면 빈 "
             "페이지가 옵니다",
             english=(
-                f"when the superadmin pages through {where_en} usage buckets through the GQL "
+                f"when {caller_en} pages through {where_en} usage buckets through the GQL "
                 "path where none are laid, an empty page comes back"
             ),
         ),

@@ -148,7 +148,11 @@ class UsageRow(Scenario[TestSeedingSession, AUsageScopeAndACaller, ResourceUsage
 
     @override
     def given(self) -> Given[TestSeedingSession, AUsageScopeAndACaller]:
-        return AUsageScopeAndSomeone(who=Side.NOBODY if self.refused else Side.SUPERADMIN)
+        if self.refused:
+            return AUsageScopeAndSomeone(who=Side.NOBODY)
+        if self.how.startswith("admin_"):
+            return AUsageScopeAndSomeone(who=Side.SUPERADMIN)
+        return AUsageScopeAndSomeone(who=Side.READER)
 
     @override
     def when(self) -> When[AUsageScopeAndACaller, ResourceUsageAdapter, Any]:
@@ -184,10 +188,14 @@ def _row(how: str, *, refused: bool = False) -> UsageRow:
             refused=True,
         )
     caller = (
-        "슈퍼관리자가" if how.startswith("admin_") else "리소스 그룹에서 읽을 수 있는 슈퍼관리자가"
+        "슈퍼관리자가"
+        if how.startswith("admin_")
+        else "리소스 그룹에서 사용량을 읽을 수 있는 일반 사용자가"
     )
     caller_en = (
-        "the superadmin" if how.startswith("admin_") else "the superadmin reading in the group"
+        "the superadmin"
+        if how.startswith("admin_")
+        else "a regular user granted permission to read usage in the resource group"
     )
     return UsageRow(
         named=f"{slug}-returns-an-empty-page",
