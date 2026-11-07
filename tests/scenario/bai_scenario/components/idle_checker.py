@@ -381,6 +381,7 @@ class EveryAssignmentIsListed(Then[AssignmentsAndACaller, AssignmentsAnswered]):
         expected = sorted(answer.ids, key=lambda one: one)
         seen: list[Verdict] = [
             Same("total_count", payload.total_count, len(laid.domains)),
+            Same("items count", len(payload.items), len(laid.domains)),
             Same("has_next_page", payload.has_next_page, False),
             Same("has_previous_page", payload.has_previous_page, False),
         ]
