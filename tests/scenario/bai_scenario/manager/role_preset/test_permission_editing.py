@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
     RolePermissionPresetEntry,
 )
 from ai.backend.manager.api.adapters.role_preset.adapter import RolePresetAdapter
+from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
@@ -192,10 +193,11 @@ class RemovingAnswersForTheMissingOne(
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 권한 항목 둘과 없는 id 하나를 한 번에 제거하면, "
+            "프리셋 수정 권한을 받은 사용자가 권한 항목 둘과 없는 id 하나를 한 번에 제거하면, "
             "둘은 처리된 목록에 오고 없는 id 는 실패 목록에 옵니다",
             english=(
-                "when the superadmin removes two permission entries and one missing id "
+                "when a user granted update on presets removes two permission entries and "
+                "one missing id "
                 "at once, the two come back in the processed list and the missing id "
                 "comes back in the failed list"
             ),
@@ -203,7 +205,7 @@ class RemovingAnswersForTheMissingOne(
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetWithEntriesAndACaller]:
-        return APresetWithEntriesAndSomeone(role=UserRole.SUPERADMIN)
+        return APresetWithEntriesAndSomeone(granted=Permission.UPDATE)
 
     @override
     def when(self) -> When[APresetWithEntriesAndACaller, RolePresetAdapter, Removed]:
@@ -215,20 +217,21 @@ class RemovingAnswersForTheMissingOne(
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingRemovesNone(
+class AUserWithoutUpdateRemovesNone(
     Scenario[TestSeedingSession, APresetWithEntriesAndACaller, RolePresetAdapter, Removed]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-removes-none-of-the-entries"
+        return "a-user-without-update-removes-none-of-the-entries"
 
     @override
     def describe(self) -> str:
         return Says(
-            "아무 권한도 받지 않은 사용자가 권한 항목 여럿을 한 번에 제거하려 하면, "
+            "프리셋 읽기 권한만 받은 사용자가 권한 항목 여럿을 한 번에 제거하려 하면, "
             "제거된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
             english=(
-                "when a user granted nothing tries to remove several permission entries "
+                "when a user granted only read on presets tries to remove several permission "
+                "entries "
                 "at once, none is removed and every one comes back in the failed list "
                 "for lack of permission"
             ),
@@ -236,7 +239,7 @@ class AUserGrantedNothingRemovesNone(
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetWithEntriesAndACaller]:
-        return APresetWithEntriesAndSomeone()
+        return APresetWithEntriesAndSomeone(granted=Permission.READ)
 
     @override
     def when(self) -> When[APresetWithEntriesAndACaller, RolePresetAdapter, Removed]:
@@ -251,7 +254,7 @@ SCENARIOS: list[PermissionStep] = [
     TheSuperadminAddsEntries(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotAddEntries(),
     RemovingAnswersForTheMissingOne(),
-    AUserGrantedNothingRemovesNone(),
+    AUserWithoutUpdateRemovesNone(),
 ]
 
 
