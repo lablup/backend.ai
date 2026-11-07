@@ -10,8 +10,10 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.entity_share.request import (
+    EntityShareFilter,
     EntityShareOrderBy,
     EntityShareScope,
     EntityShareTargetScope,
@@ -60,8 +62,12 @@ class SearchingTheShares(When[ASharedFolderAndACaller, EntityShareAdapter, Found
                 english=f"{laid.caller.username} pages through the shares of their own side",
             )
         return Says(
-            f"{laid.caller.username}이 폴더 {laid.folder.name}에 걸린 공유를 훑습니다",
-            english=f"{laid.caller.username} pages through the shares of folder {laid.folder.name}",
+            f"{laid.caller.username}이 폴더 {laid.folder.name}에 걸린 공유 가운데 "
+            f"{laid.recipient.username}에게 간 것을 훑습니다",
+            english=(
+                f"{laid.caller.username} pages through the shares of folder {laid.folder.name} "
+                f"addressed to {laid.recipient.username}"
+            ),
         )
 
     @override
@@ -85,6 +91,9 @@ class SearchingTheShares(When[ASharedFolderAndACaller, EntityShareAdapter, Found
                                 entity_id=UUID(str(laid.folder.id)),
                             )
                         ]
+                    ),
+                    filter=EntityShareFilter(
+                        recipient_entity_id=UUIDFilter(equals=UUID(str(laid.recipient.id)))
                     ),
                     order=order,
                     limit=1,
@@ -132,11 +141,12 @@ SCENARIOS: list[SearchStep] = [
     SearchRow(
         named="the-recipient-pages-through-the-shares-addressed-to-them",
         guarantees=Says(
-            "자기 스코프에서 공유를 읽을 수 있는 사용자가 자기에게 온 공유를 훑으면 그 공유만 "
-            "한 페이지로 옵니다",
+            "자기 스코프에서 공유를 읽을 수 있는 사용자가 자기에게 온 공유를 훑으면 자기가 보낸 "
+            "제안과 자기와 무관한 제안은 빠지고 그 공유만 한 페이지로 옵니다",
             english=(
                 "when a user who can read shares in their own scope pages through the ones "
-                "addressed to them, only that share comes back as one page"
+                "addressed to them, the offer they sent and an offer between others are left "
+                "out and only that share comes back as one page"
             ),
         ),
         situation=RECIPIENT,
@@ -145,11 +155,12 @@ SCENARIOS: list[SearchStep] = [
     SearchRow(
         named="the-sharer-pages-through-the-shares-of-a-folder",
         guarantees=Says(
-            "프로젝트에서 공유를 읽을 수 있는 사용자가 폴더를 범위로 훑으면 그 폴더에 걸린 공유만 "
-            "한 페이지로 옵니다",
+            "프로젝트에서 공유를 읽을 수 있는 사용자가 폴더를 범위로 받는 사람을 걸러 훑으면 다른 "
+            "폴더의 제안과 다른 사람에게 간 제안은 빠지고 그 공유만 한 페이지로 옵니다",
             english=(
-                "when a user who can read shares in the project pages through a folder, only "
-                "the shares of that folder come back as one page"
+                "when a user who can read shares in the project pages through a folder filtered "
+                "by recipient, the offer of another folder and the offer to someone else are "
+                "left out and only that share comes back as one page"
             ),
         ),
         situation=SHARER,

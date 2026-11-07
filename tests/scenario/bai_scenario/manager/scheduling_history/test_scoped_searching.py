@@ -9,17 +9,34 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     AdminSearchDeploymentHistoriesInput,
     AdminSearchRouteHistoriesInput,
     AdminSearchSessionHistoriesInput,
+    DeploymentHistoryFilter,
+    DeploymentHistoryOrder,
+    KernelHistoryFilter,
+    KernelHistoryOrder,
+    ReplicaGroupHistoryFilter,
+    ReplicaGroupHistoryOrder,
+    RouteHistoryFilter,
+    RouteHistoryOrder,
     ScopedSearchKernelHistoriesInput,
     ScopedSearchReplicaGroupHistoriesInput,
+    SessionHistoryFilter,
+    SessionHistoryOrder,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
+    DeploymentHistoryOrderField,
+    KernelHistoryOrderField,
     KernelHistoryScopeDTO,
+    OrderDirection,
+    ReplicaGroupHistoryOrderField,
     ReplicaGroupHistoryScopeDTO,
+    RouteHistoryOrderField,
+    SessionHistoryOrderField,
 )
 from ai.backend.manager.api.adapters.scheduling_history.adapter import (
     SchedulingHistoryAdapter,
@@ -89,20 +106,33 @@ class SearchingWithinTheScope(When[HistoriesAndACaller, SchedulingHistoryAdapter
                 ),
             )
         return Says(
-            f"{laid.caller.username} 이 미리 만든 대상 하나를 범위로 {where} 이력을 훑습니다",
+            f"{laid.caller.username} 이 미리 만든 대상 하나를 범위로, 미리 만든 {where} 이력 하나만 "
+            "남기는 조건과 순서를 걸어 한 건씩 훑습니다",
             english=(
                 f"{laid.caller.username} pages through {where_en} histories naming the target "
-                "laid in advance as the scope"
+                "laid in advance as the scope, with a condition that keeps one history laid in "
+                "advance and an order over one item per page"
             ),
         )
 
     @override
     async def call(self, adapter: SchedulingHistoryAdapter, laid: HistoriesAndACaller) -> Any:
+        picked = UUIDFilter(equals=laid.history_id(self.kind))
         with ActingAs(laid.caller):
             match self.kind:
                 case "session":
                     return await adapter.session_scoped_search(
-                        UUID(str(laid.session.id)), AdminSearchSessionHistoriesInput()
+                        UUID(str(laid.session.id)),
+                        AdminSearchSessionHistoriesInput(
+                            filter=SessionHistoryFilter(field_id=picked),
+                            order=[
+                                SessionHistoryOrder(
+                                    field=SessionHistoryOrderField.CREATED_AT,
+                                    direction=OrderDirection.ASC,
+                                )
+                            ],
+                            limit=1,
+                        ),
                     )
                 case "kernel":
                     sessions = [UUIDScope(value=UUID(str(laid.session.id)))]
@@ -110,17 +140,44 @@ class SearchingWithinTheScope(When[HistoriesAndACaller, SchedulingHistoryAdapter
                         sessions.append(UUIDScope(value=UUID(int=9)))
                     return await adapter.scoped_search_kernel_history(
                         ScopedSearchKernelHistoriesInput(
-                            scope=KernelHistoryScopeDTO(session=sessions)
+                            scope=KernelHistoryScopeDTO(session=sessions),
+                            filter=KernelHistoryFilter(field_id=picked),
+                            order=[
+                                KernelHistoryOrder(
+                                    field=KernelHistoryOrderField.CREATED_AT,
+                                    direction=OrderDirection.ASC,
+                                )
+                            ],
+                            limit=1,
                         )
                     )
                 case "deployment":
                     return await adapter.deployment_scoped_search(
                         UUID(str(laid.deployment.id)),
-                        AdminSearchDeploymentHistoriesInput(),
+                        AdminSearchDeploymentHistoriesInput(
+                            filter=DeploymentHistoryFilter(field_id=picked),
+                            order=[
+                                DeploymentHistoryOrder(
+                                    field=DeploymentHistoryOrderField.CREATED_AT,
+                                    direction=OrderDirection.ASC,
+                                )
+                            ],
+                            limit=1,
+                        ),
                     )
                 case "route":
                     return await adapter.route_scoped_search(
-                        UUID(str(laid.replica.id)), AdminSearchRouteHistoriesInput()
+                        UUID(str(laid.replica.id)),
+                        AdminSearchRouteHistoriesInput(
+                            filter=RouteHistoryFilter(field_id=picked),
+                            order=[
+                                RouteHistoryOrder(
+                                    field=RouteHistoryOrderField.CREATED_AT,
+                                    direction=OrderDirection.ASC,
+                                )
+                            ],
+                            limit=1,
+                        ),
                     )
                 case _:
                     deployments = [UUIDScope(value=UUID(str(laid.deployment.id)))]
@@ -128,7 +185,15 @@ class SearchingWithinTheScope(When[HistoriesAndACaller, SchedulingHistoryAdapter
                         deployments.append(UUIDScope(value=UUID(int=9)))
                     return await adapter.scoped_search_replica_group_history(
                         ScopedSearchReplicaGroupHistoriesInput(
-                            scope=ReplicaGroupHistoryScopeDTO(deployment=deployments)
+                            scope=ReplicaGroupHistoryScopeDTO(deployment=deployments),
+                            filter=ReplicaGroupHistoryFilter(field_id=picked),
+                            order=[
+                                ReplicaGroupHistoryOrder(
+                                    field=ReplicaGroupHistoryOrderField.CREATED_AT,
+                                    direction=OrderDirection.ASC,
+                                )
+                            ],
+                            limit=1,
                         )
                     )
 
@@ -153,7 +218,7 @@ class ScopedRow(Scenario[TestSeedingSession, HistoriesAndACaller, SchedulingHist
 
     @override
     def given(self) -> Given[TestSeedingSession, HistoriesAndACaller]:
-        return HistoriesAndSomeone(who=self.who, outside=self.outside)
+        return HistoriesAndSomeone(who=self.who, outside=self.outside, beside=self.outside)
 
     @override
     def when(self) -> When[HistoriesAndACaller, SchedulingHistoryAdapter, Any]:
@@ -218,11 +283,13 @@ def _row(kind: str, *, refused: bool = False, two_items: bool = False) -> Scoped
         named=f"a-reader-pages-through-the-scoped-{slug}-histories",
         guarantees=Says(
             "프로젝트에서 세션과 배포를 읽을 수 있는 일반 사용자가 미리 만든 대상을 범위로 "
-            f"{where} 이력을 훑으면 그 이력 하나만 한 페이지로 옵니다",
+            f"{where} 이력을 조건으로 걸러 훑으면 범위 밖의 이력과 조건에 걸린 이력은 빠지고 "
+            "그 이력 하나만 한 페이지로 옵니다",
             english=(
                 "when a regular user granted permission to read sessions and deployments pages "
-                f"through {where_en} histories of the target laid in advance, only that one "
-                "history comes back as one page"
+                f"through {where_en} histories of the target laid in advance with a condition, "
+                "the history outside the scope and the one the condition drops are left out and "
+                "only that one history comes back as one page"
             ),
         ),
         kind=kind,

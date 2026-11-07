@@ -167,14 +167,26 @@ class HistoriesAndSomeone(Given[Any, HistoriesAndACaller]):
 
     이력 한 줄씩이 세션, 커널, 배포, 라우트, 복제본 그룹에 붙어 있다. ``who``가 부르는
     사람이다. ``outside`` 면 같은 다섯 가지를 한 벌 더 세워, 범위를 대고 훑을 때 걸러지는지
-    볼 수 있게 한다.
+    볼 수 있게 한다. ``beside`` 면 범위 안의 대상마다 이력을 한 줄씩 더 남겨, 조건으로
+    걸러지는지 볼 수 있게 한다.
     """
 
     who: Side = Side.SUPERADMIN
     outside: bool = False
+    beside: bool = False
 
     @override
     def describe(self) -> str:
+        if self.outside and self.beside:
+            return Says(
+                "스케줄링 이력이 두 줄씩 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, "
+                f"범위 밖에 이력이 붙은 같은 것이 한 벌 더 있고, {_who(self.who)}",
+                english=(
+                    "one set of a session, kernel, deployment, route and replica group carrying "
+                    "two scheduling history rows each, one more set of each outside the scope "
+                    f"carrying a history row, and {_who_en(self.who)}"
+                ),
+            )
         if self.outside:
             return Says(
                 "스케줄링 이력이 붙은 세션, 커널, 배포, 라우트, 복제본 그룹이 한 벌, 범위 밖에 "
@@ -247,6 +259,19 @@ class HistoriesAndSomeone(Given[Any, HistoriesAndACaller]):
             ),
             deployment,
         )
+        if self.beside:
+            await seeding.adding(TestSeedSessionHistory(), session)
+            await seeding.adding(TestSeedKernelHistory(kernel_id=seeding.made(kernel).id), session)
+            await seeding.adding(TestSeedDeploymentHistory(), deployment)
+            await seeding.adding(
+                TestSeedRouteHistory(route_id=ReplicaID(seeding.made(replica).id)), deployment
+            )
+            await seeding.adding(
+                TestSeedReplicaGroupHistory(
+                    replica_group_id=ReplicaGroupID(seeding.made(replica_group).id)
+                ),
+                deployment,
+            )
         if self.outside:
             await self._lay_outside(seeding, place)
         caller = await seeding.within(
