@@ -620,7 +620,7 @@ when a user granted session read in the project searches the environment variabl
 
 Given
 
-- one pending session with a kernel and its kernel group, and one user who reads it
+- one pending session with a kernel and its kernel group, the same shape laid beside it in the same project and again in another project, and one user who reads it
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -647,6 +647,17 @@ Given
     - Role session-reader-1: applies only within the scope it is granted in
     - Role session-reader-1: READ allowed on every session
     - regular user user-2: holds Role session-reader-1
+  - Session beside-session-1: waiting to be scheduled
+  - Session beside-session-1: has one main kernel group
+  - Session beside-session-1(has one main kernel group): has one environment variable
+  - Session beside-session-1(has one main kernel group): asks for 1 in the slot-1 slot
+  - Session beside-session-1: has one kernel asking for slot-1 1
+  - Project outside-project-1
+  - Session outside-session-1: waiting to be scheduled
+  - Session outside-session-1: has one main kernel group
+  - Session outside-session-1(has one main kernel group): has one environment variable
+  - Session outside-session-1(has one main kernel group): asks for 1 in the slot-1 slot
+  - Session outside-session-1: has one kernel asking for slot-1 1
 
 When
 
@@ -710,7 +721,7 @@ when a user granted session read in the project searches the resource slots of a
 
 Given
 
-- one pending session with a kernel and its kernel group, and one user who reads it
+- one pending session with a kernel and its kernel group, the same shape laid beside it in the same project and again in another project, and one user who reads it
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -737,6 +748,17 @@ Given
     - Role session-reader-1: applies only within the scope it is granted in
     - Role session-reader-1: READ allowed on every session
     - regular user user-2: holds Role session-reader-1
+  - Session beside-session-1: waiting to be scheduled
+  - Session beside-session-1: has one main kernel group
+  - Session beside-session-1(has one main kernel group): has one environment variable
+  - Session beside-session-1(has one main kernel group): asks for 1 in the slot-1 slot
+  - Session beside-session-1: has one kernel asking for slot-1 1
+  - Project outside-project-1
+  - Session outside-session-1: waiting to be scheduled
+  - Session outside-session-1: has one main kernel group
+  - Session outside-session-1(has one main kernel group): has one environment variable
+  - Session outside-session-1(has one main kernel group): asks for 1 in the slot-1 slot
+  - Session outside-session-1: has one kernel asking for slot-1 1
 
 When
 
@@ -800,7 +822,7 @@ when a user granted session read in the project searches the kernel groups of a 
 
 Given
 
-- one pending session with a kernel and its kernel group, and one user who reads it
+- one pending session with a kernel and its kernel group, the same shape laid beside it in the same project and again in another project, and one user who reads it
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -827,6 +849,17 @@ Given
     - Role session-reader-1: applies only within the scope it is granted in
     - Role session-reader-1: READ allowed on every session
     - regular user user-2: holds Role session-reader-1
+  - Session beside-session-1: waiting to be scheduled
+  - Session beside-session-1: has one main kernel group
+  - Session beside-session-1(has one main kernel group): has one environment variable
+  - Session beside-session-1(has one main kernel group): asks for 1 in the slot-1 slot
+  - Session beside-session-1: has one kernel asking for slot-1 1
+  - Project outside-project-1
+  - Session outside-session-1: waiting to be scheduled
+  - Session outside-session-1: has one main kernel group
+  - Session outside-session-1(has one main kernel group): has one environment variable
+  - Session outside-session-1(has one main kernel group): asks for 1 in the slot-1 slot
+  - Session outside-session-1: has one kernel asking for slot-1 1
 
 When
 
@@ -1026,7 +1059,7 @@ when a superadmin holding no permission searches every kernel, the stored kernel
 
 Given
 
-- one pending session with a kernel and its kernel group, and one user who reads it
+- one pending session with a kernel and its kernel group, the same shape laid beside it in the same project and again in another project, and one user who reads it
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1048,6 +1081,17 @@ Given
   - Session session-1(has one main kernel group): has one environment variable
   - Session session-1(has one main kernel group): asks for 1 in the slot-1 slot
   - Session session-1: has one kernel asking for slot-1 1
+  - Session beside-session-1: waiting to be scheduled
+  - Session beside-session-1: has one main kernel group
+  - Session beside-session-1(has one main kernel group): has one environment variable
+  - Session beside-session-1(has one main kernel group): asks for 1 in the slot-1 slot
+  - Session beside-session-1: has one kernel asking for slot-1 1
+  - Project outside-project-1
+  - Session outside-session-1: waiting to be scheduled
+  - Session outside-session-1: has one main kernel group
+  - Session outside-session-1(has one main kernel group): has one environment variable
+  - Session outside-session-1(has one main kernel group): asks for 1 in the slot-1 slot
+  - Session outside-session-1: has one kernel asking for slot-1 1
 
 When
 
@@ -1289,7 +1333,7 @@ when a user granted session read in the project searches sessions in that projec
 
 Given
 
-- one pending session with a kernel and its kernel group, and one user who reads it
+- one pending session with a kernel and its kernel group, the same shape laid beside it in the same project and again in another project, and one user who reads it
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1316,6 +1360,17 @@ Given
     - Role session-reader-1: applies only within the scope it is granted in
     - Role session-reader-1: READ allowed on every session
     - regular user user-2: holds Role session-reader-1
+  - Session beside-session-1: waiting to be scheduled
+  - Session beside-session-1: has one main kernel group
+  - Session beside-session-1(has one main kernel group): has one environment variable
+  - Session beside-session-1(has one main kernel group): asks for 1 in the slot-1 slot
+  - Session beside-session-1: has one kernel asking for slot-1 1
+  - Project outside-project-1
+  - Session outside-session-1: waiting to be scheduled
+  - Session outside-session-1: has one main kernel group
+  - Session outside-session-1(has one main kernel group): has one environment variable
+  - Session outside-session-1(has one main kernel group): asks for 1 in the slot-1 slot
+  - Session outside-session-1: has one kernel asking for slot-1 1
 
 When
 
@@ -1379,7 +1434,7 @@ when a user granted session read in the project searches sessions in that projec
 
 Given
 
-- one pending session with a kernel and its kernel group, and one user who reads it
+- one pending session with a kernel and its kernel group, the same shape laid beside it in the same project and again in another project, and one user who reads it
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1406,6 +1461,17 @@ Given
     - Role session-reader-1: applies only within the scope it is granted in
     - Role session-reader-1: READ allowed on every session
     - regular user user-2: holds Role session-reader-1
+  - Session beside-session-1: waiting to be scheduled
+  - Session beside-session-1: has one main kernel group
+  - Session beside-session-1(has one main kernel group): has one environment variable
+  - Session beside-session-1(has one main kernel group): asks for 1 in the slot-1 slot
+  - Session beside-session-1: has one kernel asking for slot-1 1
+  - Project outside-project-1
+  - Session outside-session-1: waiting to be scheduled
+  - Session outside-session-1: has one main kernel group
+  - Session outside-session-1(has one main kernel group): has one environment variable
+  - Session outside-session-1(has one main kernel group): asks for 1 in the slot-1 slot
+  - Session outside-session-1: has one kernel asking for slot-1 1
 
 When
 
@@ -1469,7 +1535,7 @@ when a user granted session read in the project searches sessions in that projec
 
 Given
 
-- one pending session with a kernel and its kernel group, and one user who reads it
+- one pending session with a kernel and its kernel group, the same shape laid beside it in the same project and again in another project, and one user who reads it
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1496,6 +1562,17 @@ Given
     - Role session-reader-1: applies only within the scope it is granted in
     - Role session-reader-1: READ allowed on every session
     - regular user user-2: holds Role session-reader-1
+  - Session beside-session-1: waiting to be scheduled
+  - Session beside-session-1: has one main kernel group
+  - Session beside-session-1(has one main kernel group): has one environment variable
+  - Session beside-session-1(has one main kernel group): asks for 1 in the slot-1 slot
+  - Session beside-session-1: has one kernel asking for slot-1 1
+  - Project outside-project-1
+  - Session outside-session-1: waiting to be scheduled
+  - Session outside-session-1: has one main kernel group
+  - Session outside-session-1(has one main kernel group): has one environment variable
+  - Session outside-session-1(has one main kernel group): asks for 1 in the slot-1 slot
+  - Session outside-session-1: has one kernel asking for slot-1 1
 
 When
 
@@ -1649,7 +1726,7 @@ when a user granted session read in the project searches the kernels of a sessio
 
 Given
 
-- one pending session with a kernel and its kernel group, and one user who reads it
+- one pending session with a kernel and its kernel group, the same shape laid beside it in the same project and again in another project, and one user who reads it
   - Domain home-1
   - Project resource policy default: the personal project created along with a user looks it up by this name
   - Project team-1
@@ -1676,6 +1753,17 @@ Given
     - Role session-reader-1: applies only within the scope it is granted in
     - Role session-reader-1: READ allowed on every session
     - regular user user-2: holds Role session-reader-1
+  - Session beside-session-1: waiting to be scheduled
+  - Session beside-session-1: has one main kernel group
+  - Session beside-session-1(has one main kernel group): has one environment variable
+  - Session beside-session-1(has one main kernel group): asks for 1 in the slot-1 slot
+  - Session beside-session-1: has one kernel asking for slot-1 1
+  - Project outside-project-1
+  - Session outside-session-1: waiting to be scheduled
+  - Session outside-session-1: has one main kernel group
+  - Session outside-session-1(has one main kernel group): has one environment variable
+  - Session outside-session-1(has one main kernel group): asks for 1 in the slot-1 slot
+  - Session outside-session-1: has one kernel asking for slot-1 1
 
 When
 
