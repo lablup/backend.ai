@@ -134,7 +134,10 @@ async def lay_someone(
     """호출자 한 명. `granted`가 없으면 public 에서 읽을 권한을 함께 받는다."""
     if granted:
         home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
-        return await seeding.within(SomeoneGrantedOnCategories(home, granted, role=role))
+        caller: Laid[UserData] = await seeding.within(
+            SomeoneGrantedOnCategories(home, granted, role=role)
+        )
+        return caller
     return await lay_a_public_reader(seeding, PrometheusQueryPresetCategoryEntityType(), role)
 
 
@@ -205,7 +208,7 @@ class ManyCategoriesAndSomeone(Given[Any, ManyCategoriesAndACaller]):
     @override
     def describe(self) -> str:
         if self.granted:
-            permissions = ", ".join(one.name for one in self.granted)
+            permissions = ", ".join(one.name or str(int(one)) for one in self.granted)
             return Says(
                 f"카테고리 {self.besides + 1}개와, global 에서 {permissions} 권한을 받은 "
                 "일반 사용자 한 명",
