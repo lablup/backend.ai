@@ -294,9 +294,9 @@ Then
   - items[0].ownership.creator_id: 생성한 사용자와 같다
   - items[0].ownership.creator_email = 'user-1@scenario.local'
   - items[0].unmanaged_path = None
-  - items[0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - items[0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - items[0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - items[0].metadata.usage_mode = 'general'
+  - items[0].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - items[0].access_control.permission = 'none'
   - items[0].quota.max_size = None
   - items[0].quota.max_files = 1000
   - items[0].metadata.created_at: 이 실행이 쓴 시각
@@ -400,9 +400,9 @@ Then
   - [0].ownership.creator_id: 생성한 사용자와 같다
   - [0].ownership.creator_email = 'user-1@scenario.local'
   - [0].unmanaged_path = None
-  - [0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - [0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - [0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - [0].metadata.usage_mode = 'general'
+  - [0].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - [0].access_control.permission = 'none'
   - [0].quota.max_size = None
   - [0].quota.max_files = 1000
   - [0].metadata.created_at: 이 실행이 쓴 시각
@@ -454,9 +454,9 @@ Then
   - [0].ownership.creator_id: 생성한 사용자와 같다
   - [0].ownership.creator_email = 'user-1@scenario.local'
   - [0].unmanaged_path = None
-  - [0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - [0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - [0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - [0].metadata.usage_mode = 'general'
+  - [0].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - [0].access_control.permission = 'none'
   - [0].quota.max_size = None
   - [0].quota.max_files = 1000
   - [0].metadata.created_at: 이 실행이 쓴 시각
@@ -502,9 +502,9 @@ Then
   - [0].ownership.creator_id: 생성한 사용자와 같다
   - [0].ownership.creator_email = 'user-1@scenario.local'
   - [0].unmanaged_path = None
-  - [0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - [0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - [0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - [0].metadata.usage_mode = 'general'
+  - [0].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - [0].access_control.permission = 'none'
   - [0].quota.max_size = None
   - [0].quota.max_files = 1000
   - [0].metadata.created_at: 이 실행이 쓴 시각
@@ -556,9 +556,9 @@ Then
   - [0].ownership.creator_id: 생성한 사용자와 같다
   - [0].ownership.creator_email = 'user-1@scenario.local'
   - [0].unmanaged_path = None
-  - [0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - [0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - [0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - [0].metadata.usage_mode = 'general'
+  - [0].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - [0].access_control.permission = 'none'
   - [0].quota.max_size = None
   - [0].quota.max_files = 1000
   - [0].metadata.created_at: 이 실행이 쓴 시각
@@ -675,9 +675,9 @@ Then
   - items[0].ownership.creator_id: 생성한 사용자와 같다
   - items[0].ownership.creator_email = 'user-1@scenario.local'
   - items[0].unmanaged_path = None
-  - items[0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - items[0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - items[0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - items[0].metadata.usage_mode = 'general'
+  - items[0].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - items[0].access_control.permission = 'rw'
   - items[0].quota.max_size = None
   - items[0].quota.max_files = 1000
   - items[0].metadata.created_at: 이 실행이 쓴 시각
@@ -762,9 +762,9 @@ Then
   - items[0].ownership.creator_id: 생성한 사용자와 같다
   - items[0].ownership.creator_email = 'user-1@scenario.local'
   - items[0].unmanaged_path = None
-  - items[0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - items[0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - items[0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - items[0].metadata.usage_mode = 'general'
+  - items[0].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - items[0].access_control.permission = 'none'
   - items[0].quota.max_size = None
   - items[0].quota.max_files = 1000
   - items[0].metadata.created_at: 이 실행이 쓴 시각
@@ -781,9 +781,9 @@ Then
   - items[1].ownership.creator_id: 생성한 사용자와 같다
   - items[1].ownership.creator_email = 'user-1@scenario.local'
   - items[1].unmanaged_path = None
-  - items[1].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - items[1].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - items[1].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - items[1].metadata.usage_mode = 'general'
+  - items[1].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - items[1].access_control.permission = 'none'
   - items[1].quota.max_size = None
   - items[1].quota.max_files = 1000
   - items[1].metadata.created_at: 이 실행이 쓴 시각
@@ -1008,14 +1008,15 @@ Then
   - vfolder.metadata.last_used = None
   - vfolder.access_control.ownership_type = 'user'
   - vfolder.ownership.user_id: 복제한 사람와 같다
-  - vfolder.ownership.project_id: 건너뜀: 개인 vfolder 는 그 사용자의 개인 프로젝트에 붙고, 그 id 는 실행마다 다릅니다
+  - vfolder.ownership.project_id: 원본 vfolder 가 놓인 복제한 사람의 개인 프로젝트와 같다
   - vfolder.ownership.creator_id: 복제한 사람와 같다
   - vfolder.ownership.creator_email = 'user-1@scenario.local'
   - vfolder.unmanaged_path = None
-  - vfolder.metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - vfolder.metadata.quota_scope_id: 건너뜀: 복제한 사람의 id 로 만들어져 실행마다 다릅니다
-  - vfolder.access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - vfolder.quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - vfolder.metadata.usage_mode = 'general'
+  - vfolder.metadata.quota_scope_id: 복제한 사람의 quota scope 와 같다
+  - vfolder.access_control.permission = 'none'
+  - vfolder.quota.max_size = None
+  - vfolder.quota.max_files = 1000
   - vfolder.metadata.created_at: 이 실행이 쓴 시각
 
 <a id="cloning-a-user-granted-nothing-may-not-clone-their-folder"></a>
@@ -1248,10 +1249,11 @@ Then
   - ownership.creator_id: 만든 사람와 같다
   - ownership.creator_email = 'user-1@scenario.local'
   - unmanaged_path = None
-  - metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - metadata.quota_scope_id: 건너뜀: 소유자의 id 로 만들어져 실행마다 다릅니다
-  - access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
-  - quota: 건너뜀: 저장소가 응답하는 값이라 여기서 말할 수 없습니다
+  - metadata.usage_mode = 'general'
+  - metadata.quota_scope_id: 폴더 소유자의 quota scope 와 같다
+  - access_control.permission = 'rw'
+  - quota.max_size = None
+  - quota.max_files = 1000
   - metadata.created_at: 이 실행이 쓴 시각
 
 <a id="creating-a-user-granted-nothing-may-not-make-a-project-folder"></a>
@@ -1383,9 +1385,9 @@ Then
   - vfolder.ownership.creator_id: 생성한 사용자와 같다
   - vfolder.ownership.creator_email = 'user-1@scenario.local'
   - vfolder.unmanaged_path = None
-  - vfolder.metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - vfolder.metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - vfolder.access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - vfolder.metadata.usage_mode = 'general'
+  - vfolder.metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - vfolder.access_control.permission = 'none'
   - vfolder.quota.max_size = None
   - vfolder.quota.max_files = 1000
   - vfolder.metadata.created_at: 이 실행이 쓴 시각
@@ -1630,9 +1632,9 @@ Then
   - ownership.creator_id: 생성한 사용자와 같다
   - ownership.creator_email = 'user-1@scenario.local'
   - unmanaged_path = None
-  - metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - metadata.usage_mode = 'general'
+  - metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - access_control.permission = 'none'
   - quota.max_size = None
   - quota.max_files = 1000
   - metadata.created_at: 이 실행이 쓴 시각
@@ -1683,9 +1685,9 @@ Then
   - ownership.creator_id: 생성한 사용자와 같다
   - ownership.creator_email = 'user-1@scenario.local'
   - unmanaged_path = None
-  - metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - metadata.usage_mode = 'general'
+  - metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - access_control.permission = 'none'
   - quota.max_size = None
   - quota.max_files = 1000
   - metadata.created_at: 이 실행이 쓴 시각
@@ -2152,9 +2154,9 @@ Then
   - successes[0].ownership.creator_id: 생성한 사용자와 같다
   - successes[0].ownership.creator_email = 'user-1@scenario.local'
   - successes[0].unmanaged_path = None
-  - successes[0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - successes[0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - successes[0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - successes[0].metadata.usage_mode = 'general'
+  - successes[0].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - successes[0].access_control.permission = 'none'
   - successes[0].quota.max_size = None
   - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: 이 실행이 쓴 시각
@@ -2171,9 +2173,9 @@ Then
   - successes[1].ownership.creator_id: 생성한 사용자와 같다
   - successes[1].ownership.creator_email = 'user-1@scenario.local'
   - successes[1].unmanaged_path = None
-  - successes[1].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - successes[1].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - successes[1].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - successes[1].metadata.usage_mode = 'general'
+  - successes[1].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - successes[1].access_control.permission = 'none'
   - successes[1].quota.max_size = None
   - successes[1].quota.max_files = 1000
   - successes[1].metadata.created_at: 이 실행이 쓴 시각
@@ -2268,9 +2270,9 @@ Then
   - successes[0].ownership.creator_id: 생성한 사용자와 같다
   - successes[0].ownership.creator_email = 'user-1@scenario.local'
   - successes[0].unmanaged_path = None
-  - successes[0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - successes[0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - successes[0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - successes[0].metadata.usage_mode = 'general'
+  - successes[0].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - successes[0].access_control.permission = 'none'
   - successes[0].quota.max_size = None
   - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: 이 실행이 쓴 시각
@@ -2287,9 +2289,9 @@ Then
   - successes[1].ownership.creator_id: 생성한 사용자와 같다
   - successes[1].ownership.creator_email = 'user-1@scenario.local'
   - successes[1].unmanaged_path = None
-  - successes[1].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - successes[1].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - successes[1].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - successes[1].metadata.usage_mode = 'general'
+  - successes[1].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - successes[1].access_control.permission = 'none'
   - successes[1].quota.max_size = None
   - successes[1].quota.max_files = 1000
   - successes[1].metadata.created_at: 이 실행이 쓴 시각
@@ -2342,9 +2344,9 @@ Then
   - successes[0].ownership.creator_id: 생성한 사용자와 같다
   - successes[0].ownership.creator_email = 'user-1@scenario.local'
   - successes[0].unmanaged_path = None
-  - successes[0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - successes[0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - successes[0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - successes[0].metadata.usage_mode = 'general'
+  - successes[0].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - successes[0].access_control.permission = 'none'
   - successes[0].quota.max_size = None
   - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: 이 실행이 쓴 시각
@@ -2399,9 +2401,9 @@ Then
   - successes[0].ownership.creator_id: 생성한 사용자와 같다
   - successes[0].ownership.creator_email = 'user-1@scenario.local'
   - successes[0].unmanaged_path = None
-  - successes[0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - successes[0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - successes[0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - successes[0].metadata.usage_mode = 'general'
+  - successes[0].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - successes[0].access_control.permission = 'none'
   - successes[0].quota.max_size = None
   - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: 이 실행이 쓴 시각
@@ -2458,9 +2460,9 @@ Then
   - successes[0].ownership.creator_id: 생성한 사용자와 같다
   - successes[0].ownership.creator_email = 'user-1@scenario.local'
   - successes[0].unmanaged_path = None
-  - successes[0].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - successes[0].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - successes[0].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - successes[0].metadata.usage_mode = 'general'
+  - successes[0].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - successes[0].access_control.permission = 'none'
   - successes[0].quota.max_size = None
   - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: 이 실행이 쓴 시각
@@ -2477,9 +2479,9 @@ Then
   - successes[1].ownership.creator_id: 생성한 사용자와 같다
   - successes[1].ownership.creator_email = 'user-1@scenario.local'
   - successes[1].unmanaged_path = None
-  - successes[1].metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - successes[1].metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - successes[1].access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - successes[1].metadata.usage_mode = 'general'
+  - successes[1].metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - successes[1].access_control.permission = 'none'
   - successes[1].quota.max_size = None
   - successes[1].quota.max_files = 1000
   - successes[1].metadata.created_at: 이 실행이 쓴 시각
@@ -2569,9 +2571,9 @@ Then
   - vfolder.ownership.creator_id: 생성한 사용자와 같다
   - vfolder.ownership.creator_email = 'user-1@scenario.local'
   - vfolder.unmanaged_path = None
-  - vfolder.metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - vfolder.metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - vfolder.access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - vfolder.metadata.usage_mode = 'general'
+  - vfolder.metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - vfolder.access_control.permission = 'none'
   - vfolder.quota.max_size = None
   - vfolder.quota.max_files = 1000
   - vfolder.metadata.created_at: 이 실행이 쓴 시각
@@ -2911,9 +2913,9 @@ Then
   - vfolder.ownership.creator_id: 생성한 사용자와 같다
   - vfolder.ownership.creator_email = 'user-1@scenario.local'
   - vfolder.unmanaged_path = None
-  - vfolder.metadata.usage_mode: 건너뜀: 타입이 이미 값을 고정합니다
-  - vfolder.metadata.quota_scope_id: 건너뜀: 소유자의 id 로 생성되어 실행마다 다릅니다
-  - vfolder.access_control.permission: 건너뜀: 마운트 권한이라 이 표가 확인하는 값이 아닙니다
+  - vfolder.metadata.usage_mode = 'general'
+  - vfolder.metadata.quota_scope_id: 미리 저장한 vfolder 의 quota scope 와 같다
+  - vfolder.access_control.permission = 'none'
   - vfolder.quota.max_size = None
   - vfolder.quota.max_files = 1000
   - vfolder.metadata.created_at: 이 실행이 쓴 시각

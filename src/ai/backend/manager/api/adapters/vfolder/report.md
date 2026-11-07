@@ -294,9 +294,9 @@ Then
   - items[0].ownership.creator_id: same as the user who created the vfolder
   - items[0].ownership.creator_email = 'user-1@scenario.local'
   - items[0].unmanaged_path = None
-  - items[0].metadata.usage_mode: skipped: the type already fixes the value
-  - items[0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - items[0].access_control.permission: skipped: it is a mount permission, which this table does not check
+  - items[0].metadata.usage_mode = 'general'
+  - items[0].metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - items[0].access_control.permission = 'none'
   - items[0].quota.max_size = None
   - items[0].quota.max_files = 1000
   - items[0].metadata.created_at: the time this run wrote
@@ -400,9 +400,9 @@ Then
   - [0].ownership.creator_id: same as the user who created the vfolder
   - [0].ownership.creator_email = 'user-1@scenario.local'
   - [0].unmanaged_path = None
-  - [0].metadata.usage_mode: skipped: the type already fixes the value
-  - [0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - [0].access_control.permission: skipped: it is a mount permission, which this table does not check
+  - [0].metadata.usage_mode = 'general'
+  - [0].metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - [0].access_control.permission = 'none'
   - [0].quota.max_size = None
   - [0].quota.max_files = 1000
   - [0].metadata.created_at: the time this run wrote
@@ -454,9 +454,9 @@ Then
   - [0].ownership.creator_id: same as the user who created the vfolder
   - [0].ownership.creator_email = 'user-1@scenario.local'
   - [0].unmanaged_path = None
-  - [0].metadata.usage_mode: skipped: the type already fixes the value
-  - [0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - [0].access_control.permission: skipped: it is a mount permission, which this table does not check
+  - [0].metadata.usage_mode = 'general'
+  - [0].metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - [0].access_control.permission = 'none'
   - [0].quota.max_size = None
   - [0].quota.max_files = 1000
   - [0].metadata.created_at: the time this run wrote
@@ -502,9 +502,9 @@ Then
   - [0].ownership.creator_id: same as the user who created the vfolder
   - [0].ownership.creator_email = 'user-1@scenario.local'
   - [0].unmanaged_path = None
-  - [0].metadata.usage_mode: skipped: the type already fixes the value
-  - [0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - [0].access_control.permission: skipped: it is a mount permission, which this table does not check
+  - [0].metadata.usage_mode = 'general'
+  - [0].metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - [0].access_control.permission = 'none'
   - [0].quota.max_size = None
   - [0].quota.max_files = 1000
   - [0].metadata.created_at: the time this run wrote
@@ -556,9 +556,9 @@ Then
   - [0].ownership.creator_id: same as the user who created the vfolder
   - [0].ownership.creator_email = 'user-1@scenario.local'
   - [0].unmanaged_path = None
-  - [0].metadata.usage_mode: skipped: the type already fixes the value
-  - [0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - [0].access_control.permission: skipped: it is a mount permission, which this table does not check
+  - [0].metadata.usage_mode = 'general'
+  - [0].metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - [0].access_control.permission = 'none'
   - [0].quota.max_size = None
   - [0].quota.max_files = 1000
   - [0].metadata.created_at: the time this run wrote
@@ -675,9 +675,9 @@ Then
   - items[0].ownership.creator_id: same as the user who created the vfolder
   - items[0].ownership.creator_email = 'user-1@scenario.local'
   - items[0].unmanaged_path = None
-  - items[0].metadata.usage_mode: skipped: the type already fixes the value
-  - items[0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - items[0].access_control.permission: skipped: it is a mount permission, which this table does not check
+  - items[0].metadata.usage_mode = 'general'
+  - items[0].metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - items[0].access_control.permission = 'rw'
   - items[0].quota.max_size = None
   - items[0].quota.max_files = 1000
   - items[0].metadata.created_at: the time this run wrote
@@ -762,9 +762,9 @@ Then
   - items[0].ownership.creator_id: same as the user who created the vfolder
   - items[0].ownership.creator_email = 'user-1@scenario.local'
   - items[0].unmanaged_path = None
-  - items[0].metadata.usage_mode: skipped: the type already fixes the value
-  - items[0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - items[0].access_control.permission: skipped: it is a mount permission, which this table does not check
+  - items[0].metadata.usage_mode = 'general'
+  - items[0].metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - items[0].access_control.permission = 'none'
   - items[0].quota.max_size = None
   - items[0].quota.max_files = 1000
   - items[0].metadata.created_at: the time this run wrote
@@ -781,9 +781,9 @@ Then
   - items[1].ownership.creator_id: same as the user who created the vfolder
   - items[1].ownership.creator_email = 'user-1@scenario.local'
   - items[1].unmanaged_path = None
-  - items[1].metadata.usage_mode: skipped: the type already fixes the value
-  - items[1].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - items[1].access_control.permission: skipped: it is a mount permission, which this table does not check
+  - items[1].metadata.usage_mode = 'general'
+  - items[1].metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - items[1].access_control.permission = 'none'
   - items[1].quota.max_size = None
   - items[1].quota.max_files = 1000
   - items[1].metadata.created_at: the time this run wrote
@@ -1008,14 +1008,15 @@ Then
   - vfolder.metadata.last_used = None
   - vfolder.access_control.ownership_type = 'user'
   - vfolder.ownership.user_id: same as the cloner
-  - vfolder.ownership.project_id: skipped: a personal folder lands in the user's personal project, whose id differs per run
+  - vfolder.ownership.project_id: same as the cloner's personal project the source vfolder is placed in
   - vfolder.ownership.creator_id: same as the cloner
   - vfolder.ownership.creator_email = 'user-1@scenario.local'
   - vfolder.unmanaged_path = None
-  - vfolder.metadata.usage_mode: skipped: the type already fixes the value
-  - vfolder.metadata.quota_scope_id: skipped: it is made from the cloner's id, so it differs per run
-  - vfolder.access_control.permission: skipped: it is a mount permission, which this table does not check
-  - vfolder.quota: skipped: the storage answers it, so it cannot be stated here
+  - vfolder.metadata.usage_mode = 'general'
+  - vfolder.metadata.quota_scope_id: same as the quota scope of the cloner
+  - vfolder.access_control.permission = 'none'
+  - vfolder.quota.max_size = None
+  - vfolder.quota.max_files = 1000
   - vfolder.metadata.created_at: the time this run wrote
 
 <a id="cloning-a-user-granted-nothing-may-not-clone-their-folder"></a>
@@ -1248,10 +1249,11 @@ Then
   - ownership.creator_id: same as the creator
   - ownership.creator_email = 'user-1@scenario.local'
   - unmanaged_path = None
-  - metadata.usage_mode: skipped: the type already fixes the value
-  - metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - access_control.permission: skipped: it is a mount permission, which this table does not check
-  - quota: skipped: the storage answers it, so it cannot be stated here
+  - metadata.usage_mode = 'general'
+  - metadata.quota_scope_id: same as the quota scope of the folder owner
+  - access_control.permission = 'rw'
+  - quota.max_size = None
+  - quota.max_files = 1000
   - metadata.created_at: the time this run wrote
 
 <a id="creating-a-user-granted-nothing-may-not-make-a-project-folder"></a>
@@ -1383,9 +1385,9 @@ Then
   - vfolder.ownership.creator_id: same as the user who created the vfolder
   - vfolder.ownership.creator_email = 'user-1@scenario.local'
   - vfolder.unmanaged_path = None
-  - vfolder.metadata.usage_mode: skipped: the type already fixes the value
-  - vfolder.metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - vfolder.access_control.permission: skipped: it is a mount permission, which this table does not check
+  - vfolder.metadata.usage_mode = 'general'
+  - vfolder.metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - vfolder.access_control.permission = 'none'
   - vfolder.quota.max_size = None
   - vfolder.quota.max_files = 1000
   - vfolder.metadata.created_at: the time this run wrote
@@ -1630,9 +1632,9 @@ Then
   - ownership.creator_id: same as the user who created the vfolder
   - ownership.creator_email = 'user-1@scenario.local'
   - unmanaged_path = None
-  - metadata.usage_mode: skipped: the type already fixes the value
-  - metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - access_control.permission: skipped: it is a mount permission, which this table does not check
+  - metadata.usage_mode = 'general'
+  - metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - access_control.permission = 'none'
   - quota.max_size = None
   - quota.max_files = 1000
   - metadata.created_at: the time this run wrote
@@ -1683,9 +1685,9 @@ Then
   - ownership.creator_id: same as the user who created the vfolder
   - ownership.creator_email = 'user-1@scenario.local'
   - unmanaged_path = None
-  - metadata.usage_mode: skipped: the type already fixes the value
-  - metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - access_control.permission: skipped: it is a mount permission, which this table does not check
+  - metadata.usage_mode = 'general'
+  - metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - access_control.permission = 'none'
   - quota.max_size = None
   - quota.max_files = 1000
   - metadata.created_at: the time this run wrote
@@ -2152,9 +2154,9 @@ Then
   - successes[0].ownership.creator_id: same as the user who created the vfolder
   - successes[0].ownership.creator_email = 'user-1@scenario.local'
   - successes[0].unmanaged_path = None
-  - successes[0].metadata.usage_mode: skipped: the type already fixes the value
-  - successes[0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - successes[0].access_control.permission: skipped: it is a mount permission, which this table does not check
+  - successes[0].metadata.usage_mode = 'general'
+  - successes[0].metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - successes[0].access_control.permission = 'none'
   - successes[0].quota.max_size = None
   - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: the time this run wrote
@@ -2171,9 +2173,9 @@ Then
   - successes[1].ownership.creator_id: same as the user who created the vfolder
   - successes[1].ownership.creator_email = 'user-1@scenario.local'
   - successes[1].unmanaged_path = None
-  - successes[1].metadata.usage_mode: skipped: the type already fixes the value
-  - successes[1].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - successes[1].access_control.permission: skipped: it is a mount permission, which this table does not check
+  - successes[1].metadata.usage_mode = 'general'
+  - successes[1].metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - successes[1].access_control.permission = 'none'
   - successes[1].quota.max_size = None
   - successes[1].quota.max_files = 1000
   - successes[1].metadata.created_at: the time this run wrote
@@ -2268,9 +2270,9 @@ Then
   - successes[0].ownership.creator_id: same as the user who created the vfolder
   - successes[0].ownership.creator_email = 'user-1@scenario.local'
   - successes[0].unmanaged_path = None
-  - successes[0].metadata.usage_mode: skipped: the type already fixes the value
-  - successes[0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - successes[0].access_control.permission: skipped: it is a mount permission, which this table does not check
+  - successes[0].metadata.usage_mode = 'general'
+  - successes[0].metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - successes[0].access_control.permission = 'none'
   - successes[0].quota.max_size = None
   - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: the time this run wrote
@@ -2287,9 +2289,9 @@ Then
   - successes[1].ownership.creator_id: same as the user who created the vfolder
   - successes[1].ownership.creator_email = 'user-1@scenario.local'
   - successes[1].unmanaged_path = None
-  - successes[1].metadata.usage_mode: skipped: the type already fixes the value
-  - successes[1].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - successes[1].access_control.permission: skipped: it is a mount permission, which this table does not check
+  - successes[1].metadata.usage_mode = 'general'
+  - successes[1].metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - successes[1].access_control.permission = 'none'
   - successes[1].quota.max_size = None
   - successes[1].quota.max_files = 1000
   - successes[1].metadata.created_at: the time this run wrote
@@ -2342,9 +2344,9 @@ Then
   - successes[0].ownership.creator_id: same as the user who created the vfolder
   - successes[0].ownership.creator_email = 'user-1@scenario.local'
   - successes[0].unmanaged_path = None
-  - successes[0].metadata.usage_mode: skipped: the type already fixes the value
-  - successes[0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - successes[0].access_control.permission: skipped: it is a mount permission, which this table does not check
+  - successes[0].metadata.usage_mode = 'general'
+  - successes[0].metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - successes[0].access_control.permission = 'none'
   - successes[0].quota.max_size = None
   - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: the time this run wrote
@@ -2399,9 +2401,9 @@ Then
   - successes[0].ownership.creator_id: same as the user who created the vfolder
   - successes[0].ownership.creator_email = 'user-1@scenario.local'
   - successes[0].unmanaged_path = None
-  - successes[0].metadata.usage_mode: skipped: the type already fixes the value
-  - successes[0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - successes[0].access_control.permission: skipped: it is a mount permission, which this table does not check
+  - successes[0].metadata.usage_mode = 'general'
+  - successes[0].metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - successes[0].access_control.permission = 'none'
   - successes[0].quota.max_size = None
   - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: the time this run wrote
@@ -2458,9 +2460,9 @@ Then
   - successes[0].ownership.creator_id: same as the user who created the vfolder
   - successes[0].ownership.creator_email = 'user-1@scenario.local'
   - successes[0].unmanaged_path = None
-  - successes[0].metadata.usage_mode: skipped: the type already fixes the value
-  - successes[0].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - successes[0].access_control.permission: skipped: it is a mount permission, which this table does not check
+  - successes[0].metadata.usage_mode = 'general'
+  - successes[0].metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - successes[0].access_control.permission = 'none'
   - successes[0].quota.max_size = None
   - successes[0].quota.max_files = 1000
   - successes[0].metadata.created_at: the time this run wrote
@@ -2477,9 +2479,9 @@ Then
   - successes[1].ownership.creator_id: same as the user who created the vfolder
   - successes[1].ownership.creator_email = 'user-1@scenario.local'
   - successes[1].unmanaged_path = None
-  - successes[1].metadata.usage_mode: skipped: the type already fixes the value
-  - successes[1].metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - successes[1].access_control.permission: skipped: it is a mount permission, which this table does not check
+  - successes[1].metadata.usage_mode = 'general'
+  - successes[1].metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - successes[1].access_control.permission = 'none'
   - successes[1].quota.max_size = None
   - successes[1].quota.max_files = 1000
   - successes[1].metadata.created_at: the time this run wrote
@@ -2569,9 +2571,9 @@ Then
   - vfolder.ownership.creator_id: same as the user who created the vfolder
   - vfolder.ownership.creator_email = 'user-1@scenario.local'
   - vfolder.unmanaged_path = None
-  - vfolder.metadata.usage_mode: skipped: the type already fixes the value
-  - vfolder.metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - vfolder.access_control.permission: skipped: it is a mount permission, which this table does not check
+  - vfolder.metadata.usage_mode = 'general'
+  - vfolder.metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - vfolder.access_control.permission = 'none'
   - vfolder.quota.max_size = None
   - vfolder.quota.max_files = 1000
   - vfolder.metadata.created_at: the time this run wrote
@@ -2911,9 +2913,9 @@ Then
   - vfolder.ownership.creator_id: same as the user who created the vfolder
   - vfolder.ownership.creator_email = 'user-1@scenario.local'
   - vfolder.unmanaged_path = None
-  - vfolder.metadata.usage_mode: skipped: the type already fixes the value
-  - vfolder.metadata.quota_scope_id: skipped: it is made from the owner's id, so it differs per run
-  - vfolder.access_control.permission: skipped: it is a mount permission, which this table does not check
+  - vfolder.metadata.usage_mode = 'general'
+  - vfolder.metadata.quota_scope_id: same as the quota scope of the vfolder seeded in advance
+  - vfolder.access_control.permission = 'none'
   - vfolder.quota.max_size = None
   - vfolder.quota.max_files = 1000
   - vfolder.metadata.created_at: the time this run wrote
