@@ -9,6 +9,7 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.login_session import LoginSessionID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.login_session.request import (
     AdminRevokeLoginSessionInput,
@@ -60,6 +61,7 @@ from bai_scenario.seeds.seeder import Laid
 from bai_scenario.seeds.user.fields import TestSeedKeypairOf, TestSeedLoginSessionOf
 
 type Searched = AdminSearchLoginSessionsPayload | MySearchLoginSessionsPayload
+type Loaded = list[LoginSessionNode | Exception | None]
 
 
 @dataclass(frozen=True)
@@ -70,7 +72,7 @@ class RevokedThenSearched:
     after: Searched
 
 
-type Answer = Searched | RevokedThenSearched | UnblockUserPayload
+type Answer = Searched | RevokedThenSearched | UnblockUserPayload | Loaded
 
 
 @dataclass(frozen=True)
@@ -516,6 +518,87 @@ class Unblocked(Then[TwoPeopleAndTheirSessions, Answer]):
         if not isinstance(answer, UnblockUserPayload):
             return [Refused(InsufficientPrivilege, answered.raised)]
         return [Same("success", answer.success, True)]
+
+
+@dataclass(frozen=True)
+class LoadingTheSessionAndMissing(When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]):
+    """호출자 세션과 없는 id를 한 번에 읽는다."""
+
+    @override
+    def operation(self) -> str:
+        return "batch_load_by_ids"
+
+    @override
+    def describe(self, laid: TwoPeopleAndTheirSessions) -> str:
+        return Says(
+            f"{laid.caller.username}이 자기 세션과 없는 id 를 일괄 읽습니다",
+            english=f"{laid.caller.username} batch reads their own session and a missing id",
+        )
+
+    @override
+    async def call(self, adapter: LoginSessionAdapter, laid: TwoPeopleAndTheirSessions) -> Answer:
+        assert laid.caller_session is not None
+        with ActingAs(laid.caller):
+            return await adapter.batch_load_by_ids([
+                LoginSessionID(laid.caller_session.id),
+                LoginSessionID(uuid4()),
+            ])
+
+
+@dataclass(frozen=True)
+class TheSessionThenAGap(Then[TwoPeopleAndTheirSessions, Answer]):
+    """읽은 세션은 노드로, 없는 id 자리는 빈 값으로 온다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "읽은 세션은 노드로, 없는 id 자리는 빈 값으로 옵니다",
+            english="the session read comes back as a node and the missing id as an empty value",
+        )
+
+    @override
+    def look(self, laid: TwoPeopleAndTheirSessions, answered: Answered[Answer]) -> list[Verdict]:
+        loaded = answered.response
+        if not isinstance(loaded, list):
+            return [Refused(NotEnoughPermission, answered.raised)]
+        assert laid.caller_session is not None
+        first, second = loaded
+        seen: list[Verdict] = [Same("length", len(loaded), 2)]
+        if isinstance(first, LoginSessionNode):
+            seen.extend(SessionNodeLook(self.started).verdicts(first, laid.caller_session, "[0]."))
+        else:
+            seen.append(Same("[0]", type(first).__name__, "LoginSessionNode"))
+        seen.append(Same("[1]", second, None))
+        return seen
+
+
+@dataclass(frozen=True)
+class ARejectionForTheSessionAndAGap(Then[TwoPeopleAndTheirSessions, Answer]):
+    """읽을 수 없는 세션은 거부되고, 없는 id 자리는 빈 값으로 온다."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "읽을 수 없는 세션은 권한 부족으로 거부되고, 없는 id 자리는 빈 값으로 옵니다",
+            english=(
+                "the unreadable session is rejected for lack of permission and the missing id "
+                "comes back empty"
+            ),
+        )
+
+    @override
+    def look(self, laid: TwoPeopleAndTheirSessions, answered: Answered[Answer]) -> list[Verdict]:
+        loaded = answered.response
+        if not isinstance(loaded, list):
+            return [Refused(NotEnoughPermission, answered.raised)]
+        first, second = loaded
+        return [
+            Same("length", len(loaded), 2),
+            Refused(NotEnoughPermission, first if isinstance(first, Exception) else None),
+            Same("[1]", second, None),
+        ]
 
 
 type SessionStep = Scenario[
@@ -973,6 +1056,74 @@ class OnlyTheSuperadminUnblocks(
         return TheCallIsRefused(InsufficientPrivilege)
 
 
+@dataclass(frozen=True)
+class AGrantedUserLoadsTheirSession(
+    Scenario[TestSeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-read-on-themselves-loads-their-own-session-by-id"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "자기 스코프에서 READ 를 받은 사용자가 자기 세션과 없는 id 를 한 번에 읽으면, "
+            "자기 세션 전체와 빈 값이 차례로 옵니다",
+            english=(
+                "when a user granted READ in their own scope reads their own session and a "
+                "missing id at once, their whole session and an empty value come back in "
+                "that order"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirSessions]:
+        return SomeoneAndAnother(permissions=(Permission.READ,))
+
+    @override
+    def when(self) -> When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
+        return LoadingTheSessionAndMissing()
+
+    @override
+    def then(self) -> Then[TwoPeopleAndTheirSessions, Answer]:
+        return TheSessionThenAGap(started=self.started)
+
+
+@dataclass(frozen=True)
+class AUserGrantedNothingGetsARejectionForTheSession(
+    Scenario[TestSeedingSession, TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-gets-a-rejection-for-their-own-session"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "권한을 받지 않은 사용자가 자기 세션과 없는 id 를 한 번에 읽으면, 그 세션 항목은 "
+            "권한 부족으로 거부되고 없는 id 자리는 빈 값으로 옵니다",
+            english=(
+                "when a user holding no permission reads their own session and a missing id at "
+                "once, that session entry is rejected for lack of permission and the missing "
+                "id entry is empty"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirSessions]:
+        return SomeoneAndAnother()
+
+    @override
+    def when(self) -> When[TwoPeopleAndTheirSessions, LoginSessionAdapter, Answer]:
+        return LoadingTheSessionAndMissing()
+
+    @override
+    def then(self) -> Then[TwoPeopleAndTheirSessions, Answer]:
+        return ARejectionForTheSessionAndAGap()
+
+
 SCENARIOS: list[SessionStep] = [
     TheSuperadminSearchesEverySession(started=datetime.now(UTC)),
     OnlyTheSuperadminSearchesEverySession(),
@@ -988,6 +1139,8 @@ SCENARIOS: list[SessionStep] = [
     TheSuperadminUnblocksAUser(),
     UnblockingANameNobodyHoldsSucceeds(),
     OnlyTheSuperadminUnblocks(),
+    AGrantedUserLoadsTheirSession(started=datetime.now(UTC)),
+    AUserGrantedNothingGetsARejectionForTheSession(),
 ]
 
 

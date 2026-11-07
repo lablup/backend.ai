@@ -5,9 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, override
+from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.data.entity.login_history import LoginHistoryID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.login_history.request import (
     AdminSearchLoginHistoryInput,
@@ -50,7 +52,11 @@ from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.seeder import Laid
 from bai_scenario.seeds.user.fields import TestSeedLoginHistoryOf
 
-type Answer = AdminSearchLoginHistoryPayload | MySearchLoginHistoryPayload
+type Answer = (
+    AdminSearchLoginHistoryPayload
+    | MySearchLoginHistoryPayload
+    | list[LoginHistoryNode | Exception | None]
+)
 
 
 @dataclass(frozen=True)
@@ -301,6 +307,87 @@ class OnlyMyRecord(Then[TwoPeopleAndTheirHistory, Answer]):
         return seen
 
 
+@dataclass(frozen=True)
+class LoadingTheRecordAndMissing(When[TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]):
+    """자기 기록과 없는 id를 한 번에 읽는다."""
+
+    @override
+    def operation(self) -> str:
+        return "batch_load_by_ids"
+
+    @override
+    def describe(self, laid: TwoPeopleAndTheirHistory) -> str:
+        return Says(
+            f"{laid.caller.username}이 자기 이력과 없는 id 를 일괄 읽습니다",
+            english=f"{laid.caller.username} batch reads their own record and a missing id",
+        )
+
+    @override
+    async def call(self, adapter: LoginHistoryAdapter, laid: TwoPeopleAndTheirHistory) -> Answer:
+        assert laid.caller_history is not None
+        with ActingAs(laid.caller):
+            return await adapter.batch_load_by_ids([
+                LoginHistoryID(laid.caller_history.id),
+                LoginHistoryID(uuid4()),
+            ])
+
+
+@dataclass(frozen=True)
+class TheRecordThenAGap(Then[TwoPeopleAndTheirHistory, Answer]):
+    """읽은 기록은 노드로, 없는 id 자리는 빈 값으로 온다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "읽은 이력은 노드로, 없는 id 자리는 빈 값으로 옵니다",
+            english="the record read comes back as a node and the missing id as an empty value",
+        )
+
+    @override
+    def look(self, laid: TwoPeopleAndTheirHistory, answered: Answered[Answer]) -> list[Verdict]:
+        loaded = answered.response
+        if not isinstance(loaded, list):
+            return [Refused(NotEnoughPermission, answered.raised)]
+        assert laid.caller_history is not None
+        first, second = loaded
+        seen: list[Verdict] = [Same("length", len(loaded), 2)]
+        if isinstance(first, LoginHistoryNode):
+            seen.extend(HistoryNodeLook(self.started).verdicts(first, laid.caller_history, "[0]."))
+        else:
+            seen.append(Same("[0]", type(first).__name__, "LoginHistoryNode"))
+        seen.append(Same("[1]", second, None))
+        return seen
+
+
+@dataclass(frozen=True)
+class ARejectionForTheRecordAndAGap(Then[TwoPeopleAndTheirHistory, Answer]):
+    """읽을 수 없는 기록은 거부되고, 없는 id 자리는 빈 값으로 온다."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "읽을 수 없는 이력은 권한 부족으로 거부되고, 없는 id 자리는 빈 값으로 옵니다",
+            english=(
+                "the unreadable record is rejected for lack of permission and the missing id "
+                "comes back empty"
+            ),
+        )
+
+    @override
+    def look(self, laid: TwoPeopleAndTheirHistory, answered: Answered[Answer]) -> list[Verdict]:
+        loaded = answered.response
+        if not isinstance(loaded, list):
+            return [Refused(NotEnoughPermission, answered.raised)]
+        first, second = loaded
+        return [
+            Same("length", len(loaded), 2),
+            Refused(NotEnoughPermission, first if isinstance(first, Exception) else None),
+            Same("[1]", second, None),
+        ]
+
+
 type HistoryStep = Scenario[
     TestSeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer
 ]
@@ -436,11 +523,81 @@ class AUserGrantedNothingMayNotSearchTheirHistory(
         return TheCallIsRefused(NotEnoughPermission)
 
 
+@dataclass(frozen=True)
+class AGrantedUserLoadsTheirHistory(
+    Scenario[TestSeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-read-on-themselves-loads-their-own-history-by-id"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "자기 스코프에서 READ 를 받은 사용자가 자기 이력과 없는 id 를 한 번에 읽으면, "
+            "자기 이력 전체와 빈 값이 차례로 옵니다",
+            english=(
+                "when a user granted READ in their own scope reads their own record and a "
+                "missing id at once, their whole record and an empty value come back in that "
+                "order"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirHistory]:
+        return SomeoneAndAnother(permissions=(Permission.READ,))
+
+    @override
+    def when(self) -> When[TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]:
+        return LoadingTheRecordAndMissing()
+
+    @override
+    def then(self) -> Then[TwoPeopleAndTheirHistory, Answer]:
+        return TheRecordThenAGap(started=self.started)
+
+
+@dataclass(frozen=True)
+class AUserGrantedNothingGetsARejectionForTheRecord(
+    Scenario[TestSeedingSession, TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-gets-a-rejection-for-their-own-history"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "권한을 받지 않은 사용자가 자기 이력과 없는 id 를 한 번에 읽으면, 그 이력 항목은 "
+            "권한 부족으로 거부되고 없는 id 자리는 빈 값으로 옵니다",
+            english=(
+                "when a user holding no permission reads their own record and a missing id at "
+                "once, that record entry is rejected for lack of permission and the missing id "
+                "entry is empty"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, TwoPeopleAndTheirHistory]:
+        return SomeoneAndAnother()
+
+    @override
+    def when(self) -> When[TwoPeopleAndTheirHistory, LoginHistoryAdapter, Answer]:
+        return LoadingTheRecordAndMissing()
+
+    @override
+    def then(self) -> Then[TwoPeopleAndTheirHistory, Answer]:
+        return ARejectionForTheRecordAndAGap()
+
+
 SCENARIOS: list[HistoryStep] = [
     TheSuperadminSearchesEveryRecord(started=datetime.now(UTC)),
     OnlyTheSuperadminSearchesEveryRecord(),
     AGrantedUserSearchesOnlyTheirOwnHistory(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotSearchTheirHistory(),
+    AGrantedUserLoadsTheirHistory(started=datetime.now(UTC)),
+    AUserGrantedNothingGetsARejectionForTheRecord(),
 ]
 
 

@@ -2,21 +2,21 @@
 
 [background](/src/ai/backend/manager/api/adapters/user/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/user/adapter.py)
 
-Scenario: incomplete 8 / 48
+Scenario: incomplete 3 / 53
 
-- built from ops (23)
+- built from ops (27)
   - LoginHistoryAdapter.admin_search: representative success ✓ · representative rejection ✓
-  - LoginHistoryAdapter.batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - LoginHistoryAdapter.batch_load_by_ids: representative success ✓ · representative rejection ✓
   - LoginHistoryAdapter.my_search: representative success ✓ · representative rejection ✓
   - LoginSessionAdapter.admin_search: representative success ✓ · representative rejection ✓
-  - LoginSessionAdapter.batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - LoginSessionAdapter.batch_load_by_ids: representative success ✓ · representative rejection ✓
   - LoginSessionAdapter.my_search: representative success ✓ · representative rejection ✓
   - UserAdapter.admin_search: representative success ✓ · representative rejection ✓
   - UserAdapter.admin_search_keypairs: representative success ✓ · representative rejection ✓
   - UserAdapter.batch_load_by_ids: representative success ✓ · representative rejection ✓
   - UserAdapter.batch_lookup_by_emails: representative success ✓ · representative rejection ✓
-  - UserAdapter.bulk_get_keypair_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - UserAdapter.bulk_lookup_keypair_access_keys: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - UserAdapter.bulk_get_keypair_ids: representative success ✓ · representative rejection ✓
+  - UserAdapter.bulk_lookup_keypair_access_keys: representative success ✓ · representative rejection ✓
   - UserAdapter.domain_search: representative success ✓ · representative rejection ✓
   - UserAdapter.gql_admin_search: representative success ✓ · representative rejection ✓
   - UserAdapter.gql_admin_search_keypairs: representative success ✓ · representative rejection ✓
@@ -24,19 +24,23 @@ Scenario: incomplete 8 / 48
   - UserAdapter.gql_search_by_domain: representative success ✓ · representative rejection ✓
   - UserAdapter.gql_search_by_project: representative success ✓ · representative rejection ✓
   - UserAdapter.project_search: representative success ✓ · representative rejection ✓
-  - UserAdapter.resolve_domain_id: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - UserAdapter.resolve_domain_id: representative success ✓ · representative rejection ✓
   - UserAdapter.role_search: representative success ✓ · representative rejection ✓
   - UserAdapter.scoped_search: representative success ✓ · representative rejection ✓
   - UserAdapter.search_my_keypairs: representative success ✓ · representative rejection ✓
+  - UserConfigAdapter.delete_default_auto_generated_file: representative success ✗ · representative rejection ✓: SCENARIO-GAP
+  - UserConfigAdapter.get_default_auto_generated_file: representative success ✗ · representative rejection ✓: SCENARIO-GAP
+  - UserConfigAdapter.get_default_auto_generated_files: representative success ✓ · representative rejection ✓
+  - UserConfigAdapter.update_default_auto_generated_file: representative success ✗ · representative rejection ✓: SCENARIO-GAP
 - ops + direct implementation (7)
-  - UserAdapter.bulk_create_users: success absent · rejection present 1 (atomic_bulk_get_ops, global_scope): SCENARIO-GAP
-  - UserAdapter.bulk_create_users_with_keypair: success absent · rejection present 1 (atomic_bulk_get_ops, global_scope): SCENARIO-GAP
+  - UserAdapter.bulk_create_users: success present 1 · rejection present 1 (atomic_bulk_get_ops, global_scope)
+  - UserAdapter.bulk_create_users_with_keypair: success present 1 · rejection present 1 (atomic_bulk_get_ops, global_scope)
   - UserAdapter.bulk_update_users: success present 3 · rejection present 1 (atomic_bulk_get_ops, global_scope, partial_bulk_get_ops, single_entity)
-  - UserAdapter.create_user: success absent · rejection present 2 (atomic_bulk_get_ops, scope): SCENARIO-GAP
+  - UserAdapter.create_user: success present 1 · rejection present 2 (atomic_bulk_get_ops, scope)
   - UserAdapter.delete_user_by_id: success present 1 · rejection present 1 (atomic_bulk_get_ops, single_entity)
   - UserAdapter.get: success present 1 · rejection present 1 (atomic_bulk_get_ops, single_entity)
   - UserAdapter.update_user_by_id: success present 7 · rejection present 6 (atomic_bulk_get_ops, single_entity)
-- direct implementation (18)
+- direct implementation (19)
   - LoginSessionAdapter.admin_revoke: success present 1 · rejection present 2 (global_scope)
   - LoginSessionAdapter.admin_unblock_user: success present 2 · rejection present 1 (global_scope)
   - LoginSessionAdapter.my_revoke: success present 1 · rejection present 3 (single_field)
@@ -55,6 +59,7 @@ Scenario: incomplete 8 / 48
   - UserAdapter.switch_default_access_key: success present 1 · rejection present 2 (single_entity)
   - UserAdapter.update_my_keypair: success present 1 · rejection present 3 (single_field)
   - UserAdapter.update_user: success present 1 · rejection present 1 (single_entity)
+  - UserConfigAdapter.create_auto_generated_file: success present 1 · rejection present 2 (single_entity)
 
 **LoginHistoryAdapter.admin_search**
 
@@ -62,6 +67,13 @@ Scenario: incomplete 8 / 48
 |---|---|
 | [when the superadmin searches in a history search gated by the global role, every record seeded in advance comes back in descending creation time regardless of the user](#login_history-the-superadmin-searches-every-users-login-history) | answered |
 | [a user holding the permission is rejected by the global role gate when searching every history record](#login_history-a-user-who-is-not-the-superadmin-may-not-search-every-login-history) | rejected |
+
+**LoginHistoryAdapter.batch_load_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted READ in their own scope reads their own record and a missing id at once, their whole record and an empty value come back in that order](#login_history-a-user-granted-read-on-themselves-loads-their-own-history-by-id) | answered |
+| [when a user holding no permission reads their own record and a missing id at once, that record entry is rejected for lack of permission and the missing id entry is empty](#login_history-a-user-granted-nothing-gets-a-rejection-for-their-own-history) | rejected |
 
 **LoginHistoryAdapter.my_search**
 
@@ -76,6 +88,13 @@ Scenario: incomplete 8 / 48
 |---|---|
 | [when the superadmin searches without page arguments in a session search gated by the global role, every session seeded in advance comes back in descending creation time regardless of the user](#login_sessions-the-superadmin-searches-every-users-login-sessions) | answered |
 | [a user holding the permission is rejected by the global role gate when searching every login session](#login_sessions-a-user-who-is-not-the-superadmin-may-not-search-every-login-session) | rejected |
+
+**LoginSessionAdapter.batch_load_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted READ in their own scope reads their own session and a missing id at once, their whole session and an empty value come back in that order](#login_sessions-a-user-granted-read-on-themselves-loads-their-own-session-by-id) | answered |
+| [when a user holding no permission reads their own session and a missing id at once, that session entry is rejected for lack of permission and the missing id entry is empty](#login_sessions-a-user-granted-nothing-gets-a-rejection-for-their-own-session) | rejected |
 
 **LoginSessionAdapter.my_search**
 
@@ -113,6 +132,20 @@ Scenario: incomplete 8 / 48
 | [when a user granted the user read permission in the target user scope looks up that user's email, the id of that user comes back](#reading-a-user-granted-read-on-another-user-looks-up-their-id-by-email) | answered |
 | [when a user holding no permission gives an empty email list, no action is called and an empty list comes back](#reading-an-email-lookup-of-no-emails-answers-an-empty-list) | answered |
 | [when a user granted read on only one user looks up a readable user, an unreadable user, and a missing email at once, the first comes back as an id and the other two come back with the same rejection in input order](#reading-an-unreadable-user-and-a-missing-email-are-refused-alike) | rejected |
+
+**UserAdapter.bulk_get_keypair_ids**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted the user read permission in the target user scope reads that user's key and a missing id at once, the whole key and an empty value come back in that order](#loading_keypairs-a-user-granted-read-on-another-loads-their-key-by-id) | answered |
+| [when a user holding no permission reads another user's key and a missing id at once, that key entry is rejected for lack of permission and the missing id entry is empty](#loading_keypairs-a-user-granted-nothing-gets-a-rejection-for-anothers-key) | rejected |
+
+**UserAdapter.bulk_lookup_keypair_access_keys**
+
+| scenario | verdict |
+|---|---|
+| [when a user looks up an access key and an access key nobody holds at once, the first comes back as that keypair's id and the second as an empty value](#loading_keypairs-a-user-looks-up-the-keypair-an-access-key-names) | answered |
+| [looking up a key by an access key without a login context is rejected as user not found](#loading_keypairs-looking-up-an-access-key-without-login-is-refused) | rejected |
 
 **UserAdapter.domain_search**
 
@@ -164,6 +197,13 @@ Scenario: incomplete 8 / 48
 | [when a user granted user READ in the project scope searches by that project, only the users on its roster come back](#searching-a-user-granted-on-a-project-searching-it-finds-only-its-roster) | answered |
 | [a project search from a user holding no role is rejected by the scope permission gate](#searching-a-user-granted-nothing-may-not-search-a-project) | rejected |
 
+**UserAdapter.resolve_domain_id**
+
+| scenario | verdict |
+|---|---|
+| [when a user in a domain resolves its name, the id of that domain comes back](#resolving_domain-a-user-resolves-the-id-of-a-domain-by-its-name) | answered |
+| [resolving a name no domain answers to is rejected as not found](#resolving_domain-resolving-a-domain-name-nothing-answers-to-is-not-found) | rejected |
+
 **UserAdapter.role_search**
 
 | scenario | verdict |
@@ -188,16 +228,46 @@ Scenario: incomplete 8 / 48
 | [when a user holding the permission searches without page arguments, ten keys in descending creation time and the next page flag come back](#own_keypairs-searching-own-keys-without-page-arguments-answers-the-ten-newest) | answered |
 | [a user holding no role who tries to search their own keys is rejected by the scope permission gate](#own_keypairs-a-user-granted-nothing-may-not-search-their-own-keys) | rejected |
 
+**UserConfigAdapter.delete_default_auto_generated_file**
+
+| scenario | verdict |
+|---|---|
+| [a user holding no permission who tries to delete their own config file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-delete-a-config-file) | rejected |
+| [when a user holding READ and UPDATE deletes a config file not marked as default, it is rejected as not found](#config_files-deleting-a-config-file-that-is-not-marked-default-is-not-found) | rejected |
+
+**UserConfigAdapter.get_default_auto_generated_file**
+
+| scenario | verdict |
+|---|---|
+| [when a user holding READ reads a config file not marked as default, it is rejected as not found](#config_files-a-config-file-that-is-not-marked-default-is-not-found) | rejected |
+| [a user holding no permission who tries to read their own config file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-read-a-config-file) | rejected |
+
+**UserConfigAdapter.get_default_auto_generated_files**
+
+| scenario | verdict |
+|---|---|
+| [when a user holding READ lists the config files of theirs marked as default, an empty list comes back](#config_files-a-user-granted-read-on-themselves-lists-no-default-config-file) | answered |
+| [a user holding no permission who tries to list their own config files is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-list-their-config-files) | rejected |
+
+**UserConfigAdapter.update_default_auto_generated_file**
+
+| scenario | verdict |
+|---|---|
+| [a user holding no permission who tries to change their own config file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-update-a-config-file) | rejected |
+| [when a user holding READ and UPDATE changes a config file not marked as default, it is rejected as not found](#config_files-updating-a-config-file-that-is-not-marked-default-is-not-found) | rejected |
+
 **UserAdapter.bulk_create_users**
 
 | scenario | verdict |
 |---|---|
+| [when the superadmin bulk creates one user, the user just created comes back and none failed](#creating-the-superadmin-bulk-creates-a-user) | answered |
 | [even a user granted CREATE in the domain scope is rejected by the global role gate when bulk creating users](#creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users) | rejected |
 
 **UserAdapter.bulk_create_users_with_keypair**
 
 | scenario | verdict |
 |---|---|
+| [when the superadmin bulk creates one user through the keypair-returning call, the user just created and its default keypair with the secret key come back and none failed](#creating-the-superadmin-bulk-creates-a-user-and-gets-its-keypair) | answered |
 | [a user holding the permission is rejected by the global role gate when calling this bulk create](#creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users-with-keypairs) | rejected |
 
 **UserAdapter.bulk_update_users**
@@ -213,6 +283,7 @@ Scenario: incomplete 8 / 48
 
 | scenario | verdict |
 |---|---|
+| [when a user granted the read and create permissions on users in the domain scope creates a user in that domain, the whole user just created and its default keypair with the secret key come back](#creating-a-user-granted-create-on-a-domain-makes-a-user-in-it) | answered |
 | [a user holding no role who tries to create a user is rejected by the domain scope permission gate](#creating-a-user-granted-nothing-may-not-create-a-user) | rejected |
 | [when a user holding the permission gives a domain name nothing answers to, the domain name lookup step rejects it as not found](#creating-a-user-may-not-be-created-in-a-domain-name-nothing-answers-to) | rejected |
 
@@ -395,6 +466,14 @@ Scenario: incomplete 8 / 48
 | [when a user granted UPDATE in the target user scope sends an edit holding only the allowed IP, a success flag comes back and the allowed IP of that user changes](#editing-a-user-granted-update-changes-the-allowed-client-ip) | answered |
 | [when an allowed IP edit comes from a user holding no role, the entity permission gate rejects it](#editing-a-user-granted-nothing-may-not-change-the-allowed-client-ip) | rejected |
 
+**UserConfigAdapter.create_auto_generated_file**
+
+| scenario | verdict |
+|---|---|
+| [when a user holding UPDATE on themselves writes a config file, an empty response comes back](#config_files-a-user-granted-update-on-themselves-writes-their-own-config-file) | answered |
+| [when a user holding UPDATE tries to write a config file where the manager keeps its own, input validation rejects it](#config_files-a-config-file-in-a-place-the-manager-keeps-is-refused) | rejected |
+| [a user holding no permission who tries to write their own config file is rejected for lack of permission](#config_files-a-user-granted-nothing-may-not-write-a-config-file) | rejected |
+
 ### LoginHistoryAdapter.admin_search
 
 <a id="login_history-the-superadmin-searches-every-users-login-history"></a>
@@ -475,6 +554,82 @@ Then
 
 - the call is rejected
   - rejected: InsufficientPrivilege
+
+### LoginHistoryAdapter.batch_load_by_ids
+
+<a id="login_history-a-user-granted-read-on-themselves-loads-their-own-history-by-id"></a>
+
+#### [a-user-granted-read-on-themselves-loads-their-own-history-by-id](/tests/scenario/bai_scenario/manager/user/test_login_history.py): pass
+
+when a user granted READ in their own scope reads their own record and a missing id at once, their whole record and an empty value come back in that order
+
+Given
+
+- one domain and two users, the caller holds the READ permission on their own user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - regular user user-1: has one successful login record
+  - regular user user-2: has one successful login record
+  - a role assignment granting the user the READ permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - regular user user-1: holds Role user-role-1
+
+When
+
+- LoginHistoryAdapter.batch_load_by_ids: user-1 batch reads their own record and a missing id
+
+Then
+
+- the record read comes back as a node and the missing id as an empty value
+  - length = 2
+  - [0].id: same as the record seeded in advance
+  - [0].user_id: same as the record owner
+  - [0].domain_name = 'home-1'
+  - [0].result = 'success'
+  - [0].fail_reason = None
+  - [0].client_ip = None
+  - [0].created_at: the time this run wrote
+  - [1] = None
+
+<a id="login_history-a-user-granted-nothing-gets-a-rejection-for-their-own-history"></a>
+
+#### [a-user-granted-nothing-gets-a-rejection-for-their-own-history](/tests/scenario/bai_scenario/manager/user/test_login_history.py): pass
+
+when a user holding no permission reads their own record and a missing id at once, that record entry is rejected for lack of permission and the missing id entry is empty
+
+Given
+
+- one domain and two users, the caller holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - regular user user-1: has one successful login record
+  - regular user user-2: has one successful login record
+
+When
+
+- LoginHistoryAdapter.batch_load_by_ids: user-1 batch reads their own record and a missing id
+
+Then
+
+- the unreadable record is rejected for lack of permission and the missing id comes back empty
+  - length = 2
+  - rejected: NotEnoughPermission
+  - [1] = None
 
 ### LoginHistoryAdapter.my_search
 
@@ -641,6 +796,90 @@ Then
 
 - the call is rejected
   - rejected: InsufficientPrivilege
+
+### LoginSessionAdapter.batch_load_by_ids
+
+<a id="login_sessions-a-user-granted-read-on-themselves-loads-their-own-session-by-id"></a>
+
+#### [a-user-granted-read-on-themselves-loads-their-own-session-by-id](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
+
+when a user granted READ in their own scope reads their own session and a missing id at once, their whole session and an empty value come back in that order
+
+Given
+
+- one domain and two users, the caller holds the READ permission on their own user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - regular user user-1: has one active login session
+  - Keypair policy keypair-policy-4: up to 5 concurrent sessions
+  - regular user user-2: has one more active keypair besides the default one
+  - regular user user-2: has one active login session
+  - a role assignment granting the user the READ permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - regular user user-1: holds Role user-role-1
+
+When
+
+- LoginSessionAdapter.batch_load_by_ids: user-1 batch reads their own session and a missing id
+
+Then
+
+- the session read comes back as a node and the missing id as an empty value
+  - length = 2
+  - [0].id: same as the session seeded in advance
+  - [0].user_id: same as the session owner
+  - [0].access_key: same as the key that opened the session
+  - [0].status = 'active'
+  - [0].created_at: the time this run wrote
+  - [0].last_accessed_at = None
+  - [0].invalidated_at = None
+  - [1] = None
+
+<a id="login_sessions-a-user-granted-nothing-gets-a-rejection-for-their-own-session"></a>
+
+#### [a-user-granted-nothing-gets-a-rejection-for-their-own-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
+
+when a user holding no permission reads their own session and a missing id at once, that session entry is rejected for lack of permission and the missing id entry is empty
+
+Given
+
+- one domain and two users, the caller holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - regular user user-1: has one active login session
+  - Keypair policy keypair-policy-4: up to 5 concurrent sessions
+  - regular user user-2: has one more active keypair besides the default one
+  - regular user user-2: has one active login session
+
+When
+
+- LoginSessionAdapter.batch_load_by_ids: user-1 batch reads their own session and a missing id
+
+Then
+
+- the unreadable session is rejected for lack of permission and the missing id comes back empty
+  - length = 2
+  - rejected: NotEnoughPermission
+  - [1] = None
 
 ### LoginSessionAdapter.my_search
 
@@ -1133,6 +1372,153 @@ Then
   - [0]: same as the id of the readable user
   - rejected: GenericBadRequest
   - rejected: GenericBadRequest
+
+### UserAdapter.bulk_get_keypair_ids
+
+<a id="loading_keypairs-a-user-granted-read-on-another-loads-their-key-by-id"></a>
+
+#### [a-user-granted-read-on-another-loads-their-key-by-id](/tests/scenario/bai_scenario/manager/user/test_loading_keypairs.py): pass
+
+when a user granted the user read permission in the target user scope reads that user's key and a missing id at once, the whole key and an empty value come back in that order
+
+Given
+
+- one domain and two users, the target holds one more keypair besides the default one, and the caller holds the user read permission on the target
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+  - a role assignment granting the user the READ permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - regular user user-2: holds Role user-role-1
+
+When
+
+- UserAdapter.bulk_get_keypair_ids: user-2 batch reads the key of user-1 and a missing id
+
+Then
+
+- the key read comes back as a node and the missing id as an empty value
+  - length = 2
+  - id: same as the keypair seeded in advance
+  - access_key: same as the keypair seeded in advance
+  - is_active = True
+  - is_admin = False
+  - is_default = False
+  - rate_limit = 10000
+  - resource_policy = 'keypair-policy-2'
+  - ssh_public_key = ''
+  - num_queries = 0
+  - last_used = None
+  - user_id: same as the keypair owner
+  - created_at: the time this run wrote
+  - modified_at: the time this run wrote
+  - field_id: same as the keypair seeded in advance
+  - [1] = None
+
+<a id="loading_keypairs-a-user-granted-nothing-gets-a-rejection-for-anothers-key"></a>
+
+#### [a-user-granted-nothing-gets-a-rejection-for-anothers-key](/tests/scenario/bai_scenario/manager/user/test_loading_keypairs.py): pass
+
+when a user holding no permission reads another user's key and a missing id at once, that key entry is rejected for lack of permission and the missing id entry is empty
+
+Given
+
+- one domain and two users, the target holds one more keypair besides the default one, and the caller holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+
+When
+
+- UserAdapter.bulk_get_keypair_ids: user-2 batch reads the key of user-1 and a missing id
+
+Then
+
+- the unreadable key is rejected for lack of permission and the missing id comes back empty
+  - length = 2
+  - rejected: NotEnoughPermission
+  - [1] = None
+
+### UserAdapter.bulk_lookup_keypair_access_keys
+
+<a id="loading_keypairs-a-user-looks-up-the-keypair-an-access-key-names"></a>
+
+#### [a-user-looks-up-the-keypair-an-access-key-names](/tests/scenario/bai_scenario/manager/user/test_loading_keypairs.py): pass
+
+when a user looks up an access key and an access key nobody holds at once, the first comes back as that keypair's id and the second as an empty value
+
+Given
+
+- one domain and two users, the target holds one more keypair besides the default one, and the caller holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+
+When
+
+- UserAdapter.bulk_lookup_keypair_access_keys: user-2 looks up the access key of user-1 and an access key nobody holds
+
+Then
+
+- the key found comes back as its id and the access key nobody holds is empty
+  - length = 2
+  - [0]: same as the keypair seeded in advance
+  - [1] = None
+
+<a id="loading_keypairs-looking-up-an-access-key-without-login-is-refused"></a>
+
+#### [looking-up-an-access-key-without-login-is-refused](/tests/scenario/bai_scenario/manager/user/test_loading_keypairs.py): pass
+
+looking up a key by an access key without a login context is rejected as user not found
+
+Given
+
+- one domain and two users, the target holds one more keypair besides the default one, and the caller holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+  - regular user user-1: has one more active keypair besides the default one
+
+When
+
+- UserAdapter.bulk_lookup_keypair_access_keys: without a login context, looks up an access key
+
+Then
+
+- the call is rejected
+  - rejected: UserNotFound
 
 ### UserAdapter.domain_search
 
@@ -1681,6 +2067,58 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
+### UserAdapter.resolve_domain_id
+
+<a id="resolving_domain-a-user-resolves-the-id-of-a-domain-by-its-name"></a>
+
+#### [a-user-resolves-the-id-of-a-domain-by-its-name](/tests/scenario/bai_scenario/manager/user/test_resolving_domain.py): pass
+
+when a user in a domain resolves its name, the id of that domain comes back
+
+Given
+
+- one domain and one user in it
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- UserAdapter.resolve_domain_id: user-1 resolves the id of home-1
+
+Then
+
+- the id of that domain comes back
+  - id: same as the id of the domain seeded in advance
+
+<a id="resolving_domain-resolving-a-domain-name-nothing-answers-to-is-not-found"></a>
+
+#### [resolving-a-domain-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/user/test_resolving_domain.py): pass
+
+resolving a name no domain answers to is rejected as not found
+
+Given
+
+- one domain and one user in it
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- UserAdapter.resolve_domain_id: user-1 resolves the id of no-such-domain
+
+Then
+
+- the call is rejected
+  - rejected: EntityNotFoundError
+
 ### UserAdapter.role_search
 
 <a id="searching-a-user-granted-on-the-role-scope-searching-by-role-finds-only-its-holders"></a>
@@ -2038,7 +2476,288 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
+### UserConfigAdapter.delete_default_auto_generated_file
+
+<a id="config_files-a-user-granted-nothing-may-not-delete-a-config-file"></a>
+
+#### [a-user-granted-nothing-may-not-delete-a-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+a user holding no permission who tries to delete their own config file is rejected for lack of permission
+
+Given
+
+- one domain and one user, the user holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- UserConfigAdapter.delete_default_auto_generated_file: user-1 deletes one of their own config files
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="config_files-deleting-a-config-file-that-is-not-marked-default-is-not-found"></a>
+
+#### [deleting-a-config-file-that-is-not-marked-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+when a user holding READ and UPDATE deletes a config file not marked as default, it is rejected as not found
+
+Given
+
+- one domain and one user, the user holds one config file not marked as default, the user holds the READ, UPDATE permission on themselves
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - regular user user-1: has one config file that is not marked default
+  - a role assignment granting the user the READ, UPDATE permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - Role user-role-1: UPDATE allowed on every user
+    - regular user user-1: holds Role user-role-1
+
+When
+
+- UserConfigAdapter.delete_default_auto_generated_file: user-1 deletes one of their own config files
+
+Then
+
+- the call is rejected
+  - rejected: DotfileNotFound
+
+### UserConfigAdapter.get_default_auto_generated_file
+
+<a id="config_files-a-config-file-that-is-not-marked-default-is-not-found"></a>
+
+#### [a-config-file-that-is-not-marked-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+when a user holding READ reads a config file not marked as default, it is rejected as not found
+
+Given
+
+- one domain and one user, the user holds one config file not marked as default, the user holds the READ permission on themselves
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - regular user user-1: has one config file that is not marked default
+  - a role assignment granting the user the READ permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - regular user user-1: holds Role user-role-1
+
+When
+
+- UserConfigAdapter.get_default_auto_generated_file: user-1 reads one of their own config files
+
+Then
+
+- the call is rejected
+  - rejected: DotfileNotFound
+
+<a id="config_files-a-user-granted-nothing-may-not-read-a-config-file"></a>
+
+#### [a-user-granted-nothing-may-not-read-a-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+a user holding no permission who tries to read their own config file is rejected for lack of permission
+
+Given
+
+- one domain and one user, the user holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- UserConfigAdapter.get_default_auto_generated_file: user-1 reads one of their own config files
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### UserConfigAdapter.get_default_auto_generated_files
+
+<a id="config_files-a-user-granted-read-on-themselves-lists-no-default-config-file"></a>
+
+#### [a-user-granted-read-on-themselves-lists-no-default-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+when a user holding READ lists the config files of theirs marked as default, an empty list comes back
+
+Given
+
+- one domain and one user, the user holds the READ permission on themselves
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - a role assignment granting the user the READ permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - regular user user-1: holds Role user-role-1
+
+When
+
+- UserConfigAdapter.get_default_auto_generated_files: user-1 lists the config files of theirs marked as default
+
+Then
+
+- no file is marked default, so an empty list comes back
+  - files = []
+
+<a id="config_files-a-user-granted-nothing-may-not-list-their-config-files"></a>
+
+#### [a-user-granted-nothing-may-not-list-their-config-files](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+a user holding no permission who tries to list their own config files is rejected for lack of permission
+
+Given
+
+- one domain and one user, the user holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- UserConfigAdapter.get_default_auto_generated_files: user-1 lists the config files of theirs marked as default
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### UserConfigAdapter.update_default_auto_generated_file
+
+<a id="config_files-a-user-granted-nothing-may-not-update-a-config-file"></a>
+
+#### [a-user-granted-nothing-may-not-update-a-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+a user holding no permission who tries to change their own config file is rejected for lack of permission
+
+Given
+
+- one domain and one user, the user holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- UserConfigAdapter.update_default_auto_generated_file: user-1 changes the permission and content of one of their config files
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="config_files-updating-a-config-file-that-is-not-marked-default-is-not-found"></a>
+
+#### [updating-a-config-file-that-is-not-marked-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+when a user holding READ and UPDATE changes a config file not marked as default, it is rejected as not found
+
+Given
+
+- one domain and one user, the user holds one config file not marked as default, the user holds the READ, UPDATE permission on themselves
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - regular user user-1: has one config file that is not marked default
+  - a role assignment granting the user the READ, UPDATE permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - Role user-role-1: UPDATE allowed on every user
+    - regular user user-1: holds Role user-role-1
+
+When
+
+- UserConfigAdapter.update_default_auto_generated_file: user-1 changes the permission and content of one of their config files
+
+Then
+
+- the call is rejected
+  - rejected: DotfileNotFound
+
 ### UserAdapter.bulk_create_users
+
+<a id="creating-the-superadmin-bulk-creates-a-user"></a>
+
+#### [the-superadmin-bulk-creates-a-user](/tests/scenario/bai_scenario/manager/user/test_creating.py): pass
+
+when the superadmin bulk creates one user, the user just created comes back and none failed
+
+Given
+
+- one domain and one superadmin, and the caller holds no permission
+  - Domain home-1
+  - User resource policy user-policy-1: up to 10 folders per user
+  - Default keypair policy default-keypair-policy-1: a keypair that names no policy gets this one
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- UserAdapter.bulk_create_users: user-1 bulk creates made in home-1
+
+Then
+
+- the user just created comes back and none failed
+  - created_users.length = 1
+  - failed = []
+  - user.id: skipped: the database generates it
+  - user.entity_id: same as the user's own id
+  - user.basic_info.username = 'made'
+  - user.basic_info.email = 'made@scenario.local'
+  - user.basic_info.full_name = None
+  - user.basic_info.description = None
+  - user.basic_info.integration_name = None
+  - user.status.status = 'active'
+  - user.status.status_info = None
+  - user.status.need_password_change = False
+  - user.organization.domain_name = 'home-1'
+  - user.organization.domain_id: same as the id of the domain seeded in advance
+  - user.organization.role = 'user'
+  - user.organization.resource_policy = 'user-policy-1'
+  - user.organization.main_access_key: the user's main access key is filled
+  - user.security.allowed_client_ip = None
+  - user.security.totp_activated = False
+  - user.security.totp_activated_at = None
+  - user.security.sudo_session_enabled = False
+  - user.container.container_uid = None
+  - user.container.container_main_gid = None
+  - user.container.container_gids = None
+  - user.timestamps.created_at: the time this run wrote
+  - user.timestamps.modified_at: the time this run wrote
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users"></a>
 
@@ -2070,6 +2789,73 @@ Then
   - rejected: InsufficientPrivilege
 
 ### UserAdapter.bulk_create_users_with_keypair
+
+<a id="creating-the-superadmin-bulk-creates-a-user-and-gets-its-keypair"></a>
+
+#### [the-superadmin-bulk-creates-a-user-and-gets-its-keypair](/tests/scenario/bai_scenario/manager/user/test_creating.py): pass
+
+when the superadmin bulk creates one user through the keypair-returning call, the user just created and its default keypair with the secret key come back and none failed
+
+Given
+
+- one domain and one superadmin, and the caller holds no permission
+  - Domain home-1
+  - User resource policy user-policy-1: up to 10 folders per user
+  - Default keypair policy default-keypair-policy-1: a keypair that names no policy gets this one
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- UserAdapter.bulk_create_users_with_keypair: user-1 bulk creates made in home-1
+
+Then
+
+- the user just created and its default keypair with the secret key come back and none failed
+  - created.length = 1
+  - failed = []
+  - user.id: skipped: the database generates it
+  - user.entity_id: same as the user's own id
+  - user.basic_info.username = 'made'
+  - user.basic_info.email = 'made@scenario.local'
+  - user.basic_info.full_name = None
+  - user.basic_info.description = None
+  - user.basic_info.integration_name = None
+  - user.status.status = 'active'
+  - user.status.status_info = None
+  - user.status.need_password_change = False
+  - user.organization.domain_name = 'home-1'
+  - user.organization.domain_id: same as the id of the domain seeded in advance
+  - user.organization.role = 'user'
+  - user.organization.resource_policy = 'user-policy-1'
+  - user.organization.main_access_key: same as the keypair this call made
+  - user.security.allowed_client_ip = None
+  - user.security.totp_activated = False
+  - user.security.totp_activated_at = None
+  - user.security.sudo_session_enabled = False
+  - user.container.container_uid = None
+  - user.container.container_main_gid = None
+  - user.container.container_gids = None
+  - user.timestamps.created_at: the time this run wrote
+  - user.timestamps.modified_at: the time this run wrote
+  - created[0].keypair.id: skipped: it is the access key the manager made
+  - created[0].keypair.field_id: skipped: the database generates it
+  - created[0].keypair.access_key: skipped: the manager creates it
+  - created[0].keypair.is_active = True
+  - created[0].keypair.is_admin = False
+  - created[0].keypair.is_default = True
+  - created[0].keypair.rate_limit = 10000
+  - created[0].keypair.resource_policy = 'default-keypair-policy-1'
+  - created[0].keypair.ssh_public_key: skipped: it is the RSA key the manager made
+  - created[0].keypair.num_queries = 0
+  - created[0].keypair.last_used = None
+  - created[0].keypair.user_id: same as the user just created
+  - created[0].keypair.created_at: the time this run wrote
+  - created[0].keypair.modified_at: the time this run wrote
+  - created[0].secret_key: the secret key the manager made is filled
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users-with-keypairs"></a>
 
@@ -2326,6 +3112,76 @@ Then
   - rejected: InsufficientPrivilege
 
 ### UserAdapter.create_user
+
+<a id="creating-a-user-granted-create-on-a-domain-makes-a-user-in-it"></a>
+
+#### [a-user-granted-create-on-a-domain-makes-a-user-in-it](/tests/scenario/bai_scenario/manager/user/test_creating.py): pass
+
+when a user granted the read and create permissions on users in the domain scope creates a user in that domain, the whole user just created and its default keypair with the secret key come back
+
+Given
+
+- one domain and one user, and the caller holds the READ and CREATE permissions on users in the domain scope
+  - Domain home-1
+  - User resource policy user-policy-1: up to 10 folders per user
+  - Default keypair policy default-keypair-policy-1: a keypair that names no policy gets this one
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - a role assignment granting the user the READ, CREATE permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: READ allowed on every user
+    - Role user-role-1: CREATE allowed on every user
+    - regular user user-1: holds Role user-role-1
+
+When
+
+- UserAdapter.create_user: user-1 creates made in home-1
+
+Then
+
+- the whole user just created and its default keypair with the secret key come back
+  - user.id: skipped: the database generates it
+  - user.entity_id: same as the user's own id
+  - user.basic_info.username = 'made'
+  - user.basic_info.email = 'made@scenario.local'
+  - user.basic_info.full_name = None
+  - user.basic_info.description = None
+  - user.basic_info.integration_name = None
+  - user.status.status = 'active'
+  - user.status.status_info = None
+  - user.status.need_password_change = False
+  - user.organization.domain_name = 'home-1'
+  - user.organization.domain_id: same as the id of the domain seeded in advance
+  - user.organization.role = 'user'
+  - user.organization.resource_policy = 'user-policy-1'
+  - user.organization.main_access_key: same as the keypair this call made
+  - user.security.allowed_client_ip = None
+  - user.security.totp_activated = False
+  - user.security.totp_activated_at = None
+  - user.security.sudo_session_enabled = False
+  - user.container.container_uid = None
+  - user.container.container_main_gid = None
+  - user.container.container_gids = None
+  - user.timestamps.created_at: the time this run wrote
+  - user.timestamps.modified_at: the time this run wrote
+  - keypair.id: skipped: it is the access key the manager made
+  - keypair.field_id: skipped: the database generates it
+  - keypair.access_key: skipped: the manager creates it
+  - keypair.is_active = True
+  - keypair.is_admin = False
+  - keypair.is_default = True
+  - keypair.rate_limit = 10000
+  - keypair.resource_policy = 'default-keypair-policy-1'
+  - keypair.ssh_public_key: skipped: it is the RSA key the manager made
+  - keypair.num_queries = 0
+  - keypair.last_used = None
+  - keypair.user_id: same as the user just created
+  - keypair.created_at: the time this run wrote
+  - keypair.modified_at: the time this run wrote
+  - secret_key: the secret key the manager made is filled
 
 <a id="creating-a-user-granted-nothing-may-not-create-a-user"></a>
 
@@ -5201,6 +6057,91 @@ Given
 When
 
 - UserAdapter.update_user: user-2 changes the allowed IP of user-1, and user-3 reads it back
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### UserConfigAdapter.create_auto_generated_file
+
+<a id="config_files-a-user-granted-update-on-themselves-writes-their-own-config-file"></a>
+
+#### [a-user-granted-update-on-themselves-writes-their-own-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+when a user holding UPDATE on themselves writes a config file, an empty response comes back
+
+Given
+
+- one domain and one user, the user holds the UPDATE permission on themselves
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - a role assignment granting the user the UPDATE permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: UPDATE allowed on every user
+    - regular user user-1: holds Role user-role-1
+
+When
+
+- UserConfigAdapter.create_auto_generated_file: user-1 writes one of their own config files
+
+Then
+
+- an empty response comes back
+  - response = {}
+
+<a id="config_files-a-config-file-in-a-place-the-manager-keeps-is-refused"></a>
+
+#### [a-config-file-in-a-place-the-manager-keeps-is-refused](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+when a user holding UPDATE tries to write a config file where the manager keeps its own, input validation rejects it
+
+Given
+
+- one domain and one user, the user holds the UPDATE permission on themselves
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - a role assignment granting the user the UPDATE permissions
+    - Role user-role-1: applies only within the scope it is granted in
+    - Role user-role-1: UPDATE allowed on every user
+    - regular user user-1: holds Role user-role-1
+
+When
+
+- UserConfigAdapter.create_auto_generated_file: user-1 tries to write a config file where the manager keeps its own
+
+Then
+
+- the call is rejected
+  - rejected: InvalidDotfilePath
+
+<a id="config_files-a-user-granted-nothing-may-not-write-a-config-file"></a>
+
+#### [a-user-granted-nothing-may-not-write-a-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+a user holding no permission who tries to write their own config file is rejected for lack of permission
+
+Given
+
+- one domain and one user, the user holds no permission
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- UserConfigAdapter.create_auto_generated_file: user-1 writes one of their own config files
 
 Then
 
