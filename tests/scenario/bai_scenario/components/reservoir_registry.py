@@ -300,7 +300,7 @@ class ThePurgedIdComesBack(Then[ARegistryAndACaller, PurgeReservoirRegistryPaylo
                         english="the id of the registry seeded in advance",
                     ),
                 ),
-            )
+            ),
         ]
 
 

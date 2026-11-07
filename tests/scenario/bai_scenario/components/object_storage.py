@@ -249,7 +249,7 @@ class ThePurgedStorageId(Then[AStorageAndACaller, PurgeObjectStoragePayload]):
                         english="the object storage created in advance",
                     ),
                 ),
-            )
+            ),
         ]
 
 

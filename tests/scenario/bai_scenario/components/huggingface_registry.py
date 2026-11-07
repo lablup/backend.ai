@@ -298,7 +298,7 @@ class ThePurgedIdComesBack(Then[ARegistryAndACaller, PurgeHuggingFaceRegistryPay
                         english="the id of the registry created in advance",
                     ),
                 ),
-            )
+            ),
         ]
 
 

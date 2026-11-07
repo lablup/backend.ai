@@ -258,7 +258,7 @@ class ThePurgedStorageId(Then[AStorageAndACaller, PurgeVFSStoragePayload]):
                         english="the VFS storage seeded in advance",
                     ),
                 ),
-            )
+            ),
         ]
 
 
