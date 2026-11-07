@@ -12,6 +12,8 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     IdleCheckerAssignmentFilter,
+    IdleCheckerAssignmentOrder,
+    IdleCheckerAssignmentOrderField,
     SearchIdleCheckerAssignmentsInput,
 )
 from ai.backend.manager.api.adapters.idle_checker_assignment.adapter import (
@@ -40,7 +42,7 @@ type SearchingStep = Scenario[
 
 @dataclass(frozen=True)
 class SearchingByTheChecker(When[AssignmentsAndACaller, IdleCheckerAssignmentAdapter, Searched]):
-    """미리 저장한 검사기의 할당을 검색한다."""
+    """미리 저장한 검사기의 할당을, 시간순과 페이지 크기로 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -49,8 +51,12 @@ class SearchingByTheChecker(When[AssignmentsAndACaller, IdleCheckerAssignmentAda
     @override
     def describe(self, laid: AssignmentsAndACaller) -> str:
         return Says(
-            f"{laid.caller.username} 이 검사기로 필터 기반 조회합니다",
-            english=f"{laid.caller.username} reads filtered by the checker",
+            f"{laid.caller.username} 이 검사기를 필터로, 할당의 시간순 정렬과 페이지 크기를 "
+            "한 번에 조회합니다",
+            english=(
+                f"{laid.caller.username} reads with the checker as the filter, the time "
+                "order and a page size in one request"
+            ),
         )
 
     @override
@@ -63,7 +69,13 @@ class SearchingByTheChecker(When[AssignmentsAndACaller, IdleCheckerAssignmentAda
                 SearchIdleCheckerAssignmentsInput(
                     filter=IdleCheckerAssignmentFilter(
                         idle_checker_id=UUIDFilter(equals=laid.checker.id)
-                    )
+                    ),
+                    order=[
+                        IdleCheckerAssignmentOrder(
+                            field=IdleCheckerAssignmentOrderField.CREATED_AT
+                        )
+                    ],
+                    first=10,
                 )
             )
         return AssignmentsAnswered(ids=ids, payload=payload)
@@ -82,17 +94,20 @@ class TheSuperadminSearchesAssignments(
     @override
     def describe(self) -> str:
         return Says(
-            "global 역할로 검사하는 연산이므로 superadmin 이 검색하면, 심은 할당이 모두 "
-            "한 번씩 집계되어 반환됩니다",
+            "global 역할로 검사하는 연산이므로 superadmin 이 검사기를 필터로, 할당의 시간순 "
+            "정렬과 페이지 크기를 한 번에 검색하면, 그 검사기의 할당이 모두 한 번씩 "
+            "집계되어 반환됩니다",
             english=(
-                "the operation is gated by the global role, so when the superadmin searches, "
-                "every assignment seeded in advance is counted once and comes back whole"
+                "the operation is gated by the global role, so when the superadmin searches "
+                "with the checker as the filter, the time order and a page size in one "
+                "request, the assignments of that checker are all counted once and come "
+                "back whole"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AssignmentsAndACaller]:
-        return OneCheckerOnSomeDomains(role=UserRole.SUPERADMIN)
+        return OneCheckerOnSomeDomains(role=UserRole.SUPERADMIN, another_checker=True)
 
     @override
     def when(self) -> When[AssignmentsAndACaller, IdleCheckerAssignmentAdapter, Searched]:

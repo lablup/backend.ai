@@ -9,7 +9,11 @@ from typing import override
 import pytest
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
+    IdleCheckerAssignmentFilter,
+    IdleCheckerAssignmentOrder,
+    IdleCheckerAssignmentOrderField,
     IdleCheckerAssignmentScopeDTO,
     IdleCheckerScopeRefDTO,
     ScopedSearchIdleCheckerAssignmentsInput,
@@ -25,7 +29,7 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.idle_checker import (
     AssignmentsAndACaller,
     AssignmentsAnswered,
-    EveryAssignmentIsListed,
+    OnlyTheScopedAssignmentsAreListed,
     OneCheckerOnSomeDomains,
     assignment_ids,
 )
@@ -41,7 +45,7 @@ type SearchingStep = Scenario[
 
 @dataclass(frozen=True)
 class SearchingInTwoDomains(When[AssignmentsAndACaller, IdleCheckerAssignmentAdapter, Searched]):
-    """미리 저장한 도메인 둘을 스코프로 검색한다."""
+    """미리 저장한 도메인 둘을 스코프로, 검사기를 필터로 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -51,10 +55,10 @@ class SearchingInTwoDomains(When[AssignmentsAndACaller, IdleCheckerAssignmentAda
     def describe(self, laid: AssignmentsAndACaller) -> str:
         return Says(
             f"{laid.caller.username} 이 도메인 {laid.domains[0].name}과 {laid.domains[1].name}을 "
-            "스코프로 조회합니다",
+            "스코프로, 검사기를 필터로 조회합니다",
             english=(
                 f"{laid.caller.username} reads scoped to the domains {laid.domains[0].name} "
-                f"and {laid.domains[1].name}"
+                f"and {laid.domains[1].name}, with the checker as the filter"
             ),
         )
 
@@ -71,9 +75,18 @@ class SearchingInTwoDomains(When[AssignmentsAndACaller, IdleCheckerAssignmentAda
                             IdleCheckerScopeRefDTO(
                                 scope_type=IdleCheckerScopeTypeDTO.DOMAIN, scope_id=domain.id
                             )
-                            for domain in laid.domains
+                            for domain in laid.domains[:2]
                         ]
-                    )
+                    ),
+                    filter=IdleCheckerAssignmentFilter(
+                        idle_checker_id=UUIDFilter(equals=laid.checker.id)
+                    ),
+                    order=[
+                        IdleCheckerAssignmentOrder(
+                            field=IdleCheckerAssignmentOrderField.CREATED_AT
+                        )
+                    ],
+                    first=10,
                 )
             )
         return AssignmentsAnswered(ids=ids, payload=payload)
@@ -92,17 +105,18 @@ class TheSuperadminScopedSearchesAssignments(
     @override
     def describe(self) -> str:
         return Says(
-            "superadmin 이 도메인 둘을 스코프로 검색하면, 그 도메인들의 할당이 모두 "
-            "한 번씩 집계되어 반환됩니다",
+            "superadmin 이 도메인 둘을 스코프로, 검사기를 필터로, 시간순 정렬과 페이지 크기를 "
+            "한 번에 검색하면, 그 도메인들의 할당만 한 번씩 집계되어 반환됩니다",
             english=(
-                "when the superadmin searches scoped to two domains, the assignments of those "
-                "domains are all counted once and come back whole"
+                "when the superadmin searches scoped to two domains, with the checker as the "
+                "filter, the time order and a page size in one request, only the assignments "
+                "of those domains are counted once and come back whole"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, AssignmentsAndACaller]:
-        return OneCheckerOnSomeDomains(role=UserRole.SUPERADMIN)
+        return OneCheckerOnSomeDomains(role=UserRole.SUPERADMIN, count=3, another_checker=True)
 
     @override
     def when(self) -> When[AssignmentsAndACaller, IdleCheckerAssignmentAdapter, Searched]:
@@ -110,7 +124,7 @@ class TheSuperadminScopedSearchesAssignments(
 
     @override
     def then(self) -> Then[AssignmentsAndACaller, Searched]:
-        return EveryAssignmentIsListed(started=self.started)
+        return OnlyTheScopedAssignmentsAreListed(started=self.started)
 
 
 @dataclass(frozen=True)
