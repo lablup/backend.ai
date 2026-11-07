@@ -100,8 +100,8 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [아무 권한도 받지 않은 superadmin 이 커널을 전체 검색하면, 저장된 커널 전체가 반환됩니다. 이 동작은 역할이라 요청한 사용자가 superadmin 입니다](#searching-superadmin-searches-every-kernel) | 성공 |
-| [superadmin 이 아닌 사용자가 커널을 전체 검색하면, 역할 부족으로 거부됩니다](#searching-a-user-who-is-not-a-superadmin-searches-every-kernel) | 거부 |
+| [아무 권한도 받지 않은 superadmin 이 세션 하나의 커널로 걸러 전체 커널을 검색하면, 저장된 커널 전체가 반환됩니다. 이 동작은 역할이라 요청한 사용자가 superadmin 입니다](#searching-superadmin-searches-every-kernel) | 성공 |
+| [superadmin 이 아닌 사용자가 세션 하나의 커널로 걸러 전체 커널을 검색하면, 역할 부족으로 거부됩니다](#searching-a-user-who-is-not-a-superadmin-searches-every-kernel) | 거부 |
 
 **batch_load_by_ids**
 
@@ -1055,7 +1055,7 @@ Then
 
 #### [superadmin-searches-every-kernel](/tests/scenario/bai_scenario/manager/session/test_searching.py): pass
 
-아무 권한도 받지 않은 superadmin 이 커널을 전체 검색하면, 저장된 커널 전체가 반환됩니다. 이 동작은 역할이라 요청한 사용자가 superadmin 입니다
+아무 권한도 받지 않은 superadmin 이 세션 하나의 커널로 걸러 전체 커널을 검색하면, 저장된 커널 전체가 반환됩니다. 이 동작은 역할이라 요청한 사용자가 superadmin 입니다
 
 Given
 
@@ -1095,7 +1095,7 @@ Given
 
 When
 
-- SessionAdapter.admin_search_kernels: user-2이 필터 없이 모든 커널을 조회합니다
+- SessionAdapter.admin_search_kernels: user-2이 session-1 세션의 커널로 걸러 모든 커널을 한 페이지씩 조회합니다
 
 Then
 
@@ -1109,7 +1109,7 @@ Then
 
 #### [a-user-who-is-not-a-superadmin-searches-every-kernel](/tests/scenario/bai_scenario/manager/session/test_searching.py): pass
 
-superadmin 이 아닌 사용자가 커널을 전체 검색하면, 역할 부족으로 거부됩니다
+superadmin 이 아닌 사용자가 세션 하나의 커널로 걸러 전체 커널을 검색하면, 역할 부족으로 거부됩니다
 
 Given
 
@@ -1138,7 +1138,7 @@ Given
 
 When
 
-- SessionAdapter.admin_search_kernels: user-2이 필터 없이 모든 커널을 조회합니다
+- SessionAdapter.admin_search_kernels: user-2이 session-1 세션의 커널로 걸러 모든 커널을 한 페이지씩 조회합니다
 
 Then
 
