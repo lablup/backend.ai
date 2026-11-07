@@ -99,8 +99,12 @@ class SearchingEveryKernel(When[LaidSessionAndCaller, SessionAdapter, Kernels]):
     @override
     def describe(self, laid: LaidSessionAndCaller) -> str:
         return Says(
-            f"{laid.caller.username}이 필터 없이 모든 커널을 조회합니다",
-            english=f"{laid.caller.username} searches every kernel without a filter",
+            f"{laid.caller.username}이 {laid.session.name} 세션의 커널로 걸러 모든 커널을 "
+            "한 페이지씩 조회합니다",
+            english=(
+                f"{laid.caller.username} searches every kernel filtered by the session "
+                f"{laid.session.name}, one page at a time"
+            ),
         )
 
     @override
@@ -435,18 +439,21 @@ class SearchingEveryKernelAsTheSuperadmin(
     def describe(self) -> str:
         if self.superadmin:
             return Says(
-                "아무 권한도 받지 않은 superadmin 이 커널을 전체 검색하면, 저장된 커널 전체가 "
-                "반환됩니다. 이 동작은 역할이라 요청한 사용자가 superadmin 입니다",
+                "아무 권한도 받지 않은 superadmin 이 세션 하나의 커널로 걸러 전체 커널을 "
+                "검색하면, 저장된 커널 전체가 반환됩니다. 이 동작은 역할이라 요청한 사용자가 "
+                "superadmin 입니다",
                 english=(
-                    "when a superadmin holding no permission searches every kernel, the stored "
-                    "kernel comes back; a role checks this operation, so the requesting user is "
-                    "a superadmin"
+                    "when a superadmin holding no permission searches every kernel filtered by "
+                    "one session, the stored kernel comes back; a role checks this operation, so "
+                    "the requesting user is a superadmin"
                 ),
             )
         return Says(
-            "superadmin 이 아닌 사용자가 커널을 전체 검색하면, 역할 부족으로 거부됩니다",
+            "superadmin 이 아닌 사용자가 세션 하나의 커널로 걸러 전체 커널을 검색하면, 역할 "
+            "부족으로 거부됩니다",
             english=(
-                "when a user who is not a superadmin searches every kernel, the role rejects it"
+                "when a user who is not a superadmin searches every kernel filtered by one "
+                "session, the role rejects it"
             ),
         )
 
