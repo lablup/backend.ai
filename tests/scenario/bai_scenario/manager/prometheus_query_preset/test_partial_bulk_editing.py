@@ -283,9 +283,7 @@ class AUserGrantedNothingEditsNone(
 
 
 @dataclass(frozen=True)
-class TheEditedOneComesBackAndTheAbsentOneIsDenied(
-    Then[ManyPresetsAndACaller, Edited]
-):
+class TheEditedOneComesBackAndTheAbsentOneIsDenied(Then[ManyPresetsAndACaller, Edited]):
     """수정된 대상은 새 설명을 실어 오고, 권한이 없는 항목은 실패 목록에 온다."""
 
     started: datetime
@@ -406,7 +404,9 @@ class EditingAsNobody(When[ManyPresetsAndACaller, Adapter, Edited]):
             )
             for preset in laid.laid
         ]
-        return await adapter.partial_bulk_update(PartialBulkUpdateQueryDefinitionsInput(items=items))
+        return await adapter.partial_bulk_update(
+            PartialBulkUpdateQueryDefinitionsInput(items=items)
+        )
 
 
 @dataclass(frozen=True)

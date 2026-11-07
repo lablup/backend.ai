@@ -205,9 +205,7 @@ class AUserGrantedNothingPurgesNone(
 
 
 @dataclass(frozen=True)
-class TheGrantedOneIsPurgedAndTheAbsentOneIsDenied(
-    Then[ManyPresetsAndACaller, Purged]
-):
+class TheGrantedOneIsPurgedAndTheAbsentOneIsDenied(Then[ManyPresetsAndACaller, Purged]):
     """권한을 받은 대상은 지워지기 전 모습으로 오고, 권한이 없는 항목은 실패 목록에 온다."""
 
     missing: UUID
@@ -329,8 +327,7 @@ class ACallCarryingNoUserMayNotPurge(
     @override
     def describe(self) -> str:
         return Says(
-            "프리셋이 있고 사용자 컨텍스트 없이 한 번에 purge 하면, 호출자를 알 수 없어 "
-            "거부됩니다",
+            "프리셋이 있고 사용자 컨텍스트 없이 한 번에 purge 하면, 호출자를 알 수 없어 거부됩니다",
             english=(
                 "when presets exist and they are purged at once without a user context, it is "
                 "rejected because the caller cannot be known"
