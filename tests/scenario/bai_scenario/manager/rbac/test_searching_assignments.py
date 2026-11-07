@@ -5,13 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import override
+from uuid import UUID
 
 import pytest
 
 from ai.backend.common.data.entity.role import RoleEntityType, RoleID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.rbac.request import (
     RoleAssignmentFilter,
     RoleAssignmentOrderBy,
@@ -59,10 +60,17 @@ def _in_seeded_order(
     return sorted(nodes, key=lambda node: order.get(node.user_id, len(order)))
 
 
-def _search(laid: RolesAndACaller, username: str, limit: int) -> SearchRoleAssignmentsInput:
+def _search(
+    laid: RolesAndACaller, username: str, limit: int, role_id: UUID | None = None
+) -> SearchRoleAssignmentsInput:
     """하나의 필터, 하나의 정렬, 페이지 크기를 함께 싣는다."""
+    condition = (
+        RoleAssignmentFilter(role_id=UUIDFilter(equals=role_id))
+        if role_id is not None
+        else RoleAssignmentFilter(username=StringFilter(equals=username))
+    )
     return SearchRoleAssignmentsInput(
-        filter=RoleAssignmentFilter(username=StringFilter(equals=username)),
+        filter=condition,
         order=[RoleAssignmentOrderBy(field="username", direction=OrderDirection.ASC)],
         limit=limit,
     )
@@ -121,8 +129,11 @@ class SearchingMyAssignments(When[RolesAndACaller, RBACAdapter, AssignmentPage])
 
     @override
     async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> AssignmentPage:
+        role_id = laid.self_role.id if laid.self_role is not None else None
         with ActingAs(laid.caller):
-            return await adapter.my_search_role_assignments(_search(laid, laid.caller.username, 1))
+            return await adapter.my_search_role_assignments(
+                _search(laid, laid.caller.username, 1, role_id=role_id)
+            )
 
 
 @dataclass(frozen=True)
@@ -297,18 +308,18 @@ class AUserHoldingARoleSearchesItsAssignment(
     @override
     def describe(self) -> str:
         return Says(
-            "자기 스코프의 역할 읽기 권한을 가진 역할을 가진 사용자가 자기 이름으로 자기의 역할 "
-            "배정을 검색하면, 그 배정만 오고 다른 사람의 배정은 빠집니다",
+            "자기 스코프의 역할 읽기 권한을 가진 역할을 가진 사용자가 자기 역할 배정을 역할 하나의 "
+            "id 로 검색하면, 그 배정만 오고 다른 역할과 다른 사람의 배정은 빠집니다",
             english=(
                 "when a user holding a role with role read permission in their own scope searches "
-                "their own role assignments by their own name, that assignment comes back and "
-                "another user's is left out"
+                "their own role assignments filtered to one role, that assignment comes back and "
+                "neither their other role nor another user's assignment is listed"
             ),
         )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
-        return RolesAndSomeone(self_grant=(Permission.READ,), assignees=1, assigned=1)
+        return RolesAndSomeone(self_grant=(Permission.READ,), self_roles=2, assignees=1, assigned=1)
 
     @override
     def when(self) -> When[RolesAndACaller, RBACAdapter, AssignmentPage]:
