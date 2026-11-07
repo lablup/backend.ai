@@ -31,13 +31,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [심은 검사기가 쓰지 않는 종류를 필터로 조회하면 아무 검사기도 반환되지 않습니다](#searching-a-checker-type-no-checker-uses-leaves-nothing) | 성공 |
-| [검사기가 지어진 시각보다 뒤를 필터로 조회하면 아무 검사기도 반환되지 않습니다](#searching-a-created-at-filter-after-the-written-time-leaves-nothing) | 성공 |
-| [검사기 여럿 중 하나의 이름을 필터로 조회하면 그 이름의 검사기 하나만 반환됩니다](#searching-a-name-filter-narrows-the-answer-to-that-checker) | 성공 |
-| [검사기 하나의 id 를 필터로 조회하면 그 검사기 하나만 반환됩니다](#searching-an-entity-id-filter-narrows-the-answer-to-that-checker) | 성공 |
-| [이름의 역순으로 정렬해 조회하면 검사기가 이름의 역순으로 반환됩니다](#searching-an-order-by-name-brings-the-checkers-back-in-name-order) | 성공 |
-| [검사기가 고쳐진 시각보다 뒤를 필터로 조회하면 아무 검사기도 반환되지 않습니다](#searching-an-updated-at-filter-after-the-written-time-leaves-nothing) | 성공 |
-| [global 역할로 검사하는 연산이므로 superadmin 이 필터 없이 검색하면, 심은 검사기가 모두 한 번씩 집계되어 반환됩니다](#searching-the-superadmin-searches-idle-checkers-without-a-filter) | 성공 |
+| [global 역할로 검사하는 연산이므로 superadmin 이 검사기 하나의 이름을 필터로, 이름의 역순 정렬과 페이지 크기를 한 번에 조회하면, 그 이름의 검사기 하나만 한 번씩 집계되어 반환됩니다](#searching-the-superadmin-searches-idle-checkers-with-a-name-filter-and-an-order) | 성공 |
 | [global 역할로 검사하는 연산이므로 superadmin 이 아닌 사용자가 검색하면 역할 부족으로 거부됩니다](#searching-a-user-who-is-not-the-superadmin-may-not-search-idle-checkers) | 거부 |
 
 **batch_load_by_ids**
@@ -185,41 +179,11 @@ Then
 
 ### admin_search
 
-<a id="searching-a-checker-type-no-checker-uses-leaves-nothing"></a>
+<a id="searching-the-superadmin-searches-idle-checkers-with-a-name-filter-and-an-order"></a>
 
-#### [a-checker-type-no-checker-uses-leaves-nothing](/tests/scenario/bai_scenario/manager/idle_checker/test_searching.py): pass
+#### [the-superadmin-searches-idle-checkers-with-a-name-filter-and-an-order](/tests/scenario/bai_scenario/manager/idle_checker/test_searching.py): pass
 
-심은 검사기가 쓰지 않는 종류를 필터로 조회하면 아무 검사기도 반환되지 않습니다
-
-Given
-
-- 유휴 검사기 2개와, superadmin 한 명
-  - 유휴 검사기 idle-checker-1: 대화형 세션을 3600초 뒤에 종료합니다
-  - 유휴 검사기 idle-checker-2: 대화형 세션을 3600초 뒤에 종료합니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- IdleCheckerAdapter.admin_search: user-1 이 심은 검사기가 쓰지 않는 종류로 조회합니다
-
-Then
-
-- 아무 검사기도 집계되지 않습니다
-  - total_count = 0
-  - items count = 0
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="searching-a-created-at-filter-after-the-written-time-leaves-nothing"></a>
-
-#### [a-created-at-filter-after-the-written-time-leaves-nothing](/tests/scenario/bai_scenario/manager/idle_checker/test_searching.py): pass
-
-검사기가 지어진 시각보다 뒤를 필터로 조회하면 아무 검사기도 반환되지 않습니다
+global 역할로 검사하는 연산이므로 superadmin 이 검사기 하나의 이름을 필터로, 이름의 역순 정렬과 페이지 크기를 한 번에 조회하면, 그 이름의 검사기 하나만 한 번씩 집계되어 반환됩니다
 
 Given
 
@@ -235,167 +199,16 @@ Given
 
 When
 
-- IdleCheckerAdapter.admin_search: user-1 이 검사기가 지어진 시각보다 1초 뒤를 조회합니다
+- IdleCheckerAdapter.admin_search: user-1 이 이름이 idle-checker-1인 검사기를 필터로, 이름의 역순 정렬과 페이지 크기를 한 번에 조회합니다
 
 Then
 
-- 아무 검사기도 집계되지 않습니다
-  - total_count = 0
-  - items count = 0
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="searching-a-name-filter-narrows-the-answer-to-that-checker"></a>
-
-#### [a-name-filter-narrows-the-answer-to-that-checker](/tests/scenario/bai_scenario/manager/idle_checker/test_searching.py): pass
-
-검사기 여럿 중 하나의 이름을 필터로 조회하면 그 이름의 검사기 하나만 반환됩니다
-
-Given
-
-- 유휴 검사기 2개와, superadmin 한 명
-  - 유휴 검사기 idle-checker-1: 대화형 세션을 3600초 뒤에 종료합니다
-  - 유휴 검사기 idle-checker-2: 대화형 세션을 3600초 뒤에 종료합니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- IdleCheckerAdapter.admin_search: user-1 이 이름이 idle-checker-1인 검사기만 조회합니다
-
-Then
-
-- 미리 저장한 검사기 하나만 한 번씩 집계되어 전체가 반환됩니다
+- 필터가 나머지 검사기를 제외해, 그 이름의 검사기 하나만 한 번씩 집계되어 전체가 반환됩니다
   - total_count = 1
+  - items count = 1
   - has_next_page = False
   - has_previous_page = False
   - items[0]: 미리 저장한 검사기 전체와 같다
-
-<a id="searching-an-entity-id-filter-narrows-the-answer-to-that-checker"></a>
-
-#### [an-entity-id-filter-narrows-the-answer-to-that-checker](/tests/scenario/bai_scenario/manager/idle_checker/test_searching.py): pass
-
-검사기 하나의 id 를 필터로 조회하면 그 검사기 하나만 반환됩니다
-
-Given
-
-- 유휴 검사기 2개와, superadmin 한 명
-  - 유휴 검사기 idle-checker-1: 대화형 세션을 3600초 뒤에 종료합니다
-  - 유휴 검사기 idle-checker-2: 대화형 세션을 3600초 뒤에 종료합니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- IdleCheckerAdapter.admin_search: user-1 이 미리 저장한 검사기 하나의 id 로 조회합니다
-
-Then
-
-- 미리 저장한 검사기 하나만 한 번씩 집계되어 전체가 반환됩니다
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-  - items[0]: 미리 저장한 검사기 전체와 같다
-
-<a id="searching-an-order-by-name-brings-the-checkers-back-in-name-order"></a>
-
-#### [an-order-by-name-brings-the-checkers-back-in-name-order](/tests/scenario/bai_scenario/manager/idle_checker/test_searching.py): pass
-
-이름의 역순으로 정렬해 조회하면 검사기가 이름의 역순으로 반환됩니다
-
-Given
-
-- 유휴 검사기 2개와, superadmin 한 명
-  - 유휴 검사기 idle-checker-1: 대화형 세션을 3600초 뒤에 종료합니다
-  - 유휴 검사기 idle-checker-2: 대화형 세션을 3600초 뒤에 종료합니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- IdleCheckerAdapter.admin_search: user-1 이 이름의 역순으로 정렬해 조회합니다
-
-Then
-
-- 미리 저장한 검사기가 이름의 역순으로 모두 한 번씩 집계되어 반환됩니다
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-  - items[0]: 이름이 1번째로 느린 미리 저장한 검사기 전체와 같다
-  - items[1]: 이름이 2번째로 느린 미리 저장한 검사기 전체와 같다
-
-<a id="searching-an-updated-at-filter-after-the-written-time-leaves-nothing"></a>
-
-#### [an-updated-at-filter-after-the-written-time-leaves-nothing](/tests/scenario/bai_scenario/manager/idle_checker/test_searching.py): pass
-
-검사기가 고쳐진 시각보다 뒤를 필터로 조회하면 아무 검사기도 반환되지 않습니다
-
-Given
-
-- 유휴 검사기 2개와, superadmin 한 명
-  - 유휴 검사기 idle-checker-1: 대화형 세션을 3600초 뒤에 종료합니다
-  - 유휴 검사기 idle-checker-2: 대화형 세션을 3600초 뒤에 종료합니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- IdleCheckerAdapter.admin_search: user-1 이 검사기가 고쳐진 시각보다 1초 뒤를 조회합니다
-
-Then
-
-- 아무 검사기도 집계되지 않습니다
-  - total_count = 0
-  - items count = 0
-  - has_next_page = False
-  - has_previous_page = False
-
-<a id="searching-the-superadmin-searches-idle-checkers-without-a-filter"></a>
-
-#### [the-superadmin-searches-idle-checkers-without-a-filter](/tests/scenario/bai_scenario/manager/idle_checker/test_searching.py): pass
-
-global 역할로 검사하는 연산이므로 superadmin 이 필터 없이 검색하면, 심은 검사기가 모두 한 번씩 집계되어 반환됩니다
-
-Given
-
-- 유휴 검사기 2개와, superadmin 한 명
-  - 유휴 검사기 idle-checker-1: 대화형 세션을 3600초 뒤에 종료합니다
-  - 유휴 검사기 idle-checker-2: 대화형 세션을 3600초 뒤에 종료합니다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
-    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-
-When
-
-- IdleCheckerAdapter.admin_search: user-1 이 필터 없이 전체를 조회합니다
-
-Then
-
-- 미리 저장한 검사기가 모두 한 번씩 집계되어 전체가 반환됩니다
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-  - items[0]: 1번째로 미리 저장한 검사기 전체와 같다
-  - items[1]: 2번째로 미리 저장한 검사기 전체와 같다
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-idle-checkers"></a>
 

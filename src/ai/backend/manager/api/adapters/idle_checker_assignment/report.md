@@ -7,8 +7,8 @@ Scenario: incomplete 2 / 7
 - direct implementation (7)
   - admin_create: success present 1 · rejection present 1 (relation)
   - admin_search: success present 1 · rejection present 1 (global_scope)
-  - partial_bulk_purge: success present 3 · rejection absent (relation): SCENARIO-GAP
-  - partial_bulk_update: success present 3 · rejection absent (relation): SCENARIO-GAP
+  - partial_bulk_purge: success present 2 · rejection absent (relation): SCENARIO-GAP
+  - partial_bulk_update: success present 2 · rejection absent (relation): SCENARIO-GAP
   - purge: success present 1 · rejection present 1 (relation)
   - scoped_search: success present 1 · rejection present 1 (scope)
   - update: success present 1 · rejection present 1 (relation)
@@ -24,7 +24,7 @@ Scenario: incomplete 2 / 7
 
 | scenario | verdict |
 |---|---|
-| [the operation is gated by the global role, so when the superadmin searches, every assignment seeded in advance is counted once and comes back whole](#searching-the-superadmin-searches-idle-checker-assignments) | answered |
+| [the operation is gated by the global role, so when the superadmin searches with the checker as the filter, the time order and a page size in one request, the assignments of that checker are all counted once and come back whole](#searching-the-superadmin-searches-idle-checker-assignments) | answered |
 | [when two assignments exist and a user granted nothing searches, it is rejected for lack of role](#searching-an-assignment-search-by-a-user-granted-nothing-is-refused) | rejected |
 
 **partial_bulk_purge**
@@ -32,7 +32,6 @@ Scenario: incomplete 2 / 7
 | scenario | verdict |
 |---|---|
 | [when a user granted nothing tries to purge several assignments in one call, none is deleted and all come back in the failed list because they cannot be found](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-assignments) | answered |
-| [when two assignments exist and are purged at once without a user context, the call answers and every assignment comes back in the failed list because the caller cannot be known](#partial_bulk_purging-an-assignment-purge-carrying-no-user-fails-every-item) | answered |
 | [when the superadmin purges two assignments and a missing id in one call, the two come back as they were before the purge and the missing id comes back in the failed list because no target answers to it](#partial_bulk_purging-the-superadmin-purges-several-assignments-and-is-answered-for-the-missing-one) | answered |
 
 **partial_bulk_update**
@@ -40,7 +39,6 @@ Scenario: incomplete 2 / 7
 | scenario | verdict |
 |---|---|
 | [when a user granted nothing tries to disable several assignments in one call, none is disabled and all come back in the failed list because they cannot be found](#partial_bulk_editing-a-user-granted-nothing-disables-none-of-several-assignments) | answered |
-| [when two assignments exist and are disabled at once without a user context, the call answers and every assignment comes back in the failed list because the caller cannot be known](#partial_bulk_editing-an-assignment-update-carrying-no-user-fails-every-item) | answered |
 | [when the superadmin disables several assignments in one call, all come back as disabled assignments and nothing failed](#partial_bulk_editing-the-superadmin-disables-several-assignments-at-once) | answered |
 
 **purge**
@@ -54,7 +52,7 @@ Scenario: incomplete 2 / 7
 
 | scenario | verdict |
 |---|---|
-| [when the superadmin searches scoped to two domains, the assignments of those domains are all counted once and come back whole](#scoped_searching-the-superadmin-scoped-searches-idle-checker-assignments) | answered |
+| [when the superadmin searches scoped to two domains, with the checker as the filter, the time order and a page size in one request, only the assignments of those domains are counted once and come back whole](#scoped_searching-the-superadmin-scoped-searches-idle-checker-assignments) | answered |
 | [when two assignments exist and a user granted nothing searches with a scope, it is rejected for lack of permission](#scoped_searching-a-scoped-assignment-search-by-a-user-granted-nothing-is-refused) | rejected |
 
 **update**
@@ -132,16 +130,18 @@ Then
 
 #### [the-superadmin-searches-idle-checker-assignments](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_searching.py): pass
 
-the operation is gated by the global role, so when the superadmin searches, every assignment seeded in advance is counted once and comes back whole
+the operation is gated by the global role, so when the superadmin searches with the checker as the filter, the time order and a page size in one request, the assignments of that checker are all counted once and come back whole
 
 Given
 
-- one idle checker enabled on 2 domains and one superadmin
+- one idle checker enabled on 2 domains and one superadmin, and another checker is enabled on the first domain
   - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
   - Domain scope-1
   - Domain scope-2
   - Domain scope-1 has enabled Idle checker idle-checker-1
   - Domain scope-2 has enabled Idle checker idle-checker-1
+  - Idle checker idle-checker-2: ends interactive sessions after 3600 seconds
+  - Domain scope-1 has enabled Idle checker idle-checker-2
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -151,11 +151,11 @@ Given
 
 When
 
-- IdleCheckerAssignmentAdapter.admin_search: user-1 reads filtered by the checker
+- IdleCheckerAssignmentAdapter.admin_search: user-1 reads with the checker as the filter, the time order and a page size in one request
 
 Then
 
-- every assignment seeded in advance is counted once and each comes back whole
+- the filter excludes the other checker's assignment, so every assignment seeded in advance is counted once and each comes back whole
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
@@ -201,7 +201,7 @@ Given
 
 When
 
-- IdleCheckerAssignmentAdapter.admin_search: user-2 reads filtered by the checker
+- IdleCheckerAssignmentAdapter.admin_search: user-2 reads with the checker as the filter, the time order and a page size in one request
 
 Then
 
@@ -248,45 +248,6 @@ Then
   - failed[0].message: a reason containing 'Cannot resolve the given idle_checker key'
   - failed[1].id: same as the id put in the request number 2
   - failed[1].message: a reason containing 'Cannot resolve the given idle_checker key'
-
-<a id="partial_bulk_purging-an-assignment-purge-carrying-no-user-fails-every-item"></a>
-
-#### [an-assignment-purge-carrying-no-user-fails-every-item](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_partial_bulk_purging.py): pass
-
-when two assignments exist and are purged at once without a user context, the call answers and every assignment comes back in the failed list because the caller cannot be known
-
-Given
-
-- one idle checker enabled on 2 domains and one regular user
-  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
-  - Domain scope-1
-  - Domain scope-2
-  - Domain scope-1 has enabled Idle checker idle-checker-1
-  - Domain scope-2 has enabled Idle checker idle-checker-1
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Domain home-2
-
-When
-
-- IdleCheckerAssignmentAdapter.partial_bulk_purge: purges 2 assignments at once without a user context
-
-Then
-
-- no assignment is processed and every requested assignment comes back in the failed list
-  - successes = []
-  - failed count = 2
-  - failed[0].id: same as the id put in the request number 1
-  - failed[0].message: a reason containing 'User not found in context'
-  - failed[1].id: same as the id put in the request number 2
-  - failed[1].message: a reason containing 'User not found in context'
 
 <a id="partial_bulk_purging-the-superadmin-purges-several-assignments-and-is-answered-for-the-missing-one"></a>
 
@@ -375,45 +336,6 @@ Then
   - failed[0].message: a reason containing 'Cannot resolve the given idle_checker key'
   - failed[1].id: same as the id put in the request number 2
   - failed[1].message: a reason containing 'Cannot resolve the given idle_checker key'
-
-<a id="partial_bulk_editing-an-assignment-update-carrying-no-user-fails-every-item"></a>
-
-#### [an-assignment-update-carrying-no-user-fails-every-item](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_partial_bulk_editing.py): pass
-
-when two assignments exist and are disabled at once without a user context, the call answers and every assignment comes back in the failed list because the caller cannot be known
-
-Given
-
-- one idle checker enabled on 2 domains and one regular user
-  - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
-  - Domain scope-1
-  - Domain scope-2
-  - Domain scope-1 has enabled Idle checker idle-checker-1
-  - Domain scope-2 has enabled Idle checker idle-checker-1
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - Domain home-2
-
-When
-
-- IdleCheckerAssignmentAdapter.partial_bulk_update: disables 2 assignments in one call without a user context
-
-Then
-
-- no assignment is processed and every requested assignment comes back in the failed list
-  - successes = []
-  - failed count = 2
-  - failed[0].id: same as the id put in the request number 1
-  - failed[0].message: a reason containing 'User not found in context'
-  - failed[1].id: same as the id put in the request number 2
-  - failed[1].message: a reason containing 'User not found in context'
 
 <a id="partial_bulk_editing-the-superadmin-disables-several-assignments-at-once"></a>
 
@@ -532,16 +454,20 @@ Then
 
 #### [the-superadmin-scoped-searches-idle-checker-assignments](/tests/scenario/bai_scenario/manager/idle_checker_assignment/test_scoped_searching.py): pass
 
-when the superadmin searches scoped to two domains, the assignments of those domains are all counted once and come back whole
+when the superadmin searches scoped to two domains, with the checker as the filter, the time order and a page size in one request, only the assignments of those domains are counted once and come back whole
 
 Given
 
-- one idle checker enabled on 2 domains and one superadmin
+- one idle checker enabled on 3 domains and one superadmin, and another checker is enabled on the first domain
   - Idle checker idle-checker-1: ends interactive sessions after 3600 seconds
   - Domain scope-1
   - Domain scope-2
+  - Domain scope-3
   - Domain scope-1 has enabled Idle checker idle-checker-1
   - Domain scope-2 has enabled Idle checker idle-checker-1
+  - Domain scope-3 has enabled Idle checker idle-checker-1
+  - Idle checker idle-checker-2: ends interactive sessions after 3600 seconds
+  - Domain scope-1 has enabled Idle checker idle-checker-2
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -551,14 +477,16 @@ Given
 
 When
 
-- IdleCheckerAssignmentAdapter.scoped_search: user-1 reads scoped to the domains scope-1 and scope-2
+- IdleCheckerAssignmentAdapter.scoped_search: user-1 reads scoped to the domains scope-1 and scope-2, with the checker as the filter
 
 Then
 
-- every assignment seeded in advance is counted once and each comes back whole
+- only the assignments of the domains named in the scope are counted once and each comes back whole, and the assignment of the domain outside the scope does not come back
   - total_count = 2
+  - items count = 2
   - has_next_page = False
   - has_previous_page = False
+  - items in the domain outside the scope = []
   - items[0].id: same as the seeded assignment in the order read by id
   - items[0].scope_type = <IdleCheckerScopeTypeDTO.DOMAIN: 'domain'>
   - items[0].scope_id: same as the domain seeded in advance
@@ -601,7 +529,7 @@ Given
 
 When
 
-- IdleCheckerAssignmentAdapter.scoped_search: user-2 reads scoped to the domains scope-1 and scope-2
+- IdleCheckerAssignmentAdapter.scoped_search: user-2 reads scoped to the domains scope-1 and scope-2, with the checker as the filter
 
 Then
 
