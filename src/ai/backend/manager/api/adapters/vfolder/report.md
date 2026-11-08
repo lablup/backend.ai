@@ -140,7 +140,7 @@ Scenario: incomplete 5 / 30
 | scenario | verdict |
 |---|---|
 | [when a user granted deployment create in a project deploys a model vfolder they can read, the id and name of the deployment made come back](#deploying-a-user-granted-deployment-create-deploys-a-model-folder) | answered |
-| [when a user granted nothing tries to deploy a model vfolder, it is rejected for lack of permission](#deploying-a-user-granted-nothing-may-not-deploy-a-model-folder) | rejected |
+| [when a user granted folder read but not deployment create tries to deploy a model vfolder, it is rejected for lack of permission](#deploying-a-user-without-deployment-create-may-not-deploy-a-model-folder) | rejected |
 | [when a user tries to deploy a vfolder not used as a model, it is rejected as not a model folder](#deploying-deploying-a-folder-not-used-as-a-model-is-refused) | rejected |
 
 **get**
@@ -1486,7 +1486,7 @@ when a user granted deployment create in a project deploys a model vfolder they 
 
 Given
 
-- a project and a resource group to hold deployments, one model vfolder, a runtime variant and a revision preset, and one user granted deployment create in that project
+- a project and a resource group to hold deployments, one model vfolder, a runtime variant and a revision preset, and one user granted folder read and deployment create in that project
   - Domain home-1: vfolders of this domain can be placed on local:volume1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -1518,15 +1518,15 @@ Then
   - deployment_id: skipped: the database generates it
   - deployment_name: a name starting with 'folder-1'
 
-<a id="deploying-a-user-granted-nothing-may-not-deploy-a-model-folder"></a>
+<a id="deploying-a-user-without-deployment-create-may-not-deploy-a-model-folder"></a>
 
-#### [a-user-granted-nothing-may-not-deploy-a-model-folder](/tests/scenario/bai_scenario/manager/vfolder/test_deploying.py): pass
+#### [a-user-without-deployment-create-may-not-deploy-a-model-folder](/tests/scenario/bai_scenario/manager/vfolder/test_deploying.py): pass
 
-when a user granted nothing tries to deploy a model vfolder, it is rejected for lack of permission
+when a user granted folder read but not deployment create tries to deploy a model vfolder, it is rejected for lack of permission
 
 Given
 
-- a project and a resource group to hold deployments, one model vfolder, a runtime variant and a revision preset, and one user holding no permission
+- a project and a resource group to hold deployments, one model vfolder, a runtime variant and a revision preset, and one user granted folder read but not deployment create in that project
   - Domain home-1: vfolders of this domain can be placed on local:volume1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -1536,6 +1536,10 @@ Given
   - Project project-1
   - Resource group resource-group-1: uses the fifo scheduler
   - Project vfolder folder-1: is placed in the project, is ready, is used as model
+  - Grant vfolder permissions
+    - Role folder-writer-1: applies only within the scope it is granted in
+    - Role folder-writer-1: READ allowed on every vfolder
+    - regular user user-1: holds Role folder-writer-1
   - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
   - Container registry host-1: image source
   - Image image-1: x86_64 image
@@ -1558,7 +1562,7 @@ when a user tries to deploy a vfolder not used as a model, it is rejected as not
 
 Given
 
-- a project and a resource group to hold deployments, one general vfolder, a runtime variant and a revision preset, and one user granted deployment create in that project
+- a project and a resource group to hold deployments, one general vfolder, a runtime variant and a revision preset, and one user granted folder read and deployment create in that project
   - Domain home-1: vfolders of this domain can be placed on local:volume1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name

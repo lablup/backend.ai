@@ -140,7 +140,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [그 프로젝트에서 배포 생성 권한을 받은 사용자가 읽을 수 있는 모델 vfolder 로 배포를 만들면, 만들어진 배포의 id 와 이름이 응답으로 옵니다](#deploying-a-user-granted-deployment-create-deploys-a-model-folder) | 성공 |
-| [아무 권한도 받지 않은 사용자가 모델 vfolder 로 배포를 만들려 하면 권한 부족으로 거부됩니다](#deploying-a-user-granted-nothing-may-not-deploy-a-model-folder) | 거부 |
+| [폴더 읽기만 받고 배포 생성은 받지 않은 사용자가 모델 vfolder 로 배포를 만들려 하면 권한 부족으로 거부됩니다](#deploying-a-user-without-deployment-create-may-not-deploy-a-model-folder) | 거부 |
 | [모델 용도가 아닌 vfolder 로 배포를 만들려 하면 모델 폴더가 아니라는 이유로 거부됩니다](#deploying-deploying-a-folder-not-used-as-a-model-is-refused) | 거부 |
 
 **get**
@@ -1486,7 +1486,7 @@ Then
 
 Given
 
-- 배포를 놓을 프로젝트와 자원 그룹, model 용도 vfolder 하나, 런타임 종류와 리비전 프리셋, 그리고 배포를 만들 수 있는 사용자 한 명
+- 배포를 놓을 프로젝트와 자원 그룹, model 용도 vfolder 하나, 런타임 종류와 리비전 프리셋, 그리고 폴더 읽기와 배포 생성을 받은 사용자 한 명
   - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
@@ -1506,7 +1506,7 @@ Given
   - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
-  - 배포 리비전 프리셋 preset-1: 단일 노드, 복제본 하나, 롤링 업데이트, 모델 정의가 실려 있습니다
+  - 배포 리비전 프리셋 preset-1: 단일 노드, 복제본 하나, 롤링 업데이트, 모델 정의가 채워져 있다
 
 When
 
@@ -1518,15 +1518,15 @@ Then
   - deployment_id: 건너뜀: 데이터베이스가 생성합니다
   - deployment_name: 'folder-1'로 시작하는 이름
 
-<a id="deploying-a-user-granted-nothing-may-not-deploy-a-model-folder"></a>
+<a id="deploying-a-user-without-deployment-create-may-not-deploy-a-model-folder"></a>
 
-#### [a-user-granted-nothing-may-not-deploy-a-model-folder](/tests/scenario/bai_scenario/manager/vfolder/test_deploying.py): pass
+#### [a-user-without-deployment-create-may-not-deploy-a-model-folder](/tests/scenario/bai_scenario/manager/vfolder/test_deploying.py): pass
 
-아무 권한도 받지 않은 사용자가 모델 vfolder 로 배포를 만들려 하면 권한 부족으로 거부됩니다
+폴더 읽기만 받고 배포 생성은 받지 않은 사용자가 모델 vfolder 로 배포를 만들려 하면 권한 부족으로 거부됩니다
 
 Given
 
-- 배포를 놓을 프로젝트와 자원 그룹, model 용도 vfolder 하나, 런타임 종류와 리비전 프리셋, 그리고 아무 권한도 받지 않은 사용자 한 명
+- 배포를 놓을 프로젝트와 자원 그룹, model 용도 vfolder 하나, 런타임 종류와 리비전 프리셋, 그리고 폴더 읽기만 받고 배포 생성은 받지 않은 사용자 한 명
   - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
@@ -1536,10 +1536,14 @@ Given
   - 프로젝트 project-1
   - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
   - 프로젝트 vfolder folder-1: 프로젝트에 놓입니다, ready 상태입니다, model 용도입니다
+  - vfolder 권한 부여
+    - 역할 folder-writer-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 folder-writer-1: vfolder 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 folder-writer-1 보유
   - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
-  - 배포 리비전 프리셋 preset-1: 단일 노드, 복제본 하나, 롤링 업데이트, 모델 정의가 실려 있습니다
+  - 배포 리비전 프리셋 preset-1: 단일 노드, 복제본 하나, 롤링 업데이트, 모델 정의가 채워져 있다
 
 When
 
@@ -1558,7 +1562,7 @@ Then
 
 Given
 
-- 배포를 놓을 프로젝트와 자원 그룹, general 용도 vfolder 하나, 런타임 종류와 리비전 프리셋, 그리고 배포를 만들 수 있는 사용자 한 명
+- 배포를 놓을 프로젝트와 자원 그룹, general 용도 vfolder 하나, 런타임 종류와 리비전 프리셋, 그리고 폴더 읽기와 배포 생성을 받은 사용자 한 명
   - 도메인 home-1: 이 도메인의 vfolder 는 local:volume1에 놓을 수 있습니다
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
@@ -1578,7 +1582,7 @@ Given
   - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
   - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
   - 이미지 image-1: x86_64 이미지
-  - 배포 리비전 프리셋 preset-1: 단일 노드, 복제본 하나, 롤링 업데이트, 모델 정의가 실려 있습니다
+  - 배포 리비전 프리셋 preset-1: 단일 노드, 복제본 하나, 롤링 업데이트, 모델 정의가 채워져 있다
 
 When
 
