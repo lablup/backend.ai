@@ -21,7 +21,7 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRowFromThree, TestSeedShar
 class TestSeedVFolderShare(TestSeedRowFromThree[UserData, VFolderData, UserData, EntityShareData]):
     """The first person offers the folder to the second, under ``cap``."""
 
-    cap: Permission
+    cap: Permission | None = None
     name_hint: str = "share"
 
     @override
@@ -30,6 +30,11 @@ class TestSeedVFolderShare(TestSeedRowFromThree[UserData, VFolderData, UserData,
 
     @override
     def detail(self) -> str:
+        if self.cap is None:
+            return Says(
+                "권한 상한 없이 제안되었고, 아직 응답하지 않았습니다",
+                english="offered with no ceiling on the permissions, not answered yet",
+            )
         return Says(
             f"{self.cap.name} 권한으로 제안되었고, 아직 응답하지 않았습니다",
             english=f"offered under the {self.cap.name} permission, not answered yet",
