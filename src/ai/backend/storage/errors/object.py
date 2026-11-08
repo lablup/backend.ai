@@ -129,6 +129,21 @@ class ObjectStorageConfigInvalidError(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class ReservoirFilePathInvalidError(BackendAIError, web.HTTPBadRequest):
+    """Raised when a file path from Reservoir would be written outside the download path."""
+
+    error_type = "https://api.backend.ai/probs/storage/reservoir/file-path/invalid"
+    error_title = "Reservoir File Path Invalid"
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 class ReservoirStorageConfigInvalidError(BackendAIError, web.HTTPBadRequest):
     """Raised when reservoir storage config is invalid."""
 

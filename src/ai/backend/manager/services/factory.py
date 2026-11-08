@@ -372,6 +372,7 @@ def create_services(args: ServiceArgs) -> Services:
             huggingface_registry_repository=repositories.huggingface_registry.repository,
             reservoir_registry_repository=repositories.reservoir_registry.repository,
             vfolder_repository=repositories.vfolder.repository,
+            permission_check=repositories.rbac.permission_check,
             config_provider=args.config_provider,
             valkey_artifact_client=args.valkey_artifact_client,
             background_task_manager=args.background_task_manager,

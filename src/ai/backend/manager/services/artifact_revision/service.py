@@ -11,11 +11,19 @@ from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
     ArtifactRevisionDownloadProgress,
     CombinedDownloadProgress,
 )
+<<<<<<< HEAD:src/ai/backend/manager/services/artifact_revision/service.py
+=======
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.permission.types import Permission
+>>>>>>> d5a52bbe0 (fix(BA-8923): check Reservoir file paths and the target vfolder permission in artifact import (#16487)):src/ai/backend/manager/services/artifact/revision/service.py
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.data.storage.types import (
     ArtifactStorageImportStep,
@@ -29,6 +37,7 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceImportModelsReq,
     ReservoirImportModelsReq,
 )
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import VFolderID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.artifact_registry.reservoir_client import ReservoirRegistryClient
@@ -44,6 +53,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
+from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.dto.request import (
     DelegateImportArtifactsReq,
     ImportArtifactsOptions,
@@ -58,11 +68,19 @@ from ai.backend.manager.errors.artifact_registry import (
     InvalidArtifactRegistryTypeError,
 )
 from ai.backend.manager.errors.common import ServerMisconfiguredError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.storage import UnsupportedStorageTypeError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
+<<<<<<< HEAD:src/ai/backend/manager/services/artifact_revision/service.py
+=======
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.rbac.permission_check_repository import (
+    RbacPermissionCheckRepository,
+)
+>>>>>>> d5a52bbe0 (fix(BA-8923): check Reservoir file paths and the target vfolder permission in artifact import (#16487)):src/ai/backend/manager/services/artifact/revision/service.py
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
@@ -137,6 +155,7 @@ class ArtifactRevisionService:
     _huggingface_registry_repository: HuggingFaceRepository
     _reservoir_registry_repository: ReservoirRegistryRepository
     _vfolder_repository: VfolderRepository
+    _permission_check: RbacPermissionCheckRepository
     _storage_manager: StorageSessionManager
     _config_provider: ManagerConfigProvider
     _background_task_manager: BackgroundTaskManager
@@ -151,6 +170,7 @@ class ArtifactRevisionService:
         huggingface_registry_repository: HuggingFaceRepository,
         reservoir_registry_repository: ReservoirRegistryRepository,
         vfolder_repository: VfolderRepository,
+        permission_check: RbacPermissionCheckRepository,
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
         valkey_artifact_client: ValkeyArtifactDownloadTrackingClient,
@@ -164,6 +184,7 @@ class ArtifactRevisionService:
         self._huggingface_registry_repository = huggingface_registry_repository
         self._reservoir_registry_repository = reservoir_registry_repository
         self._vfolder_repository = vfolder_repository
+        self._permission_check = permission_check
         self._storage_manager = storage_manager
         self._config_provider = config_provider
         self._valkey_artifact_client = valkey_artifact_client
@@ -392,6 +413,14 @@ class ArtifactRevisionService:
     async def import_revision(
         self, action: ImportArtifactRevisionAction
     ) -> ImportArtifactRevisionActionResult:
+        # Checked before the try so that a denied caller does not mark the revision failed.
+        vfolder_id: VFolderID | None = None
+        volume_name: str | None = None
+        if action.vfolder_id:
+            vfolder_data = await self._get_updatable_vfolder(VFolderUUID(action.vfolder_id))
+            vfolder_id = VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)
+            _, volume_name = self._storage_manager.get_proxy_and_volume(vfolder_data.host)
+
         try:
             revision_data = await self._artifact_repository.get_artifact_revision_by_id(
                 action.artifact_revision_id
@@ -413,6 +442,7 @@ class ArtifactRevisionService:
 
             storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_host)
 
+<<<<<<< HEAD:src/ai/backend/manager/services/artifact_revision/service.py
             # Look up vfolder to get volume_name (host) if vfolder_id is provided
             vfolder_id: VFolderID | None = None
             volume_name: str | None = None
@@ -422,6 +452,8 @@ class ArtifactRevisionService:
                     vfolder_id = VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)
                     _, volume_name = self._storage_manager.get_proxy_and_volume(vfolder_data.host)
 
+=======
+>>>>>>> d5a52bbe0 (fix(BA-8923): check Reservoir file paths and the target vfolder permission in artifact import (#16487)):src/ai/backend/manager/services/artifact/revision/service.py
             task_id: UUID
             match artifact.registry_type:
                 case ArtifactRegistryType.HUGGINGFACE:
@@ -609,6 +641,20 @@ class ArtifactRevisionService:
             raise e
 
         return ImportArtifactRevisionActionResult(result=revision_data, task_id=task_id)
+
+    async def _get_updatable_vfolder(self, vfolder_uuid: VFolderUUID) -> VFolderData:
+        """The vfolder an import writes into, once the caller is shown to hold UPDATE on it."""
+        requester = current_user()
+        if requester is None:
+            raise UnreachableError("User context is not available")
+        held = await self._permission_check.held_permissions(
+            UserID(requester.user_id), [vfolder_uuid]
+        )
+        if not held.get(vfolder_uuid, Permission.NONE).covers(Permission.UPDATE):
+            raise NotEnoughPermission(
+                f"The caller has no update permission on vfolder {vfolder_uuid}"
+            )
+        return await self._vfolder_repository.get_by_id(vfolder_uuid)
 
     async def cleanup(
         self, action: CleanupArtifactRevisionAction
