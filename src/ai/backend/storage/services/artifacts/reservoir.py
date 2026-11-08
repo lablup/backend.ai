@@ -1,16 +1,23 @@
 import asyncio
 import logging
 import mimetypes
+import os
 import tarfile
 import tempfile
 import uuid
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
+<<<<<<< HEAD
 from pathlib import Path
+=======
+from http import HTTPStatus
+from pathlib import Path, PurePosixPath
+>>>>>>> d5a52bbe (fix(BA-8923): check Reservoir file paths and the target vfolder permission in artifact import (#16487))
 from typing import Any, Final, cast, override
 
 import aiofiles
 import aiohttp
+from pydantic import TypeAdapter, ValidationError
 
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
@@ -28,6 +35,7 @@ from ai.backend.common.data.storage.types import (
 )
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
+from ai.backend.common.typed_validators import VFolderRelativePath
 from ai.backend.common.types import DispatchResult, StreamReader
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.client.manager import ManagerHTTPClient, ManagerHTTPClientPool
@@ -45,6 +53,7 @@ from ai.backend.storage.errors import (
     StorageNotFoundError,
     StorageStepRequiredStepNotProvided,
 )
+from ai.backend.storage.errors.object import ReservoirFilePathInvalidError
 from ai.backend.storage.services.artifacts.common import ModelArchiveStep, ModelVerifyStep
 from ai.backend.storage.services.artifacts.storage_transfer import StorageTransferManager
 from ai.backend.storage.services.artifacts.types import (
@@ -60,6 +69,7 @@ from ai.backend.storage.types import BucketCopyOptions
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DOWNLOAD_PROGRESS_UPDATE_INTERVAL: Final[int] = 30
+_relative_path_adapter: Final[TypeAdapter[str]] = TypeAdapter(VFolderRelativePath)
 
 
 class ReservoirVFSDownloadStreamReader(StreamReader):
@@ -768,6 +778,7 @@ class ReservoirDownloadStep(ImportStep[None]):
 
             log.info("Found {} files to download for model: {}", len(files), model_prefix)
 
+<<<<<<< HEAD
             # Initialize artifact download tracking in Redis with all file information
             revision = context.model.resolve_revision(ArtifactRegistryType.RESERVOIR)
             file_info_list = [
@@ -779,6 +790,44 @@ class ReservoirDownloadStep(ImportStep[None]):
                 model_id=context.model.model_id,
                 revision=revision,
                 file_info_list=file_info_list,
+=======
+        log.debug("Found {} files to download for model: {}", len(files), model_prefix)
+
+        # Directories are created when the files under them are written.
+        file_entries = [file_info for file_info in files if file_info.type != "directory"]
+        # Check every path before anything is written.
+        relative_paths = [
+            self._model_relative_path(file_info.path, model_prefix) for file_info in file_entries
+        ]
+
+        # Initialize artifact download tracking in Redis with all file information
+        revision = context.model.resolve_revision(ArtifactRegistryType.RESERVOIR)
+        file_info_list = [(file_info.path, file_info.size or 0) for file_info in file_entries]
+        await self._redis_client.init_artifact_download(
+            model_id=context.model.model_id,
+            revision=revision,
+            file_info_list=file_info_list,
+        )
+
+        # Create file downloader
+        downloader = ReservoirVFSFileDownloader(
+            client=manager_client,
+            storage_name=registry_config.storage_name,
+            redis_client=self._redis_client,
+            model_id=context.model.model_id,
+            revision=revision,
+        )
+
+        # Download each file individually
+        total_bytes = 0
+        for file_info, relative_path in zip(file_entries, relative_paths, strict=True):
+            remote_file_path = file_info.path
+            local_file_path = await run_in_executor_with_context(
+                None, self._prepare_local_path, dest_path, relative_path
+            )
+            bytes_downloaded = await downloader.download_file(
+                remote_file_path, local_file_path, file_info.size or 0
+>>>>>>> d5a52bbe (fix(BA-8923): check Reservoir file paths and the target vfolder permission in artifact import (#16487))
             )
 
             # Create file downloader
@@ -820,6 +869,39 @@ class ReservoirDownloadStep(ImportStep[None]):
         except Exception as e:
             log.error("VFS download failed for {}: {!s}", model_prefix, e)
             raise
+
+    def _model_relative_path(self, remote_path: str, model_prefix: str) -> PurePosixPath:
+        """The path under the model directory that a Reservoir file is written to.
+
+        Rejects a path with a ``.`` or ``..`` segment and one that leaves the model directory.
+        """
+        if any(part in (os.curdir, os.pardir) for part in remote_path.split("/")):
+            raise ReservoirFilePathInvalidError(
+                f"The Reservoir file path has a '.' or '..' segment: {remote_path}"
+            )
+        remote = PurePosixPath(remote_path)
+        prefix = PurePosixPath(model_prefix)
+        relative = remote.relative_to(prefix) if remote.is_relative_to(prefix) else remote
+        try:
+            _relative_path_adapter.validate_python(relative.as_posix())
+        except ValidationError as e:
+            raise ReservoirFilePathInvalidError(
+                f"The Reservoir file path points outside the download path: {remote_path}"
+            ) from e
+        return relative
+
+    def _prepare_local_path(self, dest_path: Path, relative_path: PurePosixPath) -> Path:
+        """The local file path, with its parent created once no symlink is found to lead it out.
+
+        The path is resolved before any directory is created, the file itself included.
+        """
+        local_path = dest_path / relative_path
+        if not local_path.resolve().is_relative_to(dest_path.resolve()):
+            raise ReservoirFilePathInvalidError(
+                f"The Reservoir file path points outside the download path: {relative_path}"
+            )
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        return local_path
 
     async def _handle_object_storage_download(
         self,
