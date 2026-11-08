@@ -68,6 +68,8 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Test the release-grade classifier
       run: python ./scripts/test_determine_release_type.py
+    - name: Test the NEXT_RELEASE_VERSION freeze
+      run: python ./scripts/test_freeze_release_version.py
     - name: Check the changelog fragment names
       run: python ./scripts/validate-changelog-fragments.py
     - name: Check the manager package __init__ files hold no imports
