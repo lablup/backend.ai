@@ -360,9 +360,9 @@ Given
       - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
       - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 역할 public-purger-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 public-purger-1: prometheus_query_preset 전체에 HARD_DELETE 허용
-    - 일반 사용자 user-1: 역할 public-purger-1 보유
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 public-reader-1: prometheus_query_preset 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -1443,9 +1443,9 @@ Given
       - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
       - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
-    - 역할 public-updater-1: 부여된 스코프 안에서만 적용됩니다
-    - 역할 public-updater-1: prometheus_query_preset 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 public-updater-1 보유
+    - 역할 public-reader-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 public-reader-1: prometheus_query_preset 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 

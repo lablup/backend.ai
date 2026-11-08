@@ -354,15 +354,15 @@ Given
 - 1 presets and one user granted HARD_DELETE on presets
   - Query preset wanted-1
   - Domain home-1
-  - Prepare a user granted HARD_DELETE on prometheus_query_preset in public
+  - Prepare a user granted the HARD_DELETE permission on prometheus_query_preset in public
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
       - Keypair policy keypair-policy-1: up to 5 concurrent sessions
       - regular user user-1: has their own keypair and personal project
-    - Role public-purger-1: applies only within the scope it is granted in
-    - Role public-purger-1: HARD_DELETE allowed on every prometheus_query_preset
-    - regular user user-1: holds Role public-purger-1
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: HARD_DELETE allowed on every prometheus_query_preset
+    - regular user user-1: holds Role public-reader-1
 
 When
 
@@ -1437,15 +1437,15 @@ Given
 - 1 presets and one user granted UPDATE on presets
   - Query preset wanted-1
   - Domain home-1
-  - Prepare a user granted UPDATE on prometheus_query_preset in public
+  - Prepare a user granted the UPDATE permission on prometheus_query_preset in public
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
       - Keypair policy keypair-policy-1: up to 5 concurrent sessions
       - regular user user-1: has their own keypair and personal project
-    - Role public-updater-1: applies only within the scope it is granted in
-    - Role public-updater-1: UPDATE allowed on every prometheus_query_preset
-    - regular user user-1: holds Role public-updater-1
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: UPDATE allowed on every prometheus_query_preset
+    - regular user user-1: holds Role public-reader-1
 
 When
 
