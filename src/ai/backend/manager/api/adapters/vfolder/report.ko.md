@@ -1495,7 +1495,7 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 프로젝트 project-1
   - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
-  - 프로젝트 vfolder folder-1: 프로젝트에 놓입니다, ready 상태입니다, model 용도입니다
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태이며, 용도는 model 입니다
   - vfolder 권한 부여
     - 역할 folder-writer-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 folder-writer-1: vfolder 전체에 READ 허용
@@ -1535,7 +1535,7 @@ Given
     - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
   - 프로젝트 project-1
   - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
-  - 프로젝트 vfolder folder-1: 프로젝트에 놓입니다, ready 상태입니다, model 용도입니다
+  - 프로젝트 vfolder folder-1: 프로젝트에 놓이고, 사용할 수 있는 상태이며, 용도는 model 입니다
   - vfolder 권한 부여
     - 역할 folder-writer-1: 부여된 스코프 안에서만 적용됩니다
     - 역할 folder-writer-1: vfolder 전체에 READ 허용

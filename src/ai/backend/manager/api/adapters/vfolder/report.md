@@ -1495,7 +1495,7 @@ Given
     - regular user user-1: has their own keypair and personal project
   - Project project-1
   - Resource group resource-group-1: uses the fifo scheduler
-  - Project vfolder folder-1: is placed in the project, is ready, is used as model
+  - Project vfolder folder-1: is placed in the project, is ready to use, and is for model
   - Grant vfolder permissions
     - Role folder-writer-1: applies only within the scope it is granted in
     - Role folder-writer-1: READ allowed on every vfolder
@@ -1535,7 +1535,7 @@ Given
     - regular user user-1: has their own keypair and personal project
   - Project project-1
   - Resource group resource-group-1: uses the fifo scheduler
-  - Project vfolder folder-1: is placed in the project, is ready, is used as model
+  - Project vfolder folder-1: is placed in the project, is ready to use, and is for model
   - Grant vfolder permissions
     - Role folder-writer-1: applies only within the scope it is granted in
     - Role folder-writer-1: READ allowed on every vfolder
