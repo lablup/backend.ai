@@ -29,11 +29,13 @@ class TestSeedProject(TestSeedRowFromTwo[DomainData, ProjectResourcePolicyData, 
     def detail(self) -> str:
         if self.is_active and self.type is None:
             return Says("")
-        parts = []
+        parts: list[str] = []
         if not self.is_active:
             parts.append(Says("비활성 상태", english="inactive"))
         if self.type is not None:
-            parts.append(Says(f"유형은 {self.type.value}입니다", english=f"of type {self.type.value}"))
+            parts.append(
+                Says(f"유형은 {self.type.value}입니다", english=f"of type {self.type.value}")
+            )
         return joined(parts, ", ")
 
     @override
