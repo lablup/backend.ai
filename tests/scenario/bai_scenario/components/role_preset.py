@@ -22,6 +22,8 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.common.dto.manager.v2.role_permission_preset.response import (
+    BulkAddRolePermissionPresetsPayload,
+    BulkRemoveRolePermissionPresetsPayload,
     RolePermissionPresetNode,
     SearchRolePermissionPresetsPayload,
 )
@@ -85,21 +87,23 @@ class SomeoneGrantedOnPresets(TestSeedNest[Laid[UserData]]):
     @override
     def lay(self, seed: TestSeeder) -> Laid[UserData]:
         someone = seed.within(SomeoneOf(self.domain, role=self.role))
-        role = seed.creating_from(
+        granted = seed.creating_from(
             TestSeedRole(
-                lambda _: global_entity_id(GlobalEntityName.GLOBAL), name_hint="preset-reader"
+                lambda _: global_entity_id(GlobalEntityName.GLOBAL), name_hint="preset-writer"
             ),
             someone,
         )
         seed.adding(
             TestSeedPermission(entity_type=RolePresetEntityType(), permission=self.permission),
-            role,
+            granted,
         )
-        seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+        seed.granting(granted, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
         return someone
 
 
-async def _lay_caller(seeding: Any, role: UserRole, granted: Permission | None) -> Laid[UserData]:
+async def lay_a_caller_granted(
+    seeding: Any, role: UserRole, granted: Permission | None
+) -> Laid[UserData]:
     """A user of the given role, granted the permission on role presets when given."""
     home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
     if granted is not None:
@@ -108,6 +112,16 @@ async def _lay_caller(seeding: Any, role: UserRole, granted: Permission | None) 
             await seeding.within(SomeoneGrantedOnPresets(home, granted, role=role)),
         )
     return cast("Laid[UserData]", await seeding.within(SomeoneOf(home, role=role)))
+
+
+def caller_words(role: UserRole, granted: Permission | None) -> tuple[str, str]:
+    """The caller as the report words it: Korean, English."""
+    if granted is None:
+        return f"{role.value} 한 명", f"one {role.value}"
+    return (
+        f"global 에서 {granted.name} 권한을 받은 {role.value} 한 명",
+        f"one {role.value} granted {granted.name} in global",
+    )
 
 
 @dataclass(frozen=True)
@@ -148,26 +162,15 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
 
     @override
     def describe(self) -> str:
-        role = self.role.value
-        if self.granted is not None:
-            if self.scope_type == ProjectEntityType():
-                base_ko = "이미 있는 프리셋 하나와"
-                base_en = "one preset that already exists and"
-            else:
-                base_ko = f"이미 있는 {self.scope_type} 스코프 프리셋 하나와"
-                base_en = f"one preset that already exists in the {self.scope_type} scope and"
-            return Says(
-                f"{base_ko}, global 에서 {self.granted.name} 권한을 받은 {role} 한 명",
-                english=f"{base_en} one {role} granted {self.granted.name} in global",
-            )
+        ko, en = caller_words(self.role, self.granted)
         if self.scope_type == ProjectEntityType():
             return Says(
-                f"이미 있는 프리셋 하나와, {role} 한 명",
-                english=f"one preset that already exists and one {role}",
+                f"이미 있는 프리셋 하나와, {ko}",
+                english=f"one preset that already exists and {en}",
             )
         return Says(
-            f"이미 있는 {self.scope_type} 스코프 프리셋 하나와, {role} 한 명",
-            english=f"one preset that already exists in the {self.scope_type} scope and one {role}",
+            f"이미 있는 {self.scope_type} 스코프 프리셋 하나와, {ko}",
+            english=f"one preset that already exists in the {self.scope_type} scope and {en}",
         )
 
     @override
@@ -180,7 +183,7 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
                 role_name_template=self.role_name_template,
             )
         )
-        caller = await _lay_caller(seeding, self.role, self.granted)
+        caller = await lay_a_caller_granted(seeding, self.role, self.granted)
         return APresetAndACaller(preset=seeding.made(preset), caller=seeding.made(caller))
 
 
@@ -189,20 +192,21 @@ class AProjectAndADomainPresetAndSomeone(Given[Any, ManyPresetsAndACaller]):
     """프로젝트 스코프 프리셋 하나, 도메인 스코프 프리셋 하나와, 호출자 한 명."""
 
     role: UserRole = UserRole.USER
+    granted: Permission | None = None
 
     @override
     def describe(self) -> str:
-        role = self.role.value
+        ko, en = caller_words(self.role, self.granted)
         return Says(
-            f"프로젝트 스코프 프리셋과 도메인 스코프 프리셋 하나씩과, {role} 한 명",
-            english=(f"one project-scope preset, one domain-scope preset, and one {role}"),
+            f"프로젝트 스코프 프리셋과 도메인 스코프 프리셋 하나씩과, {ko}",
+            english=f"one project-scope preset, one domain-scope preset, and {en}",
         )
 
     @override
     async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
         project = await seeding.creating(TestSeedRolePreset())
         domain = await seeding.creating(TestSeedRolePreset(scope_type=DomainEntityType()))
-        caller = await _lay_caller(seeding, self.role, None)
+        caller = await lay_a_caller_granted(seeding, self.role, self.granted)
         return ManyPresetsAndACaller(
             laid=(seeding.made(project), seeding.made(domain)), caller=seeding.made(caller)
         )
@@ -218,23 +222,16 @@ class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
 
     @override
     def describe(self) -> str:
-        role = self.role.value
-        if self.granted is not None:
-            return Says(
-                f"프리셋 {self.count}개와, global 에서 {self.granted.name} 권한을 받은 {role} 한 명",
-                english=(
-                    f"{self.count} presets and one {role} granted {self.granted.name} in global"
-                ),
-            )
+        ko, en = caller_words(self.role, self.granted)
         return Says(
-            f"프리셋 {self.count}개와, {role} 한 명",
-            english=f"{self.count} presets and one {role}",
+            f"프리셋 {self.count}개와, {ko}",
+            english=f"{self.count} presets and {en}",
         )
 
     @override
     async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
         laid = [await seeding.creating(TestSeedRolePreset()) for _ in range(self.count)]
-        caller = await _lay_caller(seeding, self.role, self.granted)
+        caller = await lay_a_caller_granted(seeding, self.role, self.granted)
         return ManyPresetsAndACaller(
             laid=tuple(seeding.made(one) for one in laid), caller=seeding.made(caller)
         )
@@ -249,19 +246,10 @@ class APresetWithEntriesAndSomeone(Given[Any, APresetWithEntriesAndACaller]):
 
     @override
     def describe(self) -> str:
-        role = self.role.value
-        if self.granted is not None:
-            return Says(
-                f"권한 항목 둘을 가진 프리셋 하나와, "
-                f"global 에서 {self.granted.name} 권한을 받은 {role} 한 명",
-                english=(
-                    "one preset with two permission entries and one "
-                    f"{role} granted {self.granted.name} in global"
-                ),
-            )
+        ko, en = caller_words(self.role, self.granted)
         return Says(
-            f"권한 항목 둘을 가진 프리셋 하나와, {role} 한 명",
-            english=f"one preset with two permission entries and one {role}",
+            f"권한 항목 둘을 가진 프리셋 하나와, {ko}",
+            english=f"one preset with two permission entries and {en}",
         )
 
     @override
@@ -275,7 +263,7 @@ class APresetWithEntriesAndSomeone(Given[Any, APresetWithEntriesAndACaller]):
                 TestSeedRolePresetPermission(ProjectEntityType(), Permission.UPDATE), preset
             ),
         ]
-        caller = await _lay_caller(seeding, self.role, self.granted)
+        caller = await lay_a_caller_granted(seeding, self.role, self.granted)
         return APresetWithEntriesAndACaller(
             preset=seeding.made(preset),
             entries=tuple(seeding.made(one) for one in entries),
@@ -295,13 +283,12 @@ class PresetLook:
 
     def verdicts(self, at: str, node: RolePresetNode, seeded: RolePresetData) -> list[Verdict]:
         written = WrittenByThisRun(self.started)
-        owner_assign: list[Verdict] = (
-            [Same(f"{at}auto_assign_to_owner", node.auto_assign_to_owner, True)]
-            if self.auto_assign_to_owner
-            else []
+        deleted_at: list[Verdict] = (
+            [Held(f"{at}deleted_at", node.deleted_at, written)]
+            if self.deleted
+            else [Same(f"{at}deleted_at", node.deleted_at, None)]
         )
         return [
-            *owner_assign,
             Held[UUID](
                 f"{at}id",
                 node.id,
@@ -331,7 +318,18 @@ class PresetLook:
                 node.auto_assign,
                 self.auto_assign if self.auto_assign is not None else seeded.auto_assign,
             ),
+            Same(f"{at}role_name_template", node.role_name_template, seeded.role_name_template),
+            Same(
+                f"{at}auto_assign_to_owner",
+                node.auto_assign_to_owner,
+                (
+                    self.auto_assign_to_owner
+                    if self.auto_assign_to_owner is not None
+                    else seeded.auto_assign_to_owner
+                ),
+            ),
             Same(f"{at}deleted", node.deleted, self.deleted),
+            *deleted_at,
             Held(f"{at}created_at", node.created_at, written),
             Held(f"{at}updated_at", node.updated_at, written),
         ]
@@ -463,7 +461,7 @@ class OnlyTheFirstPresetComesBack(Then[ManyPresetsAndACaller, PartialBulkPayload
         for node in payload.successes:
             verdicts += self.expected.verdicts("successes[0].", node, laid.laid[0])
         for failure in payload.failed:
-            verdicts.append(
+            verdicts += [
                 Held[UUID](
                     "failed[0].id",
                     failure.id,
@@ -471,8 +469,9 @@ class OnlyTheFirstPresetComesBack(Then[ManyPresetsAndACaller, PartialBulkPayload
                         laid.laid[1].id,
                         Says("두 번째 프리셋의 id", english="the id of the second preset"),
                     ),
-                )
-            )
+                ),
+                Held("failed[0].message", failure.message, Mentions("Only a project role preset")),
+            ]
         return verdicts
 
 
@@ -538,35 +537,45 @@ class TheEntriesAreAdded(Then[APresetAndACaller, list[RolePermissionPresetNode]]
         items = answered.response
         if items is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        written = WrittenByThisRun(self.started)
-        got = sorted(items, key=lambda one: str(one.entity_type))
-        verdicts: list[Verdict] = [Same("items count", len(items), len(ENTRIES))]
-        for i, (node, (entity_type, permission)) in enumerate(zip(got, ENTRIES, strict=False)):
-            verdicts += [
-                Skipped(
-                    f"items[{i}].id",
-                    Says("데이터베이스가 생성합니다", english="the database generates it"),
-                ),
-                Skipped(
-                    f"items[{i}].field_id",
-                    Says("데이터베이스가 생성합니다", english="the database generates it"),
-                ),
-                Held[UUID](
-                    f"items[{i}].role_preset_id",
-                    node.role_preset_id,
-                    SameAs(
-                        laid.preset.id,
-                        Says(
-                            "미리 저장한 프리셋의 id",
-                            english="the id of the preset seeded in advance",
-                        ),
+        return added_entry_verdicts("items", laid, items, self.started)
+
+
+def added_entry_verdicts(
+    at: str,
+    laid: APresetAndACaller,
+    items: list[RolePermissionPresetNode],
+    started: datetime,
+) -> list[Verdict]:
+    """넣은 항목 노드들을 요청한 항목과 맞춰 본다."""
+    written = WrittenByThisRun(started)
+    got = sorted(items, key=lambda one: str(one.entity_type))
+    verdicts: list[Verdict] = [Same(f"{at} count", len(items), len(ENTRIES))]
+    for i, (node, (entity_type, permission)) in enumerate(zip(got, ENTRIES, strict=False)):
+        verdicts += [
+            Skipped(
+                f"{at}[{i}].id",
+                Says("데이터베이스가 생성합니다", english="the database generates it"),
+            ),
+            Skipped(
+                f"{at}[{i}].field_id",
+                Says("데이터베이스가 생성합니다", english="the database generates it"),
+            ),
+            Held[UUID](
+                f"{at}[{i}].role_preset_id",
+                node.role_preset_id,
+                SameAs(
+                    laid.preset.id,
+                    Says(
+                        "미리 저장한 프리셋의 id",
+                        english="the id of the preset seeded in advance",
                     ),
                 ),
-                Same(f"items[{i}].entity_type", str(node.entity_type), entity_type),
-                Same(f"items[{i}].permission", node.permission, permission),
-                Held(f"items[{i}].created_at", node.created_at, written),
-            ]
-        return verdicts
+            ),
+            Same(f"{at}[{i}].entity_type", str(node.entity_type), entity_type),
+            Same(f"{at}[{i}].permission", node.permission, permission),
+            Held(f"{at}[{i}].created_at", node.created_at, written),
+        ]
+    return verdicts
 
 
 @dataclass(frozen=True)
@@ -596,62 +605,7 @@ class TheEntriesAreRemoved(
         payload = answered.response
         if payload is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        got = sorted(payload.successes, key=lambda one: str(one.entity_type))
-        wanted = sorted(laid.entries, key=lambda one: str(one.entity_type))
-        verdicts: list[Verdict] = [Same("successes count", len(got), len(wanted))]
-        for i, (node, entry) in enumerate(zip(got, wanted, strict=False)):
-            verdicts += [
-                Held[UUID](
-                    f"successes[{i}].id",
-                    node.id,
-                    SameAs(
-                        entry.id,
-                        Says(
-                            "미리 저장한 항목의 id",
-                            english="the id of the entry seeded in advance",
-                        ),
-                    ),
-                ),
-                Held[UUID](
-                    f"successes[{i}].field_id",
-                    node.field_id,
-                    SameAs(
-                        entry.id,
-                        Says(
-                            "미리 저장한 항목의 id",
-                            english="the id of the entry seeded in advance",
-                        ),
-                    ),
-                ),
-                Held[UUID](
-                    f"successes[{i}].role_preset_id",
-                    node.role_preset_id,
-                    SameAs(
-                        laid.preset.id,
-                        Says(
-                            "미리 저장한 프리셋의 id",
-                            english="the id of the preset seeded in advance",
-                        ),
-                    ),
-                ),
-                Same(f"successes[{i}].entity_type", str(node.entity_type), str(entry.entity_type)),
-                Same(
-                    f"successes[{i}].permission",
-                    node.permission,
-                    PermissionBitDTO.of(entry.permission),
-                ),
-                Held[datetime](
-                    f"successes[{i}].created_at",
-                    node.created_at,
-                    SameAs(
-                        entry.created_at,
-                        Says(
-                            "미리 저장한 항목의 시각",
-                            english="the time of the entry seeded in advance",
-                        ),
-                    ),
-                ),
-            ]
+        verdicts = removed_entry_verdicts("successes", laid, payload.successes)
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
@@ -664,6 +618,165 @@ class TheEntriesAreRemoved(
                     ),
                 ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
+            ]
+        return verdicts
+
+
+def removed_entry_verdicts(
+    at: str,
+    laid: APresetWithEntriesAndACaller,
+    nodes: list[RolePermissionPresetNode],
+) -> list[Verdict]:
+    """뺀 항목 노드들을 미리 저장한 항목과 맞춰 본다."""
+    got = sorted(nodes, key=lambda one: str(one.entity_type))
+    wanted = sorted(laid.entries, key=lambda one: str(one.entity_type))
+    verdicts: list[Verdict] = [Same(f"{at} count", len(got), len(wanted))]
+    for i, (node, entry) in enumerate(zip(got, wanted, strict=False)):
+        verdicts += [
+            Held[UUID](
+                f"{at}[{i}].id",
+                node.id,
+                SameAs(
+                    entry.id,
+                    Says(
+                        "미리 저장한 항목의 id",
+                        english="the id of the entry seeded in advance",
+                    ),
+                ),
+            ),
+            Held[UUID](
+                f"{at}[{i}].field_id",
+                node.field_id,
+                SameAs(
+                    entry.id,
+                    Says(
+                        "미리 저장한 항목의 id",
+                        english="the id of the entry seeded in advance",
+                    ),
+                ),
+            ),
+            Held[UUID](
+                f"{at}[{i}].role_preset_id",
+                node.role_preset_id,
+                SameAs(
+                    laid.preset.id,
+                    Says(
+                        "미리 저장한 프리셋의 id",
+                        english="the id of the preset seeded in advance",
+                    ),
+                ),
+            ),
+            Same(f"{at}[{i}].entity_type", str(node.entity_type), str(entry.entity_type)),
+            Same(
+                f"{at}[{i}].permission",
+                node.permission,
+                PermissionBitDTO.of(entry.permission),
+            ),
+            Held[datetime](
+                f"{at}[{i}].created_at",
+                node.created_at,
+                SameAs(
+                    entry.created_at,
+                    Says(
+                        "미리 저장한 항목의 시각",
+                        english="the time of the entry seeded in advance",
+                    ),
+                ),
+            ),
+        ]
+    return verdicts
+
+
+@dataclass(frozen=True)
+class TheEntriesAreAddedInBulk(Then[APresetAndACaller, BulkAddRolePermissionPresetsPayload]):
+    """넣은 항목이 요청한 순서대로 오고, 실패한 항목은 없다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "추가한 두 항목이 프리셋 아래에 오고, 실패한 항목은 없습니다",
+            english="the two entries added come back under the preset, and none failed",
+        )
+
+    @override
+    def look(
+        self, laid: APresetAndACaller, answered: Answered[BulkAddRolePermissionPresetsPayload]
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        return [
+            *added_entry_verdicts("items", laid, payload.items, self.started),
+            Same("failed", payload.failed, []),
+        ]
+
+
+@dataclass(frozen=True)
+class TheEntriesAreRemovedInBulk(
+    Then[APresetWithEntriesAndACaller, BulkRemoveRolePermissionPresetsPayload]
+):
+    """뺀 항목이 모두 오고, 실패한 항목은 없다."""
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "제거한 두 항목이 모두 오고, 실패한 항목은 없습니다",
+            english="the two entries removed come back, and none failed",
+        )
+
+    @override
+    def look(
+        self,
+        laid: APresetWithEntriesAndACaller,
+        answered: Answered[BulkRemoveRolePermissionPresetsPayload],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        return [
+            *removed_entry_verdicts("items", laid, payload.items),
+            Same("failed", payload.failed, []),
+        ]
+
+
+@dataclass(frozen=True)
+class NothingIsRemovedInBulk(
+    Then[APresetWithEntriesAndACaller, BulkRemoveRolePermissionPresetsPayload]
+):
+    """뺀 것 없이, 항목이 모두 같은 이유로 실패 목록에 온다."""
+
+    reason: str
+
+    @override
+    def says(self) -> str:
+        return Says(
+            "제거된 것 없이 항목이 모두 실패 목록에 옵니다",
+            english="nothing is removed and every entry comes back in the failed list",
+        )
+
+    @override
+    def look(
+        self,
+        laid: APresetWithEntriesAndACaller,
+        answered: Answered[BulkRemoveRolePermissionPresetsPayload],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        verdicts: list[Verdict] = [
+            Same("items", payload.items, []),
+            Same("failed count", len(payload.failed), len(laid.entries)),
+        ]
+        for i, (failure, entry) in enumerate(zip(payload.failed, laid.entries, strict=False)):
+            verdicts += [
+                Held[UUID](
+                    f"failed[{i}].permission_preset_id",
+                    failure.permission_preset_id,
+                    SameAs(entry.id, Says("항목의 id", english="the id of the entry")),
+                ),
+                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]
         return verdicts
 
@@ -845,7 +958,7 @@ class ProjectPresetsAndADomainOne(Given[Any, PresetsToFind]):
     async def lay(self, seeding: Any) -> PresetsToFind:
         matching = [await seeding.creating(TestSeedRolePreset()) for _ in range(2)]
         filtered_out = await seeding.creating(TestSeedRolePreset(scope_type=DomainEntityType()))
-        caller = await _lay_caller(seeding, self.role, None)
+        caller = await lay_a_caller_granted(seeding, self.role, None)
         return PresetsToFind(
             matching=tuple(seeding.made(one) for one in matching),
             filtered_out=seeding.made(filtered_out),
@@ -934,7 +1047,7 @@ class PresetEntriesForSearchAndSomeone(Given[Any, PresetEntriesToFind]):
         outside_preset = await seeding.adding(
             TestSeedRolePresetPermission(ProjectEntityType(), Permission.READ), other
         )
-        caller = await _lay_caller(seeding, self.role, self.granted)
+        caller = await lay_a_caller_granted(seeding, self.role, self.granted)
         return PresetEntriesToFind(
             preset=seeding.made(preset),
             matching=(seeding.made(domain_read), seeding.made(project_read)),

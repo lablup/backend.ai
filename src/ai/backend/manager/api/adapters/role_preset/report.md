@@ -2,7 +2,7 @@
 
 [background](/src/ai/backend/manager/api/adapters/role_preset/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/role_preset/adapter.py)
 
-Scenario: incomplete 11 / 21
+Scenario: incomplete 9 / 21
 
 - built from ops (14)
   - batch_load_by_ids: representative success ✓ · representative rejection ✓
@@ -21,11 +21,11 @@ Scenario: incomplete 11 / 21
   - search_permission_presets: representative success ✓ · representative rejection ✓
 - direct implementation (7)
   - atomic_bulk_add_permissions: success present 1 · rejection present 1 (single_entity)
-  - bulk_add_permissions: success absent · rejection absent (single_entity): SCENARIO-GAP
-  - bulk_remove_permissions: success absent · rejection absent (partial_bulk_field): SCENARIO-GAP
-  - create: success present 1 · rejection absent (scope): SCENARIO-GAP
+  - bulk_add_permissions: success present 1 · rejection present 2 (single_entity)
+  - bulk_remove_permissions: success present 2 · rejection absent (partial_bulk_field): SCENARIO-GAP
+  - create: success present 1 · rejection present 2 (scope)
   - partial_bulk_remove_permissions: success present 2 · rejection absent (partial_bulk_field): SCENARIO-GAP
-  - partial_bulk_update: success present 3 · rejection absent (partial_bulk): SCENARIO-GAP
+  - partial_bulk_update: success present 4 · rejection absent (partial_bulk): SCENARIO-GAP
   - update: success present 2 · rejection present 2 (single_entity)
 
 **batch_load_by_ids**
@@ -111,26 +111,44 @@ Scenario: incomplete 11 / 21
 | [when the superadmin adds two permission entries to a preset that has none, the two entries added come back under the preset](#permission_editing-the-superadmin-adds-entries-to-a-preset) | answered |
 | [when a user granted nothing tries to add permission entries to a preset, it is rejected for lack of permission](#permission_editing-a-user-granted-nothing-may-not-add-entries) | rejected |
 
+**bulk_add_permissions**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted update on presets adds two permission entries to a preset that has none, the two entries added come back under the preset and none failed](#bulk_permission_editing-a-user-granted-update-adds-entries-in-bulk) | answered |
+| [when a user granted only read on presets tries to add permission entries to a preset, it is rejected for lack of permission](#bulk_permission_editing-a-user-without-update-may-not-add-entries-in-bulk) | rejected |
+| [when a user granted update on presets adds permission entries a preset already has, it is rejected as an entry conflict](#bulk_permission_editing-an-entry-already-there-is-refused-in-bulk) | rejected |
+
+**bulk_remove_permissions**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted update on presets removes two permission entries at once, the two entries removed come back and none failed](#bulk_permission_editing-a-user-granted-update-removes-entries-in-bulk) | answered |
+| [when a user granted only read on presets tries to remove several permission entries at once, none is removed and every one comes back in the failed list for lack of permission](#bulk_permission_editing-a-user-without-update-removes-none-of-the-entries-in-bulk) | answered |
+
 **create**
 
 | scenario | verdict |
 |---|---|
-| [creating a project-scope preset with owner assignment on brings it back turned on](#creating-a-project-preset-is-made-with-owner-assign) | answered |
+| [when a user granted create on presets fills every optional field and creates a preset, the whole preset carrying those values comes back](#creating-a-user-granted-create-makes-a-preset) | answered |
+| [when a user granted create on presets creates a preset under the name and scope of one that already exists, it is rejected as a name conflict](#creating-a-taken-name-is-refused) | rejected |
+| [when a user granted only read on presets tries to create a preset, it is rejected for lack of permission](#creating-a-user-without-create-may-not-make-a-preset) | rejected |
 
 **partial_bulk_remove_permissions**
 
 | scenario | verdict |
 |---|---|
-| [when a user granted nothing tries to remove several permission entries at once, none is removed and every one comes back in the failed list for lack of permission](#permission_editing-a-user-granted-nothing-removes-none-of-the-entries) | answered |
-| [when the superadmin removes two permission entries and one missing id at once, the two come back in the processed list and the missing id comes back in the failed list](#permission_editing-removing-entries-answers-for-the-missing-one) | answered |
+| [when a user granted only read on presets tries to remove several permission entries at once, none is removed and every one comes back in the failed list for lack of permission](#permission_editing-a-user-without-update-removes-none-of-the-entries) | answered |
+| [when a user granted update on presets removes two permission entries and one missing id at once, the two come back in the processed list and the missing id comes back in the failed list](#permission_editing-removing-entries-answers-for-the-missing-one) | answered |
 
 **partial_bulk_update**
 
 | scenario | verdict |
 |---|---|
-| [when a user granted nothing tries to edit several presets at once, none is edited and every one comes back in the failed list for lack of permission](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | answered |
+| [when a user granted update on presets renames a preset to a name already taken in the same scope, nothing is edited and the preset comes back in the failed list because the name is taken](#partial_bulk_editing-a-taken-name-fails-the-rename) | answered |
+| [when a user granted update on presets turns auto assign on for several presets at once, all of them come back with the new value and nothing failed](#partial_bulk_editing-a-user-granted-update-edits-several-presets-at-once) | answered |
+| [when a user granted only read on presets tries to edit several presets at once, none is edited and every one comes back in the failed list for lack of permission](#partial_bulk_editing-a-user-without-update-edits-none-of-several-presets) | answered |
 | [turning on owner assignment of project-scope and domain-scope presets at once edits only the project-scope preset, and the domain-scope preset comes back in the failed list](#partial_bulk_editing-only-the-project-preset-takes-owner-assign) | answered |
-| [when the superadmin turns auto assign on for several presets at once, all of them come back with the new value and nothing failed](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | answered |
 
 **update**
 
@@ -161,9 +179,9 @@ Given
       - User resource policy user-policy-1: up to 10 folders per user
       - Keypair policy keypair-policy-1: up to 5 concurrent sessions
       - regular user user-1: has their own keypair and personal project
-    - Role preset-reader-1: applies only within the scope it is granted in
-    - Role preset-reader-1: READ allowed on every role_preset
-    - regular user user-1: holds Role preset-reader-1
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: READ allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
 
 When
 
@@ -246,9 +264,9 @@ Given
       - User resource policy user-policy-1: up to 10 folders per user
       - Keypair policy keypair-policy-1: up to 5 concurrent sessions
       - regular user user-1: has their own keypair and personal project
-    - Role preset-reader-1: applies only within the scope it is granted in
-    - Role preset-reader-1: READ allowed on every role_preset
-    - regular user user-1: holds Role preset-reader-1
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: READ allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
 
 When
 
@@ -332,7 +350,10 @@ Then
   - name = 'preset-1'
   - scope_type = 'project'
   - auto_assign = False
+  - role_name_template = None
+  - auto_assign_to_owner = False
   - deleted = True
+  - deleted_at: the time this run wrote
   - created_at: the time this run wrote
   - updated_at: the time this run wrote
 
@@ -381,9 +402,9 @@ Given
       - User resource policy user-policy-1: up to 10 folders per user
       - Keypair policy keypair-policy-1: up to 5 concurrent sessions
       - regular user user-1: has their own keypair and personal project
-    - Role preset-reader-1: applies only within the scope it is granted in
-    - Role preset-reader-1: READ allowed on every role_preset
-    - regular user user-1: holds Role preset-reader-1
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: READ allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
 
 When
 
@@ -495,7 +516,10 @@ Then
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
   - successes[0].auto_assign = False
+  - successes[0].role_name_template = None
+  - successes[0].auto_assign_to_owner = False
   - successes[0].deleted = True
+  - successes[0].deleted_at: the time this run wrote
   - successes[0].created_at: the time this run wrote
   - successes[0].updated_at: the time this run wrote
   - successes[1].id: same as the id of the preset seeded in advance
@@ -503,7 +527,10 @@ Then
   - successes[1].name = 'preset-2'
   - successes[1].scope_type = 'project'
   - successes[1].auto_assign = False
+  - successes[1].role_name_template = None
+  - successes[1].auto_assign_to_owner = False
   - successes[1].deleted = True
+  - successes[1].deleted_at: the time this run wrote
   - successes[1].created_at: the time this run wrote
   - successes[1].updated_at: the time this run wrote
   - failed count = 1
@@ -575,7 +602,10 @@ Then
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
   - successes[0].auto_assign = False
+  - successes[0].role_name_template = None
+  - successes[0].auto_assign_to_owner = False
   - successes[0].deleted = False
+  - successes[0].deleted_at = None
   - successes[0].created_at: the time this run wrote
   - successes[0].updated_at: the time this run wrote
   - successes[1].id: same as the id of the preset seeded in advance
@@ -583,7 +613,10 @@ Then
   - successes[1].name = 'preset-2'
   - successes[1].scope_type = 'project'
   - successes[1].auto_assign = False
+  - successes[1].role_name_template = None
+  - successes[1].auto_assign_to_owner = False
   - successes[1].deleted = False
+  - successes[1].deleted_at = None
   - successes[1].created_at: the time this run wrote
   - successes[1].updated_at: the time this run wrote
   - failed count = 1
@@ -623,7 +656,10 @@ Then
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
   - successes[0].auto_assign = False
+  - successes[0].role_name_template = None
+  - successes[0].auto_assign_to_owner = False
   - successes[0].deleted = False
+  - successes[0].deleted_at = None
   - successes[0].created_at: the time this run wrote
   - successes[0].updated_at: the time this run wrote
   - successes[1].id: same as the id of the preset seeded in advance
@@ -631,7 +667,10 @@ Then
   - successes[1].name = 'preset-2'
   - successes[1].scope_type = 'project'
   - successes[1].auto_assign = False
+  - successes[1].role_name_template = None
+  - successes[1].auto_assign_to_owner = False
   - successes[1].deleted = False
+  - successes[1].deleted_at = None
   - successes[1].created_at: the time this run wrote
   - successes[1].updated_at: the time this run wrote
   - failed = []
@@ -667,7 +706,10 @@ Then
   - name = 'preset-1'
   - scope_type = 'project'
   - auto_assign = False
+  - role_name_template = None
+  - auto_assign_to_owner = False
   - deleted = False
+  - deleted_at = None
   - created_at: the time this run wrote
   - updated_at: the time this run wrote
 
@@ -728,7 +770,10 @@ Then
   - name = 'preset-1'
   - scope_type = 'project'
   - auto_assign = False
+  - role_name_template = None
+  - auto_assign_to_owner = False
   - deleted = False
+  - deleted_at = None
   - created_at: the time this run wrote
   - updated_at: the time this run wrote
 
@@ -854,9 +899,9 @@ Given
       - User resource policy user-policy-1: up to 10 folders per user
       - Keypair policy keypair-policy-1: up to 5 concurrent sessions
       - regular user user-1: has their own keypair and personal project
-    - Role preset-reader-1: applies only within the scope it is granted in
-    - Role preset-reader-1: READ allowed on every role_preset
-    - regular user user-1: holds Role preset-reader-1
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: READ allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
 
 When
 
@@ -973,54 +1018,321 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-### create
+### bulk_add_permissions
 
-<a id="creating-a-project-preset-is-made-with-owner-assign"></a>
+<a id="bulk_permission_editing-a-user-granted-update-adds-entries-in-bulk"></a>
 
-#### [a-project-preset-is-made-with-owner-assign](/tests/scenario/bai_scenario/manager/role_preset/test_creating.py): pass
+#### [a-user-granted-update-adds-entries-in-bulk](/tests/scenario/bai_scenario/manager/role_preset/test_bulk_permission_editing.py): pass
 
-creating a project-scope preset with owner assignment on brings it back turned on
+when a user granted update on presets adds two permission entries to a preset that has none, the two entries added come back under the preset and none failed
 
 Given
 
-- one superadmin
+- one preset that already exists and one user granted UPDATE in global
+  - Role preset preset-1: for the project scope, with automatic grant disabled
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted the UPDATE permission on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: UPDATE allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
 
 When
 
-- RolePresetAdapter.create: user-1 creates a project-scope preset with owner assignment on
+- RolePresetAdapter.bulk_add_permissions: user-1 adds 2 permission entries to preset-1
 
 Then
 
-- the preset with owner assignment turned on comes back
-  - name = 'made-preset'
-  - auto_assign_to_owner = True
+- the two entries added come back under the preset, and none failed
+  - items count = 2
+  - items[0].id: skipped: the database generates it
+  - items[0].field_id: skipped: the database generates it
+  - items[0].role_preset_id: same as the id of the preset seeded in advance
+  - items[0].entity_type = 'domain'
+  - items[0].permission = <PermissionBitDTO.READ: 'read'>
+  - items[0].created_at: the time this run wrote
+  - items[1].id: skipped: the database generates it
+  - items[1].field_id: skipped: the database generates it
+  - items[1].role_preset_id: same as the id of the preset seeded in advance
+  - items[1].entity_type = 'project'
+  - items[1].permission = <PermissionBitDTO.UPDATE: 'update'>
+  - items[1].created_at: the time this run wrote
+  - failed = []
 
-### partial_bulk_remove_permissions
+<a id="bulk_permission_editing-a-user-without-update-may-not-add-entries-in-bulk"></a>
 
-<a id="permission_editing-a-user-granted-nothing-removes-none-of-the-entries"></a>
+#### [a-user-without-update-may-not-add-entries-in-bulk](/tests/scenario/bai_scenario/manager/role_preset/test_bulk_permission_editing.py): pass
 
-#### [a-user-granted-nothing-removes-none-of-the-entries](/tests/scenario/bai_scenario/manager/role_preset/test_permission_editing.py): pass
-
-when a user granted nothing tries to remove several permission entries at once, none is removed and every one comes back in the failed list for lack of permission
+when a user granted only read on presets tries to add permission entries to a preset, it is rejected for lack of permission
 
 Given
 
-- one preset with two permission entries and one user
+- one preset that already exists and one user granted READ in global
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare a user granted the READ permission on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: READ allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
+
+When
+
+- RolePresetAdapter.bulk_add_permissions: user-1 adds 2 permission entries to preset-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="bulk_permission_editing-an-entry-already-there-is-refused-in-bulk"></a>
+
+#### [an-entry-already-there-is-refused-in-bulk](/tests/scenario/bai_scenario/manager/role_preset/test_bulk_permission_editing.py): pass
+
+when a user granted update on presets adds permission entries a preset already has, it is rejected as an entry conflict
+
+Given
+
+- one preset with two permission entries and one user granted UPDATE in global
   - Role preset preset-1: for the project scope, with automatic grant disabled
   - Role preset preset-1: READ allowed on every domain
   - Role preset preset-1: UPDATE allowed on every project
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the UPDATE permission on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: UPDATE allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
+
+When
+
+- RolePresetAdapter.bulk_add_permissions: user-1 adds 2 permission entries to preset-1
+
+Then
+
+- the call is rejected
+  - rejected: RolePermissionPresetConflict
+
+### bulk_remove_permissions
+
+<a id="bulk_permission_editing-a-user-granted-update-removes-entries-in-bulk"></a>
+
+#### [a-user-granted-update-removes-entries-in-bulk](/tests/scenario/bai_scenario/manager/role_preset/test_bulk_permission_editing.py): pass
+
+when a user granted update on presets removes two permission entries at once, the two entries removed come back and none failed
+
+Given
+
+- one preset with two permission entries and one user granted UPDATE in global
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-1: READ allowed on every domain
+  - Role preset preset-1: UPDATE allowed on every project
+  - Domain home-1
+  - Prepare a user granted the UPDATE permission on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: UPDATE allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
+
+When
+
+- RolePresetAdapter.bulk_remove_permissions: user-1 removes 2 permission entries from preset-1 at once
+
+Then
+
+- the two entries removed come back, and none failed
+  - items count = 2
+  - items[0].id: same as the id of the entry seeded in advance
+  - items[0].field_id: same as the id of the entry seeded in advance
+  - items[0].role_preset_id: same as the id of the preset seeded in advance
+  - items[0].entity_type = 'domain'
+  - items[0].permission = <PermissionBitDTO.READ: 'read'>
+  - items[0].created_at: same as the time of the entry seeded in advance
+  - items[1].id: same as the id of the entry seeded in advance
+  - items[1].field_id: same as the id of the entry seeded in advance
+  - items[1].role_preset_id: same as the id of the preset seeded in advance
+  - items[1].entity_type = 'project'
+  - items[1].permission = <PermissionBitDTO.UPDATE: 'update'>
+  - items[1].created_at: same as the time of the entry seeded in advance
+  - failed = []
+
+<a id="bulk_permission_editing-a-user-without-update-removes-none-of-the-entries-in-bulk"></a>
+
+#### [a-user-without-update-removes-none-of-the-entries-in-bulk](/tests/scenario/bai_scenario/manager/role_preset/test_bulk_permission_editing.py): pass
+
+when a user granted only read on presets tries to remove several permission entries at once, none is removed and every one comes back in the failed list for lack of permission
+
+Given
+
+- one preset with two permission entries and one user granted READ in global
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-1: READ allowed on every domain
+  - Role preset preset-1: UPDATE allowed on every project
+  - Domain home-1
+  - Prepare a user granted the READ permission on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: READ allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
+
+When
+
+- RolePresetAdapter.bulk_remove_permissions: user-1 removes 2 permission entries from preset-1 at once
+
+Then
+
+- nothing is removed and every entry comes back in the failed list
+  - items = []
+  - failed count = 2
+  - failed[0].permission_preset_id: same as the id of the entry
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].permission_preset_id: same as the id of the entry
+  - failed[1].message: a reason containing 'Insufficient permission'
+
+### create
+
+<a id="creating-a-user-granted-create-makes-a-preset"></a>
+
+#### [a-user-granted-create-makes-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_creating.py): pass
+
+when a user granted create on presets fills every optional field and creates a preset, the whole preset carrying those values comes back
+
+Given
+
+- one user granted CREATE in global
+  - Domain home-1
+  - Prepare a user granted the CREATE permission on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: CREATE allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
+
+When
+
+- RolePresetAdapter.create: user-1 creates a project-scope preset with auto assign, owner assignment and two permission entries filled
+
+Then
+
+- the whole preset carrying every value filled comes back
+  - id: skipped: the database generates it
+  - entity_id: skipped: the database generates it
+  - name = 'made-preset'
+  - scope_type = 'project'
+  - role_name_template = None
+  - auto_assign = True
+  - auto_assign_to_owner = True
+  - deleted = False
+  - deleted_at = None
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+
+<a id="creating-a-taken-name-is-refused"></a>
+
+#### [a-taken-name-is-refused](/tests/scenario/bai_scenario/manager/role_preset/test_creating.py): pass
+
+when a user granted create on presets creates a preset under the name and scope of one that already exists, it is rejected as a name conflict
+
+Given
+
+- one preset that already exists and one user granted CREATE in global
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare a user granted the CREATE permission on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: CREATE allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
+
+When
+
+- RolePresetAdapter.create: user-1 creates a project-scope preset under the name preset-1 that already exists
+
+Then
+
+- the call is rejected
+  - rejected: RolePresetCreateConflict
+
+<a id="creating-a-user-without-create-may-not-make-a-preset"></a>
+
+#### [a-user-without-create-may-not-make-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_creating.py): pass
+
+when a user granted only read on presets tries to create a preset, it is rejected for lack of permission
+
+Given
+
+- one user granted READ in global
+  - Domain home-1
+  - Prepare a user granted the READ permission on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: READ allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
+
+When
+
+- RolePresetAdapter.create: user-1 creates a project-scope preset with auto assign, owner assignment and two permission entries filled
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### partial_bulk_remove_permissions
+
+<a id="permission_editing-a-user-without-update-removes-none-of-the-entries"></a>
+
+#### [a-user-without-update-removes-none-of-the-entries](/tests/scenario/bai_scenario/manager/role_preset/test_permission_editing.py): pass
+
+when a user granted only read on presets tries to remove several permission entries at once, none is removed and every one comes back in the failed list for lack of permission
+
+Given
+
+- one preset with two permission entries and one user granted READ in global
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-1: READ allowed on every domain
+  - Role preset preset-1: UPDATE allowed on every project
+  - Domain home-1
+  - Prepare a user granted the READ permission on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: READ allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
 
 When
 
@@ -1040,20 +1352,24 @@ Then
 
 #### [removing-entries-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/role_preset/test_permission_editing.py): pass
 
-when the superadmin removes two permission entries and one missing id at once, the two come back in the processed list and the missing id comes back in the failed list
+when a user granted update on presets removes two permission entries and one missing id at once, the two come back in the processed list and the missing id comes back in the failed list
 
 Given
 
-- one preset with two permission entries and one superadmin
+- one preset with two permission entries and one user granted UPDATE in global
   - Role preset preset-1: for the project scope, with automatic grant disabled
   - Role preset preset-1: READ allowed on every domain
   - Role preset preset-1: UPDATE allowed on every project
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted the UPDATE permission on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: UPDATE allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
 
 When
 
@@ -1081,23 +1397,115 @@ Then
 
 ### partial_bulk_update
 
-<a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets"></a>
+<a id="partial_bulk_editing-a-taken-name-fails-the-rename"></a>
 
-#### [a-user-granted-nothing-edits-none-of-several-presets](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_editing.py): pass
+#### [a-taken-name-fails-the-rename](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_editing.py): pass
 
-when a user granted nothing tries to edit several presets at once, none is edited and every one comes back in the failed list for lack of permission
+when a user granted update on presets renames a preset to a name already taken in the same scope, nothing is edited and the preset comes back in the failed list because the name is taken
 
 Given
 
-- 2 presets and one user
+- 2 presets and one user granted UPDATE in global
   - Role preset preset-1: for the project scope, with automatic grant disabled
   - Role preset preset-2: for the project scope, with automatic grant disabled
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the UPDATE permission on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: UPDATE allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
+
+When
+
+- RolePresetAdapter.partial_bulk_update: user-1 renames preset-1 to preset-2 in the same scope
+
+Then
+
+- nothing is edited and the renamed preset comes back in the failed list because the name is taken
+  - successes = []
+  - failed count = 1
+  - failed[0].id: same as the id of the renamed preset
+  - failed[0].message: a reason containing 'already has this name'
+
+<a id="partial_bulk_editing-a-user-granted-update-edits-several-presets-at-once"></a>
+
+#### [a-user-granted-update-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_editing.py): pass
+
+when a user granted update on presets turns auto assign on for several presets at once, all of them come back with the new value and nothing failed
+
+Given
+
+- 2 presets and one user granted UPDATE in global
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare a user granted the UPDATE permission on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: UPDATE allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
+
+When
+
+- RolePresetAdapter.partial_bulk_update: user-1 turns auto assign on for 2 presets at once
+
+Then
+
+- every target preset comes back with the new value, and nothing failed
+  - successes count = 2
+  - successes[0].id: same as the id of the preset seeded in advance
+  - successes[0].entity_id: same as the id of the preset seeded in advance
+  - successes[0].name = 'preset-1'
+  - successes[0].scope_type = 'project'
+  - successes[0].auto_assign = True
+  - successes[0].role_name_template = None
+  - successes[0].auto_assign_to_owner = False
+  - successes[0].deleted = False
+  - successes[0].deleted_at = None
+  - successes[0].created_at: the time this run wrote
+  - successes[0].updated_at: the time this run wrote
+  - successes[1].id: same as the id of the preset seeded in advance
+  - successes[1].entity_id: same as the id of the preset seeded in advance
+  - successes[1].name = 'preset-2'
+  - successes[1].scope_type = 'project'
+  - successes[1].auto_assign = True
+  - successes[1].role_name_template = None
+  - successes[1].auto_assign_to_owner = False
+  - successes[1].deleted = False
+  - successes[1].deleted_at = None
+  - successes[1].created_at: the time this run wrote
+  - successes[1].updated_at: the time this run wrote
+  - failed = []
+
+<a id="partial_bulk_editing-a-user-without-update-edits-none-of-several-presets"></a>
+
+#### [a-user-without-update-edits-none-of-several-presets](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_editing.py): pass
+
+when a user granted only read on presets tries to edit several presets at once, none is edited and every one comes back in the failed list for lack of permission
+
+Given
+
+- 2 presets and one user granted READ in global
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare a user granted the READ permission on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: READ allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
 
 When
 
@@ -1121,15 +1529,19 @@ turning on owner assignment of project-scope and domain-scope presets at once ed
 
 Given
 
-- one project-scope preset, one domain-scope preset, and one superadmin
+- one project-scope preset, one domain-scope preset, and one user granted UPDATE in global
   - Role preset preset-1: for the project scope, with automatic grant disabled
   - Role preset preset-2: for the domain scope, with automatic grant disabled
   - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
+  - Prepare a user granted the UPDATE permission on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: UPDATE allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
 
 When
 
@@ -1140,60 +1552,19 @@ Then
 - only the project-scope preset comes back edited, and the domain-scope preset comes back in the failed list
   - successes count = 1
   - failed count = 1
-  - successes[0].auto_assign_to_owner = True
   - successes[0].id: same as the id of the preset seeded in advance
   - successes[0].entity_id: same as the id of the preset seeded in advance
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
   - successes[0].auto_assign = False
+  - successes[0].role_name_template = None
+  - successes[0].auto_assign_to_owner = True
   - successes[0].deleted = False
+  - successes[0].deleted_at = None
   - successes[0].created_at: the time this run wrote
   - successes[0].updated_at: the time this run wrote
   - failed[0].id: same as the id of the second preset
-
-<a id="partial_bulk_editing-the-superadmin-edits-several-presets-at-once"></a>
-
-#### [the-superadmin-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_editing.py): pass
-
-when the superadmin turns auto assign on for several presets at once, all of them come back with the new value and nothing failed
-
-Given
-
-- 2 presets and one superadmin
-  - Role preset preset-1: for the project scope, with automatic grant disabled
-  - Role preset preset-2: for the project scope, with automatic grant disabled
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- RolePresetAdapter.partial_bulk_update: user-1 turns auto assign on for 2 presets at once
-
-Then
-
-- every target preset comes back with the new value, and nothing failed
-  - successes count = 2
-  - successes[0].id: same as the id of the preset seeded in advance
-  - successes[0].entity_id: same as the id of the preset seeded in advance
-  - successes[0].name = 'preset-1'
-  - successes[0].scope_type = 'project'
-  - successes[0].auto_assign = True
-  - successes[0].deleted = False
-  - successes[0].created_at: the time this run wrote
-  - successes[0].updated_at: the time this run wrote
-  - successes[1].id: same as the id of the preset seeded in advance
-  - successes[1].entity_id: same as the id of the preset seeded in advance
-  - successes[1].name = 'preset-2'
-  - successes[1].scope_type = 'project'
-  - successes[1].auto_assign = True
-  - successes[1].deleted = False
-  - successes[1].created_at: the time this run wrote
-  - successes[1].updated_at: the time this run wrote
-  - failed = []
+  - failed[0].message: a reason containing 'Only a project role preset'
 
 ### update
 
@@ -1221,13 +1592,15 @@ When
 Then
 
 - the whole preset with owner assignment turned on comes back
-  - auto_assign_to_owner = True
   - id: same as the id of the preset seeded in advance
   - entity_id: same as the id of the preset seeded in advance
   - name = 'preset-1'
   - scope_type = 'project'
   - auto_assign = False
+  - role_name_template = None
+  - auto_assign_to_owner = True
   - deleted = False
+  - deleted_at = None
   - created_at: the time this run wrote
   - updated_at: the time this run wrote
 
@@ -1260,7 +1633,10 @@ Then
   - name = 'renamed-preset'
   - scope_type = 'project'
   - auto_assign = False
+  - role_name_template = None
+  - auto_assign_to_owner = False
   - deleted = False
+  - deleted_at = None
   - created_at: the time this run wrote
   - updated_at: the time this run wrote
 
