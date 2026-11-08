@@ -35,6 +35,7 @@ check_and_test() {
 
 if ! command -v gh &> /dev/null; then
   echo "GitHub CLI (gh) is not installed. Running lint/check/test on HEAD~1."
+  python3 scripts/knowledge/check_words.py --base HEAD~1
   pants tailor --check update-build-files --check --changed-since=HEAD~1
   pants lint --changed-since=HEAD~1
   check_and_test HEAD~1
@@ -66,6 +67,7 @@ else
     ORIGIN="origin"
   fi
   echo "Performing lint/check/test on ${ORIGIN}/${BASE_BRANCH}..HEAD@${CURRENT_COMMIT} ..."
+  python3 scripts/knowledge/check_words.py --base "${ORIGIN}/${BASE_BRANCH}"
   pants lint --changed-since="${ORIGIN}/${BASE_BRANCH}"
   check_and_test "${ORIGIN}/${BASE_BRANCH}"
 fi
