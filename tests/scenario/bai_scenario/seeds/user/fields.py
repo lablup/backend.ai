@@ -16,6 +16,7 @@ from ai.backend.manager.data.auth.login_session_types import (
     LoginAttemptResult,
     LoginHistoryData,
     LoginSessionData,
+    LoginSessionStatus,
 )
 from ai.backend.manager.data.keypair.types import KeyPairData, KeyPairSecrets
 from ai.backend.manager.data.user.types import UserData
@@ -77,10 +78,14 @@ class TestSeedLoginSessionOf(TestSeedFieldCreator[UserData, LoginSessionData]):
     """A login the user holds, made with the key an earlier row answered."""
 
     access_key: str
+    status: LoginSessionStatus = LoginSessionStatus.ACTIVE
 
     @override
     def kind(self) -> str:
-        return Says("활성 로그인 세션 하나를 갖습니다", english="has one active login session")
+        return Says(
+            f"상태가 {self.status.value} 인 로그인 세션 하나를 갖습니다",
+            english=f"has one login session in status {self.status.value}",
+        )
 
     @override
     def owner_id(self, owner: UserData) -> UserID:
@@ -88,7 +93,9 @@ class TestSeedLoginSessionOf(TestSeedFieldCreator[UserData, LoginSessionData]):
 
     @override
     def seed(self) -> LoginSessionCreator:
-        return LoginSessionCreator(session_token=secrets.token_hex(16), access_key=self.access_key)
+        return LoginSessionCreator(
+            session_token=secrets.token_hex(16), access_key=self.access_key, status=self.status
+        )
 
 
 @dataclass(frozen=True)
