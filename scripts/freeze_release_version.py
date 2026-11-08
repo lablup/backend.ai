@@ -10,8 +10,8 @@ version string.
 The constant definition in meta.py and its re-export in __init__.py remain
 untouched for the next development cycle.
 
-After running this script, run ``pants fix ::`` and ``pants fmt ::`` to remove
-the now-unused NEXT_RELEASE_VERSION imports.
+After running this script, run ``ruff check --fix`` and ``ruff format`` on the changed
+files (``scripts/release.sh`` does) to remove the now-unused NEXT_RELEASE_VERSION imports.
 """
 
 from __future__ import annotations
@@ -90,6 +90,5 @@ def freeze_version(target_version: str) -> None:
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print(f"Usage: {sys.argv[0]} <target_version>", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(f"Usage: {sys.argv[0]} <target_version>")
     freeze_version(sys.argv[1])

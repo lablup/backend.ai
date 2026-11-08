@@ -29,14 +29,6 @@ fi
 TARGET_VERSION=$1
 WEBUI_VERSION=$2
 
-# An alpha or rc is an internal build: the release PR's CI runs the same checks,
-# so the local dependency and BUILD-file checks below are skipped for it.
-if [[ "$TARGET_VERSION" =~ (a|rc)[0-9]+$ ]]; then
-    IS_INTERNAL=true
-else
-    IS_INTERNAL=false
-fi
-
 if [ "$#" -eq 1 ]; then
     echo "Preparing release for version ${TARGET_VERSION} (skipping WebUI update)"
     git checkout -b "release/$TARGET_VERSION"
@@ -69,8 +61,15 @@ if [[ "$TARGET_VERSION" =~ (rc|a|b|dev)[0-9]+ ]]; then
 else
     echo "Freezing NEXT_RELEASE_VERSION to ${TARGET_VERSION}..."
     python3 scripts/freeze_release_version.py "${TARGET_VERSION}"
-    pants fix ::
-    pants fmt ::
+    RUFF_VERSION=$(scripts/pyscript.sh scripts/tomltool.py -f pants.toml get 'ruff.version')
+    FROZEN=()
+    while IFS= read -r -d '' f; do
+        FROZEN+=("$f")
+    done < <(git diff --name-only -z -- 'src/*.py')
+    if [ ${#FROZEN[@]} -gt 0 ]; then
+        uvx "ruff@${RUFF_VERSION}" check --fix --exit-zero --quiet --force-exclude "${FROZEN[@]}"
+        uvx "ruff@${RUFF_VERSION}" format --quiet --force-exclude "${FROZEN[@]}"
+    fi
 fi
 
 # Give the news fragments named without a PR number their PR number
@@ -92,14 +91,6 @@ python3 scripts/run-towncrier.py "${TARGET_VERSION}" || exit 1
 # a release line, so this is a no-op for every other release; it also retires
 # the lines that are due.
 .github/scripts/update-maintained-versions.sh "${TARGET_VERSION}" "${LTS_ARG[@]}"
-
-# Check dependencies
-if [ "$IS_INTERNAL" = "true" ]; then
-    echo "Skipping the dependency and BUILD-file checks for internal version ${TARGET_VERSION}"
-else
-    pants tailor --check update-build-files --check '::'
-    pants check ::
-fi
 
 git add -A
 git commit -m "release: $TARGET_VERSION"

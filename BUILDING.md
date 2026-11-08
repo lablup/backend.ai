@@ -57,6 +57,11 @@ All development commands use `pants` instead of `pip`, `poetry`, or `uv`.
 - CI handles type checking and tests (`ci.yml` lint-and-typecheck and test jobs)
 - Bypass with `git commit --no-verify` for work-in-progress commits, but not on main or release branches
 
+### Git Pre-push Hook (`scripts/pre-push.sh`)
+- Runs on every `git push`
+- Runs `scripts/knowledge/check_words.py` against the PR's base branch (`HEAD~1` without `gh`)
+- Does not run pants; CI runs lint, type checking and tests
+
 ## Running Pants Commands
 
 **Basic Structure:**
