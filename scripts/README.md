@@ -42,8 +42,6 @@ current, see `AGENTS.md` in this directory.
 | `pre-commit.sh` | Runs `ruff format` and `ruff check` over the staged Python files, with the ruff version from `pants.toml` | auto: `pre-commit` |
 | `pre-push` | Hook stub copied into `.git/hooks/` that calls `pre-push.sh` | auto: git, installed by `install-dev.sh` |
 | `pre-push.sh` | Runs `knowledge/check_words.py` against the PR's base branch. CI runs the pants checks | auto: `pre-push` |
-| `hooks/auto-format.sh` | Runs `pants fmt` on the files an AI agent touched | auto: Claude Code hook (per-user settings) |
-| `hooks/auto-fix.sh` | Runs `pants fix` on the files an AI agent touched | auto: Claude Code hook (per-user settings) |
 
 ## Pull-request CI
 
