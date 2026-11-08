@@ -60,7 +60,7 @@ if [[ "$TARGET_VERSION" =~ (rc|a|b|dev)[0-9]+ ]]; then
     echo "Skipping NEXT_RELEASE_VERSION freeze for pre-release version ${TARGET_VERSION}"
 else
     echo "Freezing NEXT_RELEASE_VERSION to ${TARGET_VERSION}..."
-    python3 scripts/freeze_release_version.py "${TARGET_VERSION}"
+    python3 scripts/freeze_release_version.py "${TARGET_VERSION}" || exit 1
     RUFF_VERSION=$(scripts/pyscript.sh scripts/tomltool.py -f pants.toml get 'ruff.version')
     FROZEN=()
     while IFS= read -r -d '' f; do

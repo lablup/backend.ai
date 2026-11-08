@@ -89,6 +89,7 @@ current, see `AGENTS.md` in this directory.
 | `check-bake-targets.sh` | Fails when `docker-bake.hcl`'s default group and the `list-dockerfiles.sh --service` registry drift apart | auto: `docker-images.yml` |
 | `determine-release-type.py` | Prints `RELEASE_AUDIENCE` and `IS_PRERELEASE` for the `VERSION` file; rejects a version that is neither an alpha, a release candidate nor a final release | auto: `ci.yml` (`determine-release-grade`) |
 | `test_determine_release_type.py` | Checks `determine-release-type.py` against every classified and rejected version | auto: `ci.yml` (`check-build-and-lint`) |
+| `test_freeze_release_version.py` | Checks `freeze_release_version.py` against standalone, one-line and multi-line imports | auto: `ci.yml` (`check-build-and-lint`) |
 | `normalize-version.py` | Prints the PEP 440-normalized version used for docker image tags, rejecting local segments (`+` is not a legal docker tag character) | auto: `docker-images.yml` |
 | `build-wheels.sh` | Builds the platform-specific and generic wheels | auto: `ci.yml` (release job) |
 | `build-scies.sh` | Builds the scie executables locally (CI runs the equivalent pants commands inline) | person |
