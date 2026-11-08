@@ -66,11 +66,19 @@ pants lint --changed-since=origin/{base_branch}
    - Focus on what the change means to users and developers, not implementation details
    - Show the draft to the user for approval; with `--draft`, skip the approval
 
-3. **Create file**
+3. **Find the epic**
+   - The `Epic` row of `hejo issue get {jira_key}` is the epic key. Without an issue key or an epic, leave out `--epic` and skip step 4
+
+4. **Create the epic files if missing**
+   - Write the pair `changes/epics/{epic_key}.md` (English) and `changes/epics/{epic_key}.ko.md` (Korean) in the format of the epic file section of `changes/README.md`
+   - Draft them from the epic's English title, Korean title and body. Show the draft to the user for approval; with `--draft`, skip the approval
+
+5. **Create the fragment**
    ```bash
-   python3 scripts/new-changelog.py {changelog_type} "{changelog_message}"
+   python3 scripts/new-changelog.py {changelog_type} "{changelog_message}" [--issue {jira_key}] [--epic {epic_key}]
    ```
-   - Prints the path `changes/<YYYYMMDD>-<HHMMSS>-<6 chars>.{changelog_type}.md`; the release renames it to `<PR-number>.{changelog_type}.md` (`changes/README.md`)
+   - Prints the path `changes/<YYYYMMDD>-<HHMMSS>-<6 chars>.{changelog_type}.md`; the release renames it to `<PR-number>.{changelog_type}.md`
+   - Without an issue key, leave out `--issue`
    - Stage it with the code in Phase 4, so it goes into the first push
 
 ### Phase 4: Commit

@@ -31,7 +31,7 @@ current, see `AGENTS.md` in this directory.
 | `refresh-graphql-gateway.sh` | Regenerates the schema, copies it to the root and restarts the Apollo Router (`--recreate` recreates the container so config updates apply) | person |
 | `alembic-rebase.py` | Rebases a migration branch when alembic heads have diverged | person (`src/ai/backend/README.md`) |
 | `download-webui-release.sh` | Downloads and unpacks a WebUI bundle into `src/ai/backend/web` | person; `release.sh` |
-| `new-changelog.py` | Writes a news fragment named `changes/<YYYYMMDD>-<HHMMSS>-<6 chars>.<type>.md` and prints its path | person; Claude Code (`/submit`) |
+| `new-changelog.py` | Writes a news fragment named `changes/<YYYYMMDD>-<HHMMSS>-<6 chars>.<type>.md`, with front matter for `--issue` and `--epic`, and prints its path | person; Claude Code (`/submit`) |
 | `knowledge/search.py` | Lists or searches `KNOWLEDGE.md` frontmatter across the repository | person; Claude Code (`/knowledge`) |
 
 ## Commit and push
@@ -50,6 +50,7 @@ current, see `AGENTS.md` in this directory.
 
 | Script | What it does | Called by |
 |---|---|---|
+| `validate-changelog-fragments.py` | Checks the names, types, front matter and epic file pairs in `changes/` | auto: `ci.yml` (`check-build-and-lint`) |
 | `check-multiple-alembic-heads.py` | Fails the build when the migration graph has more than one head | auto: `ci.yml`, `.github/scripts/merge-alembic-heads.sh` |
 | `check-alembic-revision.py` | Rejects a migration whose `upgrade()` / `downgrade()` is empty | auto: `ci.yml` |
 | `check-init-imports.py` | Fails when an `__init__.py` under the given directories imports anything, apart from the files it allows | auto: `ci.yml` (`check-build-and-lint`) |
@@ -77,9 +78,9 @@ current, see `AGENTS.md` in this directory.
 | `release.sh` | Cuts a release branch and produces the whole release commit | person |
 | `download-external-tools.sh` | Refreshes the bundled external binaries (bssh, all-smi, …) | auto: `release.sh` |
 | `freeze_release_version.py` | Replaces `NEXT_RELEASE_VERSION` placeholders with the version being released (skipped for pre-releases) | auto: `release.sh`, `.github/scripts/bump-next-release-on-main.sh` |
-| `rename-changelog-fragments.py` | Renames `changes/<YYYYMMDD>-<HHMMSS>-<6 chars>.<type>.md` to `<PR-number>.<type>.md` with `git mv`, taking the PR number from the commit that added the file; stops the release on a fragment name it cannot place | auto: `release.sh` |
+| `rename-changelog-fragments.py` | Renames each new-style news fragment to `<PR-number>.<type>.md` with `git mv` and drops its front matter, taking the PR number from the commit that added the file; stops the release on a file that breaks the rules or has no PR number | auto: `release.sh` |
 | `run-towncrier.py` | Runs towncrier against the version-branch changelog file | auto: `release.sh` |
-| `changelog_fragments.py` | Module, not a command: fragment name patterns and the towncrier fragment settings | auto: imported by `new-changelog.py`, `rename-changelog-fragments.py` |
+| `changelog_fragments.py` | Module, not a command: the rules for the files in `changes/` (names, types, front matter, epic files) | auto: imported by `new-changelog.py`, `rename-changelog-fragments.py`, `validate-changelog-fragments.py`, `run-towncrier.py` |
 | `changelog_files.py` | Module, not a command: maps a version to its `CHANGELOG/<version>.md` | auto: imported by `run-towncrier.py`, `extract-release-changelog.py` |
 | `bump_next_release_version.py` | Rewrites or prints `NEXT_RELEASE_VERSION` in `meta.py` | auto: `.github/scripts/bump-next-release-on-main.sh` |
 | `.github/scripts/update-maintained-versions.sh` | Registers a newly cut release line in `.github/maintained-versions.yml` and retires the due ones | auto: `release.sh` |
@@ -90,7 +91,6 @@ current, see `AGENTS.md` in this directory.
 | `list-dockerfiles.sh` | Prints the `docker/` dockerfile build matrix (`--service` / `--infra`) as JSON; a new `backend.ai-*` dockerfile must be registered in its allowlist | auto: `sbom.yml`; `docker-images.yml` (via `check-bake-targets.sh`); `osv-scanner.yml` (also scheduled: weekly cron and push to `main`) |
 | `check-bake-targets.sh` | Fails when `docker-bake.hcl`'s default group and the `list-dockerfiles.sh --service` registry drift apart | auto: `docker-images.yml` |
 | `determine-release-type.py` | Prints `RELEASE_AUDIENCE` and `IS_PRERELEASE` for the `VERSION` file; rejects a version that is neither an alpha, a release candidate nor a final release | auto: `ci.yml` (`determine-release-grade`) |
-| `test_changelog_fragments.py` | Checks `new-changelog.py` and `rename-changelog-fragments.py` against temporary git repositories | auto: `ci.yml` (`check-build-and-lint`) |
 | `test_determine_release_type.py` | Checks `determine-release-type.py` against every classified and rejected version | auto: `ci.yml` (`check-build-and-lint`) |
 | `normalize-version.py` | Prints the PEP 440-normalized version used for docker image tags, rejecting local segments (`+` is not a legal docker tag character) | auto: `docker-images.yml` |
 | `build-wheels.sh` | Builds the platform-specific and generic wheels | auto: `ci.yml` (release job) |
