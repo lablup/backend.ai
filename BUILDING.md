@@ -45,10 +45,6 @@ All development commands use `pants` instead of `pip`, `poetry`, or `uv`.
 
 ## Automated Quality Checks
 
-### Claude Code Hooks (`.claude/settings.local.json`, gitignored)
-- **PostToolUse**: Runs `pants fmt` after Edit/Write operations
-- **Stop**: Runs `pants fix` on modified Python files when Claude finishes
-
 ### Git Pre-commit Hook (`scripts/pre-commit.sh`)
 - Runs on every `git commit`
 - Runs `ruff format` and `ruff check` on staged Python files through `uvx`, with the ruff version from `pants.toml`

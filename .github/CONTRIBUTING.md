@@ -397,12 +397,7 @@ Pay more attention to the PR title: it becomes the final commit message on squas
 - [ ] Checked formatting and linting
 
 ### 2. CI/CD checks
-```bash
-# Run locally first
-pants lint ::
-pants check ::
-pants test <changed-tests>
-```
+The git hooks (pre-commit, pre-push) run the low-cost checks, and CI runs the pants-based checks (lint, typecheck, test). When a hook or CI fails, find the cause in its output or the failed job's log and fix it.
 
 - [ ] All lint passes
 - [ ] All typechecks pass

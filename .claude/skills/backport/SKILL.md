@@ -99,31 +99,27 @@ Run every check inside the worktree.
    ```bash
    git grep -n -E '^(<<<<<<<|=======$|>>>>>>>)' -- src tests
    ```
-2. Check every Python file the backport changed or added:
-   ```bash
-   git diff --name-only --diff-filter=d "bp/base-${ver}" -- '*.py' | xargs -r pants fmt fix lint
-   ```
-3. Check that each fixture and constructor argument the new tests use exists on the release branch (`grep`). Do not run `pants check` or `pants test` locally. CI runs them.
-4. Compare `git diff --stat "bp/base-${ver}"` with the change on `main`. A backport much larger than the original pulled in `main`-only code.
+2. Check that each fixture and constructor argument the new tests use exists on the release branch (`grep`). CI runs the pants-based checks (root `AGENTS.md` "Before committing").
+3. Compare `git diff --stat "bp/base-${ver}"` with the change on `main`. A backport much larger than the original pulled in `main`-only code.
 
 ## Phase 5: Commit and push
 
-1. Add a commit on top of the workflow's commit. Do not amend it. Phase 4 already ran the checks, so skip the pre-commit hook:
+1. Add a commit on top of the workflow's commit. Do not amend it. The pre-commit hook checks the staged files:
    ```bash
    git add <files>
-   git commit --no-verify -m "fix(BA-XXXX): resolve backport conflicts for <ver>"
+   git commit -m "fix(BA-XXXX): resolve backport conflicts for <ver>"
    ```
    - The body states what was kept from the release branch and what `main`-only code was dropped.
-2. Push, skipping the pre-push hook for the same reason:
+2. Push. The pre-push hook checks for rejected words:
    ```bash
-   git push --no-verify origin "backport/<PR>-to-${ver}"
+   git push origin "backport/<PR>-to-${ver}"
    ```
 3. Check that the pull request head moved to the new commit, then remove the worktree:
    ```bash
    gh pr view <number> --repo lablup/backend.ai --json headRefOid --jq .headRefOid
    git worktree remove "<scratchpad>/bp-${ver}"
    ```
-4. Merge by hand once CI passes. The workflow does not enable auto-merge on a conflicted backport.
+4. Merge by hand once CI passes. The workflow does not enable auto-merge on a conflicted backport. If CI fails again, go back to Phase 1 and find the cause in the failed job's log.
 
 ## Related documents
 

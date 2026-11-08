@@ -1,6 +1,6 @@
 ---
 name: submit
-description: Complete submission workflow - quality checks, commit, PR creation, changelog generation, and final push. Use after finishing implementation work.
+description: Complete submission workflow - changelog generation, commit, push, PR creation, and CI watch with fixes. Use after finishing implementation work.
 tags:
   - submit
   - pr
@@ -10,7 +10,7 @@ tags:
 
 # Submit Workflow
 
-Automates the post-implementation submission pipeline: quality enforcement, changelog, commit, PR creation, and push.
+Automates the post-implementation submission pipeline: changelog, commit, push, PR creation, and CI watch.
 
 ## Parameters
 
@@ -18,7 +18,7 @@ Automates the post-implementation submission pipeline: quality enforcement, chan
 - **changelog_type** (optional): One of `breaking`, `feature`, `enhance`, `deprecation`, `fix`, `doc`, `deps`, `misc`, `test`. If omitted, infer from the most significant change.
 - **changelog_message** (optional): One-line English summary for the changelog fragment. If omitted, generate from the changes.
 - **base_branch** (optional): Target branch for PR. Defaults to `main`.
-- **draft** (optional): Open a draft PR. Skips local quality checks, commits with `--no-verify`, and requires no approval.
+- **draft** (optional): Open a draft PR. Commits with `--no-verify` to skip the pre-commit hook, and requires no approval.
 
 ## Workflow
 
@@ -35,25 +35,9 @@ Automates the post-implementation submission pipeline: quality enforcement, chan
    - `git log {base_branch}..HEAD` to see existing commits on branch
    - Summarize changes to user before proceeding
 
-### Phase 2: Quality Enforcement (Local)
+### Phase 2: Checks
 
-Skip this phase with `--draft`.
-
-**Do not skip this phase otherwise.**
-
-Run sequentially, stop on first failure:
-
-```bash
-pants fmt --changed-since=origin/{base_branch}
-pants fix --changed-since=origin/{base_branch}
-pants lint --changed-since=origin/{base_branch}
-```
-
-- If `fmt` or `fix` produce changes, stage them automatically
-- If `lint` fails, fix the issues and re-run
-- After all pass, continue to next phase
-
-**Note:** Type checking (`pants check`) and tests (`pants test`) are enforced by CI only. Do not run them locally; they consume excessive resources when multiple workers run concurrently.
+No local checks run here. Checks follow the root `AGENTS.md` "Before committing": the git hooks run on commit and push, and the pants-based checks are confirmed from the CI results in Phase 6.
 
 ### Phase 3: Changelog Fragment
 
@@ -152,7 +136,26 @@ pants lint --changed-since=origin/{base_branch}
 
 5. **Extract PR number** from `gh pr create` output
 
-### Phase 6: Summary
+### Phase 6: CI
+
+Skip this phase with `--draft`.
+
+1. Wait for CI with a time limit, not indefinitely:
+   ```bash
+   timeout 1500 gh pr checks {pr_number} --watch --fail-fast
+   ```
+2. Act on the result:
+
+   | Result | Action |
+   |---|---|
+   | All pass | Phase 7 |
+   | Failure | Find the failed job with `gh pr checks {pr_number}` and the cause with `gh run view --job <job-id> --log-failed`. Fix it, commit (Phase 4), push and go back to step 1 |
+   | Timeout | Stop waiting and report CI as pending in Phase 7 |
+
+   - If the same failure remains after two fixes, stop and report the cause and the log to the user
+   - Report, without fixing, a failure unrelated to the change (one that also fails on other PRs, a runner error)
+
+### Phase 7: Summary
 
 Report final status:
 
@@ -165,24 +168,23 @@ Submission Complete
   Branch:    {branch_name}
   Changelog: {changelog_path}
 
-Quality checks: All passed
+CI: {passed | failed: <job> | pending: gh pr checks {pr_number}}
 Commits: {count} commit(s)
 ```
 
-With `--draft`, print `Quality checks: skipped (draft)` instead.
+With `--draft`, print `CI: not watched (draft)` instead.
 
 ## Error Handling
 
-### Quality check failure
+### Hook or CI failure
 ```
-Quality check failed at: {step}
+Failed at: {pre-commit | pre-push | CI job name}
+
+Cause:
+{cause found from the hook output or the job log}
 
 Error:
 {error_output}
-
-Options:
-1. Fix issues and re-run /submit
-2. Address specific failures manually
 ```
 
 ### No changes to commit
@@ -218,7 +220,7 @@ Options:
 ### Basic usage (auto-detect everything)
 ```
 User: /submit
-Agent: [Detects BA-1234 from branch, runs quality checks, generates changelog, commits, creates PR]
+Agent: [Detects BA-1234 from branch, generates changelog, commits, creates PR, watches CI]
 ```
 
 ### With explicit JIRA key
@@ -236,7 +238,7 @@ Agent: [Uses provided parameters, runs full workflow]
 ### Draft PR without waiting for approval
 ```
 User: /submit --draft
-Agent: [Skips quality checks, adds the changelog fragment, commits with --no-verify, opens a draft PR]
+Agent: [Adds the changelog fragment, commits with --no-verify, opens a draft PR, does not watch CI]
 ```
 
 ## Related documents
@@ -245,9 +247,7 @@ Agent: [Skips quality checks, adds the changelog fragment, commits with --no-ver
 
 ## Implementation Notes
 
-- Local quality checks (`fmt`, `fix`, `lint`) use `--changed-since=origin/{base_branch}` to cover all commits on the branch
-- `--draft` skips them and commits with `--no-verify`
-- Type checking and tests run in CI only; do not run them locally
+- `--draft` commits with `--no-verify` to skip the pre-commit hook and does not wait for CI
 - Changelog follows [towncrier](https://github.com/twisted/towncrier) format configured in `pyproject.toml`
 - The changelog fragment is named without a PR number and goes into the first push; the release renames it (`changes/README.md`). A `<PR-number>.<type>.md` fragment added after `gh pr create` is still accepted
 - A single PR may have multiple changelog fragments (for example both `feature` and `fix`)
