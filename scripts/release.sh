@@ -45,6 +45,9 @@ else
     pants fmt ::
 fi
 
+# Give the news fragments named without a PR number their PR number
+python3 scripts/rename-changelog-fragments.py || exit 1
+
 # Update the changelog (--yes consumes news fragments without an interactive prompt)
 LOCKSET=towncrier/$(yq '.python.interpreter_constraints[0] | split("==") | .[1]' pants.toml) ./py -m towncrier --yes
 
