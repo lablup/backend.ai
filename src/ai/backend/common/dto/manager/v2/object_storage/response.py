@@ -33,7 +33,9 @@ class ObjectStorageNode(BaseResponseModel):
     name: str = Field(description="Object storage name")
     host: str = Field(description="Host address of the object storage")
     access_key: str = Field(description="Access key for authentication")
-    secret_key: str = Field(description="Secret key for authentication")
+    secret_key: str = Field(
+        description="Secret key for authentication. Masked unless the caller is a superadmin."
+    )
     endpoint: str = Field(description="Endpoint URL of the object storage")
     region: str | None = Field(default=None, description="Region of the object storage")
 
