@@ -2615,6 +2615,11 @@ class AbstractAgent[
             if not should_proceed:
                 log.debug("kernel creation already in progress")
                 raise ResourceError("Kernel creation already in progress")
+            if not restarting and kernel_id in self.kernel_registry:
+                # Replacing the registered object would orphan its runner, which keeps
+                # reconnecting to the address and steals the replies of whoever gets it next.
+                log.debug("kernel already created")
+                raise ResourceError("Kernel already created")
 
             if throttle_sema is None:
                 # make a local semaphore
