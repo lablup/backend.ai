@@ -32,7 +32,7 @@ PR 제목과 변경 기록 항목(`changes/<...>.<type>.md`)은 서로 다른 �
 - `<PR-number>.<type>.md` 이름은 PR 을 연 뒤에만 넣을 수 있고, 그 두 번째 push 로 PR 의 CI 를 처음부터 다시 실행한다.
 - `<YYYYMMDD>-<HHMMSS>-<6 chars>.<type>.md` 이름은 코드와 같은 첫 push 에 넣는다. 이슈 키 유무와 상관없이 이 이름을 권장한다.
 - PR 번호는 릴리스 때 git 이력에서 붙인다. 파일을 추가한 first-parent 커밋 제목에 squash merge 나 백포트가 남긴 `(#N)` 이 있다.
-- 이름을 바꾸며 front matter 를 떼므로 towncrier 는 지금처럼 `<PR-number>.<type>.md` 만 읽는다.
+- 이름을 변경하며 front matter 를 떼므로 towncrier 는 지금처럼 `<PR-number>.<type>.md` 만 읽는다.
 
 ## 에픽 파일을 두는 이유
 
