@@ -407,12 +407,10 @@ class AsyncEtcd(AbstractKVStore):
 
     @staticmethod
     def _tls_options_from_cert_files(tls: EtcdTLSConfigData) -> TlsOptions:
-        tls_options = TlsOptions()
+        tls_options = TlsOptions().with_handshake_timeout(tls.handshake_timeout)
         if tls.ca_cert is not None:
             ca_cert_pem = tls.ca_cert.read_bytes()
             tls_options = tls_options.with_ca_certificate(ca_cert_pem)
-        if tls.handshake_timeout is not None:
-            tls_options = tls_options.with_handshake_timeout(tls.handshake_timeout)
         if tls.client_cert is None or tls.client_key is None:
             return tls_options
         client_cert_pem = tls.client_cert.read_bytes()

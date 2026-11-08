@@ -442,7 +442,7 @@ class Context(metaclass=ABCMeta):
                 ca_cert=None,
                 client_cert=None,
                 client_key=None,
-                handshake_timeout=None,
+                handshake_timeout=10.0,
             ),
         )
         async with AsyncEtcd.create_from_config(etcd_config) as etcd:

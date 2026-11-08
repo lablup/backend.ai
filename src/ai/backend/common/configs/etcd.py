@@ -58,11 +58,11 @@ class EtcdTLSConfig(BaseConfigSchema):
     ]
     handshake_timeout: Annotated[
         float,
-        Field(default=10.0, ge=0),
+        Field(default=10.0, gt=0),
         BackendAIConfigMeta(
             description=(
                 "Seconds to wait for the TLS handshake with an etcd member. "
-                "Set to 0 for no limit. Request timeouts do not end a stalled handshake."
+                "Request timeouts do not end a stalled handshake."
             ),
             added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="10.0", prod="10.0"),
@@ -71,8 +71,6 @@ class EtcdTLSConfig(BaseConfigSchema):
 
     @model_validator(mode="after")
     def _validate_certificate_combination(self) -> Self:
-        if self.enabled and self.ca_cert is None:
-            raise ValueError("etcd.tls.ca-cert is required when etcd.tls.enabled is true")
         if (self.client_cert is None) != (self.client_key is None):
             raise ValueError("etcd.tls.client-cert and etcd.tls.client-key must be set together")
         return self
@@ -83,7 +81,7 @@ class EtcdTLSConfig(BaseConfigSchema):
             ca_cert=self.ca_cert,
             client_cert=self.client_cert,
             client_key=self.client_key,
-            handshake_timeout=self.handshake_timeout if self.handshake_timeout > 0 else None,
+            handshake_timeout=self.handshake_timeout,
         )
 
 

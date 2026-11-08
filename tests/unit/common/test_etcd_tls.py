@@ -29,12 +29,6 @@ class _RejectedTLSConfigCase:
 
 
 @dataclass(frozen=True)
-class _HandshakeTimeoutConversionCase:
-    handshake_timeout: float
-    expected_handshake_timeout: float | None
-
-
-@dataclass(frozen=True)
 class _EndpointSchemeCase:
     tls_enabled: bool
     expected_endpoint: str
@@ -69,15 +63,13 @@ def etcd_config_data_of_case(case: _EndpointSchemeCase, pem_file: Path) -> EtcdC
 
 
 @pytest.fixture
-def enabled_tls_config_of_case(
-    case: _HandshakeTimeoutConversionCase, pem_file: Path
-) -> EtcdTLSConfig:
+def enabled_tls_config_with_client_certificate(pem_file: Path) -> EtcdTLSConfig:
     return EtcdTLSConfig.model_validate({
         "enabled": True,
         "ca-cert": pem_file,
         "client-cert": pem_file,
         "client-key": pem_file,
-        "handshake-timeout": case.handshake_timeout,
+        "handshake-timeout": 5.0,
     })
 
 
@@ -108,11 +100,6 @@ class TestEtcdTLSConfig:
         "case",
         [
             _RejectedTLSConfigCase(
-                keys_set_to_a_pem_file=(),
-                keys_set_to_a_missing_file=(),
-                expected_error="ca-cert is required",
-            ),
-            _RejectedTLSConfigCase(
                 keys_set_to_a_pem_file=("ca-cert", "client-cert"),
                 keys_set_to_a_missing_file=(),
                 expected_error="must be set together",
@@ -128,7 +115,7 @@ class TestEtcdTLSConfig:
                 expected_error="ca-cert",
             ),
         ],
-        ids=["no-certificates", "client-cert-only", "client-key-only", "missing-ca-cert"],
+        ids=["client-cert-only", "client-key-only", "missing-ca-cert"],
     )
     def test_rejects_invalid_certificates(
         self, case: _RejectedTLSConfigCase, raw_tls_config_of_case: dict[str, Any]
@@ -136,26 +123,15 @@ class TestEtcdTLSConfig:
         with pytest.raises(BackendAISchemaValidationFailed, match=case.expected_error):
             EtcdTLSConfig.model_validate(raw_tls_config_of_case)
 
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _HandshakeTimeoutConversionCase(handshake_timeout=1.5, expected_handshake_timeout=1.5),
-            _HandshakeTimeoutConversionCase(handshake_timeout=0, expected_handshake_timeout=None),
-        ],
-        ids=lambda case: f"handshake-timeout-{case.handshake_timeout}",
-    )
     def test_enabled_config_converts_to_data(
-        self,
-        case: _HandshakeTimeoutConversionCase,
-        enabled_tls_config_of_case: EtcdTLSConfig,
-        pem_file: Path,
+        self, enabled_tls_config_with_client_certificate: EtcdTLSConfig, pem_file: Path
     ) -> None:
-        assert enabled_tls_config_of_case.to_dataclass() == EtcdTLSConfigData(
+        assert enabled_tls_config_with_client_certificate.to_dataclass() == EtcdTLSConfigData(
             enabled=True,
             ca_cert=pem_file,
             client_cert=pem_file,
             client_key=pem_file,
-            handshake_timeout=case.expected_handshake_timeout,
+            handshake_timeout=5.0,
         )
 
 
