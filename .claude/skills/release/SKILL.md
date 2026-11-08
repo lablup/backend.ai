@@ -75,13 +75,13 @@ scripts/release.sh --lts {target_version} [webui_version]
 2. Downloads WebUI release (if `webui_version` provided)
 3. Updates `VERSION` file
 4. Freezes `NEXT_RELEASE_VERSION` placeholders to the actual version (stable releases only; skipped for `rc`/`a`/`b`/`dev`/`post`)
+   - Then runs `ruff check --fix` and `ruff format` on the frozen files through `uvx`, with the ruff version from `pants.toml`. The script does not run pants; the release PR's CI runs `pants tailor` and `pants check`
 5. Runs `scripts/run-towncrier.py {target_version}`, which consumes the `changes/` fragments into `CHANGELOG/{major}.{minor}.md` (skipped entirely when there are no fragments)
 6. Runs `.github/scripts/update-maintained-versions.sh {target_version}`, which registers the line when the target is an `X.Y.0rc1` cut and retires the lines that are due: an LTS line once its recorded `retire_after` has passed, a regular line as soon as any newer line exists.
    **Report its output to the user**: a retirement means that version stops receiving backports and drops out of the installer channel selection from that point on.
 6. Generates sample config files
 7. Generates API docs (OpenAPI, GraphQL schema)
-8. Runs quality checks: `pants tailor --check`, `pants check ::` (final and patch releases only; skipped for `a`/`rc`, whose release PR CI runs the same checks)
-9. Commits everything as `release: {target_version}`
+8. Commits everything as `release: {target_version}`
 **Advancing NEXT_RELEASE_VERSION:**
 - `release.sh` does not advance it. When an `X.Y.0rc1` release PR merges and cuts `X.Y`, `create-version-branch.yml` opens a `release: freeze X.Y.0 and bump NEXT_RELEASE_VERSION to X.(Y+1).0` PR against `main`
 - That PR also freezes `main`'s `NEXT_RELEASE_VERSION` references to `X.Y.0`, the same value the version branch freezes them to at its final release. When it rewrites a migration's `# Part of:` marker, it carries the `allow:migration-edit` label
@@ -89,7 +89,6 @@ scripts/release.sh --lts {target_version} [webui_version]
 - For a year rollover or a sprint skip, set the `NEXT_DEV_VERSION` repository variable (for example `27.1.0`) before the rc1 merges, and clear it afterwards
 
 **Error handling:**
-- If quality checks fail, report errors and stop
 - If towncrier fails, check `pyproject.toml` towncrier config and `changes/` directory
 - If no changelog block was produced, check whether `changes/` held any fragment; `run-towncrier.py` skips towncrier when there is none, by design
 - If config generation fails, check component CLI availability

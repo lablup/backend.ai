@@ -2,19 +2,19 @@
 
 [background](/src/ai/backend/manager/api/adapters/prometheus_query_preset/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/prometheus_query_preset/adapter.py)
 
-Scenario: incomplete 3 / 10
+Scenario: complete
 
 - built from ops (5)
-  - batch_load_by_ids: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_by_ids: representative success ✓ · representative rejection ✓
   - get: representative success ✓ · representative rejection ✓
-  - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_purge: representative success ✓ · representative rejection ✓
   - purge: representative success ✓ · representative rejection ✓
   - search: representative success ✓ · representative rejection ✓
 - direct implementation (5)
   - admin_preview: success present 2 · rejection present 2 (global_scope)
   - create: success present 4 · rejection present 4 (global_scope)
   - execute_preset: success present 3 · rejection present 4 (single_entity)
-  - partial_bulk_update: success present 3 · rejection absent (partial_bulk): SCENARIO-GAP
+  - partial_bulk_update: success present 4 · rejection present 1 (partial_bulk)
   - update: success present 6 · rejection present 3 (single_entity)
 
 **batch_load_by_ids**
@@ -23,6 +23,7 @@ Scenario: incomplete 3 / 10
 |---|---|
 | [even when presets exist, reading an empty id list answers an empty response](#loading-loading-an-empty-id-list-answers-an-empty-list) | answered |
 | [when two presets and one absent id are read at once, the two present ones come back as nodes and the absent one as an empty item, in the requested order](#loading-loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-gap) | answered |
+| [when a user granted nothing reads presets by ids at once, it is rejected for lack of permission](#loading-a-user-granted-nothing-may-not-load-presets-by-ids) | rejected |
 
 **get**
 
@@ -37,7 +38,9 @@ Scenario: incomplete 3 / 10
 | scenario | verdict |
 |---|---|
 | [when a user granted nothing tries to purge several presets at once, nothing is deleted and all come back in the failed list for lack of permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets) | answered |
+| [when a user granted purge purges one preset and one absent id at once, the preset comes back as it was before deletion and the absent id comes back in the failed list for the permission check](#partial_bulk_purging-a-user-granted-purge-purges-only-what-it-may) | answered |
 | [when the superadmin purges two presets and one absent id at once, the two come back as they were before deletion and the absent id comes back in the failed list because the target is not found](#partial_bulk_purging-purging-several-presets-answers-for-the-missing-one) | answered |
+| [when presets exist and they are purged at once without a user context, it is rejected because the caller cannot be known](#partial_bulk_purging-a-call-carrying-no-user-may-not-purge-several-presets) | rejected |
 
 **purge**
 
@@ -98,7 +101,9 @@ Scenario: incomplete 3 / 10
 |---|---|
 | [when the superadmin edits several presets at once and gives one a broken template, only that one comes back in the failed list for the template check and the rest are edited](#partial_bulk_editing-a-broken-template-fails-only-the-preset-it-was-meant-for) | answered |
 | [when a user granted nothing tries to edit several presets at once, nothing is edited and all come back in the failed list for lack of permission](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | answered |
+| [when a user granted update edits one preset and one absent id at once, the preset comes back with the new description and the absent id comes back in the failed list for the permission check](#partial_bulk_editing-a-user-granted-update-edits-only-what-it-may) | answered |
 | [when the superadmin changes the descriptions of several presets at once, all come back with the new description and none failed](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | answered |
+| [when presets exist and their descriptions are edited at once without a user context, it is rejected because the caller cannot be known](#partial_bulk_editing-a-call-carrying-no-user-may-not-edit-several-presets) | rejected |
 
 **update**
 
@@ -179,6 +184,33 @@ Then
   - [0]: same as the whole preset of the id requested at position 1
   - [1]: same as the whole preset of the id requested at position 2
   - [2] = None
+
+<a id="loading-a-user-granted-nothing-may-not-load-presets-by-ids"></a>
+
+#### [a-user-granted-nothing-may-not-load-presets-by-ids](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_loading.py): pass
+
+when a user granted nothing reads presets by ids at once, it is rejected for lack of permission
+
+Given
+
+- 2 presets and one user
+  - Query preset wanted-1
+  - Query preset other-1
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- PrometheusQueryPresetAdapter.batch_load_by_ids: user-1 reads the ids of 2 presets seeded in advance and one absent id at once
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### get
 
@@ -311,6 +343,40 @@ Then
   - failed[1].id: same as the id of the target preset
   - failed[1].message: a reason containing 'Insufficient permission'
 
+<a id="partial_bulk_purging-a-user-granted-purge-purges-only-what-it-may"></a>
+
+#### [a-user-granted-purge-purges-only-what-it-may](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_purging.py): pass
+
+when a user granted purge purges one preset and one absent id at once, the preset comes back as it was before deletion and the absent id comes back in the failed list for the permission check
+
+Given
+
+- 1 presets and one user granted HARD_DELETE on presets
+  - Query preset wanted-1
+  - Domain home-1
+  - Prepare a user granted the HARD_DELETE permission on prometheus_query_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: HARD_DELETE allowed on every prometheus_query_preset
+    - regular user user-1: holds Role public-reader-1
+
+When
+
+- PrometheusQueryPresetAdapter.partial_bulk_purge: user-1 purges 1 presets at once and one absent id
+
+Then
+
+- the preset the caller was granted comes back as it was before deletion, and the item the caller has no permission on comes back in the failed list for the permission check
+  - successes count = 1
+  - failed count = 1
+  - successes[0]: same as the whole target preset
+  - failed[0].id: same as the absent id put in the request
+  - failed[0].message: a reason containing 'Insufficient permission'
+
 <a id="partial_bulk_purging-purging-several-presets-answers-for-the-missing-one"></a>
 
 #### [purging-several-presets-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_purging.py): pass
@@ -346,6 +412,36 @@ Then
   - successes[1]: same as the whole target preset
   - failed[0].id: same as the absent id put in the request
   - failed[0].message: a reason containing 'not found'
+
+<a id="partial_bulk_purging-a-call-carrying-no-user-may-not-purge-several-presets"></a>
+
+#### [a-call-carrying-no-user-may-not-purge-several-presets](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_purging.py): pass
+
+when presets exist and they are purged at once without a user context, it is rejected because the caller cannot be known
+
+Given
+
+- 1 presets and one user
+  - Query preset wanted-1
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset
+    - regular user user-1: holds Role public-reader-1
+
+When
+
+- PrometheusQueryPresetAdapter.partial_bulk_purge: purges presets at once without a user context
+
+Then
+
+- the call is rejected
+  - rejected: UnreachableError
 
 ### purge
 
@@ -1330,6 +1426,41 @@ Then
   - failed[1].id: same as the id of the target preset
   - failed[1].message: a reason containing 'Insufficient permission'
 
+<a id="partial_bulk_editing-a-user-granted-update-edits-only-what-it-may"></a>
+
+#### [a-user-granted-update-edits-only-what-it-may](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_editing.py): pass
+
+when a user granted update edits one preset and one absent id at once, the preset comes back with the new description and the absent id comes back in the failed list for the permission check
+
+Given
+
+- 1 presets and one user granted UPDATE on presets
+  - Query preset wanted-1
+  - Domain home-1
+  - Prepare a user granted the UPDATE permission on prometheus_query_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: UPDATE allowed on every prometheus_query_preset
+    - regular user user-1: holds Role public-reader-1
+
+When
+
+- PrometheusQueryPresetAdapter.partial_bulk_update: user-1 edits the descriptions of 1 presets at once and one absent id
+
+Then
+
+- the edited preset comes back with the new description, and the item the caller has no permission on comes back in the failed list for the permission check
+  - successes count = 1
+  - successes[0]: same as the whole target preset carrying the new description
+  - successes[0].updated_at: the time this run wrote
+  - failed count = 1
+  - failed[0].id: same as the absent id put in the request
+  - failed[0].message: a reason containing 'Insufficient permission'
+
 <a id="partial_bulk_editing-the-superadmin-edits-several-presets-at-once"></a>
 
 #### [the-superadmin-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_editing.py): pass
@@ -1365,6 +1496,36 @@ Then
   - successes[1]: same as the whole target preset carrying the new description
   - successes[1].updated_at: the time this run wrote
   - failed = []
+
+<a id="partial_bulk_editing-a-call-carrying-no-user-may-not-edit-several-presets"></a>
+
+#### [a-call-carrying-no-user-may-not-edit-several-presets](/tests/scenario/bai_scenario/manager/prometheus_query_preset/test_partial_bulk_editing.py): pass
+
+when presets exist and their descriptions are edited at once without a user context, it is rejected because the caller cannot be known
+
+Given
+
+- 1 presets and one user
+  - Query preset wanted-1
+  - Domain home-1
+  - Prepare a user granted read permission on prometheus_query_preset in public
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role public-reader-1: applies only within the scope it is granted in
+    - Role public-reader-1: READ allowed on every prometheus_query_preset
+    - regular user user-1: holds Role public-reader-1
+
+When
+
+- PrometheusQueryPresetAdapter.partial_bulk_update: edits the descriptions of presets at once without a user context
+
+Then
+
+- the call is rejected
+  - rejected: UnreachableError
 
 ### update
 

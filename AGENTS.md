@@ -95,15 +95,9 @@ Skills source: `.claude/skills/{name}/SKILL.md`
 
 ## Before committing
 
-Before committing, run the commands below and fix all errors:
-
-```bash
-pants fmt --changed-since=HEAD~1
-pants fix --changed-since=HEAD~1
-pants lint --changed-since=HEAD~1
-pants check --changed-since=HEAD~1
-pants test --changed-since=HEAD~1
-```
+- The git hooks (pre-commit, pre-push) run the low-cost checks. When a hook fails, find the cause in its output, fix it and commit or push again. Do not bypass it with `--no-verify` (except `/submit --draft`).
+- CI runs the pants-based checks (lint, check, test). After a push, check the results with `gh pr checks <PR>`; for a failed job, find the cause with `gh run view --job <job-id> --log-failed` (the job id is the last segment of the check's `link` in `gh pr checks <PR> --json name,bucket,link`), fix it and push again.
+- A local `pants test` is scoped to the changed tests. While working in several worktrees at once, local pants runs are not recommended because their pantsd loads add up; confirm with the CI results.
 
 **Fix all lint, type, and test errors — never suppress or skip.**
 

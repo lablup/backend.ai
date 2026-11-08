@@ -7,7 +7,7 @@
 - ops 구성 (5)
   - admin_search: 대표 성공 ✓ · 대표 거부 ✓
   - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
-  - batch_load_scopes_by_ids: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
+  - batch_load_scopes_by_ids: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
   - scoped_search: 대표 성공 ✓ · 대표 거부 ✓
   - search_scopes: 대표 성공 ✓ · 대표 거부 ✓
 
@@ -37,6 +37,12 @@
 | [기록을 실행한 사용자에만 읽기 권한을 받은 사용자가 그 기록과 다른 프로젝트의 기록을 조회하면, 실행한 사용자로 접근한 기록은 반환되고 다른 기록은 권한 부족으로 응답합니다](#batch_loading-a-record-is-read-through-the-user-who-triggered-it) | 거부 |
 | [읽기 권한이 없는 사용자가 자기에 대한 기록 둘을 id 로 조회하면, 항목마다 권한 부족으로 응답합니다](#batch_loading-a-user-granted-nothing-is-refused-in-every-slot-even-for-records-about-themselves) | 거부 |
 | [아무 권한도 받지 않은 모니터 역할 사용자가 id 둘을 조회하면, 항목마다 권한 부족으로 응답합니다](#batch_loading-the-monitor-role-without-a-grant-is-refused-in-every-slot) | 거부 |
+
+**batch_load_scopes_by_ids**
+
+| 시나리오 | 판정 |
+|---|---|
+| [범위 둘을 남긴 기록을 superadmin 이 그 범위들과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 에 해당하는 항목은 비어 있습니다](#batch_loading_scopes-the-superadmin-batch-load-leaves-a-missing-scope-id-empty) | 성공 |
 
 **scoped_search**
 
@@ -788,6 +794,53 @@ Then
   - length = 2
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
+
+### batch_load_scopes_by_ids
+
+<a id="batch_loading_scopes-the-superadmin-batch-load-leaves-a-missing-scope-id-empty"></a>
+
+#### [the-superadmin-batch-load-leaves-a-missing-scope-id-empty](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading_scopes.py): pass
+
+범위 둘을 남긴 기록을 superadmin 이 그 범위들과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id 에 해당하는 항목은 비어 있습니다
+
+Given
+
+- 한 프로젝트에 대한 기록을 다른 사용자가 실행했고 그 기록이 다른 프로젝트와 한 사용자를 범위로 남겼으며, superadmin 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 프로젝트 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - superadmin user-3: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 프로젝트 team-1: 'linked' 기록, 스코프 2개 추가됨
+
+When
+
+- AuditLogAdapter.batch_load_scopes_by_ids: user-3이 기록 하나의 범위와 없는 id 하나를 한 번에 조회합니다
+
+Then
+
+- 요청한 순서대로 반환되고, 없는 id 에 해당하는 항목은 비어 있습니다
+  - len(items) = 3
+  - items[0].id: 검색에서 읽은 범위 항목와 같다
+  - items[0].field_id: 검색에서 읽은 범위 항목와 같다
+  - items[0].audit_log_id: 검색에서 읽은 범위 항목와 같다
+  - items[0].scope_type = 'project'
+  - items[0].scope_id: 검색에서 읽은 범위 항목와 같다
+  - items[1].id: 검색에서 읽은 범위 항목와 같다
+  - items[1].field_id: 검색에서 읽은 범위 항목와 같다
+  - items[1].audit_log_id: 검색에서 읽은 범위 항목와 같다
+  - items[1].scope_type = 'user'
+  - items[1].scope_id: 검색에서 읽은 범위 항목와 같다
+  - items[2] = None
 
 ### scoped_search
 

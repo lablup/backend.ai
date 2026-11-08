@@ -7,7 +7,7 @@ Scenario: incomplete 1 / 5
 - built from ops (5)
   - admin_search: representative success ✓ · representative rejection ✓
   - batch_load_by_ids: representative success ✓ · representative rejection ✓
-  - batch_load_scopes_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_scopes_by_ids: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - scoped_search: representative success ✓ · representative rejection ✓
   - search_scopes: representative success ✓ · representative rejection ✓
 
@@ -37,6 +37,12 @@ Scenario: incomplete 1 / 5
 | [when a user granted read only on the user who triggered a record reads that record and a record of another project, the record reached through the triggering user comes back and the other answers with a permission failure](#batch_loading-a-record-is-read-through-the-user-who-triggered-it) | rejected |
 | [when a user without read permission reads two records about themselves by id, every item answers with a permission failure](#batch_loading-a-user-granted-nothing-is-refused-in-every-slot-even-for-records-about-themselves) | rejected |
 | [when a monitor-role user granted nothing reads two ids, every item answers with a permission failure](#batch_loading-the-monitor-role-without-a-grant-is-refused-in-every-slot) | rejected |
+
+**batch_load_scopes_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin batch-loads the two scopes a record left and one unknown id, they come back in the order asked and the item for the unknown id is empty](#batch_loading_scopes-the-superadmin-batch-load-leaves-a-missing-scope-id-empty) | answered |
 
 **scoped_search**
 
@@ -788,6 +794,53 @@ Then
   - length = 2
   - rejected: NotEnoughPermission
   - rejected: NotEnoughPermission
+
+### batch_load_scopes_by_ids
+
+<a id="batch_loading_scopes-the-superadmin-batch-load-leaves-a-missing-scope-id-empty"></a>
+
+#### [the-superadmin-batch-load-leaves-a-missing-scope-id-empty](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading_scopes.py): pass
+
+when the superadmin batch-loads the two scopes a record left and one unknown id, they come back in the order asked and the item for the unknown id is empty
+
+Given
+
+- a record about one project was triggered by another user and left another project and one user as its scopes, and one superadmin
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - superadmin user-3: has their own keypair and personal project
+  - Project team-1: 'linked' record, 2 scopes added
+
+When
+
+- AuditLogAdapter.batch_load_scopes_by_ids: user-3 reads the scopes of one record and one unknown id at once
+
+Then
+
+- they come back in the order asked and the item for an unknown id is empty
+  - len(items) = 3
+  - items[0].id: same as the scope entry the search read
+  - items[0].field_id: same as the scope entry the search read
+  - items[0].audit_log_id: same as the scope entry the search read
+  - items[0].scope_type = 'project'
+  - items[0].scope_id: same as the scope entry the search read
+  - items[1].id: same as the scope entry the search read
+  - items[1].field_id: same as the scope entry the search read
+  - items[1].audit_log_id: same as the scope entry the search read
+  - items[1].scope_type = 'user'
+  - items[1].scope_id: same as the scope entry the search read
+  - items[2] = None
 
 ### scoped_search
 

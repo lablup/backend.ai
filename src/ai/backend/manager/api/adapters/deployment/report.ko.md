@@ -2,58 +2,58 @@
 
 [배경](/src/ai/backend/manager/api/adapters/deployment/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/deployment/adapter.py)
 
-시나리오: 미완성 33 / 47
+시나리오: 미완성 12 / 47
 
 - ops 구성 (22)
   - admin_search: 대표 성공 ✓ · 대표 거부 ✓
-  - admin_search_replicas: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
+  - admin_search_replicas: 대표 성공 ✓ · 대표 거부 ✓
   - admin_search_revisions: 대표 성공 ✓ · 대표 거부 ✓
-  - batch_load_access_tokens_by_ids: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
-  - batch_load_auto_scaling_rules_by_ids: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
+  - batch_load_access_tokens_by_ids: 대표 성공 ✓ · 대표 거부 ✓
+  - batch_load_auto_scaling_rules_by_ids: 대표 성공 ✓ · 대표 거부 ✓
   - batch_load_by_ids: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
   - batch_load_policies_by_endpoint_ids: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
-  - batch_load_policies_by_ids: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
-  - batch_load_replicas_by_ids: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
+  - batch_load_policies_by_ids: 대표 성공 ✓ · 대표 거부 ✓
+  - batch_load_replicas_by_ids: 대표 성공 ✓ · 대표 거부 ✓
   - batch_load_revisions_by_ids: 대표 성공 ✓ · 대표 거부 ✗: SCENARIO-GAP
-  - batch_load_routes_by_ids: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
-  - get_access_token: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
-  - get_replica: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
+  - batch_load_routes_by_ids: 대표 성공 ✓ · 대표 거부 ✓
+  - get_access_token: 대표 성공 ✓ · 대표 거부 ✓
+  - get_replica: 대표 성공 ✓ · 대표 거부 ✓
   - get_revision: 대표 성공 ✓ · 대표 거부 ✓
   - project_search: 대표 성공 ✓ · 대표 거부 ✓
   - scoped_search: 대표 성공 ✓ · 대표 거부 ✓
-  - search_access_tokens: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
-  - search_policies: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
-  - search_replicas: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
+  - search_access_tokens: 대표 성공 ✓ · 대표 거부 ✓
+  - search_policies: 대표 성공 ✓ · 대표 거부 ✓
+  - search_replicas: 대표 성공 ✓ · 대표 거부 ✓
   - search_revisions: 대표 성공 ✓ · 대표 거부 ✓
-  - search_routes: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
-  - search_rules: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
+  - search_routes: 대표 성공 ✓ · 대표 거부 ✓
+  - search_rules: 대표 성공 ✓ · 대표 거부 ✓
 - ops + 직접 구현 (1)
   - get_current_revision: 성공 없음 · 거부 있음 1 (get_ops, single_entity): SCENARIO-GAP
 - 직접 구현 (24)
   - activate_revision: 성공 없음 · 거부 없음 (single_entity): SCENARIO-GAP
   - add_revision: 성공 있음 4 · 거부 있음 7 (single_entity)
   - admin_refresh_deployment_revisions: 성공 없음 · 거부 없음 (global_scope): SCENARIO-GAP
-  - bulk_delete_access_tokens: 성공 없음 · 거부 없음 (partial_bulk_field): SCENARIO-GAP
+  - bulk_delete_access_tokens: 성공 있음 2 · 거부 없음 (partial_bulk_field): SCENARIO-GAP
   - bulk_delete_rules: 성공 없음 · 거부 없음 (partial_bulk): SCENARIO-GAP
   - create: 성공 있음 3 · 거부 있음 2 (scope)
-  - create_access_token: 성공 없음 · 거부 없음 (single_entity): SCENARIO-GAP
-  - create_rule: 성공 없음 · 거부 없음 (single_entity): SCENARIO-GAP
+  - create_access_token: 성공 없음 · 거부 있음 1 (single_entity): SCENARIO-GAP
+  - create_rule: 성공 있음 1 · 거부 있음 1 (single_entity)
   - delete: 성공 있음 2 · 거부 있음 2 (single_entity)
   - get: 성공 있음 2 · 거부 있음 3 (single_entity)
-  - get_policy: 성공 없음 · 거부 없음 (single_entity): SCENARIO-GAP
-  - get_rule: 성공 없음 · 거부 없음 (single_entity): SCENARIO-GAP
+  - get_policy: 성공 있음 1 · 거부 있음 1 (single_entity)
+  - get_rule: 성공 있음 1 · 거부 있음 1 (single_entity)
   - partial_bulk_purge_access_tokens: 성공 있음 2 · 거부 없음 (partial_bulk_field): SCENARIO-GAP
   - partial_bulk_purge_rules: 성공 있음 3 · 거부 없음 (partial_bulk_field): SCENARIO-GAP
   - partial_bulk_update_rules: 성공 있음 2 · 거부 없음 (partial_bulk_field): SCENARIO-GAP
-  - purge_access_token: 성공 없음 · 거부 없음 (single_field): SCENARIO-GAP
-  - purge_rule: 성공 없음 · 거부 없음 (single_entity): SCENARIO-GAP
+  - purge_access_token: 성공 있음 1 · 거부 있음 1 (single_field)
+  - purge_rule: 성공 있음 1 · 거부 있음 1 (single_entity)
   - replace_options: 성공 있음 4 · 거부 있음 3 (single_entity)
   - search_revision_resource_slots: 성공 있음 1 · 거부 있음 1 (single_field)
   - sync_replicas: 성공 있음 1 · 거부 있음 1 (single_entity)
   - update: 성공 있음 5 · 거부 있음 2 (single_entity)
-  - update_route_traffic: 성공 없음 · 거부 없음 (single_field): SCENARIO-GAP
-  - update_rule: 성공 없음 · 거부 없음 (single_entity): SCENARIO-GAP
-  - upsert_policy: 성공 없음 · 거부 없음 (single_entity): SCENARIO-GAP
+  - update_route_traffic: 성공 있음 1 · 거부 있음 1 (single_field)
+  - update_rule: 성공 있음 1 · 거부 있음 1 (single_entity)
+  - upsert_policy: 성공 있음 1 · 거부 있음 1 (single_entity)
 
 **admin_search**
 
@@ -62,6 +62,13 @@
 | [배포 셋이 있고 superadmin 이 필터 없이 전체를 조회하면, 셋을 모두 셉니다](#searching-the-superadmin-counts-every-deployment) | 성공 |
 | [배포 읽기 권한을 받았지만 superadmin 이 아닌 사용자가 전체를 조회하면, 역할로 거부됩니다. 이 동작은 권한 그래프가 아니라 역할이 검사합니다](#searching-a-user-granted-read-may-not-search-every-deployment) | 거부 |
 
+**admin_search_replicas**
+
+| 시나리오 | 판정 |
+|---|---|
+| [superadmin 이 복제본 전체를 기준으로 걸러 조회하면, 심은 복제본이 옵니다. 복제본 전체 훑기는 전역 권한이 필요한 호출이라 이 행의 요청 사용자는 superadmin 입니다](#searching_replicas_admin-the-superadmin-searches-the-replicas) | 성공 |
+| [아무 권한도 받지 않은 사용자가 복제본 전체를 조회하려 하면, 전역 권한이 없다는 이유로 거부됩니다](#searching_replicas_admin-a-user-granted-nothing-searches-no-replica) | 거부 |
+
 **admin_search_revisions**
 
 | 시나리오 | 판정 |
@@ -69,11 +76,60 @@
 | [두 프로젝트의 배포에 리비전이 나뉘어 있고 superadmin 이 필터 없이 전체를 조회하면, 둘의 것을 모두 셉니다. 이 동작은 역할이 검사합니다](#searching_revisions-the-superadmin-counts-every-revision) | 성공 |
 | [모든 배포에 읽기 권한을 받았지만 superadmin 이 아닌 사용자가 전체 리비전을 조회하면, 역할로 거부됩니다](#searching_revisions-a-user-granted-read-may-not-search-every-revision) | 거부 |
 
+**batch_load_access_tokens_by_ids**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 조회 권한을 받은 사용자가 배포가 걸린 접근 토큰을 id 로 한꺼번에 읽으면, 그 토큰들이 옵니다](#batch_loading_access_tokens-a-user-granted-deployment-read-loads-the-tokens-by-id) | 성공 |
+| [아무 권한도 받지 않은 사용자가 배포가 걸린 접근 토큰을 id 로 한꺼번에 읽으려 하면, 모든 항목이 권한이 없다는 이유로 거부됩니다](#batch_loading_access_tokens-a-user-granted-nothing-gets-a-refusal-for-each-token) | 거부 |
+
+**batch_load_auto_scaling_rules_by_ids**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 조회 권한을 받은 사용자가 배포가 걸린 자동 스케일링 규칙을 id 로 한꺼번에 읽으면, 그 규칙들이 옵니다](#batch_loading_rules-a-user-granted-deployment-read-loads-the-rules-by-id) | 성공 |
+| [아무 권한도 받지 않은 사용자가 배포가 걸린 자동 스케일링 규칙을 id 로 한꺼번에 읽으려 하면, 모든 항목이 권한이 없다는 이유로 거부됩니다](#batch_loading_rules-a-user-granted-nothing-gets-a-refusal-for-each-rule) | 거부 |
+
+**batch_load_policies_by_ids**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 조회 권한을 받은 사용자가 배포가 걸린 정책을 id 로 한꺼번에 읽으면, 그 정책이 옵니다](#batch_loading_policies-a-user-granted-deployment-read-loads-the-policy-by-id) | 성공 |
+| [아무 권한도 받지 않은 사용자가 배포가 걸린 정책을 id 로 한꺼번에 읽으려 하면, 모든 항목이 권한이 없다는 이유로 거부됩니다](#batch_loading_policies-a-user-granted-nothing-gets-a-refusal-for-the-policy) | 거부 |
+
+**batch_load_replicas_by_ids**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 조회 권한을 받은 사용자가 배포가 걸린 복제본을 id 로 한꺼번에 읽으면, 그 복제본들이 옵니다](#batch_loading_replicas-a-user-granted-deployment-read-loads-the-replicas-by-id) | 성공 |
+| [아무 권한도 받지 않은 사용자가 배포가 걸린 복제본을 id 로 한꺼번에 읽으려 하면, 모든 항목이 권한이 없다는 이유로 거부됩니다](#batch_loading_replicas-a-user-granted-nothing-gets-a-refusal-for-the-replicas) | 거부 |
+
 **batch_load_revisions_by_ids**
 
 | 시나리오 | 판정 |
 |---|---|
 | [한 프로젝트에서만 배포 읽기 권한을 받은 사용자가 읽을 수 있는 리비전, 다른 프로젝트의 리비전, 아무것도 갖지 않은 id 를 한 번에 조회하면, 지정한 순서대로 리비전, 거부, 빈 항목이 옵니다](#reading_revisions-loading-revisions-by-id-answers-each-id-on-its-own) | 성공 |
+
+**batch_load_routes_by_ids**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 조회 권한을 받은 사용자가 배포가 걸린 라우트를 id 로 한꺼번에 읽으면, 그 라우트들이 옵니다](#batch_loading_routes-a-user-granted-deployment-read-loads-the-routes-by-id) | 성공 |
+| [아무 권한도 받지 않은 사용자가 배포가 걸린 라우트를 id 로 한꺼번에 읽으려 하면, 모든 항목이 권한이 없다는 이유로 거부됩니다](#batch_loading_routes-a-user-granted-nothing-gets-a-refusal-for-the-routes) | 거부 |
+
+**get_access_token**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 조회 권한을 받은 사용자가 배포가 걸린 접근 토큰 하나를 읽으면, 그 토큰이 옵니다](#reading_access_tokens-a-user-granted-deployment-read-reads-a-token) | 성공 |
+| [아무 권한도 받지 않은 사용자가 배포가 걸린 접근 토큰 하나를 읽으려 하면, 토큰이 걸린 배포를 찾는 조회가 거부됩니다](#reading_access_tokens-a-user-granted-nothing-reads-no-token) | 거부 |
+
+**get_replica**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 조회 권한을 받은 사용자가 배포의 복제본을 읽으면, 그 복제본이 옵니다](#reading_replicas-a-user-granted-deployment-read-reads-the-replica) | 성공 |
+| [아무 권한도 받지 않은 사용자가 배포의 복제본을 읽으려 하면, 복제본이 걸린 배포를 찾는 조회가 거부됩니다](#reading_replicas-a-user-granted-nothing-reads-no-replica) | 거부 |
 
 **get_revision**
 
@@ -98,6 +154,28 @@
 | [같은 프로젝트에 두 사람이 각자 배포를 생성했고 자기 스코프에서 읽기 권한을 받은 사람이 자기 것을 조회하면, 자기가 생성한 것만 나옵니다](#searching-searching-my-own-finds-only-what-i-made) | 성공 |
 | [자기 스코프에서 읽기 권한을 받지 않은 사람이 자기 것을 조회하면, 권한 부족으로 거부됩니다. 이 동작도 범위를 좁히기만 하지 않고 권한이 검사합니다](#searching-a-user-granted-nothing-may-not-search-even-their-own) | 거부 |
 
+**search_access_tokens**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 조회 권한을 받은 사용자가 배포가 걸린 접근 토큰을 기준으로 걸러 훑으면, 그 토큰들이 옵니다](#searching_access_tokens-a-user-granted-deployment-read-searches-the-tokens) | 성공 |
+| [아무 권한도 받지 않은 사용자가 배포가 걸린 접근 토큰을 훑으려 하면, 권한이 없다는 이유로 거부됩니다](#searching_access_tokens-a-user-granted-nothing-searches-no-token) | 거부 |
+
+**search_policies**
+
+| 시나리오 | 판정 |
+|---|---|
+| [superadmin 이 배포 정책을 기준으로 걸러 훑으면, 심은 정책이 옵니다. 정책 훑기는 전역 권한이 필요한 호출이라 이 행의 요청 사용자는 superadmin 입니다](#searching_policies-the-superadmin-searches-the-policies) | 성공 |
+| [아무 권한도 받지 않은 사용자가 배포 정책을 훑으려 하면, 전역 권한이 없다는 이유로 거부됩니다](#searching_policies-a-user-granted-nothing-searches-no-policy) | 거부 |
+
+**search_replicas**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 조회 권한을 받은 사용자가 트래픽이 켜진 라우트의 복제본을 조회하면, 심은 복제본이 옵니다](#searching_replicas-a-user-granted-deployment-read-searches-the-replica-with-traffic-enabled) | 성공 |
+| [배포 조회 권한을 받은 사용자가 배포의 복제본을 기준으로 걸러 조회하면, 심은 복제본이 옵니다](#searching_replicas-a-user-granted-deployment-read-searches-the-replicas) | 성공 |
+| [아무 권한도 받지 않은 사용자가 배포의 복제본을 조회하려 하면, 권한이 없다는 이유로 거부됩니다](#searching_replicas-a-user-granted-nothing-searches-no-replica) | 거부 |
+
 **search_revisions**
 
 | 시나리오 | 판정 |
@@ -106,6 +184,20 @@
 | [두 프로젝트의 배포에 리비전이 나뉘어 있고 한쪽에만 읽기 권한을 받은 사용자가 그쪽 배포의 리비전을 조회하면, 그쪽 것만 나옵니다](#searching_revisions-another-deployments-revisions-stay-out-of-a-deployment-search) | 성공 |
 | [리비전 셋이 딸린 배포의 리비전을 번호 필터로 조회하면, 그 번호의 것만 남습니다](#searching_revisions-filtering-revisions-by-number-leaves-only-that-one) | 성공 |
 | [아무 배포 권한도 받지 않은 사용자가 배포의 리비전을 조회하면, 권한 부족으로 거부됩니다](#searching_revisions-a-user-granted-nothing-may-not-search-a-deployments-revisions) | 거부 |
+
+**search_routes**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 조회 권한을 받은 사용자가 배포의 라우트를 기준으로 걸러 조회하면, 심은 라우트가 옵니다](#searching_routes-a-user-granted-deployment-read-searches-the-routes) | 성공 |
+| [아무 권한도 받지 않은 사용자가 배포의 라우트를 조회하려 하면, 권한이 없다는 이유로 거부됩니다](#searching_routes-a-user-granted-nothing-searches-no-route) | 거부 |
+
+**search_rules**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 조회 권한을 받은 사용자가 배포가 걸린 자동 스케일링 규칙을 기준으로 걸러 훑으면, 그 규칙들이 옵니다](#searching_rules-a-user-granted-deployment-read-searches-the-rules) | 성공 |
+| [아무 권한도 받지 않은 사용자가 배포가 걸린 자동 스케일링 규칙을 훑으려 하면, 권한이 없다는 이유로 거부됩니다](#searching_rules-a-user-granted-nothing-searches-no-rule) | 거부 |
 
 **get_current_revision**
 
@@ -129,6 +221,13 @@
 | [프리셋 없이 인퍼런스 런타임 종류를 빼고 리비전을 추가하면, 입력이 틀렸다는 이유로 거부됩니다](#adding_revisions-a-revision-with-no-runtime-variant-from-any-layer-is-refused) | 거부 |
 | [배포 읽기 권한만 받은 사용자가 리비전을 추가하면, 권한 부족으로 거부됩니다](#adding_revisions-a-user-granted-only-read-may-not-add-a-revision) | 거부 |
 
+**bulk_delete_access_tokens**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 영구 삭제 권한을 받은 사용자가 배포가 걸린 접근 토큰 여럿을 한 번에 purge 하면, 그 토큰들의 id 가 옵니다](#retiring_access_tokens-a-user-granted-deployment-purge-purges-tokens-at-once) | 성공 |
+| [아무 권한도 받지 않은 사용자가 배포가 걸린 접근 토큰 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 id 목록이 비어 옵니다](#retiring_access_tokens-a-user-granted-nothing-purges-no-token-at-once) | 성공 |
+
 **create**
 
 | 시나리오 | 판정 |
@@ -138,6 +237,19 @@
 | [엔티티 권한 집행을 비활성화하면 아무 권한도 받지 않은 사용자도 배포를 생성합니다. 이 동작은 역할이 아니라 권한 그래프가 검사합니다](#creating-turning-enforcement-off-lets-a-user-create-a-deployment) | 성공 |
 | [생성 권한을 받은 프로젝트가 아닌 다른 프로젝트에 배포를 생성하면, 권한 부족으로 거부됩니다](#creating-a-create-grant-in-another-project-does-not-reach-this-one) | 거부 |
 | [아무 배포 권한도 받지 않은 사용자가 배포를 생성하면, 권한 부족으로 거부됩니다](#creating-a-user-granted-nothing-may-not-create-a-deployment) | 거부 |
+
+**create_access_token**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 생성 권한을 받은 사용자가 심은 배포의 접근 토큰을 만들려 하면, 배포의 스케일링 그룹에 프록시 대상이 없다는 이유로 거부됩니다. 토큰 문자열을 발행하는 주체가 그룹의 프록시 대상이므로, 대상이 없으면 만들 수 없습니다](#creating_access_tokens-a-user-granted-deployment-create-makes-no-token) | 거부 |
+
+**create_rule**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 생성 권한을 받은 사용자가 배포에 자동 스케일링 규칙을 만들면, 만든 규칙이 옵니다](#creating_rules-a-user-granted-deployment-create-makes-a-rule) | 성공 |
+| [아무 권한도 받지 않은 사용자가 배포에 자동 스케일링 규칙을 만들려 하면, 권한이 없다는 이유로 거부됩니다](#creating_rules-a-user-granted-nothing-makes-no-rule) | 거부 |
 
 **delete**
 
@@ -157,6 +269,20 @@
 | [같은 배포가 있고 아무 권한도 받지 않은 사용자가 조회하면, 권한 부족으로 거부됩니다](#reading-a-user-granted-nothing-may-not-read-a-deployment) | 거부 |
 | [superadmin 이 아무것도 갖지 않은 id 로 조회하면, 대상이 없다는 것으로 거부됩니다. 권한 검사를 지나가는 사람만 이 응답을 봅니다](#reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
 | [읽기 권한을 받은 사용자가 아무것도 갖지 않은 id 로 조회하면, 대상이 없다는 것이 아니라 권한 부족으로 거부됩니다. 없는 row 에는 걸린 권한도 없기 때문입니다](#reading-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | 거부 |
+
+**get_policy**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 조회 권한을 받은 사용자가 배포가 걸린 정책을 읽으면, 그 정책이 옵니다](#reading_policy-a-user-granted-deployment-read-reads-the-policy) | 성공 |
+| [아무 권한도 받지 않은 사용자가 배포가 걸린 정책을 읽으려 하면, 권한이 없다는 이유로 거부됩니다](#reading_policy-a-user-granted-nothing-reads-no-policy) | 거부 |
+
+**get_rule**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 조회 권한을 받은 사용자가 심은 규칙 하나를 id 로 읽으면, 그 규칙이 옵니다](#reading_rules-a-user-granted-deployment-read-reads-a-rule) | 성공 |
+| [아무 권한도 받지 않은 사용자가 심은 규칙 하나를 id 로 읽으려 하면, 규칙이 걸린 배포를 찾는 조회가 거부됩니다](#reading_rules-a-user-granted-nothing-reads-no-rule) | 거부 |
 
 **partial_bulk_purge_access_tokens**
 
@@ -179,6 +305,20 @@
 |---|---|
 | [배포 수정 권한을 받은 사용자가 오토스케일링 규칙 여럿의 지표 이름을 한 번에 변경하면, 모두 새 이름으로 오고 실패한 것은 없습니다](#partial_bulk_auto_scaling_rules-a-deployment-editor-edits-several-rules-at-once) | 성공 |
 | [아무 권한도 받지 않은 사용자가 오토스케일링 규칙 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다](#partial_bulk_auto_scaling_rules-a-user-granted-nothing-edits-none-of-several-rules) | 성공 |
+
+**purge_access_token**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 조회와 영구 삭제 권한을 받은 사용자가 배포가 걸린 접근 토큰 하나를 purge 하면, 그 토큰의 id 가 옵니다. 토큰 purge 는 토큰이 걸린 배포를 먼저 찾는 호출이라 조회 권한도 필요합니다](#retiring_access_tokens-a-user-granted-deployment-purge-purges-a-token) | 성공 |
+| [아무 권한도 받지 않은 사용자가 배포가 걸린 접근 토큰 하나를 purge 하려 하면, 토큰이 걸린 배포를 찾는 조회가 거부됩니다](#retiring_access_tokens-a-user-granted-nothing-purges-no-token) | 거부 |
+
+**purge_rule**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 조회와 영구 삭제 권한을 받은 사용자가 배포가 걸린 자동 스케일링 규칙 하나를 purge 하면, 그 규칙의 id 가 옵니다. 규칙 purge 는 배포를 먼저 찾는 호출이라 조회 권한도 필요합니다](#retiring_rules-a-user-granted-deployment-purge-purges-a-rule) | 성공 |
+| [아무 권한도 받지 않은 사용자가 배포가 걸린 자동 스케일링 규칙 하나를 purge 하려 하면, 규칙이 걸린 배포를 찾는 조회가 거부됩니다](#retiring_rules-a-user-granted-nothing-purges-no-rule) | 거부 |
 
 **replace_options**
 
@@ -217,6 +357,27 @@
 | [다른 사람이 생성한 배포의 이름을 아무 권한도 받지 않은 superadmin 이 변경하면, 이름만 새 값이 됩니다. 역할이 권한 그래프를 지나갑니다](#editing-the-superadmin-renames-anothers-deployment-without-a-grant) | 성공 |
 | [읽기 권한만 받은 사용자가 배포를 수정하면, 권한 부족으로 거부됩니다](#editing-a-user-granted-only-read-may-not-update-a-deployment) | 거부 |
 | [superadmin 이 아무것도 갖지 않은 id 를 수정하면, 대상이 없다는 것으로 거부됩니다](#editing-updating-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
+
+**update_route_traffic**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 조회와 수정 권한을 받은 사용자가 라우트의 트래픽을 열면, 트래픽을 연 라우트가 옵니다. 트래픽 바꾸기는 라우트가 걸린 배포를 먼저 찾는 호출이라 조회 권한도 필요합니다](#editing_route_traffic-a-user-granted-deployment-update-opens-the-traffic) | 성공 |
+| [아무 권한도 받지 않은 사용자가 라우트의 트래픽을 바꾸려 하면, 라우트가 걸린 배포를 찾는 조회가 거부됩니다](#editing_route_traffic-a-user-granted-nothing-changes-no-traffic) | 거부 |
+
+**update_rule**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 조회와 수정 권한을 받은 사용자가 심은 규칙 하나를 고치면, 고친 규칙이 옵니다. 규칙 읽기와 고치기는 배포를 먼저 찾는 호출이라 조회 권한도 필요합니다](#updating_rules-a-user-granted-deployment-update-edits-a-rule) | 성공 |
+| [아무 권한도 받지 않은 사용자가 심은 규칙 하나를 고치려 하면, 규칙이 걸린 배포를 찾는 조회가 거부됩니다](#updating_rules-a-user-granted-nothing-edits-no-rule) | 거부 |
+
+**upsert_policy**
+
+| 시나리오 | 판정 |
+|---|---|
+| [배포 수정 권한을 받은 사용자가 배포에 정책을 올리면, 올린 정책이 옵니다. 정책 upsert 는 갈아끼우기라 수정 권한으로 거는 호출입니다](#upserting_policy-a-user-granted-deployment-update-puts-the-policy) | 성공 |
+| [아무 권한도 받지 않은 사용자가 배포에 정책을 올리려 하면, 권한이 없다는 이유로 거부됩니다](#upserting_policy-a-user-granted-nothing-puts-no-policy) | 거부 |
 
 ### admin_search
 
@@ -282,6 +443,112 @@ Given
 When
 
 - DeploymentAdapter.admin_search: user-1 이 필터 없이 전체를 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: InsufficientPrivilege
+
+### admin_search_replicas
+
+<a id="searching_replicas_admin-the-superadmin-searches-the-replicas"></a>
+
+#### [the-superadmin-searches-the-replicas](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas_admin.py): pass
+
+superadmin 이 복제본 전체를 기준으로 걸러 조회하면, 심은 복제본이 옵니다. 복제본 전체 훑기는 전역 권한이 필요한 호출이라 이 행의 요청 사용자는 superadmin 입니다
+
+Given
+
+- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, superadmin 한 명, 트래픽이 켜진 복제본 라우트 하나가 더 걸려 있고
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 vfolder, 인퍼런스 런타임 종류, 자원 슬롯 유형 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+    - vfolder 읽기 권한 부여
+      - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - superadmin user-1: 역할 folder-reader-1 보유
+    - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+    - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+    - 자원 슬롯 유형 mem: 리비전이 채우지 않아도 됩니다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+
+When
+
+- DeploymentAdapter.admin_search_replicas: user-1 이 복제본 전체를 하나의 기준으로 걸러 순서와 함께 조회합니다
+
+Then
+
+- 기준이 제외하는 복제본은 오지 않고, 심은 복제본이 양과 함께 옵니다
+  - total_count = 1
+  - items count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: 미리 저장한 라우트의 id 와 같다
+  - items[0].field_id: 미리 저장한 라우트의 id 와 같다
+  - items[0].deployment_id: 복제본이 받쳐주는 배포의 id 와 같다
+  - items[0].revision_id: 미리 저장한 리비전의 id 와 같다
+  - items[0].session_id = None
+  - items[0].readiness_status = 'NOT_CHECKED'
+  - items[0].liveness_status = 'NOT_CHECKED'
+  - items[0].activeness_status = 'INACTIVE'
+  - items[0].status = 'provisioning'
+  - items[0].traffic_status = 'inactive'
+  - items[0].health_status = 'not_checked'
+  - items[0].created_at: 이 실행이 쓴 시각
+
+<a id="searching_replicas_admin-a-user-granted-nothing-searches-no-replica"></a>
+
+#### [a-user-granted-nothing-searches-no-replica](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas_admin.py): pass
+
+아무 권한도 받지 않은 사용자가 복제본 전체를 조회하려 하면, 전역 권한이 없다는 이유로 거부됩니다
+
+Given
+
+- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 vfolder, 인퍼런스 런타임 종류, 자원 슬롯 유형 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+    - vfolder 읽기 권한 부여
+      - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+    - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+    - 자원 슬롯 유형 mem: 리비전이 채우지 않아도 됩니다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+
+When
+
+- DeploymentAdapter.admin_search_replicas: user-1 이 복제본 전체를 하나의 기준으로 걸러 순서와 함께 조회합니다
 
 Then
 
@@ -383,6 +650,358 @@ Then
 - 거부됩니다
   - 거부: InsufficientPrivilege
 
+### batch_load_access_tokens_by_ids
+
+<a id="batch_loading_access_tokens-a-user-granted-deployment-read-loads-the-tokens-by-id"></a>
+
+#### [a-user-granted-deployment-read-loads-the-tokens-by-id](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_access_tokens.py): pass
+
+배포 조회 권한을 받은 사용자가 배포가 걸린 접근 토큰을 id 로 한꺼번에 읽으면, 그 토큰들이 옵니다
+
+Given
+
+- 접근 토큰 2개가 걸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+
+When
+
+- DeploymentAdapter.batch_load_access_tokens_by_ids: user-1 이 심은 토큰 2개를 id 로 한꺼번에 읽습니다
+
+Then
+
+- 토큰이 요청에 넣은 순서대로 옵니다
+  - loaded count = 2
+  - [0].id: 미리 저장한 토큰의 id 와 같다
+  - [0].field_id: 미리 저장한 토큰의 id 와 같다
+  - [0].token = 'scenario-token'
+  - [0].expires_at = None
+  - [0].created_at: 이 실행이 쓴 시각
+  - [1].id: 미리 저장한 토큰의 id 와 같다
+  - [1].field_id: 미리 저장한 토큰의 id 와 같다
+  - [1].token = 'scenario-token'
+  - [1].expires_at = None
+  - [1].created_at: 이 실행이 쓴 시각
+
+<a id="batch_loading_access_tokens-a-user-granted-nothing-gets-a-refusal-for-each-token"></a>
+
+#### [a-user-granted-nothing-gets-a-refusal-for-each-token](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_access_tokens.py): pass
+
+아무 권한도 받지 않은 사용자가 배포가 걸린 접근 토큰을 id 로 한꺼번에 읽으려 하면, 모든 항목이 권한이 없다는 이유로 거부됩니다
+
+Given
+
+- 접근 토큰 2개가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+
+When
+
+- DeploymentAdapter.batch_load_access_tokens_by_ids: user-1 이 심은 토큰 2개를 id 로 한꺼번에 읽습니다
+
+Then
+
+- 토큰 없이 모든 항목이 거부된 예외로 옵니다
+  - loaded count = 2
+  - 거부: NotEnoughPermission
+  - 거부: NotEnoughPermission
+
+### batch_load_auto_scaling_rules_by_ids
+
+<a id="batch_loading_rules-a-user-granted-deployment-read-loads-the-rules-by-id"></a>
+
+#### [a-user-granted-deployment-read-loads-the-rules-by-id](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_rules.py): pass
+
+배포 조회 권한을 받은 사용자가 배포가 걸린 자동 스케일링 규칙을 id 로 한꺼번에 읽으면, 그 규칙들이 옵니다
+
+Given
+
+- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+
+When
+
+- DeploymentAdapter.batch_load_auto_scaling_rules_by_ids: user-1 이 심은 규칙 2개를 id 로 한꺼번에 읽습니다
+
+Then
+
+- 규칙이 요청에 넣은 순서대로 옵니다
+  - loaded count = 2
+  - [0].id: 미리 저장한 규칙의 id 와 같다
+  - [0].field_id: 미리 저장한 규칙의 id 와 같다
+  - [0].deployment_id: 규칙이 걸린 배포의 id 와 같다
+  - [0].metric_source = 'KERNEL'
+  - [0].metric_name = 'cpu_util'
+  - [0].min_threshold = None
+  - [0].max_threshold = None
+  - [0].step_size = 1
+  - [0].time_window = 60
+  - [0].min_replicas = None
+  - [0].max_replicas = None
+  - [0].prometheus_query_preset_id = None
+  - [0].created_at: 이 실행이 쓴 시각
+  - [0].last_triggered_at = None
+  - [1].id: 미리 저장한 규칙의 id 와 같다
+  - [1].field_id: 미리 저장한 규칙의 id 와 같다
+  - [1].deployment_id: 규칙이 걸린 배포의 id 와 같다
+  - [1].metric_source = 'KERNEL'
+  - [1].metric_name = 'cpu_util'
+  - [1].min_threshold = None
+  - [1].max_threshold = None
+  - [1].step_size = 1
+  - [1].time_window = 60
+  - [1].min_replicas = None
+  - [1].max_replicas = None
+  - [1].prometheus_query_preset_id = None
+  - [1].created_at: 이 실행이 쓴 시각
+  - [1].last_triggered_at = None
+
+<a id="batch_loading_rules-a-user-granted-nothing-gets-a-refusal-for-each-rule"></a>
+
+#### [a-user-granted-nothing-gets-a-refusal-for-each-rule](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_rules.py): pass
+
+아무 권한도 받지 않은 사용자가 배포가 걸린 자동 스케일링 규칙을 id 로 한꺼번에 읽으려 하면, 모든 항목이 권한이 없다는 이유로 거부됩니다
+
+Given
+
+- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+
+When
+
+- DeploymentAdapter.batch_load_auto_scaling_rules_by_ids: user-1 이 심은 규칙 2개를 id 로 한꺼번에 읽습니다
+
+Then
+
+- 규칙 없이 모든 항목이 거부된 예외로 옵니다
+  - loaded count = 2
+  - 거부: NotEnoughPermission
+  - 거부: NotEnoughPermission
+
+### batch_load_policies_by_ids
+
+<a id="batch_loading_policies-a-user-granted-deployment-read-loads-the-policy-by-id"></a>
+
+#### [a-user-granted-deployment-read-loads-the-policy-by-id](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_policies.py): pass
+
+배포 조회 권한을 받은 사용자가 배포가 걸린 정책을 id 로 한꺼번에 읽으면, 그 정책이 옵니다
+
+Given
+
+- 정책 하나가 걸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 배포 정책 하나를 갖는다
+
+When
+
+- DeploymentAdapter.batch_load_policies_by_ids: user-1 이 심은 정책 하나를 id 로 한꺼번에 읽습니다
+
+Then
+
+- 정책이 요청에 넣은 순서대로 옵니다
+  - [0].id: 미리 저장한 정책의 id 와 같다
+  - [0].field_id: 미리 저장한 정책의 id 와 같다
+  - [0].deployment_id: 정책이 걸린 배포의 id 와 같다
+  - [0].strategy_spec.strategy: 미리 저장한 정책의 전략와 같다
+  - [0].strategy_spec.max_surge = IntOrPercent(count=1, percent=None)
+  - [0].strategy_spec.max_unavailable = IntOrPercent(count=0, percent=None)
+  - [0].created_at: 이 실행이 쓴 시각
+  - [0].updated_at: 이 실행이 쓴 시각
+
+<a id="batch_loading_policies-a-user-granted-nothing-gets-a-refusal-for-the-policy"></a>
+
+#### [a-user-granted-nothing-gets-a-refusal-for-the-policy](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_policies.py): pass
+
+아무 권한도 받지 않은 사용자가 배포가 걸린 정책을 id 로 한꺼번에 읽으려 하면, 모든 항목이 권한이 없다는 이유로 거부됩니다
+
+Given
+
+- 정책 하나가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 배포 정책 하나를 갖는다
+
+When
+
+- DeploymentAdapter.batch_load_policies_by_ids: user-1 이 심은 정책 하나를 id 로 한꺼번에 읽습니다
+
+Then
+
+- 정책 없이 모든 항목이 거부된 예외로 옵니다
+  - 거부: NotEnoughPermission
+
+### batch_load_replicas_by_ids
+
+<a id="batch_loading_replicas-a-user-granted-deployment-read-loads-the-replicas-by-id"></a>
+
+#### [a-user-granted-deployment-read-loads-the-replicas-by-id](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_replicas.py): pass
+
+배포 조회 권한을 받은 사용자가 배포가 걸린 복제본을 id 로 한꺼번에 읽으면, 그 복제본들이 옵니다
+
+Given
+
+- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 vfolder, 인퍼런스 런타임 종류, 자원 슬롯 유형 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+    - vfolder 읽기 권한 부여
+      - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+    - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+    - 자원 슬롯 유형 mem: 리비전이 채우지 않아도 됩니다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+
+When
+
+- DeploymentAdapter.batch_load_replicas_by_ids: user-1 이 심은 복제본을 id 로 한꺼번에 읽습니다
+
+Then
+
+- 복제본이 요청에 넣은 순서대로 옵니다
+  - [0].id: 미리 저장한 라우트의 id 와 같다
+  - [0].field_id: 미리 저장한 라우트의 id 와 같다
+  - [0].deployment_id: 복제본이 받쳐주는 배포의 id 와 같다
+  - [0].revision_id: 미리 저장한 리비전의 id 와 같다
+  - [0].session_id = None
+  - [0].readiness_status = 'NOT_CHECKED'
+  - [0].liveness_status = 'NOT_CHECKED'
+  - [0].activeness_status = 'INACTIVE'
+  - [0].status = 'provisioning'
+  - [0].traffic_status = 'inactive'
+  - [0].health_status = 'not_checked'
+  - [0].created_at: 이 실행이 쓴 시각
+
+<a id="batch_loading_replicas-a-user-granted-nothing-gets-a-refusal-for-the-replicas"></a>
+
+#### [a-user-granted-nothing-gets-a-refusal-for-the-replicas](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_replicas.py): pass
+
+아무 권한도 받지 않은 사용자가 배포가 걸린 복제본을 id 로 한꺼번에 읽으려 하면, 모든 항목이 권한이 없다는 이유로 거부됩니다
+
+Given
+
+- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 vfolder, 인퍼런스 런타임 종류, 자원 슬롯 유형 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+    - vfolder 읽기 권한 부여
+      - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+    - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+    - 자원 슬롯 유형 mem: 리비전이 채우지 않아도 됩니다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+
+When
+
+- DeploymentAdapter.batch_load_replicas_by_ids: user-1 이 심은 복제본을 id 로 한꺼번에 읽습니다
+
+Then
+
+- 복제본 없이 모든 항목이 거부된 예외로 옵니다
+  - 거부: NotEnoughPermission
+
 ### batch_load_revisions_by_ids
 
 <a id="reading_revisions-loading-revisions-by-id-answers-each-id-on-its-own"></a>
@@ -453,6 +1072,284 @@ Then
   - [0].revision_preset_id = None
   - [1] = 'NotEnoughPermission'
   - [2] = None
+
+### batch_load_routes_by_ids
+
+<a id="batch_loading_routes-a-user-granted-deployment-read-loads-the-routes-by-id"></a>
+
+#### [a-user-granted-deployment-read-loads-the-routes-by-id](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_routes.py): pass
+
+배포 조회 권한을 받은 사용자가 배포가 걸린 라우트를 id 로 한꺼번에 읽으면, 그 라우트들이 옵니다
+
+Given
+
+- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 vfolder, 인퍼런스 런타임 종류, 자원 슬롯 유형 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+    - vfolder 읽기 권한 부여
+      - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+    - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+    - 자원 슬롯 유형 mem: 리비전이 채우지 않아도 됩니다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+
+When
+
+- DeploymentAdapter.batch_load_routes_by_ids: user-1 이 심은 라우트를 id 로 한꺼번에 읽습니다
+
+Then
+
+- 라우트가 요청에 넣은 순서대로 옵니다
+  - [0].id: 미리 저장한 라우트의 id 와 같다
+  - [0].field_id: 미리 저장한 라우트의 id 와 같다
+  - [0].deployment_id: 라우트가 받쳐주는 배포의 id 와 같다
+  - [0].session_id = None
+  - [0].status = 'provisioning'
+  - [0].health_status = 'not_checked'
+  - [0].traffic_ratio = 1.0
+  - [0].created_at: 이 실행이 쓴 시각
+  - [0].revision_id: 미리 저장한 리비전의 id 와 같다
+  - [0].traffic_status = 'inactive'
+  - [0].error_data = {}
+
+<a id="batch_loading_routes-a-user-granted-nothing-gets-a-refusal-for-the-routes"></a>
+
+#### [a-user-granted-nothing-gets-a-refusal-for-the-routes](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_routes.py): pass
+
+아무 권한도 받지 않은 사용자가 배포가 걸린 라우트를 id 로 한꺼번에 읽으려 하면, 모든 항목이 권한이 없다는 이유로 거부됩니다
+
+Given
+
+- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 vfolder, 인퍼런스 런타임 종류, 자원 슬롯 유형 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+    - vfolder 읽기 권한 부여
+      - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+    - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+    - 자원 슬롯 유형 mem: 리비전이 채우지 않아도 됩니다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+
+When
+
+- DeploymentAdapter.batch_load_routes_by_ids: user-1 이 심은 라우트를 id 로 한꺼번에 읽습니다
+
+Then
+
+- 라우트 없이 모든 항목이 거부된 예외로 옵니다
+  - 거부: NotEnoughPermission
+
+### get_access_token
+
+<a id="reading_access_tokens-a-user-granted-deployment-read-reads-a-token"></a>
+
+#### [a-user-granted-deployment-read-reads-a-token](/tests/scenario/bai_scenario/manager/deployment/test_reading_access_tokens.py): pass
+
+배포 조회 권한을 받은 사용자가 배포가 걸린 접근 토큰 하나를 읽으면, 그 토큰이 옵니다
+
+Given
+
+- 접근 토큰 2개가 걸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+
+When
+
+- DeploymentAdapter.get_access_token: user-1 이 심은 토큰 하나를 읽습니다
+
+Then
+
+- 읽은 토큰이 옵니다
+  - id: 미리 저장한 토큰의 id 와 같다
+  - field_id: 미리 저장한 토큰의 id 와 같다
+  - token = 'scenario-token'
+  - expires_at = None
+  - created_at: 이 실행이 쓴 시각
+
+<a id="reading_access_tokens-a-user-granted-nothing-reads-no-token"></a>
+
+#### [a-user-granted-nothing-reads-no-token](/tests/scenario/bai_scenario/manager/deployment/test_reading_access_tokens.py): pass
+
+아무 권한도 받지 않은 사용자가 배포가 걸린 접근 토큰 하나를 읽으려 하면, 토큰이 걸린 배포를 찾는 조회가 거부됩니다
+
+Given
+
+- 접근 토큰 2개가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+
+When
+
+- DeploymentAdapter.get_access_token: user-1 이 심은 토큰 하나를 읽습니다
+
+Then
+
+- 거부됩니다
+  - 거부: GenericBadRequest
+
+### get_replica
+
+<a id="reading_replicas-a-user-granted-deployment-read-reads-the-replica"></a>
+
+#### [a-user-granted-deployment-read-reads-the-replica](/tests/scenario/bai_scenario/manager/deployment/test_reading_replicas.py): pass
+
+배포 조회 권한을 받은 사용자가 배포의 복제본을 읽으면, 그 복제본이 옵니다
+
+Given
+
+- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 vfolder, 인퍼런스 런타임 종류, 자원 슬롯 유형 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+    - vfolder 읽기 권한 부여
+      - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+    - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+    - 자원 슬롯 유형 mem: 리비전이 채우지 않아도 됩니다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+
+When
+
+- DeploymentAdapter.get_replica: user-1 이 심은 복제본 하나를 읽습니다
+
+Then
+
+- 심은 복제본이 전체가 응답으로 옵니다
+  - id: 미리 저장한 라우트의 id 와 같다
+  - field_id: 미리 저장한 라우트의 id 와 같다
+  - deployment_id: 복제본이 받쳐주는 배포의 id 와 같다
+  - revision_id: 미리 저장한 리비전의 id 와 같다
+  - session_id = None
+  - readiness_status = 'NOT_CHECKED'
+  - liveness_status = 'NOT_CHECKED'
+  - activeness_status = 'INACTIVE'
+  - status = 'provisioning'
+  - traffic_status = 'inactive'
+  - health_status = 'not_checked'
+  - created_at: 이 실행이 쓴 시각
+
+<a id="reading_replicas-a-user-granted-nothing-reads-no-replica"></a>
+
+#### [a-user-granted-nothing-reads-no-replica](/tests/scenario/bai_scenario/manager/deployment/test_reading_replicas.py): pass
+
+아무 권한도 받지 않은 사용자가 배포의 복제본을 읽으려 하면, 복제본이 걸린 배포를 찾는 조회가 거부됩니다
+
+Given
+
+- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 vfolder, 인퍼런스 런타임 종류, 자원 슬롯 유형 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+    - vfolder 읽기 권한 부여
+      - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+    - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+    - 자원 슬롯 유형 mem: 리비전이 채우지 않아도 됩니다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+
+When
+
+- DeploymentAdapter.get_replica: user-1 이 심은 복제본 하나를 읽습니다
+
+Then
+
+- 거부됩니다
+  - 거부: GenericBadRequest
 
 ### get_revision
 
@@ -790,6 +1687,340 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
+### search_access_tokens
+
+<a id="searching_access_tokens-a-user-granted-deployment-read-searches-the-tokens"></a>
+
+#### [a-user-granted-deployment-read-searches-the-tokens](/tests/scenario/bai_scenario/manager/deployment/test_searching_access_tokens.py): pass
+
+배포 조회 권한을 받은 사용자가 배포가 걸린 접근 토큰을 기준으로 걸러 훑으면, 그 토큰들이 옵니다
+
+Given
+
+- 접근 토큰 2개가 걸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명, 같은 배포에 토큰 하나가 더 걸려 있고, 토큰 하나가 다른 배포에 걸려 있고
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+  - 배포 other-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-1: 배포 토큰 하나를 갖는다
+
+When
+
+- DeploymentAdapter.search_access_tokens: user-1 이 배포가 걸린 접근 토큰을 하나의 기준으로 걸러 순서와 함께 훑습니다
+
+Then
+
+- 기준이 제외하는 토큰과 다른 배포에 걸린 토큰은 오지 않고, 배포가 걸린 토큰이 양과 함께 옵니다
+  - total_count = 2
+  - items count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: 미리 저장한 토큰의 id 와 같다
+  - items[0].field_id: 미리 저장한 토큰의 id 와 같다
+  - items[0].token = 'scenario-token'
+  - items[0].expires_at = None
+  - items[0].created_at: 이 실행이 쓴 시각
+  - items[1].id: 미리 저장한 토큰의 id 와 같다
+  - items[1].field_id: 미리 저장한 토큰의 id 와 같다
+  - items[1].token = 'scenario-token'
+  - items[1].expires_at = None
+  - items[1].created_at: 이 실행이 쓴 시각
+
+<a id="searching_access_tokens-a-user-granted-nothing-searches-no-token"></a>
+
+#### [a-user-granted-nothing-searches-no-token](/tests/scenario/bai_scenario/manager/deployment/test_searching_access_tokens.py): pass
+
+아무 권한도 받지 않은 사용자가 배포가 걸린 접근 토큰을 훑으려 하면, 권한이 없다는 이유로 거부됩니다
+
+Given
+
+- 접근 토큰 2개가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+
+When
+
+- DeploymentAdapter.search_access_tokens: user-1 이 배포가 걸린 접근 토큰을 하나의 기준으로 걸러 순서와 함께 훑습니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### search_policies
+
+<a id="searching_policies-the-superadmin-searches-the-policies"></a>
+
+#### [the-superadmin-searches-the-policies](/tests/scenario/bai_scenario/manager/deployment/test_searching_policies.py): pass
+
+superadmin 이 배포 정책을 기준으로 걸러 훑으면, 심은 정책이 옵니다. 정책 훑기는 전역 권한이 필요한 호출이라 이 행의 요청 사용자는 superadmin 입니다
+
+Given
+
+- 정책 하나가 걸린 배포 하나와, superadmin 한 명, 정책 하나가 다른 배포에 걸려 있고
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 배포 정책 하나를 갖는다
+  - 배포 other-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-1: 배포 정책 하나를 갖는다
+
+When
+
+- DeploymentAdapter.search_policies: user-1 이 배포 정책을 하나의 기준으로 걸러 훑습니다
+
+Then
+
+- 기준이 제외하는 다른 배포의 정책은 오지 않고, 심은 정책이 양과 함께 옵니다
+  - total_count = 1
+  - items count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: 미리 저장한 정책의 id 와 같다
+  - items[0].field_id: 미리 저장한 정책의 id 와 같다
+  - items[0].deployment_id: 정책이 걸린 배포의 id 와 같다
+  - items[0].strategy_spec.strategy: 미리 저장한 정책의 전략와 같다
+  - items[0].strategy_spec.max_surge = IntOrPercent(count=1, percent=None)
+  - items[0].strategy_spec.max_unavailable = IntOrPercent(count=0, percent=None)
+  - items[0].created_at: 이 실행이 쓴 시각
+  - items[0].updated_at: 이 실행이 쓴 시각
+
+<a id="searching_policies-a-user-granted-nothing-searches-no-policy"></a>
+
+#### [a-user-granted-nothing-searches-no-policy](/tests/scenario/bai_scenario/manager/deployment/test_searching_policies.py): pass
+
+아무 권한도 받지 않은 사용자가 배포 정책을 훑으려 하면, 전역 권한이 없다는 이유로 거부됩니다
+
+Given
+
+- 정책 하나가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 배포 정책 하나를 갖는다
+
+When
+
+- DeploymentAdapter.search_policies: user-1 이 배포 정책을 하나의 기준으로 걸러 훑습니다
+
+Then
+
+- 거부됩니다
+  - 거부: InsufficientPrivilege
+
+### search_replicas
+
+<a id="searching_replicas-a-user-granted-deployment-read-searches-the-replica-with-traffic-enabled"></a>
+
+#### [a-user-granted-deployment-read-searches-the-replica-with-traffic-enabled](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas.py): pass
+
+배포 조회 권한을 받은 사용자가 트래픽이 켜진 라우트의 복제본을 조회하면, 심은 복제본이 옵니다
+
+Given
+
+- 리비전과 트래픽이 켜진 복제본 라우트 1개가 딸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 vfolder, 인퍼런스 런타임 종류, 자원 슬롯 유형 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+    - vfolder 읽기 권한 부여
+      - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+    - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+    - 자원 슬롯 유형 mem: 리비전이 채우지 않아도 됩니다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+
+When
+
+- DeploymentAdapter.search_replicas: user-1 이 deployment-1의 복제본을 조회합니다
+
+Then
+
+- 트래픽이 켜진 심은 복제본이 양과 함께 옵니다
+  - total_count = 1
+  - items count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: 미리 저장한 라우트의 id 와 같다
+  - items[0].field_id: 미리 저장한 라우트의 id 와 같다
+  - items[0].deployment_id: 복제본이 받쳐주는 배포의 id 와 같다
+  - items[0].revision_id: 미리 저장한 리비전의 id 와 같다
+  - items[0].session_id = None
+  - items[0].readiness_status = 'NOT_CHECKED'
+  - items[0].liveness_status = 'NOT_CHECKED'
+  - items[0].activeness_status = 'INACTIVE'
+  - items[0].status = 'provisioning'
+  - items[0].traffic_status = 'active'
+  - items[0].health_status = 'not_checked'
+  - items[0].created_at: 이 실행이 쓴 시각
+
+<a id="searching_replicas-a-user-granted-deployment-read-searches-the-replicas"></a>
+
+#### [a-user-granted-deployment-read-searches-the-replicas](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas.py): pass
+
+배포 조회 권한을 받은 사용자가 배포의 복제본을 기준으로 걸러 조회하면, 심은 복제본이 옵니다
+
+Given
+
+- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명, 트래픽이 켜진 복제본 라우트 하나가 더 걸려 있고, 복제본 라우트 하나가 다른 배포에 걸려 있고
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 vfolder, 인퍼런스 런타임 종류, 자원 슬롯 유형 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+    - vfolder 읽기 권한 부여
+      - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+    - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+    - 자원 슬롯 유형 mem: 리비전이 채우지 않아도 됩니다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+  - 배포 other-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-2: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 other-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 other-1: 복제본 라우트 하나를 갖는다
+
+When
+
+- DeploymentAdapter.search_replicas: user-1 이 deployment-1의 복제본을 하나의 기준으로 걸러 순서와 함께 조회합니다
+
+Then
+
+- 기준이 제외하는 복제본과 다른 배포에 걸린 복제본은 오지 않고, 심은 복제본이 양과 함께 옵니다
+  - total_count = 1
+  - items count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: 미리 저장한 라우트의 id 와 같다
+  - items[0].field_id: 미리 저장한 라우트의 id 와 같다
+  - items[0].deployment_id: 복제본이 받쳐주는 배포의 id 와 같다
+  - items[0].revision_id: 미리 저장한 리비전의 id 와 같다
+  - items[0].session_id = None
+  - items[0].readiness_status = 'NOT_CHECKED'
+  - items[0].liveness_status = 'NOT_CHECKED'
+  - items[0].activeness_status = 'INACTIVE'
+  - items[0].status = 'provisioning'
+  - items[0].traffic_status = 'inactive'
+  - items[0].health_status = 'not_checked'
+  - items[0].created_at: 이 실행이 쓴 시각
+
+<a id="searching_replicas-a-user-granted-nothing-searches-no-replica"></a>
+
+#### [a-user-granted-nothing-searches-no-replica](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas.py): pass
+
+아무 권한도 받지 않은 사용자가 배포의 복제본을 조회하려 하면, 권한이 없다는 이유로 거부됩니다
+
+Given
+
+- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 vfolder, 인퍼런스 런타임 종류, 자원 슬롯 유형 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+    - vfolder 읽기 권한 부여
+      - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+    - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+    - 자원 슬롯 유형 mem: 리비전이 채우지 않아도 됩니다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+
+When
+
+- DeploymentAdapter.search_replicas: user-1 이 deployment-1의 복제본을 하나의 기준으로 걸러 순서와 함께 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
 ### search_revisions
 
 <a id="searching_revisions-a-user-granted-read-counts-every-revision-of-a-deployment"></a>
@@ -979,6 +2210,220 @@ Given
 When
 
 - DeploymentAdapter.search_revisions: user-1 이 deployment-1의 리비전을 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### search_routes
+
+<a id="searching_routes-a-user-granted-deployment-read-searches-the-routes"></a>
+
+#### [a-user-granted-deployment-read-searches-the-routes](/tests/scenario/bai_scenario/manager/deployment/test_searching_routes.py): pass
+
+배포 조회 권한을 받은 사용자가 배포의 라우트를 기준으로 걸러 조회하면, 심은 라우트가 옵니다
+
+Given
+
+- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명, 트래픽이 켜진 복제본 라우트 하나가 더 걸려 있고, 복제본 라우트 하나가 다른 배포에 걸려 있고
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 vfolder, 인퍼런스 런타임 종류, 자원 슬롯 유형 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+    - vfolder 읽기 권한 부여
+      - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+    - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+    - 자원 슬롯 유형 mem: 리비전이 채우지 않아도 됩니다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+  - 배포 other-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-2: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 other-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 other-1: 복제본 라우트 하나를 갖는다
+
+When
+
+- DeploymentAdapter.search_routes: user-1 이 deployment-1의 라우트를 하나의 기준으로 걸러 순서와 함께 조회합니다
+
+Then
+
+- 기준이 제외하는 라우트와 다른 배포에 걸린 라우트는 오지 않고, 심은 라우트가 양과 함께 옵니다
+  - total_count = 1
+  - items count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: 미리 저장한 라우트의 id 와 같다
+  - items[0].field_id: 미리 저장한 라우트의 id 와 같다
+  - items[0].deployment_id: 라우트가 받쳐주는 배포의 id 와 같다
+  - items[0].session_id = None
+  - items[0].status = 'provisioning'
+  - items[0].health_status = 'not_checked'
+  - items[0].traffic_ratio = 1.0
+  - items[0].created_at: 이 실행이 쓴 시각
+  - items[0].revision_id: 미리 저장한 리비전의 id 와 같다
+  - items[0].traffic_status = 'inactive'
+  - items[0].error_data = {}
+
+<a id="searching_routes-a-user-granted-nothing-searches-no-route"></a>
+
+#### [a-user-granted-nothing-searches-no-route](/tests/scenario/bai_scenario/manager/deployment/test_searching_routes.py): pass
+
+아무 권한도 받지 않은 사용자가 배포의 라우트를 조회하려 하면, 권한이 없다는 이유로 거부됩니다
+
+Given
+
+- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 vfolder, 인퍼런스 런타임 종류, 자원 슬롯 유형 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+    - vfolder 읽기 권한 부여
+      - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+    - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+    - 자원 슬롯 유형 mem: 리비전이 채우지 않아도 됩니다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+
+When
+
+- DeploymentAdapter.search_routes: user-1 이 deployment-1의 라우트를 하나의 기준으로 걸러 순서와 함께 조회합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### search_rules
+
+<a id="searching_rules-a-user-granted-deployment-read-searches-the-rules"></a>
+
+#### [a-user-granted-deployment-read-searches-the-rules](/tests/scenario/bai_scenario/manager/deployment/test_searching_rules.py): pass
+
+배포 조회 권한을 받은 사용자가 배포가 걸린 자동 스케일링 규칙을 기준으로 걸러 훑으면, 그 규칙들이 옵니다
+
+Given
+
+- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명, 같은 배포에 지표 이름이 다른 규칙 하나가 더 걸려 있고, 규칙 하나가 다른 배포에 걸려 있고
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+  - 배포 other-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 other-1: 오토스케일링 규칙 하나를 갖는다
+
+When
+
+- DeploymentAdapter.search_rules: user-1 이 배포가 걸린 자동 스케일링 규칙을 하나의 기준으로 걸러 순서와 함께 훑습니다
+
+Then
+
+- 기준이 제외하는 규칙과 다른 배포에 걸린 규칙은 오지 않고, 배포가 걸린 규칙이 양과 함께 옵니다
+  - total_count = 2
+  - items count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: 미리 저장한 규칙의 id 와 같다
+  - items[0].field_id: 미리 저장한 규칙의 id 와 같다
+  - items[0].deployment_id: 규칙이 걸린 배포의 id 와 같다
+  - items[0].metric_source = 'KERNEL'
+  - items[0].metric_name = 'cpu_util'
+  - items[0].min_threshold = None
+  - items[0].max_threshold = None
+  - items[0].step_size = 1
+  - items[0].time_window = 60
+  - items[0].min_replicas = None
+  - items[0].max_replicas = None
+  - items[0].prometheus_query_preset_id = None
+  - items[0].created_at: 이 실행이 쓴 시각
+  - items[0].last_triggered_at = None
+  - items[1].id: 미리 저장한 규칙의 id 와 같다
+  - items[1].field_id: 미리 저장한 규칙의 id 와 같다
+  - items[1].deployment_id: 규칙이 걸린 배포의 id 와 같다
+  - items[1].metric_source = 'KERNEL'
+  - items[1].metric_name = 'cpu_util'
+  - items[1].min_threshold = None
+  - items[1].max_threshold = None
+  - items[1].step_size = 1
+  - items[1].time_window = 60
+  - items[1].min_replicas = None
+  - items[1].max_replicas = None
+  - items[1].prometheus_query_preset_id = None
+  - items[1].created_at: 이 실행이 쓴 시각
+  - items[1].last_triggered_at = None
+
+<a id="searching_rules-a-user-granted-nothing-searches-no-rule"></a>
+
+#### [a-user-granted-nothing-searches-no-rule](/tests/scenario/bai_scenario/manager/deployment/test_searching_rules.py): pass
+
+아무 권한도 받지 않은 사용자가 배포가 걸린 자동 스케일링 규칙을 훑으려 하면, 권한이 없다는 이유로 거부됩니다
+
+Given
+
+- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+
+When
+
+- DeploymentAdapter.search_rules: user-1 이 배포가 걸린 자동 스케일링 규칙을 하나의 기준으로 걸러 순서와 함께 훑습니다
 
 Then
 
@@ -1570,6 +3015,75 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
+### bulk_delete_access_tokens
+
+<a id="retiring_access_tokens-a-user-granted-deployment-purge-purges-tokens-at-once"></a>
+
+#### [a-user-granted-deployment-purge-purges-tokens-at-once](/tests/scenario/bai_scenario/manager/deployment/test_retiring_access_tokens.py): pass
+
+배포 영구 삭제 권한을 받은 사용자가 배포가 걸린 접근 토큰 여럿을 한 번에 purge 하면, 그 토큰들의 id 가 옵니다
+
+Given
+
+- 접근 토큰 2개가 걸린 배포 하나와, 배포에 HARD_DELETE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 HARD_DELETE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+
+When
+
+- DeploymentAdapter.bulk_delete_access_tokens: user-1 이 심은 토큰 2개를 한 번에 purge 합니다
+
+Then
+
+- purge 한 토큰의 id 들이 옵니다
+  - ids count = 2
+  - ids[0]: 미리 저장한 토큰의 id 와 같다
+  - ids[1]: 미리 저장한 토큰의 id 와 같다
+
+<a id="retiring_access_tokens-a-user-granted-nothing-purges-no-token-at-once"></a>
+
+#### [a-user-granted-nothing-purges-no-token-at-once](/tests/scenario/bai_scenario/manager/deployment/test_retiring_access_tokens.py): pass
+
+아무 권한도 받지 않은 사용자가 배포가 걸린 접근 토큰 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 id 목록이 비어 옵니다
+
+Given
+
+- 접근 토큰 2개가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+
+When
+
+- DeploymentAdapter.bulk_delete_access_tokens: user-1 이 심은 토큰 2개를 한 번에 purge 합니다
+
+Then
+
+- purge 된 것 없이 id 목록이 비어 옵니다
+  - ids = []
+
 ### create
 
 <a id="creating-a-deployment-made-without-a-name-is-named-after-its-maker"></a>
@@ -1776,6 +3290,122 @@ Given
 When
 
 - DeploymentAdapter.create: user-1 이 team-1에 serving 배포를 생성합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### create_access_token
+
+<a id="creating_access_tokens-a-user-granted-deployment-create-makes-no-token"></a>
+
+#### [a-user-granted-deployment-create-makes-no-token](/tests/scenario/bai_scenario/manager/deployment/test_creating_access_tokens.py): pass
+
+배포 생성 권한을 받은 사용자가 심은 배포의 접근 토큰을 만들려 하면, 배포의 스케일링 그룹에 프록시 대상이 없다는 이유로 거부됩니다. 토큰 문자열을 발행하는 주체가 그룹의 프록시 대상이므로, 대상이 없으면 만들 수 없습니다
+
+Given
+
+- 접근 토큰 2개가 걸린 배포 하나와, 배포에 CREATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 CREATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+
+When
+
+- DeploymentAdapter.create_access_token: user-1 이 심은 배포의 접근 토큰 하나를 만듭니다
+
+Then
+
+- 거부됩니다
+  - 거부: InvalidAPIParameters
+
+### create_rule
+
+<a id="creating_rules-a-user-granted-deployment-create-makes-a-rule"></a>
+
+#### [a-user-granted-deployment-create-makes-a-rule](/tests/scenario/bai_scenario/manager/deployment/test_creating_rules.py): pass
+
+배포 생성 권한을 받은 사용자가 배포에 자동 스케일링 규칙을 만들면, 만든 규칙이 옵니다
+
+Given
+
+- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 배포에 CREATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 CREATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+
+When
+
+- DeploymentAdapter.create_rule: user-1 이 배포에 자동 스케일링 규칙 하나를 만듭니다
+
+Then
+
+- 만든 규칙이 전체가 응답으로 옵니다
+  - id: 건너뜀: the database generates it
+  - field_id: 건너뜀: the database generates it
+  - deployment_id: 규칙이 걸린 배포의 id 와 같다
+  - metric_source = 'KERNEL'
+  - metric_name = 'made-rule'
+  - min_threshold = None
+  - max_threshold = None
+  - step_size = 1
+  - time_window = 60
+  - min_replicas = None
+  - max_replicas = None
+  - prometheus_query_preset_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_triggered_at = None
+
+<a id="creating_rules-a-user-granted-nothing-makes-no-rule"></a>
+
+#### [a-user-granted-nothing-makes-no-rule](/tests/scenario/bai_scenario/manager/deployment/test_creating_rules.py): pass
+
+아무 권한도 받지 않은 사용자가 배포에 자동 스케일링 규칙을 만들려 하면, 권한이 없다는 이유로 거부됩니다
+
+Given
+
+- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+
+When
+
+- DeploymentAdapter.create_rule: user-1 이 배포에 자동 스케일링 규칙 하나를 만듭니다
 
 Then
 
@@ -2107,6 +3737,158 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
+### get_policy
+
+<a id="reading_policy-a-user-granted-deployment-read-reads-the-policy"></a>
+
+#### [a-user-granted-deployment-read-reads-the-policy](/tests/scenario/bai_scenario/manager/deployment/test_reading_policy.py): pass
+
+배포 조회 권한을 받은 사용자가 배포가 걸린 정책을 읽으면, 그 정책이 옵니다
+
+Given
+
+- 정책 하나가 걸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 배포 정책 하나를 갖는다
+
+When
+
+- DeploymentAdapter.get_policy: user-1 이 배포가 걸린 정책을 읽습니다
+
+Then
+
+- 배포가 걸린 정책이 전체가 응답으로 옵니다
+  - id: 미리 저장한 정책의 id 와 같다
+  - field_id: 미리 저장한 정책의 id 와 같다
+  - deployment_id: 정책이 걸린 배포의 id 와 같다
+  - strategy_spec.strategy: 미리 저장한 정책의 전략와 같다
+  - strategy_spec.max_surge = IntOrPercent(count=1, percent=None)
+  - strategy_spec.max_unavailable = IntOrPercent(count=0, percent=None)
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
+
+<a id="reading_policy-a-user-granted-nothing-reads-no-policy"></a>
+
+#### [a-user-granted-nothing-reads-no-policy](/tests/scenario/bai_scenario/manager/deployment/test_reading_policy.py): pass
+
+아무 권한도 받지 않은 사용자가 배포가 걸린 정책을 읽으려 하면, 권한이 없다는 이유로 거부됩니다
+
+Given
+
+- 정책 하나가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 배포 정책 하나를 갖는다
+
+When
+
+- DeploymentAdapter.get_policy: user-1 이 배포가 걸린 정책을 읽습니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### get_rule
+
+<a id="reading_rules-a-user-granted-deployment-read-reads-a-rule"></a>
+
+#### [a-user-granted-deployment-read-reads-a-rule](/tests/scenario/bai_scenario/manager/deployment/test_reading_rules.py): pass
+
+배포 조회 권한을 받은 사용자가 심은 규칙 하나를 id 로 읽으면, 그 규칙이 옵니다
+
+Given
+
+- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+
+When
+
+- DeploymentAdapter.get_rule: user-1 이 심은 규칙 하나를 id 로 읽습니다
+
+Then
+
+- 읽은 규칙이 전체가 응답으로 옵니다
+  - id: 미리 저장한 규칙의 id 와 같다
+  - field_id: 미리 저장한 규칙의 id 와 같다
+  - deployment_id: 규칙이 걸린 배포의 id 와 같다
+  - metric_source = 'KERNEL'
+  - metric_name = 'cpu_util'
+  - min_threshold = None
+  - max_threshold = None
+  - step_size = 1
+  - time_window = 60
+  - min_replicas = None
+  - max_replicas = None
+  - prometheus_query_preset_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_triggered_at = None
+
+<a id="reading_rules-a-user-granted-nothing-reads-no-rule"></a>
+
+#### [a-user-granted-nothing-reads-no-rule](/tests/scenario/bai_scenario/manager/deployment/test_reading_rules.py): pass
+
+아무 권한도 받지 않은 사용자가 심은 규칙 하나를 id 로 읽으려 하면, 규칙이 걸린 배포를 찾는 조회가 거부됩니다
+
+Given
+
+- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+
+When
+
+- DeploymentAdapter.get_rule: user-1 이 심은 규칙 하나를 id 로 읽습니다
+
+Then
+
+- 거부됩니다
+  - 거부: GenericBadRequest
+
 ### partial_bulk_purge_access_tokens
 
 <a id="partial_bulk_access_tokens-a-user-granted-nothing-purges-none-of-several-tokens"></a>
@@ -2378,6 +4160,144 @@ Then
   - failed[0].message: 'Insufficient permission'를 담은 이유
   - failed[1].id: 미리 저장한 규칙의 id 와 같다
   - failed[1].message: 'Insufficient permission'를 담은 이유
+
+### purge_access_token
+
+<a id="retiring_access_tokens-a-user-granted-deployment-purge-purges-a-token"></a>
+
+#### [a-user-granted-deployment-purge-purges-a-token](/tests/scenario/bai_scenario/manager/deployment/test_retiring_access_tokens.py): pass
+
+배포 조회와 영구 삭제 권한을 받은 사용자가 배포가 걸린 접근 토큰 하나를 purge 하면, 그 토큰의 id 가 옵니다. 토큰 purge 는 토큰이 걸린 배포를 먼저 찾는 호출이라 조회 권한도 필요합니다
+
+Given
+
+- 접근 토큰 2개가 걸린 배포 하나와, 배포에 READ, HARD_DELETE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ, HARD_DELETE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 역할 deployment-user-1: deployment 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+
+When
+
+- DeploymentAdapter.purge_access_token: user-1 이 심은 토큰 하나를 purge 합니다
+
+Then
+
+- purge 한 토큰의 id 가 응답으로 옵니다
+  - id: 미리 저장한 토큰의 id 와 같다
+  - field_id: 미리 저장한 토큰의 id 와 같다
+
+<a id="retiring_access_tokens-a-user-granted-nothing-purges-no-token"></a>
+
+#### [a-user-granted-nothing-purges-no-token](/tests/scenario/bai_scenario/manager/deployment/test_retiring_access_tokens.py): pass
+
+아무 권한도 받지 않은 사용자가 배포가 걸린 접근 토큰 하나를 purge 하려 하면, 토큰이 걸린 배포를 찾는 조회가 거부됩니다
+
+Given
+
+- 접근 토큰 2개가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+  - 배포 deployment-1: 배포 토큰 하나를 갖는다
+
+When
+
+- DeploymentAdapter.purge_access_token: user-1 이 심은 토큰 하나를 purge 합니다
+
+Then
+
+- 거부됩니다
+  - 거부: GenericBadRequest
+
+### purge_rule
+
+<a id="retiring_rules-a-user-granted-deployment-purge-purges-a-rule"></a>
+
+#### [a-user-granted-deployment-purge-purges-a-rule](/tests/scenario/bai_scenario/manager/deployment/test_retiring_rules.py): pass
+
+배포 조회와 영구 삭제 권한을 받은 사용자가 배포가 걸린 자동 스케일링 규칙 하나를 purge 하면, 그 규칙의 id 가 옵니다. 규칙 purge 는 배포를 먼저 찾는 호출이라 조회 권한도 필요합니다
+
+Given
+
+- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 배포에 READ, HARD_DELETE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ, HARD_DELETE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 역할 deployment-user-1: deployment 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+
+When
+
+- DeploymentAdapter.purge_rule: user-1 이 심은 규칙 하나를 purge 합니다
+
+Then
+
+- purge 한 규칙의 id 가 응답으로 옵니다
+  - id: 미리 저장한 규칙의 id 와 같다
+  - field_id: 미리 저장한 규칙의 id 와 같다
+
+<a id="retiring_rules-a-user-granted-nothing-purges-no-rule"></a>
+
+#### [a-user-granted-nothing-purges-no-rule](/tests/scenario/bai_scenario/manager/deployment/test_retiring_rules.py): pass
+
+아무 권한도 받지 않은 사용자가 배포가 걸린 자동 스케일링 규칙 하나를 purge 하려 하면, 규칙이 걸린 배포를 찾는 조회가 거부됩니다
+
+Given
+
+- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+
+When
+
+- DeploymentAdapter.purge_rule: user-1 이 심은 규칙 하나를 purge 합니다
+
+Then
+
+- 거부됩니다
+  - 거부: GenericBadRequest
 
 ### replace_options
 
@@ -3100,4 +5020,259 @@ Then
 
 - 거부됩니다
   - 거부: EndpointNotFound
+
+### update_route_traffic
+
+<a id="editing_route_traffic-a-user-granted-deployment-update-opens-the-traffic"></a>
+
+#### [a-user-granted-deployment-update-opens-the-traffic](/tests/scenario/bai_scenario/manager/deployment/test_editing_route_traffic.py): pass
+
+배포 조회와 수정 권한을 받은 사용자가 라우트의 트래픽을 열면, 트래픽을 연 라우트가 옵니다. 트래픽 바꾸기는 라우트가 걸린 배포를 먼저 찾는 호출이라 조회 권한도 필요합니다
+
+Given
+
+- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, 배포에 READ, UPDATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ, UPDATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 vfolder, 인퍼런스 런타임 종류, 자원 슬롯 유형 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+    - vfolder 읽기 권한 부여
+      - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+    - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+    - 자원 슬롯 유형 mem: 리비전이 채우지 않아도 됩니다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+
+When
+
+- DeploymentAdapter.update_route_traffic: user-1 이 deployment-1의 라우트 트래픽을 active 로 바꿉니다
+
+Then
+
+- 트래픽을 연 라우트가 전체가 응답으로 옵니다
+  - id: 미리 저장한 라우트의 id 와 같다
+  - field_id: 미리 저장한 라우트의 id 와 같다
+  - deployment_id: 라우트가 받쳐주는 배포의 id 와 같다
+  - session_id = None
+  - status = 'provisioning'
+  - health_status = 'not_checked'
+  - traffic_ratio = 1.0
+  - created_at: 이 실행이 쓴 시각
+  - revision_id: 미리 저장한 리비전의 id 와 같다
+  - traffic_status = 'active'
+  - error_data = {}
+
+<a id="editing_route_traffic-a-user-granted-nothing-changes-no-traffic"></a>
+
+#### [a-user-granted-nothing-changes-no-traffic](/tests/scenario/bai_scenario/manager/deployment/test_editing_route_traffic.py): pass
+
+아무 권한도 받지 않은 사용자가 라우트의 트래픽을 바꾸려 하면, 라우트가 걸린 배포를 찾는 조회가 거부됩니다
+
+Given
+
+- 리비전과 복제본 라우트 1개가 딸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 리비전이 딛는 이미지, 모델 vfolder, 인퍼런스 런타임 종류, 자원 슬롯 유형 준비
+    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+    - 이미지 image-1: x86_64 이미지
+    - 개인 vfolder folder-1: 그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다
+    - vfolder 읽기 권한 부여
+      - 역할 folder-reader-1: 부여된 스코프 안에서만 적용됩니다
+      - 역할 folder-reader-1: vfolder 전체에 READ 허용
+      - 일반 사용자 user-1: 역할 folder-reader-1 보유
+    - 인퍼런스 런타임 종류 runtime-1: 기본 모델 정의가 비어 있고, 모델 vfolder 의 설정 파일을 읽지 않습니다
+    - 자원 슬롯 유형 cpu: 리비전이 채우지 않아도 됩니다
+    - 자원 슬롯 유형 mem: 리비전이 채우지 않아도 됩니다
+  - 배포 deployment-1: 리비전 하나를 갖는다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 복제본 그룹과 함께 생성하는 세션 그룹입니다
+  - 배포 deployment-1: 세션 그룹을 가진 복제본 그룹 하나를 갖습니다
+  - 배포 deployment-1: 복제본 라우트 하나를 갖는다
+
+When
+
+- DeploymentAdapter.update_route_traffic: user-1 이 deployment-1의 라우트 트래픽을 active 로 바꿉니다
+
+Then
+
+- 거부됩니다
+  - 거부: GenericBadRequest
+
+### update_rule
+
+<a id="updating_rules-a-user-granted-deployment-update-edits-a-rule"></a>
+
+#### [a-user-granted-deployment-update-edits-a-rule](/tests/scenario/bai_scenario/manager/deployment/test_updating_rules.py): pass
+
+배포 조회와 수정 권한을 받은 사용자가 심은 규칙 하나를 고치면, 고친 규칙이 옵니다. 규칙 읽기와 고치기는 배포를 먼저 찾는 호출이라 조회 권한도 필요합니다
+
+Given
+
+- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 배포에 READ, UPDATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 READ, UPDATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 READ 허용
+    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+
+When
+
+- DeploymentAdapter.update_rule: user-1 이 심은 규칙 하나의 단계 크기와 시간 창을 고칩니다
+
+Then
+
+- 고친 규칙이 전체가 응답으로 옵니다
+  - id: 미리 저장한 규칙의 id 와 같다
+  - field_id: 미리 저장한 규칙의 id 와 같다
+  - deployment_id: 규칙이 걸린 배포의 id 와 같다
+  - metric_source = 'KERNEL'
+  - metric_name = 'cpu_util'
+  - min_threshold = None
+  - max_threshold = None
+  - step_size = 2
+  - time_window = 120
+  - min_replicas = None
+  - max_replicas = None
+  - prometheus_query_preset_id = None
+  - created_at: 이 실행이 쓴 시각
+  - last_triggered_at = None
+
+<a id="updating_rules-a-user-granted-nothing-edits-no-rule"></a>
+
+#### [a-user-granted-nothing-edits-no-rule](/tests/scenario/bai_scenario/manager/deployment/test_updating_rules.py): pass
+
+아무 권한도 받지 않은 사용자가 심은 규칙 하나를 고치려 하면, 규칙이 걸린 배포를 찾는 조회가 거부됩니다
+
+Given
+
+- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+  - 배포 deployment-1: 오토스케일링 규칙 하나를 갖는다
+
+When
+
+- DeploymentAdapter.update_rule: user-1 이 심은 규칙 하나의 단계 크기와 시간 창을 고칩니다
+
+Then
+
+- 거부됩니다
+  - 거부: GenericBadRequest
+
+### upsert_policy
+
+<a id="upserting_policy-a-user-granted-deployment-update-puts-the-policy"></a>
+
+#### [a-user-granted-deployment-update-puts-the-policy](/tests/scenario/bai_scenario/manager/deployment/test_upserting_policy.py): pass
+
+배포 수정 권한을 받은 사용자가 배포에 정책을 올리면, 올린 정책이 옵니다. 정책 upsert 는 갈아끼우기라 수정 권한으로 거는 호출입니다
+
+Given
+
+- 이미 있는 배포 하나와, 배포에 UPDATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포에 UPDATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 역할 deployment-user-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+
+When
+
+- DeploymentAdapter.upsert_policy: user-1 이 배포에 롤링 업데이트 정책을 올립니다
+
+Then
+
+- 올린 정책이 전체가 응답으로 옵니다
+  - id: 건너뜀: the database generates it
+  - field_id: 건너뜀: the database generates it
+  - deployment_id: 정책을 올린 배포의 id 와 같다
+  - strategy_spec.strategy = <DeploymentStrategy.ROLLING: 'ROLLING'>
+  - strategy_spec.max_surge = IntOrPercent(count=None, percent=0.5)
+  - strategy_spec.max_unavailable = IntOrPercent(count=None, percent=0.0)
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
+
+<a id="upserting_policy-a-user-granted-nothing-puts-no-policy"></a>
+
+#### [a-user-granted-nothing-puts-no-policy](/tests/scenario/bai_scenario/manager/deployment/test_upserting_policy.py): pass
+
+아무 권한도 받지 않은 사용자가 배포에 정책을 올리려 하면, 권한이 없다는 이유로 거부됩니다
+
+Given
+
+- 이미 있는 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 배포 권한을 하나도 받지 않은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 배포 deployment-1: 복제본 1개를 두려 한다, 아직 리비전이 없다
+
+When
+
+- DeploymentAdapter.upsert_policy: user-1 이 배포에 롤링 업데이트 정책을 올립니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
 

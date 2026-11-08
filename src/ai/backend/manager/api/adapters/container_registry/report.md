@@ -2,10 +2,10 @@
 
 [background](/src/ai/backend/manager/api/adapters/container_registry/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/container_registry/adapter.py)
 
-Scenario: incomplete 2 / 10
+Scenario: complete
 
 - built from ops (4)
-  - admin_partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - admin_partial_bulk_purge: representative success ✓ · representative rejection ✓
   - admin_search: representative success ✓ · representative rejection ✓
   - batch_load_by_ids: representative success ✓ · representative rejection ✓
   - lookup_by_name_and_registry_project: representative success ✓ · representative rejection ✓
@@ -14,15 +14,15 @@ Scenario: incomplete 2 / 10
   - admin_purge: success present 2 · rejection present 2 (global_scope)
   - admin_update: success present 3 · rejection present 4 (global_scope, membership, relation)
   - apply_allowed_groups: success present 8 · rejection present 6 (relation)
-  - apply_global: success absent · rejection absent (membership): SCENARIO-GAP
+  - apply_global: success present 2 · rejection present 3 (membership)
   - link_project_as_default: success present 1 · rejection present 3 (relation)
 
 **admin_partial_bulk_purge**
 
 | scenario | verdict |
 |---|---|
-| [when a user granted nothing tries to purge several container registries at once, nothing is purged and all come back in the failed list because there is no permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-registries) | answered |
 | [when the superadmin purges two container registries and one id that does not exist at once, the two come back as they were before purging and the id that does not exist comes back in the failed list because there is no such target](#partial_bulk_purging-purging-several-registries-answers-for-the-missing-one) | answered |
+| [when a user granted nothing tries to purge several container registries at once, nothing is purged and all come back in the failed list because there is no permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-registries) | rejected |
 
 **admin_search**
 
@@ -98,6 +98,16 @@ Scenario: incomplete 2 / 10
 | [when a user granted only create permission on both scopes removes a project, it is rejected for lack of permission](#allowing_projects-create-permission-does-not-allow-removing-a-project) | rejected |
 | [when a user granted only delete permission on both scopes adds a project, it is rejected for lack of permission](#allowing_projects-soft-delete-permission-does-not-allow-adding-a-project) | rejected |
 
+**apply_global**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted update permission on the registry and on public sets the registry not global, the same registry comes back whole with global false](#setting_global-a-user-granted-on-both-scopes-takes-a-registry-out-of-public) | answered |
+| [when the superadmin sets a registry not global, the same registry comes back whole with global false](#setting_global-the-superadmin-takes-a-registry-out-of-public) | answered |
+| [when a user granted nothing tries to change a registry's visibility, it is rejected for lack of permission. This call checks permission on the registry and on the public scope together](#setting_global-a-user-granted-nothing-may-not-change-a-registry-visibility) | rejected |
+| [when a user granted update permission on public but not on the registry tries to change a registry's visibility, it is rejected for lack of permission. This call does not pass with only one of the two scopes permitting it](#setting_global-a-user-granted-on-public-but-not-the-registry-may-not-change-a-registry-visibility) | rejected |
+| [when a user granted update permission on the registry but not on public tries to change a registry's visibility, it is rejected for lack of permission. This call does not pass with only one of the two scopes permitting it](#setting_global-a-user-granted-on-the-registry-but-not-public-may-not-change-a-registry-visibility) | rejected |
+
 **link_project_as_default**
 
 | scenario | verdict |
@@ -108,6 +118,56 @@ Scenario: incomplete 2 / 10
 | [when a user granted permission on the container registry but not the project tries to create an association and make it the default, the relation operation checks permission on every named scope, so it is rejected for lack of permission](#linking_default_project-a-user-granted-on-the-registry-but-not-the-project-cannot-link-a-default) | rejected |
 
 ### admin_partial_bulk_purge
+
+<a id="partial_bulk_purging-purging-several-registries-answers-for-the-missing-one"></a>
+
+#### [purging-several-registries-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/container_registry/test_partial_bulk_purging.py): pass
+
+when the superadmin purges two container registries and one id that does not exist at once, the two come back as they were before purging and the id that does not exist comes back in the failed list because there is no such target
+
+Given
+
+- two registries and one superadmin
+  - Domain home-1
+  - Container registry wanted-1: image source
+  - Container registry other-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ContainerRegistryAdapter.admin_partial_bulk_purge: user-1 purges 2 container registries and one id that does not exist at once
+
+Then
+
+- every container registry seeded in advance comes back as it was before it was purged, and the id that does not exist comes back in the failed list because there is no such target
+  - successes count = 2
+  - successes[0].id: same as the id of the container registry seeded in advance
+  - successes[0].entity_id: same as the id of the container registry seeded in advance
+  - successes[0].url = 'https://wanted-1.scenario.local'
+  - successes[0].registry_name = 'wanted-1'
+  - successes[0].type = <ContainerRegistryType.DOCKER: 'docker'>
+  - successes[0].project = None
+  - successes[0].username = None
+  - successes[0].ssl_verify = True
+  - successes[0].is_global = True
+  - successes[0].extra = None
+  - successes[1].id: same as the id of the container registry seeded in advance
+  - successes[1].entity_id: same as the id of the container registry seeded in advance
+  - successes[1].url = 'https://other-1.scenario.local'
+  - successes[1].registry_name = 'other-1'
+  - successes[1].type = <ContainerRegistryType.HARBOR2: 'harbor2'>
+  - successes[1].project = None
+  - successes[1].username = None
+  - successes[1].ssl_verify = True
+  - successes[1].is_global = False
+  - successes[1].extra = None
+  - failed count = 1
+  - failed[0].id: same as the id that does not exist put in the request
+  - failed[0].message: a reason containing 'not found'
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-registries"></a>
 
@@ -137,57 +197,9 @@ Then
   - successes = []
   - failed count = 2
   - failed[0].id: same as the id of the container registry seeded in advance
-  - failed[0].message: a reason containing 'Insufficient permission'
+  - rejected: failed[0]: Insufficient permission
   - failed[1].id: same as the id of the container registry seeded in advance
-  - failed[1].message: a reason containing 'Insufficient permission'
-
-<a id="partial_bulk_purging-purging-several-registries-answers-for-the-missing-one"></a>
-
-#### [purging-several-registries-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/container_registry/test_partial_bulk_purging.py): pass
-
-when the superadmin purges two container registries and one id that does not exist at once, the two come back as they were before purging and the id that does not exist comes back in the failed list because there is no such target
-
-Given
-
-- two registries and one superadmin
-  - Domain home-1
-  - Container registry wanted-1: image source
-  - Container registry other-1: image source
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - superadmin user-1: has their own keypair and personal project
-
-When
-
-- ContainerRegistryAdapter.admin_partial_bulk_purge: user-1 purges 2 container registries and one id that does not exist at once
-
-Then
-
-- every container registry seeded in advance comes back as it was before it was purged, and the id that does not exist comes back in the failed list because there is no such target
-  - successes count = 2
-  - successes[0].id: same as the id of the container registry seeded in advance
-  - successes[0].url = 'https://wanted-1.scenario.local'
-  - successes[0].registry_name = 'wanted-1'
-  - successes[0].type = <ContainerRegistryType.DOCKER: 'docker'>
-  - successes[0].project = None
-  - successes[0].username = None
-  - successes[0].ssl_verify = True
-  - successes[0].is_global = True
-  - successes[0].extra = None
-  - successes[1].id: same as the id of the container registry seeded in advance
-  - successes[1].url = 'https://other-1.scenario.local'
-  - successes[1].registry_name = 'other-1'
-  - successes[1].type = <ContainerRegistryType.HARBOR2: 'harbor2'>
-  - successes[1].project = None
-  - successes[1].username = None
-  - successes[1].ssl_verify = True
-  - successes[1].is_global = False
-  - successes[1].extra = None
-  - failed count = 1
-  - failed[0].id: same as the id that does not exist put in the request
-  - failed[0].message: a reason containing 'not found'
+  - rejected: failed[1]: Insufficient permission
 
 ### admin_search
 
@@ -514,6 +526,7 @@ When
 Then
 
 - the whole created registry comes back
+  - entity_id: same as the id in the response
   - url = 'https://made.scenario.local'
   - registry_name = 'made-registry'
   - type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -548,6 +561,7 @@ When
 Then
 
 - the whole created registry comes back
+  - entity_id: same as the id in the response
   - url = 'https://made.scenario.local'
   - registry_name = 'made-registry'
   - type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -637,6 +651,7 @@ Then
 
 - the id that was deleted comes back
   - id: same as the id of the container registry seeded in advance
+  - entity_id: same as the id of the container registry seeded in advance
 
 <a id="retiring-deleting-a-registry-takes-its-allowed-projects-with-it"></a>
 
@@ -665,6 +680,7 @@ Then
 
 - the id that was deleted comes back
   - id: same as the id of the container registry seeded in advance
+  - entity_id: same as the id of the container registry seeded in advance
 
 <a id="retiring-a-user-who-is-not-the-superadmin-may-not-delete-a-registry"></a>
 
@@ -744,6 +760,7 @@ When
 Then
 
 - the whole registry made in advance comes back
+  - entity_id: same as the id of the registry seeded in advance
   - url = 'https://host-1.scenario.local'
   - registry_name = 'host-1'
   - type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -778,6 +795,7 @@ When
 Then
 
 - the whole registry made in advance comes back
+  - entity_id: same as the id of the registry seeded in advance
   - url = 'https://moved.scenario.local'
   - registry_name = 'host-1'
   - type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -813,6 +831,7 @@ When
 Then
 
 - the whole registry made in advance comes back
+  - entity_id: same as the id of the registry seeded in advance
   - url = 'https://host-1.scenario.local'
   - registry_name = 'host-1'
   - type = <ContainerRegistryType.DOCKER: 'docker'>
@@ -1419,6 +1438,171 @@ Given
 When
 
 - ContainerRegistryAdapter.apply_allowed_groups: user-1 added to the allow list
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### apply_global
+
+<a id="setting_global-a-user-granted-on-both-scopes-takes-a-registry-out-of-public"></a>
+
+#### [a-user-granted-on-both-scopes-takes-a-registry-out-of-public](/tests/scenario/bai_scenario/manager/container_registry/test_setting_global.py): pass
+
+when a user granted update permission on the registry and on public sets the registry not global, the same registry comes back whole with global false
+
+Given
+
+- one registry, and one user, granted update on the registry and on public
+  - Domain home-1
+  - Container registry host-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted update permission on the registry, public
+    - Role registry-keeper-1: applies only within the scope it is granted in
+    - Role registry-keeper-1: UPDATE allowed on every container_registry
+    - regular user user-1: holds Role registry-keeper-1
+    - Role public-registry-keeper-1: applies only within the scope it is granted in
+    - Role public-registry-keeper-1: UPDATE allowed on every global
+    - regular user user-1: holds Role public-registry-keeper-1
+
+When
+
+- ContainerRegistryAdapter.apply_global: user-1 changes whether host-1 is global
+
+Then
+
+- the whole seeded registry comes back with the new visibility
+  - id: same as the id of the container registry seeded in advance
+  - url = 'https://host-1.scenario.local'
+  - registry_name = 'host-1'
+  - type = <ContainerRegistryType.DOCKER: 'docker'>
+  - project = None
+  - username = None
+  - password = None
+  - ssl_verify = True
+  - is_global = False
+  - extra = None
+
+<a id="setting_global-the-superadmin-takes-a-registry-out-of-public"></a>
+
+#### [the-superadmin-takes-a-registry-out-of-public](/tests/scenario/bai_scenario/manager/container_registry/test_setting_global.py): pass
+
+when the superadmin sets a registry not global, the same registry comes back whole with global false
+
+Given
+
+- one registry, and one superadmin
+  - Domain home-1
+  - Container registry host-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ContainerRegistryAdapter.apply_global: user-1 changes whether host-1 is global
+
+Then
+
+- the whole seeded registry comes back with the new visibility
+  - id: same as the id of the container registry seeded in advance
+  - url = 'https://host-1.scenario.local'
+  - registry_name = 'host-1'
+  - type = <ContainerRegistryType.DOCKER: 'docker'>
+  - project = None
+  - username = None
+  - password = None
+  - ssl_verify = True
+  - is_global = False
+  - extra = None
+
+<a id="setting_global-a-user-granted-nothing-may-not-change-a-registry-visibility"></a>
+
+#### [a-user-granted-nothing-may-not-change-a-registry-visibility](/tests/scenario/bai_scenario/manager/container_registry/test_setting_global.py): pass
+
+when a user granted nothing tries to change a registry's visibility, it is rejected for lack of permission. This call checks permission on the registry and on the public scope together
+
+Given
+
+- one registry, and one user
+  - Domain home-1
+  - Container registry host-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- ContainerRegistryAdapter.apply_global: user-1 changes whether host-1 is global
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="setting_global-a-user-granted-on-public-but-not-the-registry-may-not-change-a-registry-visibility"></a>
+
+#### [a-user-granted-on-public-but-not-the-registry-may-not-change-a-registry-visibility](/tests/scenario/bai_scenario/manager/container_registry/test_setting_global.py): pass
+
+when a user granted update permission on public but not on the registry tries to change a registry's visibility, it is rejected for lack of permission. This call does not pass with only one of the two scopes permitting it
+
+Given
+
+- one registry, and one user, granted update on public and not on the registry
+  - Domain home-1
+  - Container registry host-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted update permission on public
+    - Role public-registry-keeper-1: applies only within the scope it is granted in
+    - Role public-registry-keeper-1: UPDATE allowed on every global
+    - regular user user-1: holds Role public-registry-keeper-1
+
+When
+
+- ContainerRegistryAdapter.apply_global: user-1 changes whether host-1 is global
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="setting_global-a-user-granted-on-the-registry-but-not-public-may-not-change-a-registry-visibility"></a>
+
+#### [a-user-granted-on-the-registry-but-not-public-may-not-change-a-registry-visibility](/tests/scenario/bai_scenario/manager/container_registry/test_setting_global.py): pass
+
+when a user granted update permission on the registry but not on public tries to change a registry's visibility, it is rejected for lack of permission. This call does not pass with only one of the two scopes permitting it
+
+Given
+
+- one registry, and one user, granted update on the registry and not on public
+  - Domain home-1
+  - Container registry host-1: image source
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted update permission on the registry
+    - Role registry-keeper-1: applies only within the scope it is granted in
+    - Role registry-keeper-1: UPDATE allowed on every container_registry
+    - regular user user-1: holds Role registry-keeper-1
+
+When
+
+- ContainerRegistryAdapter.apply_global: user-1 changes whether host-1 is global
 
 Then
 

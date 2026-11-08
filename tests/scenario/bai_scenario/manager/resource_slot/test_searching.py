@@ -15,10 +15,12 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
     AdminSearchResourceSlotTypesPayload,
 )
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import SlotTypes
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
+from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_slot import (
     EveryLaidSlotTypeIsCounted,
     ManySlotTypesAndACaller,
@@ -365,10 +367,62 @@ class AskingForTheFirstOneGivesOne(
         return TheFirstPageOfSlotTypes(size=1)
 
 
+@dataclass(frozen=True)
+class SearchingWithoutLogin(When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]):
+    """로그인 문맥 없이 전체를 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "search_slot_types"
+
+    @override
+    def describe(self, laid: ManySlotTypesAndACaller) -> str:
+        return Says(
+            "로그인 문맥 없이 전체를 조회합니다",
+            english="without a login context, reads everything",
+        )
+
+    @override
+    async def call(self, adapter: ResourceSlotAdapter, laid: ManySlotTypesAndACaller) -> Searched:
+        return await adapter.search_slot_types(AdminSearchResourceSlotTypesInput())
+
+
+@dataclass(frozen=True)
+class ACallWithoutLoginIsRefused(
+    Scenario[TestSeedingSession, ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "searching-slot-types-without-login-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "로그인 문맥 없이 자원 슬롯 유형을 조회하면 거부됩니다",
+            english=(
+                "reading slot types without a login context is rejected because there is no "
+                "caller to authorize against"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManySlotTypesAndACaller]:
+        return ManySlotTypesAndSomeone(besides=1)
+
+    @override
+    def when(self) -> When[ManySlotTypesAndACaller, ResourceSlotAdapter, Searched]:
+        return SearchingWithoutLogin()
+
+    @override
+    def then(self) -> Then[ManySlotTypesAndACaller, Searched]:
+        return TheCallIsRefused(UnreachableError)
+
+
 SCENARIOS: list[SearchingStep] = [
     AUserGrantedNothingCountsEverySlotType(),
     ANameFilterNarrows(),
     OmittingThePageSizeGivesTen(),
+    ACallWithoutLoginIsRefused(),
     # TODO(BA-7928): the adapter reads neither the kind and display name filters nor
     # `first`, so these three rows fail until it does.
     # AKindFilterNarrows(),

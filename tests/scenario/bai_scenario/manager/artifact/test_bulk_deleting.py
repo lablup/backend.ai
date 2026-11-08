@@ -95,6 +95,28 @@ class SoftDeletingThenRestoringByIds(When[ManyArtifactsAndACaller, ArtifactAdapt
 
 
 @dataclass(frozen=True)
+class RestoringByIds(When[ManyArtifactsAndACaller, ArtifactAdapter, Deleted]):
+    """대상 아티팩트들을 id 목록으로 restore 한다."""
+
+    @override
+    def operation(self) -> str:
+        return "restore_artifacts"
+
+    @override
+    def describe(self, laid: ManyArtifactsAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 아티팩트 {len(laid.laid)}개를 id 목록으로 restore 합니다",
+            english=(f"{laid.caller.username} restores {len(laid.laid)} artifacts by an id list"),
+        )
+
+    @override
+    async def call(self, adapter: ArtifactAdapter, laid: ManyArtifactsAndACaller) -> Deleted:
+        ids: list[UUID] = [artifact.id for artifact in laid.laid]
+        with ActingAs(laid.caller):
+            return await adapter.restore_artifacts(ids)
+
+
+@dataclass(frozen=True)
 class EveryTargetIsAnswered(Then[ManyArtifactsAndACaller, Deleted]):
     """대상이 모두 같은 상태로 온다."""
 
@@ -224,10 +246,39 @@ class TheSuperadminRestoresByIds(
         return EveryTargetIsAnswered(started=self.started, expected=ArtifactLook())
 
 
+@dataclass(frozen=True)
+class AUserWhoIsNotSuperadminMayNotRestoreByIds(
+    Scenario[TestSeedingSession, ManyArtifactsAndACaller, ArtifactAdapter, Deleted]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-who-is-not-superadmin-may-not-restore-artifacts-by-ids"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "superadmin 이 아닌 사용자는 아티팩트를 id 목록으로 restore 할 수 없습니다",
+            english=("a user who is not the superadmin cannot restore artifacts by an id list"),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyArtifactsAndACaller]:
+        return ManyArtifactsAndSomeone()
+
+    @override
+    def when(self) -> When[ManyArtifactsAndACaller, ArtifactAdapter, Deleted]:
+        return RestoringByIds()
+
+    @override
+    def then(self) -> Then[ManyArtifactsAndACaller, Deleted]:
+        return TheCallIsRefused(InsufficientPrivilege)
+
+
 SCENARIOS: list[ArtifactStep] = [
     TheSuperadminSoftDeletesByIds(started=datetime.now(UTC)),
     AUserWhoIsNotSuperadminMayNotSoftDeleteByIds(),
     TheSuperadminRestoresByIds(started=datetime.now(UTC)),
+    AUserWhoIsNotSuperadminMayNotRestoreByIds(),
 ]
 
 

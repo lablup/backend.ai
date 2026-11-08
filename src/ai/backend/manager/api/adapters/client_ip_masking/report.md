@@ -6,7 +6,7 @@ Scenario: incomplete 2 / 5
 
 - built from ops (5)
   - admin_search: representative success ✓ · representative rejection ✓
-  - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_by_ids: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - purge: representative success ✓ · representative rejection ✓
   - upsert: representative success ✓ · representative rejection ✓
@@ -18,6 +18,12 @@ Scenario: incomplete 2 / 5
 | [when the monitor role reads without a filter, the same response as the superadmin comes back. The superadmin check allows the monitor's read](#searching-the-monitor-searches-masking-policies-like-the-superadmin) | answered |
 | [when two policies of different targets exist and the superadmin reads without a filter, both are counted](#searching-the-superadmin-counts-every-masking-policy-laid) | answered |
 | [when a user who is not the superadmin requests a read of everything, it is rejected because the role is insufficient](#searching-a-user-who-is-not-the-superadmin-may-not-search-masking-policies) | rejected |
+
+**batch_load_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin batch-loads two policies created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | answered |
 
 **partial_bulk_purge**
 
@@ -136,6 +142,52 @@ Then
 
 - the call is rejected
   - rejected: InsufficientPrivilege
+
+### batch_load_by_ids
+
+<a id="reading-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
+
+#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/client_ip_masking/test_reading.py): pass
+
+when the superadmin batch-loads two policies created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty
+
+Given
+
+- two client IP masking policies of different targets and one superadmin
+  - client IP masking policy default: truncate mode, prefix length v4 24, v6 48
+  - client IP masking policy login_history: truncate mode, prefix length v4 24, v6 48
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ClientIPMaskingAdapter.batch_load_by_ids: user-1 batch-loads the 2 policies created in advance and one unknown id
+
+Then
+
+- they come back in the order asked and the item for an unknown id is empty
+  - len(items) = 3
+  - items[0].id: same as the policy created in advance
+  - items[0].entity_id: same as the policy created in advance
+  - items[0].target_type = 'default'
+  - items[0].mode = 'truncate'
+  - items[0].ipv4_prefix = 24
+  - items[0].ipv6_prefix = 48
+  - items[0].created_at: the time this run wrote
+  - items[0].updated_at: the time this run wrote
+  - items[1].id: same as the policy created in advance
+  - items[1].entity_id: same as the policy created in advance
+  - items[1].target_type = 'login_history'
+  - items[1].mode = 'truncate'
+  - items[1].ipv4_prefix = 24
+  - items[1].ipv6_prefix = 48
+  - items[1].created_at: the time this run wrote
+  - items[1].updated_at: the time this run wrote
+  - items[2] = None
 
 ### partial_bulk_purge
 
