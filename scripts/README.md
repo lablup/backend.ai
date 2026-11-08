@@ -31,6 +31,7 @@ current, see `AGENTS.md` in this directory.
 | `refresh-graphql-gateway.sh` | Regenerates the schema, copies it to the root and restarts the Apollo Router (`--recreate` recreates the container so config updates apply) | person |
 | `alembic-rebase.py` | Rebases a migration branch when alembic heads have diverged | person (`src/ai/backend/README.md`) |
 | `download-webui-release.sh` | Downloads and unpacks a WebUI bundle into `src/ai/backend/web` | person; `release.sh` |
+| `new-changelog.py` | Writes a changelog fragment named `changes/<YYYYMMDD>-<HHMMSS>-<6 chars>.<type>.md`, with front matter for `--issue` and `--epic`, and prints its path | person; Claude Code (`/submit`) |
 | `knowledge/search.py` | Lists or searches `KNOWLEDGE.md` frontmatter across the repository | person; Claude Code (`/knowledge`) |
 
 ## Commit and push
@@ -49,6 +50,7 @@ current, see `AGENTS.md` in this directory.
 
 | Script | What it does | Called by |
 |---|---|---|
+| `validate-changelog-fragments.py` | Checks the names, types, front matter and epic file pairs in `changes/` | auto: `ci.yml` (`check-build-and-lint`) |
 | `check-multiple-alembic-heads.py` | Fails the build when the migration graph has more than one head | auto: `ci.yml`, `.github/scripts/merge-alembic-heads.sh` |
 | `check-alembic-revision.py` | Rejects a migration whose `upgrade()` / `downgrade()` is empty | auto: `ci.yml` |
 | `check-init-imports.py` | Fails when an `__init__.py` under the given directories imports anything, apart from the files it allows | auto: `ci.yml` (`check-build-and-lint`) |
@@ -76,7 +78,9 @@ current, see `AGENTS.md` in this directory.
 | `release.sh` | Cuts a release branch and produces the whole release commit | person |
 | `download-external-tools.sh` | Refreshes the bundled external binaries (bssh, all-smi, …) | auto: `release.sh` |
 | `freeze_release_version.py` | Replaces `NEXT_RELEASE_VERSION` placeholders with the version being released (skipped for pre-releases) | auto: `release.sh`, `.github/scripts/bump-next-release-on-main.sh` |
+| `rename-changelog-fragments.py` | Renames each new-style changelog fragment to `<PR-number>.<type>.md` with `git mv` and drops its front matter, taking the PR number from the commit that added the file; stops the release on a file that breaks the rules or has no PR number | auto: `release.sh` |
 | `run-towncrier.py` | Runs towncrier against the version-branch changelog file | auto: `release.sh` |
+| `changelog_fragments.py` | Module, not a command: the rules for the files in `changes/` (names, types, front matter, epic files) | auto: imported by `new-changelog.py`, `rename-changelog-fragments.py`, `validate-changelog-fragments.py`, `run-towncrier.py` |
 | `changelog_files.py` | Module, not a command: maps a version to its `CHANGELOG/<version>.md` | auto: imported by `run-towncrier.py`, `extract-release-changelog.py` |
 | `bump_next_release_version.py` | Rewrites or prints `NEXT_RELEASE_VERSION` in `meta.py` | auto: `.github/scripts/bump-next-release-on-main.sh` |
 | `.github/scripts/update-maintained-versions.sh` | Registers a newly cut release line in `.github/maintained-versions.yml` and retires the due ones | auto: `release.sh` |
