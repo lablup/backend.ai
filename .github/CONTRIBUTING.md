@@ -143,8 +143,8 @@ Examples: `feature/add-pr-guidelines`, `fix/session-memory-leak`
 
 ### 3. Create PR
 
-Once implementation is complete, create a Pull Request.
-Once the PR number is assigned, proceed to the next step.
+When implementation is complete, create a pull request.
+Write the changelog fragment (step 4) before opening the PR, so it goes into the same push as the code.
 
 **Tip**: If work is still in progress, you can create a Draft PR.
 
@@ -152,7 +152,11 @@ Once the PR number is assigned, proceed to the next step.
 
 ### 4. Write Changelog Fragment (Towncrier)
 
-After the PR is created and you have the **PR number**, write a changelog fragment.
+Write the changelog fragment before opening the PR and put it in the same push as the code. The release fills in the PR number.
+With a JIRA (`BA-`) or hejo (`BAI-`) issue key, pass `--issue`; when that issue belongs to an epic, also pass `--epic`.
+`{PR#}.{type}.md` written by hand with the PR number is the previous convention and is still accepted.
+The names, front matter and epic files are described in [`changes/README.md`](/changes/README.md#filename-convention).
+
 Backend.AI uses [Towncrier](https://towncrier.readthedocs.io/) to automatically generate release notes.
 
 **Important**: These fragments are used to generate the changelog of the version branch
@@ -161,9 +165,9 @@ Write clearly and concisely about what you changed and its impact, as this will 
 
 **Create Fragment File**:
 ```bash
-# Create a file in the changes/ directory
-# Format: {PR#}.{type}.md
-# Examples: 6424.feature.md, 6469.fix.md
+# Prints the path of the new file
+python3 scripts/new-changelog.py fix "Resolve deadlock in image rescan"
+python3 scripts/new-changelog.py fix "Resolve deadlock in image rescan" --issue BA-2790 --epic BA-2700
 ```
 
 **Fragment Types**:

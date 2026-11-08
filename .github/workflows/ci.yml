@@ -104,6 +104,8 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Test the release-grade classifier
       run: python ./scripts/test_determine_release_type.py
+    - name: Check the changelog fragment names
+      run: python ./scripts/validate-changelog-fragments.py
     - name: Set up remote cache backend (if applicable)
       run: |
         echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
