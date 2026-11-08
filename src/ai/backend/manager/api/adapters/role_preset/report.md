@@ -7,9 +7,9 @@ Scenario: incomplete 9 / 21
 - built from ops (14)
   - batch_load_by_ids: representative success ✓ · representative rejection ✓
   - batch_load_permissions_by_ids: representative success ✓ · representative rejection ✓
-  - bulk_delete: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - bulk_purge: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - bulk_restore: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - bulk_delete: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - bulk_restore: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - delete: representative success ✓ · representative rejection ✓
   - get: representative success ✓ · representative rejection ✓
   - partial_bulk_delete: representative success ✓ · representative rejection ✗: SCENARIO-GAP
@@ -41,6 +41,27 @@ Scenario: incomplete 9 / 21
 |---|---|
 | [when a user granted read in global loads the ids of two permission entries of a preset at once, both come back whole in the requested order](#permission_reading-a-user-granted-read-loads-permission-entries-in-order) | answered |
 | [when a user granted nothing loads the ids of two permission entries at once, instead of the whole request being rejected, every entry comes back holding a rejection for lack of permission](#permission_reading-a-user-granted-nothing-loading-entries-is-denied-on-every-id) | rejected |
+
+**bulk_delete**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted nothing tries to bulk soft delete several presets, none is soft-deleted and every one comes back in the failed list for lack of permission](#bulk_deleting-a-user-granted-nothing-bulk-soft-deletes-none-of-several-presets) | answered |
+| [when a user granted soft_delete on role presets bulk soft deletes several presets, all of them come back marked deleted](#bulk_deleting-a-user-granted-soft-delete-bulk-soft-deletes-several-presets) | answered |
+
+**bulk_purge**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted hard_delete on role presets bulk purges several presets, all of them come back as they were before the purge](#bulk_deleting-a-user-granted-hard-delete-bulk-purges-several-presets) | answered |
+| [when a user granted nothing tries to bulk purge several presets, none is purged and every one comes back in the failed list for lack of permission](#bulk_deleting-a-user-granted-nothing-bulk-purges-none-of-several-presets) | answered |
+
+**bulk_restore**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted nothing tries to bulk restore several presets, none is restored and every one comes back in the failed list for lack of permission](#bulk_deleting-a-user-granted-nothing-bulk-restores-none-of-several-presets) | answered |
+| [when a user granted soft_delete on role presets bulk soft deletes several presets and then bulk restores them, all of them come back not marked deleted](#bulk_deleting-a-user-granted-soft-delete-bulk-restores-several-presets) | answered |
 
 **delete**
 
@@ -74,6 +95,7 @@ Scenario: incomplete 9 / 21
 
 | scenario | verdict |
 |---|---|
+| [when a user granted nothing tries to restore several presets at once, none is restored and every one comes back in the failed list for lack of permission](#partial_bulk_deleting-a-user-granted-nothing-restores-none-of-several-presets) | answered |
 | [when several soft-deleted presets are restored at once, all of them come back not marked deleted](#partial_bulk_deleting-restoring-several-brings-them-back) | answered |
 
 **purge**
@@ -173,7 +195,7 @@ Given
   - Role preset preset-1: for the project scope, with automatic grant disabled
   - Role preset preset-2: for the project scope, with automatic grant disabled
   - Domain home-1
-  - Prepare a user granted the READ permission on role presets in global
+  - Prepare a user granted READ on role presets in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
@@ -258,7 +280,7 @@ Given
   - Role preset preset-1: READ allowed on every domain
   - Role preset preset-1: UPDATE allowed on every project
   - Domain home-1
-  - Prepare a user granted the READ permission on role presets in global
+  - Prepare a user granted READ on role presets in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
@@ -318,6 +340,270 @@ Then
   - length = 2
   - rejected: NotEnoughPermission
   - rejected: NotEnoughPermission
+
+### bulk_delete
+
+<a id="bulk_deleting-a-user-granted-nothing-bulk-soft-deletes-none-of-several-presets"></a>
+
+#### [a-user-granted-nothing-bulk-soft-deletes-none-of-several-presets](/tests/scenario/bai_scenario/manager/role_preset/test_bulk_deleting.py): pass
+
+when a user granted nothing tries to bulk soft delete several presets, none is soft-deleted and every one comes back in the failed list for lack of permission
+
+Given
+
+- 2 presets and one user
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- RolePresetAdapter.bulk_delete: user-1 soft deletes 2 presets at once
+
+Then
+
+- nothing is processed and every target comes back in the failed list
+  - items = []
+  - failed count = 2
+  - failed[0].role_preset_id: same as the id of the target
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].role_preset_id: same as the id of the target
+  - failed[1].message: a reason containing 'Insufficient permission'
+
+<a id="bulk_deleting-a-user-granted-soft-delete-bulk-soft-deletes-several-presets"></a>
+
+#### [a-user-granted-soft-delete-bulk-soft-deletes-several-presets](/tests/scenario/bai_scenario/manager/role_preset/test_bulk_deleting.py): pass
+
+when a user granted soft_delete on role presets bulk soft deletes several presets, all of them come back marked deleted
+
+Given
+
+- 2 presets and one user granted SOFT_DELETE on role presets
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare a user granted SOFT_DELETE on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: SOFT_DELETE allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
+
+When
+
+- RolePresetAdapter.bulk_delete: user-1 soft deletes 2 presets at once
+
+Then
+
+- every target preset comes back marked deleted, and nothing failed
+  - items count = 2
+  - items[0].id: same as the id of the preset seeded in advance
+  - items[0].entity_id: same as the id of the preset seeded in advance
+  - items[0].name = 'preset-1'
+  - items[0].scope_type = 'project'
+  - items[0].auto_assign = False
+  - items[0].role_name_template = None
+  - items[0].auto_assign_to_owner = False
+  - items[0].deleted = True
+  - items[0].deleted_at: the time this run wrote
+  - items[0].created_at: the time this run wrote
+  - items[0].updated_at: the time this run wrote
+  - items[1].id: same as the id of the preset seeded in advance
+  - items[1].entity_id: same as the id of the preset seeded in advance
+  - items[1].name = 'preset-2'
+  - items[1].scope_type = 'project'
+  - items[1].auto_assign = False
+  - items[1].role_name_template = None
+  - items[1].auto_assign_to_owner = False
+  - items[1].deleted = True
+  - items[1].deleted_at: the time this run wrote
+  - items[1].created_at: the time this run wrote
+  - items[1].updated_at: the time this run wrote
+  - failed = []
+
+### bulk_purge
+
+<a id="bulk_deleting-a-user-granted-hard-delete-bulk-purges-several-presets"></a>
+
+#### [a-user-granted-hard-delete-bulk-purges-several-presets](/tests/scenario/bai_scenario/manager/role_preset/test_bulk_deleting.py): pass
+
+when a user granted hard_delete on role presets bulk purges several presets, all of them come back as they were before the purge
+
+Given
+
+- 2 presets and one user granted HARD_DELETE on role presets
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare a user granted HARD_DELETE on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: HARD_DELETE allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
+
+When
+
+- RolePresetAdapter.bulk_purge: user-1 purges 2 presets at once
+
+Then
+
+- every target preset comes back not marked deleted, and nothing failed
+  - items count = 2
+  - items[0].id: same as the id of the preset seeded in advance
+  - items[0].entity_id: same as the id of the preset seeded in advance
+  - items[0].name = 'preset-1'
+  - items[0].scope_type = 'project'
+  - items[0].auto_assign = False
+  - items[0].role_name_template = None
+  - items[0].auto_assign_to_owner = False
+  - items[0].deleted = False
+  - items[0].deleted_at = None
+  - items[0].created_at: the time this run wrote
+  - items[0].updated_at: the time this run wrote
+  - items[1].id: same as the id of the preset seeded in advance
+  - items[1].entity_id: same as the id of the preset seeded in advance
+  - items[1].name = 'preset-2'
+  - items[1].scope_type = 'project'
+  - items[1].auto_assign = False
+  - items[1].role_name_template = None
+  - items[1].auto_assign_to_owner = False
+  - items[1].deleted = False
+  - items[1].deleted_at = None
+  - items[1].created_at: the time this run wrote
+  - items[1].updated_at: the time this run wrote
+  - failed = []
+
+<a id="bulk_deleting-a-user-granted-nothing-bulk-purges-none-of-several-presets"></a>
+
+#### [a-user-granted-nothing-bulk-purges-none-of-several-presets](/tests/scenario/bai_scenario/manager/role_preset/test_bulk_deleting.py): pass
+
+when a user granted nothing tries to bulk purge several presets, none is purged and every one comes back in the failed list for lack of permission
+
+Given
+
+- 2 presets and one user
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- RolePresetAdapter.bulk_purge: user-1 purges 2 presets at once
+
+Then
+
+- nothing is processed and every target comes back in the failed list
+  - items = []
+  - failed count = 2
+  - failed[0].role_preset_id: same as the id of the target
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].role_preset_id: same as the id of the target
+  - failed[1].message: a reason containing 'Insufficient permission'
+
+### bulk_restore
+
+<a id="bulk_deleting-a-user-granted-nothing-bulk-restores-none-of-several-presets"></a>
+
+#### [a-user-granted-nothing-bulk-restores-none-of-several-presets](/tests/scenario/bai_scenario/manager/role_preset/test_bulk_deleting.py): pass
+
+when a user granted nothing tries to bulk restore several presets, none is restored and every one comes back in the failed list for lack of permission
+
+Given
+
+- 2 presets and one user
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- RolePresetAdapter.bulk_restore: user-1 restores 2 presets at once
+
+Then
+
+- nothing is processed and every target comes back in the failed list
+  - items = []
+  - failed count = 2
+  - failed[0].role_preset_id: same as the id of the target
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].role_preset_id: same as the id of the target
+  - failed[1].message: a reason containing 'Insufficient permission'
+
+<a id="bulk_deleting-a-user-granted-soft-delete-bulk-restores-several-presets"></a>
+
+#### [a-user-granted-soft-delete-bulk-restores-several-presets](/tests/scenario/bai_scenario/manager/role_preset/test_bulk_deleting.py): pass
+
+when a user granted soft_delete on role presets bulk soft deletes several presets and then bulk restores them, all of them come back not marked deleted
+
+Given
+
+- 2 presets and one user granted SOFT_DELETE on role presets
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare a user granted SOFT_DELETE on role presets in global
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role preset-writer-1: applies only within the scope it is granted in
+    - Role preset-writer-1: SOFT_DELETE allowed on every role_preset
+    - regular user user-1: holds Role preset-writer-1
+
+When
+
+- RolePresetAdapter.bulk_restore: user-1 soft deletes 2 presets at once and then restores them at once
+
+Then
+
+- every target preset comes back not marked deleted, and nothing failed
+  - items count = 2
+  - items[0].id: same as the id of the preset seeded in advance
+  - items[0].entity_id: same as the id of the preset seeded in advance
+  - items[0].name = 'preset-1'
+  - items[0].scope_type = 'project'
+  - items[0].auto_assign = False
+  - items[0].role_name_template = None
+  - items[0].auto_assign_to_owner = False
+  - items[0].deleted = False
+  - items[0].deleted_at = None
+  - items[0].created_at: the time this run wrote
+  - items[0].updated_at: the time this run wrote
+  - items[1].id: same as the id of the preset seeded in advance
+  - items[1].entity_id: same as the id of the preset seeded in advance
+  - items[1].name = 'preset-2'
+  - items[1].scope_type = 'project'
+  - items[1].auto_assign = False
+  - items[1].role_name_template = None
+  - items[1].auto_assign_to_owner = False
+  - items[1].deleted = False
+  - items[1].deleted_at = None
+  - items[1].created_at: the time this run wrote
+  - items[1].updated_at: the time this run wrote
+  - failed = []
 
 ### delete
 
@@ -396,7 +682,7 @@ Given
 - one preset that already exists and one user granted READ in global
   - Role preset preset-1: for the project scope, with automatic grant enabled, with owner assignment enabled, carrying a role name template
   - Domain home-1
-  - Prepare a user granted the READ permission on role presets in global
+  - Prepare a user granted READ on role presets in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
@@ -624,6 +910,38 @@ Then
   - failed[0].message: a reason containing 'not found'
 
 ### partial_bulk_restore
+
+<a id="partial_bulk_deleting-a-user-granted-nothing-restores-none-of-several-presets"></a>
+
+#### [a-user-granted-nothing-restores-none-of-several-presets](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_deleting.py): pass
+
+when a user granted nothing tries to restore several presets at once, none is restored and every one comes back in the failed list for lack of permission
+
+Given
+
+- 2 presets and one user
+  - Role preset preset-1: for the project scope, with automatic grant disabled
+  - Role preset preset-2: for the project scope, with automatic grant disabled
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- RolePresetAdapter.partial_bulk_restore: user-1 restores 2 presets at once
+
+Then
+
+- nothing is processed and every target comes back in the failed list
+  - successes = []
+  - failed count = 2
+  - failed[0].id: same as the id of the target
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_deleting-restoring-several-brings-them-back"></a>
 
@@ -893,7 +1211,7 @@ Given
   - Role preset preset-2: for the project scope, with automatic grant disabled
   - Role preset preset-2: READ allowed on every project
   - Domain home-1
-  - Prepare a user granted the READ permission on role presets in global
+  - Prepare a user granted READ on role presets in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
@@ -1031,7 +1349,7 @@ Given
 - one preset that already exists and one user granted UPDATE in global
   - Role preset preset-1: for the project scope, with automatic grant disabled
   - Domain home-1
-  - Prepare a user granted the UPDATE permission on role presets in global
+  - Prepare a user granted UPDATE on role presets in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
@@ -1074,7 +1392,7 @@ Given
 - one preset that already exists and one user granted READ in global
   - Role preset preset-1: for the project scope, with automatic grant disabled
   - Domain home-1
-  - Prepare a user granted the READ permission on role presets in global
+  - Prepare a user granted READ on role presets in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
@@ -1106,7 +1424,7 @@ Given
   - Role preset preset-1: READ allowed on every domain
   - Role preset preset-1: UPDATE allowed on every project
   - Domain home-1
-  - Prepare a user granted the UPDATE permission on role presets in global
+  - Prepare a user granted UPDATE on role presets in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
@@ -1140,7 +1458,7 @@ Given
   - Role preset preset-1: READ allowed on every domain
   - Role preset preset-1: UPDATE allowed on every project
   - Domain home-1
-  - Prepare a user granted the UPDATE permission on role presets in global
+  - Prepare a user granted UPDATE on role presets in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
@@ -1185,7 +1503,7 @@ Given
   - Role preset preset-1: READ allowed on every domain
   - Role preset preset-1: UPDATE allowed on every project
   - Domain home-1
-  - Prepare a user granted the READ permission on role presets in global
+  - Prepare a user granted READ on role presets in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
@@ -1221,7 +1539,7 @@ Given
 
 - one user granted CREATE in global
   - Domain home-1
-  - Prepare a user granted the CREATE permission on role presets in global
+  - Prepare a user granted CREATE on role presets in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
@@ -1261,7 +1579,7 @@ Given
 - one preset that already exists and one user granted CREATE in global
   - Role preset preset-1: for the project scope, with automatic grant disabled
   - Domain home-1
-  - Prepare a user granted the CREATE permission on role presets in global
+  - Prepare a user granted CREATE on role presets in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
@@ -1290,7 +1608,7 @@ Given
 
 - one user granted READ in global
   - Domain home-1
-  - Prepare a user granted the READ permission on role presets in global
+  - Prepare a user granted READ on role presets in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
@@ -1324,7 +1642,7 @@ Given
   - Role preset preset-1: READ allowed on every domain
   - Role preset preset-1: UPDATE allowed on every project
   - Domain home-1
-  - Prepare a user granted the READ permission on role presets in global
+  - Prepare a user granted READ on role presets in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
@@ -1361,7 +1679,7 @@ Given
   - Role preset preset-1: READ allowed on every domain
   - Role preset preset-1: UPDATE allowed on every project
   - Domain home-1
-  - Prepare a user granted the UPDATE permission on role presets in global
+  - Prepare a user granted UPDATE on role presets in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
@@ -1409,7 +1727,7 @@ Given
   - Role preset preset-1: for the project scope, with automatic grant disabled
   - Role preset preset-2: for the project scope, with automatic grant disabled
   - Domain home-1
-  - Prepare a user granted the UPDATE permission on role presets in global
+  - Prepare a user granted UPDATE on role presets in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
@@ -1443,7 +1761,7 @@ Given
   - Role preset preset-1: for the project scope, with automatic grant disabled
   - Role preset preset-2: for the project scope, with automatic grant disabled
   - Domain home-1
-  - Prepare a user granted the UPDATE permission on role presets in global
+  - Prepare a user granted UPDATE on role presets in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
@@ -1497,7 +1815,7 @@ Given
   - Role preset preset-1: for the project scope, with automatic grant disabled
   - Role preset preset-2: for the project scope, with automatic grant disabled
   - Domain home-1
-  - Prepare a user granted the READ permission on role presets in global
+  - Prepare a user granted READ on role presets in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
@@ -1533,7 +1851,7 @@ Given
   - Role preset preset-1: for the project scope, with automatic grant disabled
   - Role preset preset-2: for the domain scope, with automatic grant disabled
   - Domain home-1
-  - Prepare a user granted the UPDATE permission on role presets in global
+  - Prepare a user granted UPDATE on role presets in global
     - Prepare one user in the domain
       - Project resource policy default: the personal project created along with a user looks it up by this name
       - User resource policy user-policy-1: up to 10 folders per user
