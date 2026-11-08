@@ -46,25 +46,34 @@ class TestSeedPersonalVFolder(TestSeedRowFrom[UserData, VFolderData]):
 
     @override
     def detail(self) -> str:
-        parts: list[str] = [
-            Says(
-                "그 사람의 개인 프로젝트에 놓입니다",
-                english="is placed in that person's personal project",
-            )
-        ]
-        if self.status is VFolderOperationStatus.READY:
-            parts.append(Says("사용할 수 있는 상태입니다", english="is ready to use"))
-        else:
-            parts.append(Says(f"{self.status.value} 상태입니다", english=f"is {self.status.value}"))
-        if self.usage_mode is not VFolderUsageMode.GENERAL:
-            parts.append(
+        if (
+            self.status is VFolderOperationStatus.READY
+            and self.usage_mode is VFolderUsageMode.GENERAL
+            and not self.cloneable
+        ):
+            parts: list[str] = [
                 Says(
-                    f"{self.usage_mode.value} 용도입니다",
-                    english=f"is used as {self.usage_mode.value}",
+                    "그 사람의 개인 프로젝트에 놓이고, 사용할 수 있는 상태입니다",
+                    english="is placed in that person's personal project and is ready to use",
                 )
-            )
-        if self.cloneable:
-            parts.append(Says("복제할 수 있습니다", english="may be cloned"))
+            ]
+        else:
+            parts = [
+                Says(
+                    "그 사람의 개인 프로젝트에 놓입니다",
+                    english="is placed in that person's personal project",
+                ),
+                Says(f"{self.status.value} 상태입니다", english=f"is {self.status.value}"),
+            ]
+            if self.usage_mode is not VFolderUsageMode.GENERAL:
+                parts.append(
+                    Says(
+                        f"{self.usage_mode.value} 용도입니다",
+                        english=f"is used as {self.usage_mode.value}",
+                    )
+                )
+            if self.cloneable:
+                parts.append(Says("복제할 수 있습니다", english="may be cloned"))
         if self.default_mount_permission is not None:
             permission = self.default_mount_permission.value
             parts.append(
@@ -169,7 +178,9 @@ class TestSeedProjectVFolder(TestSeedRowFromTwo[ProjectData, UserData, VFolderDa
         if self.cloneable:
             ko.append("복제할 수 있습니다")
             en.append("may be cloned")
-        english = en[0] + " and " + en[1] if len(en) == 2 else ", ".join(en[:-1]) + ", and " + en[-1]
+        english = (
+            en[0] + " and " + en[1] if len(en) == 2 else ", ".join(en[:-1]) + ", and " + en[-1]
+        )
         return Says(", ".join(ko), english=english)
 
     def _more(self) -> bool:
