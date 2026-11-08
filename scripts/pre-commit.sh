@@ -40,8 +40,9 @@ echo "Running pre-commit checks (ruff ${RUFF_VERSION})..."
 
 # 1. Auto-format
 echo "✓ Formatting..."
-if ! "${RUFF[@]}" format --force-exclude "${PY_FILES[@]}"; then
-  echo "❌ Formatting failed"
+if ! "${RUFF[@]}" format --check --force-exclude "${PY_FILES[@]}"; then
+  "${RUFF[@]}" format --force-exclude "${PY_FILES[@]}" || true
+  echo "❌ Files were reformatted. Review the changes, stage them with git add and commit again."
   EXIT_CODE=1
 fi
 
