@@ -10,7 +10,7 @@ class EtcdTLSConfigData:
     ca_cert: Path | None
     client_cert: Path | None
     client_key: Path | None
-    handshake_timeout: float
+    handshake_timeout: float | None
 
 
 @dataclass
