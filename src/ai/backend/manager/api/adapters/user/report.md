@@ -2,83 +2,66 @@
 
 [background](/src/ai/backend/manager/api/adapters/user/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/user/adapter.py)
 
-Scenario: incomplete 7 / 42
+Scenario: incomplete 6 / 39
 
-- built from ops (20)
-  - LoginHistoryAdapter.admin_search: representative success ✓ · representative rejection ✓
-  - LoginHistoryAdapter.batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - LoginHistoryAdapter.my_search: representative success ✓ · representative rejection ✓
-  - UserAdapter.admin_search: representative success ✓ · representative rejection ✓
-  - UserAdapter.admin_search_keypairs: representative success ✓ · representative rejection ✓
-  - UserAdapter.batch_load_by_ids: representative success ✓ · representative rejection ✓
-  - UserAdapter.batch_lookup_by_emails: representative success ✓ · representative rejection ✓
-  - UserAdapter.bulk_get_keypair_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - UserAdapter.bulk_lookup_keypair_access_keys: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - UserAdapter.domain_search: representative success ✓ · representative rejection ✓
-  - UserAdapter.gql_admin_search: representative success ✓ · representative rejection ✓
-  - UserAdapter.gql_admin_search_keypairs: representative success ✓ · representative rejection ✓
-  - UserAdapter.gql_scoped_search: representative success ✓ · representative rejection ✓
-  - UserAdapter.gql_search_by_domain: representative success ✓ · representative rejection ✓
-  - UserAdapter.gql_search_by_project: representative success ✓ · representative rejection ✓
-  - UserAdapter.project_search: representative success ✓ · representative rejection ✓
-  - UserAdapter.resolve_domain_id: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - UserAdapter.role_search: representative success ✓ · representative rejection ✓
-  - UserAdapter.scoped_search: representative success ✓ · representative rejection ✓
-  - UserAdapter.search_my_keypairs: representative success ✓ · representative rejection ✓
+- built from ops (17)
+  - admin_search: representative success ✓ · representative rejection ✓
+  - admin_search_keypairs: representative success ✓ · representative rejection ✓
+  - batch_load_by_ids: representative success ✓ · representative rejection ✓
+  - batch_lookup_by_emails: representative success ✓ · representative rejection ✓
+  - bulk_get_keypair_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - bulk_lookup_keypair_access_keys: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - domain_search: representative success ✓ · representative rejection ✓
+  - gql_admin_search: representative success ✓ · representative rejection ✓
+  - gql_admin_search_keypairs: representative success ✓ · representative rejection ✓
+  - gql_scoped_search: representative success ✓ · representative rejection ✓
+  - gql_search_by_domain: representative success ✓ · representative rejection ✓
+  - gql_search_by_project: representative success ✓ · representative rejection ✓
+  - project_search: representative success ✓ · representative rejection ✓
+  - resolve_domain_id: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - role_search: representative success ✓ · representative rejection ✓
+  - scoped_search: representative success ✓ · representative rejection ✓
+  - search_my_keypairs: representative success ✓ · representative rejection ✓
 - ops + direct implementation (7)
-  - UserAdapter.bulk_create_users: success absent · rejection present 1 (atomic_bulk_get_ops, global_scope): SCENARIO-GAP
-  - UserAdapter.bulk_create_users_with_keypair: success absent · rejection present 1 (atomic_bulk_get_ops, global_scope): SCENARIO-GAP
-  - UserAdapter.bulk_update_users: success present 3 · rejection present 1 (atomic_bulk_get_ops, global_scope, partial_bulk_get_ops, single_entity)
-  - UserAdapter.create_user: success absent · rejection present 2 (atomic_bulk_get_ops, scope): SCENARIO-GAP
-  - UserAdapter.delete_user_by_id: success present 1 · rejection present 1 (atomic_bulk_get_ops, single_entity)
-  - UserAdapter.get: success present 1 · rejection present 1 (atomic_bulk_get_ops, single_entity)
-  - UserAdapter.update_user_by_id: success present 7 · rejection present 6 (atomic_bulk_get_ops, single_entity)
+  - bulk_create_users: success absent · rejection present 1 (atomic_bulk_get_ops, global_scope): SCENARIO-GAP
+  - bulk_create_users_with_keypair: success absent · rejection present 1 (atomic_bulk_get_ops, global_scope): SCENARIO-GAP
+  - bulk_update_users: success present 3 · rejection present 1 (atomic_bulk_get_ops, global_scope, partial_bulk_get_ops, single_entity)
+  - create_user: success absent · rejection present 2 (atomic_bulk_get_ops, scope): SCENARIO-GAP
+  - delete_user_by_id: success present 1 · rejection present 1 (atomic_bulk_get_ops, single_entity)
+  - get: success present 1 · rejection present 1 (atomic_bulk_get_ops, single_entity)
+  - update_user_by_id: success present 7 · rejection present 6 (atomic_bulk_get_ops, single_entity)
 - direct implementation (15)
-  - UserAdapter.admin_create_keypair: success present 1 · rejection present 2 (single_entity)
-  - UserAdapter.admin_delete_keypair: success present 1 · rejection present 3 (single_field)
-  - UserAdapter.admin_delete_ssh_keypair: success present 1 · rejection present 2 (single_entity)
-  - UserAdapter.admin_get_keypair: success present 1 · rejection present 1 (single_field)
-  - UserAdapter.admin_get_ssh_keypair: success present 1 · rejection present 1 (single_entity)
-  - UserAdapter.admin_register_ssh_keypair: success present 1 · rejection present 2 (single_entity)
-  - UserAdapter.admin_update_keypair: success present 1 · rejection present 3 (single_field)
-  - UserAdapter.bulk_purge_users: success present 2 · rejection present 1 (global_scope)
-  - UserAdapter.issue_my_keypair: success present 2 · rejection present 1 (single_entity)
-  - UserAdapter.purge_user_by_id: success present 1 · rejection present 2 (single_entity)
-  - UserAdapter.restore_user_by_id: success present 1 · rejection present 2 (single_entity)
-  - UserAdapter.revoke_my_keypair: success present 1 · rejection present 4 (single_field)
-  - UserAdapter.switch_default_access_key: success present 1 · rejection present 2 (single_entity)
-  - UserAdapter.update_my_keypair: success present 1 · rejection present 3 (single_field)
-  - UserAdapter.update_user: success present 1 · rejection present 1 (single_entity)
+  - admin_create_keypair: success present 1 · rejection present 2 (single_entity)
+  - admin_delete_keypair: success present 1 · rejection present 3 (single_field)
+  - admin_delete_ssh_keypair: success present 1 · rejection present 2 (single_entity)
+  - admin_get_keypair: success present 1 · rejection present 1 (single_field)
+  - admin_get_ssh_keypair: success present 1 · rejection present 1 (single_entity)
+  - admin_register_ssh_keypair: success present 1 · rejection present 2 (single_entity)
+  - admin_update_keypair: success present 1 · rejection present 3 (single_field)
+  - bulk_purge_users: success present 2 · rejection present 1 (global_scope)
+  - issue_my_keypair: success present 2 · rejection present 1 (single_entity)
+  - purge_user_by_id: success present 1 · rejection present 2 (single_entity)
+  - restore_user_by_id: success present 1 · rejection present 2 (single_entity)
+  - revoke_my_keypair: success present 1 · rejection present 4 (single_field)
+  - switch_default_access_key: success present 1 · rejection present 2 (single_entity)
+  - update_my_keypair: success present 1 · rejection present 3 (single_field)
+  - update_user: success present 1 · rejection present 1 (single_entity)
 
-**LoginHistoryAdapter.admin_search**
-
-| scenario | verdict |
-|---|---|
-| [when the superadmin searches in a history search gated by the global role, every record seeded in advance comes back in descending creation time regardless of the user](#login_history-the-superadmin-searches-every-users-login-history) | answered |
-| [a user holding the permission is rejected by the global role gate when searching every history record](#login_history-a-user-who-is-not-the-superadmin-may-not-search-every-login-history) | rejected |
-
-**LoginHistoryAdapter.my_search**
-
-| scenario | verdict |
-|---|---|
-| [when a user granted READ in their own scope searches, the history of other users is left out](#login_history-a-user-granted-read-on-themselves-searches-only-their-own-login-history) | answered |
-| [a user holding no role who tries to search their own history is rejected by the scope permission gate even for themselves](#login_history-a-user-granted-nothing-may-not-search-their-own-login-history) | rejected |
-
-**UserAdapter.admin_search**
+**admin_search**
 
 | scenario | verdict |
 |---|---|
 | [when the superadmin searches without a filter in a search gated by the global role, every user seeded in advance comes back, deleted ones included](#searching-the-superadmin-searching-every-user-counts-deleted-ones-too) | answered |
 | [even a user granted permission in the domain scope is rejected by the global role gate when searching every user](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-user) | rejected |
 
-**UserAdapter.admin_search_keypairs**
+**admin_search_keypairs**
 
 | scenario | verdict |
 |---|---|
 | [when the superadmin searches without page arguments in a key search gated by the global role, every user's key comes back and the limit field comes back empty](#managing_keypairs-the-superadmin-searching-every-key-gets-every-users-key) | answered |
 | [a user holding the permission is rejected by the global role gate when searching every key](#managing_keypairs-a-user-who-is-not-the-superadmin-may-not-search-every-key) | rejected |
 
-**UserAdapter.batch_load_by_ids**
+**batch_load_by_ids**
 
 | scenario | verdict |
 |---|---|
@@ -86,7 +69,7 @@ Scenario: incomplete 7 / 42
 | [when the superadmin requests an existing id and a missing id together, it passes the permission gate and the missing element comes back empty](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | answered |
 | [when a user granted read on only one user requests a readable user, an unreadable user, and a missing id at once, a result comes back for each element in input order](#reading-a-batch-load-answers-a-node-or-a-rejection-for-each-id-in-order) | rejected |
 
-**UserAdapter.batch_lookup_by_emails**
+**batch_lookup_by_emails**
 
 | scenario | verdict |
 |---|---|
@@ -94,7 +77,7 @@ Scenario: incomplete 7 / 42
 | [when a user holding no permission gives an empty email list, no action is called and an empty list comes back](#reading-an-email-lookup-of-no-emails-answers-an-empty-list) | answered |
 | [when a user granted read on only one user looks up a readable user, an unreadable user, and a missing email at once, the first comes back as an id and the other two come back with the same rejection in input order](#reading-an-unreadable-user-and-a-missing-email-are-refused-alike) | rejected |
 
-**UserAdapter.domain_search**
+**domain_search**
 
 | scenario | verdict |
 |---|---|
@@ -102,49 +85,49 @@ Scenario: incomplete 7 / 42
 | [a user holding no role who tries to search by domain name is rejected by the scope permission gate](#searching-a-user-granted-nothing-may-not-search-a-domain-by-name) | rejected |
 | [when a user holding the permission searches by a domain name nothing answers to, the name lookup step rejects it as not found before the scope check](#searching-searching-a-domain-name-nothing-answers-to-is-not-found) | rejected |
 
-**UserAdapter.gql_admin_search**
+**gql_admin_search**
 
 | scenario | verdict |
 |---|---|
 | [when the superadmin searches omitting both the cursor and the page arguments, up to ten users come back in descending creation time along with the next page flag](#searching-a-gql-search-without-page-arguments-answers-the-newest-ten) | answered |
 | [a user holding the permission is rejected by the global role gate when searching every user over GQL](#searching-a-user-who-is-not-the-superadmin-may-not-gql-search-every-user) | rejected |
 
-**UserAdapter.gql_admin_search_keypairs**
+**gql_admin_search_keypairs**
 
 | scenario | verdict |
 |---|---|
 | [when the superadmin gives a policy name in a GQL key search gated by the global role, only the keys under that policy come back](#managing_keypairs-the-superadmin-gql-key-search-by-policy-name-gets-that-policys-keys-only) | answered |
 | [a user holding the permission is rejected by the global role gate when searching keys over GQL](#managing_keypairs-a-user-who-is-not-the-superadmin-may-not-search-every-key-over-gql) | rejected |
 
-**UserAdapter.gql_scoped_search**
+**gql_scoped_search**
 
 | scenario | verdict |
 |---|---|
 | [a GQL scoped search under the same permission brings back the users of both scopes in the cursor response](#searching-a-gql-scoped-search-over-two-granted-scopes-joins-their-users) | answered |
 | [when a user granted READ on only one scope gives two scopes to a GQL scoped search, the scope permission gate rejects all of them](#searching-one-scope-without-a-grant-refuses-the-whole-gql-scoped-search) | rejected |
 
-**UserAdapter.gql_search_by_domain**
+**gql_search_by_domain**
 
 | scenario | verdict |
 |---|---|
 | [a GQL domain search under the same permission brings back only the users of that domain in the cursor response](#searching-a-user-granted-on-a-domain-gql-searching-it-finds-only-its-users) | answered |
 | [a GQL domain search from a user holding no role is rejected by the scope permission gate](#searching-a-user-granted-nothing-may-not-gql-search-a-domain) | rejected |
 
-**UserAdapter.gql_search_by_project**
+**gql_search_by_project**
 
 | scenario | verdict |
 |---|---|
 | [a GQL project search under the same permission brings back only the users on the roster in the cursor response](#searching-a-user-granted-on-a-project-gql-searching-it-finds-only-its-roster) | answered |
 | [a GQL project search from a user holding no role is rejected by the scope permission gate](#searching-a-user-granted-nothing-may-not-gql-search-a-project) | rejected |
 
-**UserAdapter.project_search**
+**project_search**
 
 | scenario | verdict |
 |---|---|
 | [when a user granted user READ in the project scope searches by that project, only the users on its roster come back](#searching-a-user-granted-on-a-project-searching-it-finds-only-its-roster) | answered |
 | [a project search from a user holding no role is rejected by the scope permission gate](#searching-a-user-granted-nothing-may-not-search-a-project) | rejected |
 
-**UserAdapter.role_search**
+**role_search**
 
 | scenario | verdict |
 |---|---|
@@ -152,7 +135,7 @@ Scenario: incomplete 7 / 42
 | [when the superadmin gives one role in a role search gated by the global role, only the user assigned that role comes back](#searching-the-superadmin-searching-by-role-finds-only-its-holders) | answered |
 | [a user holding no permission who tries to search by role is rejected by the scope permission gate](#searching-a-user-granted-nothing-may-not-search-by-role) | rejected |
 
-**UserAdapter.scoped_search**
+**scoped_search**
 
 | scenario | verdict |
 |---|---|
@@ -160,7 +143,7 @@ Scenario: incomplete 7 / 42
 | [when a user holding the permission runs a scoped search without page arguments, limit 50 and offset 0 are carried in the response](#searching-a-scoped-search-without-page-arguments-answers-up-to-fifty) | answered |
 | [when a user granted READ on only the first scope gives two scopes, the scope permission gate rejects all of them](#searching-one-scope-without-a-grant-refuses-the-whole-scoped-search) | rejected |
 
-**UserAdapter.search_my_keypairs**
+**search_my_keypairs**
 
 | scenario | verdict |
 |---|---|
@@ -168,19 +151,19 @@ Scenario: incomplete 7 / 42
 | [when a user holding the permission searches without page arguments, ten keys in descending creation time and the next page flag come back](#own_keypairs-searching-own-keys-without-page-arguments-answers-the-ten-newest) | answered |
 | [a user holding no role who tries to search their own keys is rejected by the scope permission gate](#own_keypairs-a-user-granted-nothing-may-not-search-their-own-keys) | rejected |
 
-**UserAdapter.bulk_create_users**
+**bulk_create_users**
 
 | scenario | verdict |
 |---|---|
 | [even a user granted CREATE in the domain scope is rejected by the global role gate when bulk creating users](#creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users) | rejected |
 
-**UserAdapter.bulk_create_users_with_keypair**
+**bulk_create_users_with_keypair**
 
 | scenario | verdict |
 |---|---|
 | [a user holding the permission is rejected by the global role gate when calling this bulk create](#creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users-with-keypairs) | rejected |
 
-**UserAdapter.bulk_update_users**
+**bulk_update_users**
 
 | scenario | verdict |
 |---|---|
@@ -189,28 +172,28 @@ Scenario: incomplete 7 / 42
 | [when the superadmin gives one user to update and one to rename into a taken name in a bulk edit gated by the global role, one is updated and one comes back as failed with its user id](#editing-the-superadmin-bulk-edit-answers-the-updated-and-the-failed-apart) | answered |
 | [even a user granted UPDATE in the domain scope is rejected by the global role gate when bulk editing users](#editing-a-user-who-is-not-the-superadmin-may-not-bulk-edit-users) | rejected |
 
-**UserAdapter.create_user**
+**create_user**
 
 | scenario | verdict |
 |---|---|
 | [a user holding no role who tries to create a user is rejected by the domain scope permission gate](#creating-a-user-granted-nothing-may-not-create-a-user) | rejected |
 | [when a user holding the permission gives a domain name nothing answers to, the domain name lookup step rejects it as not found](#creating-a-user-may-not-be-created-in-a-domain-name-nothing-answers-to) | rejected |
 
-**UserAdapter.delete_user_by_id**
+**delete_user_by_id**
 
 | scenario | verdict |
 |---|---|
 | [when a user granted SOFT_DELETE in the target user scope deletes the user, success comes back and the state of that user changes to deleted](#retiring-a-user-granted-soft-delete-marks-another-user-deleted) | answered |
 | [a user holding no role who tries to delete a user is rejected by the entity permission gate](#retiring-a-user-granted-nothing-may-not-delete-another-user) | rejected |
 
-**UserAdapter.get**
+**get**
 
 | scenario | verdict |
 |---|---|
 | [when a user granted the user read permission in the target user scope reads the user, the whole node with the default key filled comes back](#reading-a-user-granted-read-on-another-user-reads-their-whole-node) | answered |
 | [a user holding no role who tries to read another user is rejected by the entity permission gate](#reading-a-user-granted-nothing-may-not-read-another-user) | rejected |
 
-**UserAdapter.update_user_by_id**
+**update_user_by_id**
 
 | scenario | verdict |
 |---|---|
@@ -228,7 +211,7 @@ Scenario: incomplete 7 / 42
 | [when a user granted only UPDATE and READ in the target user scope gives DELETED in an edit, the entity permission gate of the delete rejects it](#retiring-an-edit-to-deleted-is-refused-without-soft-delete) | rejected |
 | [when only DELETED is given in an edit of a deleted user, nothing changes and that user comes back](#retiring-an-edit-to-deleted-on-a-deleted-user-changes-nothing) | rejected |
 
-**UserAdapter.admin_create_keypair**
+**admin_create_keypair**
 
 | scenario | verdict |
 |---|---|
@@ -236,7 +219,7 @@ Scenario: incomplete 7 / 42
 | [when a user holding the permission gives a policy name that does not exist, input validation rejects it](#managing_keypairs-a-key-may-not-be-made-under-a-policy-that-does-not-exist) | rejected |
 | [a user holding no role who tries to create a key is rejected by the entity permission gate](#managing_keypairs-a-user-granted-nothing-may-not-make-a-key-for-another) | rejected |
 
-**UserAdapter.admin_delete_keypair**
+**admin_delete_keypair**
 
 | scenario | verdict |
 |---|---|
@@ -245,7 +228,7 @@ Scenario: incomplete 7 / 42
 | [a user holding only READ who tries to delete a key is rejected by the entity permission gate](#managing_keypairs-a-user-granted-only-read-may-not-delete-another-users-key) | rejected |
 | [when a user holding the permission tries to delete the target's default key, input validation rejects it](#managing_keypairs-another-users-default-key-may-not-be-deleted) | rejected |
 
-**UserAdapter.admin_delete_ssh_keypair**
+**admin_delete_ssh_keypair**
 
 | scenario | verdict |
 |---|---|
@@ -253,21 +236,21 @@ Scenario: incomplete 7 / 42
 | [a user holding no role who tries to delete a key is rejected at the owner lookup step](#managing_keypairs-a-user-granted-nothing-may-not-clear-another-users-ssh-key) | rejected |
 | [a user holding only READ who tries to delete a key is rejected by the entity permission gate](#managing_keypairs-a-user-granted-only-read-may-not-clear-another-users-ssh-key) | rejected |
 
-**UserAdapter.admin_get_keypair**
+**admin_get_keypair**
 
 | scenario | verdict |
 |---|---|
 | [when a user granted READ in the target scope reads a key, that whole key node comes back](#managing_keypairs-a-granted-user-reads-another-users-key-by-access-key) | answered |
 | [a user holding no role who tries to read a key is rejected at the owner lookup step](#managing_keypairs-a-user-granted-nothing-may-not-read-another-users-key) | rejected |
 
-**UserAdapter.admin_get_ssh_keypair**
+**admin_get_ssh_keypair**
 
 | scenario | verdict |
 |---|---|
 | [when a user granted READ in the target scope reads the SSH key, only the access key and the public key come back and the private key does not](#managing_keypairs-a-granted-user-reads-another-users-ssh-public-key-only) | answered |
 | [a user holding no role who tries to read a key is rejected at the owner lookup step](#managing_keypairs-a-user-granted-nothing-may-not-read-another-users-ssh-public-key) | rejected |
 
-**UserAdapter.admin_register_ssh_keypair**
+**admin_register_ssh_keypair**
 
 | scenario | verdict |
 |---|---|
@@ -275,7 +258,7 @@ Scenario: incomplete 7 / 42
 | [a user holding no role who tries to register an SSH key is rejected at the owner lookup step](#managing_keypairs-a-user-granted-nothing-may-not-register-another-users-ssh-key) | rejected |
 | [a user holding only READ who tries to register an SSH key is rejected by the entity permission gate](#managing_keypairs-a-user-granted-only-read-may-not-register-another-users-ssh-key) | rejected |
 
-**UserAdapter.admin_update_keypair**
+**admin_update_keypair**
 
 | scenario | verdict |
 |---|---|
@@ -284,7 +267,7 @@ Scenario: incomplete 7 / 42
 | [a user holding only READ who tries to change a key is rejected by the entity permission gate](#managing_keypairs-a-user-granted-only-read-may-not-change-another-users-key) | rejected |
 | [when a user holding the permission gives a policy name that does not exist, input validation rejects it](#managing_keypairs-another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist) | rejected |
 
-**UserAdapter.bulk_purge_users**
+**bulk_purge_users**
 
 | scenario | verdict |
 |---|---|
@@ -292,7 +275,7 @@ Scenario: incomplete 7 / 42
 | [when the superadmin gives two users in a bulk purge gated by the global role, the two ids and a count of two come back](#retiring-the-superadmin-bulk-purge-answers-the-purged-ids-and-count) | answered |
 | [even a user granted HARD_DELETE in the domain scope is rejected by the global role gate when purging in bulk](#retiring-a-user-who-is-not-the-superadmin-may-not-purge-in-bulk) | rejected |
 
-**UserAdapter.issue_my_keypair**
+**issue_my_keypair**
 
 | scenario | verdict |
 |---|---|
@@ -300,7 +283,7 @@ Scenario: incomplete 7 / 42
 | [when a user holding the permission issues a key, moves the default key to it, and revokes the original default key, all three calls pass in turn and only the issued key is left](#own_keypairs-an-issued-key-made-default-lets-the-original-default-key-be-revoked) | answered |
 | [a user holding no role who tries to issue their own key is rejected by the entity permission gate even for themselves](#own_keypairs-a-user-granted-nothing-may-not-issue-their-own-key) | rejected |
 
-**UserAdapter.purge_user_by_id**
+**purge_user_by_id**
 
 | scenario | verdict |
 |---|---|
@@ -308,7 +291,7 @@ Scenario: incomplete 7 / 42
 | [a user holding no role who tries to purge a user is rejected by the entity permission gate](#retiring-a-user-granted-nothing-may-not-purge-another-user) | rejected |
 | [when a user holding the permission gives an admin id that does not exist as the heir, input validation rejects it](#retiring-purging-a-user-to-an-admin-who-does-not-exist-is-refused) | rejected |
 
-**UserAdapter.restore_user_by_id**
+**restore_user_by_id**
 
 | scenario | verdict |
 |---|---|
@@ -316,7 +299,7 @@ Scenario: incomplete 7 / 42
 | [a user holding no role who tries to restore a user is rejected by the entity permission gate](#retiring-a-user-granted-nothing-may-not-restore-another-user) | rejected |
 | [when a user holding the permission tries to restore an inactive user that was not deleted, it is rejected because the user is not deleted](#retiring-restoring-a-user-who-was-not-deleted-is-refused) | rejected |
 
-**UserAdapter.revoke_my_keypair**
+**revoke_my_keypair**
 
 | scenario | verdict |
 |---|---|
@@ -326,7 +309,7 @@ Scenario: incomplete 7 / 42
 | [when a user holding the permission gives a value that is no key, the owner lookup step rejects it with the same exception as a missing permission](#own_keypairs-an-access-key-nobody-holds-may-not-be-revoked) | rejected |
 | [when a user holding the permission tries to revoke their own default key, input validation rejects it](#own_keypairs-the-default-key-may-not-be-revoked) | rejected |
 
-**UserAdapter.switch_default_access_key**
+**switch_default_access_key**
 
 | scenario | verdict |
 |---|---|
@@ -334,7 +317,7 @@ Scenario: incomplete 7 / 42
 | [a user holding no role who tries to move the default key is rejected by the entity permission gate](#own_keypairs-a-user-granted-nothing-may-not-move-their-default-key) | rejected |
 | [when a user holding the permission gives another user's key, input validation rejects it](#own_keypairs-someone-elses-key-may-not-become-the-default-key) | rejected |
 
-**UserAdapter.update_my_keypair**
+**update_my_keypair**
 
 | scenario | verdict |
 |---|---|
@@ -343,170 +326,14 @@ Scenario: incomplete 7 / 42
 | [a user holding only READ who tries to turn a key inactive is rejected by the entity permission gate](#own_keypairs-a-user-granted-only-read-may-not-turn-off-their-own-key) | rejected |
 | [when a user holding the permission tries to turn their own default key inactive, input validation rejects it](#own_keypairs-the-default-key-may-not-be-turned-off) | rejected |
 
-**UserAdapter.update_user**
+**update_user**
 
 | scenario | verdict |
 |---|---|
 | [when a user granted UPDATE in the target user scope sends an edit holding only the allowed IP, a success flag comes back and the allowed IP of that user changes](#editing-a-user-granted-update-changes-the-allowed-client-ip) | answered |
 | [when an allowed IP edit comes from a user holding no role, the entity permission gate rejects it](#editing-a-user-granted-nothing-may-not-change-the-allowed-client-ip) | rejected |
 
-### LoginHistoryAdapter.admin_search
-
-<a id="login_history-the-superadmin-searches-every-users-login-history"></a>
-
-#### [the-superadmin-searches-every-users-login-history](/tests/scenario/bai_scenario/manager/user/test_login_history.py): pass
-
-when the superadmin searches in a history search gated by the global role, every record seeded in advance comes back in descending creation time regardless of the user
-
-Given
-
-- one domain, one superadmin, and two users who each hold one success record
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-    - User resource policy user-policy-3: up to 10 folders per user
-    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
-    - superadmin user-3: has their own keypair and personal project
-  - regular user user-1: has one successful login record
-  - regular user user-2: has one successful login record
-
-When
-
-- LoginHistoryAdapter.admin_search: user-3 searches every login history record
-
-Then
-
-- every record seeded in advance comes back in order
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-  - items.length = 2
-  - items[0].id: same as the record seeded in advance
-  - items[0].user_id: same as the record owner
-  - items[0].domain_name = 'home-1'
-  - items[0].result = 'success'
-  - items[0].fail_reason = None
-  - items[0].client_ip = None
-  - items[0].created_at: the time this run wrote
-  - items[1].id: same as the record seeded in advance
-  - items[1].user_id: same as the record owner
-  - items[1].domain_name = 'home-1'
-  - items[1].result = 'success'
-  - items[1].fail_reason = None
-  - items[1].client_ip = None
-  - items[1].created_at: the time this run wrote
-
-<a id="login_history-a-user-who-is-not-the-superadmin-may-not-search-every-login-history"></a>
-
-#### [a-user-who-is-not-the-superadmin-may-not-search-every-login-history](/tests/scenario/bai_scenario/manager/user/test_login_history.py): pass
-
-a user holding the permission is rejected by the global role gate when searching every history record
-
-Given
-
-- one domain, and the caller holds the user READ permission in the domain scope
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-  - a role assignment granting the user the READ permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - regular user user-1: holds Role user-role-1
-
-When
-
-- LoginHistoryAdapter.admin_search: user-1 searches every login history record
-
-Then
-
-- the call is rejected
-  - rejected: InsufficientPrivilege
-
-### LoginHistoryAdapter.my_search
-
-<a id="login_history-a-user-granted-read-on-themselves-searches-only-their-own-login-history"></a>
-
-#### [a-user-granted-read-on-themselves-searches-only-their-own-login-history](/tests/scenario/bai_scenario/manager/user/test_login_history.py): pass
-
-when a user granted READ in their own scope searches, the history of other users is left out
-
-Given
-
-- one domain and two users, the caller holds the READ permission on their own user
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - regular user user-1: has one successful login record
-  - regular user user-2: has one successful login record
-  - a role assignment granting the user the READ permissions
-    - Role user-role-1: applies only within the scope it is granted in
-    - Role user-role-1: READ allowed on every user
-    - regular user user-1: holds Role user-role-1
-
-When
-
-- LoginHistoryAdapter.my_search: user-1 searches their own login history
-
-Then
-
-- only their own record comes back
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-  - items.length = 1
-  - items[0].id: same as the record seeded in advance
-  - items[0].user_id: same as the record owner
-  - items[0].domain_name = 'home-1'
-  - items[0].result = 'success'
-  - items[0].fail_reason = None
-  - items[0].client_ip = None
-  - items[0].created_at: the time this run wrote
-
-<a id="login_history-a-user-granted-nothing-may-not-search-their-own-login-history"></a>
-
-#### [a-user-granted-nothing-may-not-search-their-own-login-history](/tests/scenario/bai_scenario/manager/user/test_login_history.py): pass
-
-a user holding no role who tries to search their own history is rejected by the scope permission gate even for themselves
-
-Given
-
-- one domain and two users, the caller holds no permission
-  - Domain home-1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
-    - regular user user-1: has their own keypair and personal project
-    - User resource policy user-policy-2: up to 10 folders per user
-    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
-    - regular user user-2: has their own keypair and personal project
-  - regular user user-1: has one successful login record
-
-When
-
-- LoginHistoryAdapter.my_search: user-1 searches their own login history
-
-Then
-
-- the call is rejected
-  - rejected: NotEnoughPermission
-
-### UserAdapter.admin_search
+### admin_search
 
 <a id="searching-the-superadmin-searching-every-user-counts-deleted-ones-too"></a>
 
@@ -572,7 +399,7 @@ Then
 - the call is rejected
   - rejected: InsufficientPrivilege
 
-### UserAdapter.admin_search_keypairs
+### admin_search_keypairs
 
 <a id="managing_keypairs-the-superadmin-searching-every-key-gets-every-users-key"></a>
 
@@ -676,7 +503,7 @@ Then
 - the call is rejected
   - rejected: InsufficientPrivilege
 
-### UserAdapter.batch_load_by_ids
+### batch_load_by_ids
 
 <a id="reading-a-batch-load-of-no-ids-answers-an-empty-list"></a>
 
@@ -816,7 +643,7 @@ Then
   - rejected: NotEnoughPermission
   - rejected: NotEnoughPermission
 
-### UserAdapter.batch_lookup_by_emails
+### batch_lookup_by_emails
 
 <a id="reading-a-user-granted-read-on-another-user-looks-up-their-id-by-email"></a>
 
@@ -917,7 +744,7 @@ Then
   - rejected: GenericBadRequest
   - rejected: GenericBadRequest
 
-### UserAdapter.domain_search
+### domain_search
 
 <a id="searching-a-user-granted-on-a-domain-searching-it-by-name-finds-only-its-users"></a>
 
@@ -1012,7 +839,7 @@ Then
 - the call is rejected
   - rejected: EntityNotFoundError
 
-### UserAdapter.gql_admin_search
+### gql_admin_search
 
 <a id="searching-a-gql-search-without-page-arguments-answers-the-newest-ten"></a>
 
@@ -1106,7 +933,7 @@ Then
 - the call is rejected
   - rejected: InsufficientPrivilege
 
-### UserAdapter.gql_admin_search_keypairs
+### gql_admin_search_keypairs
 
 <a id="managing_keypairs-the-superadmin-gql-key-search-by-policy-name-gets-that-policys-keys-only"></a>
 
@@ -1184,7 +1011,7 @@ Then
 - the call is rejected
   - rejected: InsufficientPrivilege
 
-### UserAdapter.gql_scoped_search
+### gql_scoped_search
 
 <a id="searching-a-gql-scoped-search-over-two-granted-scopes-joins-their-users"></a>
 
@@ -1262,7 +1089,7 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-### UserAdapter.gql_search_by_domain
+### gql_search_by_domain
 
 <a id="searching-a-user-granted-on-a-domain-gql-searching-it-finds-only-its-users"></a>
 
@@ -1328,7 +1155,7 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-### UserAdapter.gql_search_by_project
+### gql_search_by_project
 
 <a id="searching-a-user-granted-on-a-project-gql-searching-it-finds-only-its-roster"></a>
 
@@ -1396,7 +1223,7 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-### UserAdapter.project_search
+### project_search
 
 <a id="searching-a-user-granted-on-a-project-searching-it-finds-only-its-roster"></a>
 
@@ -1464,7 +1291,7 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-### UserAdapter.role_search
+### role_search
 
 <a id="searching-a-user-granted-on-the-role-scope-searching-by-role-finds-only-its-holders"></a>
 
@@ -1575,7 +1402,7 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-### UserAdapter.scoped_search
+### scoped_search
 
 <a id="searching-a-scoped-search-over-two-granted-scopes-joins-their-users"></a>
 
@@ -1685,7 +1512,7 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-### UserAdapter.search_my_keypairs
+### search_my_keypairs
 
 <a id="own_keypairs-a-user-granted-read-searching-their-keys-sees-only-their-own"></a>
 
@@ -1821,7 +1648,7 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-### UserAdapter.bulk_create_users
+### bulk_create_users
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users"></a>
 
@@ -1852,7 +1679,7 @@ Then
 - the call is rejected
   - rejected: InsufficientPrivilege
 
-### UserAdapter.bulk_create_users_with_keypair
+### bulk_create_users_with_keypair
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users-with-keypairs"></a>
 
@@ -1883,7 +1710,7 @@ Then
 - the call is rejected
   - rejected: InsufficientPrivilege
 
-### UserAdapter.bulk_update_users
+### bulk_update_users
 
 <a id="retiring-a-bulk-edit-deletes-and-restores-per-item-and-refuses-a-deleted-user-edit"></a>
 
@@ -2108,7 +1935,7 @@ Then
 - the call is rejected
   - rejected: InsufficientPrivilege
 
-### UserAdapter.create_user
+### create_user
 
 <a id="creating-a-user-granted-nothing-may-not-create-a-user"></a>
 
@@ -2164,7 +1991,7 @@ Then
 - the call is rejected
   - rejected: EntityNotFoundError
 
-### UserAdapter.delete_user_by_id
+### delete_user_by_id
 
 <a id="retiring-a-user-granted-soft-delete-marks-another-user-deleted"></a>
 
@@ -2249,7 +2076,7 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-### UserAdapter.get
+### get
 
 <a id="reading-a-user-granted-read-on-another-user-reads-their-whole-node"></a>
 
@@ -2332,7 +2159,7 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-### UserAdapter.update_user_by_id
+### update_user_by_id
 
 <a id="editing-a-user-granted-update-changing-only-the-full-name-leaves-the-rest"></a>
 
@@ -2936,7 +2763,7 @@ Then
 - the whole user still in the deleted state comes back
   - rejected: NotEnoughPermission
 
-### UserAdapter.admin_create_keypair
+### admin_create_keypair
 
 <a id="managing_keypairs-a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy"></a>
 
@@ -3046,7 +2873,7 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-### UserAdapter.admin_delete_keypair
+### admin_delete_keypair
 
 <a id="managing_keypairs-a-granted-user-deleting-another-users-extra-key-gets-its-access-key"></a>
 
@@ -3184,7 +3011,7 @@ Then
 - the call is rejected
   - rejected: KeyPairForbidden
 
-### UserAdapter.admin_delete_ssh_keypair
+### admin_delete_ssh_keypair
 
 <a id="managing_keypairs-a-granted-user-clearing-another-users-ssh-key-empties-the-public-key"></a>
 
@@ -3292,7 +3119,7 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-### UserAdapter.admin_get_keypair
+### admin_get_keypair
 
 <a id="managing_keypairs-a-granted-user-reads-another-users-key-by-access-key"></a>
 
@@ -3370,7 +3197,7 @@ Then
 - the call is rejected
   - rejected: GenericBadRequest
 
-### UserAdapter.admin_get_ssh_keypair
+### admin_get_ssh_keypair
 
 <a id="managing_keypairs-a-granted-user-reads-another-users-ssh-public-key-only"></a>
 
@@ -3441,7 +3268,7 @@ Then
 - the call is rejected
   - rejected: GenericBadRequest
 
-### UserAdapter.admin_register_ssh_keypair
+### admin_register_ssh_keypair
 
 <a id="managing_keypairs-a-granted-user-registering-another-users-ssh-key-gets-the-access-key"></a>
 
@@ -3549,7 +3376,7 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-### UserAdapter.admin_update_keypair
+### admin_update_keypair
 
 <a id="managing_keypairs-a-granted-user-changing-another-users-rate-limit-changes-only-that"></a>
 
@@ -3697,7 +3524,7 @@ Then
 - the call is rejected
   - rejected: KeypairResourcePolicyNotFound
 
-### UserAdapter.bulk_purge_users
+### bulk_purge_users
 
 <a id="retiring-a-bulk-purge-records-a-missing-id-as-a-failure"></a>
 
@@ -3795,7 +3622,7 @@ Then
 - the call is rejected
   - rejected: InsufficientPrivilege
 
-### UserAdapter.issue_my_keypair
+### issue_my_keypair
 
 <a id="own_keypairs-a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key"></a>
 
@@ -3924,7 +3751,7 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-### UserAdapter.purge_user_by_id
+### purge_user_by_id
 
 <a id="retiring-a-user-granted-hard-delete-purges-a-user-with-no-folders-or-sessions"></a>
 
@@ -4022,7 +3849,7 @@ Then
 - the call is rejected
   - rejected: UserNotFound
 
-### UserAdapter.restore_user_by_id
+### restore_user_by_id
 
 <a id="retiring-a-user-granted-soft-delete-restores-a-deleted-user-to-active"></a>
 
@@ -4143,7 +3970,7 @@ Then
 - the call is rejected
   - rejected: UserModificationBadRequest
 
-### UserAdapter.revoke_my_keypair
+### revoke_my_keypair
 
 <a id="own_keypairs-a-user-granted-read-and-update-revokes-a-non-default-key"></a>
 
@@ -4309,7 +4136,7 @@ Then
 - the call is rejected
   - rejected: KeyPairForbidden
 
-### UserAdapter.switch_default_access_key
+### switch_default_access_key
 
 <a id="own_keypairs-a-user-granted-read-and-update-moves-their-default-key"></a>
 
@@ -4423,7 +4250,7 @@ Then
 - the call is rejected
   - rejected: KeyPairForbidden
 
-### UserAdapter.update_my_keypair
+### update_my_keypair
 
 <a id="own_keypairs-a-user-granted-read-and-update-turns-off-a-non-default-key"></a>
 
@@ -4554,7 +4381,7 @@ Then
 - the call is rejected
   - rejected: KeyPairForbidden
 
-### UserAdapter.update_user
+### update_user
 
 <a id="editing-a-user-granted-update-changes-the-allowed-client-ip"></a>
 

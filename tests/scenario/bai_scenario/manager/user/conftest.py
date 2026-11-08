@@ -18,7 +18,6 @@ from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
-from ai.backend.manager.api.adapters.login_history.adapter import LoginHistoryAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -131,8 +130,3 @@ async def auth(
             key_pool,
         ),
     )
-
-
-@pytest.fixture
-async def login_history_adapter(auth: AuthProcessors) -> LoginHistoryAdapter:
-    return LoginHistoryAdapter(auth)
