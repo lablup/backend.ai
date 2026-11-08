@@ -30,6 +30,7 @@ from ai.backend.manager.plugin.totp.hook import TOTPHook
 
 _OPENID_SECRET = "test-openid-secret"
 _TOTP_KEY = "JBSWY3DPEHPK3PXP"
+_TOTP_TOKEN_SECRET = "totp-registration-token-secret-for-tests"
 _ACTIVE_USER_WITH_TOTP = AuthorizingUser(
     uuid=UserID(uuid.UUID(int=1)),
     username="alice",
@@ -194,7 +195,7 @@ class TestPostAuthorizeAfterKeypairReturnsNone:
         ctx = HookPluginContext(MagicMock(spec=AsyncEtcd), {})
         ctx.plugins = {
             "auth_keypair": KeypairAuthHookPlugin({}, {}),
-            "totp": TOTPHook({}, {}),
+            "totp": TOTPHook({"token_secret": _TOTP_TOKEN_SECRET}, {}),
         }
         return _KeypairAndTotpDispatch(
             ctx=ctx,
