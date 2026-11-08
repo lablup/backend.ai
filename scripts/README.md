@@ -41,8 +41,7 @@ current, see `AGENTS.md` in this directory.
 | `pre-commit` | Hook stub copied into `.git/hooks/` that calls `pre-commit.sh` | auto: git, installed by `install-dev.sh` |
 | `pre-commit.sh` | Runs `ruff format` and `ruff check` over the staged Python files, with the ruff version from `pants.toml` | auto: `pre-commit` |
 | `pre-push` | Hook stub copied into `.git/hooks/` that calls `pre-push.sh` | auto: git, installed by `install-dev.sh` |
-| `pre-push.sh` | Runs `knowledge/check_words.py`, `pants lint`, `pants check` and `pants test` against the PR's base branch | auto: `pre-push` |
-| `plan-push-targets.sh` | Writes the changed targets and their direct dependents to a file and prints its path, cached by a hash of the base commit, HEAD's tree and the uncommitted changes | auto: `pre-push.sh` |
+| `pre-push.sh` | Runs `knowledge/check_words.py` against the PR's base branch. CI runs the pants checks | auto: `pre-push` |
 | `hooks/auto-format.sh` | Runs `pants fmt` on the files an AI agent touched | auto: Claude Code hook (per-user settings) |
 | `hooks/auto-fix.sh` | Runs `pants fix` on the files an AI agent touched | auto: Claude Code hook (per-user settings) |
 
@@ -54,9 +53,9 @@ current, see `AGENTS.md` in this directory.
 | `check-multiple-alembic-heads.py` | Fails the build when the migration graph has more than one head | auto: `ci.yml`, `.github/scripts/merge-alembic-heads.sh` |
 | `check-alembic-revision.py` | Rejects a migration whose `upgrade()` / `downgrade()` is empty | auto: `ci.yml` |
 | `check-init-imports.py` | Fails when an `__init__.py` under the given directories imports anything, apart from the files it allows | auto: `ci.yml` (`check-build-and-lint`) |
-| `knowledge/check.py` | Validates `KNOWLEDGE.md` frontmatter, paths, and body links | auto: `knowledge-check.yml`, `pre-push.sh`; person |
+| `knowledge/check.py` | Validates `KNOWLEDGE.md` frontmatter, paths, and body links | auto: `knowledge-check.yml`; person |
 | `knowledge/check_bilingual.py` | Validates `.md` and `.ko.md` pairs and rejects Korean added to a `.md` file | auto: `knowledge-check.yml`; person |
-| `knowledge/check_words.py` | Finds the words the glossary rejects in added document lines or given files | auto: `knowledge-check.yml`; person |
+| `knowledge/check_words.py` | Finds the words the glossary rejects in added document lines or given files | auto: `knowledge-check.yml`, `pre-push.sh`; person |
 | `get-platform-suffix.py` | Prints the `<os>-<arch>` suffix used in artifact names | auto: `ci.yml`, `build-test.yml` |
 | `.github/scripts/decide-backport-targets.sh` | Reads `.github/maintained-versions.yml` and the `Backport:` trailer to decide the target branches | auto: `backport.yml` |
 | `.github/scripts/check-backport-migration.sh` | Warns when a pull request both carries a `Backport:` trailer and changes the database schema, since both migrations then have to be idempotent | auto: `backport-migration-check.yml` |
@@ -101,9 +100,9 @@ current, see `AGENTS.md` in this directory.
 
 | Script | What it does | Called by |
 |---|---|---|
-| `pyscript.sh` | Runs a PEP 723 script with uv-managed dependencies | person; `install-dev.sh`, `pre-commit.sh` |
+| `pyscript.sh` | Runs a PEP 723 script with uv-managed dependencies | person; `install-dev.sh`, `pre-commit.sh`, `release.sh` |
 | `python.sh` | Runs a plain Python command through the uv-managed interpreter | person; `install-dev.sh` |
-| `tomltool.py` | Gets or sets a key in a TOML file or stream | person; `pre-commit.sh` |
+| `tomltool.py` | Gets or sets a key in a TOML file or stream | person; `pre-commit.sh`, `release.sh` |
 | `add_future_annotations.py` | Adds the missing `from __future__ import annotations` imports | person |
 | `validate_ann_compliance.py` | Reports the ANN (flake8-annotations) violations of a path | person |
 | `run_mypy_subset.sh` | Runs `pants check` over a subset of paths | person |
