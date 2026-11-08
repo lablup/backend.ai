@@ -4,7 +4,7 @@
 
 ## 이 디렉터리가 있는 이유
 
-PR 제목과 변경 기록 항목(`changes/<PR-number>.<type>.md`)은 서로 다른 곳에 있지만 같은 분류를 공유한다. 이 문서는 그 분류와, `fix:` 가 자동 백포트를 유발해서 생기는 예외(같은 릴리스의 수정)를 담는다.
+PR 제목과 변경 기록 항목(`changes/<...>.<type>.md`)은 서로 다른 곳에 있지만 같은 분류를 공유한다. 이 문서는 그 분류와, `fix:` 가 자동 백포트를 유발해서 생기는 예외(같은 릴리스의 수정)를 담는다.
 
 ## 카테고리, PR 제목 접두사, changelog 유형의 대응
 
@@ -26,3 +26,10 @@ PR 제목과 변경 기록 항목(`changes/<PR-number>.<type>.md`)은 서로 다
 - 이 동작은 버그가 이미 지원 중인 브랜치에 있을 때만 타당하다.
 - 버그가 있는 코드가 `main` 에만 있다면, 같은 미출시 주기에 앞서 들어온 코드라면, `fix` 로 표시할 때 출시된 적 없는 코드를 백포트하게 된다.
 - 그래서 PR 제목은 `chore` 를, 변경 기록 항목은 `misc` 를 사용한다.
+
+## 변경 기록 항목을 PR 번호 없이 이름 지을 수 있는 이유
+
+- `<PR-number>.<type>.md` 이름은 PR 을 연 뒤에만 넣을 수 있고, 그 두 번째 push 로 PR 의 CI 를 처음부터 다시 실행한다.
+- `<YYYYMMDD>-<HHMMSS>-<6 chars>.<type>.md` 이름은 코드와 같은 첫 push 에 넣는다.
+- PR 번호는 릴리스 때 git 이력에서 붙인다. 파일을 추가한 first-parent 커밋 제목에 squash merge 나 백포트가 남긴 `(#N)` 이 있다.
+- towncrier 설정, `changes/template.md`, changelog 형식은 그대로다. towncrier 는 `<PR-number>.<type>.md` 이름만 본다.

@@ -36,9 +36,19 @@ Note: maintainers may modify the news fragment without notice before merge.
 
 ### Filename convention
 
-News fragments live in `changes/` and must be named `<PR-number>.<type>.md`, where `<type>` matches one of the `directory` values defined by the `[[tool.towncrier.type]]` entries in `pyproject.toml` (e.g., `fix`, `feature`, `breaking`, `misc`).
+News fragments live in `changes/`. `<type>` matches one of the `directory` values defined by the `[[tool.towncrier.type]]` entries in `pyproject.toml` (e.g., `fix`, `feature`, `breaking`, `misc`). Two names are allowed:
 
-The number in the filename must be the **pull request number** — not an issue number, Linear/Jira ticket, or any other identifier. Open the pull request first, then name the fragment with its number from the start; CI does not rename fragments. Backport PRs (targeting release branches) preserve the original fragment numbering so release notes keep linking back to the original change.
+| Name | When | Made by |
+|---|---|---|
+| `<YYYYMMDD>-<HHMMSS>-<6 lowercase letters or digits>.<type>.md` (default) | Before the pull request exists, in the same push as the code | `python3 scripts/new-changelog.py <type> "<sentence>"`, which prints the path |
+| `<PR-number>.<type>.md` | After the pull request exists | By hand |
+
+- The number in `<PR-number>.<type>.md` is the **pull request number**, not an issue number, Linear/Jira ticket or any other identifier.
+- At release time `scripts/release.sh` renames each `<YYYYMMDD>-<HHMMSS>-<6 chars>.<type>.md` to `<PR-number>.<type>.md` with `git mv` before running towncrier (`scripts/rename-changelog-fragments.py`):
+  - The PR number is the first `(#N)` in the subject of the first-parent commit that added the file. A backport commit `... (#N) (#M)` gives the original PR number `N`.
+  - When `<PR-number>.<type>.md` already exists, the name takes towncrier's counter: `<PR-number>.<type>.1.md`, `.2.md`, ...
+  - The release stops when a fragment's subject has no `(#N)`, or when a fragment name matches neither form.
+- Backport PRs (targeting release branches) keep the original fragment name so release notes keep linking back to the original change.
 
 ## In the middle: Pull request titles
 
