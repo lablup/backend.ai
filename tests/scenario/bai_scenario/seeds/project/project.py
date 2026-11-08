@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.types import VFolderHostPermissionMap
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.project.types import ProjectData, ProjectType
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
@@ -15,11 +16,15 @@ from bai_scenario.seeds.seeder import Naming, TestSeedRowFromTwo, joined
 
 @dataclass(frozen=True)
 class TestSeedProject(TestSeedRowFromTwo[DomainData, ProjectResourcePolicyData, ProjectData]):
-    """A project of the given domain, under the given policy."""
+    """A project of the given domain, under the given policy.
+
+    ``allowed_vfolder_hosts`` are the hosts a folder of this project may land on.
+    """
 
     name_hint: str = "project"
     is_active: bool = True
     type: ProjectType | None = None
+    allowed_vfolder_hosts: VFolderHostPermissionMap | None = None
 
     @override
     def kind(self) -> str:
@@ -27,7 +32,7 @@ class TestSeedProject(TestSeedRowFromTwo[DomainData, ProjectResourcePolicyData, 
 
     @override
     def detail(self) -> str:
-        if self.is_active and self.type is None:
+        if self.is_active and self.type is None and self.allowed_vfolder_hosts is None:
             return Says("")
         parts: list[str] = []
         if not self.is_active:
@@ -35,6 +40,14 @@ class TestSeedProject(TestSeedRowFromTwo[DomainData, ProjectResourcePolicyData, 
         if self.type is not None:
             parts.append(
                 Says(f"유형은 {self.type.value}입니다", english=f"of type {self.type.value}")
+            )
+        if self.allowed_vfolder_hosts is not None:
+            hosts = ", ".join(self.allowed_vfolder_hosts)
+            parts.append(
+                Says(
+                    f"이 프로젝트의 vfolder 는 {hosts}에 놓을 수 있습니다",
+                    english=f"vfolders of this project can be placed on {hosts}",
+                )
             )
         return joined(parts, ", ")
 
@@ -54,4 +67,5 @@ class TestSeedProject(TestSeedRowFromTwo[DomainData, ProjectResourcePolicyData, 
             resource_policy=second.name,
             is_active=self.is_active,
             type=self.type,
+            allowed_vfolder_hosts=self.allowed_vfolder_hosts,
         )
