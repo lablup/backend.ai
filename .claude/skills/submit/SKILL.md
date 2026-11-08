@@ -10,13 +10,13 @@ tags:
 
 # Submit Workflow
 
-Automates the post-implementation submission pipeline: quality enforcement, commit, PR creation, changelog, and push.
+Automates the post-implementation submission pipeline: quality enforcement, changelog, commit, PR creation, and push.
 
 ## Parameters
 
 - **jira_key** (optional): JIRA issue key (e.g., `BA-1234`). Auto-detected from branch name if pattern `BA-\d+` exists.
 - **changelog_type** (optional): One of `breaking`, `feature`, `enhance`, `deprecation`, `fix`, `doc`, `deps`, `misc`, `test`. If omitted, infer from the most significant change.
-- **changelog_message** (optional): One-line English summary for the news fragment. If omitted, generate from PR description.
+- **changelog_message** (optional): One-line English summary for the changelog fragment. If omitted, generate from the changes.
 - **base_branch** (optional): Target branch for PR. Defaults to `main`.
 
 ## Workflow
@@ -52,11 +52,37 @@ pants lint --changed-since=origin/{base_branch}
 
 **Note:** Type checking (`pants check`) and tests (`pants test`) are enforced by CI only. Do NOT run them locally — they consume excessive resources when multiple workers run concurrently.
 
-### Phase 3: Commit
+### Phase 3: Changelog Fragment
+
+1. **Determine changelog type** (if not provided); see `changes/KNOWLEDGE.md` for valid types and the category mapping
+
+2. **Generate changelog message** (if not provided)
+   - Single-line English sentence
+   - Imperative/commanding form: "Fix XXX", "Add YYY", "Support ZZZ"
+   - Or complete sentence: "Now it does ZZZ"
+   - Focus on what the change means to users and developers, not implementation details
+   - Show the draft to the user for approval; with `--draft`, skip the approval
+
+3. **Find the epic**
+   - The `Epic` row of `hejo issue get {jira_key}` is the epic key. Without an issue key or an epic, leave out `--epic` and skip step 4
+
+4. **Create the epic files if missing**
+   - Write the pair `changes/epics/{epic_key}.md` (English) and `changes/epics/{epic_key}.ko.md` (Korean) in the format of the epic file section of `changes/README.md`
+   - Draft them from the epic's English title, Korean title and body. Show the draft to the user for approval; with `--draft`, skip the approval
+
+5. **Create the fragment**
+   ```bash
+   python3 scripts/new-changelog.py {changelog_type} "{changelog_message}" [--issue {jira_key}] [--epic {epic_key}]
+   ```
+   - Prints the path `changes/<YYYYMMDD>-<HHMMSS>-<6 chars>.{changelog_type}.md`; the release renames it to `<PR-number>.{changelog_type}.md`
+   - Without an issue key, leave out `--issue`
+   - Stage it with the code in Phase 4, so it goes into the first push
+
+### Phase 4: Commit
 
 1. **Stage changes**
-   - `git add` specific files (avoid `-A` to prevent accidental inclusion of secrets)
-   - Never stage `.env`, credentials, or other sensitive files
+   - `git add` specific files, including the changelog fragment from Phase 3 (avoid `-A` to prevent accidental inclusion of secrets)
+   - Do not stage `.env`, credentials or other sensitive files
 
 2. **Generate commit message**
    - Use conventional commit style: `type(BA-XXXX): description`
@@ -70,7 +96,7 @@ pants lint --changed-since=origin/{base_branch}
    - Present draft message to user for approval
    - Commit with approved message
 
-### Phase 4: PR Creation
+### Phase 5: PR Creation
 
 1. **Push branch**
    - `git push -u origin {branch_name}`
@@ -119,28 +145,6 @@ pants lint --changed-since=origin/{base_branch}
 
 5. **Extract PR number** from `gh pr create` output
 
-### Phase 5: Changelog (News Fragment)
-
-1. **Determine changelog type** (if not provided) — see `changes/KNOWLEDGE.md` for valid types and the category mapping
-
-2. **Generate changelog message** (if not provided)
-   - Single-line English sentence
-   - Imperative/commanding form: "Fix XXX", "Add YYY", "Support ZZZ"
-   - Or complete sentence: "Now it does ZZZ"
-   - Focus on what the change means to users/developers, not implementation details
-
-3. **Create file**
-   - Path: `changes/{pr_number}.{changelog_type}.md`
-   - Content: single-line changelog message
-   - Show draft to user for approval
-
-4. **Commit and push**
-   ```bash
-   git add changes/{pr_number}.{changelog_type}.md
-   git commit -m "changelog: add news fragment for PR #{pr_number}"
-   git push
-   ```
-
 ### Phase 6: Summary
 
 Report final status:
@@ -152,7 +156,7 @@ Submission Complete
   URL:       https://github.com/lablup/backend.ai/pull/{pr_number}
   JIRA:      BA-XXXX
   Branch:    {branch_name}
-  Changelog: changes/{pr_number}.{changelog_type}.md
+  Changelog: {changelog_path}
 
 Quality checks: All passed
 Commits: {count} commit(s)
@@ -205,7 +209,7 @@ Options:
 ### Basic usage (auto-detect everything)
 ```
 User: /submit
-Agent: [Detects BA-1234 from branch, runs quality checks, commits, creates PR, generates changelog]
+Agent: [Detects BA-1234 from branch, runs quality checks, generates changelog, commits, creates PR]
 ```
 
 ### With explicit JIRA key
@@ -229,6 +233,6 @@ Agent: [Uses provided parameters, runs full workflow]
 - Local quality checks (`fmt`, `fix`, `lint`) use `--changed-since=origin/{base_branch}` to cover all PR changes, not just the last commit
 - Type checking and tests run in CI only — do not run them locally
 - Changelog follows [towncrier](https://github.com/twisted/towncrier) format configured in `pyproject.toml`
-- PR number is only available after `gh pr create`, so changelog is always a second commit
-- A single PR may have multiple news fragments (e.g., both `feature` and `fix`)
-- News fragment content should be a single-line sentence per `changes/README.md` guidelines
+- The changelog fragment is named without a PR number and goes into the first push; the release renames it (`changes/README.md`). A `<PR-number>.<type>.md` fragment added after `gh pr create` is still accepted
+- A single PR may have multiple changelog fragments (for example both `feature` and `fix`)
+- Changelog fragment content should be a single-line sentence per `changes/README.md` guidelines
