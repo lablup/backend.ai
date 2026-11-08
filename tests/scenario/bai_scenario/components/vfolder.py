@@ -798,9 +798,15 @@ class AModelFolderForDeployment(Given[Any, AModelFolderPlace]):
     @override
     def describe(self) -> str:
         mode = self.usage_mode.value
-        grant_ko = "배포를 만들 수 있는" if self.granted else "아무 권한도 받지 않은"
+        grant_ko = (
+            "폴더 읽기와 배포 생성을 받은"
+            if self.granted
+            else "폴더 읽기만 받고 배포 생성은 받지 않은"
+        )
         grant_en = (
-            "granted deployment create in that project" if self.granted else "holding no permission"
+            "granted folder read and deployment create in that project"
+            if self.granted
+            else "granted folder read but not deployment create in that project"
         )
         return Says(
             f"배포를 놓을 프로젝트와 자원 그룹, {mode} 용도 vfolder 하나, 런타임 종류와 "
@@ -825,12 +831,12 @@ class AModelFolderForDeployment(Given[Any, AModelFolderPlace]):
             project,
             caller,
         )
-        if self.granted:
-            await seeding.within(
-                SomeoneGrantedOnFoldersIn(
-                    project, lambda p: ProjectID(p.id), caller, (Permission.READ,)
-                )
+        await seeding.within(
+            SomeoneGrantedOnFoldersIn(
+                project, lambda p: ProjectID(p.id), caller, (Permission.READ,)
             )
+        )
+        if self.granted:
             role = await seeding.creating_from(
                 TestSeedRole(lambda p: ProjectID(p.id), name_hint="deployer"), project
             )

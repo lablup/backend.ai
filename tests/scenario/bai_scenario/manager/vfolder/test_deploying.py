@@ -183,21 +183,21 @@ class AFolderNotForModelsMayNotBeDeployed(
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingMayNotDeploy(
+class AUserWithoutDeploymentCreateMayNotDeploy(
     Scenario[TestSeedingSession, AModelFolderPlace, VFolderAdapter, DeployVFolderPayload]
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-may-not-deploy-a-model-folder"
+        return "a-user-without-deployment-create-may-not-deploy-a-model-folder"
 
     @override
     def describe(self) -> str:
         return Says(
-            "아무 권한도 받지 않은 사용자가 모델 vfolder 로 배포를 만들려 하면 권한 부족으로 "
-            "거부됩니다",
+            "폴더 읽기만 받고 배포 생성은 받지 않은 사용자가 모델 vfolder 로 배포를 만들려 하면 "
+            "권한 부족으로 거부됩니다",
             english=(
-                "when a user granted nothing tries to deploy a model vfolder, it is rejected for "
-                "lack of permission"
+                "when a user granted folder read but not deployment create tries to deploy a model "
+                "vfolder, it is rejected for lack of permission"
             ),
         )
 
@@ -217,7 +217,7 @@ class AUserGrantedNothingMayNotDeploy(
 SCENARIOS: list[DeployingStep] = [
     AGrantedUserDeploysTheModelFolder(),
     AFolderNotForModelsMayNotBeDeployed(),
-    AUserGrantedNothingMayNotDeploy(),
+    AUserWithoutDeploymentCreateMayNotDeploy(),
 ]
 
 
