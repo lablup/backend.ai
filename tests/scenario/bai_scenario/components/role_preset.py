@@ -53,7 +53,6 @@ from ai.backend.testutils.scenario_steps import (
 )
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.domain import WAS_HERE, Mentions, SomeoneOf, WrittenByThisRun
-from bai_scenario.components.system import lay_a_caller
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
 from bai_scenario.seeds.role_preset.preset import TestSeedRolePreset, TestSeedRolePresetPermission
@@ -75,17 +74,15 @@ class SomeoneGrantedOnPresets(TestSeedNest[Laid[UserData]]):
     """
 
     domain: Laid[Any]
-    permission: Permission
+    permissions: tuple[Permission, ...]
     role: UserRole = UserRole.USER
 
     @override
     def kind(self) -> str:
+        names = ", ".join(str(permission.name) for permission in self.permissions)
         return Says(
-            f"global 에서 역할 프리셋 {self.permission.name} 권한을 받은 사용자 준비",
-            english=(
-                f"Prepare a user granted the {self.permission.name} permission "
-                "on role presets in global"
-            ),
+            f"global 에서 역할 프리셋 {names} 권한을 받은 사용자 준비",
+            english=f"Prepare a user granted {names} on role presets in global",
         )
 
     @override
@@ -97,10 +94,11 @@ class SomeoneGrantedOnPresets(TestSeedNest[Laid[UserData]]):
             ),
             someone,
         )
-        seed.adding(
-            TestSeedPermission(entity_type=RolePresetEntityType(), permission=self.permission),
-            granted,
-        )
+        for permission in self.permissions:
+            seed.adding(
+                TestSeedPermission(entity_type=RolePresetEntityType(), permission=permission),
+                granted,
+            )
         seed.granting(granted, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
         return someone
 
@@ -113,7 +111,7 @@ async def lay_a_caller_granted(
     if granted is not None:
         return cast(
             "Laid[UserData]",
-            await seeding.within(SomeoneGrantedOnPresets(home, granted, role=role)),
+            await seeding.within(SomeoneGrantedOnPresets(home, (granted,), role=role)),
         )
     return cast("Laid[UserData]", await seeding.within(SomeoneOf(home, role=role)))
 
@@ -239,38 +237,6 @@ class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
         return ManyPresetsAndACaller(
             laid=tuple(seeding.made(one) for one in laid), caller=seeding.made(caller)
         )
-
-
-@dataclass(frozen=True)
-class SomeoneGrantedOnPresets(TestSeedNest[Laid[UserData]]):
-    """그 사용자에게 global 스코프에서 역할 프리셋에 대한 권한을 준다."""
-
-    domain: Laid[Any]
-    granted: tuple[Permission, ...]
-    role: UserRole = UserRole.USER
-
-    @override
-    def kind(self) -> str:
-        return Says(
-            "global 에서 역할 프리셋 권한을 받은 사용자 준비",
-            english="Prepare a user granted permission on role presets in global",
-        )
-
-    @override
-    def lay(self, seed: TestSeeder) -> Laid[UserData]:
-        someone = seed.within(SomeoneOf(self.domain, role=self.role))
-        role = seed.creating_from(
-            TestSeedRole(
-                lambda _: global_entity_id(GlobalEntityName.GLOBAL), name_hint="preset-keeper"
-            ),
-            someone,
-        )
-        for permission in self.granted:
-            seed.adding(
-                TestSeedPermission(entity_type=RolePresetEntityType(), permission=permission), role
-            )
-        seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
-        return someone
 
 
 async def lay_a_caller_granted_on_presets(
