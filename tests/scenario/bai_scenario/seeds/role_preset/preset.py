@@ -28,6 +28,9 @@ class TestSeedRolePreset(TestSeedRow[RolePresetData]):
 
     name_hint: str = "preset"
     scope_type: EntityType = ProjectEntityType()
+    auto_assign: bool = False
+    auto_assign_to_owner: bool = False
+    role_name_template: str | None = None
 
     @override
     def kind(self) -> str:
@@ -36,13 +39,23 @@ class TestSeedRolePreset(TestSeedRow[RolePresetData]):
     @override
     def detail(self) -> str:
         if self.scope_type == ProjectEntityType():
-            return Says(
-                "프로젝트 스코프용이고 자동 부여는 비활성입니다",
-                english="for the project scope, with automatic grant disabled",
-            )
+            scope_ko, scope_en = "프로젝트 스코프용", "for the project scope"
+        else:
+            scope_ko = f"{self.scope_type} 스코프용"
+            scope_en = f"for the {self.scope_type} scope"
+        notes_ko = ["자동 부여를 켬" if self.auto_assign else "자동 부여는 비활성"]
+        notes_en = [
+            "with automatic grant enabled" if self.auto_assign else "with automatic grant disabled"
+        ]
+        if self.auto_assign_to_owner:
+            notes_ko.append("소유자 부여를 켬")
+            notes_en.append("with owner assignment enabled")
+        if self.role_name_template is not None:
+            notes_ko.append("역할 이름 템플릿을 가짐")
+            notes_en.append("carrying a role name template")
         return Says(
-            f"{self.scope_type} 스코프용이고 자동 부여는 비활성입니다",
-            english=f"for the {self.scope_type} scope, with automatic grant disabled",
+            f"{scope_ko}이고 {', '.join(notes_ko)}입니다",
+            english=f"{scope_en}, {', '.join(notes_en)}",
         )
 
     @override
@@ -51,7 +64,13 @@ class TestSeedRolePreset(TestSeedRow[RolePresetData]):
 
     @override
     def seed(self, name: str) -> RolePresetCreator:
-        return RolePresetCreator(name=name, scope_type=self.scope_type)
+        return RolePresetCreator(
+            name=name,
+            scope_type=self.scope_type,
+            auto_assign=self.auto_assign,
+            auto_assign_to_owner=self.auto_assign_to_owner,
+            role_name_template=self.role_name_template,
+        )
 
 
 @dataclass(frozen=True)
