@@ -2,66 +2,71 @@
 
 [배경](/src/ai/backend/manager/api/adapters/user/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/user/adapter.py)
 
-시나리오: 미완성 6 / 39
+시나리오: 미완성 3 / 44
 
-- ops 구성 (17)
-  - admin_search: 대표 성공 ✓ · 대표 거부 ✓
-  - admin_search_keypairs: 대표 성공 ✓ · 대표 거부 ✓
-  - batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
-  - batch_lookup_by_emails: 대표 성공 ✓ · 대표 거부 ✓
-  - bulk_get_keypair_ids: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
-  - bulk_lookup_keypair_access_keys: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
-  - domain_search: 대표 성공 ✓ · 대표 거부 ✓
-  - gql_admin_search: 대표 성공 ✓ · 대표 거부 ✓
-  - gql_admin_search_keypairs: 대표 성공 ✓ · 대표 거부 ✓
-  - gql_scoped_search: 대표 성공 ✓ · 대표 거부 ✓
-  - gql_search_by_domain: 대표 성공 ✓ · 대표 거부 ✓
-  - gql_search_by_project: 대표 성공 ✓ · 대표 거부 ✓
-  - project_search: 대표 성공 ✓ · 대표 거부 ✓
-  - resolve_domain_id: 대표 성공 ✗ · 대표 거부 ✗: SCENARIO-GAP
-  - role_search: 대표 성공 ✓ · 대표 거부 ✓
-  - scoped_search: 대표 성공 ✓ · 대표 거부 ✓
-  - search_my_keypairs: 대표 성공 ✓ · 대표 거부 ✓
+- ops 구성 (21)
+  - UserAdapter.admin_search: 대표 성공 ✓ · 대표 거부 ✓
+  - UserAdapter.admin_search_keypairs: 대표 성공 ✓ · 대표 거부 ✓
+  - UserAdapter.batch_load_by_ids: 대표 성공 ✓ · 대표 거부 ✓
+  - UserAdapter.batch_lookup_by_emails: 대표 성공 ✓ · 대표 거부 ✓
+  - UserAdapter.bulk_get_keypair_ids: 대표 성공 ✓ · 대표 거부 ✓
+  - UserAdapter.bulk_lookup_keypair_access_keys: 대표 성공 ✓ · 대표 거부 ✓
+  - UserAdapter.domain_search: 대표 성공 ✓ · 대표 거부 ✓
+  - UserAdapter.gql_admin_search: 대표 성공 ✓ · 대표 거부 ✓
+  - UserAdapter.gql_admin_search_keypairs: 대표 성공 ✓ · 대표 거부 ✓
+  - UserAdapter.gql_scoped_search: 대표 성공 ✓ · 대표 거부 ✓
+  - UserAdapter.gql_search_by_domain: 대표 성공 ✓ · 대표 거부 ✓
+  - UserAdapter.gql_search_by_project: 대표 성공 ✓ · 대표 거부 ✓
+  - UserAdapter.project_search: 대표 성공 ✓ · 대표 거부 ✓
+  - UserAdapter.resolve_domain_id: 대표 성공 ✓ · 대표 거부 ✓
+  - UserAdapter.role_search: 대표 성공 ✓ · 대표 거부 ✓
+  - UserAdapter.scoped_search: 대표 성공 ✓ · 대표 거부 ✓
+  - UserAdapter.search_my_keypairs: 대표 성공 ✓ · 대표 거부 ✓
+  - UserConfigAdapter.delete_default_auto_generated_file: 대표 성공 ✗ · 대표 거부 ✓: SCENARIO-GAP
+  - UserConfigAdapter.get_default_auto_generated_file: 대표 성공 ✗ · 대표 거부 ✓: SCENARIO-GAP
+  - UserConfigAdapter.get_default_auto_generated_files: 대표 성공 ✓ · 대표 거부 ✓
+  - UserConfigAdapter.update_default_auto_generated_file: 대표 성공 ✗ · 대표 거부 ✓: SCENARIO-GAP
 - ops + 직접 구현 (7)
-  - bulk_create_users: 성공 없음 · 거부 있음 1 (atomic_bulk_get_ops, global_scope): SCENARIO-GAP
-  - bulk_create_users_with_keypair: 성공 없음 · 거부 있음 1 (atomic_bulk_get_ops, global_scope): SCENARIO-GAP
-  - bulk_update_users: 성공 있음 3 · 거부 있음 1 (atomic_bulk_get_ops, global_scope, partial_bulk_get_ops, single_entity)
-  - create_user: 성공 없음 · 거부 있음 2 (atomic_bulk_get_ops, scope): SCENARIO-GAP
-  - delete_user_by_id: 성공 있음 1 · 거부 있음 1 (atomic_bulk_get_ops, single_entity)
-  - get: 성공 있음 1 · 거부 있음 1 (atomic_bulk_get_ops, single_entity)
-  - update_user_by_id: 성공 있음 7 · 거부 있음 6 (atomic_bulk_get_ops, single_entity)
-- 직접 구현 (15)
-  - admin_create_keypair: 성공 있음 1 · 거부 있음 2 (single_entity)
-  - admin_delete_keypair: 성공 있음 1 · 거부 있음 3 (single_field)
-  - admin_delete_ssh_keypair: 성공 있음 1 · 거부 있음 2 (single_entity)
-  - admin_get_keypair: 성공 있음 1 · 거부 있음 1 (single_field)
-  - admin_get_ssh_keypair: 성공 있음 1 · 거부 있음 1 (single_entity)
-  - admin_register_ssh_keypair: 성공 있음 1 · 거부 있음 2 (single_entity)
-  - admin_update_keypair: 성공 있음 1 · 거부 있음 3 (single_field)
-  - bulk_purge_users: 성공 있음 2 · 거부 있음 1 (global_scope)
-  - issue_my_keypair: 성공 있음 2 · 거부 있음 1 (single_entity)
-  - purge_user_by_id: 성공 있음 1 · 거부 있음 2 (single_entity)
-  - restore_user_by_id: 성공 있음 1 · 거부 있음 2 (single_entity)
-  - revoke_my_keypair: 성공 있음 1 · 거부 있음 4 (single_field)
-  - switch_default_access_key: 성공 있음 1 · 거부 있음 2 (single_entity)
-  - update_my_keypair: 성공 있음 1 · 거부 있음 3 (single_field)
-  - update_user: 성공 있음 1 · 거부 있음 1 (single_entity)
+  - UserAdapter.bulk_create_users: 성공 있음 1 · 거부 있음 1 (atomic_bulk_get_ops, global_scope)
+  - UserAdapter.bulk_create_users_with_keypair: 성공 있음 1 · 거부 있음 1 (atomic_bulk_get_ops, global_scope)
+  - UserAdapter.bulk_update_users: 성공 있음 3 · 거부 있음 1 (atomic_bulk_get_ops, global_scope, partial_bulk_get_ops, single_entity)
+  - UserAdapter.create_user: 성공 있음 1 · 거부 있음 2 (atomic_bulk_get_ops, scope)
+  - UserAdapter.delete_user_by_id: 성공 있음 1 · 거부 있음 1 (atomic_bulk_get_ops, single_entity)
+  - UserAdapter.get: 성공 있음 1 · 거부 있음 1 (atomic_bulk_get_ops, single_entity)
+  - UserAdapter.update_user_by_id: 성공 있음 7 · 거부 있음 6 (atomic_bulk_get_ops, single_entity)
+- 직접 구현 (16)
+  - UserAdapter.admin_create_keypair: 성공 있음 1 · 거부 있음 2 (single_entity)
+  - UserAdapter.admin_delete_keypair: 성공 있음 1 · 거부 있음 3 (single_field)
+  - UserAdapter.admin_delete_ssh_keypair: 성공 있음 1 · 거부 있음 2 (single_entity)
+  - UserAdapter.admin_get_keypair: 성공 있음 1 · 거부 있음 1 (single_field)
+  - UserAdapter.admin_get_ssh_keypair: 성공 있음 1 · 거부 있음 1 (single_entity)
+  - UserAdapter.admin_register_ssh_keypair: 성공 있음 1 · 거부 있음 2 (single_entity)
+  - UserAdapter.admin_update_keypair: 성공 있음 1 · 거부 있음 3 (single_field)
+  - UserAdapter.bulk_purge_users: 성공 있음 2 · 거부 있음 1 (global_scope)
+  - UserAdapter.issue_my_keypair: 성공 있음 2 · 거부 있음 1 (single_entity)
+  - UserAdapter.purge_user_by_id: 성공 있음 1 · 거부 있음 2 (single_entity)
+  - UserAdapter.restore_user_by_id: 성공 있음 1 · 거부 있음 2 (single_entity)
+  - UserAdapter.revoke_my_keypair: 성공 있음 1 · 거부 있음 4 (single_field)
+  - UserAdapter.switch_default_access_key: 성공 있음 1 · 거부 있음 2 (single_entity)
+  - UserAdapter.update_my_keypair: 성공 있음 1 · 거부 있음 3 (single_field)
+  - UserAdapter.update_user: 성공 있음 1 · 거부 있음 1 (single_entity)
+  - UserConfigAdapter.create_auto_generated_file: 성공 있음 1 · 거부 있음 2 (single_entity)
 
-**admin_search**
+**UserAdapter.admin_search**
 
 | 시나리오 | 판정 |
 |---|---|
 | [전역 역할이 문인 검색에서 superadmin 이 필터 없이 조회하면, 삭제 상태 사용자를 포함해 미리 저장한 사용자가 모두 옵니다](#searching-the-superadmin-searching-every-user-counts-deleted-ones-too) | 성공 |
 | [도메인 스코프 권한을 받은 사용자라도 전체 검색을 하려 하면, 전역 역할 문이 막습니다](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-user) | 거부 |
 
-**admin_search_keypairs**
+**UserAdapter.admin_search_keypairs**
 
 | 시나리오 | 판정 |
 |---|---|
 | [전역 역할이 문인 키 검색에서 superadmin 이 페이지 인자 없이 조회하면, 모든 사용자의 키가 오고 limit 자리는 비어서 옵니다](#managing_keypairs-the-superadmin-searching-every-key-gets-every-users-key) | 성공 |
 | [권한 받은 사용자가 키 전체 검색을 하려 하면, 전역 역할 문이 막습니다](#managing_keypairs-a-user-who-is-not-the-superadmin-may-not-search-every-key) | 거부 |
 
-**batch_load_by_ids**
+**UserAdapter.batch_load_by_ids**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -69,7 +74,7 @@
 | [superadmin 이 있는 id 와 없는 id 를 함께 요청하면, 권한 문을 지나 없는 원소 자리에 빈 값이 옵니다](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | 성공 |
 | [한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 id 를 한 번에 요청하면, 입력 순서대로 원소별 결과가 옵니다](#reading-a-batch-load-answers-a-node-or-a-rejection-for-each-id-in-order) | 거부 |
 
-**batch_lookup_by_emails**
+**UserAdapter.batch_lookup_by_emails**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -77,7 +82,21 @@
 | [권한 없는 사용자가 빈 email 목록을 주면, 어떤 액션도 호출하지 않고 빈 목록이 응답으로 옵니다](#reading-an-email-lookup-of-no-emails-answers-an-empty-list) | 성공 |
 | [한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 email 을 한 번에 찾으면, 첫째는 id, 나머지 둘은 같은 거부가 입력 순서대로 옵니다](#reading-an-unreadable-user-and-a-missing-email-are-refused-alike) | 거부 |
 
-**domain_search**
+**UserAdapter.bulk_get_keypair_ids**
+
+| 시나리오 | 판정 |
+|---|---|
+| [대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 그 사용자의 키와 없는 id 를 한 번에 읽으면, 키 전체와 빈 값이 차례로 옵니다](#loading_keypairs-a-user-granted-read-on-another-loads-their-key-by-id) | 성공 |
+| [권한을 받지 않은 사용자가 다른 사용자의 키와 없는 id 를 한 번에 읽으면, 그 키 항목은 권한 부족으로 거부되고 없는 id 자리는 빈 값으로 옵니다](#loading_keypairs-a-user-granted-nothing-gets-a-rejection-for-anothers-key) | 거부 |
+
+**UserAdapter.bulk_lookup_keypair_access_keys**
+
+| 시나리오 | 판정 |
+|---|---|
+| [사용자가 access key 와 어떤 키도 아닌 access key 를 한 번에 찾으면, 첫째는 그 키의 id 로, 둘째는 빈 값으로 옵니다](#loading_keypairs-a-user-looks-up-the-keypair-an-access-key-names) | 성공 |
+| [로그인 문맥 없이 access key 로 키를 찾으면, 사용자를 찾을 수 없다는 것으로 거부됩니다](#loading_keypairs-looking-up-an-access-key-without-login-is-refused) | 거부 |
+
+**UserAdapter.domain_search**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -85,49 +104,56 @@
 | [역할을 받지 않은 사용자가 도메인 이름으로 조회하려 하면, 스코프 권한 문이 막습니다](#searching-a-user-granted-nothing-may-not-search-a-domain-by-name) | 거부 |
 | [권한 받은 사용자가 어떤 도메인도 아닌 이름으로 조회하려 하면, 스코프 검사 전에 이름 조회 단계가 대상 없음으로 막습니다](#searching-searching-a-domain-name-nothing-answers-to-is-not-found) | 거부 |
 
-**gql_admin_search**
+**UserAdapter.gql_admin_search**
 
 | 시나리오 | 판정 |
 |---|---|
 | [superadmin 이 커서와 페이지 인자를 모두 생략하고 조회하면, 생성 시각 내림차순으로 열 명까지 오고 다음 페이지 여부가 함께 옵니다](#searching-a-gql-search-without-page-arguments-answers-the-newest-ten) | 성공 |
 | [권한 받은 사용자가 GQL 전체 검색을 하려 하면, 전역 역할 문이 막습니다](#searching-a-user-who-is-not-the-superadmin-may-not-gql-search-every-user) | 거부 |
 
-**gql_admin_search_keypairs**
+**UserAdapter.gql_admin_search_keypairs**
 
 | 시나리오 | 판정 |
 |---|---|
 | [전역 역할이 문인 GQL 키 검색에서 superadmin 이 정책 이름을 주면, 그 정책을 사용하는 키만 옵니다](#managing_keypairs-the-superadmin-gql-key-search-by-policy-name-gets-that-policys-keys-only) | 성공 |
 | [권한 받은 사용자가 GQL 키 검색을 하려 하면, 전역 역할 문이 막습니다](#managing_keypairs-a-user-who-is-not-the-superadmin-may-not-search-every-key-over-gql) | 거부 |
 
-**gql_scoped_search**
+**UserAdapter.gql_scoped_search**
 
 | 시나리오 | 판정 |
 |---|---|
 | [같은 권한으로 GQL 스코프 검색을 하면, 두 스코프 사용자가 커서 응답으로 옵니다](#searching-a-gql-scoped-search-over-two-granted-scopes-joins-their-users) | 성공 |
 | [한 스코프에만 READ 를 받고 GQL 스코프 검색에 둘을 주면, 스코프 권한 문이 전체를 막습니다](#searching-one-scope-without-a-grant-refuses-the-whole-gql-scoped-search) | 거부 |
 
-**gql_search_by_domain**
+**UserAdapter.gql_search_by_domain**
 
 | 시나리오 | 판정 |
 |---|---|
 | [같은 권한으로 GQL 도메인 검색을 하면, 그 도메인 사용자만 커서 응답으로 옵니다](#searching-a-user-granted-on-a-domain-gql-searching-it-finds-only-its-users) | 성공 |
 | [역할 없이 GQL 도메인 검색을 하면, 스코프 권한 문이 막습니다](#searching-a-user-granted-nothing-may-not-gql-search-a-domain) | 거부 |
 
-**gql_search_by_project**
+**UserAdapter.gql_search_by_project**
 
 | 시나리오 | 판정 |
 |---|---|
 | [같은 권한으로 GQL 프로젝트 검색을 하면, 멤버 목록의 사용자만 커서 응답으로 옵니다](#searching-a-user-granted-on-a-project-gql-searching-it-finds-only-its-roster) | 성공 |
 | [역할 없이 GQL 프로젝트 검색을 하면, 스코프 권한 문이 막습니다](#searching-a-user-granted-nothing-may-not-gql-search-a-project) | 거부 |
 
-**project_search**
+**UserAdapter.project_search**
 
 | 시나리오 | 판정 |
 |---|---|
 | [프로젝트 스코프에서 사용자 READ 를 받은 사용자가 그 프로젝트로 조회하면, 멤버 목록에 오른 사용자만 옵니다](#searching-a-user-granted-on-a-project-searching-it-finds-only-its-roster) | 성공 |
 | [역할 없이 프로젝트 검색을 하면, 스코프 권한 문이 막습니다](#searching-a-user-granted-nothing-may-not-search-a-project) | 거부 |
 
-**role_search**
+**UserAdapter.resolve_domain_id**
+
+| 시나리오 | 판정 |
+|---|---|
+| [도메인에 속한 사용자가 그 도메인의 이름으로 id 를 찾으면, 그 도메인의 id 가 응답으로 옵니다](#resolving_domain-a-user-resolves-the-id-of-a-domain-by-its-name) | 성공 |
+| [아무 도메인도 갖지 않은 이름으로 id 를 찾으면, 대상이 없다는 것으로 거부됩니다](#resolving_domain-resolving-a-domain-name-nothing-answers-to-is-not-found) | 거부 |
+
+**UserAdapter.role_search**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -135,7 +161,7 @@
 | [전역 역할이 문인 역할 검색에서 superadmin 이 역할 하나를 주면, 그 역할을 배정받은 사용자만 옵니다](#searching-the-superadmin-searching-by-role-finds-only-its-holders) | 성공 |
 | [아무 권한도 받지 않은 사용자가 역할로 조회하려 하면, 스코프 권한 문이 막습니다](#searching-a-user-granted-nothing-may-not-search-by-role) | 거부 |
 
-**scoped_search**
+**UserAdapter.scoped_search**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -143,7 +169,7 @@
 | [권한 받은 사용자가 페이지 인자 없이 스코프 검색을 하면, limit 50 offset 0이 응답에 실립니다](#searching-a-scoped-search-without-page-arguments-answers-up-to-fifty) | 성공 |
 | [첫 스코프에만 READ 를 받은 사용자가 두 스코프를 함께 주면, 스코프 권한 문이 전체를 막습니다](#searching-one-scope-without-a-grant-refuses-the-whole-scoped-search) | 거부 |
 
-**search_my_keypairs**
+**UserAdapter.search_my_keypairs**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -151,19 +177,49 @@
 | [권한 받은 사용자가 페이지 인자 없이 조회하면, 생성 시각 내림차순 열 개와 다음 페이지 여부가 응답으로 옵니다](#own_keypairs-searching-own-keys-without-page-arguments-answers-the-ten-newest) | 성공 |
 | [역할 없이 자기 키를 조회하려 하면, 스코프 권한 문이 막습니다](#own_keypairs-a-user-granted-nothing-may-not-search-their-own-keys) | 거부 |
 
-**bulk_create_users**
+**UserConfigAdapter.delete_default_auto_generated_file**
 
 | 시나리오 | 판정 |
 |---|---|
+| [권한을 받지 않은 사용자가 자기 설정 파일을 지우려 하면, 권한 부족으로 거부됩니다](#config_files-a-user-granted-nothing-may-not-delete-a-config-file) | 거부 |
+| [READ 와 UPDATE 를 받은 사용자가 기본으로 표시되지 않은 설정 파일을 지우려 하면, 대상이 없다는 것으로 거부됩니다](#config_files-deleting-a-config-file-that-is-not-marked-default-is-not-found) | 거부 |
+
+**UserConfigAdapter.get_default_auto_generated_file**
+
+| 시나리오 | 판정 |
+|---|---|
+| [READ 를 받은 사용자가 기본으로 표시되지 않은 설정 파일을 읽으려 하면, 대상이 없다는 것으로 거부됩니다](#config_files-a-config-file-that-is-not-marked-default-is-not-found) | 거부 |
+| [권한을 받지 않은 사용자가 자기 설정 파일을 읽으려 하면, 권한 부족으로 거부됩니다](#config_files-a-user-granted-nothing-may-not-read-a-config-file) | 거부 |
+
+**UserConfigAdapter.get_default_auto_generated_files**
+
+| 시나리오 | 판정 |
+|---|---|
+| [READ 를 받은 사용자가 자기 설정 파일 중 기본으로 표시된 것을 훑으면, 빈 목록이 옵니다](#config_files-a-user-granted-read-on-themselves-lists-no-default-config-file) | 성공 |
+| [권한을 받지 않은 사용자가 자기 설정 파일을 훑으려 하면, 권한 부족으로 거부됩니다](#config_files-a-user-granted-nothing-may-not-list-their-config-files) | 거부 |
+
+**UserConfigAdapter.update_default_auto_generated_file**
+
+| 시나리오 | 판정 |
+|---|---|
+| [권한을 받지 않은 사용자가 자기 설정 파일을 고치려 하면, 권한 부족으로 거부됩니다](#config_files-a-user-granted-nothing-may-not-update-a-config-file) | 거부 |
+| [READ 와 UPDATE 를 받은 사용자가 기본으로 표시되지 않은 설정 파일을 고치려 하면, 대상이 없다는 것으로 거부됩니다](#config_files-updating-a-config-file-that-is-not-marked-default-is-not-found) | 거부 |
+
+**UserAdapter.bulk_create_users**
+
+| 시나리오 | 판정 |
+|---|---|
+| [superadmin 이 사용자 하나를 일괄 생성하면, 만든 사용자 하나가 오고 실패한 것은 없습니다](#creating-the-superadmin-bulk-creates-a-user) | 성공 |
 | [도메인 스코프에서 CREATE 를 받은 사용자라도 일괄 생성하려 하면, 전역 역할 문이 막습니다](#creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users) | 거부 |
 
-**bulk_create_users_with_keypair**
+**UserAdapter.bulk_create_users_with_keypair**
 
 | 시나리오 | 판정 |
 |---|---|
+| [superadmin 이 키를 함께 받는 일괄 생성으로 사용자 하나를 만들면, 만든 사용자와 그 기본 키가 비밀 키와 함께 오고 실패한 것은 없습니다](#creating-the-superadmin-bulk-creates-a-user-and-gets-its-keypair) | 성공 |
 | [권한 받은 사용자가 이 일괄 생성을 하려 하면, 전역 역할 문이 막습니다](#creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users-with-keypairs) | 거부 |
 
-**bulk_update_users**
+**UserAdapter.bulk_update_users**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -172,28 +228,29 @@
 | [전역 역할이 문인 일괄 수정에서 superadmin 이 있는 사용자와 이름이 겹치게 변경하는 사용자를 함께 주면, 하나는 수정되고 하나는 사용자 id 와 함께 실패로 담깁니다](#editing-the-superadmin-bulk-edit-answers-the-updated-and-the-failed-apart) | 성공 |
 | [도메인 스코프에서 UPDATE 를 받은 사용자라도 일괄 수정하려 하면, 전역 역할 문이 막습니다](#editing-a-user-who-is-not-the-superadmin-may-not-bulk-edit-users) | 거부 |
 
-**create_user**
+**UserAdapter.create_user**
 
 | 시나리오 | 판정 |
 |---|---|
+| [도메인 스코프에서 사용자 읽기와 생성 권한을 받은 사용자가 그 도메인에 사용자를 만들면, 만든 사용자 전체와 기본 키가 비밀 키와 함께 옵니다](#creating-a-user-granted-create-on-a-domain-makes-a-user-in-it) | 성공 |
 | [역할을 받지 않은 사용자가 생성하려 하면, 도메인 스코프 권한 문이 막습니다](#creating-a-user-granted-nothing-may-not-create-a-user) | 거부 |
 | [권한 받은 사용자가 어떤 도메인도 아닌 이름을 주면, 도메인 이름 조회 단계가 대상 없음으로 막습니다](#creating-a-user-may-not-be-created-in-a-domain-name-nothing-answers-to) | 거부 |
 
-**delete_user_by_id**
+**UserAdapter.delete_user_by_id**
 
 | 시나리오 | 판정 |
 |---|---|
 | [대상 사용자 스코프에서 SOFT_DELETE 를 받은 사용자가 삭제하면, 성공이 오고 그 사용자 상태가 삭제로 변경됩니다](#retiring-a-user-granted-soft-delete-marks-another-user-deleted) | 성공 |
 | [역할 없이 삭제하려 하면, 엔티티 권한 문이 막습니다](#retiring-a-user-granted-nothing-may-not-delete-another-user) | 거부 |
 
-**get**
+**UserAdapter.get**
 
 | 시나리오 | 판정 |
 |---|---|
 | [대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 읽으면, 기본 키까지 채운 노드 전체가 응답으로 옵니다](#reading-a-user-granted-read-on-another-user-reads-their-whole-node) | 성공 |
 | [아무 역할도 받지 않은 사용자가 다른 사용자를 읽으려 하면, 엔티티 권한 문이 막습니다](#reading-a-user-granted-nothing-may-not-read-another-user) | 거부 |
 
-**update_user_by_id**
+**UserAdapter.update_user_by_id**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -211,7 +268,7 @@
 | [대상 사용자 스코프에서 UPDATE 와 READ 만 받은 사용자가 수정으로 DELETED 를 주면, 삭제의 엔티티 권한 문이 막습니다](#retiring-an-edit-to-deleted-is-refused-without-soft-delete) | 거부 |
 | [삭제 상태 사용자에 수정으로 DELETED 만 주면, 아무것도 변경되지 않고 그 사용자가 응답으로 옵니다](#retiring-an-edit-to-deleted-on-a-deleted-user-changes-nothing) | 거부 |
 
-**admin_create_keypair**
+**UserAdapter.admin_create_keypair**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -219,7 +276,7 @@
 | [권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막습니다](#managing_keypairs-a-key-may-not-be-made-under-a-policy-that-does-not-exist) | 거부 |
 | [역할 없이 키를 생성하려 하면, 엔티티 권한 문이 막습니다](#managing_keypairs-a-user-granted-nothing-may-not-make-a-key-for-another) | 거부 |
 
-**admin_delete_keypair**
+**UserAdapter.admin_delete_keypair**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -228,7 +285,7 @@
 | [READ 만 받고 삭제하려 하면, 엔티티 권한 문이 막습니다](#managing_keypairs-a-user-granted-only-read-may-not-delete-another-users-key) | 거부 |
 | [권한 받은 사용자가 대상의 기본 키를 삭제하려 하면, 입력 검증이 막습니다](#managing_keypairs-another-users-default-key-may-not-be-deleted) | 거부 |
 
-**admin_delete_ssh_keypair**
+**UserAdapter.admin_delete_ssh_keypair**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -236,21 +293,21 @@
 | [역할 없이 삭제하려 하면, 소유자 조회 단계가 막습니다](#managing_keypairs-a-user-granted-nothing-may-not-clear-another-users-ssh-key) | 거부 |
 | [READ 만 받고 삭제하려 하면, 엔티티 권한 문이 막습니다](#managing_keypairs-a-user-granted-only-read-may-not-clear-another-users-ssh-key) | 거부 |
 
-**admin_get_keypair**
+**UserAdapter.admin_get_keypair**
 
 | 시나리오 | 판정 |
 |---|---|
 | [대상 스코프에서 READ 를 받은 사용자가 읽으면, 그 키 노드 전체가 응답으로 옵니다](#managing_keypairs-a-granted-user-reads-another-users-key-by-access-key) | 성공 |
 | [역할 없이 읽으려 하면, 소유자 조회 단계가 막습니다](#managing_keypairs-a-user-granted-nothing-may-not-read-another-users-key) | 거부 |
 
-**admin_get_ssh_keypair**
+**UserAdapter.admin_get_ssh_keypair**
 
 | 시나리오 | 판정 |
 |---|---|
 | [대상 스코프에서 READ 를 받은 사용자가 읽으면, access key 와 공개키만 오고 개인키는 오지 않습니다](#managing_keypairs-a-granted-user-reads-another-users-ssh-public-key-only) | 성공 |
 | [역할 없이 읽으려 하면, 소유자 조회 단계가 막습니다](#managing_keypairs-a-user-granted-nothing-may-not-read-another-users-ssh-public-key) | 거부 |
 
-**admin_register_ssh_keypair**
+**UserAdapter.admin_register_ssh_keypair**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -258,7 +315,7 @@
 | [역할 없이 등록하려 하면, 소유자 조회 단계가 막습니다](#managing_keypairs-a-user-granted-nothing-may-not-register-another-users-ssh-key) | 거부 |
 | [READ 만 받고 등록하려 하면, 엔티티 권한 문이 막습니다](#managing_keypairs-a-user-granted-only-read-may-not-register-another-users-ssh-key) | 거부 |
 
-**admin_update_keypair**
+**UserAdapter.admin_update_keypair**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -267,7 +324,7 @@
 | [READ 만 받고 변경하려 하면, 엔티티 권한 문이 막습니다](#managing_keypairs-a-user-granted-only-read-may-not-change-another-users-key) | 거부 |
 | [권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막습니다](#managing_keypairs-another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist) | 거부 |
 
-**bulk_purge_users**
+**UserAdapter.bulk_purge_users**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -275,7 +332,7 @@
 | [전역 역할이 문인 일괄 영구 삭제에서 superadmin 이 사용자 둘을 주면, 두 id 와 개수 둘이 응답으로 옵니다](#retiring-the-superadmin-bulk-purge-answers-the-purged-ids-and-count) | 성공 |
 | [도메인 스코프에서 HARD_DELETE 를 받은 사용자라도 일괄 영구 삭제를 하려 하면, 전역 역할 문이 막습니다](#retiring-a-user-who-is-not-the-superadmin-may-not-purge-in-bulk) | 거부 |
 
-**issue_my_keypair**
+**UserAdapter.issue_my_keypair**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -283,7 +340,7 @@
 | [권한 받은 사용자가 키를 발급하고 그 키로 기본 키를 옮긴 다음 원래 기본 키를 회수하면, 세 호출이 차례로 통과하고 발급한 키 하나만 남습니다](#own_keypairs-an-issued-key-made-default-lets-the-original-default-key-be-revoked) | 성공 |
 | [역할을 받지 않은 사용자가 자기 키를 발급하려 하면, 본인이어도 엔티티 권한 문이 막습니다](#own_keypairs-a-user-granted-nothing-may-not-issue-their-own-key) | 거부 |
 
-**purge_user_by_id**
+**UserAdapter.purge_user_by_id**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -291,7 +348,7 @@
 | [역할 없이 영구 삭제하려 하면, 엔티티 권한 문이 막습니다](#retiring-a-user-granted-nothing-may-not-purge-another-user) | 거부 |
 | [권한 받은 사용자가 넘겨받을 관리자로 없는 id 를 주면, 입력 검증이 막습니다](#retiring-purging-a-user-to-an-admin-who-does-not-exist-is-refused) | 거부 |
 
-**restore_user_by_id**
+**UserAdapter.restore_user_by_id**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -299,7 +356,7 @@
 | [역할 없이 복원하려 하면, 엔티티 권한 문이 막습니다](#retiring-a-user-granted-nothing-may-not-restore-another-user) | 거부 |
 | [권한 받은 사용자가 삭제되지 않은 비활성 사용자를 복원하려 하면, 삭제 상태가 아니라 거부됩니다](#retiring-restoring-a-user-who-was-not-deleted-is-refused) | 거부 |
 
-**revoke_my_keypair**
+**UserAdapter.revoke_my_keypair**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -309,7 +366,7 @@
 | [권한 받은 사용자가 어떤 키도 아닌 값을 주면, 소유자 조회 단계가 권한 없음과 같은 예외로 막습니다](#own_keypairs-an-access-key-nobody-holds-may-not-be-revoked) | 거부 |
 | [권한 받은 사용자가 자기 기본 키를 회수하려 하면, 입력 검증이 막습니다](#own_keypairs-the-default-key-may-not-be-revoked) | 거부 |
 
-**switch_default_access_key**
+**UserAdapter.switch_default_access_key**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -317,7 +374,7 @@
 | [역할 없이 기본 키를 옮기려 하면, 엔티티 권한 문이 막습니다](#own_keypairs-a-user-granted-nothing-may-not-move-their-default-key) | 거부 |
 | [권한 받은 사용자가 다른 사용자의 키를 주면, 입력 검증이 막습니다](#own_keypairs-someone-elses-key-may-not-become-the-default-key) | 거부 |
 
-**update_my_keypair**
+**UserAdapter.update_my_keypair**
 
 | 시나리오 | 판정 |
 |---|---|
@@ -326,14 +383,22 @@
 | [READ 만 받고 키를 비활성으로 변경하려 하면, 엔티티 권한 문이 막습니다](#own_keypairs-a-user-granted-only-read-may-not-turn-off-their-own-key) | 거부 |
 | [권한 받은 사용자가 자기 기본 키를 비활성으로 변경하려 하면, 입력 검증이 막습니다](#own_keypairs-the-default-key-may-not-be-turned-off) | 거부 |
 
-**update_user**
+**UserAdapter.update_user**
 
 | 시나리오 | 판정 |
 |---|---|
 | [대상 사용자 스코프에서 UPDATE 를 받은 사용자가 허용 IP 만 담은 수정을 보내면, 성공 표시가 오고 그 사용자의 허용 IP 가 변경됩니다](#editing-a-user-granted-update-changes-the-allowed-client-ip) | 성공 |
 | [역할 없이 허용 IP 수정을 보내면, 엔티티 권한 문이 막습니다](#editing-a-user-granted-nothing-may-not-change-the-allowed-client-ip) | 거부 |
 
-### admin_search
+**UserConfigAdapter.create_auto_generated_file**
+
+| 시나리오 | 판정 |
+|---|---|
+| [자기 자신에게 UPDATE 를 받은 사용자가 설정 파일을 만들면, 빈 응답이 옵니다](#config_files-a-user-granted-update-on-themselves-writes-their-own-config-file) | 성공 |
+| [UPDATE 를 받은 사용자가 관리자가 쓰는 자리에 설정 파일을 만들려 하면, 입력 검증이 거부합니다](#config_files-a-config-file-in-a-place-the-manager-keeps-is-refused) | 거부 |
+| [권한을 받지 않은 사용자가 자기 설정 파일을 만들려 하면, 권한 부족으로 거부됩니다](#config_files-a-user-granted-nothing-may-not-write-a-config-file) | 거부 |
+
+### UserAdapter.admin_search
 
 <a id="searching-the-superadmin-searching-every-user-counts-deleted-ones-too"></a>
 
@@ -399,7 +464,7 @@ Then
 - 거부됩니다
   - 거부: InsufficientPrivilege
 
-### admin_search_keypairs
+### UserAdapter.admin_search_keypairs
 
 <a id="managing_keypairs-the-superadmin-searching-every-key-gets-every-users-key"></a>
 
@@ -503,7 +568,7 @@ Then
 - 거부됩니다
   - 거부: InsufficientPrivilege
 
-### batch_load_by_ids
+### UserAdapter.batch_load_by_ids
 
 <a id="reading-a-batch-load-of-no-ids-answers-an-empty-list"></a>
 
@@ -643,7 +708,7 @@ Then
   - 거부: NotEnoughPermission
   - 거부: NotEnoughPermission
 
-### batch_lookup_by_emails
+### UserAdapter.batch_lookup_by_emails
 
 <a id="reading-a-user-granted-read-on-another-user-looks-up-their-id-by-email"></a>
 
@@ -744,7 +809,154 @@ Then
   - 거부: GenericBadRequest
   - 거부: GenericBadRequest
 
-### domain_search
+### UserAdapter.bulk_get_keypair_ids
+
+<a id="loading_keypairs-a-user-granted-read-on-another-loads-their-key-by-id"></a>
+
+#### [a-user-granted-read-on-another-loads-their-key-by-id](/tests/scenario/bai_scenario/manager/user/test_loading_keypairs.py): pass
+
+대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 그 사용자의 키와 없는 id 를 한 번에 읽으면, 키 전체와 빈 값이 차례로 옵니다
+
+Given
+
+- 도메인 하나와 사용자 둘, 대상은 기본이 아닌 키를 하나 더 갖고, 호출자는 대상에 대한 사용자 읽기 권한을 받았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+  - 사용자 READ 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.bulk_get_keypair_ids: user-2이 user-1의 키와 없는 id 를 일괄 읽습니다
+
+Then
+
+- 읽은 키는 노드로, 없는 id 자리는 빈 값으로 옵니다
+  - length = 2
+  - id: 미리 저장한 키페어와 같다
+  - access_key: 미리 저장한 키페어와 같다
+  - is_active = True
+  - is_admin = False
+  - is_default = False
+  - rate_limit = 10000
+  - resource_policy = 'keypair-policy-2'
+  - ssh_public_key = ''
+  - num_queries = 0
+  - last_used = None
+  - user_id: 키페어 소유자와 같다
+  - created_at: 이 실행이 쓴 시각
+  - modified_at: 이 실행이 쓴 시각
+  - field_id: 미리 저장한 키페어와 같다
+  - [1] = None
+
+<a id="loading_keypairs-a-user-granted-nothing-gets-a-rejection-for-anothers-key"></a>
+
+#### [a-user-granted-nothing-gets-a-rejection-for-anothers-key](/tests/scenario/bai_scenario/manager/user/test_loading_keypairs.py): pass
+
+권한을 받지 않은 사용자가 다른 사용자의 키와 없는 id 를 한 번에 읽으면, 그 키 항목은 권한 부족으로 거부되고 없는 id 자리는 빈 값으로 옵니다
+
+Given
+
+- 도메인 하나와 사용자 둘, 대상은 기본이 아닌 키를 하나 더 갖고, 호출자는 아무 권한도 받지 않았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+
+When
+
+- UserAdapter.bulk_get_keypair_ids: user-2이 user-1의 키와 없는 id 를 일괄 읽습니다
+
+Then
+
+- 읽을 수 없는 키는 권한 부족으로 거부되고, 없는 id 자리는 빈 값으로 옵니다
+  - length = 2
+  - 거부: NotEnoughPermission
+  - [1] = None
+
+### UserAdapter.bulk_lookup_keypair_access_keys
+
+<a id="loading_keypairs-a-user-looks-up-the-keypair-an-access-key-names"></a>
+
+#### [a-user-looks-up-the-keypair-an-access-key-names](/tests/scenario/bai_scenario/manager/user/test_loading_keypairs.py): pass
+
+사용자가 access key 와 어떤 키도 아닌 access key 를 한 번에 찾으면, 첫째는 그 키의 id 로, 둘째는 빈 값으로 옵니다
+
+Given
+
+- 도메인 하나와 사용자 둘, 대상은 기본이 아닌 키를 하나 더 갖고, 호출자는 아무 권한도 받지 않았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+
+When
+
+- UserAdapter.bulk_lookup_keypair_access_keys: user-2이 user-1의 access key 와 없는 access key 로 키를 찾습니다
+
+Then
+
+- 찾은 키의 id 는 그 키의 것이고, 없는 access key 자리는 비어 있습니다
+  - length = 2
+  - [0]: 미리 저장한 키페어와 같다
+  - [1] = None
+
+<a id="loading_keypairs-looking-up-an-access-key-without-login-is-refused"></a>
+
+#### [looking-up-an-access-key-without-login-is-refused](/tests/scenario/bai_scenario/manager/user/test_loading_keypairs.py): pass
+
+로그인 문맥 없이 access key 로 키를 찾으면, 사용자를 찾을 수 없다는 것으로 거부됩니다
+
+Given
+
+- 도메인 하나와 사용자 둘, 대상은 기본이 아닌 키를 하나 더 갖고, 호출자는 아무 권한도 받지 않았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키페어 하나를 더 갖습니다
+
+When
+
+- UserAdapter.bulk_lookup_keypair_access_keys: 로그인 문맥 없이 access key 로 키를 찾습니다
+
+Then
+
+- 거부됩니다
+  - 거부: UserNotFound
+
+### UserAdapter.domain_search
 
 <a id="searching-a-user-granted-on-a-domain-searching-it-by-name-finds-only-its-users"></a>
 
@@ -839,7 +1051,7 @@ Then
 - 거부됩니다
   - 거부: EntityNotFoundError
 
-### gql_admin_search
+### UserAdapter.gql_admin_search
 
 <a id="searching-a-gql-search-without-page-arguments-answers-the-newest-ten"></a>
 
@@ -933,7 +1145,7 @@ Then
 - 거부됩니다
   - 거부: InsufficientPrivilege
 
-### gql_admin_search_keypairs
+### UserAdapter.gql_admin_search_keypairs
 
 <a id="managing_keypairs-the-superadmin-gql-key-search-by-policy-name-gets-that-policys-keys-only"></a>
 
@@ -1011,7 +1223,7 @@ Then
 - 거부됩니다
   - 거부: InsufficientPrivilege
 
-### gql_scoped_search
+### UserAdapter.gql_scoped_search
 
 <a id="searching-a-gql-scoped-search-over-two-granted-scopes-joins-their-users"></a>
 
@@ -1089,7 +1301,7 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
-### gql_search_by_domain
+### UserAdapter.gql_search_by_domain
 
 <a id="searching-a-user-granted-on-a-domain-gql-searching-it-finds-only-its-users"></a>
 
@@ -1155,7 +1367,7 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
-### gql_search_by_project
+### UserAdapter.gql_search_by_project
 
 <a id="searching-a-user-granted-on-a-project-gql-searching-it-finds-only-its-roster"></a>
 
@@ -1223,7 +1435,7 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
-### project_search
+### UserAdapter.project_search
 
 <a id="searching-a-user-granted-on-a-project-searching-it-finds-only-its-roster"></a>
 
@@ -1291,7 +1503,59 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
-### role_search
+### UserAdapter.resolve_domain_id
+
+<a id="resolving_domain-a-user-resolves-the-id-of-a-domain-by-its-name"></a>
+
+#### [a-user-resolves-the-id-of-a-domain-by-its-name](/tests/scenario/bai_scenario/manager/user/test_resolving_domain.py): pass
+
+도메인에 속한 사용자가 그 도메인의 이름으로 id 를 찾으면, 그 도메인의 id 가 응답으로 옵니다
+
+Given
+
+- 도메인 하나와, 그 도메인에 속한 사용자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- UserAdapter.resolve_domain_id: user-1이 home-1의 id 를 찾습니다
+
+Then
+
+- 그 도메인의 id 가 응답으로 옵니다
+  - id: 미리 저장한 도메인의 id 와 같다
+
+<a id="resolving_domain-resolving-a-domain-name-nothing-answers-to-is-not-found"></a>
+
+#### [resolving-a-domain-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/user/test_resolving_domain.py): pass
+
+아무 도메인도 갖지 않은 이름으로 id 를 찾으면, 대상이 없다는 것으로 거부됩니다
+
+Given
+
+- 도메인 하나와, 그 도메인에 속한 사용자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- UserAdapter.resolve_domain_id: user-1이 no-such-domain 의 id 를 찾습니다
+
+Then
+
+- 거부됩니다
+  - 거부: EntityNotFoundError
+
+### UserAdapter.role_search
 
 <a id="searching-a-user-granted-on-the-role-scope-searching-by-role-finds-only-its-holders"></a>
 
@@ -1402,7 +1666,7 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
-### scoped_search
+### UserAdapter.scoped_search
 
 <a id="searching-a-scoped-search-over-two-granted-scopes-joins-their-users"></a>
 
@@ -1512,7 +1776,7 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
-### search_my_keypairs
+### UserAdapter.search_my_keypairs
 
 <a id="own_keypairs-a-user-granted-read-searching-their-keys-sees-only-their-own"></a>
 
@@ -1648,7 +1912,288 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
-### bulk_create_users
+### UserConfigAdapter.delete_default_auto_generated_file
+
+<a id="config_files-a-user-granted-nothing-may-not-delete-a-config-file"></a>
+
+#### [a-user-granted-nothing-may-not-delete-a-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+권한을 받지 않은 사용자가 자기 설정 파일을 지우려 하면, 권한 부족으로 거부됩니다
+
+Given
+
+- 도메인 하나와 사용자 하나, 사용자는 아무 권한도 받지 않았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- UserConfigAdapter.delete_default_auto_generated_file: user-1이 자기 설정 파일 하나를 지웁니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+<a id="config_files-deleting-a-config-file-that-is-not-marked-default-is-not-found"></a>
+
+#### [deleting-a-config-file-that-is-not-marked-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+READ 와 UPDATE 를 받은 사용자가 기본으로 표시되지 않은 설정 파일을 지우려 하면, 대상이 없다는 것으로 거부됩니다
+
+Given
+
+- 도메인 하나와 사용자 하나, 사용자는 기본으로 표시되지 않은 설정 파일 하나를 갖고 있습니다, 사용자는 자기 자신에게 READ, UPDATE 권한을 받았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 일반 사용자 user-1: 기본으로 표시되지 않은 설정 파일 하나를 갖습니다
+  - 사용자 READ, UPDATE 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserConfigAdapter.delete_default_auto_generated_file: user-1이 자기 설정 파일 하나를 지웁니다
+
+Then
+
+- 거부됩니다
+  - 거부: DotfileNotFound
+
+### UserConfigAdapter.get_default_auto_generated_file
+
+<a id="config_files-a-config-file-that-is-not-marked-default-is-not-found"></a>
+
+#### [a-config-file-that-is-not-marked-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+READ 를 받은 사용자가 기본으로 표시되지 않은 설정 파일을 읽으려 하면, 대상이 없다는 것으로 거부됩니다
+
+Given
+
+- 도메인 하나와 사용자 하나, 사용자는 기본으로 표시되지 않은 설정 파일 하나를 갖고 있습니다, 사용자는 자기 자신에게 READ 권한을 받았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 일반 사용자 user-1: 기본으로 표시되지 않은 설정 파일 하나를 갖습니다
+  - 사용자 READ 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserConfigAdapter.get_default_auto_generated_file: user-1이 자기 설정 파일 하나를 읽습니다
+
+Then
+
+- 거부됩니다
+  - 거부: DotfileNotFound
+
+<a id="config_files-a-user-granted-nothing-may-not-read-a-config-file"></a>
+
+#### [a-user-granted-nothing-may-not-read-a-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+권한을 받지 않은 사용자가 자기 설정 파일을 읽으려 하면, 권한 부족으로 거부됩니다
+
+Given
+
+- 도메인 하나와 사용자 하나, 사용자는 아무 권한도 받지 않았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- UserConfigAdapter.get_default_auto_generated_file: user-1이 자기 설정 파일 하나를 읽습니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### UserConfigAdapter.get_default_auto_generated_files
+
+<a id="config_files-a-user-granted-read-on-themselves-lists-no-default-config-file"></a>
+
+#### [a-user-granted-read-on-themselves-lists-no-default-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+READ 를 받은 사용자가 자기 설정 파일 중 기본으로 표시된 것을 훑으면, 빈 목록이 옵니다
+
+Given
+
+- 도메인 하나와 사용자 하나, 사용자는 자기 자신에게 READ 권한을 받았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 사용자 READ 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserConfigAdapter.get_default_auto_generated_files: user-1이 기본으로 표시된 자기 설정 파일을 훑습니다
+
+Then
+
+- 기본으로 표시된 파일이 없어 빈 목록이 옵니다
+  - files = []
+
+<a id="config_files-a-user-granted-nothing-may-not-list-their-config-files"></a>
+
+#### [a-user-granted-nothing-may-not-list-their-config-files](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+권한을 받지 않은 사용자가 자기 설정 파일을 훑으려 하면, 권한 부족으로 거부됩니다
+
+Given
+
+- 도메인 하나와 사용자 하나, 사용자는 아무 권한도 받지 않았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- UserConfigAdapter.get_default_auto_generated_files: user-1이 기본으로 표시된 자기 설정 파일을 훑습니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### UserConfigAdapter.update_default_auto_generated_file
+
+<a id="config_files-a-user-granted-nothing-may-not-update-a-config-file"></a>
+
+#### [a-user-granted-nothing-may-not-update-a-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+권한을 받지 않은 사용자가 자기 설정 파일을 고치려 하면, 권한 부족으로 거부됩니다
+
+Given
+
+- 도메인 하나와 사용자 하나, 사용자는 아무 권한도 받지 않았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- UserConfigAdapter.update_default_auto_generated_file: user-1이 자기 설정 파일 하나의 권한과 내용을 바꿉니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+<a id="config_files-updating-a-config-file-that-is-not-marked-default-is-not-found"></a>
+
+#### [updating-a-config-file-that-is-not-marked-default-is-not-found](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+READ 와 UPDATE 를 받은 사용자가 기본으로 표시되지 않은 설정 파일을 고치려 하면, 대상이 없다는 것으로 거부됩니다
+
+Given
+
+- 도메인 하나와 사용자 하나, 사용자는 기본으로 표시되지 않은 설정 파일 하나를 갖고 있습니다, 사용자는 자기 자신에게 READ, UPDATE 권한을 받았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 일반 사용자 user-1: 기본으로 표시되지 않은 설정 파일 하나를 갖습니다
+  - 사용자 READ, UPDATE 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserConfigAdapter.update_default_auto_generated_file: user-1이 자기 설정 파일 하나의 권한과 내용을 바꿉니다
+
+Then
+
+- 거부됩니다
+  - 거부: DotfileNotFound
+
+### UserAdapter.bulk_create_users
+
+<a id="creating-the-superadmin-bulk-creates-a-user"></a>
+
+#### [the-superadmin-bulk-creates-a-user](/tests/scenario/bai_scenario/manager/user/test_creating.py): pass
+
+superadmin 이 사용자 하나를 일괄 생성하면, 만든 사용자 하나가 오고 실패한 것은 없습니다
+
+Given
+
+- 도메인 하나와 superadmin 한 명, 호출자는 아무 권한도 받지 않았습니다
+  - 도메인 home-1
+  - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+  - 기본 키페어 정책 default-keypair-policy-1: 키페어가 정책을 대지 않으면 이 정책을 받습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- UserAdapter.bulk_create_users: user-1이 home-1에 made 을 일괄 생성합니다
+
+Then
+
+- 만든 사용자 하나가 응답으로 오고, 실패한 것은 없습니다
+  - created_users.length = 1
+  - failed = []
+  - user.id: 건너뜀: 데이터베이스가 생성합니다
+  - user.entity_id: 그 사용자의 id 와 같다
+  - user.basic_info.username = 'made'
+  - user.basic_info.email = 'made@scenario.local'
+  - user.basic_info.full_name = None
+  - user.basic_info.description = None
+  - user.basic_info.integration_name = None
+  - user.status.status = 'active'
+  - user.status.status_info = None
+  - user.status.need_password_change = False
+  - user.organization.domain_name = 'home-1'
+  - user.organization.domain_id: 미리 저장한 도메인의 id 와 같다
+  - user.organization.role = 'user'
+  - user.organization.resource_policy = 'user-policy-1'
+  - user.organization.main_access_key: 그 사용자의 기본 키가 채워져 있습니다
+  - user.security.allowed_client_ip = None
+  - user.security.totp_activated = False
+  - user.security.totp_activated_at = None
+  - user.security.sudo_session_enabled = False
+  - user.container.container_uid = None
+  - user.container.container_main_gid = None
+  - user.container.container_gids = None
+  - user.timestamps.created_at: 이 실행이 쓴 시각
+  - user.timestamps.modified_at: 이 실행이 쓴 시각
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users"></a>
 
@@ -1679,7 +2224,74 @@ Then
 - 거부됩니다
   - 거부: InsufficientPrivilege
 
-### bulk_create_users_with_keypair
+### UserAdapter.bulk_create_users_with_keypair
+
+<a id="creating-the-superadmin-bulk-creates-a-user-and-gets-its-keypair"></a>
+
+#### [the-superadmin-bulk-creates-a-user-and-gets-its-keypair](/tests/scenario/bai_scenario/manager/user/test_creating.py): pass
+
+superadmin 이 키를 함께 받는 일괄 생성으로 사용자 하나를 만들면, 만든 사용자와 그 기본 키가 비밀 키와 함께 오고 실패한 것은 없습니다
+
+Given
+
+- 도메인 하나와 superadmin 한 명, 호출자는 아무 권한도 받지 않았습니다
+  - 도메인 home-1
+  - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+  - 기본 키페어 정책 default-keypair-policy-1: 키페어가 정책을 대지 않으면 이 정책을 받습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- UserAdapter.bulk_create_users_with_keypair: user-1이 home-1에 made 을 일괄 생성합니다
+
+Then
+
+- 만든 사용자와 그 기본 키가 비밀 키와 함께 응답으로 오고, 실패한 것은 없습니다
+  - created.length = 1
+  - failed = []
+  - user.id: 건너뜀: 데이터베이스가 생성합니다
+  - user.entity_id: 그 사용자의 id 와 같다
+  - user.basic_info.username = 'made'
+  - user.basic_info.email = 'made@scenario.local'
+  - user.basic_info.full_name = None
+  - user.basic_info.description = None
+  - user.basic_info.integration_name = None
+  - user.status.status = 'active'
+  - user.status.status_info = None
+  - user.status.need_password_change = False
+  - user.organization.domain_name = 'home-1'
+  - user.organization.domain_id: 미리 저장한 도메인의 id 와 같다
+  - user.organization.role = 'user'
+  - user.organization.resource_policy = 'user-policy-1'
+  - user.organization.main_access_key: 이 호출이 만든 키와 같다
+  - user.security.allowed_client_ip = None
+  - user.security.totp_activated = False
+  - user.security.totp_activated_at = None
+  - user.security.sudo_session_enabled = False
+  - user.container.container_uid = None
+  - user.container.container_main_gid = None
+  - user.container.container_gids = None
+  - user.timestamps.created_at: 이 실행이 쓴 시각
+  - user.timestamps.modified_at: 이 실행이 쓴 시각
+  - created[0].keypair.id: 건너뜀: 매니저가 만든 access key 입니다
+  - created[0].keypair.field_id: 건너뜀: 데이터베이스가 생성합니다
+  - created[0].keypair.access_key: 건너뜀: 매니저가 만듭니다
+  - created[0].keypair.is_active = True
+  - created[0].keypair.is_admin = False
+  - created[0].keypair.is_default = True
+  - created[0].keypair.rate_limit = 10000
+  - created[0].keypair.resource_policy = 'default-keypair-policy-1'
+  - created[0].keypair.ssh_public_key: 건너뜀: 매니저가 만든 RSA 키입니다
+  - created[0].keypair.num_queries = 0
+  - created[0].keypair.last_used = None
+  - created[0].keypair.user_id: 방금 만든 사용자와 같다
+  - created[0].keypair.created_at: 이 실행이 쓴 시각
+  - created[0].keypair.modified_at: 이 실행이 쓴 시각
+  - created[0].secret_key: 매니저가 만든 비밀 키가 채워져 있습니다
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users-with-keypairs"></a>
 
@@ -1710,7 +2322,7 @@ Then
 - 거부됩니다
   - 거부: InsufficientPrivilege
 
-### bulk_update_users
+### UserAdapter.bulk_update_users
 
 <a id="retiring-a-bulk-edit-deletes-and-restores-per-item-and-refuses-a-deleted-user-edit"></a>
 
@@ -1935,7 +2547,77 @@ Then
 - 거부됩니다
   - 거부: InsufficientPrivilege
 
-### create_user
+### UserAdapter.create_user
+
+<a id="creating-a-user-granted-create-on-a-domain-makes-a-user-in-it"></a>
+
+#### [a-user-granted-create-on-a-domain-makes-a-user-in-it](/tests/scenario/bai_scenario/manager/user/test_creating.py): pass
+
+도메인 스코프에서 사용자 읽기와 생성 권한을 받은 사용자가 그 도메인에 사용자를 만들면, 만든 사용자 전체와 기본 키가 비밀 키와 함께 옵니다
+
+Given
+
+- 도메인 하나와 user 한 명, 호출자는 도메인 스코프에서 사용자 READ and CREATE 권한을 받았습니다
+  - 도메인 home-1
+  - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+  - 기본 키페어 정책 default-keypair-policy-1: 키페어가 정책을 대지 않으면 이 정책을 받습니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 사용자 READ, CREATE 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 역할 user-role-1: user 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.create_user: user-1이 home-1에 made 을 생성합니다
+
+Then
+
+- 만든 사용자 전체와, 그 사용자의 기본 키가 비밀 키와 함께 응답으로 옵니다
+  - user.id: 건너뜀: 데이터베이스가 생성합니다
+  - user.entity_id: 그 사용자의 id 와 같다
+  - user.basic_info.username = 'made'
+  - user.basic_info.email = 'made@scenario.local'
+  - user.basic_info.full_name = None
+  - user.basic_info.description = None
+  - user.basic_info.integration_name = None
+  - user.status.status = 'active'
+  - user.status.status_info = None
+  - user.status.need_password_change = False
+  - user.organization.domain_name = 'home-1'
+  - user.organization.domain_id: 미리 저장한 도메인의 id 와 같다
+  - user.organization.role = 'user'
+  - user.organization.resource_policy = 'user-policy-1'
+  - user.organization.main_access_key: 이 호출이 만든 키와 같다
+  - user.security.allowed_client_ip = None
+  - user.security.totp_activated = False
+  - user.security.totp_activated_at = None
+  - user.security.sudo_session_enabled = False
+  - user.container.container_uid = None
+  - user.container.container_main_gid = None
+  - user.container.container_gids = None
+  - user.timestamps.created_at: 이 실행이 쓴 시각
+  - user.timestamps.modified_at: 이 실행이 쓴 시각
+  - keypair.id: 건너뜀: 매니저가 만든 access key 입니다
+  - keypair.field_id: 건너뜀: 데이터베이스가 생성합니다
+  - keypair.access_key: 건너뜀: 매니저가 만듭니다
+  - keypair.is_active = True
+  - keypair.is_admin = False
+  - keypair.is_default = True
+  - keypair.rate_limit = 10000
+  - keypair.resource_policy = 'default-keypair-policy-1'
+  - keypair.ssh_public_key: 건너뜀: 매니저가 만든 RSA 키입니다
+  - keypair.num_queries = 0
+  - keypair.last_used = None
+  - keypair.user_id: 방금 만든 사용자와 같다
+  - keypair.created_at: 이 실행이 쓴 시각
+  - keypair.modified_at: 이 실행이 쓴 시각
+  - secret_key: 매니저가 만든 비밀 키가 채워져 있습니다
 
 <a id="creating-a-user-granted-nothing-may-not-create-a-user"></a>
 
@@ -1991,7 +2673,7 @@ Then
 - 거부됩니다
   - 거부: EntityNotFoundError
 
-### delete_user_by_id
+### UserAdapter.delete_user_by_id
 
 <a id="retiring-a-user-granted-soft-delete-marks-another-user-deleted"></a>
 
@@ -2076,7 +2758,7 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
-### get
+### UserAdapter.get
 
 <a id="reading-a-user-granted-read-on-another-user-reads-their-whole-node"></a>
 
@@ -2159,7 +2841,7 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
-### update_user_by_id
+### UserAdapter.update_user_by_id
 
 <a id="editing-a-user-granted-update-changing-only-the-full-name-leaves-the-rest"></a>
 
@@ -2763,7 +3445,7 @@ Then
 - 삭제 상태 그대로인 사용자 전체가 응답으로 옵니다
   - 거부: NotEnoughPermission
 
-### admin_create_keypair
+### UserAdapter.admin_create_keypair
 
 <a id="managing_keypairs-a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy"></a>
 
@@ -2873,7 +3555,7 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
-### admin_delete_keypair
+### UserAdapter.admin_delete_keypair
 
 <a id="managing_keypairs-a-granted-user-deleting-another-users-extra-key-gets-its-access-key"></a>
 
@@ -3011,7 +3693,7 @@ Then
 - 거부됩니다
   - 거부: KeyPairForbidden
 
-### admin_delete_ssh_keypair
+### UserAdapter.admin_delete_ssh_keypair
 
 <a id="managing_keypairs-a-granted-user-clearing-another-users-ssh-key-empties-the-public-key"></a>
 
@@ -3119,7 +3801,7 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
-### admin_get_keypair
+### UserAdapter.admin_get_keypair
 
 <a id="managing_keypairs-a-granted-user-reads-another-users-key-by-access-key"></a>
 
@@ -3197,7 +3879,7 @@ Then
 - 거부됩니다
   - 거부: GenericBadRequest
 
-### admin_get_ssh_keypair
+### UserAdapter.admin_get_ssh_keypair
 
 <a id="managing_keypairs-a-granted-user-reads-another-users-ssh-public-key-only"></a>
 
@@ -3268,7 +3950,7 @@ Then
 - 거부됩니다
   - 거부: GenericBadRequest
 
-### admin_register_ssh_keypair
+### UserAdapter.admin_register_ssh_keypair
 
 <a id="managing_keypairs-a-granted-user-registering-another-users-ssh-key-gets-the-access-key"></a>
 
@@ -3376,7 +4058,7 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
-### admin_update_keypair
+### UserAdapter.admin_update_keypair
 
 <a id="managing_keypairs-a-granted-user-changing-another-users-rate-limit-changes-only-that"></a>
 
@@ -3524,7 +4206,7 @@ Then
 - 거부됩니다
   - 거부: KeypairResourcePolicyNotFound
 
-### bulk_purge_users
+### UserAdapter.bulk_purge_users
 
 <a id="retiring-a-bulk-purge-records-a-missing-id-as-a-failure"></a>
 
@@ -3622,7 +4304,7 @@ Then
 - 거부됩니다
   - 거부: InsufficientPrivilege
 
-### issue_my_keypair
+### UserAdapter.issue_my_keypair
 
 <a id="own_keypairs-a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key"></a>
 
@@ -3751,7 +4433,7 @@ Then
 - 거부됩니다
   - 거부: NotEnoughPermission
 
-### purge_user_by_id
+### UserAdapter.purge_user_by_id
 
 <a id="retiring-a-user-granted-hard-delete-purges-a-user-with-no-folders-or-sessions"></a>
 
@@ -3849,7 +4531,7 @@ Then
 - 거부됩니다
   - 거부: UserNotFound
 
-### restore_user_by_id
+### UserAdapter.restore_user_by_id
 
 <a id="retiring-a-user-granted-soft-delete-restores-a-deleted-user-to-active"></a>
 
@@ -3970,7 +4652,7 @@ Then
 - 거부됩니다
   - 거부: UserModificationBadRequest
 
-### revoke_my_keypair
+### UserAdapter.revoke_my_keypair
 
 <a id="own_keypairs-a-user-granted-read-and-update-revokes-a-non-default-key"></a>
 
@@ -4136,7 +4818,7 @@ Then
 - 거부됩니다
   - 거부: KeyPairForbidden
 
-### switch_default_access_key
+### UserAdapter.switch_default_access_key
 
 <a id="own_keypairs-a-user-granted-read-and-update-moves-their-default-key"></a>
 
@@ -4250,7 +4932,7 @@ Then
 - 거부됩니다
   - 거부: KeyPairForbidden
 
-### update_my_keypair
+### UserAdapter.update_my_keypair
 
 <a id="own_keypairs-a-user-granted-read-and-update-turns-off-a-non-default-key"></a>
 
@@ -4381,7 +5063,7 @@ Then
 - 거부됩니다
   - 거부: KeyPairForbidden
 
-### update_user
+### UserAdapter.update_user
 
 <a id="editing-a-user-granted-update-changes-the-allowed-client-ip"></a>
 
@@ -4465,6 +5147,91 @@ Given
 When
 
 - UserAdapter.update_user: user-2이 user-1의 허용 IP 를 변경하고, user-3이 다시 읽습니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### UserConfigAdapter.create_auto_generated_file
+
+<a id="config_files-a-user-granted-update-on-themselves-writes-their-own-config-file"></a>
+
+#### [a-user-granted-update-on-themselves-writes-their-own-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+자기 자신에게 UPDATE 를 받은 사용자가 설정 파일을 만들면, 빈 응답이 옵니다
+
+Given
+
+- 도메인 하나와 사용자 하나, 사용자는 자기 자신에게 UPDATE 권한을 받았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 사용자 UPDATE 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserConfigAdapter.create_auto_generated_file: user-1이 자기 설정 파일을 하나 만듭니다
+
+Then
+
+- 빈 응답이 옵니다
+  - response = {}
+
+<a id="config_files-a-config-file-in-a-place-the-manager-keeps-is-refused"></a>
+
+#### [a-config-file-in-a-place-the-manager-keeps-is-refused](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+UPDATE 를 받은 사용자가 관리자가 쓰는 자리에 설정 파일을 만들려 하면, 입력 검증이 거부합니다
+
+Given
+
+- 도메인 하나와 사용자 하나, 사용자는 자기 자신에게 UPDATE 권한을 받았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 사용자 UPDATE 권한을 부여한 역할 배정
+    - 역할 user-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserConfigAdapter.create_auto_generated_file: user-1이 관리자가 쓰는 자리에 설정 파일을 만들려 합니다
+
+Then
+
+- 거부됩니다
+  - 거부: InvalidDotfilePath
+
+<a id="config_files-a-user-granted-nothing-may-not-write-a-config-file"></a>
+
+#### [a-user-granted-nothing-may-not-write-a-config-file](/tests/scenario/bai_scenario/manager/user/test_config_files.py): pass
+
+권한을 받지 않은 사용자가 자기 설정 파일을 만들려 하면, 권한 부족으로 거부됩니다
+
+Given
+
+- 도메인 하나와 사용자 하나, 사용자는 아무 권한도 받지 않았습니다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- UserConfigAdapter.create_auto_generated_file: user-1이 자기 설정 파일을 하나 만듭니다
 
 Then
 

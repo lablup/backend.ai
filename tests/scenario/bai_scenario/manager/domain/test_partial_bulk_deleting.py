@@ -109,6 +109,29 @@ class SoftDeletingThenRestoringEveryTarget(When[ManyDomainsAndACaller, DomainAda
 
 
 @dataclass(frozen=True)
+class RestoringEveryTarget(When[ManyDomainsAndACaller, DomainAdapter, Deleted]):
+    """대상 도메인들을 한 번에 restore 한다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_restore"
+
+    @override
+    def describe(self, laid: ManyDomainsAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 도메인 {len(laid.elsewhere())}개를 한 번에 restore 합니다",
+            english=f"{laid.caller.username} restores {len(laid.elsewhere())} domains at once",
+        )
+
+    @override
+    async def call(self, adapter: DomainAdapter, laid: ManyDomainsAndACaller) -> Deleted:
+        with ActingAs(laid.caller):
+            return await adapter.partial_bulk_restore(
+                PartialBulkRestoreDomainsInput(ids=[domain.id for domain in laid.elsewhere()])
+            )
+
+
+@dataclass(frozen=True)
 class EveryTargetComesBack(Then[ManyDomainsAndACaller, Deleted]):
     """대상이 모두 처리된 목록에 온다. `missing`이 있으면 그 id 만 실패 목록에 온다."""
 
@@ -269,10 +292,44 @@ class RestoringBringsSeveralBack(
         return EveryTargetComesBack(started=self.started, active=True)
 
 
+@dataclass(frozen=True)
+class AUserGrantedNothingRestoresNone(
+    Scenario[TestSeedingSession, ManyDomainsAndACaller, DomainAdapter, Deleted]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-restores-none-of-several-domains"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "아무 권한도 받지 않은 사용자가 비활성 도메인 여럿을 한 번에 restore 하려 하면, "
+            "restore 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing restores several inactive domains at once, "
+                "none is restored and every one comes back in the failed list for lack of "
+                "permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyDomainsAndACaller]:
+        return ManyDomainsAndSomeone(besides=1, targets_inactive=True)
+
+    @override
+    def when(self) -> When[ManyDomainsAndACaller, DomainAdapter, Deleted]:
+        return RestoringEveryTarget()
+
+    @override
+    def then(self) -> Then[ManyDomainsAndACaller, Deleted]:
+        return NothingIsProcessed(reason="Insufficient permission")
+
+
 SCENARIOS: list[DomainStep] = [
     SoftDeletingAnswersForTheMissingOne(started=datetime.now(UTC)),
     AUserGrantedNothingSoftDeletesNone(),
     RestoringBringsSeveralBack(started=datetime.now(UTC)),
+    AUserGrantedNothingRestoresNone(),
 ]
 
 
