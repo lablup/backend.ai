@@ -80,6 +80,7 @@ from ai.backend.manager.data.session.options import (
 from ai.backend.manager.data.session.types import SessionTerminationStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.agent import AgentNotAllocated
+from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.common import (
     InternalServerError,
     ServiceUnavailable,
@@ -243,6 +244,7 @@ from ai.backend.manager.services.session.types import (
 from ai.backend.manager.services.session.utils import drop_undefined
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import UserScope
+from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -1492,6 +1494,16 @@ class SessionService:
         domain_name = action.domain_name
         if action.owner_id is not None:
             owner = await self._user_repository.get_user_by_uuid(action.owner_id)
+            if action.owner_id != action.user_id:
+                try:
+                    check_if_requester_is_eligible_to_act_as_target_user(
+                        action.user_role,
+                        action.domain_name,
+                        owner.role,
+                        owner.domain_name,
+                    )
+                except RuntimeError as e:
+                    raise InsufficientPrivilege(str(e)) from e
             owner_access_key = await self._user_repository.default_access_key(
                 UserID(action.owner_id)
             )
