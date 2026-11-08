@@ -97,6 +97,8 @@ jobs:
       uses: actions/setup-python@v6
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Check the changelog fragment names
+      run: python ./scripts/validate-changelog-fragments.py
     - name: Set up remote cache backend (if applicable)
       run: |
         echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
