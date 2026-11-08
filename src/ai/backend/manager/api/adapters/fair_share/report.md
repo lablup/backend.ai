@@ -2,12 +2,12 @@
 
 [background](/src/ai/backend/manager/api/adapters/fair_share/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/fair_share/adapter.py)
 
-Scenario: incomplete 4 / 15
+Scenario: complete
 
 - direct implementation (15)
   - atomic_bulk_upsert_domain: success present 1 · rejection present 2 (scope)
-  - atomic_bulk_upsert_project: success absent · rejection absent (scope): SCENARIO-GAP
-  - atomic_bulk_upsert_user: success absent · rejection absent (scope): SCENARIO-GAP
+  - atomic_bulk_upsert_project: success present 1 · rejection present 2 (scope)
+  - atomic_bulk_upsert_user: success present 1 · rejection present 2 (scope)
   - get_domain: success present 1 · rejection present 2 (scope)
   - get_project: success present 1 · rejection present 2 (scope)
   - get_user: success present 1 · rejection present 2 (scope)
@@ -18,8 +18,8 @@ Scenario: incomplete 4 / 15
   - search_rg_user: success present 1 · rejection present 2 (scope)
   - search_user: success present 1 · rejection present 1 (global_scope)
   - upsert_domain: success present 1 · rejection present 2 (scope)
-  - upsert_project: success absent · rejection absent (scope): SCENARIO-GAP
-  - upsert_user: success absent · rejection absent (scope): SCENARIO-GAP
+  - upsert_project: success present 1 · rejection present 2 (scope)
+  - upsert_user: success present 1 · rejection present 2 (scope)
 
 **atomic_bulk_upsert_domain**
 
@@ -28,6 +28,22 @@ Scenario: incomplete 4 / 15
 | [when the superadmin sets the weights of two domains at once, a count comes back saying that two were set](#atomic_bulk_upserting-the-superadmin-sets-several-domain-weights-at-once) | answered |
 | [when a user granted nothing tries to set the weights of two domains at once, it is rejected for a lack of permission](#atomic_bulk_upserting-a-user-granted-nothing-may-not-set-several-domain-weights) | rejected |
 | [when a user granted the update permission through a role assigned on the group tries to set the weights of two domains at once, it is rejected for a lack of permission. A weight write checks permission against the global target, not the group](#atomic_bulk_upserting-a-user-granted-update-on-the-group-may-not-set-several-domain-weights) | rejected |
+
+**atomic_bulk_upsert_project**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin sets the weights of two projects at once, a count comes back saying that two were set](#atomic_bulk_upserting_project-the-superadmin-sets-several-project-weights-at-once) | answered |
+| [when a user granted nothing tries to set the weights of two projects at once, it is rejected for a lack of permission](#atomic_bulk_upserting_project-a-user-granted-nothing-may-not-set-several-project-weights) | rejected |
+| [when a user granted the update permission through a role assigned on the group tries to set the weights of two projects at once, it is rejected for a lack of permission. A weight write checks permission against the global target, not the group](#atomic_bulk_upserting_project-a-user-granted-update-on-the-group-may-not-set-several-project-weights) | rejected |
+
+**atomic_bulk_upsert_user**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin sets the weights of two users at once, a count comes back saying that two were set](#atomic_bulk_upserting_user-the-superadmin-sets-several-user-weights-at-once) | answered |
+| [when a user granted nothing tries to set the weights of two users at once, it is rejected for a lack of permission](#atomic_bulk_upserting_user-a-user-granted-nothing-may-not-set-several-user-weights) | rejected |
+| [when a user granted the update permission through a role assigned on the group tries to set the weights of two users at once, it is rejected for a lack of permission. A weight write checks permission against the global target, not the group](#atomic_bulk_upserting_user-a-user-granted-update-on-the-group-may-not-set-several-user-weights) | rejected |
 
 **get_domain**
 
@@ -105,6 +121,22 @@ Scenario: incomplete 4 / 15
 | [when the superadmin sets the weight of a domain in the group, the record comes back carrying that weight and the rest of the settings are the group defaults](#upserting-the-superadmin-sets-a-domain-weight) | answered |
 | [when a user granted nothing tries to set the weight of a domain, it is rejected for a lack of permission](#upserting-a-user-granted-nothing-may-not-set-a-domain-weight) | rejected |
 | [when a user granted the update permission through a role assigned on the group tries to set the weight of a domain, it is rejected for a lack of permission. A weight write checks permission against the global target, not the group](#upserting-a-user-granted-update-on-the-group-may-not-set-a-domain-weight) | rejected |
+
+**upsert_project**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin sets the weight of a project in the group, the record comes back carrying that weight and the rest of the settings are the group defaults](#upserting_project-the-superadmin-sets-a-project-weight) | answered |
+| [when a user granted nothing tries to set the weight of a project, it is rejected for a lack of permission](#upserting_project-a-user-granted-nothing-may-not-set-a-project-weight) | rejected |
+| [when a user granted the update permission through a role assigned on the group tries to set the weight of a project, it is rejected for a lack of permission. A weight write checks permission against the global target, not the group](#upserting_project-a-user-granted-update-on-the-group-may-not-set-a-project-weight) | rejected |
+
+**upsert_user**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin sets the weight of a user in the group, the record comes back carrying that weight and the rest of the settings are the group defaults](#upserting_user-the-superadmin-sets-a-user-weight) | answered |
+| [when a user granted nothing tries to set the weight of a user, it is rejected for a lack of permission](#upserting_user-a-user-granted-nothing-may-not-set-a-user-weight) | rejected |
+| [when a user granted the update permission through a role assigned on the group tries to set the weight of a user, it is rejected for a lack of permission. A weight write checks permission against the global target, not the group](#upserting_user-a-user-granted-update-on-the-group-may-not-set-a-user-weight) | rejected |
 
 ### atomic_bulk_upsert_domain
 
@@ -187,6 +219,201 @@ Given
 When
 
 - FairShareAdapter.atomic_bulk_upsert_domain: user-1 sets the weights of 2 domains in resource-group-1 at once
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### atomic_bulk_upsert_project
+
+<a id="atomic_bulk_upserting_project-the-superadmin-sets-several-project-weights-at-once"></a>
+
+#### [the-superadmin-sets-several-project-weights-at-once](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting_project.py): pass
+
+when the superadmin sets the weights of two projects at once, a count comes back saying that two were set
+
+Given
+
+- one resource group and 2 projects, and one superadmin
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project team-2
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- FairShareAdapter.atomic_bulk_upsert_project: user-1 sets the weights of 2 projects in resource-group-1 at once
+
+Then
+
+- a count comes back saying how many projects were set
+  - upserted_count = 2
+
+<a id="atomic_bulk_upserting_project-a-user-granted-nothing-may-not-set-several-project-weights"></a>
+
+#### [a-user-granted-nothing-may-not-set-several-project-weights](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting_project.py): pass
+
+when a user granted nothing tries to set the weights of two projects at once, it is rejected for a lack of permission
+
+Given
+
+- one resource group and 2 projects, and one regular user
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project team-2
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- FairShareAdapter.atomic_bulk_upsert_project: user-1 sets the weights of 2 projects in resource-group-1 at once
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="atomic_bulk_upserting_project-a-user-granted-update-on-the-group-may-not-set-several-project-weights"></a>
+
+#### [a-user-granted-update-on-the-group-may-not-set-several-project-weights](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting_project.py): pass
+
+when a user granted the update permission through a role assigned on the group tries to set the weights of two projects at once, it is rejected for a lack of permission. A weight write checks permission against the global target, not the group
+
+Given
+
+- one resource group and 2 projects, and the regular user granted the UPDATE role in the resource group scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project team-2
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the UPDATE role in the resource group scope
+    - Role group-role-1: applies only within the scope it is granted in
+    - Role group-role-1: UPDATE allowed on every resource_group
+    - regular user user-1: holds Role group-role-1
+
+When
+
+- FairShareAdapter.atomic_bulk_upsert_project: user-1 sets the weights of 2 projects in resource-group-1 at once
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### atomic_bulk_upsert_user
+
+<a id="atomic_bulk_upserting_user-the-superadmin-sets-several-user-weights-at-once"></a>
+
+#### [the-superadmin-sets-several-user-weights-at-once](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting_user.py): pass
+
+when the superadmin sets the weights of two users at once, a count comes back saying that two were set
+
+Given
+
+- one resource group, one project and 2 users, and one superadmin
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - superadmin user-3: has their own keypair and personal project
+  - Resource group resource-group-1: uses the fifo scheduler
+
+When
+
+- FairShareAdapter.atomic_bulk_upsert_user: user-3 sets the weights of 2 users in resource-group-1 at once
+
+Then
+
+- a count comes back saying how many users were set
+  - upserted_count = 2
+
+<a id="atomic_bulk_upserting_user-a-user-granted-nothing-may-not-set-several-user-weights"></a>
+
+#### [a-user-granted-nothing-may-not-set-several-user-weights](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting_user.py): pass
+
+when a user granted nothing tries to set the weights of two users at once, it is rejected for a lack of permission
+
+Given
+
+- one resource group, one project and 2 users, and one regular user
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-3: has their own keypair and personal project
+  - Resource group resource-group-1: uses the fifo scheduler
+
+When
+
+- FairShareAdapter.atomic_bulk_upsert_user: user-3 sets the weights of 2 users in resource-group-1 at once
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="atomic_bulk_upserting_user-a-user-granted-update-on-the-group-may-not-set-several-user-weights"></a>
+
+#### [a-user-granted-update-on-the-group-may-not-set-several-user-weights](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting_user.py): pass
+
+when a user granted the update permission through a role assigned on the group tries to set the weights of two users at once, it is rejected for a lack of permission. A weight write checks permission against the global target, not the group
+
+Given
+
+- one resource group, one project and 2 users, and the regular user granted the UPDATE role in the resource group scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-3: has their own keypair and personal project
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted the UPDATE role in the resource group scope
+    - Role group-role-1: applies only within the scope it is granted in
+    - Role group-role-1: UPDATE allowed on every resource_group
+    - regular user user-3: holds Role group-role-1
+
+When
+
+- FairShareAdapter.atomic_bulk_upsert_user: user-3 sets the weights of 2 users in resource-group-1 at once
 
 Then
 
@@ -1336,6 +1563,224 @@ Given
 When
 
 - FairShareAdapter.upsert_domain: user-1 sets the weight of home-1 in resource-group-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### upsert_project
+
+<a id="upserting_project-the-superadmin-sets-a-project-weight"></a>
+
+#### [the-superadmin-sets-a-project-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting_project.py): pass
+
+when the superadmin sets the weight of a project in the group, the record comes back carrying that weight and the rest of the settings are the group defaults
+
+Given
+
+- one resource group and 1 projects, and one superadmin
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- FairShareAdapter.upsert_project: user-1 sets the weight of the first project in resource-group-1
+
+Then
+
+- the record comes back carrying the weight just set and the rest of the settings are the group defaults
+  - id: same as the group name joined with the id of the project seeded in advance
+  - resource_group_name = 'resource-group-1'
+  - project_id: same as the id of the project seeded in advance
+  - domain_name = 'home-1'
+  - spec.weight = Decimal('2.5')
+  - spec.uses_default = False
+  - spec.half_life_days = 7
+  - spec.lookback_days = 28
+  - spec.decay_unit_days = 1
+  - spec.resource_weights = []
+  - calculation_snapshot.fair_share_factor = Decimal('1')
+  - calculation_snapshot.total_decayed_usage = []
+  - calculation_snapshot.normalized_usage = Decimal('0')
+  - calculation_snapshot.lookback_start: skipped: it depends on the date written
+  - calculation_snapshot.lookback_end: skipped: it depends on the date written
+  - calculation_snapshot.last_calculated_at: the time this run wrote
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+
+<a id="upserting_project-a-user-granted-nothing-may-not-set-a-project-weight"></a>
+
+#### [a-user-granted-nothing-may-not-set-a-project-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting_project.py): pass
+
+when a user granted nothing tries to set the weight of a project, it is rejected for a lack of permission
+
+Given
+
+- one resource group and 1 projects, and one regular user
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- FairShareAdapter.upsert_project: user-1 sets the weight of the first project in resource-group-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="upserting_project-a-user-granted-update-on-the-group-may-not-set-a-project-weight"></a>
+
+#### [a-user-granted-update-on-the-group-may-not-set-a-project-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting_project.py): pass
+
+when a user granted the update permission through a role assigned on the group tries to set the weight of a project, it is rejected for a lack of permission. A weight write checks permission against the global target, not the group
+
+Given
+
+- one resource group and 1 projects, and the regular user granted the UPDATE role in the resource group scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the UPDATE role in the resource group scope
+    - Role group-role-1: applies only within the scope it is granted in
+    - Role group-role-1: UPDATE allowed on every resource_group
+    - regular user user-1: holds Role group-role-1
+
+When
+
+- FairShareAdapter.upsert_project: user-1 sets the weight of the first project in resource-group-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### upsert_user
+
+<a id="upserting_user-the-superadmin-sets-a-user-weight"></a>
+
+#### [the-superadmin-sets-a-user-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting_user.py): pass
+
+when the superadmin sets the weight of a user in the group, the record comes back carrying that weight and the rest of the settings are the group defaults
+
+Given
+
+- one resource group, one project and 1 users, and one superadmin
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - superadmin user-2: has their own keypair and personal project
+  - Resource group resource-group-1: uses the fifo scheduler
+
+When
+
+- FairShareAdapter.upsert_user: user-2 sets the weight of the first user in resource-group-1
+
+Then
+
+- the record comes back carrying the weight just set and the rest of the settings are the group defaults
+  - id: same as the group name joined with the ids of the user and the project seeded in advance
+  - resource_group_name = 'resource-group-1'
+  - user_uuid: same as the id of the user seeded in advance
+  - project_id: same as the id of the project seeded in advance
+  - domain_name = 'home-1'
+  - spec.weight = Decimal('2.5')
+  - spec.uses_default = False
+  - spec.half_life_days = 7
+  - spec.lookback_days = 28
+  - spec.decay_unit_days = 1
+  - spec.resource_weights = []
+  - calculation_snapshot.fair_share_factor = Decimal('1')
+  - calculation_snapshot.total_decayed_usage = []
+  - calculation_snapshot.normalized_usage = Decimal('0')
+  - calculation_snapshot.lookback_start: skipped: it depends on the date written
+  - calculation_snapshot.lookback_end: skipped: it depends on the date written
+  - calculation_snapshot.last_calculated_at: the time this run wrote
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+
+<a id="upserting_user-a-user-granted-nothing-may-not-set-a-user-weight"></a>
+
+#### [a-user-granted-nothing-may-not-set-a-user-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting_user.py): pass
+
+when a user granted nothing tries to set the weight of a user, it is rejected for a lack of permission
+
+Given
+
+- one resource group, one project and 1 users, and one regular user
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Resource group resource-group-1: uses the fifo scheduler
+
+When
+
+- FairShareAdapter.upsert_user: user-2 sets the weight of the first user in resource-group-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="upserting_user-a-user-granted-update-on-the-group-may-not-set-a-user-weight"></a>
+
+#### [a-user-granted-update-on-the-group-may-not-set-a-user-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting_user.py): pass
+
+when a user granted the update permission through a role assigned on the group tries to set the weight of a user, it is rejected for a lack of permission. A weight write checks permission against the global target, not the group
+
+Given
+
+- one resource group, one project and 1 users, and the regular user granted the UPDATE role in the resource group scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted the UPDATE role in the resource group scope
+    - Role group-role-1: applies only within the scope it is granted in
+    - Role group-role-1: UPDATE allowed on every resource_group
+    - regular user user-2: holds Role group-role-1
+
+When
+
+- FairShareAdapter.upsert_user: user-2 sets the weight of the first user in resource-group-1
 
 Then
 

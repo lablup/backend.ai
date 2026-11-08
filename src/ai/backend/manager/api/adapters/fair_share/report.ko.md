@@ -2,12 +2,12 @@
 
 [배경](/src/ai/backend/manager/api/adapters/fair_share/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/fair_share/adapter.py)
 
-시나리오: 미완성 4 / 15
+시나리오: 완성
 
 - 직접 구현 (15)
   - atomic_bulk_upsert_domain: 성공 있음 1 · 거부 있음 2 (scope)
-  - atomic_bulk_upsert_project: 성공 없음 · 거부 없음 (scope): SCENARIO-GAP
-  - atomic_bulk_upsert_user: 성공 없음 · 거부 없음 (scope): SCENARIO-GAP
+  - atomic_bulk_upsert_project: 성공 있음 1 · 거부 있음 2 (scope)
+  - atomic_bulk_upsert_user: 성공 있음 1 · 거부 있음 2 (scope)
   - get_domain: 성공 있음 1 · 거부 있음 2 (scope)
   - get_project: 성공 있음 1 · 거부 있음 2 (scope)
   - get_user: 성공 있음 1 · 거부 있음 2 (scope)
@@ -18,8 +18,8 @@
   - search_rg_user: 성공 있음 1 · 거부 있음 2 (scope)
   - search_user: 성공 있음 1 · 거부 있음 1 (global_scope)
   - upsert_domain: 성공 있음 1 · 거부 있음 2 (scope)
-  - upsert_project: 성공 없음 · 거부 없음 (scope): SCENARIO-GAP
-  - upsert_user: 성공 없음 · 거부 없음 (scope): SCENARIO-GAP
+  - upsert_project: 성공 있음 1 · 거부 있음 2 (scope)
+  - upsert_user: 성공 있음 1 · 거부 있음 2 (scope)
 
 **atomic_bulk_upsert_domain**
 
@@ -28,6 +28,22 @@
 | [superadmin 이 도메인 둘의 가중치를 한 번에 정하면 둘을 정했다는 개수가 옵니다](#atomic_bulk_upserting-the-superadmin-sets-several-domain-weights-at-once) | 성공 |
 | [아무 권한도 받지 않은 사용자가 도메인 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부됩니다](#atomic_bulk_upserting-a-user-granted-nothing-may-not-set-several-domain-weights) | 거부 |
 | [그 그룹에 부여한 역할로 수정 권한을 받은 사용자가 도메인 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부됩니다. 가중치 쓰기는 그룹이 아니라 전역 대상을 기준으로 권한을 검사합니다](#atomic_bulk_upserting-a-user-granted-update-on-the-group-may-not-set-several-domain-weights) | 거부 |
+
+**atomic_bulk_upsert_project**
+
+| 시나리오 | 판정 |
+|---|---|
+| [superadmin 이 프로젝트 둘의 가중치를 한 번에 정하면 둘을 정했다는 개수가 옵니다](#atomic_bulk_upserting_project-the-superadmin-sets-several-project-weights-at-once) | 성공 |
+| [아무 권한도 받지 않은 사용자가 프로젝트 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부됩니다](#atomic_bulk_upserting_project-a-user-granted-nothing-may-not-set-several-project-weights) | 거부 |
+| [그 그룹에 부여한 역할로 수정 권한을 받은 사용자가 프로젝트 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부됩니다. 가중치 쓰기는 그룹이 아니라 전역 대상을 기준으로 권한을 검사합니다](#atomic_bulk_upserting_project-a-user-granted-update-on-the-group-may-not-set-several-project-weights) | 거부 |
+
+**atomic_bulk_upsert_user**
+
+| 시나리오 | 판정 |
+|---|---|
+| [superadmin 이 사용자 둘의 가중치를 한 번에 정하면 둘을 정했다는 개수가 옵니다](#atomic_bulk_upserting_user-the-superadmin-sets-several-user-weights-at-once) | 성공 |
+| [아무 권한도 받지 않은 사용자가 사용자 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부됩니다](#atomic_bulk_upserting_user-a-user-granted-nothing-may-not-set-several-user-weights) | 거부 |
+| [그 그룹에 부여한 역할로 수정 권한을 받은 사용자가 사용자 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부됩니다. 가중치 쓰기는 그룹이 아니라 전역 대상을 기준으로 권한을 검사합니다](#atomic_bulk_upserting_user-a-user-granted-update-on-the-group-may-not-set-several-user-weights) | 거부 |
 
 **get_domain**
 
@@ -105,6 +121,22 @@
 | [superadmin 이 그룹 안 도메인의 가중치를 정하면 그 가중치를 담은 기록이 오고 나머지 설정은 그룹 기본값입니다](#upserting-the-superadmin-sets-a-domain-weight) | 성공 |
 | [아무 권한도 받지 않은 사용자가 도메인의 가중치를 정하려 하면 권한 부족으로 거부됩니다](#upserting-a-user-granted-nothing-may-not-set-a-domain-weight) | 거부 |
 | [그 그룹에 부여한 역할로 수정 권한을 받은 사용자가 도메인의 가중치를 정하려 하면 권한 부족으로 거부됩니다. 가중치 쓰기는 그룹이 아니라 전역 대상을 기준으로 권한을 검사합니다](#upserting-a-user-granted-update-on-the-group-may-not-set-a-domain-weight) | 거부 |
+
+**upsert_project**
+
+| 시나리오 | 판정 |
+|---|---|
+| [superadmin 이 그룹 안 프로젝트의 가중치를 정하면 그 가중치를 담은 기록이 오고 나머지 설정은 그룹 기본값입니다](#upserting_project-the-superadmin-sets-a-project-weight) | 성공 |
+| [아무 권한도 받지 않은 사용자가 프로젝트의 가중치를 정하려 하면 권한 부족으로 거부됩니다](#upserting_project-a-user-granted-nothing-may-not-set-a-project-weight) | 거부 |
+| [그 그룹에 부여한 역할로 수정 권한을 받은 사용자가 프로젝트의 가중치를 정하려 하면 권한 부족으로 거부됩니다. 가중치 쓰기는 그룹이 아니라 전역 대상을 기준으로 권한을 검사합니다](#upserting_project-a-user-granted-update-on-the-group-may-not-set-a-project-weight) | 거부 |
+
+**upsert_user**
+
+| 시나리오 | 판정 |
+|---|---|
+| [superadmin 이 그룹 안 사용자의 가중치를 정하면 그 가중치를 담은 기록이 오고 나머지 설정은 그룹 기본값입니다](#upserting_user-the-superadmin-sets-a-user-weight) | 성공 |
+| [아무 권한도 받지 않은 사용자가 사용자의 가중치를 정하려 하면 권한 부족으로 거부됩니다](#upserting_user-a-user-granted-nothing-may-not-set-a-user-weight) | 거부 |
+| [그 그룹에 부여한 역할로 수정 권한을 받은 사용자가 사용자의 가중치를 정하려 하면 권한 부족으로 거부됩니다. 가중치 쓰기는 그룹이 아니라 전역 대상을 기준으로 권한을 검사합니다](#upserting_user-a-user-granted-update-on-the-group-may-not-set-a-user-weight) | 거부 |
 
 ### atomic_bulk_upsert_domain
 
@@ -187,6 +219,201 @@ Given
 When
 
 - FairShareAdapter.atomic_bulk_upsert_domain: user-1 이 resource-group-1 안 도메인 2개의 가중치를 한 번에 정합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### atomic_bulk_upsert_project
+
+<a id="atomic_bulk_upserting_project-the-superadmin-sets-several-project-weights-at-once"></a>
+
+#### [the-superadmin-sets-several-project-weights-at-once](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting_project.py): pass
+
+superadmin 이 프로젝트 둘의 가중치를 한 번에 정하면 둘을 정했다는 개수가 옵니다
+
+Given
+
+- 리소스 그룹 하나와 프로젝트 2개, 그리고 superadmin 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 프로젝트 team-2
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- FairShareAdapter.atomic_bulk_upsert_project: user-1 이 resource-group-1 안 프로젝트 2개의 가중치를 한 번에 정합니다
+
+Then
+
+- 프로젝트 수만큼 정했다는 개수가 옵니다
+  - upserted_count = 2
+
+<a id="atomic_bulk_upserting_project-a-user-granted-nothing-may-not-set-several-project-weights"></a>
+
+#### [a-user-granted-nothing-may-not-set-several-project-weights](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting_project.py): pass
+
+아무 권한도 받지 않은 사용자가 프로젝트 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부됩니다
+
+Given
+
+- 리소스 그룹 하나와 프로젝트 2개, 그리고 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 프로젝트 team-2
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- FairShareAdapter.atomic_bulk_upsert_project: user-1 이 resource-group-1 안 프로젝트 2개의 가중치를 한 번에 정합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+<a id="atomic_bulk_upserting_project-a-user-granted-update-on-the-group-may-not-set-several-project-weights"></a>
+
+#### [a-user-granted-update-on-the-group-may-not-set-several-project-weights](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting_project.py): pass
+
+그 그룹에 부여한 역할로 수정 권한을 받은 사용자가 프로젝트 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부됩니다. 가중치 쓰기는 그룹이 아니라 전역 대상을 기준으로 권한을 검사합니다
+
+Given
+
+- 리소스 그룹 하나와 프로젝트 2개, 그리고 그 그룹 범위의 UPDATE 역할을 받은 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 프로젝트 team-2
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 리소스 그룹 범위의 UPDATE 역할을 받은 사용자 준비
+    - 역할 group-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 group-role-1: resource_group 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 group-role-1 보유
+
+When
+
+- FairShareAdapter.atomic_bulk_upsert_project: user-1 이 resource-group-1 안 프로젝트 2개의 가중치를 한 번에 정합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### atomic_bulk_upsert_user
+
+<a id="atomic_bulk_upserting_user-the-superadmin-sets-several-user-weights-at-once"></a>
+
+#### [the-superadmin-sets-several-user-weights-at-once](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting_user.py): pass
+
+superadmin 이 사용자 둘의 가중치를 한 번에 정하면 둘을 정했다는 개수가 옵니다
+
+Given
+
+- 리소스 그룹 하나와 프로젝트 하나, 사용자 2명, 그리고 superadmin 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - superadmin user-3: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+
+When
+
+- FairShareAdapter.atomic_bulk_upsert_user: user-3 이 resource-group-1 안 사용자 2개의 가중치를 한 번에 정합니다
+
+Then
+
+- 사용자 수만큼 정했다는 개수가 옵니다
+  - upserted_count = 2
+
+<a id="atomic_bulk_upserting_user-a-user-granted-nothing-may-not-set-several-user-weights"></a>
+
+#### [a-user-granted-nothing-may-not-set-several-user-weights](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting_user.py): pass
+
+아무 권한도 받지 않은 사용자가 사용자 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부됩니다
+
+Given
+
+- 리소스 그룹 하나와 프로젝트 하나, 사용자 2명, 그리고 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-3: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+
+When
+
+- FairShareAdapter.atomic_bulk_upsert_user: user-3 이 resource-group-1 안 사용자 2개의 가중치를 한 번에 정합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+<a id="atomic_bulk_upserting_user-a-user-granted-update-on-the-group-may-not-set-several-user-weights"></a>
+
+#### [a-user-granted-update-on-the-group-may-not-set-several-user-weights](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting_user.py): pass
+
+그 그룹에 부여한 역할로 수정 권한을 받은 사용자가 사용자 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부됩니다. 가중치 쓰기는 그룹이 아니라 전역 대상을 기준으로 권한을 검사합니다
+
+Given
+
+- 리소스 그룹 하나와 프로젝트 하나, 사용자 2명, 그리고 그 그룹 범위의 UPDATE 역할을 받은 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-3: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-3: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 리소스 그룹 범위의 UPDATE 역할을 받은 사용자 준비
+    - 역할 group-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 group-role-1: resource_group 전체에 UPDATE 허용
+    - 일반 사용자 user-3: 역할 group-role-1 보유
+
+When
+
+- FairShareAdapter.atomic_bulk_upsert_user: user-3 이 resource-group-1 안 사용자 2개의 가중치를 한 번에 정합니다
 
 Then
 
@@ -1336,6 +1563,224 @@ Given
 When
 
 - FairShareAdapter.upsert_domain: user-1 이 resource-group-1 안 home-1의 가중치를 정합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### upsert_project
+
+<a id="upserting_project-the-superadmin-sets-a-project-weight"></a>
+
+#### [the-superadmin-sets-a-project-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting_project.py): pass
+
+superadmin 이 그룹 안 프로젝트의 가중치를 정하면 그 가중치를 담은 기록이 오고 나머지 설정은 그룹 기본값입니다
+
+Given
+
+- 리소스 그룹 하나와 프로젝트 1개, 그리고 superadmin 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - superadmin user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- FairShareAdapter.upsert_project: user-1 이 resource-group-1 안 첫 프로젝트의 가중치를 정합니다
+
+Then
+
+- 정한 가중치를 담은 기록이 오고, 나머지 설정은 그룹 기본값입니다
+  - id: 그룹 이름과 미리 만든 프로젝트의 id 를 잇은 값와 같다
+  - resource_group_name = 'resource-group-1'
+  - project_id: 미리 만든 프로젝트의 id 와 같다
+  - domain_name = 'home-1'
+  - spec.weight = Decimal('2.5')
+  - spec.uses_default = False
+  - spec.half_life_days = 7
+  - spec.lookback_days = 28
+  - spec.decay_unit_days = 1
+  - spec.resource_weights = []
+  - calculation_snapshot.fair_share_factor = Decimal('1')
+  - calculation_snapshot.total_decayed_usage = []
+  - calculation_snapshot.normalized_usage = Decimal('0')
+  - calculation_snapshot.lookback_start: 건너뜀: 쓴 날짜에 따라 달라집니다
+  - calculation_snapshot.lookback_end: 건너뜀: 쓴 날짜에 따라 달라집니다
+  - calculation_snapshot.last_calculated_at: 이 실행이 쓴 시각
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
+
+<a id="upserting_project-a-user-granted-nothing-may-not-set-a-project-weight"></a>
+
+#### [a-user-granted-nothing-may-not-set-a-project-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting_project.py): pass
+
+아무 권한도 받지 않은 사용자가 프로젝트의 가중치를 정하려 하면 권한 부족으로 거부됩니다
+
+Given
+
+- 리소스 그룹 하나와 프로젝트 1개, 그리고 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+
+When
+
+- FairShareAdapter.upsert_project: user-1 이 resource-group-1 안 첫 프로젝트의 가중치를 정합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+<a id="upserting_project-a-user-granted-update-on-the-group-may-not-set-a-project-weight"></a>
+
+#### [a-user-granted-update-on-the-group-may-not-set-a-project-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting_project.py): pass
+
+그 그룹에 부여한 역할로 수정 권한을 받은 사용자가 프로젝트의 가중치를 정하려 하면 권한 부족으로 거부됩니다. 가중치 쓰기는 그룹이 아니라 전역 대상을 기준으로 권한을 검사합니다
+
+Given
+
+- 리소스 그룹 하나와 프로젝트 1개, 그리고 그 그룹 범위의 UPDATE 역할을 받은 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 리소스 그룹 범위의 UPDATE 역할을 받은 사용자 준비
+    - 역할 group-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 group-role-1: resource_group 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 group-role-1 보유
+
+When
+
+- FairShareAdapter.upsert_project: user-1 이 resource-group-1 안 첫 프로젝트의 가중치를 정합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+### upsert_user
+
+<a id="upserting_user-the-superadmin-sets-a-user-weight"></a>
+
+#### [the-superadmin-sets-a-user-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting_user.py): pass
+
+superadmin 이 그룹 안 사용자의 가중치를 정하면 그 가중치를 담은 기록이 오고 나머지 설정은 그룹 기본값입니다
+
+Given
+
+- 리소스 그룹 하나와 프로젝트 하나, 사용자 1명, 그리고 superadmin 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - superadmin user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+
+When
+
+- FairShareAdapter.upsert_user: user-2 이 resource-group-1 안 첫 사용자의 가중치를 정합니다
+
+Then
+
+- 정한 가중치를 담은 기록이 오고, 나머지 설정은 그룹 기본값입니다
+  - id: 그룹 이름, 미리 만든 사용자와 프로젝트의 id 를 잇은 값와 같다
+  - resource_group_name = 'resource-group-1'
+  - user_uuid: 미리 만든 사용자의 id 와 같다
+  - project_id: 미리 만든 프로젝트의 id 와 같다
+  - domain_name = 'home-1'
+  - spec.weight = Decimal('2.5')
+  - spec.uses_default = False
+  - spec.half_life_days = 7
+  - spec.lookback_days = 28
+  - spec.decay_unit_days = 1
+  - spec.resource_weights = []
+  - calculation_snapshot.fair_share_factor = Decimal('1')
+  - calculation_snapshot.total_decayed_usage = []
+  - calculation_snapshot.normalized_usage = Decimal('0')
+  - calculation_snapshot.lookback_start: 건너뜀: 쓴 날짜에 따라 달라집니다
+  - calculation_snapshot.lookback_end: 건너뜀: 쓴 날짜에 따라 달라집니다
+  - calculation_snapshot.last_calculated_at: 이 실행이 쓴 시각
+  - created_at: 이 실행이 쓴 시각
+  - updated_at: 이 실행이 쓴 시각
+
+<a id="upserting_user-a-user-granted-nothing-may-not-set-a-user-weight"></a>
+
+#### [a-user-granted-nothing-may-not-set-a-user-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting_user.py): pass
+
+아무 권한도 받지 않은 사용자가 사용자의 가중치를 정하려 하면 권한 부족으로 거부됩니다
+
+Given
+
+- 리소스 그룹 하나와 프로젝트 하나, 사용자 1명, 그리고 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+
+When
+
+- FairShareAdapter.upsert_user: user-2 이 resource-group-1 안 첫 사용자의 가중치를 정합니다
+
+Then
+
+- 거부됩니다
+  - 거부: NotEnoughPermission
+
+<a id="upserting_user-a-user-granted-update-on-the-group-may-not-set-a-user-weight"></a>
+
+#### [a-user-granted-update-on-the-group-may-not-set-a-user-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting_user.py): pass
+
+그 그룹에 부여한 역할로 수정 권한을 받은 사용자가 사용자의 가중치를 정하려 하면 권한 부족으로 거부됩니다. 가중치 쓰기는 그룹이 아니라 전역 대상을 기준으로 권한을 검사합니다
+
+Given
+
+- 리소스 그룹 하나와 프로젝트 하나, 사용자 1명, 그리고 그 그룹 범위의 UPDATE 역할을 받은 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 자원 정책 default: 사용자를 생성할 때 함께 생성되는 개인 프로젝트가 이 이름으로 조회합니다
+  - 프로젝트 team-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 자원 정책 user-policy-1: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키페어와 개인 프로젝트를 갖습니다
+    - 사용자 자원 정책 user-policy-2: 사용자 한 명당 vfolder 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키페어와 개인 프로젝트를 갖습니다
+  - 자원 그룹 resource-group-1: fifo 스케줄러를 사용합니다
+  - 리소스 그룹 범위의 UPDATE 역할을 받은 사용자 준비
+    - 역할 group-role-1: 부여된 스코프 안에서만 적용됩니다
+    - 역할 group-role-1: resource_group 전체에 UPDATE 허용
+    - 일반 사용자 user-2: 역할 group-role-1 보유
+
+When
+
+- FairShareAdapter.upsert_user: user-2 이 resource-group-1 안 첫 사용자의 가중치를 정합니다
 
 Then
 
