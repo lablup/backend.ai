@@ -6,11 +6,11 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.data.domain.types import DomainData
-from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.data.project.types import ProjectData, ProjectType
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.testutils.scenario_steps import Says
-from bai_scenario.seeds.seeder import Naming, TestSeedRowFromTwo
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFromTwo, joined
 
 
 @dataclass(frozen=True)
@@ -19,6 +19,7 @@ class TestSeedProject(TestSeedRowFromTwo[DomainData, ProjectResourcePolicyData, 
 
     name_hint: str = "project"
     is_active: bool = True
+    type: ProjectType | None = None
 
     @override
     def kind(self) -> str:
@@ -26,9 +27,16 @@ class TestSeedProject(TestSeedRowFromTwo[DomainData, ProjectResourcePolicyData, 
 
     @override
     def detail(self) -> str:
-        if self.is_active:
+        if self.is_active and self.type is None:
             return Says("")
-        return Says("비활성 상태", english="inactive")
+        parts: list[str] = []
+        if not self.is_active:
+            parts.append(Says("비활성 상태", english="inactive"))
+        if self.type is not None:
+            parts.append(
+                Says(f"유형은 {self.type.value}입니다", english=f"of type {self.type.value}")
+            )
+        return joined(parts, ", ")
 
     @override
     def name(self, naming: Naming) -> str:
@@ -45,4 +53,5 @@ class TestSeedProject(TestSeedRowFromTwo[DomainData, ProjectResourcePolicyData, 
             description=f"{name} was already here",
             resource_policy=second.name,
             is_active=self.is_active,
+            type=self.type,
         )

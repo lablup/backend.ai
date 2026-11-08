@@ -11,7 +11,12 @@ from typing import override
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderMountPolicy
+from ai.backend.common.types import (
+    QuotaScopeID,
+    QuotaScopeType,
+    VFolderMountPolicy,
+    VFolderUsageMode,
+)
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfolder.types import VFolderData, VFolderOperationStatus
@@ -77,6 +82,7 @@ class TestSeedProjectVFolder(TestSeedRowFromTwo[ProjectData, UserData, VFolderDa
 
     host: str
     name_hint: str = "folder"
+    usage_mode: VFolderUsageMode = VFolderUsageMode.GENERAL
 
     @override
     def kind(self) -> str:
@@ -84,9 +90,16 @@ class TestSeedProjectVFolder(TestSeedRowFromTwo[ProjectData, UserData, VFolderDa
 
     @override
     def detail(self) -> str:
+        if self.usage_mode is VFolderUsageMode.GENERAL:
+            return Says(
+                "프로젝트에 놓이고, 사용할 수 있는 상태입니다",
+                english="is placed in the project and is ready to use",
+            )
         return Says(
-            "프로젝트에 놓이고, 사용할 수 있는 상태입니다",
-            english="is placed in the project and is ready to use",
+            f"프로젝트에 놓이고, 사용할 수 있는 상태이며, 용도는 {self.usage_mode.value}입니다",
+            english=(
+                f"is placed in the project, is ready to use, and is for {self.usage_mode.value}"
+            ),
         )
 
     @override
@@ -103,4 +116,5 @@ class TestSeedProjectVFolder(TestSeedRowFromTwo[ProjectData, UserData, VFolderDa
             creator_id=second.id,
             status=VFolderOperationStatus.READY,
             project=ProjectID(first.id),
+            usage_mode=self.usage_mode,
         )
