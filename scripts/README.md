@@ -38,7 +38,7 @@ current, see `AGENTS.md` in this directory.
 | Script | What it does | Called by |
 |---|---|---|
 | `pre-commit` | Hook stub copied into `.git/hooks/` that calls `pre-commit.sh` | auto: git, installed by `install-dev.sh` |
-| `pre-commit.sh` | Runs `pants fmt` and `pants lint` over the changed files | auto: `pre-commit` |
+| `pre-commit.sh` | Runs `ruff format` and `ruff check` over the staged Python files, with the ruff version from `pants.toml` | auto: `pre-commit` |
 | `pre-push` | Hook stub copied into `.git/hooks/` that calls `pre-push.sh` | auto: git, installed by `install-dev.sh` |
 | `pre-push.sh` | Runs `pants lint`, `pants check` and `pants test` against the PR's base branch | auto: `pre-push` |
 | `plan-push-targets.sh` | Writes the changed targets and their direct dependents to a file and prints its path, cached by a hash of the base commit, HEAD's tree and the uncommitted changes | auto: `pre-push.sh` |
