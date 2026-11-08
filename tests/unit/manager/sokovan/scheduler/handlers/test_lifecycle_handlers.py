@@ -13,11 +13,13 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
+from dataclasses import replace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.check_precondition import (
     CheckPreconditionLifecycleHandler,
@@ -785,6 +787,37 @@ class TestTerminateSessionsLifecycleHandler:
 
         # Verify terminator was called
         mock_terminator.terminate_sessions_for_handler.assert_awaited_once_with(terminating_data)
+
+    @pytest.mark.parametrize(
+        ("status", "destroyed"),
+        [
+            (KernelStatus.TERMINATED, False),
+            (KernelStatus.ERROR, True),
+            (KernelStatus.CANCELLED, True),
+            (KernelStatus.TERMINATING, True),
+        ],
+    )
+    async def test_retry_skips_only_a_terminated_kernel(
+        self,
+        handler: TerminateSessionsLifecycleHandler,
+        mock_terminator: AsyncMock,
+        mock_repository: AsyncMock,
+        terminating_session: SessionWithKernels,
+        terminating_session_data_factory: Callable[..., list[TerminatingSessionData]],
+        status: KernelStatus,
+        destroyed: bool,
+    ) -> None:
+        """An ERROR or CANCELLED kernel may still hold a container."""
+        (session,) = terminating_session_data_factory([terminating_session])
+        kernel = replace(session.kernels[0], status=status)
+        mock_repository.get_terminating_sessions_by_ids.return_value = [
+            replace(session, kernels=[kernel])
+        ]
+
+        await handler.execute(ResourceGroupID(uuid.uuid4()), [terminating_session])
+
+        (sent,) = mock_terminator.terminate_sessions_for_handler.await_args.args[0]
+        assert sent.kernels == ([kernel] if destroyed else [])
 
     async def test_empty_session_list_returns_immediately(
         self,

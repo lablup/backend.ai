@@ -9,10 +9,11 @@ Test Scenarios:
 
 from __future__ import annotations
 
+from dataclasses import replace
 from unittest.mock import AsyncMock, MagicMock
 
 from ai.backend.common.types import KernelId
-from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.terminator.terminator import SessionTerminator
 from ai.backend.manager.views.sokovan.session import TerminatingSessionData
@@ -27,6 +28,26 @@ class TestSessionTerminatorTermination:
 
     Verifies the terminator correctly sends termination requests to agents.
     """
+
+    async def test_kernel_marked_terminated_is_still_destroyed(
+        self,
+        terminator: SessionTerminator,
+        mock_agent_client_pool: MagicMock,
+        terminating_session_single_kernel: TerminatingSessionData,
+    ) -> None:
+        """Force-termination marks kernels TERMINATED before its cleanup comes here."""
+        session = replace(
+            terminating_session_single_kernel,
+            kernels=[
+                replace(kernel, status=KernelStatus.TERMINATED)
+                for kernel in terminating_session_single_kernel.kernels
+            ],
+        )
+
+        with RecorderContext.scope("test", entity_ids=[session.session_id]):
+            await terminator.terminate_sessions_for_handler([session])
+
+        mock_agent_client_pool._mock_client.destroy_kernel.assert_awaited_once()
 
     async def test_all_kernels_terminated_successfully(
         self,

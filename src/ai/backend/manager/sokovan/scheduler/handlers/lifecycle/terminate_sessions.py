@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
+from dataclasses import replace
 from typing import TYPE_CHECKING, override
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
@@ -123,8 +124,18 @@ class TerminateSessionsLifecycleHandler(SessionLifecycleHandler):
         if not terminating_sessions:
             return result
 
+        # Only this per-tick retry may skip a TERMINATED kernel: force-termination marks
+        # its kernels TERMINATED first, and its cleanup must still destroy them.
+        unfinished_sessions = [
+            replace(
+                session,
+                kernels=[k for k in session.kernels if k.status != KernelStatus.TERMINATED],
+            )
+            for session in terminating_sessions
+        ]
+
         # Delegate to Terminator's handler-specific method
-        await self._terminator.terminate_sessions_for_handler(terminating_sessions)
+        await self._terminator.terminate_sessions_for_handler(unfinished_sessions)
 
         # Don't mark as success - status updates happen via agent events
         # The Coordinator won't update any status because success_status is None
