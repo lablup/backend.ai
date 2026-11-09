@@ -369,6 +369,11 @@ module = [
 ]
 disable_error_code = ["misc", "arg-type", "attr-defined", "assignment", "operator", "index"]
 
+# protoc output (see [python-protobuf] in pants.toml) is not written to the strict profile.
+[[tool.mypy.overrides]]
+module = "ai.backend.agent.containerd._grpcapi.*"
+ignore_errors = true
+
 # ServerAddr.face is typed as HostPortPair | None but __post_init__ always sets it
 # Disable union-attr errors for install module until types are properly refactored
 [[tool.mypy.overrides]]

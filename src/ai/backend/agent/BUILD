@@ -7,7 +7,14 @@ python_sources(
         "//:reqs#backend.ai-krunner-alpine",  # not auto-inferred
         "//:reqs#backend.ai-krunner-static-gnu",  # not auto-inferred
         ":resources",
+        ":protos",
     ],
+)
+
+protobuf_sources(
+    name="protos",
+    sources=["containerd/_grpcapi/**/*.proto"],
+    grpc=True,
 )
 
 python_sources(
