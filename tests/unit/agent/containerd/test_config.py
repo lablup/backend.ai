@@ -9,12 +9,15 @@ class TestContainerdConfig:
 
         assert config.address == "/run/containerd/containerd.sock"
         assert config.namespace == "backend-ai"
+        assert config.snapshotter == "overlayfs"
 
     def test_connection_overrides(self) -> None:
         config = ContainerdConfig.model_validate({
             "address": "/run/k3s/containerd/containerd.sock",
             "namespace": "k8s.io",
+            "snapshotter": "native",
         })
 
         assert config.address == "/run/k3s/containerd/containerd.sock"
         assert config.namespace == "k8s.io"
+        assert config.snapshotter == "native"
