@@ -7,6 +7,8 @@ import pytest
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.types import AgentId, KernelId, SessionId
 
+from .fakes import FakeContainerd
+
 
 @pytest.fixture
 def ownership_data() -> KernelOwnershipData:
@@ -15,3 +17,8 @@ def ownership_data() -> KernelOwnershipData:
         SessionId(uuid.uuid4()),
         AgentId("i-test"),
     )
+
+
+@pytest.fixture
+def fake() -> FakeContainerd:
+    return FakeContainerd()
