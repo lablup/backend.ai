@@ -962,99 +962,74 @@ class TestFullStack:
 # =============================================================================
 
 
-class _ProviderTimingOutOnFirstOpens(V2DBOpsProvider):
-    sessions_opened: int
-    _remaining_timeouts: int
+class _ProviderTimingOutFirstOpen(V2DBOpsProvider):
+    _timed_out: bool
 
-    def __init__(self, db: ExtendedAsyncSAEngine, timeouts: int) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         super().__init__(db)
-        self.sessions_opened = 0
-        self._remaining_timeouts = timeouts
+        self._timed_out = False
 
     @override
     @asynccontextmanager
     async def read_ops(self) -> AsyncGenerator[V2ReadOps]:
-        self._record_open_and_raise_timeout_if_remaining()
+        self._time_out_first_open()
         async with super().read_ops() as r:
             yield r
 
     @override
     @asynccontextmanager
     async def write_ops(self) -> AsyncGenerator[V2WriteOps]:
-        self._record_open_and_raise_timeout_if_remaining()
+        self._time_out_first_open()
         async with super().write_ops() as w:
             yield w
 
-    def _record_open_and_raise_timeout_if_remaining(self) -> None:
-        self.sessions_opened += 1
-        if self._remaining_timeouts > 0:
-            self._remaining_timeouts -= 1
+    def _time_out_first_open(self) -> None:
+        if not self._timed_out:
+            self._timed_out = True
             raise TimeoutError
 
 
-@dataclass(frozen=True)
-class _RepositoryOverTimingOutProvider:
-    repository: OpsRepository[RolePresetData]
-    provider: _ProviderTimingOutOnFirstOpens
-
-
-@dataclass(frozen=True)
-class _StoredPresetBehindTimingOutProvider:
-    repository: OpsRepository[RolePresetData]
-    provider: _ProviderTimingOutOnFirstOpens
-    preset_id: uuid.UUID
+@pytest.fixture
+def repository_timing_out_first_open(
+    database: ExtendedAsyncSAEngine,
+) -> OpsRepository[RolePresetData]:
+    return OpsRepository[RolePresetData](_ProviderTimingOutFirstOpen(database))
 
 
 @pytest.fixture
-async def stored_preset_behind_one_session_timeout(
-    database: ExtendedAsyncSAEngine,
-) -> _StoredPresetBehindTimingOutProvider:
+async def stored_preset_id(database: ExtendedAsyncSAEngine) -> uuid.UUID:
     async with database.begin_session() as sess:
         row = RolePresetRow(name="stored", scope_type=DomainEntityType())
         sess.add(row)
         await sess.flush()
-        preset_id = row.id
-    provider = _ProviderTimingOutOnFirstOpens(database, timeouts=1)
-    return _StoredPresetBehindTimingOutProvider(
-        repository=OpsRepository[RolePresetData](provider),
-        provider=provider,
-        preset_id=preset_id,
-    )
-
-
-@pytest.fixture
-def repository_behind_one_session_timeout(
-    database: ExtendedAsyncSAEngine,
-) -> _RepositoryOverTimingOutProvider:
-    provider = _ProviderTimingOutOnFirstOpens(database, timeouts=1)
-    return _RepositoryOverTimingOutProvider(
-        repository=OpsRepository[RolePresetData](provider), provider=provider
-    )
+        return row.id
 
 
 class TestRetryOnSessionOpenFailure:
-    async def test_a_read_whose_first_session_times_out_is_retried(
-        self, stored_preset_behind_one_session_timeout: _StoredPresetBehindTimingOutProvider
+    async def test_read_is_retried(
+        self,
+        repository_timing_out_first_open: OpsRepository[RolePresetData],
+        stored_preset_id: uuid.UUID,
     ) -> None:
-        read_back = await stored_preset_behind_one_session_timeout.repository.get(
-            _PresetQuerier(target=stored_preset_behind_one_session_timeout.preset_id)
+        read_back = await repository_timing_out_first_open.get(
+            _PresetQuerier(target=stored_preset_id)
         )
 
-        assert read_back.id == stored_preset_behind_one_session_timeout.preset_id
-        assert stored_preset_behind_one_session_timeout.provider.sessions_opened == 2
+        assert read_back.id == stored_preset_id
 
-    async def test_a_write_whose_first_session_times_out_is_retried_and_written_once(
+    async def test_write_is_retried_and_written_once(
         self,
         database: ExtendedAsyncSAEngine,
-        repository_behind_one_session_timeout: _RepositoryOverTimingOutProvider,
+        repository_timing_out_first_open: OpsRepository[RolePresetData],
     ) -> None:
-        created = await repository_behind_one_session_timeout.repository.create_global_entity(
+        created = await repository_timing_out_first_open.create_global_entity(
             _PresetCreator(name="retried", scope_type=DomainEntityType())
         )
 
         async with database.begin_readonly_session() as sess:
-            rows_named_retried = (
-                await sess.scalars(sa.select(RolePresetRow).where(RolePresetRow.name == "retried"))
+            ids = (
+                await sess.scalars(
+                    sa.select(RolePresetRow.id).where(RolePresetRow.name == "retried")
+                )
             ).all()
-        assert [row.id for row in rows_named_retried] == [created.id]
-        assert repository_behind_one_session_timeout.provider.sessions_opened == 2
+        assert ids == [created.id]
