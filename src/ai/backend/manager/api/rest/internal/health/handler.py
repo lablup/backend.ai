@@ -12,7 +12,6 @@ from ai.backend.common.dto.internal.health import (
     HealthResponse,
     HealthStatus,
 )
-from ai.backend.manager import __version__
 from ai.backend.manager.dto.context import RequestCtx
 
 if TYPE_CHECKING:
@@ -27,7 +26,6 @@ def _build_detail_response(connectivity: ConnectivityCheckResponse) -> web.Respo
     DEGRADED in the body but not surfaced via HTTP status."""
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
-        version=__version__,
         component=_COMPONENT_NAME,
         connectivity=connectivity,
     )
@@ -39,7 +37,6 @@ def _build_probe_response(connectivity: ConnectivityCheckResponse) -> web.Respon
     is_healthy = connectivity.overall_healthy
     response = HealthResponse(
         status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
-        version=__version__,
         component=_COMPONENT_NAME,
         connectivity=connectivity,
     )

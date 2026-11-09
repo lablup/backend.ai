@@ -61448,7 +61448,7 @@
           }
         },
         "parameters": [],
-        "description": "Simple liveness probe — returns 200 OK with version."
+        "description": "Simple liveness probe — returns 200 OK."
       }
     },
     "/health/livez": {
