@@ -9,9 +9,6 @@ import pytest
 
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.errors import KernelNotFoundError
-from ai.backend.common.events.event_types.kernel.anycast import KernelTerminatedAnycastEvent
-from ai.backend.common.events.event_types.kernel.broadcast import KernelTerminatedBroadcastEvent
-from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import KernelId, SessionId
 
 
@@ -41,7 +38,7 @@ def batch_run_whose_kernel_disappears() -> _BatchRunWhoseKernelDisappears:
 
 
 class TestExecuteBatch:
-    async def test_sends_kernel_terminated_events_when_the_kernel_disappears(
+    async def test_ends_without_sending_events_when_the_kernel_disappears(
         self, batch_run_whose_kernel_disappears: _BatchRunWhoseKernelDisappears
     ) -> None:
         batch_run = batch_run_whose_kernel_disappears
@@ -53,15 +50,4 @@ class TestExecuteBatch:
             "sleep 3600",
         )
 
-        batch_run.agent.anycast_and_broadcast_event.assert_awaited_once_with(
-            KernelTerminatedAnycastEvent(
-                kernel_id=batch_run.kernel_id,
-                session_id=batch_run.session_id,
-                reason=KernelLifecycleEventReason.SELF_TERMINATED,
-            ),
-            KernelTerminatedBroadcastEvent(
-                kernel_id=batch_run.kernel_id,
-                session_id=batch_run.session_id,
-                reason=KernelLifecycleEventReason.SELF_TERMINATED,
-            ),
-        )
+        batch_run.agent.anycast_and_broadcast_event.assert_not_awaited()
