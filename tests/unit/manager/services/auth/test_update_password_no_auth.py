@@ -13,6 +13,7 @@ from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import GenericBadRequest, RejectedByHook
+from ai.backend.manager.plugin.hook_args import VerifyPasswordFormatHookArgs
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
@@ -114,6 +115,14 @@ async def test_update_password_no_auth_successful(
         "default",
     )
     mock_valkey_session_client.delete_login_sessions.assert_awaited_once_with(deleted_tokens)
+    assert mock_hook_plugin_ctx.dispatch.call_args.args == (
+        "VERIFY_PASSWORD_FORMAT",
+        (
+            VerifyPasswordFormatHookArgs(
+                email="user@example.com", username="test-user", password="new_secure_password"
+            ),
+        ),
+    )
 
 
 async def test_update_password_no_auth_fails_when_max_password_age_is_none(

@@ -21,8 +21,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiohttp import web
+from multidict import CIMultiDict, CIMultiDictProxy
 
-from ai.backend.common.api_handlers import BodyParam, QueryParam
+from ai.backend.common.api_handlers import BodyParam, HeaderParam, QueryParam
 from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
@@ -45,6 +46,7 @@ from ai.backend.manager.api.rest.middleware.auth import (
     parse_trusted_proxy_networks,
 )
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
+from ai.backend.manager.dto.auth import SignupHeader
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.models.user.row import UserRole, UserStatus
 from ai.backend.manager.services.auth.actions.authorize import AuthorizeActionResult
@@ -374,10 +376,14 @@ class TestSignup:
             secret_key="NEWSECRET",
         )
 
+    @pytest.fixture
+    def signup_header(self) -> HeaderParam[SignupHeader]:
+        return HeaderParam(SignupHeader).from_header(CIMultiDictProxy(CIMultiDict()))
+
     async def test_calls_processor_and_returns_created(
         self,
         handler: AuthHandler,
-        request_ctx: RequestCtx,
+        signup_header: HeaderParam[SignupHeader],
         mock_processors: MagicMock,
         signup_result: SignupActionResult,
     ) -> None:
@@ -390,7 +396,7 @@ class TestSignup:
         })
         mock_processors.auth.signup.run = AsyncMock(return_value=signup_result)
 
-        response = await handler.signup(body, request_ctx)
+        response = await handler.signup(body, signup_header)
 
         mock_processors.auth.signup.run.assert_called_once()
         assert response.status_code == HTTPStatus.CREATED
@@ -403,7 +409,7 @@ class TestSignup:
     async def test_passes_optional_params_to_action(
         self,
         handler: AuthHandler,
-        request_ctx: RequestCtx,
+        signup_header: HeaderParam[SignupHeader],
         mock_processors: MagicMock,
         signup_result: SignupActionResult,
     ) -> None:
@@ -423,7 +429,7 @@ class TestSignup:
         })
         mock_processors.auth.signup.run = AsyncMock(return_value=signup_result)
 
-        await handler.signup(body, request_ctx)
+        await handler.signup(body, signup_header)
 
         action = mock_processors.auth.signup.run.call_args[0][0]
         assert action.domain_name == domain

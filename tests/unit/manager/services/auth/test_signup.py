@@ -6,6 +6,7 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.manager.data.auth.types import UserCreationData
@@ -13,7 +14,11 @@ from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import EmailAlreadyExistsError
 from ai.backend.manager.errors.user import UserCreationBadRequest
 from ai.backend.manager.models.user.row import UserRole, UserStatus
-from ai.backend.manager.plugin.hook_args import PostSignupHookArgs
+from ai.backend.manager.plugin.hook_args import (
+    PostSignupHookArgs,
+    PreSignupHookArgs,
+    VerifyPasswordFormatHookArgs,
+)
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
@@ -139,6 +144,31 @@ async def test_signup_successful_with_full_data(
     assert result.user_id == UUID("87654321-4321-8765-4321-876543218765")
     assert result.access_key == mock_keypair.access_key
     assert result.secret_key == mock_keypair.secret_key.content
+    assert [c.args for c in mock_hook_plugin_ctx.dispatch.call_args_list] == [
+        (
+            "PRE_SIGNUP",
+            (
+                PreSignupHookArgs(
+                    domain_name=DomainName("custom"),
+                    email="fulluser@example.com",
+                    password="another_secure_pass",
+                    username="fulluser",
+                    full_name="Full User Name",
+                    description="A test user account",
+                ),
+            ),
+        ),
+        (
+            "VERIFY_PASSWORD_FORMAT",
+            (
+                VerifyPasswordFormatHookArgs(
+                    email="fulluser@example.com",
+                    username="fulluser",
+                    password="another_secure_pass",
+                ),
+            ),
+        ),
+    ]
 
 
 async def test_signup_fails_when_email_already_exists(

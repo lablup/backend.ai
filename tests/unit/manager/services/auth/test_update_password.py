@@ -8,6 +8,7 @@ from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import RejectedByHook
+from ai.backend.manager.plugin.hook_args import VerifyPasswordFormatHookArgs
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
@@ -251,8 +252,14 @@ async def test_update_password_repository_call(
 
     # Verify hook was called
     mock_hook_plugin_ctx.dispatch.assert_called_once()
-    hook_call = mock_hook_plugin_ctx.dispatch.call_args
-    assert hook_call[0][0] == "VERIFY_PASSWORD_FORMAT"
+    assert mock_hook_plugin_ctx.dispatch.call_args.args == (
+        "VERIFY_PASSWORD_FORMAT",
+        (
+            VerifyPasswordFormatHookArgs(
+                email="update@example.com", username="test-user", password="new_pass123"
+            ),
+        ),
+    )
 
     assert result.success is True
     assert result.message == "Password updated successfully"
