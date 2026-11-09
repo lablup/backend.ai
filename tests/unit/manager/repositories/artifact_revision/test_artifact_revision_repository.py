@@ -20,7 +20,10 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactStatus,
     ArtifactType,
 )
-from ai.backend.manager.errors.artifact import ArtifactRevisionImportInProgressError
+from ai.backend.manager.errors.artifact import (
+    ArtifactRevisionImportInProgressError,
+    ArtifactRevisionNotFoundError,
+)
 from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.artifact.row import ArtifactRow
@@ -691,6 +694,15 @@ class TestArtifactRevisionRepository:
             ArtifactRevisionQuerier(revision_id=revision_already_importing.id)
         )
         assert revision.status == revision_already_importing.status
+
+    async def test_mark_artifact_revision_pulling_of_a_missing_revision_raises_not_found(
+        self,
+        artifact_repository: ArtifactRepository,
+    ) -> None:
+        with pytest.raises(ArtifactRevisionNotFoundError):
+            await artifact_repository.mark_artifact_revision_pulling(
+                ArtifactRevisionID(uuid.uuid4())
+            )
 
     async def test_update_artifact_revision_bytesize(
         self,
