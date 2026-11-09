@@ -11,6 +11,7 @@ from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ContainerdConfig
 from ai.backend.agent.containerd.agent import ContainerdAgent
 from ai.backend.agent.containerd.rpc.client import ContainerdClient
+from ai.backend.agent.errors.agent import InvalidAgentConfigError
 from ai.backend.common.types import KernelId
 
 
@@ -19,9 +20,14 @@ def base_init(mocker: MockerFixture) -> MagicMock:
     return mocker.patch.object(AbstractAgent, "__init__", return_value=None)
 
 
-def _local_config(containerd: dict[str, Any]) -> AgentUnifiedConfig:
+def _local_config(
+    containerd: dict[str, Any], bind_host: str = "0.0.0.0", advertised_host: str | None = None
+) -> AgentUnifiedConfig:
     config = MagicMock()
     config.containerd = ContainerdConfig.model_validate(containerd)
+    config.container.bind_host = bind_host
+    config.container.advertised_host = advertised_host
+    config.container.port_range = (30000, 30999)
     return cast(AgentUnifiedConfig, config)
 
 
@@ -50,3 +56,20 @@ class TestContainerdAgentInit:
 
         _, kwargs = base_init.call_args
         assert kwargs == {"computers": {}, "slots": {}}
+
+    @pytest.mark.parametrize("host", ["", "0.0.0.0", "10.0.0.5"])
+    def test_usable_bind_host_is_accepted(self, base_init: MagicMock, host: str) -> None:
+        _new_agent(_local_config({}, bind_host=host))
+
+    @pytest.mark.parametrize("host", ["127.0.0.1", "localhost", "::1", "example.com"])
+    def test_unusable_bind_host_is_refused(self, base_init: MagicMock, host: str) -> None:
+        with pytest.raises(InvalidAgentConfigError, match="bind-host"):
+            _new_agent(_local_config({}, bind_host=host))
+
+    @pytest.mark.parametrize("host", ["127.0.0.1", "localhost", "::1"])
+    def test_loopback_advertised_host_is_refused(self, base_init: MagicMock, host: str) -> None:
+        with pytest.raises(InvalidAgentConfigError, match="advertised-host"):
+            _new_agent(_local_config({}, advertised_host=host))
+
+    def test_named_advertised_host_is_accepted(self, base_init: MagicMock) -> None:
+        _new_agent(_local_config({}, advertised_host="agent1.example.com"))

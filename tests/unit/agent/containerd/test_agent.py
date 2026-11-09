@@ -15,6 +15,7 @@ from ai.backend.agent.containerd.agent import KERNEL_IP_LABEL, ContainerdAgent
 from ai.backend.agent.containerd.network import KernelNetwork
 from ai.backend.agent.containerd.rpc.types import ContainerRecord, TaskInfo, TaskState
 from ai.backend.agent.errors.containerd import KernelVerbNotSupported
+from ai.backend.agent.port_pool import PortPool
 from ai.backend.common.types import (
     AgentId,
     ContainerId,
@@ -39,6 +40,7 @@ def agent(
     instance.resource_lock = asyncio.Lock()
     instance._client = cast(Any, fake)
     instance._network = network
+    instance.port_pool = PortPool((30000, 30009), cooldown_sec=0)
     instance.error_monitor = MagicMock(capture_exception=AsyncMock())
     monkeypatch.setattr(instance, "reconstruct_resource_usage", AsyncMock())
     runner.script(["ip", "-d", "link", "show"], "3: bai0: <UP>\n    bridge forward_delay 1\n")

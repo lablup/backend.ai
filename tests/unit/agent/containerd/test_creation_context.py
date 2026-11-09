@@ -14,6 +14,8 @@ from ai.backend.agent.containerd.intrinsic import CPUSET_LABEL, MEMORY_LABEL
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.network import KernelNetwork
 from ai.backend.agent.errors.containerd import ContainerdOperationFailed, KernelNetworkSetupFailed
+from ai.backend.agent.errors.resources import PortPoolExhaustedError
+from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.types import (
@@ -22,6 +24,7 @@ from ai.backend.common.types import (
     KernelCreationConfig,
     KernelId,
     ResourceSlot,
+    ServicePort,
     SlotName,
 )
 
@@ -62,11 +65,17 @@ def resource_spec() -> KernelResourceSpec:
 
 
 @pytest.fixture
+def port_pool() -> PortPool:
+    return PortPool((30000, 30009), cooldown_sec=0)
+
+
+@pytest.fixture
 def ctx(
     ownership_data: KernelOwnershipData,
     fake: FakeContainerd,
     alloc_map: MagicMock,
     network: KernelNetwork,
+    port_pool: PortPool,
 ) -> Ctx:
     local_config = MagicMock()
     local_config.container.sandbox_type = "docker"
@@ -101,14 +110,22 @@ def ctx(
         local_config,
         computers,
         client=fake,
+        port_pool=port_pool,
         network=network,
         resource_lock=asyncio.Lock(),
     )
 
 
-async def _prepare(ctx: Ctx, resource_spec: KernelResourceSpec) -> ContainerdKernel:
+async def _prepare(
+    ctx: Ctx,
+    resource_spec: KernelResourceSpec,
+    service_ports: list[ServicePort] | None = None,
+) -> ContainerdKernel:
     return await ctx.prepare_container(
-        resource_spec, {"LANG": "en_US.UTF-8", "LOCAL_USER_ID": "1000"}, [], MagicMock()
+        resource_spec,
+        {"LANG": "en_US.UTF-8", "LOCAL_USER_ID": "1000"},
+        service_ports or [],
+        MagicMock(),
     )
 
 
@@ -124,7 +141,7 @@ class TestPrepareContainer:
             "type": "network",
             "path": f"/run/netns/{ns}",
         }
-        assert ctx._container_labels(resource_spec)[KERNEL_IP_LABEL] == "172.30.0.2"
+        assert ctx._container_labels(resource_spec, [])[KERNEL_IP_LABEL] == "172.30.0.2"
 
     @pytest.mark.parametrize("error", [KernelNetworkSetupFailed("x"), asyncio.CancelledError()])
     async def test_interrupted_network_setup_is_torn_down(
@@ -170,6 +187,8 @@ class TestStartContainer:
             "repl_out_port": 0,
             "stdin_port": 0,
             "stdout_port": 0,
+            "host_ports": [],
+            "kernel_ip": "172.30.0.2",
         }
         runtime, raw_spec = fake.specs[cid]
         spec: dict[str, Any] = dict(raw_spec)
@@ -184,6 +203,55 @@ class TestStartContainer:
         assert labels[CPUSET_LABEL] == "1,3"
         assert labels[MEMORY_LABEL] == "1073741824"
         assert labels["ai.backend.kernel-id"] == str(ownership_data.kernel_id)
+
+    async def test_service_ports_get_host_ports_and_dnat_rules(
+        self,
+        ctx: Ctx,
+        resource_spec: KernelResourceSpec,
+        fake: FakeContainerd,
+        runner: FakeCommandRunner,
+    ) -> None:
+        sports = [
+            cast(ServicePort, {"name": "web", "container_ports": (8080, 8081)}),
+            cast(ServicePort, {"name": "ssh", "container_ports": (22,)}),
+        ]
+        kernel = await _prepare(ctx, resource_spec, sports)
+
+        data = await ctx.start_container(kernel, [], None, [], MagicMock())
+
+        assert data["host_ports"] == [30000, 30001, 30002]
+        assert [tuple(s["host_ports"]) for s in sports] == [(30000, 30001), (30002,)]
+        targets = [c[-1] for c in runner.matching("iptables", "-w", "-t", "nat", "-A", "bai0-DNAT")]
+        assert targets == ["172.30.0.2:8080", "172.30.0.2:8081", "172.30.0.2:22"]
+        labels = fake.containers[data["container_id"]].labels
+        assert labels["ai.backend.containerd.host-ports"] == "30000,30001,30002"
+
+    async def test_failed_launch_returns_the_host_ports(
+        self,
+        ctx: Ctx,
+        resource_spec: KernelResourceSpec,
+        fake: FakeContainerd,
+        port_pool: PortPool,
+    ) -> None:
+        sports = [cast(ServicePort, {"name": "web", "container_ports": (8080,)})]
+        kernel = await _prepare(ctx, resource_spec, sports)
+        fake.failing.add("create_task")
+        before = len(port_pool)
+
+        with pytest.raises(ContainerdOperationFailed):
+            await ctx.start_container(kernel, [], None, [], MagicMock())
+
+        assert len(port_pool) == before
+        assert port_pool.acquire() == 30001
+
+    async def test_start_before_prepare_raises(
+        self, ctx: Ctx, resource_spec: KernelResourceSpec
+    ) -> None:
+        kernel = await _prepare(ctx, resource_spec)
+        ctx._address = None
+
+        with pytest.raises(KernelNetworkSetupFailed, match="before prepare_container"):
+            await ctx.start_container(kernel, [], None, [], MagicMock())
 
     async def test_failed_launch_frees_the_allocations_and_leaves_nothing(
         self,
@@ -227,3 +295,42 @@ class TestStartContainer:
 
         alloc_map.free.assert_called_once()
         assert fake.containers == {} and fake.snapshots == {} and fake.tasks == {}
+
+    async def test_pool_exhaustion_releases_the_ports_taken_and_frees_the_allocations(
+        self,
+        ctx: Ctx,
+        resource_spec: KernelResourceSpec,
+        alloc_map: MagicMock,
+        port_pool: PortPool,
+    ) -> None:
+        sports = [cast(ServicePort, {"name": "many", "container_ports": tuple(range(8000, 8011))})]
+        kernel = await _prepare(ctx, resource_spec, sports)
+        before = len(port_pool)
+
+        with pytest.raises(PortPoolExhaustedError):
+            await ctx.start_container(kernel, [], None, [], MagicMock())
+
+        assert len(port_pool) == before
+        alloc_map.free.assert_called_once()
+
+    async def test_cancelled_launch_returns_the_host_ports(
+        self,
+        ctx: Ctx,
+        resource_spec: KernelResourceSpec,
+        fake: FakeContainerd,
+        port_pool: PortPool,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        sports = [cast(ServicePort, {"name": "web", "container_ports": (8080,)})]
+        kernel = await _prepare(ctx, resource_spec, sports)
+        before = len(port_pool)
+
+        async def cancelled(*args: Any, **kwargs: Any) -> Any:
+            raise asyncio.CancelledError
+
+        monkeypatch.setattr(fake, "create_task", cancelled)
+
+        with pytest.raises(asyncio.CancelledError):
+            await ctx.start_container(kernel, [], None, [], MagicMock())
+
+        assert len(port_pool) == before

@@ -6,7 +6,7 @@ import signal
 import uuid
 from collections.abc import Mapping, MutableMapping, Sequence
 from decimal import Decimal
-from ipaddress import IPv4Address
+from ipaddress import IPv4Address, ip_address
 from pathlib import Path
 from typing import Any, Final, override
 
@@ -25,7 +25,7 @@ from ai.backend.agent.containerd.lifecycle import (
     destroy_container,
     launch_container,
 )
-from ai.backend.agent.containerd.network import KernelNetwork
+from ai.backend.agent.containerd.network import KernelNetwork, PortForward
 from ai.backend.agent.containerd.rpc.client import ContainerdAPI, ContainerdClient
 from ai.backend.agent.containerd.rpc.types import (
     ContainerdClientConfig,
@@ -39,10 +39,11 @@ from ai.backend.agent.containerd.spec import (
     merge_env,
 )
 from ai.backend.agent.errors import UnsupportedResource
-from ai.backend.agent.errors.agent import UnsupportedBaseDistroError
-from ai.backend.agent.errors.containerd import KernelVerbNotSupported
+from ai.backend.agent.errors.agent import InvalidAgentConfigError, UnsupportedBaseDistroError
+from ai.backend.agent.errors.containerd import KernelNetworkSetupFailed, KernelVerbNotSupported
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.kernel import AbstractKernel
+from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.resources import (
     AbstractComputePlugin,
     ComputerContext,
@@ -50,7 +51,7 @@ from ai.backend.agent.resources import (
     Mount,
     known_slot_types,
 )
-from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo
+from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo, Port
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.cgroup import CgroupController
 from ai.backend.common.docker import ImageRef, LabelName
@@ -90,6 +91,7 @@ _CONTAINER_STATUS: Final[Mapping[TaskState, ContainerStatus]] = {
     TaskState.PAUSING: ContainerStatus.PAUSED,
     TaskState.STOPPED: ContainerStatus.EXITED,
 }
+HOST_PORTS_LABEL: Final = "ai.backend.containerd.host-ports"
 KERNEL_IP_LABEL: Final = "ai.backend.containerd.kernel-ip"
 _RUNC_RUNTIME: Final = "io.containerd.runc.v2"
 _INTRINSIC_DEVICES: Final = frozenset({DeviceName("cpu"), DeviceName("mem")})
@@ -109,20 +111,47 @@ def _kernel_id_of(record: ContainerRecord) -> KernelId | None:
         return None
 
 
+def _check_bind_host(host: str) -> None:
+    """The DNAT match needs an IPv4 literal; loopback is never DNATed."""
+    if host in ("", "0.0.0.0"):
+        return
+    try:
+        usable = not IPv4Address(host).is_loopback
+    except ValueError:
+        usable = False
+    if not usable:
+        raise InvalidAgentConfigError(
+            "container.bind-host must be empty, 0.0.0.0 or a non-loopback IPv4 address: " + host
+        )
+
+
+def _check_advertised_host(host: str) -> None:
+    try:
+        loopback = ip_address(host).is_loopback
+    except ValueError:
+        loopback = host.lower() == "localhost"
+    if loopback:
+        raise InvalidAgentConfigError(
+            f"container.advertised-host must not be a loopback address: {host}"
+        )
+
+
 def _to_container(record: ContainerRecord, status: ContainerStatus) -> Container:
-    """The kernel publishes no port."""
+    """Only host_port is meaningful: the base discards it from the pool on startup."""
+    host_ports = [int(p) for p in record.labels.get(HOST_PORTS_LABEL, "").split(",") if p]
     return Container(
         id=ContainerId(record.id),
         status=status,
         image=record.image,
         labels=record.labels,
-        ports=[],
+        ports=[Port("127.0.0.1", p, p) for p in host_ports],
         backend_obj=record,
     )
 
 
 class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKernel]):
     _client: ContainerdAPI
+    _port_pool: PortPool
     _network: KernelNetwork
     _address: IPv4Address | None
     _resource_lock: asyncio.Lock
@@ -140,6 +169,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         restarting: bool = False,
         *,
         client: ContainerdAPI,
+        port_pool: PortPool,
         network: KernelNetwork,
         resource_lock: asyncio.Lock,
     ) -> None:
@@ -154,6 +184,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             restarting=restarting,
         )
         self._client = client
+        self._port_pool = port_pool
         self._network = network
         self._address = None
         self._resource_lock = resource_lock
@@ -312,6 +343,16 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             data={},
         )
 
+    def _acquire_host_ports(self, count: int) -> list[int]:
+        acquired: list[int] = []
+        try:
+            for _ in range(count):
+                acquired.append(self._port_pool.acquire())
+        except BackendAIError:
+            self._port_pool.release_many(acquired)
+            raise
+        return acquired
+
     async def _teardown_network(self) -> None:
         try:
             await self._network.teardown(self.kernel_id)
@@ -323,8 +364,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             for dev_name, device_alloc in resource_spec.allocations.items():
                 self.computers[dev_name].alloc_map.free(device_alloc)
 
-    # No port is published. No runner either: the task runs the image's own command, so
-    # cmdargs (the runner's arguments) are not used.
+    # Every container port of the service ports gets a pool host port and a DNAT rule; the REPL
+    # ports are 0. No runner: the task runs the image's own command, so cmdargs are not used.
     @override
     async def start_container(
         self,
@@ -336,8 +377,26 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     ) -> Mapping[str, Any]:
         image_name = self.kernel_config["image"]["canonical"]
         container_id = f"{self.kernel_id}-{uuid.uuid4().hex[:8]}"
+        service_ports = kernel_obj.service_ports
+        host_ports: list[int] = []
         try:
+            address = self._address
+            if address is None:
+                raise KernelNetworkSetupFailed("start_container ran before prepare_container")
+            host_ports = self._acquire_host_ports(
+                sum(len(sport["container_ports"]) for sport in service_ports)
+            )
             image = await resolve_image(self._client, image_name, get_arch_name())
+            pending = iter(host_ports)
+            forwards = [
+                PortForward(next(pending), cport)
+                for sport in service_ports
+                for cport in sport["container_ports"]
+            ]
+            await self._network.publish(self.kernel_id, forwards)
+            pending = iter(host_ports)
+            for sport in service_ports:
+                sport["host_ports"] = tuple(next(pending) for _ in sport["container_ports"])
             spec = build_launch_spec(
                 self._base_spec,
                 args=[*image.entrypoint, *image.cmd],
@@ -351,7 +410,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 image=image_name,
                 snapshotter=self._client.snapshotter,
                 snapshot_key=container_id,
-                labels=self._container_labels(kernel_obj.resource_spec),
+                labels=self._container_labels(kernel_obj.resource_spec, host_ports),
             )
             await launch_container(
                 self._client,
@@ -361,6 +420,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 spec=spec,
             )
         except BaseException:
+            self._port_pool.release_many(host_ports)
             await self._teardown_network()
             await self._free_allocations(kernel_obj.resource_spec)
             raise
@@ -372,11 +432,16 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             "repl_out_port": 0,
             "stdin_port": 0,
             "stdout_port": 0,
+            "host_ports": host_ports,
+            "kernel_ip": str(address),
         }
 
-    def _container_labels(self, resource_spec: KernelResourceSpec) -> dict[str, str]:
+    def _container_labels(
+        self, resource_spec: KernelResourceSpec, host_ports: Sequence[int]
+    ) -> dict[str, str]:
         cores, memory_bytes = _allocated(resource_spec)
         return {
+            HOST_PORTS_LABEL: ",".join(map(str, host_ports)),
             KERNEL_IP_LABEL: str(self._address or ""),
             CPUSET_LABEL: ",".join(map(str, cores)),
             MEMORY_LABEL: str(memory_bytes),
@@ -404,10 +469,15 @@ class ContainerdAgent(
         local_config: AgentUnifiedConfig,
         **kwargs: Any,
     ) -> None:
+        _check_bind_host(local_config.container.bind_host)
+        _check_advertised_host(local_config.container.advertised_host or "0.0.0.0")
         super().__init__(etcd, local_config, **kwargs)
         containerd_config = local_config.containerd
         self._network = KernelNetwork(
-            containerd_config.bridge_name, containerd_config.bridge_subnet
+            containerd_config.bridge_name,
+            containerd_config.bridge_subnet,
+            local_config.container.bind_host,
+            local_config.container.port_range,
         )
         # The base class starts a registry cleanup loop in its __init__, which needs the client.
         self._client = ContainerdClient(
@@ -588,6 +658,7 @@ class ContainerdAgent(
             self.computers,
             restarting=restarting,
             client=self._client,
+            port_pool=self.port_pool,
             network=self._network,
             resource_lock=self.resource_lock,
         )
