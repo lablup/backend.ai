@@ -39,6 +39,7 @@ from ai.backend.manager.errors.auth import (
     AuthorizationFailed,
     GroupMembershipNotFoundError,
     LoginSessionNotFoundError,
+    PasswordMismatch,
 )
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.user import KeyPairNotFound, UserCreationBadRequest
@@ -414,7 +415,7 @@ class AuthDBSource:
         if not matched:
             if target_password_info.need_migration(stored):
                 await asyncio.to_thread(configured_hasher.generate_new_hash, target_password_info)
-            raise AuthorizationFailed("User credential mismatch.")
+            raise PasswordMismatch(UserID(row.uuid))
         return row
 
     async def _migrate_password_hash(

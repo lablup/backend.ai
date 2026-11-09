@@ -13,7 +13,7 @@ from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.errors.auth import AuthorizationFailed
+from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordMismatch
 from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
 )
@@ -208,17 +208,19 @@ class TestCheckCredentialWithoutMigration:
         assert credential.user_id == user_with_password.user_uuid
         assert compare_to_hashed_password(_PASSWORD, credential.hashed_password)
 
-    async def test_rejects_a_wrong_password(
+    async def test_a_wrong_password_names_the_user(
         self,
         auth_repository: AuthRepository,
         user_with_password: _Credential,
     ) -> None:
-        with pytest.raises(AuthorizationFailed):
+        with pytest.raises(PasswordMismatch) as raised:
             await auth_repository.check_credential_without_migration(
                 user_with_password.domain_name,
                 user_with_password.email,
                 _password_info("wrong_password"),
             )
+
+        assert raised.value.user_id == user_with_password.user_uuid
 
     async def test_a_wrong_password_on_a_cheaper_stored_hash_costs_one_more_hash(
         self,
@@ -239,7 +241,7 @@ class TestCheckCredentialWithoutMigration:
                 autospec=True,
                 side_effect=PBKDF2_SHA256Hasher.generate_new_hash,
             ) as hashed,
-            pytest.raises(AuthorizationFailed),
+            pytest.raises(PasswordMismatch),
         ):
             await auth_repository.check_credential_without_migration(
                 user.domain_name, user.email, _password_info("wrong_password")
@@ -259,7 +261,7 @@ class TestCheckCredentialWithoutMigration:
                 autospec=True,
                 side_effect=PBKDF2_SHA256Hasher.generate_new_hash,
             ) as hashed,
-            pytest.raises(AuthorizationFailed),
+            pytest.raises(PasswordMismatch),
         ):
             await auth_repository.check_credential_without_migration(
                 user_with_password.domain_name,
@@ -281,12 +283,13 @@ class TestCheckCredentialWithoutMigration:
                 autospec=True,
                 side_effect=PBKDF2_SHA256Hasher.generate_new_hash,
             ) as hashed,
-            pytest.raises(AuthorizationFailed),
+            pytest.raises(AuthorizationFailed) as raised,
         ):
             await auth_repository.check_credential_without_migration(
                 user_with_password.domain_name, "nobody@example.com", _password_info(_PASSWORD)
             )
 
+        assert not isinstance(raised.value, PasswordMismatch)
         hashed.assert_called_once()
 
     async def test_rejects_the_email_under_another_domain(
@@ -312,7 +315,7 @@ class TestCheckCredentialWithoutMigration:
                 autospec=True,
                 side_effect=PBKDF2_SHA256Hasher.generate_new_hash,
             ) as hashed,
-            pytest.raises(AuthorizationFailed),
+            pytest.raises(AuthorizationFailed) as raised,
         ):
             await auth_repository.check_credential_without_migration(
                 user_without_password.domain_name,
@@ -320,4 +323,5 @@ class TestCheckCredentialWithoutMigration:
                 _password_info(_PASSWORD),
             )
 
+        assert not isinstance(raised.value, PasswordMismatch)
         hashed.assert_called_once()
