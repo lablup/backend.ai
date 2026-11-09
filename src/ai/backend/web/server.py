@@ -677,19 +677,10 @@ async def check_readyz(request: web.Request) -> web.Response:
     return _build_web_probe_response(connectivity)
 
 
-<<<<<<< HEAD
 async def webserver_healthcheck(request: web.Request) -> web.Response:
     stats: WebStats = request.app["stats"]
     stats.active_healthcheck_handlers.add(asyncio.current_task())
-    result = {
-        "version": __version__,
-        "details": "Success",
-    }
-    return web.json_response(result)
-=======
-async def webserver_healthcheck(_request: web.Request) -> web.Response:
     return web.json_response({"details": "Success"})
->>>>>>> a6e56ec91 (fix(BA-8974): stop returning the manager and webserver versions to unauthenticated clients (#16736))
 
 
 async def token_login_handler(request: web.Request) -> web.Response:

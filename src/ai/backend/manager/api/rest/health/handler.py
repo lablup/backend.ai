@@ -7,11 +7,6 @@ from typing import TYPE_CHECKING
 
 from aiohttp import web
 
-<<<<<<< HEAD
-from ai.backend.manager import __version__
-=======
-from ai.backend.manager.api.rest.shutdown import ServerDrainNotifier
->>>>>>> a6e56ec91 (fix(BA-8974): stop returning the manager and webserver versions to unauthenticated clients (#16736))
 from ai.backend.manager.dto.context import RequestCtx
 
 if TYPE_CHECKING:
