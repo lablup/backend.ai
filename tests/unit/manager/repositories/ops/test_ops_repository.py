@@ -964,31 +964,31 @@ class TestFullStack:
 
 class _ProviderTimingOutOnFirstOpens(V2DBOpsProvider):
     sessions_opened: int
-    _timeouts_left: int
+    _remaining_timeouts: int
 
     def __init__(self, db: ExtendedAsyncSAEngine, timeouts: int) -> None:
         super().__init__(db)
         self.sessions_opened = 0
-        self._timeouts_left = timeouts
+        self._remaining_timeouts = timeouts
 
     @override
     @asynccontextmanager
     async def read_ops(self) -> AsyncGenerator[V2ReadOps]:
-        self._time_out_while_timeouts_left()
+        self._record_open_and_raise_timeout_if_remaining()
         async with super().read_ops() as r:
             yield r
 
     @override
     @asynccontextmanager
     async def write_ops(self) -> AsyncGenerator[V2WriteOps]:
-        self._time_out_while_timeouts_left()
+        self._record_open_and_raise_timeout_if_remaining()
         async with super().write_ops() as w:
             yield w
 
-    def _time_out_while_timeouts_left(self) -> None:
+    def _record_open_and_raise_timeout_if_remaining(self) -> None:
         self.sessions_opened += 1
-        if self._timeouts_left > 0:
-            self._timeouts_left -= 1
+        if self._remaining_timeouts > 0:
+            self._remaining_timeouts -= 1
             raise TimeoutError
 
 
