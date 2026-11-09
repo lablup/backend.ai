@@ -35,6 +35,7 @@ class _CreationTracker:
         cluster_info: Any,
         *,
         throttle_sema: asyncio.Semaphore,
+        creation_attempt: Any = None,
     ) -> dict[str, Any]:
         self.semas.append(throttle_sema)
         async with throttle_sema:
