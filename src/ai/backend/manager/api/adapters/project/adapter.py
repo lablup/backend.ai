@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
     CreateProjectInput,
     PartialBulkDeleteProjectsInput,
     PartialBulkRestoreProjectsInput,
+    PartialBulkUpdateProjectItemInput,
     PartialBulkUpdateProjectsInput,
     ProjectFilter,
     ProjectOrder,
@@ -257,7 +258,13 @@ class ProjectAdapter(BaseAdapter):
 
     async def update(self, project_id: ProjectID, input: UpdateProjectInput) -> ProjectPayload:
         """Update an existing project."""
-        self._refuse_resource_policy_change_unless_superadmin([input])
+        # A project's resource policy is reassigned by a superadmin only.
+        if isinstance(input.resource_policy, str):
+            me = current_user()
+            if me is None:
+                raise UnreachableError("User context is not available")
+            if not me.is_superadmin:
+                raise InsufficientPrivilege("Only a superadmin can change the resource policy")
         result = await self._project.update_project.run(
             UpdateProjectAction(updater=self._to_updater(project_id, input))
         )
@@ -284,13 +291,33 @@ class ProjectAdapter(BaseAdapter):
         self, input: PartialBulkUpdateProjectsInput
     ) -> PartialBulkPayload[ProjectNode]:
         """Update several projects, answering for each one."""
-        self._refuse_resource_policy_change_unless_superadmin([item.input for item in input.items])
+        accepted: list[PartialBulkUpdateProjectItemInput] = []
+        refused: list[PartialBulkEntityResult[ProjectData]] = []
+        for entry in input.items:
+            # A project's resource policy is reassigned by a superadmin only.
+            if isinstance(entry.input.resource_policy, str):
+                me = current_user()
+                if me is None:
+                    raise UnreachableError("User context is not available")
+                if not me.is_superadmin:
+                    refused.append(
+                        PartialBulkEntityResult[ProjectData].denied(
+                            ProjectID(entry.id),
+                            InsufficientPrivilege(
+                                "Only a superadmin can change the resource policy"
+                            ),
+                        )
+                    )
+                    continue
+            accepted.append(entry)
+        if not accepted:
+            return self._to_partial_bulk_payload(PartialBulkResult(items=refused))
         result = await self._project.partial_bulk_update.run(
             PartialBulkUpdateProjectsAction(
-                updaters=[self._to_updater(ProjectID(item.id), item.input) for item in input.items]
+                updaters=[self._to_updater(ProjectID(item.id), item.input) for item in accepted]
             )
         )
-        requested = {ProjectID(item.id): item.input.is_active for item in input.items}
+        requested = {ProjectID(item.id): item.input.is_active for item in accepted}
         to_delete: list[ProjectID] = []
         to_restore: list[ProjectID] = []
         for item in result.items:
@@ -315,7 +342,7 @@ class ProjectAdapter(BaseAdapter):
             transitioned.update({item.entity_id: item for item in restored.items})
         return self._to_partial_bulk_payload(
             PartialBulkResult(
-                items=[transitioned.get(item.entity_id, item) for item in result.items]
+                items=[*(transitioned.get(item.entity_id, item) for item in result.items), *refused]
             )
         )
 
@@ -355,19 +382,6 @@ class ProjectAdapter(BaseAdapter):
             DeleteProjectAction(updater=ProjectSoftDeleteUpdater(project_id=data.entity_id()))
         )
         return deleted.data
-
-    @staticmethod
-    def _refuse_resource_policy_change_unless_superadmin(
-        inputs: Sequence[UpdateProjectInput],
-    ) -> None:
-        """A project's resource policy is reassigned by a superadmin only."""
-        if not any(isinstance(input.resource_policy, str) for input in inputs):
-            return
-        me = current_user()
-        if me is None:
-            raise UnreachableError("User context is not available")
-        if not me.is_superadmin:
-            raise InsufficientPrivilege("Only a superadmin can change the resource policy")
 
     def _to_updater(self, project_id: ProjectID, input: UpdateProjectInput) -> ProjectUpdater:
         return ProjectUpdater(

@@ -8,7 +8,11 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.dto.manager.v2.group.request import UpdateProjectInput
+from ai.backend.common.dto.manager.v2.group.request import (
+    PartialBulkUpdateProjectItemInput,
+    PartialBulkUpdateProjectsInput,
+    UpdateProjectInput,
+)
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
@@ -89,6 +93,11 @@ class TestResourcePolicyReassignment:
     def processors(self, readable: ProjectData) -> MagicMock:
         processors = MagicMock()
         processors.update_project.run = AsyncMock(return_value=MagicMock(data=readable))
+        processors.partial_bulk_update.run = AsyncMock(
+            return_value=PartialBulkResult(
+                items=[PartialBulkEntityResult[ProjectData].succeeded(READABLE, readable)]
+            )
+        )
         return processors
 
     @pytest.fixture
@@ -121,3 +130,45 @@ class TestResourcePolicyReassignment:
         with patch("ai.backend.manager.api.adapters.project.adapter.current_user", return_value=me):
             await adapter.update(READABLE, UpdateProjectInput(resource_policy="tier-2"))
         processors.update_project.run.assert_awaited_once()
+
+    async def test_a_bulk_update_refuses_only_the_items_reassigning_it(
+        self, adapter: ProjectAdapter, processors: MagicMock
+    ) -> None:
+        me = MagicMock(is_superadmin=False)
+        with patch("ai.backend.manager.api.adapters.project.adapter.current_user", return_value=me):
+            payload = await adapter.partial_bulk_update(
+                PartialBulkUpdateProjectsInput(
+                    items=[
+                        PartialBulkUpdateProjectItemInput(
+                            id=READABLE, input=UpdateProjectInput(name="renamed")
+                        ),
+                        PartialBulkUpdateProjectItemInput(
+                            id=DENIED, input=UpdateProjectInput(resource_policy="tier-2")
+                        ),
+                    ]
+                )
+            )
+
+        action = processors.partial_bulk_update.run.await_args.args[0]
+        assert [updater.project_id for updater in action.updaters] == [READABLE]
+        assert [node.id for node in payload.successes] == [READABLE]
+        assert [failure.id for failure in payload.failed] == [DENIED]
+
+    async def test_a_bulk_update_reassigning_it_on_every_item_updates_nothing(
+        self, adapter: ProjectAdapter, processors: MagicMock
+    ) -> None:
+        me = MagicMock(is_superadmin=False)
+        with patch("ai.backend.manager.api.adapters.project.adapter.current_user", return_value=me):
+            payload = await adapter.partial_bulk_update(
+                PartialBulkUpdateProjectsInput(
+                    items=[
+                        PartialBulkUpdateProjectItemInput(
+                            id=DENIED, input=UpdateProjectInput(resource_policy="tier-2")
+                        ),
+                    ]
+                )
+            )
+
+        processors.partial_bulk_update.run.assert_not_called()
+        assert payload.successes == []
+        assert [failure.id for failure in payload.failed] == [DENIED]
