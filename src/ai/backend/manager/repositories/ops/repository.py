@@ -17,6 +17,8 @@ from ai.backend.common.data.entity.types import (
     RuntimeEntityID,
 )
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
@@ -72,6 +74,20 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
 __all__ = ("OpsRepository",)
 
+# Reads only: a write retried after a lost reply could run twice.
+_read_retry_resilience = Resilience(
+    policies=[
+        RetryPolicy(
+            RetryArgs(
+                max_retries=3,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
+
 
 class OpsRepository[TData]:
     """Ops-backed repository for one entity, parameterized only by its ``data/`` type.
@@ -85,6 +101,7 @@ class OpsRepository[TData]:
     def __init__(self, ops_provider: V2DBOpsProvider) -> None:
         self._ops = ops_provider
 
+    @_read_retry_resilience.apply()
     async def get(self, querier: DataQuerier[Any, TData]) -> TData:
         async with self._ops.read_ops() as r:
             data = await r.query_data(querier)
@@ -97,6 +114,7 @@ class OpsRepository[TData]:
                 )
             return data
 
+    @_read_retry_resilience.apply()
     async def bulk_get(
         self, querier: BulkEntityQuerier[Any, TData], entity_ids: Sequence[EntityIdentifier]
     ) -> Mapping[EntityIdentifier, TData]:
@@ -108,6 +126,7 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.query_bulk_data(querier, entity_ids)
 
+    @_read_retry_resilience.apply()
     async def get_field[TFieldData: FieldData](
         self, querier: FieldQuerier[Any, TFieldData]
     ) -> TFieldData:
@@ -122,6 +141,7 @@ class OpsRepository[TData]:
                 )
             return data
 
+    @_read_retry_resilience.apply()
     async def lookup[TEntityID: EntityIdentifier](
         self, lookup: DataLookup[Any, TEntityID]
     ) -> TEntityID:
@@ -140,6 +160,7 @@ class OpsRepository[TData]:
                 )
             return entity_id
 
+    @_read_retry_resilience.apply()
     async def bulk_lookup[TKey, TEntityID: EntityIdentifier](
         self, lookup: BulkDataLookup[TKey, TEntityID], keys: Sequence[TKey]
     ) -> Mapping[TKey, TEntityID]:
@@ -147,6 +168,7 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.lookup_entity_ids(lookup, keys)
 
+    @_read_retry_resilience.apply()
     async def bulk_get_fields[TFieldData: FieldData](
         self, querier: BulkFieldQuerier[Any, TFieldData], field_ids: Sequence[FieldIdentifier]
     ) -> Mapping[FieldIdentifier, TFieldData]:
@@ -154,6 +176,7 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.query_bulk_field_data(querier, field_ids)
 
+    @_read_retry_resilience.apply()
     async def owned_fields[TOwnerID: EntityIdentifier, TFieldData: FieldData](
         self,
         querier: OwnedFieldQuerier[TOwnerID, Any, TFieldData],
@@ -163,6 +186,7 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.query_owned_fields(querier, owner_ids)
 
+    @_read_retry_resilience.apply()
     async def field_owners(
         self, lookup: FieldOwnerLookup[Any, Any], field_ids: Sequence[FieldIdentifier]
     ) -> Mapping[FieldIdentifier, EntityIdentifier]:
@@ -188,6 +212,7 @@ class OpsRepository[TData]:
             )
         return owner
 
+    @_read_retry_resilience.apply()
     async def runtime_field_owners(
         self, lookup: RuntimeFieldOwnerLookup[Any], field_ids: Sequence[FieldIdentifier]
     ) -> Mapping[FieldIdentifier, RuntimeEntityID]:
@@ -195,6 +220,7 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.lookup_runtime_field_owners(lookup, field_ids)
 
+    @_read_retry_resilience.apply()
     async def field_owner_candidates(
         self, candidates: FieldOwnerCandidates[Any], field_ids: Sequence[FieldIdentifier]
     ) -> Mapping[FieldIdentifier, Sequence[RuntimeEntityID]]:
@@ -216,6 +242,7 @@ class OpsRepository[TData]:
             )
         return owner
 
+    @_read_retry_resilience.apply()
     async def field_owner_by_key[TOwnerID: EntityIdentifier](
         self, lookup: FieldOwnerKeyLookup[TOwnerID]
     ) -> TOwnerID:
@@ -234,6 +261,7 @@ class OpsRepository[TData]:
             )
         return owner
 
+    @_read_retry_resilience.apply()
     async def field_by_key[TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](
         self, lookup: FieldKeyLookup[TFieldID, TOwnerID]
     ) -> tuple[TFieldID, TOwnerID]:
@@ -252,6 +280,7 @@ class OpsRepository[TData]:
             )
         return resolved
 
+    @_read_retry_resilience.apply()
     async def fields_by_keys[TKey, TFieldID: FieldIdentifier, TOwnerID: EntityIdentifier](
         self, lookup: BulkFieldKeyLookup[TKey, TFieldID, TOwnerID], keys: Sequence[TKey]
     ) -> Mapping[TKey, tuple[TFieldID, TOwnerID]]:
@@ -260,6 +289,7 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.lookup_fields_by_keys(lookup, keys)
 
+    @_read_retry_resilience.apply()
     async def search_in_scopes(
         self,
         scopes: Sequence[OperationScope],
@@ -275,6 +305,7 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.search_with_scopes(scopes, searcher)
 
+    @_read_retry_resilience.apply()
     async def scoped_search(self, scoped: ScopedSearcher[Any, TData]) -> SearcherResult[TData]:
         """Read a page restricted to the searcher's scopes and narrowed by its uses.
 
@@ -283,6 +314,7 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.scoped_search(scoped)
 
+    @_read_retry_resilience.apply()
     async def global_search(
         self, global_searcher: GlobalSearcher[Any, TData]
     ) -> SearcherResult[TData]:
@@ -290,6 +322,7 @@ class OpsRepository[TData]:
         async with self._ops.read_ops() as r:
             return await r.global_search(global_searcher)
 
+    @_read_retry_resilience.apply()
     async def search_in_global(self, searcher: Searcher[Any, TData]) -> SearcherResult[TData]:
         """Read a page across the entire table, with no scope filter.
 
