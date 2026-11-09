@@ -365,7 +365,7 @@ class TestUpdateWithHistory:
         ]
 
         # Execute
-        updated_count = await db_source.update_with_history(updater, histories)
+        updated_count = len(await db_source.update_with_history(updater, histories))
 
         # Verify - session should be updated
         assert updated_count == 1
@@ -425,7 +425,7 @@ class TestUpdateWithHistory:
         ]
 
         # Execute
-        updated_count = await db_source.update_with_history(updater, histories)
+        updated_count = len(await db_source.update_with_history(updater, histories))
 
         # Verify
         assert updated_count == 1
@@ -520,7 +520,7 @@ class TestUpdateWithHistory:
         ]
 
         # Execute
-        updated_count = await db_source.update_with_history(updater, histories)
+        updated_count = len(await db_source.update_with_history(updater, histories))
 
         # Verify - all sessions should be updated
         assert updated_count == 3
@@ -572,10 +572,9 @@ class TestUpdateWithHistory:
         ]
 
         # Execute - should not fail, but update count should be 0
-        updated_count = await db_source.update_with_history(updater, histories)
+        updated_count = len(await db_source.update_with_history(updater, histories))
 
-        # Verify - no sessions updated, but history record is still created
-        # (This matches the current behavior where history is always created)
+        # Verify - no sessions updated, so no history record either
         assert updated_count == 0
 
     async def test_update_with_history_empty_histories(
@@ -599,7 +598,7 @@ class TestUpdateWithHistory:
         histories: list[SessionHistoryToCreate] = []
 
         # Execute
-        updated_count = await db_source.update_with_history(updater, histories)
+        updated_count = len(await db_source.update_with_history(updater, histories))
 
         # Verify - session should be updated, no history records
         assert updated_count == 1
@@ -1135,7 +1134,7 @@ class TestUpdateWithHistory:
         ]
 
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
-        updated_count = await db_source.update_with_history(updater, histories)
+        updated_count = len(await db_source.update_with_history(updater, histories))
         assert updated_count == 1
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:

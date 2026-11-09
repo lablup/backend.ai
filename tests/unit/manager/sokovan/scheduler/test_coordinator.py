@@ -7,6 +7,7 @@ Test Scenarios:
 - SC-CO-009 ~ SC-CO-013: HookExecution
 - SC-CO-014 ~ SC-CO-019: StatusTransition
 - SC-CO-019b: status_info cleared on RUNNING transition (BA-4841 regression)
+- SC-CO-019c: a session the transition guard leaves alone is neither broadcast nor reset
 - SC-CO-020 ~ SC-CO-025: PostProcessors
 """
 
@@ -1000,7 +1001,9 @@ class TestScheduleCoordinatorStatusTransition:
             kernel=KernelStatus.PENDING,
         )
 
-        mock_coordinator._repository.update_with_history = AsyncMock(return_value=1)
+        mock_coordinator._repository.update_with_history = AsyncMock(
+            return_value=[session_info.session_id]
+        )
         mock_coordinator._apply_kernel_pending_resets = AsyncMock()
 
         # Act
@@ -1034,7 +1037,9 @@ class TestScheduleCoordinatorStatusTransition:
             kernel=KernelStatus.SCHEDULED,
         )
 
-        mock_coordinator._repository.update_with_history = AsyncMock(return_value=1)
+        mock_coordinator._repository.update_with_history = AsyncMock(
+            return_value=[session_info.session_id]
+        )
         mock_coordinator._apply_kernel_pending_resets = AsyncMock()
 
         # Act
@@ -1070,10 +1075,10 @@ class TestScheduleCoordinatorStatusTransition:
 
         captured_updater = None
 
-        async def capture_update_with_history(updater: Any, histories: Any) -> int:
+        async def capture_update_with_history(updater: Any, histories: Any) -> list[SessionId]:
             nonlocal captured_updater
             captured_updater = updater
-            return 1
+            return [session_info.session_id]
 
         mock_coordinator._repository.update_with_history = capture_update_with_history
         mock_coordinator._apply_kernel_pending_resets = AsyncMock()
@@ -1095,6 +1100,54 @@ class TestScheduleCoordinatorStatusTransition:
         built = captured_updater.build_values()
         assert "status_info" in built
         assert built["status_info"] is None
+
+    async def test_guarded_transition_skips_a_session_left_alone(
+        self,
+        mock_coordinator: MagicMock,
+    ) -> None:
+        """SC-CO-019c: A session the guard leaves alone is neither returned nor reset.
+
+        Given: Two sessions transitioning to PENDING, one of them left alone by the guard
+        When: Apply transition is called
+        Then: The updater carries the guard, only the moved session is returned,
+              and only its kernels are reset
+        """
+        # Arrange
+        moved_info = _create_session_transition_info(session_id=SessionId(uuid4()))
+        skipped_info = _create_session_transition_info(session_id=SessionId(uuid4()))
+        transition = TransitionStatus(
+            session=SessionStatus.PENDING,
+            kernel=KernelStatus.PENDING,
+            except_session_statuses=frozenset({SessionStatus.CREATING}),
+        )
+        captured_updater = None
+
+        async def capture_update_with_history(updater: Any, histories: Any) -> list[SessionId]:
+            nonlocal captured_updater
+            captured_updater = updater
+            return [moved_info.session_id]
+
+        mock_coordinator._repository.update_with_history = capture_update_with_history
+        mock_coordinator._apply_kernel_pending_resets = AsyncMock()
+
+        # Act
+        transitioned = await ScheduleCoordinator._apply_transition(
+            mock_coordinator,
+            handler_name="test_handler",
+            session_infos=[moved_info, skipped_info],
+            transition=transition,
+            scheduling_result=SchedulingResult.EXPIRED,
+            records={},
+            status_changed_at=datetime.now(tzutc()),
+        )
+
+        # Assert
+        assert isinstance(captured_updater, SessionStatusBatchUpdater)
+        assert set(captured_updater.except_statuses) == {SessionStatus.CREATING}
+        assert transitioned == [moved_info]
+        mock_coordinator._apply_kernel_pending_resets.assert_awaited_once_with([
+            moved_info.session_id
+        ])
 
 
 # =============================================================================
