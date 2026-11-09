@@ -12,7 +12,7 @@ from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import FieldIdentifier
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDInMatchSpec
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
@@ -442,6 +442,9 @@ class DeploymentService:
                 conditions=[
                     AgentSearchableFields.own.resource_group.filter.equals(
                         StringMatchSpec(value=resource_group, case_insensitive=False, negated=False)
+                    ),
+                    AgentSearchableFields.own.uuid.filter.in_(
+                        UUIDInMatchSpec(values=list(agent_uuids), negated=False)
                     ),
                 ],
             )
