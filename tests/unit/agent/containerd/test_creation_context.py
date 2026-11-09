@@ -13,7 +13,7 @@ from ai.backend.agent.containerd.agent import ContainerdKernelCreationContext as
 from ai.backend.agent.containerd.intrinsic import CPUSET_LABEL, MEMORY_LABEL
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.network import KernelNetwork
-from ai.backend.agent.containerd.profile.base import LaunchPlan
+from ai.backend.agent.containerd.profile.base import LaunchPlan, TlsConnectReadiness
 from ai.backend.agent.containerd.profile.runc import RuncProfile
 from ai.backend.agent.containerd.rpc.types import RuntimeOptions
 from ai.backend.agent.errors.containerd import ContainerdOperationFailed, KernelNetworkSetupFailed
@@ -180,6 +180,17 @@ class _PatchingProfile:
         return LaunchPlan("io.example.v1", {"annotations": {"k": "v"}}, options)
 
 
+class _TlsProfile:
+    PLAN = LaunchPlan("io.example.v1", readiness=TlsConnectReadiness("8080", 60.0))
+
+    @property
+    def name(self) -> str:
+        return "tls"
+
+    def plan(self, kernel_config: KernelCreationConfig) -> LaunchPlan:
+        return self.PLAN
+
+
 class _FailingProfile:
     @property
     def name(self) -> str:
@@ -253,6 +264,7 @@ class TestStartContainer:
             "stdout_port": 0,
             "host_ports": [],
             "kernel_ip": "172.30.0.2",
+            "published_host": "10.0.0.5",
         }
         runtime, raw_spec = fake.specs[cid]
         spec: dict[str, Any] = dict(raw_spec)
@@ -267,6 +279,17 @@ class TestStartContainer:
         assert labels[CPUSET_LABEL] == "1,3"
         assert labels[MEMORY_LABEL] == "1073741824"
         assert labels["ai.backend.kernel-id"] == str(ownership_data.kernel_id)
+
+    async def test_kernel_gets_the_launch_plan_of_the_profile(
+        self, ctx: Ctx, resource_spec: KernelResourceSpec
+    ) -> None:
+        ctx._profile = _TlsProfile()
+        kernel = await _prepare(ctx, resource_spec)
+        assert kernel.launch_plan is None
+
+        await ctx.start_container(kernel, [], None, [], MagicMock())
+
+        assert kernel.launch_plan == _TlsProfile.PLAN
 
     async def test_service_ports_get_host_ports_and_dnat_rules(
         self,

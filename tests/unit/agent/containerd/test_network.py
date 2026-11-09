@@ -182,6 +182,17 @@ class TestPublish:
         added_at = runner.calls.index(runner.matching(*_IPT, "-t", "nat", "-A", "bai0-DNAT")[0])
         assert deleted_at < added_at
 
+    def test_published_host_is_the_bind_host_or_the_gateway(
+        self, runner: FakeCommandRunner
+    ) -> None:
+        subnet = IPv4Network("172.30.0.0/24")
+
+        bound = KernelNetwork("bai0", subnet, "10.0.0.5", (30000, 30999), run=runner)
+        anywhere = KernelNetwork("bai0", subnet, "0.0.0.0", (30000, 30999), run=runner)
+
+        assert bound.published_host == "10.0.0.5"
+        assert anywhere.published_host == "172.30.0.1"
+
     async def test_any_bind_host_adds_no_destination_match(self, runner: FakeCommandRunner) -> None:
         network = KernelNetwork(
             "bai0", IPv4Network("172.30.0.0/24"), "0.0.0.0", (30000, 30999), run=runner
