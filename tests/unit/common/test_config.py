@@ -23,6 +23,8 @@ from ai.backend.common.config import (
     merge,
     override_key,
 )
+from ai.backend.common.exception import ModelDefinitionValidationError
+from ai.backend.common.types import EndpointProtocol
 
 
 def test_override_key() -> None:
@@ -112,6 +114,7 @@ class TestMergeFieldCoverage:
             shell="/bin/base",
             port=9999,
             health_check=None,
+            protocol=EndpointProtocol.TCP,
         )
         override = ModelServiceConfig.model_construct(
             _fields_set=set(),
@@ -120,6 +123,7 @@ class TestMergeFieldCoverage:
             shell="",
             port=2,
             health_check=None,
+            protocol=EndpointProtocol.HTTP,
         )
         result = _merge_service_config(base, override)
         missing = set(ModelServiceConfig.model_fields) - result.model_fields_set
@@ -749,3 +753,23 @@ class TestModelDefinitionWithArgsAppended:
         assert first is not None and second is not None
         assert first.start_command == "a --shared true"
         assert second.start_command == "b --shared true"
+
+
+class TestServiceProtocol:
+    @staticmethod
+    def _definition(service: dict[str, Any]) -> ModelDefinition:
+        return ModelDefinition.model_validate({
+            "models": [{"name": "m", "model_path": "/m", "service": {"port": 8080, **service}}]
+        })
+
+    def test_defaults_to_http_and_accepts_tcp(self) -> None:
+        assert self._definition({}).service_protocol() is EndpointProtocol.HTTP
+        assert self._definition({"protocol": "tcp"}).service_protocol() is EndpointProtocol.TCP
+
+    def test_rejects_unsupported_value(self) -> None:
+        with pytest.raises(ModelDefinitionValidationError):
+            self._definition({"protocol": "grpc"})
+
+    def test_tcp_with_enabled_health_check_rejected(self) -> None:
+        with pytest.raises(ModelDefinitionValidationError):
+            self._definition({"protocol": "tcp", "health_check": {"enable": True}})
