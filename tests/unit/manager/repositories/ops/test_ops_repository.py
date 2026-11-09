@@ -957,6 +957,11 @@ class TestFullStack:
         assert result.entity_ids() == (preset.id,)
 
 
+# =============================================================================
+# Retry when a session cannot be opened.
+# =============================================================================
+
+
 class _ProviderTimingOutOnFirstOpens(V2DBOpsProvider):
     sessions_opened: int
     _timeouts_left: int
@@ -1031,27 +1036,25 @@ class TestRetryOnSessionOpenFailure:
     async def test_a_read_whose_first_session_times_out_is_retried(
         self, stored_preset_behind_one_session_timeout: _StoredPresetBehindTimingOutProvider
     ) -> None:
-        situation = stored_preset_behind_one_session_timeout
+        read_back = await stored_preset_behind_one_session_timeout.repository.get(
+            _PresetQuerier(target=stored_preset_behind_one_session_timeout.preset_id)
+        )
 
-        read = await situation.repository.get(_PresetQuerier(target=situation.preset_id))
-
-        assert read.id == situation.preset_id
-        assert situation.provider.sessions_opened == 2
+        assert read_back.id == stored_preset_behind_one_session_timeout.preset_id
+        assert stored_preset_behind_one_session_timeout.provider.sessions_opened == 2
 
     async def test_a_write_whose_first_session_times_out_is_retried_and_written_once(
         self,
         database: ExtendedAsyncSAEngine,
         repository_behind_one_session_timeout: _RepositoryOverTimingOutProvider,
     ) -> None:
-        situation = repository_behind_one_session_timeout
-
-        created = await situation.repository.create_global_entity(
+        created = await repository_behind_one_session_timeout.repository.create_global_entity(
             _PresetCreator(name="retried", scope_type=DomainEntityType())
         )
 
         async with database.begin_readonly_session() as sess:
-            stored = (
+            rows_named_retried = (
                 await sess.scalars(sa.select(RolePresetRow).where(RolePresetRow.name == "retried"))
             ).all()
-        assert [row.id for row in stored] == [created.id]
-        assert situation.provider.sessions_opened == 2
+        assert [row.id for row in rows_named_retried] == [created.id]
+        assert repository_behind_one_session_timeout.provider.sessions_opened == 2
