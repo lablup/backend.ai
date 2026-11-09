@@ -2733,10 +2733,13 @@ class AbstractAgent[
 
                 # Initialize the creation context
                 if self.local_config.debug.log_kernel_config:
-                    # environ can carry user secrets, so only its keys are logged.
+                    # environ, the bootstrap script and internal_data (SSH keys, dotfiles)
+                    # can carry secrets, so only environ's keys are logged.
                     dumped = {
                         **kernel_config,
                         "environ": dict.fromkeys(kernel_config["environ"], "***"),
+                        "bootstrap_script": "***" if kernel_config["bootstrap_script"] else None,
+                        "internal_data": "***" if kernel_config["internal_data"] else None,
                     }
                     log.debug("kernel creation config dumped", kernel_config=str(pretty(dumped)))
                 ctx = await self.init_kernel_context(

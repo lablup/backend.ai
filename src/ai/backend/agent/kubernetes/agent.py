@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import functools
 import hashlib
 import logging
@@ -728,7 +729,12 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         )
 
         if self.local_config.debug.log_kernel_config:
-            log.debug("initial container config built", container_config=str(deployment))
+            # env carries the session's environ, so only the variable names are logged.
+            dumped = copy.deepcopy(deployment)
+            for container in dumped["spec"]["template"]["spec"]["containers"]:
+                for env in container.get("env", []):
+                    env["value"] = "***"
+            log.debug("initial container config built", container_config=str(dumped))
 
         expose_service = Service(
             str(self.kernel_id),
