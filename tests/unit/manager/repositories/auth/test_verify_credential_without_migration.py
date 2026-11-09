@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
+from unittest.mock import patch
 
 import pytest
 
@@ -19,6 +20,7 @@ from ai.backend.manager.models.association_container_registries_groups.row impor
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
+from ai.backend.manager.models.hasher.pbkdf2 import PBKDF2_SHA256Hasher
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
@@ -218,15 +220,74 @@ class TestCheckCredentialWithoutMigration:
                 _password_info("wrong_password"),
             )
 
-    async def test_rejects_an_unknown_email(
+    async def test_a_wrong_password_on_a_cheaper_stored_hash_costs_one_more_hash(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        auth_repository: AuthRepository,
+        domain: DomainFixtureData,
+        user_resource_policy_name: str,
+    ) -> None:
+        cheap_hash = PasswordInfo(
+            password=_PASSWORD, algorithm=PasswordHashAlgorithm.SHA256, rounds=1, salt_size=32
+        )
+        user = await self._add_user(db_with_cleanup, domain, user_resource_policy_name, cheap_hash)
+
+        with (
+            patch.object(
+                PBKDF2_SHA256Hasher,
+                "generate_new_hash",
+                autospec=True,
+                side_effect=PBKDF2_SHA256Hasher.generate_new_hash,
+            ) as hashed,
+            pytest.raises(AuthorizationFailed),
+        ):
+            await auth_repository.check_credential_without_migration(
+                user.domain_name, user.email, _password_info("wrong_password")
+            )
+
+        hashed.assert_called_once()
+
+    async def test_a_wrong_password_on_a_configured_hash_costs_no_extra_hash(
         self,
         auth_repository: AuthRepository,
         user_with_password: _Credential,
     ) -> None:
-        with pytest.raises(AuthorizationFailed):
+        with (
+            patch.object(
+                PBKDF2_SHA256Hasher,
+                "generate_new_hash",
+                autospec=True,
+                side_effect=PBKDF2_SHA256Hasher.generate_new_hash,
+            ) as hashed,
+            pytest.raises(AuthorizationFailed),
+        ):
+            await auth_repository.check_credential_without_migration(
+                user_with_password.domain_name,
+                user_with_password.email,
+                _password_info("wrong_password"),
+            )
+
+        hashed.assert_not_called()
+
+    async def test_an_unknown_email_is_refused_after_one_hash(
+        self,
+        auth_repository: AuthRepository,
+        user_with_password: _Credential,
+    ) -> None:
+        with (
+            patch.object(
+                PBKDF2_SHA256Hasher,
+                "generate_new_hash",
+                autospec=True,
+                side_effect=PBKDF2_SHA256Hasher.generate_new_hash,
+            ) as hashed,
+            pytest.raises(AuthorizationFailed),
+        ):
             await auth_repository.check_credential_without_migration(
                 user_with_password.domain_name, "nobody@example.com", _password_info(_PASSWORD)
             )
+
+        hashed.assert_called_once()
 
     async def test_rejects_the_email_under_another_domain(
         self,
@@ -239,14 +300,24 @@ class TestCheckCredentialWithoutMigration:
                 other_domain.domain_name, user_with_password.email, _password_info(_PASSWORD)
             )
 
-    async def test_rejects_a_user_without_a_password(
+    async def test_a_user_without_a_password_is_refused_after_one_hash(
         self,
         auth_repository: AuthRepository,
         user_without_password: _Credential,
     ) -> None:
-        with pytest.raises(AuthorizationFailed):
+        with (
+            patch.object(
+                PBKDF2_SHA256Hasher,
+                "generate_new_hash",
+                autospec=True,
+                side_effect=PBKDF2_SHA256Hasher.generate_new_hash,
+            ) as hashed,
+            pytest.raises(AuthorizationFailed),
+        ):
             await auth_repository.check_credential_without_migration(
                 user_without_password.domain_name,
                 user_without_password.email,
                 _password_info(_PASSWORD),
             )
+
+        hashed.assert_called_once()

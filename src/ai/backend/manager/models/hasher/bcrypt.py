@@ -8,7 +8,7 @@ from typing import override
 
 import bcrypt
 
-from ai.backend.common.auth.password import HashInfo, PasswordInfo
+from ai.backend.common.auth.password import HashInfo, PasswordHashAlgorithm, PasswordInfo
 
 from .base import PasswordHasher
 
@@ -32,9 +32,14 @@ class BcryptHasher(PasswordHasher):
 
     @override
     def verify(self, password: str, hash_info: HashInfo) -> bool:
+        # A stored hash covers only the bytes bcrypt reads, so a longer password is cut to
+        # them: bcrypt 4.x cuts it itself and 5.0 raises instead.
+        max_bytes = PasswordHashAlgorithm.BCRYPT.max_password_bytes()
         try:
             # For bcrypt, the full hash is stored in hash_value
-            return bcrypt.checkpw(password.encode("utf8"), hash_info.hash_value.encode("utf8"))
+            return bcrypt.checkpw(
+                password.encode("utf8")[:max_bytes], hash_info.hash_value.encode("utf8")
+            )
         except (ValueError, Exception):
             # bcrypt.checkpw can raise ValueError or other exceptions
             return False
