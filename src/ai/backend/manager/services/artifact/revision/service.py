@@ -44,6 +44,7 @@ from ai.backend.manager.config.unified import (
     ReservoirConfig,
 )
 from ai.backend.manager.data.artifact.types import (
+    ARTIFACT_IMPORT_IN_PROGRESS_STATUSES,
     ArtifactRevisionData,
     ArtifactRevisionReadme,
     ArtifactStatus,
@@ -134,10 +135,6 @@ from ai.backend.manager.services.artifact.revision.actions.search import (
 
 _REMOTE_ARTIFACT_STATUS_POLL_INTERVAL: Final[int] = 30  # seconds
 _REMOTE_ARTIFACT_MAX_WAIT_TIME: Final[int] = 3600  # 1 hour
-_IMPORT_IN_PROGRESS_STATUSES: Final[frozenset[ArtifactStatus]] = frozenset({
-    ArtifactStatus.PULLING,
-    ArtifactStatus.VERIFYING,
-})
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -410,8 +407,10 @@ class ArtifactRevisionService:
             revision_data = await self._revision_ops.get_field(
                 ArtifactRevisionQuerier(revision_id=action.artifact_revision_id)
             )
-            if revision_data.status in _IMPORT_IN_PROGRESS_STATUSES:
-                return self._skip_import_already_in_progress(action, revision_data)
+            if revision_data.status in ARTIFACT_IMPORT_IN_PROGRESS_STATUSES:
+                raise ArtifactRevisionImportInProgressError(
+                    f"Artifact revision {revision_data.id} is already being imported"
+                )
 
             artifact = await self._artifact_repository.get_artifact_by_id(revision_data.artifact_id)
 
@@ -460,10 +459,9 @@ class ArtifactRevisionService:
                             result=revision_data, task_id=None
                         )
 
-                    if not await self._artifact_repository.mark_artifact_revision_pulling_if_unchanged(
-                        action.artifact_revision_id, revision_data.status
-                    ):
-                        return self._skip_import_already_in_progress(action, revision_data)
+                    await self._artifact_repository.mark_artifact_revision_pulling(
+                        action.artifact_revision_id
+                    )
 
                     vfolder_target: VFolderStorageTarget | None = None
                     if vfolder_id is not None and volume_name is not None:
@@ -566,13 +564,9 @@ class ArtifactRevisionService:
                                         f"Last status: {remote_progress.status}"
                                     )
 
-                        # Compared with the status read at request time, so an import that
-                        # finished while this task waited for the remote is not repeated.
-                        if not await self._artifact_repository.mark_artifact_revision_pulling_if_unchanged(
-                            action.artifact_revision_id, revision_data.status
-                        ):
-                            self._skip_import_already_in_progress(action, revision_data)
-                            return
+                        await self._artifact_repository.mark_artifact_revision_pulling(
+                            action.artifact_revision_id
+                        )
 
                         vfolder_target: VFolderStorageTarget | None = None
                         if vfolder_id is not None and volume_name is not None:
@@ -624,20 +618,6 @@ class ArtifactRevisionService:
             raise e
 
         return ImportArtifactRevisionActionResult(result=revision_data, task_id=task_id)
-
-    def _skip_import_already_in_progress(
-        self, action: ImportArtifactRevisionAction, revision_data: ArtifactRevisionData
-    ) -> ImportArtifactRevisionActionResult:
-        if action.vfolder_id is not None:
-            # Reporting success would leave the requested vfolder without the model.
-            raise ArtifactRevisionImportInProgressError(
-                f"Artifact revision {revision_data.id} is being imported; retry after it finishes"
-            )
-        log.trace(
-            "artifact revision import already in progress",
-            artifact_revision_id=revision_data.id,
-        )
-        return ImportArtifactRevisionActionResult(result=revision_data, task_id=None)
 
     async def _get_updatable_vfolder(self, vfolder_uuid: VFolderUUID) -> VFolderData:
         """The vfolder an import writes into, once the caller is shown to hold UPDATE on it."""

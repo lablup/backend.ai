@@ -566,12 +566,6 @@ class _ImportStartedFirstByAnotherRequest:
     storage_proxy_client: MagicMock
 
 
-@dataclass(frozen=True)
-class _VFolderImportOfRevisionAlreadyImporting:
-    revision: ArtifactRevisionData
-    vfolder_uuid: VFolderUUID
-
-
 class TestImportArtifactRevisionAction:
     """Test cases for ImportArtifactRevisionAction"""
 
@@ -799,9 +793,7 @@ class TestImportArtifactRevisionAction:
         """HuggingFace: force=True always downloads even if hash matches"""
         mock_revision_ops.get_field = AsyncMock(return_value=sample_revision)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=sample_artifact)
-        mock_artifact_repository.mark_artifact_revision_pulling_if_unchanged = AsyncMock(
-            return_value=True
-        )
+        mock_artifact_repository.mark_artifact_revision_pulling = AsyncMock()
         mock_artifact_repository.associate_artifact_with_storage = AsyncMock(
             return_value=AssociationArtifactsStoragesData(
                 id=uuid.uuid4(),
@@ -834,8 +826,8 @@ class TestImportArtifactRevisionAction:
         result = await service.import_revision(action)
 
         assert result.task_id == import_result.task_id
-        mock_artifact_repository.mark_artifact_revision_pulling_if_unchanged.assert_called_once_with(
-            sample_revision.id, ArtifactStatus.AVAILABLE
+        mock_artifact_repository.mark_artifact_revision_pulling.assert_called_once_with(
+            sample_revision.id
         )
 
     @pytest.fixture(
@@ -854,7 +846,7 @@ class TestImportArtifactRevisionAction:
         mock_artifact_repository.update_artifact_revision_status = AsyncMock()
         return revision
 
-    async def test_revision_already_importing_starts_no_import(
+    async def test_revision_already_importing_is_rejected(
         self,
         service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
@@ -865,51 +857,10 @@ class TestImportArtifactRevisionAction:
         action = ImportArtifactRevisionAction(
             artifact_revision_id=revision_already_importing.id, force=True
         )
-        result = await service.import_revision(action)
-
-        assert result.result == revision_already_importing
-        assert result.task_id is None
-        mock_storage_manager.get_manager_facing_client.assert_not_called()
-        mock_background_task_manager.start.assert_not_called()
-        mock_artifact_repository.update_artifact_revision_status.assert_not_called()
-
-    @pytest.fixture
-    def vfolder_import_of_revision_already_importing(
-        self,
-        mock_vfolder_repository: MagicMock,
-        mock_permission_check: MagicMock,
-        mock_storage_manager: MagicMock,
-        caller: UserData,
-        revision_already_importing: ArtifactRevisionData,
-    ) -> _VFolderImportOfRevisionAlreadyImporting:
-        vfolder_uuid = VFolderUUID(uuid.uuid4())
-        mock_permission_check.held_permissions = AsyncMock(
-            return_value={vfolder_uuid: Permission.READ | Permission.UPDATE}
-        )
-        vfolder_data = MagicMock()
-        vfolder_data.id = vfolder_uuid
-        vfolder_data.quota_scope_id = "user:" + str(caller.user_id)
-        vfolder_data.host = "local:volume1"
-        mock_vfolder_repository.get_by_id = AsyncMock(return_value=vfolder_data)
-        mock_storage_manager.get_proxy_and_volume.return_value = ("local", "volume1")
-        return _VFolderImportOfRevisionAlreadyImporting(
-            revision=revision_already_importing, vfolder_uuid=vfolder_uuid
-        )
-
-    async def test_vfolder_import_of_revision_already_importing_is_rejected(
-        self,
-        service: ArtifactRevisionService,
-        mock_artifact_repository: MagicMock,
-        mock_background_task_manager: MagicMock,
-        vfolder_import_of_revision_already_importing: _VFolderImportOfRevisionAlreadyImporting,
-    ) -> None:
-        situation = vfolder_import_of_revision_already_importing
-        action = ImportArtifactRevisionAction(
-            artifact_revision_id=situation.revision.id, vfolder_id=situation.vfolder_uuid
-        )
         with pytest.raises(ArtifactRevisionImportInProgressError):
             await service.import_revision(action)
 
+        mock_storage_manager.get_manager_facing_client.assert_not_called()
         mock_background_task_manager.start.assert_not_called()
         mock_artifact_repository.update_artifact_revision_status.assert_not_called()
 
@@ -929,8 +880,8 @@ class TestImportArtifactRevisionAction:
         revision = replace(sample_revision, status=ArtifactStatus.SCANNED)
         mock_revision_ops.get_field = AsyncMock(return_value=revision)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=sample_artifact)
-        mock_artifact_repository.mark_artifact_revision_pulling_if_unchanged = AsyncMock(
-            return_value=False
+        mock_artifact_repository.mark_artifact_revision_pulling = AsyncMock(
+            side_effect=ArtifactRevisionImportInProgressError()
         )
         mock_artifact_repository.update_artifact_revision_status = AsyncMock()
         self._setup_reservoir_config(mock_config_provider)
@@ -952,7 +903,7 @@ class TestImportArtifactRevisionAction:
             revision=revision, storage_proxy_client=storage_proxy_client
         )
 
-    async def test_huggingface_import_started_first_by_another_request_starts_no_download(
+    async def test_huggingface_import_started_first_by_another_request_is_rejected(
         self,
         service: ArtifactRevisionService,
         mock_artifact_repository: MagicMock,
@@ -960,12 +911,9 @@ class TestImportArtifactRevisionAction:
     ) -> None:
         situation = huggingface_import_started_first_by_another_request
         action = ImportArtifactRevisionAction(artifact_revision_id=situation.revision.id)
-        result = await service.import_revision(action)
+        with pytest.raises(ArtifactRevisionImportInProgressError):
+            await service.import_revision(action)
 
-        assert result.task_id is None
-        mock_artifact_repository.mark_artifact_revision_pulling_if_unchanged.assert_called_once_with(
-            situation.revision.id, ArtifactStatus.SCANNED
-        )
         situation.storage_proxy_client.import_huggingface_models.assert_not_called()
         mock_artifact_repository.update_artifact_revision_status.assert_not_called()
 
@@ -991,8 +939,8 @@ class TestImportArtifactRevisionAction:
         )
         mock_revision_ops.get_field = AsyncMock(return_value=revision)
         mock_artifact_repository.get_artifact_by_id = AsyncMock(return_value=reservoir_artifact)
-        mock_artifact_repository.mark_artifact_revision_pulling_if_unchanged = AsyncMock(
-            return_value=False
+        mock_artifact_repository.mark_artifact_revision_pulling = AsyncMock(
+            side_effect=ArtifactRevisionImportInProgressError()
         )
         mock_artifact_repository.associate_artifact_with_storage = AsyncMock(
             return_value=AssociationArtifactsStoragesData(
@@ -1014,10 +962,9 @@ class TestImportArtifactRevisionAction:
             revision=revision, storage_proxy_client=storage_proxy_client
         )
 
-    async def test_reservoir_import_started_first_by_another_request_starts_no_download(
+    async def test_reservoir_import_started_first_by_another_request_fails_its_task(
         self,
         service: ArtifactRevisionService,
-        mock_artifact_repository: MagicMock,
         mock_background_task_manager: MagicMock,
         reservoir_import_started_first_by_another_request: _ImportStartedFirstByAnotherRequest,
     ) -> None:
@@ -1025,11 +972,9 @@ class TestImportArtifactRevisionAction:
         action = ImportArtifactRevisionAction(artifact_revision_id=situation.revision.id)
         await service.import_revision(action)
         background_import_task = mock_background_task_manager.start.call_args.args[0]
-        await background_import_task(MagicMock())
+        with pytest.raises(ArtifactRevisionImportInProgressError):
+            await background_import_task(MagicMock())
 
-        mock_artifact_repository.mark_artifact_revision_pulling_if_unchanged.assert_called_once_with(
-            situation.revision.id, ArtifactStatus.SCANNED
-        )
         situation.storage_proxy_client.import_reservoir_models.assert_not_called()
 
     async def test_failure_sets_status_to_failed_and_reraises(

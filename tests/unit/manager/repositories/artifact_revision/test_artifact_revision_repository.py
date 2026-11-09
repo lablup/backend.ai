@@ -20,6 +20,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactStatus,
     ArtifactType,
 )
+from ai.backend.manager.errors.artifact import ArtifactRevisionImportInProgressError
 from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.artifact.row import ArtifactRow
@@ -60,13 +61,6 @@ from ai.backend.manager.repositories.artifact.repository import ArtifactReposito
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
-
-
-@dataclass(frozen=True)
-class _MarkPullingCase:
-    status_read_before: ArtifactStatus
-    expected_marked: bool
-    expected_status: ArtifactStatus
 
 
 @dataclass
@@ -643,38 +637,60 @@ class TestArtifactRevisionRepository:
         )
         assert revision.status == ArtifactStatus.VERIFYING
 
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _MarkPullingCase(
-                status_read_before=ArtifactStatus.AVAILABLE,
-                expected_marked=True,
-                expected_status=ArtifactStatus.PULLING,
-            ),
-            _MarkPullingCase(
-                status_read_before=ArtifactStatus.SCANNED,
-                expected_marked=False,
-                expected_status=ArtifactStatus.AVAILABLE,
-            ),
-        ],
-        ids=["status_unchanged", "status_changed_by_another_import"],
-    )
-    async def test_mark_artifact_revision_pulling_if_unchanged(
+    async def test_mark_artifact_revision_pulling(
         self,
         artifact_repository: ArtifactRepository,
         revision_ops: OpsRepository[ArtifactRevisionData],
         sample_revision_id: uuid.UUID,
-        case: _MarkPullingCase,
     ) -> None:
-        marked = await artifact_repository.mark_artifact_revision_pulling_if_unchanged(
-            ArtifactRevisionID(sample_revision_id), case.status_read_before
+        await artifact_repository.mark_artifact_revision_pulling(
+            ArtifactRevisionID(sample_revision_id)
         )
 
         revision = await revision_ops.get_field(
             ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(sample_revision_id))
         )
-        assert marked is case.expected_marked
-        assert revision.status == case.expected_status
+        assert revision.status == ArtifactStatus.PULLING
+
+    @pytest.fixture(
+        params=[ArtifactStatus.PULLING, ArtifactStatus.VERIFYING], ids=["pulling", "verifying"]
+    )
+    async def revision_already_importing(
+        self,
+        request: pytest.FixtureRequest,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_artifact_id: uuid.UUID,
+    ) -> ArtifactRevisionData:
+        revision_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ArtifactRevisionRow(
+                    id=revision_id,
+                    artifact_id=sample_artifact_id,
+                    version="main",
+                    readme="",
+                    size=1024,
+                    status=request.param.value,
+                )
+            )
+            await db_sess.flush()
+        return await OpsRepository(V2DBOpsProvider(db_with_cleanup)).get_field(
+            ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(revision_id))
+        )
+
+    async def test_mark_artifact_revision_pulling_rejects_a_revision_already_importing(
+        self,
+        artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
+        revision_already_importing: ArtifactRevisionData,
+    ) -> None:
+        with pytest.raises(ArtifactRevisionImportInProgressError):
+            await artifact_repository.mark_artifact_revision_pulling(revision_already_importing.id)
+
+        revision = await revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=revision_already_importing.id)
+        )
+        assert revision.status == revision_already_importing.status
 
     async def test_update_artifact_revision_bytesize(
         self,

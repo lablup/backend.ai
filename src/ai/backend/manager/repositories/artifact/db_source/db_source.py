@@ -12,6 +12,7 @@ from ai.backend.common.data.artifact.types import VerificationStepResult
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.data.artifact.types import (
+    ARTIFACT_IMPORT_IN_PROGRESS_STATUSES,
     ArtifactAvailability,
     ArtifactData,
     ArtifactRemoteStatus,
@@ -23,6 +24,7 @@ from ai.backend.manager.errors.artifact import (
     ArtifactAssociationDeletionError,
     ArtifactAssociationNotFoundError,
     ArtifactNotFoundError,
+    ArtifactRevisionImportInProgressError,
     ArtifactRevisionNotFoundError,
     ArtifactRevisionNotVerified,
     ArtifactRevisionUpdateError,
@@ -246,21 +248,24 @@ class ArtifactDBSource:
             await db_sess.execute(stmt)
             return artifact_revision_id
 
-    async def mark_artifact_revision_pulling_if_unchanged(
-        self, artifact_revision_id: ArtifactRevisionID, status_read_before: ArtifactStatus
-    ) -> bool:
+    async def mark_artifact_revision_pulling(
+        self, artifact_revision_id: ArtifactRevisionID
+    ) -> None:
         async with self._db.begin_session() as db_sess:
             stmt = (
                 sa.update(ArtifactRevisionRow)
                 .where(
                     ArtifactRevisionRow.id == artifact_revision_id,
-                    ArtifactRevisionRow.status == status_read_before,
+                    ArtifactRevisionRow.status.not_in(ARTIFACT_IMPORT_IN_PROGRESS_STATUSES),
                 )
                 .values(status=ArtifactStatus.PULLING)
                 .returning(ArtifactRevisionRow.id)
             )
             result = await db_sess.execute(stmt)
-            return result.scalar_one_or_none() is not None
+            if result.scalar_one_or_none() is None:
+                raise ArtifactRevisionImportInProgressError(
+                    f"Artifact revision {artifact_revision_id} is already being imported"
+                )
 
     async def update_artifact_revision_remote_status(
         self, artifact_revision_id: uuid.UUID, remote_status: ArtifactRemoteStatus
