@@ -1,11 +1,22 @@
 from __future__ import annotations
 
 import json
+import signal
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from ai.backend.agent.containerd.rpc.types import ContainerRecord, ImageTarget, TaskInfo
-from ai.backend.agent.errors.containerd import ContainerdImageInvalid, ContainerdImageNotFound
+from ai.backend.agent.containerd.rpc.types import (
+    ContainerRecord,
+    ImageTarget,
+    MountSpec,
+    TaskInfo,
+    TaskState,
+)
+from ai.backend.agent.errors.containerd import (
+    ContainerdImageInvalid,
+    ContainerdImageNotFound,
+    ContainerdOperationFailed,
+)
 
 
 class FakeContainerd:
@@ -14,26 +25,41 @@ class FakeContainerd:
     images: dict[str, ImageTarget]
     blobs: dict[str, bytes]
     containers: dict[str, ContainerRecord]
+    snapshots: dict[str, Sequence[MountSpec]]
+    specs: dict[str, tuple[str, Mapping[str, Any]]]
     tasks: dict[str, TaskInfo]
     calls: list[str]
     closed: bool
     connected: bool
     ignore_filters: bool
     failing_tasks: set[str]
+    failing: set[str]
+    exits_on_sigterm: bool
+    snapshotter = "overlayfs"
+    namespace = "fake-ns"
 
-    def __init__(self) -> None:
+    def __init__(self, *, exits_on_sigterm: bool = True) -> None:
         self.images = {}
         self.blobs = {}
         self.containers = {}
+        self.snapshots = {}
+        self.specs = {}
         self.tasks = {}
         self.calls = []
         self.closed = False
         self.connected = True
         self.ignore_filters = False
         self.failing_tasks = set()
+        self.failing = set()
+        self.exits_on_sigterm = exits_on_sigterm
 
     async def connect(self) -> None:
         self.connected = True
+
+    def _call(self, op: str) -> None:
+        self.calls.append(op)
+        if op in self.failing:
+            raise ContainerdOperationFailed(f"{op}: injected failure")
 
     async def close(self) -> None:
         self.closed = True
@@ -65,6 +91,47 @@ class FakeContainerd:
         if digest not in self.blobs:
             raise ContainerdImageInvalid(f"the blob {digest} is not in the content store")
         return self.blobs[digest]
+
+    async def prepare_snapshot(self, key: str, parent: str) -> Sequence[MountSpec]:
+        self._call("prepare_snapshot")
+        self.snapshots[key] = [MountSpec("overlay", "overlay", (f"lowerdir={parent}",))]
+        return self.snapshots[key]
+
+    async def remove_snapshot(self, key: str) -> None:
+        self._call("remove_snapshot")
+        self.snapshots.pop(key, None)
+
+    async def create_container(
+        self, record: ContainerRecord, runtime: str, spec: Mapping[str, Any], *_: Any
+    ) -> None:
+        self._call("create_container")
+        self.containers[record.id] = record
+        self.specs[record.id] = (runtime, spec)
+
+    async def get_container(self, container_id: str) -> ContainerRecord | None:
+        return self.containers.get(container_id)
+
+    async def delete_container(self, container_id: str) -> None:
+        self._call("delete_container")
+        self.containers.pop(container_id, None)
+
+    async def create_task(self, container_id: str, *_: Any) -> int:
+        self._call("create_task")
+        self.tasks[container_id] = TaskInfo(pid=1000, state=TaskState.CREATED, exit_status=0)
+        return 1000
+
+    async def start_task(self, container_id: str) -> None:
+        self._call("start_task")
+        self.tasks[container_id] = TaskInfo(pid=1000, state=TaskState.RUNNING, exit_status=0)
+
+    async def kill_task(self, container_id: str, signum: int, *, all_processes: bool) -> None:
+        self._call(f"kill_task:{signal.Signals(signum).name}")
+        if container_id in self.tasks and (signum == signal.SIGKILL or self.exits_on_sigterm):
+            self.tasks[container_id] = TaskInfo(pid=1000, state=TaskState.STOPPED, exit_status=137)
+
+    async def delete_task(self, container_id: str) -> None:
+        self._call("delete_task")
+        self.tasks.pop(container_id, None)
 
     def add_image(
         self,

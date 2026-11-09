@@ -45,7 +45,6 @@ class TestContainerdKernelInit:
 
 _RAISING: list[tuple[str, tuple[Any, ...], dict[str, Any]]] = [
     ("create_code_runner", (MagicMock(),), {"client_features": frozenset(), "api_version": 2}),
-    ("check_status", (), {}),
     ("get_completions", ("", {}), {}),
     ("get_logs", (), {}),
     ("interrupt_kernel", (), {}),
@@ -57,9 +56,6 @@ _RAISING: list[tuple[str, tuple[Any, ...], dict[str, Any]]] = [
     ("download_single", ("/home/work/a",), {}),
     ("list_files", ("/home/work",), {}),
     ("notify_event", (MagicMock(),), {}),
-    ("start_service", ("jupyter", {}), {}),
-    ("start_model_service", ({},), {}),
-    ("get_service_apps", (), {}),
 ]
 
 
@@ -76,3 +72,11 @@ class TestContainerdKernelVerbs:
 
         with pytest.raises(KernelVerbNotSupported, match=method):
             await verb(*args, **kwargs)
+
+    async def test_check_status_reports_ready(self, kernel: ContainerdKernel) -> None:
+        assert await kernel.check_status() == {}
+
+    async def test_service_stubs(self, kernel: ContainerdKernel) -> None:
+        assert await kernel.get_service_apps() == {"status": "ok", "data": []}
+        assert await kernel.start_service("jupyter", {}) == {"status": "started"}
+        assert await kernel.start_model_service({}) == {"status": "started"}
