@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from ai.backend.common.configs.etcd import EtcdConfig
+from ai.backend.common.configs.etcd import EtcdConfig, EtcdTLSConfig
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
@@ -30,6 +30,13 @@ class TestEtcdDependency:
             password=None,
             keep_alive_interval=5.0,
             keep_alive_timeout=3.0,
+            tls=EtcdTLSConfig(
+                enabled=False,
+                ca_cert=None,
+                client_cert=None,
+                client_key=None,
+                handshake_timeout=None,
+            ),
         )
 
         # Create a minimal BootstrapConfig with just etcd settings
