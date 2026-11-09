@@ -5,11 +5,10 @@ import sys
 from pathlib import Path
 from pprint import pformat
 
-from pydantic import ValidationError
-
 from ai.backend.common.config import ConfigurationError as BaseConfigError
 from ai.backend.common.config import override_key, override_with_env, read_from_file
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.exception import BackendAIError, BackendAISchemaValidationFailed
 from ai.backend.logging import LogLevel
 
 from .unified import StorageProxyUnifiedConfig
@@ -37,10 +36,13 @@ def load_local_config(
 
     try:
         return StorageProxyUnifiedConfig.model_validate(raw_cfg)
-    except ValidationError as e:
+    except BackendAIError as e:
+        # model_validate wraps ValidationError, and the after-validators raise BackendAIError
+        # directly. The wrapped error's message embeds input values; its errors() does not.
+        detail = pformat(e.errors()) if isinstance(e, BackendAISchemaValidationFailed) else str(e)
         print(
             "ConfigurationError: Validation of storage-proxy local config has failed:",
-            pformat(e.errors(include_input=False, include_url=False)),
+            detail,
             sep="\n",
             file=sys.stderr,
         )
