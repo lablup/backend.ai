@@ -301,7 +301,7 @@ class ProjectAdapter(BaseAdapter):
                     raise UnreachableError("User context is not available")
                 if not me.is_superadmin:
                     refused.append(
-                        PartialBulkEntityResult[ProjectData].denied(
+                        PartialBulkEntityResult[ProjectData].failed(
                             ProjectID(entry.id),
                             InsufficientPrivilege(
                                 "Only a superadmin can change the resource policy"
