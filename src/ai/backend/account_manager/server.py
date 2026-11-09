@@ -30,7 +30,6 @@ from aiohttp import web
 from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
-from ai.backend.common.data.config.types import EtcdConfigData, EtcdTLSConfigData
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.metrics.http import (
     SystemMetricUpdater,
@@ -42,7 +41,6 @@ from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_mult
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
-from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 
@@ -202,25 +200,7 @@ def build_root_app(
         ]
     )
 
-    etcd = AsyncEtcd.create_from_config(
-        EtcdConfigData(
-            namespace=local_config.etcd.namespace,
-            addrs=[
-                HostPortPair(host=local_config.etcd.addr.host, port=local_config.etcd.addr.port)
-            ],
-            user=local_config.etcd.user,
-            password=local_config.etcd.password,
-            keep_alive_interval=local_config.etcd.keep_alive_interval,
-            keep_alive_timeout=local_config.etcd.keep_alive_timeout,
-            tls=EtcdTLSConfigData(
-                enabled=False,
-                ca_cert=None,
-                client_cert=None,
-                client_key=None,
-                handshake_timeout=None,
-            ),
-        )
-    )
+    etcd = AsyncEtcd.create_from_config(local_config.etcd.to_dataclass())
     root_ctx = RootContext()
     root_ctx.etcd = etcd
     root_ctx.local_config = local_config
