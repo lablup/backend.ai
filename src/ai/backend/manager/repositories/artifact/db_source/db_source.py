@@ -245,6 +245,22 @@ class ArtifactDBSource:
             await db_sess.execute(stmt)
             return artifact_revision_id
 
+    async def mark_artifact_revision_pulling_if_unchanged(
+        self, artifact_revision_id: uuid.UUID, status_read_before: ArtifactStatus
+    ) -> bool:
+        async with self._db.begin_session() as db_sess:
+            stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(
+                    ArtifactRevisionRow.id == artifact_revision_id,
+                    ArtifactRevisionRow.status == status_read_before,
+                )
+                .values(status=ArtifactStatus.PULLING)
+                .returning(ArtifactRevisionRow.id)
+            )
+            result = await db_sess.execute(stmt)
+            return result.scalar_one_or_none() is not None
+
     async def update_artifact_revision_remote_status(
         self, artifact_revision_id: uuid.UUID, remote_status: ArtifactRemoteStatus
     ) -> uuid.UUID:

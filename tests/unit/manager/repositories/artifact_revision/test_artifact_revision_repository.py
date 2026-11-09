@@ -62,6 +62,13 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 
+@dataclass(frozen=True)
+class _MarkPullingCase:
+    status_read_before: ArtifactStatus
+    expected_marked: bool
+    expected_status: ArtifactStatus
+
+
 @dataclass
 class ArtifactIdFilteringFixture:
     target_artifact_id: uuid.UUID
@@ -635,6 +642,39 @@ class TestArtifactRevisionRepository:
             ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(sample_revision_id))
         )
         assert revision.status == ArtifactStatus.VERIFYING
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _MarkPullingCase(
+                status_read_before=ArtifactStatus.AVAILABLE,
+                expected_marked=True,
+                expected_status=ArtifactStatus.PULLING,
+            ),
+            _MarkPullingCase(
+                status_read_before=ArtifactStatus.SCANNED,
+                expected_marked=False,
+                expected_status=ArtifactStatus.AVAILABLE,
+            ),
+        ],
+        ids=["status_unchanged", "status_changed_by_another_import"],
+    )
+    async def test_mark_artifact_revision_pulling_if_unchanged(
+        self,
+        artifact_repository: ArtifactRepository,
+        revision_ops: OpsRepository[ArtifactRevisionData],
+        sample_revision_id: uuid.UUID,
+        case: _MarkPullingCase,
+    ) -> None:
+        marked = await artifact_repository.mark_artifact_revision_pulling_if_unchanged(
+            sample_revision_id, case.status_read_before
+        )
+
+        revision = await revision_ops.get_field(
+            ArtifactRevisionQuerier(revision_id=ArtifactRevisionID(sample_revision_id))
+        )
+        assert marked is case.expected_marked
+        assert revision.status == case.expected_status
 
     async def test_update_artifact_revision_bytesize(
         self,

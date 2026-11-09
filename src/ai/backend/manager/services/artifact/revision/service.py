@@ -405,6 +405,13 @@ class ArtifactRevisionService:
             revision_data = await self._revision_ops.get_field(
                 ArtifactRevisionQuerier(revision_id=action.artifact_revision_id)
             )
+            if revision_data.status == ArtifactStatus.PULLING:
+                log.trace(
+                    "artifact revision import already in progress",
+                    artifact_revision_id=revision_data.id,
+                )
+                return ImportArtifactRevisionActionResult(result=revision_data, task_id=None)
+
             artifact = await self._artifact_repository.get_artifact_by_id(revision_data.artifact_id)
 
             reservoir_config = self._config_provider.config.reservoir
@@ -452,9 +459,16 @@ class ArtifactRevisionService:
                             result=revision_data, task_id=None
                         )
 
-                    await self._artifact_repository.update_artifact_revision_status(
-                        action.artifact_revision_id, ArtifactStatus.PULLING
-                    )
+                    if not await self._artifact_repository.mark_artifact_revision_pulling_if_unchanged(
+                        action.artifact_revision_id, revision_data.status
+                    ):
+                        log.trace(
+                            "artifact revision import already started by another request",
+                            artifact_revision_id=revision_data.id,
+                        )
+                        return ImportArtifactRevisionActionResult(
+                            result=revision_data, task_id=None
+                        )
 
                     vfolder_target: VFolderStorageTarget | None = None
                     if vfolder_id is not None and volume_name is not None:
@@ -557,9 +571,16 @@ class ArtifactRevisionService:
                                         f"Last status: {remote_progress.status}"
                                     )
 
-                        await self._artifact_repository.update_artifact_revision_status(
-                            action.artifact_revision_id, ArtifactStatus.PULLING
-                        )
+                        # Compared with the status read at request time, so an import that
+                        # finished while this task waited for the remote is not repeated.
+                        if not await self._artifact_repository.mark_artifact_revision_pulling_if_unchanged(
+                            action.artifact_revision_id, revision_data.status
+                        ):
+                            log.trace(
+                                "artifact revision import already started by another request",
+                                artifact_revision_id=revision_data.id,
+                            )
+                            return
 
                         vfolder_target: VFolderStorageTarget | None = None
                         if vfolder_id is not None and volume_name is not None:
