@@ -17,6 +17,7 @@ from ai.backend.agent.agent import (
 )
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ContainerSandboxType
 from ai.backend.agent.containerd.image import resolve_image
+from ai.backend.agent.containerd.intrinsic import CPUSET_LABEL, MEMORY_LABEL
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.lifecycle import (
     clean_container,
@@ -329,7 +330,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 image=image_name,
                 snapshotter=self._client.snapshotter,
                 snapshot_key=container_id,
-                labels=self._container_labels(),
+                labels=self._container_labels(kernel_obj.resource_spec),
             )
             await launch_container(
                 self._client,
@@ -351,8 +352,11 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             "stdout_port": 0,
         }
 
-    def _container_labels(self) -> dict[str, str]:
+    def _container_labels(self, resource_spec: KernelResourceSpec) -> dict[str, str]:
+        cores, memory_bytes = _allocated(resource_spec)
         return {
+            CPUSET_LABEL: ",".join(map(str, cores)),
+            MEMORY_LABEL: str(memory_bytes),
             LabelName.AGENT_ID: str(self.agent_id),
             LabelName.KERNEL_ID: str(self.kernel_id),
             LabelName.SESSION_ID: str(self.session_id),
@@ -563,6 +567,7 @@ class ContainerdAgent(
             return
         if not found:
             log.warning("container missing on destroy", container_id=container_id)
+            await self.reconstruct_resource_usage()
 
     @override
     async def clean_kernel(

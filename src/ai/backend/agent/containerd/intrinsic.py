@@ -1,11 +1,13 @@
+import logging
 from collections.abc import Mapping, Sequence
-from decimal import Decimal
-from typing import Any, override
+from decimal import Decimal, InvalidOperation
+from typing import Any, Final, override
 
 from aiodocker.docker import Docker
 
+from ai.backend.agent.alloc_map import AbstractAllocMap, DiscretePropertyAllocMap
 from ai.backend.agent.docker import intrinsic as docker_intrinsic
-from ai.backend.agent.resources import AbstractAllocMap
+from ai.backend.agent.errors import InvalidArgumentError
 from ai.backend.agent.stats import (
     ContainerMeasurement,
     NodeMeasurement,
@@ -14,6 +16,21 @@ from ai.backend.agent.stats import (
 )
 from ai.backend.agent.types import Container
 from ai.backend.common.types import DeviceId, SlotName
+from ai.backend.logging.structured import StructuredLogger
+
+log = StructuredLogger(logging.getLogger(__spec__.name))
+
+# Container labels recording the kernel's allocations, read back by restore_from_container.
+CPUSET_LABEL: Final = "ai.backend.containerd.cpuset"
+MEMORY_LABEL: Final = "ai.backend.containerd.memory-bytes"
+
+
+def _discrete_map(alloc_map: AbstractAllocMap) -> DiscretePropertyAllocMap:
+    if not isinstance(alloc_map, DiscretePropertyAllocMap):
+        raise InvalidArgumentError(
+            f"Expected DiscretePropertyAllocMap, got {type(alloc_map).__name__}"
+        )
+    return alloc_map
 
 
 class CPUPlugin(docker_intrinsic.CPUPlugin):
@@ -50,7 +67,6 @@ class CPUPlugin(docker_intrinsic.CPUPlugin):
     ) -> Sequence[ProcessMeasurement]:
         return []
 
-    # FIXME(containerd-mvp): CPU limits are not applied to containerd kernels
     @override
     async def generate_docker_args(
         self,
@@ -65,7 +81,26 @@ class CPUPlugin(docker_intrinsic.CPUPlugin):
         container: Container,
         alloc_map: AbstractAllocMap,
     ) -> None:
-        return None
+        discrete = _discrete_map(alloc_map)
+        cpuset = container.labels.get(CPUSET_LABEL)
+        if not cpuset:
+            return
+        try:
+            cores = [str(int(core)) for core in cpuset.split(",")]
+        except ValueError:
+            log.warning("malformed cpuset label skipped", container_id=container.id, value=cpuset)
+            return
+        unknown = [core for core in cores if DeviceId(core) not in discrete.device_slots]
+        if unknown:
+            log.warning(
+                "cpuset label has unknown cores",
+                container_id=container.id,
+                cores=",".join(unknown),
+            )
+            cores = [core for core in cores if core not in unknown]
+        discrete.apply_allocation({
+            SlotName("cpu"): {DeviceId(core): Decimal(1) for core in cores},
+        })
 
 
 class MemoryPlugin(docker_intrinsic.MemoryPlugin):
@@ -102,7 +137,6 @@ class MemoryPlugin(docker_intrinsic.MemoryPlugin):
     ) -> Sequence[ProcessMeasurement]:
         return []
 
-    # FIXME(containerd-mvp): memory limits are not applied to containerd kernels
     @override
     async def generate_docker_args(
         self,
@@ -117,4 +151,16 @@ class MemoryPlugin(docker_intrinsic.MemoryPlugin):
         container: Container,
         alloc_map: AbstractAllocMap,
     ) -> None:
-        return None
+        discrete = _discrete_map(alloc_map)
+        memory = container.labels.get(MEMORY_LABEL)
+        if not memory:
+            return
+        try:
+            amount = Decimal(memory)
+        except InvalidOperation:
+            log.warning("malformed memory label skipped", container_id=container.id, value=memory)
+            return
+        if not amount.is_finite() or amount < 0:
+            log.warning("malformed memory label skipped", container_id=container.id, value=memory)
+            return
+        discrete.apply_allocation({SlotName("mem"): {DeviceId("root"): amount}})

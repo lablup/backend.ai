@@ -23,7 +23,7 @@ from .fakes import FakeContainerd
 
 
 @pytest.fixture
-def agent(fake: FakeContainerd) -> ContainerdAgent:
+def agent(fake: FakeContainerd, monkeypatch: pytest.MonkeyPatch) -> ContainerdAgent:
     """A bare agent carrying only the attributes the tested methods touch."""
     instance = object.__new__(ContainerdAgent)
     instance.local_config = MagicMock()
@@ -31,6 +31,7 @@ def agent(fake: FakeContainerd) -> ContainerdAgent:
     instance.resource_lock = asyncio.Lock()
     instance._client = cast(Any, fake)
     instance.error_monitor = MagicMock(capture_exception=AsyncMock())
+    monkeypatch.setattr(instance, "reconstruct_resource_usage", AsyncMock())
     return instance
 
 
@@ -214,6 +215,13 @@ class TestEnumerateContainers:
 
 
 class TestDestroyAndClean:
+    async def test_unknown_container_reconstructs_resource_usage(
+        self, agent: ContainerdAgent
+    ) -> None:
+        await agent.destroy_kernel(KernelId(uuid.uuid4()), ContainerId("absent"))
+
+        cast(AsyncMock, agent.reconstruct_resource_usage).assert_awaited_once()
+
     async def test_destroy_then_clean_removes_everything(
         self, agent: ContainerdAgent, fake: FakeContainerd
     ) -> None:
@@ -225,6 +233,7 @@ class TestDestroyAndClean:
         await agent.clean_kernel(kid, ContainerId("c1"), False)
 
         assert fake.containers == {} and fake.tasks == {} and fake.snapshots == {}
+        cast(AsyncMock, agent.reconstruct_resource_usage).assert_not_awaited()
 
     async def test_containerd_errors_are_swallowed(
         self, agent: ContainerdAgent, fake: FakeContainerd

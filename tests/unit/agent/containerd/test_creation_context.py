@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from ai.backend.agent.containerd.agent import ContainerdKernelCreationContext as Ctx
+from ai.backend.agent.containerd.intrinsic import CPUSET_LABEL, MEMORY_LABEL
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.errors.containerd import ContainerdOperationFailed
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
@@ -50,6 +51,7 @@ def resource_spec() -> KernelResourceSpec:
             DeviceName("cpu"): {
                 SlotName("cpu"): {DeviceId("1"): Decimal(1), DeviceId("3"): Decimal(1)}
             },
+            DeviceName("mem"): {SlotName("mem"): {DeviceId("root"): Decimal(1073741824)}},
         },
         scratch_disk_size=0,
     )
@@ -65,7 +67,10 @@ def ctx(
     local_config.container.sandbox_type = "docker"
     local_config.container.advertised_host = None
     local_config.container.bind_host = "10.0.0.5"
-    computers = {DeviceName("cpu"): ComputerContext(MagicMock(), [], alloc_map)}
+    computers = {
+        DeviceName("cpu"): ComputerContext(MagicMock(), [], alloc_map),
+        DeviceName("mem"): ComputerContext(MagicMock(), [], MagicMock()),
+    }
     config = cast(
         KernelCreationConfig,
         {
@@ -132,7 +137,10 @@ class TestStartContainer:
         assert spec["process"]["args"] == ["/bin/sh", "-c", "sleep 1"]
         assert spec["process"]["cwd"] == "/srv"
         assert spec["process"]["env"] == ["PATH=/usr/bin", "LANG=en_US.UTF-8", "LOCAL_USER_ID=1000"]
-        assert fake.containers[cid].labels["ai.backend.kernel-id"] == str(ownership_data.kernel_id)
+        labels = fake.containers[cid].labels
+        assert labels[CPUSET_LABEL] == "1,3"
+        assert labels[MEMORY_LABEL] == "1073741824"
+        assert labels["ai.backend.kernel-id"] == str(ownership_data.kernel_id)
 
     async def test_failed_launch_frees_the_allocations_and_leaves_nothing(
         self,
