@@ -684,7 +684,6 @@ class AgentRPCServer(aobject):
         connectivity = await self.health_probe.get_connectivity_status()
         response = HealthResponse(
             status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
-            version=VERSION,
             component="agent",
             connectivity=connectivity,
         )
@@ -1322,11 +1321,8 @@ async def server_main_logwrapper(
 def _build_agent_health_response(connectivity: ConnectivityCheckResponse) -> web.Response:
     """Detail /health — always 200; informational tier failures reported as
     DEGRADED in the body but not surfaced via HTTP status."""
-    from . import __version__
-
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
-        version=__version__,
         component="agent",
         connectivity=connectivity,
     )
@@ -1335,12 +1331,9 @@ def _build_agent_health_response(connectivity: ConnectivityCheckResponse) -> web
 
 def _build_agent_probe_response(connectivity: ConnectivityCheckResponse) -> web.Response:
     """/livez, /readyz — 503 when any gating check fails so K8s probes trip."""
-    from . import __version__
-
     is_healthy = connectivity.overall_healthy
     response = HealthResponse(
         status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
-        version=__version__,
         component="agent",
         connectivity=connectivity,
     )

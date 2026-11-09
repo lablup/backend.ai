@@ -617,7 +617,6 @@ def _build_web_health_response(connectivity: ConnectivityCheckResponse) -> web.R
     DEGRADED in the body but not surfaced via HTTP status."""
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
-        version=__version__,
         component="webserver",
         connectivity=connectivity,
     )
@@ -629,7 +628,6 @@ def _build_web_probe_response(connectivity: ConnectivityCheckResponse) -> web.Re
     is_healthy = connectivity.overall_healthy
     response = HealthResponse(
         status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
-        version=__version__,
         component="webserver",
         connectivity=connectivity,
     )
@@ -664,11 +662,7 @@ async def check_readyz(request: web.Request) -> web.Response:
 
 
 async def webserver_healthcheck(_request: web.Request) -> web.Response:
-    result = {
-        "version": __version__,
-        "details": "Success",
-    }
-    return web.json_response(result)
+    return web.json_response({"details": "Success"})
 
 
 def _claimed_user_id(auth_token: str) -> uuid.UUID | None:
@@ -1123,7 +1117,7 @@ async def webapp_ctx(
         app.router.add_route("GET", "/func/{path:stream/session/[^/]+/apps$}", manager_web_handler)
     )
     cors.add(app.router.add_route("GET", "/func/{path:stream/.*$}", manager_websocket_handler))
-    cors.add(app.router.add_route("GET", "/func/", anon_web_handler))
+    cors.add(app.router.add_route("GET", "/func/health", anon_web_handler))
 
     # Feature flag for using Apollo Router(Graphql Federation)
     if config.apollo_router.enabled:
