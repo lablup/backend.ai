@@ -136,6 +136,13 @@ redis_default_config = {
     "tls_skip_verify": False,
 }
 
+
+def _check_username_requires_password(value: dict[str, Any]) -> dict[str, Any]:
+    if value.get("username") and not value.get("password"):
+        raise t.DataError("`username` requires `password` to be set to a non-empty value.")
+    return value
+
+
 redis_config_iv = t.Dict({
     t.Key("addr", default=redis_default_config["addr"]): t.Null | tx.HostPortPair,
     t.Key(  # if present, addr is ignored and service_name becomes mandatory.
@@ -167,9 +174,10 @@ redis_config_iv = t.Dict({
                 "redis_helper_config",
                 default=redis_helper_default_config,
             ): redis_helper_config_iv,
-        }).allow_extra("*"),
+        }).allow_extra("*")
+        & t.Call(_check_username_requires_password),
     ),
-}).allow_extra("*")
+}).allow_extra("*") & t.Call(_check_username_requires_password)
 
 vfolder_config_iv = t.Dict({
     tx.AliasedKey(["mount", "_mount"], default=None): t.Null | tx.Path(type="dir"),

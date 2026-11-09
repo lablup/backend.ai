@@ -3,6 +3,7 @@ from typing import Any
 
 import pytest
 import tomli
+import trafaret as t
 
 from ai.backend.common.config import (
     DEFAULT_SHELL,
@@ -758,10 +759,32 @@ class TestRedisConfigUsername:
             "addr": "127.0.0.1:6379",
             "username": "agent",
             "password": "pw",
-            "override_configs": {"stream": {"addr": "127.0.0.1:6380", "username": "stream-agent"}},
+            "override_configs": {
+                "stream": {
+                    "addr": "127.0.0.1:6380",
+                    "username": "stream-agent",
+                    "password": "stream-pw",
+                }
+            },
         })
         assert checked["username"] == "agent"
         assert checked["override_configs"]["stream"]["username"] == "stream-agent"
+
+    @pytest.mark.parametrize("password", [None, ""])
+    def test_username_without_password_is_rejected(self, password: str | None) -> None:
+        with pytest.raises(t.DataError):
+            redis_config_iv.check({
+                "addr": "127.0.0.1:6379",
+                "username": "agent",
+                "password": password,
+            })
+
+    def test_override_username_without_password_is_rejected(self) -> None:
+        with pytest.raises(t.DataError):
+            redis_config_iv.check({
+                "addr": "127.0.0.1:6379",
+                "override_configs": {"stream": {"addr": "127.0.0.1:6380", "username": "u"}},
+            })
 
     def test_username_defaults_to_none(self) -> None:
         checked = redis_config_iv.check({

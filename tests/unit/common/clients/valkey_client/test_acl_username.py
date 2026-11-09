@@ -168,7 +168,11 @@ class TestUsernamePropagation:
             "username": ACL_USERNAME,
             "password": PASSWORD,
             "override_configs": {
-                RedisRole.STREAM: {"addr": "127.0.0.1:6380", "username": OVERRIDE_USERNAME},
+                RedisRole.STREAM: {
+                    "addr": "127.0.0.1:6380",
+                    "username": OVERRIDE_USERNAME,
+                    "password": PASSWORD,
+                },
             },
         })
         assert profile.profile_target(RedisRole.LIVE).username == ACL_USERNAME
