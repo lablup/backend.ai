@@ -25,13 +25,16 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
     When,
+    in_language,
 )
 from bai_scenario.components.domain import Mentions
 from bai_scenario.components.rbac import (
@@ -60,9 +63,18 @@ class SoftDeletingEveryRole(When[RolesAndACaller, RBACAdapter, Deleted]):
 
     @override
     def describe(self, laid: RolesAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return (
-            f"{laid.caller.username}이 역할 {len(laid.roles)}개{besides}를 한 번에 soft delete 함"
+        besides = (
+            Says(" 와 없는 id 하나", english=" and a missing id")
+            if self.missing is not None
+            else ""
+        )
+        return Says(
+            f"{laid.caller.username}이 역할 {len(laid.roles)}개{besides}를 한 번에 soft delete "
+            "합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {len(laid.roles)} roles"
+                f"{in_language(besides, Language.ENGLISH)} in one call"
+            ),
         )
 
     @override
@@ -84,9 +96,13 @@ class SoftDeletingThenRestoringEveryRole(When[RolesAndACaller, RBACAdapter, Dele
 
     @override
     def describe(self, laid: RolesAndACaller) -> str:
-        return (
-            f"{laid.caller.username}이 역할 {len(laid.roles)}개를 한 번에 soft delete "
-            "했다가 한 번에 restore 함"
+        return Says(
+            f"{laid.caller.username}이 역할 {len(laid.roles)}개를 한 번에 soft delete 했다가 "
+            "한 번에 restore 합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {len(laid.roles)} roles in one call and "
+                "then restores them in one call"
+            ),
         )
 
     @override
@@ -107,7 +123,10 @@ class PurgingEveryRole(When[RolesAndACaller, RBACAdapter, Deleted]):
 
     @override
     def describe(self, laid: RolesAndACaller) -> str:
-        return f"{laid.caller.username}이 역할 {len(laid.roles)}개를 한 번에 purge 함"
+        return Says(
+            f"{laid.caller.username}이 역할 {len(laid.roles)}개를 한 번에 purge 합니다",
+            english=f"{laid.caller.username} purges {len(laid.roles)} roles in one call",
+        )
 
     @override
     async def call(self, adapter: RBACAdapter, laid: RolesAndACaller) -> Deleted:
@@ -128,9 +147,19 @@ class EveryRoleComesBack(Then[RolesAndACaller, Deleted]):
     @override
     def says(self) -> str:
         state = "삭제 상태" if self.status == RoleStatusDTO.DELETED else "활성"
+        state_en = "in the deleted state" if self.status == RoleStatusDTO.DELETED else "active"
         if self.missing is None:
-            return f"역할이 모두 {state}로 오고, 실패한 것은 없다"
-        return f"역할이 모두 {state}로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+            return Says(
+                f"역할이 모두 {state}로 오고, 실패한 것은 없습니다",
+                english=f"every role comes back {state_en} and nothing failed",
+            )
+        return Says(
+            f"역할이 모두 {state}로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                f"every role comes back {state_en} and the missing id comes back in the failed "
+                "list because no target answers to it"
+            ),
+        )
 
     @override
     def look(self, laid: RolesAndACaller, answered: Answered[Deleted]) -> list[Verdict]:
@@ -140,13 +169,20 @@ class EveryRoleComesBack(Then[RolesAndACaller, Deleted]):
         look = RoleLook(self.started, status=self.status)
         verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(laid.roles))]
         for i, (node, role) in enumerate(zip(payload.successes, laid.roles, strict=False)):
-            verdicts += look.verdicts(f"successes[{i}].", node, role, laid.domain)
+            verdicts += look.verdicts(f"successes[{i}].", node, role, laid.domain.id)
         if self.missing is None:
             return [*verdicts, Same("failed", payload.failed, [])]
         verdicts.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             verdicts += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the missing id given in the request"),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return verdicts
@@ -165,9 +201,14 @@ class SoftDeletingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "활성 역할 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 삭제 상태로 오고 "
-            "없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+            "없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when two active roles and a missing id are soft deleted in one call, the two "
+                "come back in the deleted state and the missing id comes back in the failed "
+                "list because no target answers to it"
+            ),
         )
 
     @override
@@ -195,9 +236,13 @@ class AUserGrantedNothingSoftDeletesNone(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "아무 권한도 받지 않은 사용자가 역할 여럿을 한 번에 soft delete 하려 하면, "
-            "soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+            "soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to soft delete several roles in one call, "
+                "none is soft deleted and all come back in the failed list for lack of permission"
+            ),
         )
 
     @override
@@ -225,7 +270,12 @@ class RestoringBringsSeveralBack(
 
     @override
     def describe(self) -> str:
-        return "soft delete 된 역할 여럿을 한 번에 restore 하면, 모두 활성으로 온다"
+        return Says(
+            "soft delete 된 역할 여럿을 한 번에 restore 하면, 모두 활성으로 옵니다",
+            english=(
+                "when several soft-deleted roles are restored in one call, all come back active"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:
@@ -252,8 +302,13 @@ class TheSuperadminPurgesSeveralRoles(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 역할 여럿을 한 번에 purge 하면, 모두 처리된 목록에 오고 실패한 것은 없다"
+        return Says(
+            "superadmin 이 역할 여럿을 한 번에 purge 하면, 모두 처리된 목록에 오고 실패한 것은 "
+            "없습니다",
+            english=(
+                "when the superadmin purges several roles in one call, all come back in the "
+                "processed list and nothing failed"
+            ),
         )
 
     @override
@@ -279,9 +334,13 @@ class AUserGrantedNothingPurgesNone(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "아무 권한도 받지 않은 사용자가 역할 여럿을 한 번에 purge 하려 하면, "
-            "purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+            "purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to purge several roles in one call, none is "
+                "purged and all come back in the failed list for lack of permission"
+            ),
         )
 
     @override

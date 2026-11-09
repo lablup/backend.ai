@@ -16,7 +16,7 @@ from ai.backend.common.data.entity.audit_log import AuditLogID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.audit_log import (
     ARecordReachedThroughItsScope,
     ARecordReachedThroughItsTrigger,
@@ -43,7 +43,10 @@ class LoadingWithAGap(When[RecordsToLoad, AuditLogAdapter, Loaded]):
 
     @override
     def describe(self, laid: RecordsToLoad) -> str:
-        return f"{laid.caller.username}이 있는 id 둘과 없는 id 하나를 한 번에 조회"
+        return Says(
+            f"{laid.caller.username}이 있는 id 둘과 없는 id 하나를 한 번에 조회합니다",
+            english=(f"{laid.caller.username} reads two present ids and one absent id at once"),
+        )
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: RecordsToLoad) -> Loaded:
@@ -65,7 +68,13 @@ class LoadingReadableUnreadableAndMissing(When[RecordsToLoad, AuditLogAdapter, L
 
     @override
     def describe(self, laid: RecordsToLoad) -> str:
-        return f"{laid.caller.username}이 읽을 수 있는 기록, 읽을 수 없는 기록, 없는 id 순으로 조회"
+        return Says(
+            f"{laid.caller.username}이 읽을 수 있는 기록, 읽을 수 없는 기록, 없는 id 순으로 조회합니다",
+            english=(
+                f"{laid.caller.username} reads a readable record, an unreadable record and "
+                "an absent id, in that order"
+            ),
+        )
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: RecordsToLoad) -> Loaded:
@@ -87,7 +96,10 @@ class LoadingNothing(When[RecordsToLoad, AuditLogAdapter, Loaded]):
 
     @override
     def describe(self, laid: RecordsToLoad) -> str:
-        return f"{laid.caller.username}이 빈 id 목록으로 조회"
+        return Says(
+            f"{laid.caller.username}이 빈 id 목록으로 조회합니다",
+            english=f"{laid.caller.username} reads with an empty id list",
+        )
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: RecordsToLoad) -> Loaded:
@@ -105,7 +117,10 @@ class LoadingBoth(When[RecordsToLoad, AuditLogAdapter, Loaded]):
 
     @override
     def describe(self, laid: RecordsToLoad) -> str:
-        return f"{laid.caller.username}이 있는 id 둘을 한 번에 조회"
+        return Says(
+            f"{laid.caller.username}이 있는 id 둘을 한 번에 조회합니다",
+            english=f"{laid.caller.username} reads two present ids at once",
+        )
 
     @override
     async def call(self, adapter: AuditLogAdapter, laid: RecordsToLoad) -> Loaded:
@@ -126,9 +141,14 @@ class AGrantedReaderIsAnsweredPerSlot(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "한쪽 프로젝트에만 읽기 권한을 받은 사용자가 읽을 수 있는 기록, 읽을 수 없는 기록, "
-            "없는 id를 한 번에 조회하면, 요청한 순서대로 기록 전체, 권한 부족, 빈 항목이 반환된다"
+            "없는 id 를 한 번에 조회하면, 요청한 순서대로 기록 전체, 권한 부족, 빈 항목이 반환됩니다",
+            english=(
+                "when a user granted read on only one project reads a readable record, an "
+                "unreadable record and an absent id at once, a whole record, a permission "
+                "failure and an empty item come back in the requested order"
+            ),
         )
 
     @override
@@ -154,7 +174,14 @@ class TheNodesComeBackWithAGap(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다"
+        return Says(
+            "superadmin 이 있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 "
+            "반환되고 없는 id 에 해당하는 항목은 비어 있습니다",
+            english=(
+                "when the superadmin reads two present ids and one absent id at once, they "
+                "come back in the requested order and the item for an absent id is empty"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, RecordsToLoad]:
@@ -177,7 +204,13 @@ class AnEmptyListReadsNothing(Scenario[TestSeedingSession, RecordsToLoad, AuditL
 
     @override
     def describe(self) -> str:
-        return "빈 id 목록으로 조회하면, 권한 검사도 거치지 않고 빈 응답이 반환된다"
+        return Says(
+            "빈 id 목록으로 조회하면, 권한 검사도 거치지 않고 빈 응답이 반환됩니다",
+            english=(
+                "when an empty id list is read, an empty response comes back without passing "
+                "the permission check"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, RecordsToLoad]:
@@ -202,7 +235,14 @@ class TheMonitorRoleWithoutAGrantIsRefusedPerSlot(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 모니터 역할 사용자가 id 둘을 조회하면, 항목마다 권한 부족으로 응답한다"
+        return Says(
+            "아무 권한도 받지 않은 모니터 역할 사용자가 id 둘을 조회하면, 항목마다 권한 부족으로 "
+            "응답합니다",
+            english=(
+                "when a monitor-role user granted nothing reads two ids, every item answers "
+                "with a permission failure"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, RecordsToLoad]:
@@ -227,7 +267,14 @@ class AUserGrantedNothingIsRefusedPerSlot(
 
     @override
     def describe(self) -> str:
-        return "읽기 권한이 없는 사용자가 자기에 대한 기록 둘을 id로 조회하면, 항목마다 권한 부족으로 응답한다"
+        return Says(
+            "읽기 권한이 없는 사용자가 자기에 대한 기록 둘을 id 로 조회하면, 항목마다 권한 부족으로 "
+            "응답합니다",
+            english=(
+                "when a user without read permission reads two records about themselves by "
+                "id, every item answers with a permission failure"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, RecordsToLoad]:
@@ -252,9 +299,14 @@ class ARecordIsReadThroughItsScope(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "기록이 남긴 범위에만 읽기 권한을 받은 사용자가 그 기록과 다른 프로젝트의 기록을 "
-            "조회하면, 범위로 닿은 기록은 반환되고 다른 기록은 권한 부족으로 응답한다"
+            "조회하면, 범위로 접근한 기록은 반환되고 다른 기록은 권한 부족으로 응답합니다",
+            english=(
+                "when a user granted read only on the scope a record left reads that record "
+                "and a record of another project, the record reached through the scope comes "
+                "back and the other answers with a permission failure"
+            ),
         )
 
     @override
@@ -280,9 +332,14 @@ class ARecordIsReadThroughItsTrigger(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "기록을 실행한 사용자에만 읽기 권한을 받은 사용자가 그 기록과 다른 프로젝트의 기록을 "
-            "조회하면, 실행한 사용자로 닿은 기록은 반환되고 다른 기록은 권한 부족으로 응답한다"
+            "조회하면, 실행한 사용자로 접근한 기록은 반환되고 다른 기록은 권한 부족으로 응답합니다",
+            english=(
+                "when a user granted read only on the user who triggered a record reads that "
+                "record and a record of another project, the record reached through the "
+                "triggering user comes back and the other answers with a permission failure"
+            ),
         )
 
     @override

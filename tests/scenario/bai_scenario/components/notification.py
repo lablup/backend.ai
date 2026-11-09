@@ -35,12 +35,15 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
@@ -109,7 +112,12 @@ class AChannelAndSomeone(Given[Any, AChannelAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"{self.channel_type.value} 채널 하나와, {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        channel_type = self.channel_type.value
+        return Says(
+            f"{channel_type} 채널 하나와, {who} 한 명",
+            english=f"one {channel_type} channel and one {in_language(who, Language.ENGLISH)}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AChannelAndACaller:
@@ -126,7 +134,14 @@ class AChannelARuleAndSomeone(Given[Any, AChannelAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"채널 하나와 그것을 가리키는 규칙 하나, 그리고 {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"채널 하나와 그것을 가리키는 규칙 하나, 그리고 {who} 한 명",
+            english=(
+                f"one channel and one rule pointing at it, and one "
+                f"{in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> AChannelAndACaller:
@@ -144,7 +159,11 @@ class TwoChannelsAndSomeone(Given[Any, ManyChannelsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"webhook 채널 둘과, {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"webhook 채널 둘과, {who} 한 명",
+            english=f"two webhook channels and one {in_language(who, Language.ENGLISH)}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyChannelsAndACaller:
@@ -166,7 +185,14 @@ class AWebhookAndAnEmailChannel(Given[Any, ManyChannelsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"webhook 채널 하나와 email 채널 하나, 그리고 {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"webhook 채널 하나와 email 채널 하나, 그리고 {who} 한 명",
+            english=(
+                f"one webhook channel and one email channel, and one "
+                f"{in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyChannelsAndACaller:
@@ -188,7 +214,14 @@ class AnEnabledAndADisabledChannel(Given[Any, ManyChannelsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"활성 webhook 채널 하나와 비활성 하나, 그리고 {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"활성 webhook 채널 하나와 비활성 하나, 그리고 {who} 한 명",
+            english=(
+                f"one active webhook channel and one inactive channel, and one "
+                f"{in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyChannelsAndACaller:
@@ -213,7 +246,14 @@ class ARuleAndSomeone(Given[Any, ARuleAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"규칙 하나와 그것이 가리키는 webhook 채널, 그리고 {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"규칙 하나와 그것이 가리키는 webhook 채널, 그리고 {who} 한 명",
+            english=(
+                f"one rule and the webhook channel it points at, and one "
+                f"{in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ARuleAndACaller:
@@ -239,7 +279,14 @@ class AnOrphanRuleAndSomeone(Given[Any, ARuleAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"없는 채널 id를 가리키는 규칙 하나와, {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"없는 채널 id 를 가리키는 규칙 하나와, {who} 한 명",
+            english=(
+                f"one rule pointing at an unknown channel id and one "
+                f"{in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ARuleAndACaller:
@@ -258,7 +305,14 @@ class TwoRulesAndSomeone(Given[Any, ManyRulesAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"같은 webhook 채널을 가리키는 규칙 둘과, {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"같은 webhook 채널을 가리키는 규칙 둘과, {who} 한 명",
+            english=(
+                f"two rules pointing at the same webhook channel and one "
+                f"{in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyRulesAndACaller:
@@ -285,7 +339,14 @@ class AnEnabledAndADisabledRule(Given[Any, ManyRulesAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"활성 규칙 하나와 비활성 하나, 그리고 {role_named(self.role)} 한 명"
+        who = role_named(self.role)
+        return Says(
+            f"활성 규칙 하나와 비활성 하나, 그리고 {who} 한 명",
+            english=(
+                f"one active rule and one inactive rule, and one "
+                f"{in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyRulesAndACaller:
@@ -341,7 +402,10 @@ def email_spec_verdicts(prefix: str, spec: object) -> list[Verdict]:
             spec.auth.username if spec.auth is not None else None,
             SMTP_USERNAME,
         ),
-        Skipped(f"{prefix}spec.auth.password", "응답 타입에 그 자리가 없다"),
+        Skipped(
+            f"{prefix}spec.auth.password",
+            Says("응답 타입에 그 자리가 없습니다", english="the response type has no such place"),
+        ),
     ]
 
 
@@ -349,6 +413,7 @@ def channel_verdicts(
     prefix: str,
     node: NotificationChannelNode,
     *,
+    seeded_id: UUID | None,
     name: str,
     description: str | None,
     channel_type: NotificationChannelType,
@@ -357,21 +422,36 @@ def channel_verdicts(
     created_by: UUID,
     written: WrittenByThisRun,
 ) -> list[Verdict]:
-    """Every place of one channel node."""
+    """Every place of one channel node. ``seeded_id`` is None when it was just created."""
     spec: list[Verdict]
     match channel_type:
         case NotificationChannelType.WEBHOOK:
             spec = webhook_spec_verdicts(prefix, node.spec, url=url)
         case NotificationChannelType.EMAIL:
             spec = email_spec_verdicts(prefix, node.spec)
+    entity_id = (
+        SameAs[UUID](
+            seeded_id,
+            Says("미리 저장한 채널의 id", english="the id of the channel created in advance"),
+        )
+        if seeded_id is not None
+        else SameAs[UUID](node.id, Says("노드의 id", english="the node's own id"))
+    )
     return [
-        Skipped(f"{prefix}id", "데이터베이스가 만든다"),
+        Skipped(
+            f"{prefix}id", Says("데이터베이스가 생성합니다", english="the database generates it")
+        ),
+        Held[UUID](f"{prefix}entity_id", node.entity_id, entity_id),
         Same(f"{prefix}name", node.name, name),
         Same(f"{prefix}description", node.description, description),
         Same(f"{prefix}channel_type", node.channel_type.value, channel_type.value),
         *spec,
         Same(f"{prefix}enabled", node.enabled, enabled),
-        Held[UUID](f"{prefix}created_by", node.created_by, SameAs[UUID](created_by, "만든 사람")),
+        Held[UUID](
+            f"{prefix}created_by",
+            node.created_by,
+            SameAs[UUID](created_by, Says("만든 사람", english="the user who created it")),
+        ),
         Held(f"{prefix}created_at", node.created_at, written),
         Held(f"{prefix}updated_at", node.updated_at, written),
     ]
@@ -381,6 +461,7 @@ def rule_verdicts(
     prefix: str,
     node: NotificationRuleNode,
     *,
+    seeded_id: UUID | None,
     name: str,
     description: str | None,
     rule_type: NotificationRuleType,
@@ -390,18 +471,38 @@ def rule_verdicts(
     created_by: UUID,
     written: WrittenByThisRun,
 ) -> list[Verdict]:
-    """Every place of one rule node."""
+    """Every place of one rule node. ``seeded_id`` is None when it was just created."""
+    entity_id = (
+        SameAs[UUID](
+            seeded_id,
+            Says("미리 저장한 규칙의 id", english="the id of the rule created in advance"),
+        )
+        if seeded_id is not None
+        else SameAs[UUID](node.id, Says("노드의 id", english="the node's own id"))
+    )
     return [
-        Skipped(f"{prefix}id", "데이터베이스가 만든다"),
+        Skipped(
+            f"{prefix}id", Says("데이터베이스가 생성합니다", english="the database generates it")
+        ),
+        Held[UUID](f"{prefix}entity_id", node.entity_id, entity_id),
         Same(f"{prefix}name", node.name, name),
         Same(f"{prefix}description", node.description, description),
         Same(f"{prefix}rule_type", node.rule_type.value, rule_type.value),
         Held[UUID](
-            f"{prefix}channel_id", node.channel_id, SameAs[UUID](channel_id, "가리키는 채널")
+            f"{prefix}channel_id",
+            node.channel_id,
+            SameAs[UUID](
+                channel_id,
+                Says("가리키는 채널", english="the channel it points at"),
+            ),
         ),
         Same(f"{prefix}message_template", node.message_template, message_template),
         Same(f"{prefix}enabled", node.enabled, enabled),
-        Held[UUID](f"{prefix}created_by", node.created_by, SameAs[UUID](created_by, "만든 사람")),
+        Held[UUID](
+            f"{prefix}created_by",
+            node.created_by,
+            SameAs[UUID](created_by, Says("만든 사람", english="the user who created it")),
+        ),
         Held(f"{prefix}created_at", node.created_at, written),
         Held(f"{prefix}updated_at", node.updated_at, written),
     ]
@@ -419,7 +520,10 @@ class TheNewChannelNode(Then[Any, NotificationChannelNode]):
 
     @override
     def says(self) -> str:
-        return "생성한 채널 전체가 반환된다"
+        return Says(
+            "생성한 채널 전체가 반환됩니다",
+            english="the whole channel just created comes back",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[NotificationChannelNode]) -> list[Verdict]:
@@ -429,6 +533,7 @@ class TheNewChannelNode(Then[Any, NotificationChannelNode]):
         return channel_verdicts(
             "",
             node,
+            seeded_id=None,
             name=self.named,
             description=None,
             channel_type=self.channel_type,
@@ -451,7 +556,10 @@ class TheChannelNode(Then[AChannelAndACaller, NotificationChannelNode]):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 채널 전체가 반환된다"
+        return Says(
+            "미리 저장한 채널 전체가 반환됩니다",
+            english="the whole channel created in advance comes back",
+        )
 
     @override
     def look(
@@ -464,6 +572,7 @@ class TheChannelNode(Then[AChannelAndACaller, NotificationChannelNode]):
         return channel_verdicts(
             "",
             node,
+            seeded_id=seed.id,
             name=seed.name if isinstance(self.named, Kept) else self.named,
             description=seed.description if isinstance(self.described, Kept) else self.described,
             channel_type=seed.channel_type,
@@ -480,7 +589,10 @@ class TheLaidChannelsAreLeft(Then[ManyChannelsAndACaller, SearchNotificationChan
 
     @override
     def says(self) -> str:
-        return "응답에 나와야 하는 채널만 반환된다"
+        return Says(
+            "응답에 나와야 하는 채널만 반환됩니다",
+            english="only the channels that must appear in the response come back",
+        )
 
     @override
     def look(
@@ -507,7 +619,10 @@ class OnlyTheNamedChannelIsLeft(Then[ManyChannelsAndACaller, SearchNotificationC
 
     @override
     def says(self) -> str:
-        return "필터에 맞는 채널 하나만 반환된다"
+        return Says(
+            "필터에 맞는 채널 하나만 반환됩니다",
+            english="only the one channel matching the filter comes back",
+        )
 
     @override
     def look(
@@ -530,7 +645,10 @@ class TheFirstChannelPage(Then[ManyChannelsAndACaller, SearchNotificationChannel
 
     @override
     def says(self) -> str:
-        return "한 건짜리 첫 페이지가 반환된다"
+        return Says(
+            "한 건짜리 첫 페이지가 반환됩니다",
+            english="the first page holding one item comes back",
+        )
 
     @override
     def look(
@@ -555,7 +673,10 @@ class TheChannelsInTheOrderAsked(Then[ManyChannelsAndACaller, LoadedChannels]):
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 비어 있다"
+        return Says(
+            "요청한 순서대로 반환되고, 없는 id 에 해당하는 항목은 비어 있습니다",
+            english="they come back in the order asked and the item for an unknown id is empty",
+        )
 
     @override
     def look(
@@ -570,12 +691,13 @@ class TheChannelsInTheOrderAsked(Then[ManyChannelsAndACaller, LoadedChannels]):
         for i, expected in enumerate(laid.laid):
             got = items[i] if i < len(items) else None
             if not isinstance(got, NotificationChannelNode):
-                seen.append(Same(f"items[{i}]", got, "노드"))
+                seen.append(Same(f"items[{i}]", got, Says("노드", english="a node")))
                 continue
             seen.extend(
                 channel_verdicts(
                     f"items[{i}].",
                     got,
+                    seeded_id=expected.id,
                     name=expected.name,
                     description=expected.description,
                     channel_type=expected.channel_type,
@@ -585,7 +707,7 @@ class TheChannelsInTheOrderAsked(Then[ManyChannelsAndACaller, LoadedChannels]):
                     written=written,
                 )
             )
-        last = items[asked - 1] if len(items) >= asked else "없음"
+        last = items[asked - 1] if len(items) >= asked else Says("없음", english="none")
         seen.append(Same(f"items[{asked - 1}]", last, None))
         return seen
 
@@ -598,7 +720,10 @@ class EachItemIsRefused(Then[Any, list[Any]]):
 
     @override
     def says(self) -> str:
-        return "항목마다 권한 부족 거부가 담긴다"
+        return Says(
+            "항목마다 권한 부족 거부가 담깁니다",
+            english="each item carries a rejection for not enough permission",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[list[Any]]) -> list[Verdict]:
@@ -609,11 +734,7 @@ class EachItemIsRefused(Then[Any, list[Any]]):
         for i in range(self.asked):
             got = items[i] if i < len(items) else None
             seen.append(
-                Same(
-                    f"items[{i}]",
-                    type(got).__name__ if got is not None else None,
-                    NotEnoughPermission.__name__,
-                )
+                Refused(NotEnoughPermission, got if isinstance(got, BaseException) else None)
             )
         return seen
 
@@ -624,7 +745,7 @@ class NothingComesBack(Then[Any, list[Any]]):
 
     @override
     def says(self) -> str:
-        return "빈 응답이 반환된다"
+        return Says("빈 응답이 반환됩니다", english="an empty response comes back")
 
     @override
     def look(self, laid: Any, answered: Answered[list[Any]]) -> list[Verdict]:
@@ -640,14 +761,21 @@ class TheDeletedChannelId(Then[AChannelAndACaller, Any]):
 
     @override
     def says(self) -> str:
-        return "삭제한 채널의 id가 반환된다"
+        return Says(
+            "삭제한 채널의 id 가 반환됩니다",
+            english="the id of the deleted channel comes back",
+        )
 
     @override
     def look(self, laid: AChannelAndACaller, answered: Answered[Any]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        return [Held[UUID]("id", payload.id, SameAs[UUID](laid.channel.id, "미리 만들어 둔 채널"))]
+        seeded = Says("미리 저장한 채널", english="the channel created in advance")
+        return [
+            Held[UUID]("id", payload.id, SameAs[UUID](laid.channel.id, seeded)),
+            Held[UUID]("entity_id", payload.entity_id, SameAs[UUID](laid.channel.id, seeded)),
+        ]
 
 
 @dataclass(frozen=True)
@@ -656,14 +784,26 @@ class TheValidatedChannelId(Then[AChannelAndACaller, Any]):
 
     @override
     def says(self) -> str:
-        return "검증한 채널의 id가 반환된다"
+        return Says(
+            "검증한 채널의 id 가 반환됩니다",
+            english="the id of the validated channel comes back",
+        )
 
     @override
     def look(self, laid: AChannelAndACaller, answered: Answered[Any]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        return [Held[UUID]("id", payload.id, SameAs[UUID](laid.channel.id, "미리 만들어 둔 채널"))]
+        return [
+            Held[UUID](
+                "id",
+                payload.id,
+                SameAs[UUID](
+                    laid.channel.id,
+                    Says("미리 저장한 채널", english="the channel created in advance"),
+                ),
+            )
+        ]
 
 
 @dataclass(frozen=True)
@@ -680,7 +820,10 @@ class TheNewRuleNode(Then[AChannelAndACaller, NotificationRuleNode]):
 
     @override
     def says(self) -> str:
-        return "생성한 규칙 전체가 반환된다"
+        return Says(
+            "생성한 규칙 전체가 반환됩니다",
+            english="the whole rule just created comes back",
+        )
 
     @override
     def look(
@@ -692,6 +835,7 @@ class TheNewRuleNode(Then[AChannelAndACaller, NotificationRuleNode]):
         return rule_verdicts(
             "",
             node,
+            seeded_id=None,
             name=self.named,
             description=None,
             rule_type=self.rule_type,
@@ -715,7 +859,10 @@ class TheRuleNode(Then[ARuleAndACaller, NotificationRuleNode]):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 규칙 전체가 반환된다"
+        return Says(
+            "미리 저장한 규칙 전체가 반환됩니다",
+            english="the whole rule created in advance comes back",
+        )
 
     @override
     def look(
@@ -728,6 +875,7 @@ class TheRuleNode(Then[ARuleAndACaller, NotificationRuleNode]):
         return rule_verdicts(
             "",
             node,
+            seeded_id=seed.id,
             name=seed.name if isinstance(self.named, Kept) else self.named,
             description=seed.description if isinstance(self.described, Kept) else self.described,
             rule_type=seed.rule_type,
@@ -749,7 +897,10 @@ class TheLaidRulesAreLeft(Then[ManyRulesAndACaller, SearchNotificationRulesPaylo
 
     @override
     def says(self) -> str:
-        return "응답에 나와야 하는 규칙만 반환된다"
+        return Says(
+            "응답에 나와야 하는 규칙만 반환됩니다",
+            english="only the rules that must appear in the response come back",
+        )
 
     @override
     def look(
@@ -776,7 +927,10 @@ class OnlyTheNamedRuleIsLeft(Then[ManyRulesAndACaller, SearchNotificationRulesPa
 
     @override
     def says(self) -> str:
-        return "필터에 맞는 규칙 하나만 반환된다"
+        return Says(
+            "필터에 맞는 규칙 하나만 반환됩니다",
+            english="only the one rule matching the filter comes back",
+        )
 
     @override
     def look(
@@ -801,7 +955,10 @@ class TheRulesInTheOrderAsked(Then[ManyRulesAndACaller, LoadedRules]):
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 비어 있다"
+        return Says(
+            "요청한 순서대로 반환되고, 없는 id 에 해당하는 항목은 비어 있습니다",
+            english="they come back in the order asked and the item for an unknown id is empty",
+        )
 
     @override
     def look(self, laid: ManyRulesAndACaller, answered: Answered[LoadedRules]) -> list[Verdict]:
@@ -814,12 +971,13 @@ class TheRulesInTheOrderAsked(Then[ManyRulesAndACaller, LoadedRules]):
         for i, expected in enumerate(laid.laid):
             got = items[i] if i < len(items) else None
             if not isinstance(got, NotificationRuleNode):
-                seen.append(Same(f"items[{i}]", got, "노드"))
+                seen.append(Same(f"items[{i}]", got, Says("노드", english="a node")))
                 continue
             seen.extend(
                 rule_verdicts(
                     f"items[{i}].",
                     got,
+                    seeded_id=expected.id,
                     name=expected.name,
                     description=expected.description,
                     rule_type=expected.rule_type,
@@ -830,7 +988,7 @@ class TheRulesInTheOrderAsked(Then[ManyRulesAndACaller, LoadedRules]):
                     written=written,
                 )
             )
-        last = items[asked - 1] if len(items) >= asked else "없음"
+        last = items[asked - 1] if len(items) >= asked else Says("없음", english="none")
         seen.append(Same(f"items[{asked - 1}]", last, None))
         return seen
 
@@ -841,14 +999,21 @@ class TheDeletedRuleId(Then[ARuleAndACaller, Any]):
 
     @override
     def says(self) -> str:
-        return "삭제한 규칙의 id가 반환된다"
+        return Says(
+            "삭제한 규칙의 id 가 반환됩니다",
+            english="the id of the deleted rule comes back",
+        )
 
     @override
     def look(self, laid: ARuleAndACaller, answered: Answered[Any]) -> list[Verdict]:
         payload = answered.response
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
-        return [Held[UUID]("id", payload.id, SameAs[UUID](laid.rule.id, "미리 만들어 둔 규칙"))]
+        seeded = Says("미리 저장한 규칙", english="the rule created in advance")
+        return [
+            Held[UUID]("id", payload.id, SameAs[UUID](laid.rule.id, seeded)),
+            Held[UUID]("entity_id", payload.entity_id, SameAs[UUID](laid.rule.id, seeded)),
+        ]
 
 
 @dataclass(frozen=True)
@@ -859,7 +1024,10 @@ class TheRenderedMessage(Then[ARuleAndACaller, ValidateNotificationRulePayload])
 
     @override
     def says(self) -> str:
-        return "템플릿에 데이터를 넣어 만든 문자열이 반환된다"
+        return Says(
+            "템플릿에 데이터를 넣어 만든 문자열이 반환됩니다",
+            english="the string made by putting the data into the template comes back",
+        )
 
     @override
     def look(
@@ -884,10 +1052,20 @@ class TheChannelsComeBack(
     @override
     def says(self) -> str:
         if self.missing is None:
-            return "미리 만들어 둔 채널이 모두 처리된 목록에 오고, 실패한 것은 없다"
-        return (
-            "미리 만들어 둔 채널이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 "
-            "실패 목록에 온다"
+            return Says(
+                "미리 저장한 채널이 모두 처리된 목록에 오고, 실패한 것은 없습니다",
+                english=(
+                    "every channel created in advance comes back in the processed list "
+                    "and nothing failed"
+                ),
+            )
+        return Says(
+            "미리 저장한 채널이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 "
+            "실패 목록에 옵니다",
+            english=(
+                "every channel created in advance comes back in the processed list and an unknown "
+                "id comes back in the failed list because no target answers to it"
+            ),
         )
 
     @override
@@ -905,6 +1083,7 @@ class TheChannelsComeBack(
             verdicts += channel_verdicts(
                 f"successes[{i}].",
                 node,
+                seeded_id=seed.id,
                 name=seed.name,
                 description=(
                     seed.description if isinstance(self.described, Kept) else self.described
@@ -929,10 +1108,20 @@ class TheRulesComeBack(Then[ManyRulesAndACaller, PartialBulkPayload[Notification
     @override
     def says(self) -> str:
         if self.missing is None:
-            return "미리 만들어 둔 규칙이 모두 처리된 목록에 오고, 실패한 것은 없다"
-        return (
-            "미리 만들어 둔 규칙이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 "
-            "실패 목록에 온다"
+            return Says(
+                "미리 저장한 규칙이 모두 처리된 목록에 오고, 실패한 것은 없습니다",
+                english=(
+                    "every rule created in advance comes back in the processed list "
+                    "and nothing failed"
+                ),
+            )
+        return Says(
+            "미리 저장한 규칙이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 "
+            "실패 목록에 옵니다",
+            english=(
+                "every rule created in advance comes back in the processed list and an unknown id "
+                "comes back in the failed list because no target answers to it"
+            ),
         )
 
     @override
@@ -950,6 +1139,7 @@ class TheRulesComeBack(Then[ManyRulesAndACaller, PartialBulkPayload[Notification
             verdicts += rule_verdicts(
                 f"successes[{i}].",
                 node,
+                seeded_id=seed.id,
                 name=seed.name,
                 description=(
                     seed.description if isinstance(self.described, Kept) else self.described
@@ -971,7 +1161,14 @@ def failed_verdicts(payload: PartialBulkPayload[Any], missing: UUID | None) -> l
     verdicts: list[Verdict] = [Same("failed count", len(payload.failed), 1)]
     for failure in payload.failed:
         verdicts += [
-            Held[UUID]("failed[0].id", failure.id, SameAs(missing, "요청에 넣은 없는 id")),
+            Held[UUID](
+                "failed[0].id",
+                failure.id,
+                SameAs(
+                    missing,
+                    Says("요청에 넣은 없는 id", english="the unknown id put in the request"),
+                ),
+            ),
             Held("failed[0].message", failure.message, Mentions("not found")),
         ]
     return verdicts
@@ -985,7 +1182,13 @@ class NothingIsProcessed(Then[Any, PartialBulkPayload[Any]]):
 
     @override
     def says(self) -> str:
-        return "처리된 것 없이 미리 만들어 둔 것이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 것 없이 미리 저장한 것이 모두 실패 목록에 옵니다",
+            english=(
+                "nothing is processed and everything created in advance comes back in the "
+                "failed list"
+            ),
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[PartialBulkPayload[Any]]) -> list[Verdict]:
@@ -1000,7 +1203,15 @@ class NothingIsProcessed(Then[Any, PartialBulkPayload[Any]]):
         for i, (failure, seed) in enumerate(zip(payload.failed, targets, strict=False)):
             verdicts += [
                 Held[UUID](
-                    f"failed[{i}].id", failure.id, SameAs(seed.id, "미리 만들어 둔 것의 id")
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(
+                        seed.id,
+                        Says(
+                            "미리 저장한 것의 id",
+                            english="the id of the thing created in advance",
+                        ),
+                    ),
                 ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]

@@ -13,7 +13,6 @@ import uuid
 from collections.abc import Coroutine, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from importlib.resources import files
-from io import StringIO
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -35,6 +34,13 @@ from ai.backend.agent.agent import (
     ScanImagesResult,
 )
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ScratchType
+from ai.backend.agent.config_file import (
+    BaseKernelConfigFile,
+    DockerCredsFile,
+    EnvironFile,
+    ResourceFile,
+    SessionNameFile,
+)
 from ai.backend.agent.defs import SESSION_NAME_CONFIG_FILENAME
 from ai.backend.agent.dotfile import DotfileTargetResolver
 from ai.backend.agent.errors import K8sError, UnsupportedResource
@@ -466,9 +472,10 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 # in image importer kernels.
                 if vfolder.name != ".logs":
                     continue
+            source = await self._resolve_vfolder_mount_source(vfolder)
             mount = Mount(
                 MountTypes.K8S_HOSTPATH,
-                Path(vfolder.host_path),
+                source,
                 Path(vfolder.kernel_path),
                 vfolder.mount_perm,
                 opts={
@@ -479,7 +486,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 KubernetesHostPathVolume(
                     name=f"kernel-{self.kernel_id}-hostPath-{idx}",
                     hostPath={
-                        "path": vfolder.host_path.as_posix(),
+                        "path": source.as_posix(),
                         "type": "Directory",
                     },
                 ),
@@ -537,11 +544,17 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                                 "env": [{"name": k, "value": v} for k, v in environ.items()],
                                 "volumeMounts": [cattr.unstructure(v) for v in self.volume_mounts],
                                 "ports": [{"containerPort": x} for x in ports],
-                                "securityContext": {"privileged": True},
+                                "securityContext": {
+                                    "capabilities": {
+                                        "add": [
+                                            "IPC_LOCK",  # for hugepages and RDMA
+                                            "SYS_NICE",  # for NFS based GPUDirect Storage
+                                        ],
+                                    },
+                                },
                             }
                         ],
                         "volumes": [cattr.unstructure(v) for v in self.volumes],
-                        "securityContext": {"privileged": True},
                     },
                 },
             },
@@ -570,51 +583,41 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
                 await run_in_executor_with_context(None, _write_user_bootstrap_script)
 
-            def _write_config(file_name: str, content: str) -> None:
-                file_path = self.config_dir / file_name
-                file_path.write_text(content)
-                if KernelFeatures.UID_MATCH in self.kernel_features:
-                    uid = self.local_config.container.kernel_uid
-                    gid = self.local_config.container.kernel_gid
-                    if os.geteuid() == 0:
-                        os.chown(str(file_path), uid, gid)
+            uid: int | None = None
+            gid: int | None = None
+            if KernelFeatures.UID_MATCH in self.kernel_features:
+                uid = self.local_config.container.kernel_uid
+                gid = self.local_config.container.kernel_gid
 
-            with StringIO() as buf:
-                for k, v in environ.items():
-                    buf.write(f"{k}={v}\n")
-                # accel_envs = self.computer_docker_args.get('Env', [])
-                # for env in accel_envs:
-                #     buf.write(f'{env}\n')
-                await run_in_executor_with_context(
-                    None,
-                    functools.partial(_write_config, "environ.txt", buf.getvalue()),
-                )
-
-            await run_in_executor_with_context(
-                None,
-                functools.partial(
-                    _write_config, SESSION_NAME_CONFIG_FILENAME, self.kernel_config["session_name"]
+            config_files: list[BaseKernelConfigFile] = [
+                EnvironFile(
+                    path=self.config_dir / "environ.txt", environ=environ, uid=uid, gid=gid
                 ),
-            )
-
-            with StringIO() as buf:
-                resource_spec.write_to_file(buf)
-                for dev_type, device_alloc in resource_spec.allocations.items():
-                    computer_self = self.computers[dev_type]
-                    kvpairs = await computer_self.instance.generate_resource_data(device_alloc)
-                    for k, v in kvpairs.items():
-                        buf.write(f"{k}={v}\n")
-                await run_in_executor_with_context(
-                    None,
-                    functools.partial(_write_config, "resource.txt", buf.getvalue()),
-                )
+                SessionNameFile(
+                    path=self.config_dir / SESSION_NAME_CONFIG_FILENAME,
+                    session_name=self.kernel_config["session_name"],
+                    uid=uid,
+                    gid=gid,
+                ),
+                ResourceFile(
+                    path=self.config_dir / "resource.txt",
+                    resource_spec=resource_spec,
+                    computers=self.computers,
+                    uid=uid,
+                    gid=gid,
+                ),
+            ]
+            for config_file in config_files:
+                await config_file.write()
 
             docker_creds = self.internal_data.get("docker_credentials")
             if docker_creds:
-                await run_in_executor_with_context(
-                    None,
-                    functools.partial(_write_config, "docker-creds.json", docker_creds),
-                )
+                await DockerCredsFile(
+                    path=self.config_dir / "docker-creds.json",
+                    docker_creds=docker_creds,
+                    uid=uid,
+                    gid=gid,
+                ).write()
 
         if keypair := self.internal_data.get("ssh_keypair"):
             for mount in resource_spec.mounts:

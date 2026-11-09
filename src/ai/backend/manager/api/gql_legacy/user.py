@@ -228,8 +228,10 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
         )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self | None:
         graph_ctx: GraphQueryContext = info.context
+        if graph_ctx.user["role"] != UserRole.SUPERADMIN:
+            return None
 
         user_id = resolve_entity_id(id, UserID)
         query = sa.select(UserRow).where(UserRow.uuid == user_id)
@@ -498,7 +500,9 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
                 result.append(GroupNode.from_data(ProjectSearchableFields.own.to_data(prj_row)))
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
-    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> UserNode:
+    async def __resolve_reference(
+        self, info: graphene.ResolveInfo, **kwargs: Any
+    ) -> UserNode | None:
         return await UserNode.get_node(info, self.id)
 
 

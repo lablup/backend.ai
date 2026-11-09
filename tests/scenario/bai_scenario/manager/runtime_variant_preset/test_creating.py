@@ -40,6 +40,7 @@ from ai.backend.testutils.scenario_steps import (
     Configured,
     Given,
     Refused,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -95,7 +96,14 @@ class Creating(When[AVariantAndACaller, RuntimeVariantPresetAdapter, RuntimeVari
 
     @override
     def describe(self, laid: AVariantAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.variant.name} 변형에 {self.named} 프리셋을 생성"
+        return Says(
+            f"{laid.caller.username}이 {laid.variant.name} 인퍼런스 런타임 종류에 {self.named} "
+            "런타임 파라미터를 생성합니다",
+            english=(
+                f"{laid.caller.username} creates the runtime variant preset {self.named} under "
+                f"the runtime variant {laid.variant.name}"
+            ),
+        )
 
     @override
     async def call(
@@ -130,9 +138,13 @@ class CreatingBesideTheLaidOne(
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        return (
-            f"{laid.caller.username}이 {laid.variant.name} 변형에 "
-            f"{self.named or laid.preset.name} 프리셋을 하나 더 생성"
+        return Says(
+            f"{laid.caller.username}이 {laid.variant.name} 인퍼런스 런타임 종류에 "
+            f"{self.named or laid.preset.name} 런타임 파라미터를 하나 더 생성합니다",
+            english=(
+                f"{laid.caller.username} creates one more runtime variant preset named "
+                f"{self.named or laid.preset.name} under the runtime variant {laid.variant.name}"
+            ),
         )
 
     @override
@@ -164,7 +176,14 @@ class CreatingTheSameNameUnderTheOther(
 
     @override
     def describe(self, laid: TwoVariantsAndAPreset) -> str:
-        return f"{laid.caller.username}이 {laid.other.name} 변형에 {laid.preset.name} 프리셋을 생성"
+        return Says(
+            f"{laid.caller.username}이 {laid.other.name} 인퍼런스 런타임 종류에 "
+            f"{laid.preset.name} 런타임 파라미터를 생성합니다",
+            english=(
+                f"{laid.caller.username} creates the runtime variant preset {laid.preset.name} "
+                f"under the runtime variant {laid.other.name}"
+            ),
+        )
 
     @override
     async def call(
@@ -191,7 +210,13 @@ class TheNextPresetNode(Then[APresetAndACaller, RuntimeVariantPresetNode]):
 
     @override
     def says(self) -> str:
-        return "순위가 기존 프리셋보다 지정된 간격만큼 큰 프리셋 전체가 반환된다"
+        return Says(
+            "순위가 기존 런타임 파라미터보다 지정된 간격만큼 큰 런타임 파라미터 전체가 반환됩니다",
+            english=(
+                "the whole preset comes back with a rank larger than the existing preset by "
+                "the set gap"
+            ),
+        )
 
     @override
     def look(
@@ -235,9 +260,14 @@ class TheFirstPresetIsRankedAHundred(
 
     @override
     def describe(self) -> str:
-        return (
-            "프리셋이 없는 변형에 슈퍼관리자가 필수 항목만 지정해 생성하면 순위는 100이고, "
-            "필수 항목으로 지정되지 않으며, 나머지 선택 항목은 비어 있다"
+        return Says(
+            "런타임 파라미터가 없는 인퍼런스 런타임 종류에 superadmin 이 필수 항목만 지정해 "
+            "생성하면 순위는 100이고, 필수 항목으로 지정되지 않으며, 나머지 선택 항목은 비어 있습니다",
+            english=(
+                "when the superadmin creates a preset on a runtime variant that has none, giving "
+                "only the required values, the rank is 100, it is not marked required, and the "
+                "remaining optional values are empty"
+            ),
         )
 
     @override
@@ -269,8 +299,13 @@ class TheSecondPresetIsRankedAHundredHigher(
 
     @override
     def describe(self) -> str:
-        return (
-            "프리셋이 하나 있는 변형에 슈퍼관리자가 하나 더 생성하면 새 프리셋의 순위가 100 더 크다"
+        return Says(
+            "런타임 파라미터가 하나 있는 인퍼런스 런타임 종류에 superadmin 이 하나 더 생성하면 새 "
+            "런타임 파라미터의 순위가 100 더 큽니다",
+            english=(
+                "when the superadmin creates one more preset on a runtime variant that already "
+                "has one, the new preset's rank is 100 higher"
+            ),
         )
 
     @override
@@ -305,7 +340,13 @@ class FourValuesComeBackAsOneSpec(
 
     @override
     def describe(self) -> str:
-        return "대상·값 종류·기본값·키를 모두 지정해 생성하면 네 값이 하나의 명세로 묶여 반환된다"
+        return Says(
+            "대상, 값 종류, 기본값, 키를 모두 지정해 생성하면 네 값이 하나의 명세로 묶여 반환됩니다",
+            english=(
+                "when target, value type, default and key are all given on creation, the four "
+                "values come back bound into one spec"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
@@ -339,7 +380,13 @@ class AUiOptionCarriesItsType(
 
     @override
     def describe(self) -> str:
-        return "슬라이더 옵션을 추가하여 생성하면 UI 종류를 옵션에서 읽어 응답 노드에 함께 담는다"
+        return Says(
+            "슬라이더 옵션을 추가하여 생성하면 UI 종류를 옵션에서 읽어 응답 노드에 함께 담습니다",
+            english=(
+                "when a preset is created with a slider option added, the UI type is read from "
+                "the option and carried on the response node"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
@@ -368,7 +415,14 @@ class ANameTakenInTheSameVariantIsRefused(
 
     @override
     def describe(self) -> str:
-        return "같은 변형에 같은 이름의 프리셋을 다시 생성하면 이름이 중복되어 요청이 거부된다"
+        return Says(
+            "같은 인퍼런스 런타임 종류에 같은 이름의 런타임 파라미터를 다시 생성하면 이름이 "
+            "중복되어 요청이 거부됩니다",
+            english=(
+                "when a preset with the same name is created again under the same runtime "
+                "variant, the request is rejected as a duplicate name"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
@@ -402,7 +456,14 @@ class TheSameNameIsFreeInAnotherVariant(
 
     @override
     def describe(self) -> str:
-        return "고유성 제약은 변형과 이름의 조합에 적용되므로 다른 변형에는 같은 이름의 프리셋을 생성할 수 있다"
+        return Says(
+            "고유성 제약은 인퍼런스 런타임 종류와 이름의 조합에 적용되므로 다른 인퍼런스 런타임 "
+            "종류에는 같은 이름의 런타임 파라미터를 생성할 수 있습니다",
+            english=(
+                "because the uniqueness constraint applies to the pair of runtime variant and "
+                "name, a preset with the same name can be created under another runtime variant"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, TwoVariantsAndAPreset]:
@@ -434,7 +495,14 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 프리셋을 생성하면 역할이 부족하여 요청이 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 런타임 파라미터를 생성하면 역할이 부족하여 요청이 "
+            "거부됩니다",
+            english=(
+                "when a user who is not the superadmin creates a preset, the request is rejected "
+                "for lack of role"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AVariantAndACaller]:
@@ -467,7 +535,13 @@ class EnforcementOffStillNeedsTheSuperadmin(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 꺼도 슈퍼관리자가 아니면 프리셋을 생성할 수 없다"
+        return Says(
+            "권한 검사를 꺼도 superadmin 이 아니면 런타임 파라미터를 생성할 수 없습니다",
+            english=(
+                "turning the permission check off still does not let a user who is not the "
+                "superadmin create a preset"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:

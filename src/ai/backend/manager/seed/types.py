@@ -40,6 +40,7 @@ class SeedKind(StrEnum):
     DEPLOYMENT_PRESET = "deployment_preset"
     SESSION_TEMPLATE = "session_template"
     PROJECT_MEMBER = "project_member"
+    DOMAIN_ADMIN = "domain_admin"
     RESOURCE_GROUP_FOR_DOMAIN = "resource_group_for_domain"
     RESOURCE_GROUP_FOR_PROJECT = "resource_group_for_project"
     RESOURCE_GROUP_FOR_KEYPAIR = "resource_group_for_keypair"

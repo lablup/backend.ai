@@ -22,7 +22,7 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.login_client_type import (
     ATypeAndACaller,
@@ -55,13 +55,31 @@ class Editing(When[ATypeAndACaller, LoginClientTypeAdapter, LoginClientTypeNode]
 
     @override
     def describe(self, laid: ATypeAndACaller) -> str:
-        target = "존재하지 않는 id" if self.unknown else laid.client_type.name
-        changing = []
+        if self.unknown:
+            target_ko = "존재하지 않는 id"
+            target_en = "an id nothing answers to"
+        else:
+            target_ko = laid.client_type.name
+            target_en = laid.client_type.name
+        changing_ko: list[str] = []
+        changing_en: list[str] = []
         if self.named is not None:
-            changing.append("이름")
+            changing_ko.append("이름")
+            changing_en.append("name")
         if not isinstance(self.described, Unset):
-            changing.append("설명")
-        return f"{laid.caller.username}이 {target}의 {' 및 '.join(changing) or '아무것도'} 수정"
+            changing_ko.append("설명")
+            changing_en.append("description")
+        if changing_ko:
+            korean = (
+                f"{laid.caller.username} 이 {target_ko}의 {' 및 '.join(changing_ko)}을 수정합니다"
+            )
+            english = (
+                f"{laid.caller.username} updates the {' and '.join(changing_en)} of {target_en}"
+            )
+        else:
+            korean = f"{laid.caller.username} 이 {target_ko}의 아무것도 수정하지 않습니다"
+            english = f"{laid.caller.username} updates nothing of {target_en}"
+        return Says(korean, english=english)
 
     @override
     async def call(
@@ -88,7 +106,13 @@ class RenamingToAnothersName(
     @override
     def describe(self, laid: ManyTypesAndACaller) -> str:
         other = next(one for one in laid.laid if one.id != laid.named.id)
-        return f"{laid.caller.username}이 {laid.named.name}의 이름을 {other.name}(으)로 수정"
+        return Says(
+            (
+                f"{laid.caller.username} 이 {laid.named.name}의 이름을 {other.name} (으)로 "
+                "수정합니다"
+            ),
+            english=f"{laid.caller.username} renames {laid.named.name} to {other.name}",
+        )
 
     @override
     async def call(
@@ -114,7 +138,16 @@ class TheNameChangesAndTheDescriptionStays(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 종류의 이름만 바꾸면, 이름은 새 값이 되고 설명은 그대로 유지된다"
+        return Says(
+            (
+                "superadmin 이 로그인 클라이언트 유형의 이름만 변경하면 이름은 새 값이 되고 설명은 "
+                "그대로 유지됩니다"
+            ),
+            english=(
+                "when the superadmin changes only the name of a login client type, the name "
+                "becomes the new value and the description stays as it was"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
@@ -141,7 +174,13 @@ class ClearingTheDescription(
 
     @override
     def describe(self) -> str:
-        return "설명이 있는 종류에 설명을 비우는 수정을 하면, 설명이 없어진다"
+        return Says(
+            "설명이 있는 로그인 클라이언트 유형에 설명을 비우는 수정을 하면 설명이 없어집니다",
+            english=(
+                "when a login client type with a description is updated to clear the description, "
+                "the description goes away"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
@@ -168,7 +207,13 @@ class AnEmptyEditChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다"
+        return Says(
+            "값을 하나도 지정하지 않고 수정하면 아무것도 변경되지 않은 노드가 반환됩니다",
+            english=(
+                "when it is updated without giving any value, the node comes back with nothing "
+                "changed"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
@@ -193,9 +238,16 @@ class RenamingToATakenNameIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "종류 둘 중 한쪽의 이름을 다른 쪽 이름으로 바꾸면, 이름 중복으로 거부된다. "
-            "생성할 때와 달리 저장소의 제약 위반이 그대로 전파된다"
+        return Says(
+            (
+                "로그인 클라이언트 유형 둘 중 한쪽의 이름을 다른 쪽 이름으로 변경하면 이름 중복으로 "
+                "거부됩니다. 생성할 때와 달리 저장소의 제약 위반이 그대로 전파됩니다"
+            ),
+            english=(
+                "when one of two login client types is renamed to the name of the other, it is "
+                "rejected as a duplicate name. Unlike at creation, the repository constraint "
+                "violation propagates as it is"
+            ),
         )
 
     @override
@@ -221,7 +273,13 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다"
+        return Says(
+            ("superadmin 이 존재하지 않는 id 를 수정하면 대상을 찾을 수 없다는 이유로 거부됩니다"),
+            english=(
+                "when the superadmin updates an id nothing answers to, it is rejected because the "
+                "target cannot be found"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
@@ -246,9 +304,16 @@ class AUserGrantedNothingMayNotEdit(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 종류를 수정하면 권한 부족으로 거부된다. "
-            "종류는 어느 스코프에도 속하지 않아 그 권한을 받을 방법이 없다"
+        return Says(
+            (
+                "아무 권한도 없는 사용자가 로그인 클라이언트 유형을 수정하면 권한 부족으로 "
+                "거부됩니다. 유형은 어느 스코프에도 속하지 않아 그 권한을 받을 방법이 없습니다"
+            ),
+            english=(
+                "when a user granted nothing updates a login client type, it is rejected for a "
+                "lack of permission. The type belongs to no scope, so there is no way to receive "
+                "that permission"
+            ),
         )
 
     @override
@@ -274,9 +339,17 @@ class AUserGrantedNothingEditingAnUnknownIdIsRefusedForPermission(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 존재하지 않는 id를 수정하면 대상 없음이 아니라 권한 부족으로 "
-            "거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다"
+        return Says(
+            (
+                "아무 권한도 없는 사용자가 존재하지 않는 id 를 수정하면 대상 없음이 아니라 권한 "
+                "부족으로 거부됩니다. 권한 검사가 먼저 실행되고 없는 row 에는 부여된 권한도 없기 "
+                "때문입니다"
+            ),
+            english=(
+                "when a user granted nothing updates an id nothing answers to, it is rejected "
+                "for a lack of permission rather than a missing target, because the permission "
+                "check runs first and no permission is granted on a row that does not exist"
+            ),
         )
 
     @override
@@ -305,7 +378,16 @@ class EnforcementOffLetsAnyoneEdit(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 끄면 아무 권한도 없는 사용자도 종류를 수정할 수 있다"
+        return Says(
+            (
+                "권한 검사를 끄면 아무 권한도 없는 사용자도 로그인 클라이언트 유형을 수정할 수 "
+                "있습니다"
+            ),
+            english=(
+                "turning permission enforcement off lets even a user granted nothing update a "
+                "login client type"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:

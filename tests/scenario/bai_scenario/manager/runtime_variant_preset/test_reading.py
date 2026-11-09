@@ -28,6 +28,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Refused,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -63,7 +64,11 @@ class ReadingById(When[APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVa
     @override
     def describe(self, laid: APresetAndACaller) -> str:
         target = "존재하지 않는 ID" if self.unknown else laid.preset.name
-        return f"{laid.caller.username}의 조회 요청: 대상: {target}"
+        target_en = "an unknown id" if self.unknown else laid.preset.name
+        return Says(
+            f"{laid.caller.username}의 조회 요청: 대상: {target}",
+            english=f"read request from {laid.caller.username}: target: {target_en}",
+        )
 
     @override
     async def call(
@@ -83,9 +88,13 @@ class ReadingManyByIds(When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, 
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return (
-            f"{laid.caller.username}이 미리 만들어 둔 프리셋 {len(laid.laid)}개와 "
-            "존재하지 않는 ID 하나를 함께 조회"
+        return Says(
+            f"{laid.caller.username}이 미리 저장한 런타임 파라미터 {len(laid.laid)}개와 존재하지 "
+            "않는 ID 하나를 함께 조회합니다",
+            english=(
+                f"{laid.caller.username} reads {len(laid.laid)} presets seeded in advance "
+                "together with one unknown id"
+            ),
         )
 
     @override
@@ -110,7 +119,10 @@ class ReadingNoIds(When[APresetAndACaller, RuntimeVariantPresetAdapter, Loaded])
 
     @override
     def describe(self, laid: APresetAndACaller) -> str:
-        return f"{laid.caller.username}이 빈 ID 목록으로 조회"
+        return Says(
+            f"{laid.caller.username}이 빈 ID 목록으로 조회합니다",
+            english=f"{laid.caller.username} reads with an empty id list",
+        )
 
     @override
     async def call(self, adapter: RuntimeVariantPresetAdapter, laid: APresetAndACaller) -> Loaded:
@@ -124,7 +136,7 @@ class NothingComesBack(Then[Any, Loaded]):
 
     @override
     def says(self) -> str:
-        return "빈 응답이 반환된다"
+        return Says("빈 응답이 반환됩니다", english="an empty response comes back")
 
     @override
     def look(self, laid: Any, answered: Answered[Loaded]) -> list[Verdict]:
@@ -148,7 +160,14 @@ class AUserGrantedNothingReadsById(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 ID로 조회해도 해당 프리셋 전체가 반환된다. 이 조회는 인증 여부만 확인한다"
+        return Says(
+            "아무 권한도 없는 사용자가 ID 로 조회해도 해당 런타임 파라미터 전체가 반환됩니다. 이 "
+            "조회는 인증 여부만 확인합니다",
+            english=(
+                "when a user granted nothing reads a preset by id, the whole preset comes back. "
+                "This read checks authentication only"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
@@ -177,9 +196,14 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return (
-            "존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 "
-            "닿지 못하는 것인지는 응답으로 드러나지 않는다"
+        return Says(
+            "존재하지 않는 id 로 조회하면 거부됩니다. 권한을 요구할 대상이 없으므로, 없는 것인지 "
+            "접근하지 못하는 것인지는 응답으로 드러나지 않습니다",
+            english=(
+                "when a read names an id that nothing answers to, it is rejected. There is no "
+                "target to ask for permission on, so the response does not show whether it does "
+                "not exist or cannot be reached"
+            ),
         )
 
     @override
@@ -209,7 +233,14 @@ class MixedIdsComeBackInOrder(
 
     @override
     def describe(self) -> str:
-        return "존재하는 ID 둘과 존재하지 않는 ID 하나를 함께 조회하면 요청한 순서대로 반환되고, 존재하지 않는 ID의 위치는 비어 있다"
+        return Says(
+            "존재하는 ID 둘과 존재하지 않는 ID 하나를 함께 조회하면 요청한 순서대로 반환되고, "
+            "존재하지 않는 ID 의 위치는 비어 있습니다",
+            english=(
+                "when two existing ids and one unknown id are read together, the items come back "
+                "in the order asked and the place of the unknown id is empty"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
@@ -234,7 +265,13 @@ class AnEmptyListAnswersEmpty(
 
     @override
     def describe(self) -> str:
-        return "빈 ID 목록으로 조회하면 빈 응답이 반환되며 하위 계층은 호출하지 않는다"
+        return Says(
+            "빈 ID 목록으로 조회하면 빈 응답이 반환되며 하위 계층은 호출하지 않습니다",
+            english=(
+                "when an empty id list is read, an empty response comes back and the lower layer "
+                "is not called"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
@@ -249,11 +286,44 @@ class AnEmptyListAnswersEmpty(
         return NothingComesBack()
 
 
+@dataclass(frozen=True)
+class AUserWithoutReadPermissionIsRefusedOnBatchRead(
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Loaded]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-without-read-permission-is-refused-on-batch-read"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "public 에서 런타임 파라미터 조회 권한이 없는 사용자가 ID 로 여럿을 조회하면 조회 "
+            "전체가 거부됩니다",
+            english=(
+                "when a user without read permission on presets in public reads several by id, "
+                "the whole read is refused"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
+        return ManyPresetsAndSomeone(reading_in_public=False)
+
+    @override
+    def when(self) -> When[ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Loaded]:
+        return ReadingManyByIds()
+
+    @override
+    def then(self) -> Then[ManyPresetsAndACaller, Loaded]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
 SCENARIOS: list[ReadingStep] = [
     AUserGrantedNothingReadsById(started=datetime.now(UTC)),
     AnIdNothingAnswersToIsNotFound(),
     MixedIdsComeBackInOrder(started=datetime.now(UTC)),
     AnEmptyListAnswersEmpty(),
+    AUserWithoutReadPermissionIsRefusedOnBatchRead(),
 ]
 
 

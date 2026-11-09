@@ -26,6 +26,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Configured,
     Given,
+    Says,
     Scenario,
     Then,
     When,
@@ -44,7 +45,7 @@ from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 MADE = "cpu"
-FRESH = "새로 만든 카테고리"
+FRESH = Says("새로 만든 카테고리", english="a freshly created category")
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
 type Adapter = PrometheusQueryPresetCategoryAdapter
@@ -65,7 +66,10 @@ class Creating(When[ACallerAlone, Adapter, CategoryNodeAnswer]):
 
     @override
     def describe(self, laid: ACallerAlone) -> str:
-        return f"{laid.caller.username}이 이름 {self.named}(으)로 생성"
+        return Says(
+            f"{laid.caller.username}이 이름 {self.named}(으)로 생성합니다",
+            english=f"{laid.caller.username} creates it with the name {self.named}",
+        )
 
     @override
     async def call(self, adapter: Adapter, laid: ACallerAlone) -> CategoryNodeAnswer:
@@ -86,7 +90,13 @@ class CreatingUnderTheSameName(When[ACategoryAndACaller, Adapter, CategoryNodeAn
 
     @override
     def describe(self, laid: ACategoryAndACaller) -> str:
-        return f"{laid.caller.username}이 이미 있는 이름 {laid.category.name}(으)로 다시 생성"
+        return Says(
+            f"{laid.caller.username}이 이미 있는 이름 {laid.category.name}(으)로 다시 생성합니다",
+            english=(
+                f"{laid.caller.username} creates it again with the name "
+                f"{laid.category.name}, which already exists"
+            ),
+        )
 
     @override
     async def call(self, adapter: Adapter, laid: ACategoryAndACaller) -> CategoryNodeAnswer:
@@ -107,8 +117,12 @@ class TheNameAloneMakesAWholeNode(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 이름만 지정해 카테고리를 생성하면, 설명이 비어 있는 노드 전체가 반환된다"
+        return Says(
+            "superadmin 이 이름만 지정해 카테고리를 생성하면, 설명이 비어 있는 노드 전체가 반환됩니다",
+            english=(
+                "when the superadmin creates a category with only a name, "
+                "the whole node comes back with an empty description"
+            ),
         )
 
     @override
@@ -136,7 +150,13 @@ class TheDescriptionComesBackAsGiven(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 이름과 설명을 함께 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다"
+        return Says(
+            "superadmin 이 이름과 설명을 함께 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환됩니다",
+            english=(
+                "when the superadmin creates a category with a name and a description, "
+                "the node comes back carrying the values as given"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACallerAlone]:
@@ -161,9 +181,14 @@ class ANameAnotherCategoryHoldsIsRefused(
 
     @override
     def describe(self) -> str:
-        return (
-            "이미 다른 카테고리가 사용 중인 이름으로 슈퍼관리자가 다시 생성하면, 이름 중복으로 "
-            "거부된다. 저장소의 유일 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다"
+        return Says(
+            "이미 다른 카테고리가 사용 중인 이름으로 superadmin 이 다시 생성하면, 이름 중복으로 "
+            "거부됩니다. 저장소의 유일 제약이 차단하는 것이고 도메인 오류로 옮겨져 있지 않습니다",
+            english=(
+                "when the superadmin creates a category again with a name another category "
+                "already holds, it is rejected as a duplicate name. The unique constraint of "
+                "the repository rejects it and it is not translated into a domain error"
+            ),
         )
 
     @override
@@ -189,7 +214,13 @@ class APlainUserMayNotCreate(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아닌 사용자가 카테고리를 생성하려 하면, 역할 부족으로 거부된다"
+        return Says(
+            "superadmin 이 아닌 사용자가 카테고리를 생성하려 하면, 역할 부족으로 거부됩니다",
+            english=(
+                "when a user who is not the superadmin tries to create a category, "
+                "the role rejects it"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ACallerAlone]:
@@ -214,7 +245,10 @@ class EnforcementOffChangesNothing(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 꺼도 카테고리 생성은 여전히 거부된다"
+        return Says(
+            "권한 검사를 비활성화해도 카테고리 생성은 여전히 거부됩니다",
+            english="turning permission enforcement off still rejects creating a category",
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:

@@ -20,6 +20,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Refused,
     Same,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -51,7 +52,14 @@ class ReadingBothGroupsOfTheProject(When[Laid, SessionGroupAdapter, Answers]):
 
     @override
     def describe(self, laid: Laid) -> str:
-        return f"{laid.caller.username}이 사용자가 만든 세션 그룹, 배포의 replica group이 가진 세션 그룹 순으로 여럿 읽기"
+        return Says(
+            f"{laid.caller.username} 이 사용자가 생성한 세션 그룹, 배포의 replica group 이 가진 "
+            "세션 그룹 순으로 여럿 읽기로 조회합니다",
+            english=(
+                f"{laid.caller.username} bulk reads the session group the user created and then "
+                "the session group held by the deployment's replica group, in that order"
+            ),
+        )
 
     @override
     async def call(self, adapter: SessionGroupAdapter, laid: Laid) -> Answers:
@@ -72,7 +80,10 @@ class ReadingAMissingId(When[Laid, SessionGroupAdapter, Answers]):
 
     @override
     def describe(self, laid: Laid) -> str:
-        return f"{laid.caller.username}이 아무 세션 그룹도 갖지 않은 id로 여럿 읽기"
+        return Says(
+            f"{laid.caller.username} 이 아무 세션 그룹도 갖지 않은 id 로 여럿 읽기로 조회합니다",
+            english=f"{laid.caller.username} bulk reads an id that holds no session group",
+        )
 
     @override
     async def call(self, adapter: SessionGroupAdapter, laid: Laid) -> Answers:
@@ -90,7 +101,10 @@ class ReadingTheUsersGroupById(When[Laid, SessionGroupAdapter, Answers]):
 
     @override
     def describe(self, laid: Laid) -> str:
-        return f"{laid.caller.username}이 사용자가 만든 세션 그룹의 id로 여럿 읽기"
+        return Says(
+            f"{laid.caller.username} 이 사용자가 생성한 세션 그룹의 id 로 여럿 읽기로 조회합니다",
+            english=(f"{laid.caller.username} bulk reads the session group the user created by id"),
+        )
 
     @override
     async def call(self, adapter: SessionGroupAdapter, laid: Laid) -> Answers:
@@ -106,7 +120,14 @@ class OnlyTheUsersGroupComesBack(Then[Laid, Answers]):
 
     @override
     def says(self) -> str:
-        return "첫 자리에 사용자가 만든 세션 그룹 전체가 오고, 배포의 replica group이 가진 세션 그룹 자리는 빈 값이다"
+        return Says(
+            "첫 항목에 사용자가 생성한 세션 그룹 전체가 오고, 배포의 replica group 이 가진 "
+            "세션 그룹 항목은 빈 값입니다",
+            english=(
+                "the whole session group the user created comes back in the first entry and the "
+                "entry for the session group held by the deployment's replica group is empty"
+            ),
+        )
 
     @override
     def look(self, laid: Laid, answered: Answered[Answers]) -> list[Verdict]:
@@ -132,7 +153,10 @@ class TheOnePlaceIsEmpty(Then[Laid, Answers]):
 
     @override
     def says(self) -> str:
-        return "물은 자리가 빈 값이다"
+        return Says(
+            "요청한 항목이 빈 값입니다",
+            english="the requested entry is empty",
+        )
 
     @override
     def look(self, laid: Laid, answered: Answered[Answers]) -> list[Verdict]:
@@ -150,7 +174,10 @@ class TheOnePlaceIsRefused(Then[Laid, Answers]):
 
     @override
     def says(self) -> str:
-        return "물은 자리가 거부된다"
+        return Says(
+            "요청한 항목이 거부됩니다",
+            english="the requested entry is rejected",
+        )
 
     @override
     def look(self, laid: Laid, answered: Answered[Answers]) -> list[Verdict]:
@@ -161,7 +188,13 @@ class TheOnePlaceIsRefused(Then[Laid, Answers]):
             case [Exception() as denial]:
                 return [Refused(self.expected, denial)]
             case _:
-                return [Same("answers", [type(one).__name__ for one in answers], ["거부"])]
+                return [
+                    Same(
+                        "answers",
+                        [type(one).__name__ for one in answers],
+                        [Says("거부", english="rejection")],
+                    )
+                ]
 
 
 @dataclass(frozen=True)
@@ -176,9 +209,15 @@ class AGrantedUserReadsBothGroups(
 
     @override
     def describe(self) -> str:
-        return (
-            "그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 세션 그룹과 "
-            "배포의 replica group이 가진 세션 그룹을 함께 읽으면, 요청한 순서대로 그 세션 그룹과 빈 값이 온다"
+        return Says(
+            "그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 생성한 세션 그룹과 "
+            "배포의 replica group 이 가진 세션 그룹을 함께 읽으면, 요청한 순서대로 그 세션 그룹과 "
+            "빈 값이 옵니다",
+            english=(
+                "when a user granted session group read in that project reads the session group "
+                "the user created and the session group held by the deployment's replica group "
+                "together, that session group and an empty entry come back in the requested order"
+            ),
         )
 
     @override
@@ -204,9 +243,13 @@ class AUserGrantedNothingMayNotBulkRead(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 사용자가 만든 세션 그룹을 id로 여럿 읽으면, "
-            "그 자리가 권한 부족으로 거부된다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 사용자가 생성한 세션 그룹을 id 로 여럿 읽기로 "
+            "조회하면, 그 항목이 권한 부족으로 거부됩니다",
+            english=(
+                "when a user with no grant bulk reads the session group the user created by id, "
+                "that entry is rejected for lack of permission"
+            ),
         )
 
     @override
@@ -232,9 +275,15 @@ class TheSuperadminReadsAMissingId(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 아무 세션 그룹도 갖지 않은 id로 여럿 읽으면, 그 자리가 빈 값으로 온다. "
-            "권한 검사를 통과하는 사람이어야 읽기의 답을 볼 수 있어 행위자가 슈퍼관리자다"
+        return Says(
+            "superadmin 이 아무 세션 그룹도 갖지 않은 id 로 여럿 읽기로 조회하면, 그 항목이 빈 "
+            "값으로 옵니다. 권한 검사를 통과하는 사람이어야 읽기의 응답을 볼 수 있어 요청한 "
+            "사용자가 superadmin 입니다",
+            english=(
+                "when a superadmin bulk reads an id that holds no session group, that entry comes "
+                "back empty; only someone who passes the permission check can see the answer of a "
+                "read, so the requesting user is a superadmin"
+            ),
         )
 
     @override

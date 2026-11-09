@@ -21,46 +21,53 @@ updated:
 status: stable
 ---
 
-# 컨테이너 레지스트리 서비스 — 배경
+# Container registry service: Knowledge
 
-> 규칙: `../AGENTS.md`. 액션 shape와 게이트: `../../actions/KNOWLEDGE.md`.
+> Rules: `../AGENTS.md`. Action shapes and the gate: `../../actions/KNOWLEDGE.md`.
 
-컨테이너 레지스트리는 매니저가 이미지를 스캔해 오는 전역 엔티티다. 이 서비스는 Harbor가
-프로젝트마다 두는 스토리지 quota도 다룬다. quota 연산은 레지스트리를 직접 받지 않고,
-레지스트리를 가리키는 프로젝트를 받아 거기서 레지스트리를 찾아간다.
+A container registry is a global entity the Manager scans for images. This service also
+handles the storage quota Harbor keeps per project. A quota operation does not take the
+registry directly; it takes the project that references the registry and finds the registry
+from it.
 
-## quota 연산의 권한은 processor가 아니라 API단이 거른다
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-| 진입점 | 게이트 | 통과하는 역할 |
+## A quota operation's permission is gated at the API layer, not in the processor
+
+| Entry point | Gate | Roles that pass |
 |---|---|---|
-| REST v1 `/group/registry-quota` | route의 `superadmin_required` middleware | SUPERADMIN |
-| 레거시 GraphQL quota mutation | mutation 클래스의 `allowed_roles` | SUPERADMIN, ADMIN |
-| 레거시 GraphQL `GroupNode.registry_quota` | 없음 | 노드를 조회할 수 있는 누구나 |
+| REST v1 `/group/registry-quota` | the route's `superadmin_required` middleware | SUPERADMIN |
+| legacy GraphQL quota mutation | the mutation class's `allowed_roles` | SUPERADMIN, ADMIN |
+| legacy GraphQL `GroupNode.registry_quota` | none | anyone who can read the node |
 
-- quota processor 넷은 `anonymous_global`로 배선된다. monitor만 붙고 validator는 없으며,
-  카탈로그에는 anonymous 게이트로 잡힌다.
-- `global` shape를 쓰지 않은 이유는 그 SUPERADMIN 게이트가 레거시 GraphQL mutation이 허용하는
-  ADMIN을 잘라내기 때문이다.
-- 지향점은 프로젝트를 스코프로 삼는 `scope` shape다. seed role이 아직 `container_registry: [read]`만
-  주므로, 쓰기 권한이 role에 추가된 뒤에 옮긴다.
-- webhook processor도 같은 anonymous 배선이다. Harbor는 keypair가 없으므로 서비스가 webhook secret을
-  직접 검사한다.
+- The four quota processors are connected as `anonymous_global`. Only the monitor is attached,
+  with no validator, and the catalog records them under the anonymous gate.
+- The reason for not using the `global` shape is that its SUPERADMIN gate cuts out the ADMIN
+  that the legacy GraphQL mutation allows.
+- The target is the `scope` shape with the project as the scope. The seed role still grants
+  only `container_registry: [read]`, so it moves after the write permission is added to the role.
+- The webhook processor uses the same anonymous connection. Harbor has no keypair, so the service
+  checks the webhook secret itself.
 
-## quota 연산은 프로젝트를 거쳐 레지스트리에 닿는다
+## A quota operation reaches the registry through the project
 
 - `get_project_registry` reads the project's default registry: the
   `association_container_registries_groups` row with `is_default` set. Without one it is
   `ContainerRegistryNotFound`. Session commit finds its registry through the same lookup.
 - The `groups.container_registry` JSON column is no longer read.
-- 클라이언트 pool은 레지스트리 타입으로 클라이언트를 고른다. 구현은 `HARBOR2`뿐이라 다른 타입은
-  `ContainerRegistryQuotaNotSupported`다.
-- `project`·`username`·`password` 중 하나라도 null인 레지스트리는 Harbor를 부르기 전에
-  `ContainerRegistryQuotaNotConfigurable`로 거부된다. `ssl_verify`는 null이어도 거부하지 않고
-  `True`(TLS 검증)로 본다. 컬럼의 `server_default`와 같다.
-- `HarborQuotaClient`는 호출마다 세션을 열므로 pool은 연결 상태를 갖지 않고 close도 필요 없다.
+- The client pool picks a client by registry type. The only implementation is `HARBOR2`, so
+  any other type is `ContainerRegistryQuotaNotSupported`.
+- A registry whose `project`, `username` or `password` is null is rejected with
+  `ContainerRegistryQuotaNotConfigurable` before Harbor is called. A null `ssl_verify` is not
+  rejected and is read as `True` (TLS verification), the same as the column's `server_default`.
+- `HarborQuotaClient` opens a session per call, so the pool keeps no connection state and needs
+  no close.
 
-## 이름과 registry 내부 프로젝트명 조회는 찾은 레지스트리의 읽기 권한을 검사한다
+## The name and inner-project lookup checks read permission on the found registry
 
-- `lookup_by_name_and_registry_project`는 이름과 registry 내부 프로젝트명을 기존 lookup으로 해석하고 registry ID를 반환한다.
-- 인증 후 lookup을 수행하고, 찾은 registry의 읽기 권한을 검사한다. 일반 사용자에게는 미존재와 권한 부족을 같은 오류로 반환한다.
-- 여러 registry가 같은 키에 대응하면 공통 lookup이 거부하며 임의의 행을 선택하지 않는다.
+- `lookup_by_name_and_registry_project` resolves the name and the registry's inner project name
+  through the existing lookup and returns the registry ID.
+- It performs the lookup after authentication and checks read permission on the found registry.
+  For an ordinary user it returns non-existence and lack of permission as the same error.
+- When several registries match the same key, the shared lookup rejects the request and does not pick an
+  arbitrary row.

@@ -19,7 +19,7 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
 from ai.backend.common.dto.manager.v2.role_preset.response import RolePresetNode
 from ai.backend.manager.api.adapters.role_preset.adapter import RolePresetAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.role_preset import (
     EveryTargetComesBack,
     ManyPresetsAndACaller,
@@ -49,9 +49,14 @@ class SoftDeletingEvery(When[ManyPresetsAndACaller, RolePresetAdapter, Deleted])
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return (
-            f"{laid.caller.username}이 프리셋 {len(laid.laid)}개{besides}를 한 번에 soft delete 함"
+        besides_ko = " 와 없는 id 하나" if self.missing is not None else ""
+        besides_en = " and one missing id" if self.missing is not None else ""
+        return Says(
+            f"{laid.caller.username}이 프리셋 {len(laid.laid)}개{besides_ko}를 "
+            "한 번에 soft delete 합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {len(laid.laid)} presets{besides_en} at once"
+            ),
         )
 
     @override
@@ -73,9 +78,13 @@ class SoftDeletingThenRestoringEvery(When[ManyPresetsAndACaller, RolePresetAdapt
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        return (
-            f"{laid.caller.username}이 프리셋 {len(laid.laid)}개를 한 번에 soft delete "
-            "했다가 한 번에 restore 함"
+        return Says(
+            f"{laid.caller.username}이 프리셋 {len(laid.laid)}개를 한 번에 soft delete 한 뒤 "
+            "한 번에 restore 합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {len(laid.laid)} presets at once "
+                "and then restores them at once"
+            ),
         )
 
     @override
@@ -98,8 +107,12 @@ class PurgingEvery(When[ManyPresetsAndACaller, RolePresetAdapter, Deleted]):
 
     @override
     def describe(self, laid: ManyPresetsAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 프리셋 {len(laid.laid)}개{besides}를 한 번에 purge 함"
+        besides_ko = " 와 없는 id 하나" if self.missing is not None else ""
+        besides_en = " and one missing id" if self.missing is not None else ""
+        return Says(
+            f"{laid.caller.username}이 프리셋 {len(laid.laid)}개{besides_ko}를 한 번에 purge 합니다",
+            english=(f"{laid.caller.username} purges {len(laid.laid)} presets{besides_en} at once"),
+        )
 
     @override
     async def call(self, adapter: RolePresetAdapter, laid: ManyPresetsAndACaller) -> Deleted:
@@ -108,6 +121,28 @@ class PurgingEvery(When[ManyPresetsAndACaller, RolePresetAdapter, Deleted]):
             ids.append(self.missing)
         with ActingAs(laid.caller):
             return await adapter.partial_bulk_purge(PartialBulkPurgeRolePresetsInput(ids=ids))
+
+
+@dataclass(frozen=True)
+class RestoringEvery(When[ManyPresetsAndACaller, RolePresetAdapter, Deleted]):
+    """대상 프리셋들을 한 번에 restore 한다."""
+
+    @override
+    def operation(self) -> str:
+        return "partial_bulk_restore"
+
+    @override
+    def describe(self, laid: ManyPresetsAndACaller) -> str:
+        return Says(
+            f"{laid.caller.username}이 프리셋 {len(laid.laid)}개를 한 번에 restore 합니다",
+            english=f"{laid.caller.username} restores {len(laid.laid)} presets at once",
+        )
+
+    @override
+    async def call(self, adapter: RolePresetAdapter, laid: ManyPresetsAndACaller) -> Deleted:
+        ids: list[UUID] = [preset.id for preset in laid.laid]
+        with ActingAs(laid.caller):
+            return await adapter.partial_bulk_restore(PartialBulkRestoreRolePresetsInput(ids=ids))
 
 
 @dataclass(frozen=True)
@@ -122,9 +157,14 @@ class SoftDeletingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "프리셋 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 삭제 표시가 켜진 채 오고 "
-            "없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "프리셋 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 삭제로 표시된 채 오고 "
+            "없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when two presets and one missing id are soft-deleted at once, "
+                "the two come back marked deleted and the missing id comes back in the "
+                "failed list because there is no such target"
+            ),
         )
 
     @override
@@ -150,9 +190,14 @@ class AUserGrantedNothingSoftDeletesNone(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 soft delete 하려 하면, "
-            "soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+            "soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to soft delete several presets at once, "
+                "none is soft-deleted and every one comes back in the failed list for "
+                "lack of permission"
+            ),
         )
 
     @override
@@ -180,7 +225,13 @@ class RestoringBringsSeveralBack(
 
     @override
     def describe(self) -> str:
-        return "soft delete 된 프리셋 여럿을 한 번에 restore 하면, 모두 삭제 표시가 꺼진 채 온다"
+        return Says(
+            "soft delete 된 프리셋 여럿을 한 번에 restore 하면, 모두 삭제로 표시되지 않은 채 옵니다",
+            english=(
+                "when several soft-deleted presets are restored at once, "
+                "all of them come back not marked deleted"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
@@ -207,9 +258,14 @@ class PurgingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 하기 전의 모습으로 오고 "
-            "없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+            "없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when two presets and one missing id are purged at once, "
+                "the two come back as they were before the purge and the missing id "
+                "comes back in the failed list because there is no such target"
+            ),
         )
 
     @override
@@ -235,9 +291,14 @@ class AUserGrantedNothingPurgesNone(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, "
-            "purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+            "purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to purge several presets at once, "
+                "none is purged and every one comes back in the failed list for "
+                "lack of permission"
+            ),
         )
 
     @override
@@ -253,10 +314,44 @@ class AUserGrantedNothingPurgesNone(
         return NothingIsProcessed(reason="Insufficient permission")
 
 
+@dataclass(frozen=True)
+class AUserGrantedNothingRestoresNone(
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, RolePresetAdapter, Deleted]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-granted-nothing-restores-none-of-several-presets"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 restore 하려 하면, "
+            "restore 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to restore several presets at once, "
+                "none is restored and every one comes back in the failed list for "
+                "lack of permission"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
+        return ManyPresetsAndSomeone()
+
+    @override
+    def when(self) -> When[ManyPresetsAndACaller, RolePresetAdapter, Deleted]:
+        return RestoringEvery()
+
+    @override
+    def then(self) -> Then[ManyPresetsAndACaller, Deleted]:
+        return NothingIsProcessed(reason="Insufficient permission")
+
+
 SCENARIOS: list[DeletingStep] = [
     SoftDeletingAnswersForTheMissingOne(started=datetime.now(UTC)),
     AUserGrantedNothingSoftDeletesNone(),
     RestoringBringsSeveralBack(started=datetime.now(UTC)),
+    AUserGrantedNothingRestoresNone(),
     PurgingAnswersForTheMissingOne(started=datetime.now(UTC)),
     AUserGrantedNothingPurgesNone(),
 ]

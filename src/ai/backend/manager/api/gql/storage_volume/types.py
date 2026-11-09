@@ -64,6 +64,7 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticOutputMixin,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.errors.api import NotImplementedAPI
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.storage_volume_service_attachment.types import (
@@ -241,7 +242,7 @@ class StorageVolumeGQL(PydanticNodeMixin[StorageVolumeNode]):
         ]
         | None
     ):
-        raise NotImplementedError
+        raise NotImplementedAPI()
 
     @classmethod
     @override
@@ -252,7 +253,7 @@ class StorageVolumeGQL(PydanticNodeMixin[StorageVolumeNode]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[StorageVolumeGQL | None]:
-        raise NotImplementedError
+        raise NotImplementedAPI()
 
 
 @gql_connection_type(

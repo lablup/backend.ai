@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.request import (
 from ai.backend.common.dto.manager.v2.runtime_variant.response import RuntimeVariantNode
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.runtime_variant import (
     EveryLaidVariantComesBack,
     ManyVariantsAndACaller,
@@ -47,7 +47,15 @@ class PurgingEveryLaid(When[ManyVariantsAndACaller, RuntimeVariantAdapter, Purge
     @override
     def describe(self, laid: ManyVariantsAndACaller) -> str:
         besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 변형 {len(laid.laid)}개{besides}를 한 번에 purge 함"
+        besides_en = " and one unknown id" if self.missing is not None else ""
+        return Says(
+            f"{laid.caller.username}이 인퍼런스 런타임 종류 {len(laid.laid)}개{besides}를 한 번에 "
+            "purge 합니다",
+            english=(
+                f"{laid.caller.username} purges {len(laid.laid)} runtime variants{besides_en} "
+                "in one call"
+            ),
+        )
 
     @override
     async def call(self, adapter: RuntimeVariantAdapter, laid: ManyVariantsAndACaller) -> Purged:
@@ -71,9 +79,14 @@ class PurgingAnswersForTheMissingOne(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 변형 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 모습으로 "
-            "처리된 목록에 오고 없는 id 는 실패 목록에 온다"
+        return Says(
+            "superadmin 이 인퍼런스 런타임 종류 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge "
+            "되기 전 모습으로 처리된 목록에 오고 없는 id 는 실패 목록에 옵니다",
+            english=(
+                "when the superadmin purges two runtime variants and one unknown id in one call, "
+                "the two come back in the processed list as they were before the purge, and the "
+                "unknown id comes back in the failed list"
+            ),
         )
 
     @override
@@ -99,9 +112,14 @@ class AUserGrantedNothingPurgesNone(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 없는 사용자가 변형 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 없는 사용자가 인퍼런스 런타임 종류 여럿을 한 번에 purge 하려 하면, purge "
+            "된 것 없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted nothing tries to purge several runtime variants in one "
+                "call, nothing is purged and every one comes back in the failed list for lack "
+                "of permission"
+            ),
         )
 
     @override

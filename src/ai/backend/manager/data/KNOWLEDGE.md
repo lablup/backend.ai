@@ -12,23 +12,25 @@ generated:
 status: draft
 ---
 
-# Manager data — Knowledge
+# Manager data: Knowledge
 
 > Rules: `AGENTS.md` in the same directory.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## The boundary criterion
 
-There are four package axes that handle data — `data/`, `dto/`, `schema/`,
+There are four package axes that handle data: `data/`, `dto/`, `schema/`,
 `views/`. They can exist in common and per component, but only the manager
 touches the DB, so `views/` (and DB-coupled schema declarations) exist only in
 the manager. Ask where the value goes:
 
 | The value... | Location |
 |---|---|
-| leaves the process as (part of) an API response | `data/` — converted to a DTO in the adapter |
+| leaves the process as (part of) an API response | `data/`: converted to a DTO in the adapter |
 | is the wire format itself (validated request/response) | `dto/` (manager-only) or `common/dto/` (shared) |
-| is a declaration of structure (a validatable schema type) | `schema/` — e.g. `common/schema/` |
-| is an internal read projection for decisions (scheduler, coordinator) | `views/` — manager-only |
+| is a declaration of structure (a validatable schema type) | `schema/`: e.g. `common/schema/` |
+| is an internal read projection for decisions (scheduler, coordinator) | `views/`: manager-only |
 
 `data/` is what repositories return instead of ORM rows. It flows upward
 freely; rows do not.
@@ -52,4 +54,4 @@ freely; rows do not.
 
 - The purity rules (frozen dataclasses, imports from stdlib + `common.types` only) are the target state, not the current state.
 - Known gaps: pydantic in several session/deployment modules, filter types in `data/common/types.py` that know SQLAlchemy columns, more mutable creator/modifier dataclasses than frozen ones.
-- Treat the rules as the direction for new code — do not cite existing violations as precedent, and do not mass-fix them outside a dedicated cleanup task.
+- Treat the rules as the direction for new code: do not cite existing violations as precedent, and do not mass-fix them outside a dedicated cleanup task.

@@ -44,6 +44,7 @@ DEFAULT_CHUNK_SIZE: Final = 16 * (2**20)  # 16 MiB
 DEFAULT_ROLE: Final = "main"
 
 PASSWORD_PLACEHOLDER: Final = "*****"
+SECRET_KEY_PLACEHOLDER: Final = "*****"
 
 
 # Mapping between vfolder names and their in-container paths.

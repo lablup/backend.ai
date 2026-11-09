@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from typing import Any, override
 from uuid import UUID
 
@@ -42,15 +43,19 @@ from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.components.domain import WAS_HERE, Mentions, SomeoneOf, WrittenByThisRun
 from bai_scenario.components.system import KEPT, Kept, role_named
+from bai_scenario.seeds.agent.agent import TestSeedAgent
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.project.project import TestSeedProject
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
@@ -60,12 +65,16 @@ from bai_scenario.seeds.resource_group.resource_group import (
     TestSeedResourceGroup,
 )
 from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.resource_slot.agent_resource import TestSeedReportedSlot
+from bai_scenario.seeds.resource_slot.slot_type import TestSeedResourceSlotType
 from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 
 type Loaded = list[ResourceGroupDetailNode | Exception | None]
 type Processed = PartialBulkPayload[ResourceGroupDetailNode]
 
 SCHEDULER = "fifo"
+REPORTED_CAPACITY = Decimal("10")
+REPORTED_USED = Decimal("0")
 
 
 # ------------------------------------------------------------------ situations
@@ -73,10 +82,14 @@ SCHEDULER = "fifo"
 
 @dataclass(frozen=True)
 class AGroupAndACaller:
-    """리소스 그룹 하나와, 그것을 호출할 사용자."""
+    """리소스 그룹 하나와, 그것을 호출할 사용자.
+
+    ``slot_name``은 그룹의 에이전트가 보고한 슬롯 종류다. 보고하는 에이전트가 없으면 비어 있다.
+    """
 
     group: ResourceGroupData
     caller: UserData
+    slot_name: str = ""
 
 
 @dataclass(frozen=True)
@@ -117,7 +130,13 @@ class SomeoneGrantedOnTheGroup(TestSeedNest[Laid[None]]):
 
     @override
     def kind(self) -> str:
-        return f"리소스 그룹 범위의 {self.permission.name} 역할을 받은 사용자 준비"
+        return Says(
+            f"리소스 그룹 범위의 {self.permission.name} 역할을 받은 사용자 준비",
+            english=(
+                f"Prepare a user granted the {self.permission.name} role "
+                "in the resource group scope"
+            ),
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[None]:
@@ -142,7 +161,10 @@ class SomeoneReadingGroupsInTheDomain(TestSeedNest[Laid[None]]):
 
     @override
     def kind(self) -> str:
-        return "도메인 범위의 리소스 그룹 읽기 역할을 받은 사용자 준비"
+        return Says(
+            "도메인 범위의 리소스 그룹 읽기 역할을 받은 사용자 준비",
+            english="Prepare a user granted the resource group read role in the domain scope",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[None]:
@@ -160,20 +182,43 @@ class SomeoneReadingGroupsInTheDomain(TestSeedNest[Laid[None]]):
 
 @dataclass(frozen=True)
 class AGroupAndSomeone(Given[Any, AGroupAndACaller]):
-    """그룹 하나와 사용자 한 명. ``granted``를 주면 그 그룹에 앉힌 역할로 그 권한을 받는다."""
+    """그룹 하나와 사용자 한 명. ``granted``를 주면 그 그룹에 앉힌 역할로 그 권한을 받는다.
+
+    ``reports_a_slot``이면 그 그룹의 에이전트가 슬롯 종류 하나를 용량과 함께 보고한다.
+    """
 
     role: UserRole = UserRole.USER
     granted: Permission | None = None
     description: str | None = None
     is_active: bool = True
     is_default: bool = False
+    reports_a_slot: bool = False
 
     @override
     def describe(self) -> str:
-        who = role_named(self.role)
+        named = role_named(self.role)
+        who: str = named
         if self.granted is not None:
-            who = f"그 그룹 범위의 {self.granted.name} 역할을 받은 {who}"
-        return f"리소스 그룹 하나와, {who} 한 명"
+            who = Says(
+                f"그 그룹 범위의 {self.granted.name} 역할을 받은 {named}",
+                english=(
+                    f"{in_language(named, Language.ENGLISH)} granted the "
+                    f"{self.granted.name} role in the group scope"
+                ),
+            )
+        if self.reports_a_slot:
+            return Says(
+                f"리소스 그룹 하나와, {who} 한 명. 그 그룹의 에이전트가 슬롯 종류 하나를 용량과 "
+                "함께 보고합니다",
+                english=(
+                    f"one resource group and one {in_language(who, Language.ENGLISH)}. "
+                    "the group's agent reports one resource slot type with its capacity"
+                ),
+            )
+        return Says(
+            f"리소스 그룹 하나와, {who} 한 명",
+            english=f"one resource group and one {in_language(who, Language.ENGLISH)}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> AGroupAndACaller:
@@ -183,10 +228,24 @@ class AGroupAndSomeone(Given[Any, AGroupAndACaller]):
                 description=self.description, is_active=self.is_active, is_default=self.is_default
             )
         )
+        slot_name = ""
+        if self.reports_a_slot:
+            slot_type = await seeding.creating(TestSeedResourceSlotType(name_hint="slot"))
+            agent = await seeding.creating_from(TestSeedAgent(), group)
+            slot_name = slot_type.name
+            await seeding.adding(
+                TestSeedReportedSlot(
+                    agent_id=agent.name,
+                    slot_name=slot_name,
+                    capacity=REPORTED_CAPACITY,
+                    used=REPORTED_USED,
+                ),
+                agent,
+            )
         caller = await seeding.within(SomeoneOf(home, role=self.role))
         if self.granted is not None:
             await seeding.within(SomeoneGrantedOnTheGroup(group, caller, self.granted))
-        return AGroupAndACaller(seeding.made(group), seeding.made(caller))
+        return AGroupAndACaller(seeding.made(group), seeding.made(caller), slot_name)
 
 
 @dataclass(frozen=True)
@@ -197,8 +256,13 @@ class AGroupBesideTheDefaultAndSomeone(Given[Any, AGroupAndACaller]):
 
     @override
     def describe(self) -> str:
-        return (
-            f"기본 리소스 그룹 하나와 기본이 아닌 그룹 하나, 그리고 {role_named(self.role)} 한 명"
+        named = role_named(self.role)
+        return Says(
+            f"기본 리소스 그룹 하나와 기본이 아닌 그룹 하나, 그리고 {named} 한 명",
+            english=(
+                "one default resource group, one non-default group and "
+                f"one {in_language(named, Language.ENGLISH)}"
+            ),
         )
 
     @override
@@ -218,7 +282,11 @@ class TwoGroupsAndSomeone(Given[Any, ManyGroupsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"리소스 그룹 둘과, {role_named(self.role)} 한 명"
+        named = role_named(self.role)
+        return Says(
+            f"리소스 그룹 둘과, {named} 한 명",
+            english=f"two resource groups and one {in_language(named, Language.ENGLISH)}",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyGroupsAndACaller:
@@ -241,7 +309,14 @@ class AnActiveAndAnInactiveGroup(Given[Any, ManyGroupsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"활성 리소스 그룹 하나와 비활성 하나, 그리고 {role_named(self.role)} 한 명"
+        named = role_named(self.role)
+        return Says(
+            f"활성 리소스 그룹 하나와 비활성 하나, 그리고 {named} 한 명",
+            english=(
+                "one active resource group, one inactive group and "
+                f"one {in_language(named, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyGroupsAndACaller:
@@ -270,15 +345,34 @@ class ADomainGroupsAndSomeone(Given[Any, ADomainGroupsAndACaller]):
 
     @override
     def describe(self) -> str:
-        who = role_named(self.role)
+        named = role_named(self.role)
+        who: str = named
         if self.reading:
-            who = f"그 도메인 범위의 리소스 그룹 읽기 역할을 받은 {who}"
-        groups = (
-            "도메인에 건 리소스 그룹 하나와 걸지 않은 그룹 하나"
+            who = Says(
+                f"그 도메인 범위의 리소스 그룹 읽기 역할을 받은 {named}",
+                english=(
+                    f"{in_language(named, Language.ENGLISH)} granted the "
+                    "resource group read role in the domain scope"
+                ),
+            )
+        groups: str = (
+            Says(
+                "도메인에 건 리소스 그룹 하나와 걸지 않은 그룹 하나",
+                english="one resource group linked to the domain and one not linked",
+            )
             if self.linked
-            else "어느 것도 도메인에 걸지 않은 리소스 그룹 둘"
+            else Says(
+                "어느 것도 도메인에 걸지 않은 리소스 그룹 둘",
+                english="two resource groups neither of which is linked to the domain",
+            )
         )
-        return f"도메인 하나, {groups}, 그리고 {who} 한 명"
+        return Says(
+            f"도메인 하나, {groups}, 그리고 {who} 한 명",
+            english=(
+                f"one domain, {in_language(groups, Language.ENGLISH)}, and "
+                f"one {in_language(who, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ADomainGroupsAndACaller:
@@ -304,8 +398,22 @@ class AProjectAGroupAndSomeone(Given[Any, AProjectAGroupAndACaller]):
 
     @override
     def describe(self) -> str:
-        group = "프로젝트에 건 리소스 그룹 하나" if self.linked else "리소스 그룹 하나"
-        return f"프로젝트 하나와 {group}, 그리고 {role_named(self.role)} 한 명"
+        named = role_named(self.role)
+        group: str = (
+            Says(
+                "프로젝트에 건 리소스 그룹 하나",
+                english="one resource group linked to the project",
+            )
+            if self.linked
+            else Says("리소스 그룹 하나", english="one resource group")
+        )
+        return Says(
+            f"프로젝트 하나와 {group}, 그리고 {named} 한 명",
+            english=(
+                f"one project, {in_language(group, Language.ENGLISH)} and "
+                f"one {in_language(named, Language.ENGLISH)}"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> AProjectAGroupAndACaller:
@@ -349,7 +457,10 @@ class GroupLook:
     ) -> list[Verdict]:
         preemption = seed.scheduler.options.preemption
         return [
-            Skipped(f"{prefix}id", "데이터베이스가 만든다"),
+            Skipped(
+                f"{prefix}id",
+                Says("데이터베이스가 생성합니다", english="the database generates it"),
+            ),
             Same(f"{prefix}name", node.name, _or(self.named, seed.name)),
             Same(
                 f"{prefix}status.is_active",
@@ -421,8 +532,20 @@ class GroupLook:
                 node.scheduler.preemption.victim_scope,
                 _or(self.victim_scope, preemption.victim_scope),
             ),
-            Skipped(f"{prefix}default_deployment_options", "설치본이 정한 기본값이다"),
-            Skipped(f"{prefix}default_session_options", "설치본이 정한 기본값이다"),
+            Skipped(
+                f"{prefix}default_deployment_options",
+                Says(
+                    "설치본이 정한 기본값입니다",
+                    english="the default the installation sets",
+                ),
+            ),
+            Skipped(
+                f"{prefix}default_session_options",
+                Says(
+                    "설치본이 정한 기본값입니다",
+                    english="the default the installation sets",
+                ),
+            ),
         ]
 
 
@@ -440,7 +563,10 @@ class TheNewGroupNode(Then[Any, ResourceGroupDetailNode]):
 
     @override
     def says(self) -> str:
-        return "만든 리소스 그룹 전체가 반환된다"
+        return Says(
+            "생성한 리소스 그룹 전체가 반환됩니다",
+            english="the whole resource group just created comes back",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[ResourceGroupDetailNode]) -> list[Verdict]:
@@ -448,7 +574,7 @@ class TheNewGroupNode(Then[Any, ResourceGroupDetailNode]):
         if node is None:
             return [Refused(EntityNotFoundError, answered.raised)]
         return [
-            Skipped("id", "데이터베이스가 만든다"),
+            Skipped("id", Says("데이터베이스가 생성합니다", english="the database generates it")),
             Same("name", node.name, self.named),
             Same("status.is_active", node.status.is_active, True),
             Same("status.is_public", node.status.is_public, True),
@@ -484,8 +610,20 @@ class TheNewGroupNode(Then[Any, ResourceGroupDetailNode]):
                 node.scheduler.preemption.victim_scope,
                 PreemptionVictimScope.USER,
             ),
-            Skipped("default_deployment_options", "설치본이 정한 기본값이다"),
-            Skipped("default_session_options", "설치본이 정한 기본값이다"),
+            Skipped(
+                "default_deployment_options",
+                Says(
+                    "설치본이 정한 기본값입니다",
+                    english="the default the installation sets",
+                ),
+            ),
+            Skipped(
+                "default_session_options",
+                Says(
+                    "설치본이 정한 기본값입니다",
+                    english="the default the installation sets",
+                ),
+            ),
         ]
 
 
@@ -497,7 +635,10 @@ class TheGroupNode(Then[AGroupAndACaller, ResourceGroupDetailNode]):
 
     @override
     def says(self) -> str:
-        return "미리 만들어 둔 리소스 그룹 전체가 반환된다"
+        return Says(
+            "미리 저장한 리소스 그룹 전체가 반환됩니다",
+            english="the whole resource group seeded in advance comes back",
+        )
 
     @override
     def look(
@@ -515,7 +656,10 @@ class TheLaidGroupsAreLeft(Then[ManyGroupsAndACaller, ResourceGroupSearchPayload
 
     @override
     def says(self) -> str:
-        return "응답에 나와야 하는 리소스 그룹만 반환된다"
+        return Says(
+            "응답에 나와야 하는 리소스 그룹만 반환됩니다",
+            english="only the resource groups that must appear in the response come back",
+        )
 
     @override
     def look(
@@ -542,7 +686,10 @@ class OnlyTheNamedGroupIsLeft(Then[ManyGroupsAndACaller, ResourceGroupSearchPayl
 
     @override
     def says(self) -> str:
-        return "필터에 맞는 리소스 그룹 하나만 반환된다"
+        return Says(
+            "필터에 맞는 리소스 그룹 하나만 반환됩니다",
+            english="only the one resource group the filter names comes back",
+        )
 
     @override
     def look(
@@ -565,7 +712,10 @@ class TheFirstGroupPage(Then[ManyGroupsAndACaller, ResourceGroupSearchPayload]):
 
     @override
     def says(self) -> str:
-        return "한 건짜리 첫 페이지가 반환된다"
+        return Says(
+            "한 건짜리 첫 페이지가 반환됩니다",
+            english="the first page holding one item comes back",
+        )
 
     @override
     def look(
@@ -588,7 +738,10 @@ class OnlyTheLinkedGroupIsLeft(Then[ADomainGroupsAndACaller, ResourceGroupSearch
 
     @override
     def says(self) -> str:
-        return "도메인에 건 리소스 그룹 하나만 반환된다"
+        return Says(
+            "도메인에 건 리소스 그룹 하나만 반환됩니다",
+            english="only the one resource group linked to the domain comes back",
+        )
 
     @override
     def look(
@@ -613,7 +766,12 @@ class TheGroupsInTheOrderAsked(Then[ManyGroupsAndACaller, Loaded]):
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로 반환되고, 없는 것에 해당하는 항목은 비어 있다"
+        return Says(
+            "요청한 순서대로 반환되고, 없는 것에 해당하는 항목은 비어 있습니다",
+            english=(
+                "the items come back in the order requested and the item for a missing one is empty"
+            ),
+        )
 
     @override
     def look(self, laid: ManyGroupsAndACaller, answered: Answered[Loaded]) -> list[Verdict]:
@@ -626,7 +784,13 @@ class TheGroupsInTheOrderAsked(Then[ManyGroupsAndACaller, Loaded]):
         for i, expected in enumerate(laid.laid):
             got = items[i] if i < len(items) else None
             if not isinstance(got, ResourceGroupDetailNode):
-                seen.append(Same(f"items[{i}]", got, "노드"))
+                seen.append(
+                    Same(
+                        f"items[{i}]",
+                        got,
+                        Says("노드", english="node"),
+                    )
+                )
                 continue
             seen.extend(look.verdicts(f"items[{i}].", got, expected))
         last = items[asked - 1] if len(items) >= asked else "없음"
@@ -644,8 +808,17 @@ class EveryGroupIsProcessed(Then[ManyGroupsAndACaller, Processed]):
     @override
     def says(self) -> str:
         if self.missing is None:
-            return "그룹이 모두 처리된 목록에 오고, 실패한 것은 없다"
-        return "그룹이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+            return Says(
+                "그룹이 모두 처리된 목록에 오고, 실패한 것은 없습니다",
+                english="every group comes back in the processed list and nothing failed",
+            )
+        return Says(
+            "그룹이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "every group comes back in the processed list and an unknown id comes back "
+                "in the failed list because no target answers to it"
+            ),
+        )
 
     @override
     def look(self, laid: ManyGroupsAndACaller, answered: Answered[Processed]) -> list[Verdict]:
@@ -660,7 +833,14 @@ class EveryGroupIsProcessed(Then[ManyGroupsAndACaller, Processed]):
         seen.append(Same("failed count", len(payload.failed), 1))
         for failure in payload.failed:
             seen += [
-                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held[UUID](
+                    "failed[0].id",
+                    failure.id,
+                    SameAs(
+                        self.missing,
+                        Says("요청에 넣은 없는 id", english="the unknown id put in the request"),
+                    ),
+                ),
                 Held("failed[0].message", failure.message, Mentions("not found")),
             ]
         return seen
@@ -674,7 +854,10 @@ class NoGroupIsProcessed(Then[ManyGroupsAndACaller, Processed]):
 
     @override
     def says(self) -> str:
-        return "처리된 그룹 없이 그룹이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 그룹 없이 그룹이 모두 실패 목록에 옵니다",
+            english="no group is processed and every group comes back in the failed list",
+        )
 
     @override
     def look(self, laid: ManyGroupsAndACaller, answered: Answered[Processed]) -> list[Verdict]:
@@ -687,7 +870,11 @@ class NoGroupIsProcessed(Then[ManyGroupsAndACaller, Processed]):
         ]
         for i, (failure, group) in enumerate(zip(payload.failed, laid.laid, strict=False)):
             seen += [
-                Held[UUID](f"failed[{i}].id", failure.id, SameAs(group.id, "그룹의 id")),
+                Held[UUID](
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(group.id, Says("그룹의 id", english="the id of the group")),
+                ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]
         return seen
@@ -701,7 +888,10 @@ class EachItemIsRefused(Then[Any, list[Any]]):
 
     @override
     def says(self) -> str:
-        return "항목마다 권한 부족 거부가 담긴다"
+        return Says(
+            "항목마다 권한 부족 거부가 담깁니다",
+            english="every item carries a denial for not enough permission",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[list[Any]]) -> list[Verdict]:
@@ -712,10 +902,9 @@ class EachItemIsRefused(Then[Any, list[Any]]):
         for i in range(self.asked):
             got = items[i] if i < len(items) else None
             seen.append(
-                Same(
-                    f"items[{i}]",
-                    type(got).__name__ if got is not None else None,
-                    NotEnoughPermission.__name__,
+                Refused(
+                    NotEnoughPermission,
+                    got if isinstance(got, BaseException) else None,
                 )
             )
         return seen
@@ -727,7 +916,7 @@ class NothingComesBack(Then[Any, list[Any]]):
 
     @override
     def says(self) -> str:
-        return "빈 응답이 반환된다"
+        return Says("빈 응답이 반환됩니다", english="an empty response comes back")
 
     @override
     def look(self, laid: Any, answered: Answered[list[Any]]) -> list[Verdict]:
@@ -743,7 +932,10 @@ class TheResourceInfoIsEmpty(Then[AGroupAndACaller, ResourceInfoNode]):
 
     @override
     def says(self) -> str:
-        return "용량·사용량·여유가 모두 비어 있다"
+        return Says(
+            "용량, 사용량, 여유가 모두 비어 있습니다",
+            english="capacity, used and free are all empty",
+        )
 
     @override
     def look(self, laid: AGroupAndACaller, answered: Answered[ResourceInfoNode]) -> list[Verdict]:
@@ -763,7 +955,10 @@ class TheLinkedGroupIsAllowed(Then[ADomainGroupsAndACaller, AllowedResourceGroup
 
     @override
     def says(self) -> str:
-        return "허용 목록에 건 리소스 그룹 이름만 담긴다"
+        return Says(
+            "허용 목록에 건 리소스 그룹 이름만 담깁니다",
+            english="the allow list holds only the name of the linked resource group",
+        )
 
     @override
     def look(
@@ -781,7 +976,10 @@ class TheOtherGroupIsAllowed(Then[ADomainGroupsAndACaller, AllowedResourceGroups
 
     @override
     def says(self) -> str:
-        return "허용 목록에 방금 건 리소스 그룹 이름만 담긴다"
+        return Says(
+            "허용 목록에 방금 건 리소스 그룹 이름만 담깁니다",
+            english="the allow list holds only the name of the resource group just linked",
+        )
 
     @override
     def look(
@@ -799,7 +997,10 @@ class TheGroupIsAllowedForTheProject(Then[AProjectAGroupAndACaller, AllowedResou
 
     @override
     def says(self) -> str:
-        return "허용 목록에 건 리소스 그룹 이름만 담긴다"
+        return Says(
+            "허용 목록에 건 리소스 그룹 이름만 담깁니다",
+            english="the allow list holds only the name of the linked resource group",
+        )
 
     @override
     def look(
@@ -817,7 +1018,7 @@ class NothingIsAllowed(Then[Any, Any]):
 
     @override
     def says(self) -> str:
-        return "허용 목록이 비어 있다"
+        return Says("허용 목록이 비어 있습니다", english="the allow list is empty")
 
     @override
     def look(self, laid: Any, answered: Answered[Any]) -> list[Verdict]:
@@ -833,7 +1034,10 @@ class TheAllowedDomainNames(Then[ADomainGroupsAndACaller, AllowedDomainsPayload]
 
     @override
     def says(self) -> str:
-        return "허용 도메인에 건 도메인 이름만 담긴다"
+        return Says(
+            "허용 도메인에 건 도메인 이름만 담깁니다",
+            english="the allowed domains hold only the name of the linked domain",
+        )
 
     @override
     def look(
@@ -851,7 +1055,10 @@ class TheAllowedProjectIds(Then[AProjectAGroupAndACaller, AllowedProjectsPayload
 
     @override
     def says(self) -> str:
-        return "허용 프로젝트에 건 프로젝트 id만 담긴다"
+        return Says(
+            "허용 프로젝트에 건 프로젝트 id 만 담깁니다",
+            english="the allowed projects hold only the id of the linked project",
+        )
 
     @override
     def look(
@@ -862,7 +1069,12 @@ class TheAllowedProjectIds(Then[AProjectAGroupAndACaller, AllowedProjectsPayload
             return [Refused(EntityNotFoundError, answered.raised)]
         return [
             Held[list[UUID]](
-                "items", list(payload.items), SameAs[list[UUID]]([laid.project.id], "건 프로젝트")
+                "items",
+                list(payload.items),
+                SameAs[list[UUID]](
+                    [laid.project.id],
+                    Says("건 프로젝트", english="the linked project"),
+                ),
             )
         ]
 
@@ -873,7 +1085,10 @@ class TheFairShareDefaults(Then[AGroupAndACaller, FairShareResourceGroupSpecInfo
 
     @override
     def says(self) -> str:
-        return "기본 fair share 설정이 반환되고 가중치 목록은 비어 있다"
+        return Says(
+            "기본 fair share 설정이 반환되고 가중치 목록은 비어 있습니다",
+            english="the default fair share settings come back and the weight list is empty",
+        )
 
     @override
     def look(

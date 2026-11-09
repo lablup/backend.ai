@@ -19,6 +19,7 @@ from ai.backend.manager.models.idle_checker.creators import (
     IdleCheckerAssignmentCreator,
     IdleCheckerCreator,
 )
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import Naming, TestSeedLink, TestSeedRow
 
 
@@ -31,11 +32,14 @@ class TestSeedIdleChecker(TestSeedRow[IdleCheckerData]):
 
     @override
     def kind(self) -> str:
-        return "유휴 검사기"
+        return Says("유휴 검사기", english="Idle checker")
 
     @override
     def detail(self) -> str:
-        return f"대화형 세션을 {self.max_lifetime_seconds}초 뒤에 끝낸다"
+        return Says(
+            f"대화형 세션을 {self.max_lifetime_seconds}초 뒤에 종료합니다",
+            english=f"ends interactive sessions after {self.max_lifetime_seconds} seconds",
+        )
 
     @override
     def name(self, naming: Naming) -> str:
@@ -63,7 +67,7 @@ class AssignToDomain(TestSeedLink[DomainData, IdleCheckerData]):
 
     @override
     def kind(self) -> str:
-        return "에 켜 둔"
+        return Says("가 활성화한", english="has enabled")
 
     @override
     def scope_id(self, scope: DomainData) -> DomainID:

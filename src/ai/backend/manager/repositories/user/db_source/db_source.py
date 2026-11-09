@@ -22,6 +22,7 @@ from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -33,6 +34,7 @@ from ai.backend.manager.data.keypair.types import (
     KeyPairData,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
+from ai.backend.manager.data.session.types import SessionEntityData, SessionStatus
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
     BulkUserUpdateResultData,
@@ -88,6 +90,7 @@ from ai.backend.manager.models.keypair.row import (
 )
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
+from ai.backend.manager.models.project.updaters import PersonalProjectSoftDeleteUpdater
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
@@ -97,14 +100,12 @@ from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.session.row import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
-    DEAD_SESSION_STATUSES,
     SessionRow,
-    by_status,
-    by_user_id,
 )
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.session_group.row import SessionGroupRow
-from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.types import QueryCondition, QueryOption, join_by_related_field
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.purgers import (
     UserErrorLogPurger,
@@ -488,9 +489,10 @@ class UserDBSource:
     async def purge_user_by_uuid(self, user_uuid: UUID) -> None:
         """Completely purge user and all associated data by UUID.
 
-        The user's personal project is not among it. Its creator column is nulled by
-        the foreign key, leaving the project dangling for the retention sweep — the
-        resources it holds outlive the account rather than going with it.
+        The user's personal project is not among it. It is marked deleted and its
+        creator column is nulled by the foreign key, leaving the project dangling for
+        the retention sweep — the resources it holds outlive the account rather than
+        going with it.
         """
         user_id = UserID(user_uuid)
         await self._revoke_shared_vfolders(user_uuid)
@@ -505,6 +507,10 @@ class UserDBSource:
             await w.batch_purge_entities_in_global(UserSessionGroupPurger(user_id=user_id))
             # TODO: scope this purge. A user operation must not use in_global.
             await w.batch_purge_entities_in_global(UserVFolderAutoMountPurger(user_id=user_id))
+            # Marked before the user row goes: the FK nulls the creator column on delete,
+            # after which no statement can name the project by it.
+            # TODO: scope this update. A user operation must not use in_global.
+            await w.batch_update_in_global(PersonalProjectSoftDeleteUpdater(user_id=user_id))
             # Finally the user itself as a scope: the row and the RBAC graph it left.
             await w.purge_entity(UserPurger(user_id=user_id))
 
@@ -525,20 +531,22 @@ class UserDBSource:
                 conn, deleted_user_uuid, target_user_uuid, target_user_email
             )
 
-    async def retrieve_active_sessions(self, user_uuid: UUID) -> list[SessionRow]:
+    async def retrieve_active_sessions(self, user_uuid: UUID) -> list[SessionEntityData]:
         """Retrieve active sessions for a user."""
-        query_conditions: list[QueryCondition] = [
-            by_user_id(user_uuid),
-            by_status(AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES),
-        ]
-
-        query_options: list[QueryOption] = [
-            join_by_related_field(SessionRow.user),
-        ]
-
-        return await SessionRow.list_session_by_condition(
-            query_conditions, query_options, db=self._db
-        )
+        fields = SessionSearchableFields.own
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(
+                SessionSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        fields.user_uuid.filter.equals(
+                            UUIDEqualMatchSpec(value=user_uuid, negated=False)
+                        ),
+                        fields.status.filter.in_(AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES),
+                    ],
+                )
+            )
+        return result.items
 
     async def delegate_endpoint_ownership(
         self,
@@ -598,7 +606,7 @@ class UserDBSource:
             SessionRow.id.in_(
                 sa.select(RoutingRow.session).where(RoutingRow.endpoint.in_(endpoint_ids))
             )
-            & SessionRow.status.not_in(DEAD_SESSION_STATUSES)
+            & SessionRow.status.not_in(SessionStatus.terminal_statuses())
         )
         await session.execute(
             sa.update(KernelRow)

@@ -31,12 +31,15 @@ from ai.backend.testutils.scenario_steps import (
     Condition,
     Given,
     Held,
+    Language,
     Refused,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
+    in_language,
 )
 from bai_scenario.seeds.domain.domain import TestSeedDomain
 from bai_scenario.seeds.project.project import TestSeedProject
@@ -48,7 +51,7 @@ from bai_scenario.seeds.resource_policy.user import TestSeedUserPolicy
 from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 from bai_scenario.seeds.user.user import TestSeedUserOf
 
-WAS_HERE = "이미 있던 도메인"
+WAS_HERE = Says("이미 있던 도메인", english="a domain that already existed")
 """시드가 미리 만드는 도메인의 설명. 시나리오가 기대값으로 다시 쓰므로 한 자리에 둔다."""
 
 SKEW = timedelta(seconds=30)
@@ -72,7 +75,11 @@ class ADomainAndSomeone(Given[Any, ADomainAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"도메인 하나와, 그 도메인에 속한 {self.role.value} 한 명"
+        role = self.role.value
+        return Says(
+            f"도메인 하나와, 그 도메인에 속한 {role} 한 명",
+            english=f"one domain and one {role} in it",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ADomainAndACaller:
@@ -86,15 +93,15 @@ class ADomainAndSomeone(Given[Any, ADomainAndACaller]):
 class TargetHolds(enum.Enum):
     """건드릴 도메인에 딸린 것."""
 
-    PROJECT = "프로젝트"
-    USER = "사용자"
+    PROJECT = Says("프로젝트", english="project")
+    USER = Says("사용자", english="user")
 
 
 @dataclass(frozen=True)
 class ATargetAndSomeone(Given[Any, ADomainAndACaller]):
     """건드릴 도메인 하나와, 다른 도메인에 사는 사람 한 명.
 
-    건드리는 대상이 부르는 사람의 집이면 안 되는 자리에 쓴다. purge 요청이 그렇다.
+    건드리는 대상이 호출자의 집이면 안 되는 자리에 쓴다. purge 요청이 그렇다.
     """
 
     role: UserRole = UserRole.USER
@@ -103,10 +110,20 @@ class ATargetAndSomeone(Given[Any, ADomainAndACaller]):
 
     @override
     def describe(self) -> str:
-        target = "건드릴 도메인"
-        if self.holds is not None:
-            target = f"{self.holds.value}이 딸린 {target}"
-        return f"{target} 하나와, 다른 도메인에 사는 {self.role.value} 한 명"
+        role = self.role.value
+        if self.holds is None:
+            return Says(
+                f"건드릴 도메인 하나와, 다른 도메인에 사는 {role} 한 명",
+                english=f"one target domain and one {role} in another domain",
+            )
+        holds = self.holds.value
+        return Says(
+            f"{holds}이 딸린 건드릴 도메인 하나와, 다른 도메인에 사는 {role} 한 명",
+            english=(
+                f"one target domain holding a {in_language(holds, Language.ENGLISH)} "
+                f"and one {role} in another domain"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ADomainAndACaller:
@@ -135,27 +152,52 @@ class ManyDomainsAndACaller:
     caller: UserData
 
     def elsewhere(self) -> tuple[DomainData, ...]:
-        """부르는 사람이 살지 않는 도메인들. 첫째가 부르는 사람의 집이다."""
+        """호출자가 살지 않는 도메인들. 첫째가 호출자의 집이다."""
         return self.laid[1:]
 
 
 @dataclass(frozen=True)
 class ManyDomainsAndSomeone(Given[Any, ManyDomainsAndACaller]):
-    """도메인 여럿과 그중 한 도메인에 속한 사용자 한 명."""
+    """도메인 여럿과 그중 한 도메인에 속한 사용자 한 명.
+
+    ``targets_inactive`` 면 호출자가 살지 않는 대상 도메인들이 비활성 상태다.
+    """
 
     role: UserRole = UserRole.USER
     besides: int = 2
+    targets_inactive: bool = False
 
     @override
     def describe(self) -> str:
-        return f"도메인 {self.besides + 2}개와, 그중 하나에 속한 {self.role.value} 한 명"
+        role = self.role.value
+        if self.targets_inactive:
+            return Says(
+                f"도메인 {self.besides + 2}개와, 그중 하나에 속한 {role} 한 명, "
+                "호출자가 살지 않는 대상 도메인들은 비활성 상태입니다",
+                english=(
+                    f"{self.besides + 2} domains and one {role} in one of them, and the target "
+                    "domains the caller does not live in are inactive"
+                ),
+            )
+        return Says(
+            f"도메인 {self.besides + 2}개와, 그중 하나에 속한 {role} 한 명",
+            english=f"{self.besides + 2} domains and one {role} in one of them",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyDomainsAndACaller:
         home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
-        wanted = await seeding.creating(TestSeedDomain(name_hint="wanted", description=WAS_HERE))
+        wanted = await seeding.creating(
+            TestSeedDomain(
+                name_hint="wanted", description=WAS_HERE, is_active=not self.targets_inactive
+            )
+        )
         others = [
-            await seeding.creating(TestSeedDomain(name_hint="other", description=WAS_HERE))
+            await seeding.creating(
+                TestSeedDomain(
+                    name_hint="other", description=WAS_HERE, is_active=not self.targets_inactive
+                )
+            )
             for _ in range(self.besides)
         ]
         caller = await seeding.within(SomeoneOf(home, role=self.role))
@@ -174,7 +216,7 @@ class WrittenByThisRun(Condition[datetime | None]):
 
     @override
     def says(self) -> str:
-        return "이 실행이 쓴 시각"
+        return Says("이 실행이 쓴 시각", english="the time this run wrote")
 
     @override
     def holds(self, got: datetime | None) -> bool:
@@ -200,9 +242,19 @@ class DomainLook:
             Same(f"{prefix}allowed_docker_registries", node.registry.allowed_docker_registries, []),
             Same(f"{prefix}is_active", node.lifecycle.is_active, self.active),
             Same(f"{prefix}is_default", node.lifecycle.is_default, False),
-            Skipped(f"{prefix}id", "데이터베이스가 만든다"),
+            Skipped(
+                f"{prefix}id",
+                Says("데이터베이스가 생성합니다", english="the database generates it"),
+            ),
             Held[UUID](
-                f"{prefix}entity_id", node.entity_id, SameAs(laid.id, "미리 만든 도메인의 id")
+                f"{prefix}entity_id",
+                node.entity_id,
+                SameAs(
+                    laid.id,
+                    Says(
+                        "미리 저장한 도메인의 id", english="the id of the domain seeded in advance"
+                    ),
+                ),
             ),
             Held(f"{prefix}created_at", node.lifecycle.created_at, written),
             Held(f"{prefix}modified_at", node.lifecycle.modified_at, written),
@@ -222,7 +274,10 @@ class TheDomainNode(Then[ADomainAndACaller, DomainNode]):
 
     @override
     def says(self) -> str:
-        return "미리 만든 도메인 전체가 온다"
+        return Says(
+            "미리 저장한 도메인 전체가 응답으로 옵니다",
+            english="the whole domain seeded in advance comes back",
+        )
 
     @override
     def look(self, laid: ADomainAndACaller, answered: Answered[DomainNode]) -> list[Verdict]:
@@ -243,7 +298,10 @@ class TheNewDomainNode(Then[Any, DomainNode]):
 
     @override
     def says(self) -> str:
-        return "만든 도메인 전체가 온다"
+        return Says(
+            "만든 도메인 전체가 응답으로 옵니다",
+            english="the whole domain just created comes back",
+        )
 
     @override
     def look(self, laid: Any, answered: Answered[DomainNode]) -> list[Verdict]:
@@ -258,7 +316,7 @@ class TheNewDomainNode(Then[Any, DomainNode]):
             Same("allowed_docker_registries", node.registry.allowed_docker_registries, []),
             Same("is_active", node.lifecycle.is_active, True),
             Same("is_default", node.lifecycle.is_default, False),
-            Skipped("id", "데이터베이스가 만든다"),
+            Skipped("id", Says("데이터베이스가 생성합니다", english="the database generates it")),
             Held("created_at", node.lifecycle.created_at, written),
             Held("modified_at", node.lifecycle.modified_at, written),
         ]
@@ -272,7 +330,10 @@ class Mentions(Condition[str]):
 
     @override
     def says(self) -> str:
-        return f"'{self.phrase}'를 담은 이유"
+        return Says(
+            f"'{self.phrase}'를 담은 이유",
+            english=f"a reason containing '{self.phrase}'",
+        )
 
     @override
     def holds(self, got: str) -> bool:
@@ -287,7 +348,10 @@ class NothingIsProcessed(Then[ManyDomainsAndACaller, PartialBulkPayload[DomainNo
 
     @override
     def says(self) -> str:
-        return "처리된 도메인 없이 대상이 모두 실패 목록에 온다"
+        return Says(
+            "처리된 도메인 없이 대상이 모두 실패 목록에 옵니다",
+            english="no domain is processed and every target comes back in the failed list",
+        )
 
     @override
     def look(
@@ -305,7 +369,13 @@ class NothingIsProcessed(Then[ManyDomainsAndACaller, PartialBulkPayload[DomainNo
         ]
         for i, (failure, domain) in enumerate(zip(payload.failed, targets, strict=False)):
             verdicts += [
-                Held[UUID](f"failed[{i}].id", failure.id, SameAs(domain.id, "대상 도메인의 id")),
+                Held[UUID](
+                    f"failed[{i}].id",
+                    failure.id,
+                    SameAs(
+                        domain.id, Says("대상 도메인의 id", english="the id of the target domain")
+                    ),
+                ),
                 Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
             ]
         return verdicts
@@ -319,7 +389,7 @@ class TheCallIsRefused(Then[Any, Any]):
 
     @override
     def says(self) -> str:
-        return "거부된다"
+        return Says("거부됩니다", english="the call is rejected")
 
     @override
     def look(self, laid: Any, answered: Answered[Any]) -> list[Verdict]:
@@ -354,7 +424,7 @@ class SomeoneOf(TestSeedNest[Laid[UserData]]):
 
     @override
     def kind(self) -> str:
-        return "도메인에 속한 사용자 한 명 준비"
+        return Says("도메인에 속한 사용자 한 명 준비", english="Prepare one user in the domain")
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[UserData]:
@@ -377,7 +447,10 @@ class SomeoneReadingDomains(TestSeedNest[GrantedUser]):
 
     @override
     def kind(self) -> str:
-        return "도메인 조회 권한을 받은 사용자 준비"
+        return Says(
+            "도메인 조회 권한을 받은 사용자 준비",
+            english="Prepare a user granted permission to read domains",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> GrantedUser:
@@ -401,7 +474,10 @@ class SomeoneReadingDomainsOfTheGroup(TestSeedNest[Laid[None]]):
 
     @override
     def kind(self) -> str:
-        return "리소스 그룹 범위의 도메인 읽기 역할을 받은 사용자 준비"
+        return Says(
+            "리소스 그룹 범위의 도메인 읽기 역할을 받은 사용자 준비",
+            english="Prepare a user granted the domain read role in the resource group scope",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[None]:
@@ -429,7 +505,7 @@ class DomainsOfAGroupAndACaller:
 class DomainsOfAGroupAndSomeone(Given[Any, DomainsOfAGroupAndACaller]):
     """리소스 그룹 하나와 도메인 셋. 그중 둘만 그 그룹을 쓸 수 있다.
 
-    ``reading``이면 부르는 사람이 그 그룹 범위에서 도메인 읽기 역할을 받는다.
+    ``reading``이면 호출자가 그 그룹 범위에서 도메인 읽기 역할을 받는다.
     """
 
     role: UserRole = UserRole.USER
@@ -437,12 +513,19 @@ class DomainsOfAGroupAndSomeone(Given[Any, DomainsOfAGroupAndACaller]):
 
     @override
     def describe(self) -> str:
-        who = (
-            f"그 그룹 범위의 도메인 읽기 역할을 받은 {self.role.value}"
-            if self.reading
-            else (self.role.value)
+        role = self.role.value
+        if self.reading:
+            who_ko = f"그 그룹 범위의 도메인 읽기 역할을 받은 {role}"
+            who_en = f"the {role} granted the domain read role in the resource group scope"
+        else:
+            who_ko = role
+            who_en = f"one {role}"
+        return Says(
+            f"리소스 그룹 하나, 그 그룹을 쓸 수 있는 도메인 둘과 쓸 수 없는 하나, 그리고 {who_ko} 한 명",
+            english=(
+                f"one resource group, two domains that can use it and one that cannot, and {who_en}"
+            ),
         )
-        return f"리소스 그룹 하나, 그 그룹을 쓸 수 있는 도메인 둘과 쓸 수 없는 하나, 그리고 {who} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> DomainsOfAGroupAndACaller:

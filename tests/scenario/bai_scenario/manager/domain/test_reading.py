@@ -14,7 +14,7 @@ from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.domain import (
     ADomainAndACaller,
     ADomainAndSomeone,
@@ -41,7 +41,11 @@ class ReadingByName(When[ADomainAndACaller, DomainAdapter, DomainNode]):
 
     @override
     def describe(self, laid: ADomainAndACaller) -> str:
-        return f"{laid.caller.username}이 {self.named or laid.domain.name}으로 조회"
+        name = self.named or laid.domain.name
+        return Says(
+            f"{laid.caller.username}이 {name}으로 조회합니다",
+            english=f"{laid.caller.username} reads a domain by name {name}",
+        )
 
     @override
     async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> DomainNode:
@@ -59,7 +63,12 @@ class SoftDeletingThenReading(When[ADomainAndACaller, DomainAdapter, DomainNode]
 
     @override
     def describe(self, laid: ADomainAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.domain.name}을 soft delete 한 뒤 이름으로 조회"
+        return Says(
+            f"{laid.caller.username}이 {laid.domain.name}을 soft delete 한 뒤 이름으로 조회합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {laid.domain.name} and then reads it by name"
+            ),
+        )
 
     @override
     async def call(self, adapter: DomainAdapter, laid: ADomainAndACaller) -> DomainNode:
@@ -80,7 +89,12 @@ class TheSuperadminReadsADomainByName(
 
     @override
     def describe(self) -> str:
-        return "도메인 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 도메인이 답으로 온다"
+        return Says(
+            "도메인 하나가 있고 superadmin 이 이름으로 조회하면, 그 도메인이 응답으로 옵니다",
+            english=(
+                "with one domain laid, when the superadmin reads it by name, that domain comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
@@ -105,9 +119,13 @@ class AUserGrantedNothingMayNotRead(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "같은 도메인이 있고 사용자가 아무 권한도 받지 않았을 때, "
-            "이름으로 조회하면 권한 부족으로 거부된다"
+            "이름으로 조회하면 권한 부족으로 거부됩니다",
+            english=(
+                "with the same domain laid, when a user granted nothing reads it by name, "
+                "the call is rejected for lack of permission"
+            ),
         )
 
     @override
@@ -133,9 +151,13 @@ class ANameNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return (
-            "슈퍼관리자가 존재하지 않는 이름으로 조회하면, "
-            "권한 문제가 아니라 대상이 없다는 것으로 거부된다"
+        return Says(
+            "superadmin 이 존재하지 않는 이름으로 조회하면, "
+            "권한 문제가 아니라 대상이 없다는 것으로 거부됩니다",
+            english=(
+                "when the superadmin reads by a name that does not exist, "
+                "the call is rejected as not found, not for a permission problem"
+            ),
         )
 
     @override
@@ -163,7 +185,14 @@ class ASoftDeletedDomainIsStillRead(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 도메인을 soft delete 한 뒤 이름으로 조회하면, 비활성 상태를 실은 그 도메인이 온다"
+        return Says(
+            "superadmin 이 도메인을 soft delete 한 뒤 이름으로 조회하면, "
+            "비활성 상태를 담은 그 도메인이 응답으로 옵니다",
+            english=(
+                "when the superadmin soft deletes a domain and then reads it by name, "
+                "that domain comes back carrying the inactive state"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:

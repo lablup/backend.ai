@@ -69,6 +69,7 @@ jobs:
             - '**/BUILD'
             - 'pants.toml'
             - 'pants.ci.toml'
+            - 'get-pants.sh'
             - 'python*.lock'
             - 'tools/*.lock'
             - '.github/workflows/ci*.yml'

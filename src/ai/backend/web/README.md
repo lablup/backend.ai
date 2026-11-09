@@ -128,7 +128,6 @@ web/
 ├── proxy.py             # API proxy
 ├── security.py          # Security utilities
 ├── response.py          # Response helpers
-├── stats.py             # Statistics tracking
 ├── server.py            # Main server entry point
 └── template.py          # Template rendering
 ```
@@ -278,12 +277,6 @@ See `configs/webserver/halfstack.conf` for configuration file examples.
 - **Protocol**: HTTP/HTTPS
 - **Halfstack Port**: 8091 (manager)
 - **Note**: the manager handles authentication; the webserver adds signatures
-
-#### etcd (Global Configuration)
-- **Purpose**:
-  - Retrieve global configuration
-  - Auto-discover the manager address
-- **Halfstack Port**: 8121 (host) → 2379 (container)
 
 ### Optional Infrastructure (Observability)
 

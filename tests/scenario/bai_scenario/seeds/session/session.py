@@ -40,6 +40,7 @@ from ai.backend.manager.models.session.creators import SessionCreator
 from ai.backend.manager.models.session_designated_agent.creators import (
     SessionDesignatedAgentCreator,
 )
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import Naming, TestSeedFieldCreator, TestSeedRowFromThree
 
 
@@ -108,11 +109,11 @@ class TestSeedSession(
 
     @override
     def kind(self) -> str:
-        return "세션"
+        return Says("세션", english="Session")
 
     @override
     def detail(self) -> str:
-        return "스케줄링을 기다리고 있다"
+        return Says("스케줄링을 기다립니다", english="waiting to be scheduled")
 
     @override
     def name(self, naming: Naming) -> str:
@@ -154,7 +155,10 @@ class TestSeedSessionInGroup(TestSeedSession):
 
     @override
     def detail(self) -> str:
-        return "세션 그룹의 멤버로 스케줄링을 기다리고 있다"
+        return Says(
+            "세션 그룹의 멤버로 스케줄링을 기다립니다",
+            english="waiting to be scheduled as a member of the session group",
+        )
 
     @override
     def seed(
@@ -175,7 +179,7 @@ class TestSeedDesignatedAgentOf(
 
     @override
     def kind(self) -> str:
-        return "지정 agent 하나를 갖는다"
+        return Says("지정 에이전트 하나를 갖습니다", english="has one designated agent")
 
     @override
     def owner_id(self, owner: SessionEntityData) -> SessionID:

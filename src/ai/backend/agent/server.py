@@ -111,6 +111,7 @@ from ai.backend.common.metrics.http import (
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.networking import force_threaded_dns_resolver
+from ai.backend.common.plugin import load_configured_wheelhouse
 from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
 from ai.backend.common.process.crashdump import enable_crash_dump
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
@@ -315,9 +316,9 @@ class AgentRPCServer(aobject):
     rpc_function: ClassVar[RPCFunctionRegistry] = RPCFunctionRegistry()
     rpc_function_v2: ClassVar[RPCFunctionRegistryV2] = RPCFunctionRegistryV2()
 
-    rpc_auth_manager_public_key: PublicKey | None
-    rpc_auth_agent_public_key: PublicKey | None
-    rpc_auth_agent_secret_key: SecretKey | None
+    rpc_auth_manager_public_key: PublicKey
+    rpc_auth_agent_public_key: PublicKey
+    rpc_auth_agent_secret_key: SecretKey
 
     loop: asyncio.AbstractEventLoop
     etcd: AsyncEtcd
@@ -367,36 +368,30 @@ class AgentRPCServer(aobject):
         await self.stats_monitor.init()
         await self.error_monitor.init()
 
-        if self.local_config.agent_common.rpc_auth_agent_keypair is not None:
-            manager_pkey, _ = load_certificate(
-                str(self.local_config.agent_common.rpc_auth_manager_public_key)
+        manager_pkey, _ = load_certificate(
+            str(self.local_config.agent_common.rpc_auth_manager_public_key)
+        )
+        self.rpc_auth_manager_public_key = PublicKey(manager_pkey)
+        agent_pkey, agent_skey = load_certificate(
+            str(self.local_config.agent_common.rpc_auth_agent_keypair)
+        )
+        if agent_skey is None:
+            raise AgentInitializationError(
+                "Agent secret key is not available from the keypair file."
             )
-            self.rpc_auth_manager_public_key = PublicKey(manager_pkey)
-            agent_pkey, agent_skey = load_certificate(
-                str(self.local_config.agent_common.rpc_auth_agent_keypair)
-            )
-            if agent_skey is None:
-                raise AgentInitializationError(
-                    "Agent secret key is not available from the keypair file."
-                )
-            self.rpc_auth_agent_public_key = PublicKey(agent_pkey)
-            self.rpc_auth_agent_secret_key = SecretKey(agent_skey)
-            log.info(
-                "rpc encryption and authentication enabled",
-                agent_public_key=self.rpc_auth_agent_public_key.decode("ascii"),
-                manager_public_key=self.rpc_auth_manager_public_key.decode("ascii"),
-            )
-            auth_handler = AgentAuthHandler(
-                "local",
-                self.rpc_auth_manager_public_key,
-                self.rpc_auth_agent_public_key,
-                self.rpc_auth_agent_secret_key,
-            )
-        else:
-            self.rpc_auth_manager_public_key = None
-            self.rpc_auth_agent_public_key = None
-            self.rpc_auth_agent_secret_key = None
-            auth_handler = None
+        self.rpc_auth_agent_public_key = PublicKey(agent_pkey)
+        self.rpc_auth_agent_secret_key = SecretKey(agent_skey)
+        log.info(
+            "rpc encryption and authentication enabled",
+            agent_public_key=self.rpc_auth_agent_public_key.decode("ascii"),
+            manager_public_key=self.rpc_auth_manager_public_key.decode("ascii"),
+        )
+        auth_handler = AgentAuthHandler(
+            "local",
+            self.rpc_auth_manager_public_key,
+            self.rpc_auth_agent_public_key,
+            self.rpc_auth_agent_secret_key,
+        )
 
         self.runtime = await AgentRuntime.create_runtime(
             self.local_config,
@@ -689,7 +684,6 @@ class AgentRPCServer(aobject):
         connectivity = await self.health_probe.get_connectivity_status()
         response = HealthResponse(
             status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
-            version=VERSION,
             component="agent",
             connectivity=connectivity,
         )
@@ -1327,11 +1321,8 @@ async def server_main_logwrapper(
 def _build_agent_health_response(connectivity: ConnectivityCheckResponse) -> web.Response:
     """Detail /health — always 200; informational tier failures reported as
     DEGRADED in the body but not surfaced via HTTP status."""
-    from . import __version__
-
     response = HealthResponse(
         status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
-        version=__version__,
         component="agent",
         connectivity=connectivity,
     )
@@ -1340,12 +1331,9 @@ def _build_agent_health_response(connectivity: ConnectivityCheckResponse) -> web
 
 def _build_agent_probe_response(connectivity: ConnectivityCheckResponse) -> web.Response:
     """/livez, /readyz — 503 when any gating check fails so K8s probes trip."""
-    from . import __version__
-
     is_healthy = connectivity.overall_healthy
     response = HealthResponse(
         status=HealthStatus.OK if is_healthy else HealthStatus.ERROR,
-        version=__version__,
         component="agent",
         connectivity=connectivity,
     )
@@ -1468,25 +1456,13 @@ async def aiomonitor_ctx(
 
 @asynccontextmanager
 async def etcd_ctx(local_config: AgentUnifiedConfig) -> AsyncGenerator[AsyncEtcd]:
-    etcd_credentials = None
-    if local_config.etcd.user and local_config.etcd.password:
-        etcd_credentials = {
-            "user": local_config.etcd.user,
-            "password": local_config.etcd.password,
-        }
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
         ConfigScopes.SGROUP: f"sgroup/{local_config.agent.legacy_sgroup_name()}",
         ConfigScopes.NODE: f"nodes/agents/{local_config.agent.defaulted_id}",
     }
-    etcd_config_data = local_config.etcd.to_dataclass()
-    async with AsyncEtcd(
-        [addr.to_legacy() for addr in etcd_config_data.addrs],
-        local_config.etcd.namespace,
-        scope_prefix_map,
-        credentials=etcd_credentials,
-        keep_alive_interval=etcd_config_data.keep_alive_interval,
-        keep_alive_timeout=etcd_config_data.keep_alive_timeout,
+    async with AsyncEtcd.create_from_config(
+        local_config.etcd.to_dataclass(), scope_prefix_map
     ) as etcd:
         yield etcd
 
@@ -1830,6 +1806,7 @@ def main(
                     "supervisor",
                 )
                 log.info("agent starting", version=VERSION, runtime=utils.env_info())
+                load_configured_wheelhouse(server_config.wheelhouse)
 
                 # Built here rather than at module scope: these allocate shared memory
                 # and a semaphore, which no other `ag` subcommand has any use for.

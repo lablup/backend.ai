@@ -21,6 +21,7 @@ pants_ignore = [
     "__pycache__",
     "*~",  # vim swap/backup files
     "/scripts/",
+    "/get-pants.sh",  # run by init-pants before Pants starts
     "/plugins/",
     "/docs/",  # TODO: docs build config
     "/proposals/",

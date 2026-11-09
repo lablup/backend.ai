@@ -1,59 +1,62 @@
-# Build System & Development Commands
+# Build System and Development Commands
 
-This project uses **Pantsbuild** (version 2) for build automation and dependency management.
+This project uses **Pants** (version 2) for build automation and dependency management.
 All development commands use `pants` instead of `pip`, `poetry`, or `uv`.
 
 ## BUILD Files Policy
 
-**CRITICAL RULES:**
+**Critical rules:**
 
 ### Source Code (`src/` directory)
-- ❌ **NEVER add BUILD files for new Python modules or packages**
+- **Do not add BUILD files for new Python modules or packages**
 - Pants automatically detects Python files without explicit BUILD declarations
-- Only top-level component BUILD files exist (e.g., `src/ai/backend/manager/BUILD`)
-- These are maintained by maintainers and rarely need updates
+- Only top-level component BUILD files exist (for example, `src/ai/backend/manager/BUILD`)
+- Maintainers own these files and rarely update them
 
 ### Test Code (`tests/` directory)
-- ✅ **MUST add BUILD files for new test directories**
+- **Must add BUILD files for new test directories**
 - Use `python_tests()` for test modules
 - Use `python_testutils()` for shared test utilities
-- Do NOT explicitly list dependencies - Pants infers them from imports
+- Do not list dependencies explicitly; Pants infers them from imports
 
 **When to Update BUILD Files:**
 - Creating new test directories → Add `BUILD` with `python_tests()`
 - Adding test utilities → Add `BUILD` with `python_testutils()`
-- Never for source code changes
+- Do not add them for source code changes
 
 ## Quality Enforcement
 
-**Absolute Rule: Fix all quality issues immediately**
+**Fix all quality issues immediately, without exception.**
 
-* **Never suppress linter and type checker errors**
-  - Do NOT use `# noqa` comments to suppress linter warnings
-  - Do NOT use `# type: ignore` comments to suppress type checker errors
+* **Do not suppress linter and type checker errors**
+  - Do not use `# noqa` comments to suppress linter warnings
+  - Do not use `# type: ignore` comments to suppress type checker errors
   - Fix the root cause instead:
     - Restructure code to avoid the issue
     - Add proper type annotations
     - Refactor to eliminate circular dependencies
-  - Only use suppression comments as a last resort with clear justification
+  - Use suppression comments only as a last resort with clear justification
 
 * **Fix all quality issues discovered during development**
-  - When lint, type check, or test errors are discovered, fix them immediately
-  - This applies even if the errors are unrelated to your current work
-  - Do not skip or ignore quality issues with reasoning "it's not part of my change"
+  - Fix lint, type check, or test errors as soon as you find them
+  - This applies even when the errors are unrelated to your current work
+  - Do not skip quality issues because they are not part of your change
   - Maintaining codebase quality is a shared responsibility
 
 ## Automated Quality Checks
 
-### Claude Code Hooks (`.claude/settings.local.json`, gitignored)
-- **PostToolUse**: Runs `pants fmt` after Edit/Write operations
-- **Stop**: Runs `pants fix` on modified Python files when Claude finishes
-
 ### Git Pre-commit Hook (`scripts/pre-commit.sh`)
 - Runs on every `git commit`
-- Validates: `pants fmt`, `pants lint` on changed files (fast local feedback)
-- Type checking and tests are handled by CI (`ci.yml` lint-and-typecheck + test jobs)
-- Bypass with `git commit --no-verify` for WIP commits (never on main/release branches)
+- Runs `ruff format` and `ruff check` on staged Python files through `uvx`, with the ruff version from `pants.toml`
+- A file that `ruff format` rewrites blocks the commit; stage it and commit again
+- Visibility rules run only in CI (`pants lint`)
+- CI handles type checking and tests (`ci.yml` lint-and-typecheck and test jobs)
+- Bypass with `git commit --no-verify` for work-in-progress commits, but not on main or release branches
+
+### Git Pre-push Hook (`scripts/pre-push.sh`)
+- Runs on every `git push`
+- Runs `scripts/knowledge/check_words.py` against the PR's base branch (`HEAD~1` without `gh`)
+- Does not run pants; CI runs lint, type checking and tests
 
 ## Running Pants Commands
 
@@ -71,7 +74,7 @@ pants {subcommand} {targets} -- {arguments-passed-to-spawned-processes}
 - All files: `::`
 - Directory subtree: `path/to/subpkg::`
 - Changed files: `--changed-since=HEAD~1`
-- Changed + dependents: `--changed-dependents=transitive --changed-since=HEAD~1`
+- Changed and dependents: `--changed-dependents=transitive --changed-since=HEAD~1`
 
 ## Common Commands
 
@@ -113,10 +116,10 @@ pants export --resolve=python-default
 
 ### Running Project Entrypoints
 
-**Using Skills** (Recommended):
+**Using skills** (recommended):
 - `/cli-executor` - Interactive guide with pre-flight checks
 
-**Manual Execution:**
+**Manual execution:**
 ```bash
 # Run component CLI
 ./backend.ai {component} {subcommand}
@@ -131,11 +134,11 @@ See `.claude/skills/cli-executor/SKILL.md` for detailed operations.
 
 This project uses Alembic for three separate databases.
 
-**Using Skills** (Recommended):
+**Using skills** (recommended):
 - `/db-status` - Check schema version and migration status
 - `/db-migrate` - Apply pending migrations
 
-**Manual Execution:**
+**Manual execution:**
 ```bash
 ./py -m alembic -c {alembic-ini-path} {command}
 ```
@@ -150,20 +153,20 @@ See `.claude/skills/db-status/SKILL.md` and `.claude/skills/db-migrate/SKILL.md`
 ## Troubleshooting
 
 ### "No BUILD file found"
-- Check if you're in `tests/` directory → Add BUILD file with `python_tests()`
-- Check if you're in `src/` directory → Do NOT add BUILD file
+- Check whether you are in the `tests/` directory → Add a BUILD file with `python_tests()`
+- Check whether you are in the `src/` directory → Do not add a BUILD file
 
 ### "Import cannot be inferred"
-- Ensure imported module exists
-- Check for typos in import path
-- Verify the module has proper `__init__.py` if needed
+- Ensure the imported module exists
+- Check for typos in the import path
+- Check whether the module has a proper `__init__.py` if needed
 
 ### Lock File Conflicts
 - Run `pants generate-lockfiles --resolve=python-default`
-- Then `pants export --resolve=python-default`
+- Then run `pants export --resolve=python-default`
 
 ### Type Check Errors
-- Fix the root cause - do NOT use `# type: ignore`
+- Fix the root cause; do not use `# type: ignore`
 - Add proper type annotations
 - Use `typing.cast()` for unavoidable cases with justification
 

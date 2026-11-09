@@ -19,7 +19,7 @@ from ai.backend.common.dto.manager.v2.session.response import AdminSearchSession
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
 from bai_scenario.components.domain import ADomainAndACaller, ADomainAndSomeone
 from bai_scenario.runner.acting import ActingAs
@@ -40,7 +40,10 @@ class SearchingEverySession(When[ADomainAndACaller, SessionAdapter, Searched]):
 
     @override
     def describe(self, laid: ADomainAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체 조회"
+        return Says(
+            f"{laid.caller.username}이 필터 없이 전체를 조회합니다",
+            english=f"{laid.caller.username} searches everything without a filter",
+        )
 
     @override
     async def call(self, adapter: SessionAdapter, laid: ADomainAndACaller) -> Searched:
@@ -58,7 +61,10 @@ class NoSessionLaidMeansNoneFound(
 
     @override
     def describe(self) -> str:
-        return "세션을 하나도 심지 않은 상태에서 슈퍼관리자가 조회하면, 답은 비어 있다"
+        return Says(
+            "세션을 하나도 미리 저장하지 않은 상태에서 superadmin 이 조회하면, 응답은 비어 있습니다",
+            english="when the superadmin searches with no session seeded, the answer is empty",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
@@ -83,9 +89,13 @@ class AUserGrantedNothingMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return (
-            "필터 없는 전체 조회는 슈퍼관리자 역할로만 열리므로, "
-            "아무 권한도 받지 않은 사용자는 역할 부족으로 거부된다"
+        return Says(
+            "필터 없는 전체 조회는 superadmin 역할로만 열리므로, 아무 권한도 받지 않은 사용자는 "
+            "역할 부족으로 거부됩니다",
+            english=(
+                "an unfiltered search is open only to the superadmin role, so a user granted "
+                "nothing is rejected for lacking the role"
+            ),
         )
 
     @override

@@ -18,7 +18,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import AutoScalingRule
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.auto_scaling_rule import (
     LAID_METRIC,
     EveryRuleComesBack,
@@ -48,7 +48,13 @@ class EditingEveryRule(When[RulesOfADeploymentAndACaller, DeploymentAdapter, Ans
 
     @override
     def describe(self, laid: RulesOfADeploymentAndACaller) -> str:
-        return f"{laid.caller.username}이 규칙 {len(laid.rules)}개의 지표 이름을 한 번에 고침"
+        return Says(
+            f"{laid.caller.username} 이 오토스케일링 규칙 {len(laid.rules)}개의 지표 이름을 한 번에 수정합니다",
+            english=(
+                f"{laid.caller.username} changes the metric name of {len(laid.rules)} "
+                "auto-scaling rules at once"
+            ),
+        )
 
     @override
     async def call(self, adapter: DeploymentAdapter, laid: RulesOfADeploymentAndACaller) -> Answer:
@@ -75,8 +81,16 @@ class PurgingEveryRule(When[RulesOfADeploymentAndACaller, DeploymentAdapter, Ans
 
     @override
     def describe(self, laid: RulesOfADeploymentAndACaller) -> str:
-        besides = " 와 없는 id 하나" if self.missing is not None else ""
-        return f"{laid.caller.username}이 규칙 {len(laid.rules)}개{besides}를 한 번에 purge 함"
+        besides_ko = " 와 없는 id 하나" if self.missing is not None else ""
+        besides_en = " and one unknown id" if self.missing is not None else ""
+        return Says(
+            f"{laid.caller.username} 이 오토스케일링 규칙 {len(laid.rules)}개{besides_ko}를 한 번에 "
+            "purge 합니다",
+            english=(
+                f"{laid.caller.username} purges {len(laid.rules)} auto-scaling rules"
+                f"{besides_en} at once"
+            ),
+        )
 
     @override
     async def call(self, adapter: DeploymentAdapter, laid: RulesOfADeploymentAndACaller) -> Answer:
@@ -99,9 +113,14 @@ class AnEditorEditsSeveralRules(
 
     @override
     def describe(self) -> str:
-        return (
-            "배포 수정 권한을 받은 사용자가 규칙 여럿의 지표 이름을 한 번에 바꾸면, 모두 새 "
-            "이름으로 오고 실패한 것은 없다"
+        return Says(
+            "배포 수정 권한을 받은 사용자가 오토스케일링 규칙 여럿의 지표 이름을 한 번에 변경하면, 모두 새 "
+            "이름으로 오고 실패한 것은 없습니다",
+            english=(
+                "when a user granted deployment update changes the metric name of several "
+                "auto-scaling rules at once, every rule comes back with the new name and nothing "
+                "failed"
+            ),
         )
 
     @override
@@ -127,9 +146,14 @@ class AUserGrantedNothingEditsNoRule(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 규칙 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 "
-            "모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 오토스케일링 규칙 여럿을 한 번에 수정하려 하면, 수정된 것 없이 "
+            "모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user with no grant tries to update several auto-scaling rules at once, "
+                "nothing is updated and every rule comes back in the failed list because the user "
+                "lacks permission"
+            ),
         )
 
     @override
@@ -157,9 +181,14 @@ class PurgingAnswersForTheMissingRule(
 
     @override
     def describe(self) -> str:
-        return (
-            "배포 영구 삭제 권한을 받은 사용자가 규칙 둘과 없는 id 하나를 한 번에 purge 하면, "
-            "둘은 purge 되기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "배포 영구 삭제 권한을 받은 사용자가 오토스케일링 규칙 둘과 없는 id 하나를 한 번에 purge 하면, "
+            "둘은 purge 되기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted deployment purge purges two auto-scaling rules and one "
+                "unknown id at once, the two come back as they were before the purge and the "
+                "unknown id comes back in the failed list because no target answers to it"
+            ),
         )
 
     @override
@@ -185,9 +214,14 @@ class AUserGrantedNothingPurgesNoRule(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자가 규칙 여럿을 한 번에 purge 하려 하면, purge 된 것 "
-            "없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "아무 권한도 받지 않은 사용자가 오토스케일링 규칙 여럿을 한 번에 purge 하려 하면, purge 된 것 "
+            "없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user with no grant tries to purge several auto-scaling rules at once, "
+                "nothing is purged and every rule comes back in the failed list because the user "
+                "lacks permission"
+            ),
         )
 
     @override
@@ -213,9 +247,14 @@ class AnEditorPurgesNoRule(
 
     @override
     def describe(self) -> str:
-        return (
-            "배포 수정 권한만 받은 사용자가 규칙 여럿을 한 번에 purge 하려 하면, purge 된 것 "
-            "없이 모두 권한이 없다는 이유로 실패 목록에 온다"
+        return Says(
+            "배포 수정 권한만 받은 사용자가 오토스케일링 규칙 여럿을 한 번에 purge 하려 하면, purge 된 것 "
+            "없이 모두 권한이 없다는 이유로 실패 목록에 옵니다",
+            english=(
+                "when a user granted only deployment update tries to purge several auto-scaling "
+                "rules at once, nothing is purged and every rule comes back in the failed list "
+                "because the user lacks permission"
+            ),
         )
 
     @override

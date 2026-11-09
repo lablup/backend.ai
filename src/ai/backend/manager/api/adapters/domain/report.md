@@ -25,120 +25,122 @@ Scenario: incomplete 3 / 14
 
 | scenario | verdict |
 |---|---|
-| [슈퍼관리자가 id로 도메인 여럿을 읽으면, 그 자리에 도메인이 온다](#bulk_reading-the-superadmin-reads-domains-by-id) | answered |
-| [아무 권한도 받지 않은 사용자가 id로 도메인 여럿을 읽으면, 그 자리가 권한 부족으로 거부된다](#bulk_reading-a-user-granted-nothing-may-not-read-domains-by-id) | rejected |
+| [when the superadmin reads several domains by id, the domain comes back for that item](#bulk_reading-the-superadmin-reads-domains-by-id) | answered |
+| [when a user granted nothing reads several domains by id, that item is rejected for lack of permission](#bulk_reading-a-user-granted-nothing-may-not-read-domains-by-id) | rejected |
 
 **bulk_lookup_names**
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 찾아도 슈퍼관리자와 같은 답이 온다. 이 호출은 인증만 보므로 이름이 있는지는 누구에게나 드러난다](#looking_up-a-user-granted-nothing-gets-the-same-ids-by-name) | answered |
-| [슈퍼관리자가 있는 이름과 없는 이름으로 id를 여럿 찾으면, 있는 이름에는 그 도메인의 id, 없는 이름에는 빈 값이 온다](#looking_up-the-superadmin-looks-up-domains-by-name) | answered |
-| [로그인 문맥 없이 이름으로 id를 여럿 찾으면, 사용자를 찾을 수 없다는 것으로 거부된다](#looking_up-looking-up-domains-by-name-without-login-is-refused) | rejected |
+| [a user granted nothing gets the same answer as the superadmin. This call checks authentication only, so whether a name exists is visible to anyone](#looking_up-a-user-granted-nothing-gets-the-same-ids-by-name) | answered |
+| [when the superadmin looks up several ids for a name that exists and one that does not, the id of that domain comes back for the name that exists and an empty value for the name that does not](#looking_up-the-superadmin-looks-up-domains-by-name) | answered |
+| [looking up several ids by name without a login context is rejected as user not found](#looking_up-looking-up-domains-by-name-without-login-is-refused) | rejected |
 
 **delete**
 
 | scenario | verdict |
 |---|---|
-| [이미 soft delete 된 도메인을 슈퍼관리자가 다시 soft delete 하면, soft delete 했다는 답이 온다](#deleting-soft-deleting-a-domain-already-soft-deleted) | answered |
-| [슈퍼관리자가 도메인을 soft delete 하면, soft delete 했다는 답이 온다](#deleting-the-superadmin-soft-deletes-a-domain) | answered |
-| [아무 권한도 받지 않은 사용자는 도메인을 soft delete 할 수 없다](#deleting-a-user-granted-nothing-may-not-soft-delete-a-domain) | rejected |
-| [아무 도메인도 갖지 않은 이름을 soft delete 하려 하면 대상이 없다는 것으로 거부된다](#deleting-soft-deleting-a-name-nothing-answers-to-is-not-found) | rejected |
+| [when the superadmin soft deletes an already soft-deleted domain again, the answer says it was done and the domain comes back inactive](#deleting-soft-deleting-a-domain-already-soft-deleted) | answered |
+| [when the superadmin soft deletes a domain, the answer says it was done and the domain comes back inactive](#deleting-the-superadmin-soft-deletes-a-domain) | answered |
+| [a user granted nothing cannot soft delete a domain](#deleting-a-user-granted-nothing-may-not-soft-delete-a-domain) | rejected |
+| [soft-deleting a name no domain answers to is rejected as not found](#deleting-soft-deleting-a-name-nothing-answers-to-is-not-found) | rejected |
 
 **get**
 
 | scenario | verdict |
 |---|---|
-| [도메인 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 도메인이 답으로 온다](#reading-the-superadmin-reads-a-domain-by-name) | answered |
-| [슈퍼관리자가 도메인을 soft delete 한 뒤 이름으로 조회하면, 비활성 상태를 실은 그 도메인이 온다](#reading-the-superadmin-reads-a-soft-deleted-domain-by-name) | answered |
-| [같은 도메인이 있고 사용자가 아무 권한도 받지 않았을 때, 이름으로 조회하면 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-a-domain) | rejected |
-| [슈퍼관리자가 존재하지 않는 이름으로 조회하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#reading-reading-a-name-nothing-answers-to-is-not-found) | rejected |
+| [with one domain laid, when the superadmin reads it by name, that domain comes back](#reading-the-superadmin-reads-a-domain-by-name) | answered |
+| [when the superadmin soft deletes a domain and then reads it by name, that domain comes back carrying the inactive state](#reading-the-superadmin-reads-a-soft-deleted-domain-by-name) | answered |
+| [with the same domain laid, when a user granted nothing reads it by name, the call is rejected for lack of permission](#reading-a-user-granted-nothing-may-not-read-a-domain) | rejected |
+| [when the superadmin reads by a name that does not exist, the call is rejected as not found, not for a permission problem](#reading-reading-a-name-nothing-answers-to-is-not-found) | rejected |
 
 **global_search**
 
 | scenario | verdict |
 |---|---|
-| [도메인 여럿 중 하나의 이름으로 걸러 조회하면, 답에는 그 이름의 도메인만 남는다](#searching-a-name-filter-narrows-the-answer-to-the-domain-it-names) | answered |
-| [이 시나리오가 미리 만든 도메인이 넷일 때, 필터 없는 조회는 그 넷이 모두 나온다](#searching-the-answer-counts-every-domain-the-scenario-laid) | answered |
-| [미리 만든 도메인 중 하나를 soft delete 한 뒤 필터 없이 search 하면, 그것까지 모두 나온다](#searching-the-answer-includes-soft-deleted-domains-too) | answered |
-| [슈퍼관리자가 아닌 사용자가 전체 도메인 조회를 요청하면 역할로 막힌다](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-domain) | rejected |
+| [when several domains are searched with a filter on the name of one, only the domain of that name is left in the answer](#searching-a-name-filter-narrows-the-answer-to-the-domain-it-names) | answered |
+| [when the superadmin, the only caller the global role admits, searches the domains holding an active user ordered by project name and takes only the first page, the first domain alone comes back with the remaining count and the third domain holding no active user is left out](#nested_searching-a-nested-user-filter-and-project-name-order-narrow-the-first-page) | answered |
+| [when this scenario seeded four domains, a search without a filter brings back all four](#searching-the-answer-counts-every-domain-the-scenario-laid) | answered |
+| [when one of the domains seeded in advance is soft-deleted and every domain is searched without a filter, that one comes back too](#searching-the-answer-includes-soft-deleted-domains-too) | answered |
+| [when a user who is not the superadmin asks to search every domain, the role rejects it](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-domain) | rejected |
 
 **lookup_name**
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자도 도메인 이름으로 id를 찾을 수 있다. 이 호출은 인증만 보고, 권한은 그 id를 받는 호출이 본다](#looking_up-a-user-granted-nothing-still-looks-up-a-domain-by-name) | answered |
-| [슈퍼관리자가 도메인 이름으로 id를 찾으면, 그 도메인의 id가 온다](#looking_up-the-superadmin-looks-up-a-domain-by-name) | answered |
-| [아무 도메인도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다](#looking_up-looking-up-a-name-nothing-answers-to-is-not-found) | rejected |
+| [a user granted nothing can still look up a domain by name. This call checks authentication only, and the call receiving that id checks the permission](#looking_up-a-user-granted-nothing-still-looks-up-a-domain-by-name) | answered |
+| [when the superadmin looks up a domain by name, the id of that domain comes back](#looking_up-the-superadmin-looks-up-a-domain-by-name) | answered |
+| [looking up an id by a name no domain answers to is rejected as not found](#looking_up-looking-up-a-name-nothing-answers-to-is-not-found) | rejected |
 
 **partial_bulk_delete**
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-domains) | answered |
-| [활성 도메인 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 비활성으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | answered |
+| [when a user granted nothing soft-deletes several domains at once, none is soft-deleted and every one comes back in the failed list for lack of permission](#partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-domains) | answered |
+| [when two active domains and one missing id are soft-deleted at once, the two come back inactive and the missing id comes back in the failed list because there is no such target](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | answered |
 
 **partial_bulk_restore**
 
 | scenario | verdict |
 |---|---|
-| [soft delete 된 도메인 여럿을 한 번에 restore 하면, 모두 활성으로 온다](#partial_bulk_deleting-restoring-several-brings-them-back) | answered |
+| [when a user granted nothing restores several inactive domains at once, none is restored and every one comes back in the failed list for lack of permission](#partial_bulk_deleting-a-user-granted-nothing-restores-none-of-several-domains) | answered |
+| [when several soft-deleted domains are restored at once, all of them come back active](#partial_bulk_deleting-restoring-several-brings-them-back) | answered |
 
 **partial_bulk_update**
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-domains) | answered |
-| [활성 플래그와 설명을 섞어 도메인 여럿을 한 번에 고치면, 플래그를 내린 것은 soft delete 되고 올린 것은 restore 되며 둘 다 새 설명으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-the-active-flag-soft-deletes-or-restores-each-of-several-domains) | answered |
-| [슈퍼관리자가 도메인 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-domains-at-once) | answered |
+| [when a user granted nothing edits several domains at once, none is edited and every one comes back in the failed list for lack of permission](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-domains) | answered |
+| [when several domains are edited at once with a mix of active flags and descriptions, the one deactivated is soft-deleted and the one activated is restored, both come back with the new description, and the missing id comes back in the failed list because there is no such target](#partial_bulk_editing-the-active-flag-soft-deletes-or-restores-each-of-several-domains) | answered |
+| [when the superadmin changes the description of several domains at once, all of them come back with the new description and none failed](#partial_bulk_editing-the-superadmin-edits-several-domains-at-once) | answered |
 
 **restore**
 
 | scenario | verdict |
 |---|---|
-| [soft delete 되지 않은 도메인을 슈퍼관리자가 restore 하면, restore 했다는 답이 온다](#deleting-restoring-a-domain-that-is-not-soft-deleted) | answered |
-| [soft delete 된 도메인을 restore 하면, restore 했다는 답이 온다](#deleting-restoring-answers-that-it-restored) | answered |
-| [아무 권한도 받지 않은 사용자는 도메인을 restore 할 수 없다](#deleting-a-user-granted-nothing-may-not-restore-a-domain) | rejected |
+| [when the superadmin restores a domain that is not soft-deleted, the answer says it was restored and the domain comes back active](#deleting-restoring-a-domain-that-is-not-soft-deleted) | answered |
+| [when a soft-deleted domain is restored, the answer says it was restored and the domain comes back active](#deleting-restoring-answers-that-it-restored) | answered |
+| [a user granted nothing cannot restore a domain](#deleting-a-user-granted-nothing-may-not-restore-a-domain) | rejected |
 
 **scoped_search**
 
 | scenario | verdict |
 |---|---|
-| [리소스 그룹 범위에서 도메인 읽기 역할을 받은 사용자가 그 범위에서 search 하면, 슈퍼관리자와 같은 도메인들이 온다](#scoped_searching-a-user-granted-read-in-the-group-searches-its-domains) | answered |
-| [슈퍼관리자가 리소스 그룹 범위에서 search 하면, 그 그룹을 쓸 수 있는 도메인만 온다](#scoped_searching-the-superadmin-searches-the-domains-of-a-resource-group) | answered |
-| [아무 권한도 받지 않은 사용자가 리소스 그룹 범위에서 search 하면 권한 부족으로 거부된다](#scoped_searching-a-user-granted-nothing-may-not-search-the-domains-of-a-resource-group) | rejected |
+| [when a user granted the domain read role in a resource group scope searches in that scope, the same domains as the superadmin sees come back](#scoped_searching-a-user-granted-read-in-the-group-searches-its-domains) | answered |
+| [when the superadmin searches in a resource group scope, only the domains that can use the group come back](#scoped_searching-the-superadmin-searches-the-domains-of-a-resource-group) | answered |
+| [when a user granted nothing searches in a resource group scope, the call is rejected for lack of permission](#scoped_searching-a-user-granted-nothing-may-not-search-the-domains-of-a-resource-group) | rejected |
 
 **update**
 
 | scenario | verdict |
 |---|---|
-| [활성 플래그를 내리는 수정은 도메인을 soft delete 하고, 답이 비활성 상태를 실어 온다](#editing-clearing-the-active-flag-soft-deletes-a-domain) | answered |
-| [슈퍼관리자가 도메인의 설명만 바꾸면, 설명은 새 값이 되고 이름은 그대로 남는다](#editing-editing-a-description-leaves-the-name-alone) | answered |
-| [soft delete 된 도메인의 활성 플래그를 내리며 설명을 바꾸면, 설명은 새 값이 되고 비활성 상태는 그대로다](#editing-lowering-the-active-flag-of-a-soft-deleted-domain-edits-only-the-rest) | answered |
-| [soft delete 된 도메인의 활성 플래그를 올리는 수정은 그 도메인을 restore 하고, 답이 활성 상태를 실어 온다](#editing-raising-the-active-flag-restores-a-soft-deleted-domain) | answered |
-| [아무 권한도 받지 않은 사용자가 도메인을 수정하려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-domain) | rejected |
-| [아무 도메인도 갖지 않은 이름을 수정하려 하면 대상이 없다는 것으로 거부된다](#editing-editing-a-name-nothing-answers-to-is-not-found) | rejected |
+| [an edit that turns the active flag off soft deletes the domain, and the response carries the inactive state](#editing-clearing-the-active-flag-soft-deletes-a-domain) | answered |
+| [when the superadmin changes only the description of a domain, the description becomes the new value and the name stays](#editing-editing-a-description-leaves-the-name-alone) | answered |
+| [when an edit turns the active flag off of a soft-deleted domain and changes the description, the description becomes the new value and the inactive state stays](#editing-lowering-the-active-flag-of-a-soft-deleted-domain-edits-only-the-rest) | answered |
+| [an edit that turns the active flag on of a soft-deleted domain restores it, and the response carries the active state](#editing-raising-the-active-flag-restores-a-soft-deleted-domain) | answered |
+| [when a user granted nothing tries to edit a domain, the call is rejected for lack of permission](#editing-a-user-granted-nothing-may-not-edit-a-domain) | rejected |
+| [editing a name no domain answers to is rejected as not found](#editing-editing-a-name-nothing-answers-to-is-not-found) | rejected |
 
 **create**
 
 | scenario | verdict |
 |---|---|
-| [슈퍼관리자가 도메인을 만들면 model-store 프로젝트가 함께 생겨, 그 프로젝트를 가진 도메인으로 걸러 찾을 때 만든 도메인이 온다](#creating-creating-a-domain-also-creates-its-model-store-project) | answered |
-| [슈퍼관리자가 이름과 설명만 주고 도메인을 만들면, 요청에 없던 값들은 기본값으로 채워진 노드 전체가 답으로 온다](#creating-creating-a-domain-answers-with-the-whole-node) | answered |
-| [이름이 공백뿐이면 도메인을 만들 수 없다](#creating-a-blank-name-is-refused) | rejected |
-| [이미 어떤 도메인이 쓰고 있는 이름으로 만들려 하면, 권한이 있어도 이름이 겹친다는 이유로 거부된다](#creating-a-name-another-domain-already-holds-is-refused) | rejected |
-| [슈퍼관리자가 아닌 사용자가 도메인을 만들려 하면, 권한을 얼마나 받았는지와 무관하게 역할로 막힌다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-domain) | rejected |
-| [엔티티 권한 집행을 꺼도 도메인 생성은 여전히 막힌다. 이 문은 권한 그래프가 아니라 역할이 지키기 때문이다](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-domain) | rejected |
+| [when the superadmin creates a domain, its model-store project is created too, and searching for the domain holding that project brings back the domain just created](#creating-creating-a-domain-also-creates-its-model-store-project) | answered |
+| [when the superadmin creates a domain with only a name and a description, the whole node comes back with the values the request omitted filled from defaults](#creating-creating-a-domain-answers-with-the-whole-node) | answered |
+| [a domain cannot be created when the name is only whitespace](#creating-a-blank-name-is-refused) | rejected |
+| [when a domain is created with a name another domain already holds, it is rejected because the name is taken even when the caller has the permission](#creating-a-name-another-domain-already-holds-is-refused) | rejected |
+| [when a user who is not the superadmin tries to create a domain, the role rejects it regardless of how much permission the user holds](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-domain) | rejected |
+| [turning entity permission enforcement off still rejects creating a domain, because a role checks this operation, not the permission graph](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-domain) | rejected |
 
 **purge**
 
 | scenario | verdict |
 |---|---|
-| [아무것도 딸려 있지 않은 도메인은 purge 할 수 있다](#deleting-purging-a-domain-nothing-else-refers-to-succeeds) | answered |
-| [프로젝트가 딸린 도메인은 슈퍼관리자라도 purge 할 수 없다](#deleting-a-domain-holding-a-project-is-not-purged) | rejected |
-| [사용자가 딸린 도메인은 슈퍼관리자라도 purge 할 수 없다](#deleting-a-domain-holding-a-user-is-not-purged) | rejected |
-| [아무 권한도 받지 않은 사용자는 아무것도 딸리지 않은 도메인이라도 purge 할 수 없다](#deleting-a-user-granted-nothing-may-not-purge-a-domain) | rejected |
-| [아무 도메인도 갖지 않은 이름을 purge 하려 하면 대상이 없다는 것으로 거부된다](#deleting-purging-a-name-nothing-answers-to-is-not-found) | rejected |
+| [a domain nothing else refers to can be purged](#deleting-purging-a-domain-nothing-else-refers-to-succeeds) | answered |
+| [a domain holding a project cannot be purged even by the superadmin](#deleting-a-domain-holding-a-project-is-not-purged) | rejected |
+| [a domain holding a user cannot be purged even by the superadmin](#deleting-a-domain-holding-a-user-is-not-purged) | rejected |
+| [a user granted nothing cannot purge a domain even when nothing else refers to it](#deleting-a-user-granted-nothing-may-not-purge-a-domain) | rejected |
+| [purging a name no domain answers to is rejected as not found](#deleting-purging-a-name-nothing-answers-to-is-not-found) | rejected |
 
 ### bulk_get_ids
 
@@ -146,62 +148,62 @@ Scenario: incomplete 3 / 14
 
 #### [the-superadmin-reads-domains-by-id](/tests/scenario/bai_scenario/manager/domain/test_bulk_reading.py): pass
 
-슈퍼관리자가 id로 도메인 여럿을 읽으면, 그 자리에 도메인이 온다
+when the superadmin reads several domains by id, the domain comes back for that item
 
 Given
 
-- 건드릴 도메인 하나와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain and one superadmin in another domain
+  - Domain home-1
+  - Domain target-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.bulk_get_ids: user-1이 target-1의 id로 여럿 읽기
+- DomainAdapter.bulk_get_ids: user-1 reads several by the id of target-1
 
 Then
 
-- 물은 자리에 미리 만든 도메인 전체가 온다
+- the whole domain seeded in advance comes back for the item asked
   - [0].name = 'target-1'
-  - [0].description = '이미 있던 도메인'
+  - [0].description = 'a domain that already existed'
   - [0].integration_name = None
   - [0].allowed_docker_registries = []
   - [0].is_active = True
   - [0].is_default = False
-  - [0].id: 무시함: 데이터베이스가 만든다
-  - [0].entity_id: 미리 만든 도메인의 id와 같다
-  - [0].created_at: 이 실행이 쓴 시각
-  - [0].modified_at: 이 실행이 쓴 시각
+  - [0].id: skipped: the database generates it
+  - [0].entity_id: same as the id of the domain seeded in advance
+  - [0].created_at: the time this run wrote
+  - [0].modified_at: the time this run wrote
 
 <a id="bulk_reading-a-user-granted-nothing-may-not-read-domains-by-id"></a>
 
 #### [a-user-granted-nothing-may-not-read-domains-by-id](/tests/scenario/bai_scenario/manager/domain/test_bulk_reading.py): pass
 
-아무 권한도 받지 않은 사용자가 id로 도메인 여럿을 읽으면, 그 자리가 권한 부족으로 거부된다
+when a user granted nothing reads several domains by id, that item is rejected for lack of permission
 
 Given
 
-- 건드릴 도메인 하나와, 다른 도메인에 사는 user 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain and one user in another domain
+  - Domain home-1
+  - Domain target-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.bulk_get_ids: user-1이 target-1의 id로 여럿 읽기
+- DomainAdapter.bulk_get_ids: user-1 reads several by the id of target-1
 
 Then
 
-- 물은 자리가 거부된다
-  - 거부: NotEnoughPermission
+- the item asked is rejected
+  - rejected: NotEnoughPermission
 
 ### bulk_lookup_names
 
@@ -209,81 +211,81 @@ Then
 
 #### [a-user-granted-nothing-gets-the-same-ids-by-name](/tests/scenario/bai_scenario/manager/domain/test_looking_up.py): pass
 
-아무 권한도 받지 않은 사용자가 찾아도 슈퍼관리자와 같은 답이 온다. 이 호출은 인증만 보므로 이름이 있는지는 누구에게나 드러난다
+a user granted nothing gets the same answer as the superadmin. This call checks authentication only, so whether a name exists is visible to anyone
 
 Given
 
-- 건드릴 도메인 하나와, 다른 도메인에 사는 user 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain and one user in another domain
+  - Domain home-1
+  - Domain target-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.bulk_lookup_names: user-1이 target-1과 no-such-domain의 id를 여럿 찾음
+- DomainAdapter.bulk_lookup_names: user-1 looks up several ids for target-1 and no-such-domain
 
 Then
 
-- 있는 이름에는 그 도메인의 id, 없는 이름에는 빈 값이 온다
-  - [0]: 미리 만든 도메인의 id와 같다
+- the id of that domain comes back for the name that exists, and an empty value for the name that does not
+  - [0]: same as the id of the domain seeded in advance
   - [1] = None
 
 <a id="looking_up-the-superadmin-looks-up-domains-by-name"></a>
 
 #### [the-superadmin-looks-up-domains-by-name](/tests/scenario/bai_scenario/manager/domain/test_looking_up.py): pass
 
-슈퍼관리자가 있는 이름과 없는 이름으로 id를 여럿 찾으면, 있는 이름에는 그 도메인의 id, 없는 이름에는 빈 값이 온다
+when the superadmin looks up several ids for a name that exists and one that does not, the id of that domain comes back for the name that exists and an empty value for the name that does not
 
 Given
 
-- 건드릴 도메인 하나와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain and one superadmin in another domain
+  - Domain home-1
+  - Domain target-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.bulk_lookup_names: user-1이 target-1과 no-such-domain의 id를 여럿 찾음
+- DomainAdapter.bulk_lookup_names: user-1 looks up several ids for target-1 and no-such-domain
 
 Then
 
-- 있는 이름에는 그 도메인의 id, 없는 이름에는 빈 값이 온다
-  - [0]: 미리 만든 도메인의 id와 같다
+- the id of that domain comes back for the name that exists, and an empty value for the name that does not
+  - [0]: same as the id of the domain seeded in advance
   - [1] = None
 
 <a id="looking_up-looking-up-domains-by-name-without-login-is-refused"></a>
 
 #### [looking-up-domains-by-name-without-login-is-refused](/tests/scenario/bai_scenario/manager/domain/test_looking_up.py): pass
 
-로그인 문맥 없이 이름으로 id를 여럿 찾으면, 사용자를 찾을 수 없다는 것으로 거부된다
+looking up several ids by name without a login context is rejected as user not found
 
 Given
 
-- 건드릴 도메인 하나와, 다른 도메인에 사는 user 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain and one user in another domain
+  - Domain home-1
+  - Domain target-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.bulk_lookup_names: 로그인 문맥 없이 target-1의 id를 여럿 찾음
+- DomainAdapter.bulk_lookup_names: without a login context, looks up several ids for target-1
 
 Then
 
-- 거부된다
-  - 거부: UserNotFound
+- the call is rejected
+  - rejected: UserNotFound
 
 ### delete
 
@@ -291,105 +293,125 @@ Then
 
 #### [soft-deleting-a-domain-already-soft-deleted](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-이미 soft delete 된 도메인을 슈퍼관리자가 다시 soft delete 하면, soft delete 했다는 답이 온다
+when the superadmin soft deletes an already soft-deleted domain again, the answer says it was done and the domain comes back inactive
 
 Given
 
-- 건드릴 도메인 하나와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 twice-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain and one superadmin in another domain
+  - Domain home-1
+  - Domain twice-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.delete: user-1이 twice-1을 두 번 soft delete 함
+- DomainAdapter.delete: user-1 soft deletes twice-1 twice
 
 Then
 
-- 했다는 답이 온다
+- the answer says it was done and the domain comes back inactive
   - deleted = True
+  - domain.name = 'twice-1'
+  - domain.description = 'a domain that already existed'
+  - domain.integration_name = None
+  - domain.allowed_docker_registries = []
+  - domain.is_active = False
+  - domain.is_default = False
+  - domain.id: skipped: the database generates it
+  - domain.entity_id: same as the id of the domain seeded in advance
+  - domain.created_at: the time this run wrote
+  - domain.modified_at: the time this run wrote
 
 <a id="deleting-the-superadmin-soft-deletes-a-domain"></a>
 
 #### [the-superadmin-soft-deletes-a-domain](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-슈퍼관리자가 도메인을 soft delete 하면, soft delete 했다는 답이 온다
+when the superadmin soft deletes a domain, the answer says it was done and the domain comes back inactive
 
 Given
 
-- 건드릴 도메인 하나와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 to-delete-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain and one superadmin in another domain
+  - Domain home-1
+  - Domain to-delete-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.delete: user-1이 to-delete-1을 soft delete 함
+- DomainAdapter.delete: user-1 soft deletes to-delete-1
 
 Then
 
-- 했다는 답이 온다
+- the answer says it was done and the domain comes back inactive
   - deleted = True
+  - domain.name = 'to-delete-1'
+  - domain.description = 'a domain that already existed'
+  - domain.integration_name = None
+  - domain.allowed_docker_registries = []
+  - domain.is_active = False
+  - domain.is_default = False
+  - domain.id: skipped: the database generates it
+  - domain.entity_id: same as the id of the domain seeded in advance
+  - domain.created_at: the time this run wrote
+  - domain.modified_at: the time this run wrote
 
 <a id="deleting-a-user-granted-nothing-may-not-soft-delete-a-domain"></a>
 
 #### [a-user-granted-nothing-may-not-soft-delete-a-domain](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-아무 권한도 받지 않은 사용자는 도메인을 soft delete 할 수 없다
+a user granted nothing cannot soft delete a domain
 
 Given
 
-- 건드릴 도메인 하나와, 다른 도메인에 사는 user 한 명
-  - 도메인 home-1
-  - 도메인 untouchable-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain and one user in another domain
+  - Domain home-1
+  - Domain untouchable-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.delete: user-1이 untouchable-1을 soft delete 함
+- DomainAdapter.delete: user-1 soft deletes untouchable-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="deleting-soft-deleting-a-name-nothing-answers-to-is-not-found"></a>
 
 #### [soft-deleting-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-아무 도메인도 갖지 않은 이름을 soft delete 하려 하면 대상이 없다는 것으로 거부된다
+soft-deleting a name no domain answers to is rejected as not found
 
 Given
 
-- 건드릴 도메인 하나와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain and one superadmin in another domain
+  - Domain home-1
+  - Domain target-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.delete: user-1이 no-such-domain을 soft delete 함
+- DomainAdapter.delete: user-1 soft deletes no-such-domain
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 ### get
 
@@ -397,120 +419,120 @@ Then
 
 #### [the-superadmin-reads-a-domain-by-name](/tests/scenario/bai_scenario/manager/domain/test_reading.py): pass
 
-도메인 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 도메인이 답으로 온다
+with one domain laid, when the superadmin reads it by name, that domain comes back
 
 Given
 
-- 도메인 하나와, 그 도메인에 속한 superadmin 한 명
-  - 도메인 host-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain and one superadmin in it
+  - Domain host-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.get: user-1이 host-1으로 조회
+- DomainAdapter.get: user-1 reads a domain by name host-1
 
 Then
 
-- 미리 만든 도메인 전체가 온다
+- the whole domain seeded in advance comes back
   - name = 'host-1'
-  - description = '이미 있던 도메인'
+  - description = 'a domain that already existed'
   - integration_name = None
   - allowed_docker_registries = []
   - is_active = True
   - is_default = False
-  - id: 무시함: 데이터베이스가 만든다
-  - entity_id: 미리 만든 도메인의 id와 같다
-  - created_at: 이 실행이 쓴 시각
-  - modified_at: 이 실행이 쓴 시각
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the domain seeded in advance
+  - created_at: the time this run wrote
+  - modified_at: the time this run wrote
 
 <a id="reading-the-superadmin-reads-a-soft-deleted-domain-by-name"></a>
 
 #### [the-superadmin-reads-a-soft-deleted-domain-by-name](/tests/scenario/bai_scenario/manager/domain/test_reading.py): pass
 
-슈퍼관리자가 도메인을 soft delete 한 뒤 이름으로 조회하면, 비활성 상태를 실은 그 도메인이 온다
+when the superadmin soft deletes a domain and then reads it by name, that domain comes back carrying the inactive state
 
 Given
 
-- 건드릴 도메인 하나와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 soft-deleted-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain and one superadmin in another domain
+  - Domain home-1
+  - Domain soft-deleted-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.get: user-1이 soft-deleted-1을 soft delete 한 뒤 이름으로 조회
+- DomainAdapter.get: user-1 soft deletes soft-deleted-1 and then reads it by name
 
 Then
 
-- 미리 만든 도메인 전체가 온다
+- the whole domain seeded in advance comes back
   - name = 'soft-deleted-1'
-  - description = '이미 있던 도메인'
+  - description = 'a domain that already existed'
   - integration_name = None
   - allowed_docker_registries = []
   - is_active = False
   - is_default = False
-  - id: 무시함: 데이터베이스가 만든다
-  - entity_id: 미리 만든 도메인의 id와 같다
-  - created_at: 이 실행이 쓴 시각
-  - modified_at: 이 실행이 쓴 시각
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the domain seeded in advance
+  - created_at: the time this run wrote
+  - modified_at: the time this run wrote
 
 <a id="reading-a-user-granted-nothing-may-not-read-a-domain"></a>
 
 #### [a-user-granted-nothing-may-not-read-a-domain](/tests/scenario/bai_scenario/manager/domain/test_reading.py): pass
 
-같은 도메인이 있고 사용자가 아무 권한도 받지 않았을 때, 이름으로 조회하면 권한 부족으로 거부된다
+with the same domain laid, when a user granted nothing reads it by name, the call is rejected for lack of permission
 
 Given
 
-- 도메인 하나와, 그 도메인에 속한 user 한 명
-  - 도메인 host-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain and one user in it
+  - Domain host-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.get: user-1이 host-1으로 조회
+- DomainAdapter.get: user-1 reads a domain by name host-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="reading-reading-a-name-nothing-answers-to-is-not-found"></a>
 
 #### [reading-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/domain/test_reading.py): pass
 
-슈퍼관리자가 존재하지 않는 이름으로 조회하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
+when the superadmin reads by a name that does not exist, the call is rejected as not found, not for a permission problem
 
 Given
 
-- 도메인 하나와, 그 도메인에 속한 superadmin 한 명
-  - 도메인 host-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain and one superadmin in it
+  - Domain host-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.get: user-1이 no-such-domain으로 조회
+- DomainAdapter.get: user-1 reads a domain by name no-such-domain
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 ### global_search
 
@@ -518,59 +540,111 @@ Then
 
 #### [a-name-filter-narrows-the-answer-to-the-domain-it-names](/tests/scenario/bai_scenario/manager/domain/test_searching.py): pass
 
-도메인 여럿 중 하나의 이름으로 걸러 조회하면, 답에는 그 이름의 도메인만 남는다
+when several domains are searched with a filter on the name of one, only the domain of that name is left in the answer
 
 Given
 
-- 도메인 4개와, 그중 하나에 속한 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 wanted-1
-  - 도메인 other-1
-  - 도메인 other-2
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 4 domains and one superadmin in one of them
+  - Domain home-1
+  - Domain wanted-1
+  - Domain other-1
+  - Domain other-2
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.global_search: user-1이 wanted-1으로 걸러 조회
+- DomainAdapter.global_search: user-1 searches with a filter on wanted-1
 
 Then
 
-- 걸러낸 그 도메인 하나만 남는다
+- only the domain that the filter named is left
   - items = ['wanted-1']
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
 
+<a id="nested_searching-a-nested-user-filter-and-project-name-order-narrow-the-first-page"></a>
+
+#### [a-nested-user-filter-and-project-name-order-narrow-the-first-page](/tests/scenario/bai_scenario/manager/domain/test_nested_searching.py): pass
+
+when the superadmin, the only caller the global role admits, searches the domains holding an active user ordered by project name and takes only the first page, the first domain alone comes back with the remaining count and the third domain holding no active user is left out
+
+Given
+
+- three domains: the first and second hold one project of a different name and one active user, the third holds one inactive user, and the first holds one more superadmin
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Domain first-1
+  - Domain second-1
+  - Domain third-1
+  - Project alpha-team-1
+  - Project beta-team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+    - User resource policy user-policy-4: up to 10 folders per user
+    - Keypair policy keypair-policy-4: up to 5 concurrent sessions
+    - superadmin user-4: has their own keypair and personal project
+  - Prepare one inactive user in the domain
+    - User resource policy user-policy-3: up to 10 folders per user
+    - Keypair policy keypair-policy-3: up to 5 concurrent sessions
+    - regular user user-3: status inactive, has their own keypair and personal project
+
+When
+
+- DomainAdapter.global_search: user-4 searches the domains holding an active user, ordered by project name, taking only the first page
+
+Then
+
+- only the first domain, whose project name comes first, comes back with every field, and the third domain holding no active user is left out
+  - items count = 1
+  - total_count = 2
+  - has_next_page = True
+  - has_previous_page = False
+  - items[0].name = 'first-1'
+  - items[0].description = 'a domain that already existed'
+  - items[0].integration_name = None
+  - items[0].allowed_docker_registries = []
+  - items[0].is_active = True
+  - items[0].is_default = False
+  - items[0].id: skipped: the database generates it
+  - items[0].entity_id: same as the id of the domain seeded in advance
+  - items[0].created_at: the time this run wrote
+  - items[0].modified_at: the time this run wrote
+
 <a id="searching-the-answer-counts-every-domain-the-scenario-laid"></a>
 
 #### [the-answer-counts-every-domain-the-scenario-laid](/tests/scenario/bai_scenario/manager/domain/test_searching.py): pass
 
-이 시나리오가 미리 만든 도메인이 넷일 때, 필터 없는 조회는 그 넷이 모두 나온다
+when this scenario seeded four domains, a search without a filter brings back all four
 
 Given
 
-- 도메인 4개와, 그중 하나에 속한 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 wanted-1
-  - 도메인 other-1
-  - 도메인 other-2
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 4 domains and one superadmin in one of them
+  - Domain home-1
+  - Domain wanted-1
+  - Domain other-1
+  - Domain other-2
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.global_search: user-1이 필터 없이 전체 조회
+- DomainAdapter.global_search: user-1 searches every domain without a filter
 
 Then
 
-- 미리 만든 도메인이 모두 나온다
+- every domain seeded in advance comes back
   - items = ['home-1', 'other-1', 'other-2', 'wanted-1']
   - total_count = 4
   - has_next_page = False
@@ -580,28 +654,28 @@ Then
 
 #### [the-answer-includes-soft-deleted-domains-too](/tests/scenario/bai_scenario/manager/domain/test_searching.py): pass
 
-미리 만든 도메인 중 하나를 soft delete 한 뒤 필터 없이 search 하면, 그것까지 모두 나온다
+when one of the domains seeded in advance is soft-deleted and every domain is searched without a filter, that one comes back too
 
 Given
 
-- 도메인 4개와, 그중 하나에 속한 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 wanted-1
-  - 도메인 other-1
-  - 도메인 other-2
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 4 domains and one superadmin in one of them
+  - Domain home-1
+  - Domain wanted-1
+  - Domain other-1
+  - Domain other-2
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.global_search: user-1이 wanted-1을 soft delete 한 뒤 필터 없이 전체 조회
+- DomainAdapter.global_search: user-1 soft deletes wanted-1 and then searches every domain without a filter
 
 Then
 
-- 미리 만든 도메인이 모두 나온다
+- every domain seeded in advance comes back
   - items = ['home-1', 'other-1', 'other-2', 'wanted-1']
   - total_count = 4
   - has_next_page = False
@@ -611,29 +685,29 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-search-every-domain](/tests/scenario/bai_scenario/manager/domain/test_searching.py): pass
 
-슈퍼관리자가 아닌 사용자가 전체 도메인 조회를 요청하면 역할로 막힌다
+when a user who is not the superadmin asks to search every domain, the role rejects it
 
 Given
 
-- 도메인 4개와, 그중 하나에 속한 user 한 명
-  - 도메인 home-1
-  - 도메인 wanted-1
-  - 도메인 other-1
-  - 도메인 other-2
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 4 domains and one user in one of them
+  - Domain home-1
+  - Domain wanted-1
+  - Domain other-1
+  - Domain other-2
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.global_search: user-1이 필터 없이 전체 조회
+- DomainAdapter.global_search: user-1 searches every domain without a filter
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### lookup_name
 
@@ -641,79 +715,79 @@ Then
 
 #### [a-user-granted-nothing-still-looks-up-a-domain-by-name](/tests/scenario/bai_scenario/manager/domain/test_looking_up.py): pass
 
-아무 권한도 받지 않은 사용자도 도메인 이름으로 id를 찾을 수 있다. 이 호출은 인증만 보고, 권한은 그 id를 받는 호출이 본다
+a user granted nothing can still look up a domain by name. This call checks authentication only, and the call receiving that id checks the permission
 
 Given
 
-- 건드릴 도메인 하나와, 다른 도메인에 사는 user 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain and one user in another domain
+  - Domain home-1
+  - Domain target-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.lookup_name: user-1이 target-1의 id를 찾음
+- DomainAdapter.lookup_name: user-1 looks up the id of target-1
 
 Then
 
-- 그 도메인의 id가 온다
-  - id: 미리 만든 도메인의 id와 같다
+- the id of that domain comes back
+  - id: same as the id of the domain seeded in advance
 
 <a id="looking_up-the-superadmin-looks-up-a-domain-by-name"></a>
 
 #### [the-superadmin-looks-up-a-domain-by-name](/tests/scenario/bai_scenario/manager/domain/test_looking_up.py): pass
 
-슈퍼관리자가 도메인 이름으로 id를 찾으면, 그 도메인의 id가 온다
+when the superadmin looks up a domain by name, the id of that domain comes back
 
 Given
 
-- 건드릴 도메인 하나와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain and one superadmin in another domain
+  - Domain home-1
+  - Domain target-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.lookup_name: user-1이 target-1의 id를 찾음
+- DomainAdapter.lookup_name: user-1 looks up the id of target-1
 
 Then
 
-- 그 도메인의 id가 온다
-  - id: 미리 만든 도메인의 id와 같다
+- the id of that domain comes back
+  - id: same as the id of the domain seeded in advance
 
 <a id="looking_up-looking-up-a-name-nothing-answers-to-is-not-found"></a>
 
 #### [looking-up-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/domain/test_looking_up.py): pass
 
-아무 도메인도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다
+looking up an id by a name no domain answers to is rejected as not found
 
 Given
 
-- 건드릴 도메인 하나와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain and one superadmin in another domain
+  - Domain home-1
+  - Domain target-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.lookup_name: user-1이 no-such-domain의 id를 찾음
+- DomainAdapter.lookup_name: user-1 looks up the id of no-such-domain
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 ### partial_bulk_delete
 
@@ -721,132 +795,164 @@ Then
 
 #### [a-user-granted-nothing-soft-deletes-none-of-several-domains](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py): pass
 
-아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user granted nothing soft-deletes several domains at once, none is soft-deleted and every one comes back in the failed list for lack of permission
 
 Given
 
-- 도메인 3개와, 그중 하나에 속한 user 한 명
-  - 도메인 home-1
-  - 도메인 wanted-1
-  - 도메인 other-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 3 domains and one user in one of them
+  - Domain home-1
+  - Domain wanted-1
+  - Domain other-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.partial_bulk_delete: user-1이 도메인 2개를 한 번에 soft delete 함
+- DomainAdapter.partial_bulk_delete: user-1 soft deletes 2 domains at once
 
 Then
 
-- 처리된 도메인 없이 대상이 모두 실패 목록에 온다
+- no domain is processed and every target comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상 도메인의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 도메인의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the target domain
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target domain
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one"></a>
 
 #### [soft-deleting-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py): pass
 
-활성 도메인 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 비활성으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+when two active domains and one missing id are soft-deleted at once, the two come back inactive and the missing id comes back in the failed list because there is no such target
 
 Given
 
-- 도메인 3개와, 그중 하나에 속한 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 wanted-1
-  - 도메인 other-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 3 domains and one superadmin in one of them
+  - Domain home-1
+  - Domain wanted-1
+  - Domain other-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.partial_bulk_delete: user-1이 도메인 2개 와 없는 id 하나를 한 번에 soft delete 함
+- DomainAdapter.partial_bulk_delete: user-1 soft deletes 2 domains and one missing id at once
 
 Then
 
-- 대상 도메인이 모두 비활성으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+- every target domain comes back inactive and the missing id comes back in the failed list because there is no such target
   - successes count = 2
   - successes[0].name = 'wanted-1'
-  - successes[0].description = '이미 있던 도메인'
+  - successes[0].description = 'a domain that already existed'
   - successes[0].integration_name = None
   - successes[0].allowed_docker_registries = []
   - successes[0].is_active = False
   - successes[0].is_default = False
-  - successes[0].id: 무시함: 데이터베이스가 만든다
-  - successes[0].entity_id: 미리 만든 도메인의 id와 같다
-  - successes[0].created_at: 이 실행이 쓴 시각
-  - successes[0].modified_at: 이 실행이 쓴 시각
+  - successes[0].id: skipped: the database generates it
+  - successes[0].entity_id: same as the id of the domain seeded in advance
+  - successes[0].created_at: the time this run wrote
+  - successes[0].modified_at: the time this run wrote
   - successes[1].name = 'other-1'
-  - successes[1].description = '이미 있던 도메인'
+  - successes[1].description = 'a domain that already existed'
   - successes[1].integration_name = None
   - successes[1].allowed_docker_registries = []
   - successes[1].is_active = False
   - successes[1].is_default = False
-  - successes[1].id: 무시함: 데이터베이스가 만든다
-  - successes[1].entity_id: 미리 만든 도메인의 id와 같다
-  - successes[1].created_at: 이 실행이 쓴 시각
-  - successes[1].modified_at: 이 실행이 쓴 시각
+  - successes[1].id: skipped: the database generates it
+  - successes[1].entity_id: same as the id of the domain seeded in advance
+  - successes[1].created_at: the time this run wrote
+  - successes[1].modified_at: the time this run wrote
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 'not found'를 담은 이유
+  - failed[0].id: same as the missing id in the request
+  - failed[0].message: a reason containing 'not found'
 
 ### partial_bulk_restore
+
+<a id="partial_bulk_deleting-a-user-granted-nothing-restores-none-of-several-domains"></a>
+
+#### [a-user-granted-nothing-restores-none-of-several-domains](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py): pass
+
+when a user granted nothing restores several inactive domains at once, none is restored and every one comes back in the failed list for lack of permission
+
+Given
+
+- 3 domains and one user in one of them, and the target domains the caller does not live in are inactive
+  - Domain home-1
+  - Domain wanted-1: inactive
+  - Domain other-1: inactive
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+
+When
+
+- DomainAdapter.partial_bulk_restore: user-1 restores 2 domains at once
+
+Then
+
+- no domain is processed and every target comes back in the failed list
+  - successes = []
+  - failed count = 2
+  - failed[0].id: same as the id of the target domain
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target domain
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_deleting-restoring-several-brings-them-back"></a>
 
 #### [restoring-several-brings-them-back](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py): pass
 
-soft delete 된 도메인 여럿을 한 번에 restore 하면, 모두 활성으로 온다
+when several soft-deleted domains are restored at once, all of them come back active
 
 Given
 
-- 도메인 3개와, 그중 하나에 속한 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 wanted-1
-  - 도메인 other-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 3 domains and one superadmin in one of them
+  - Domain home-1
+  - Domain wanted-1
+  - Domain other-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.partial_bulk_restore: user-1이 도메인 2개를 한 번에 soft delete 했다가 한 번에 restore 함
+- DomainAdapter.partial_bulk_restore: user-1 soft deletes 2 domains at once and then restores them at once
 
 Then
 
-- 대상 도메인이 모두 활성으로 오고, 실패한 것은 없다
+- every target domain comes back active and none failed
   - successes count = 2
   - successes[0].name = 'wanted-1'
-  - successes[0].description = '이미 있던 도메인'
+  - successes[0].description = 'a domain that already existed'
   - successes[0].integration_name = None
   - successes[0].allowed_docker_registries = []
   - successes[0].is_active = True
   - successes[0].is_default = False
-  - successes[0].id: 무시함: 데이터베이스가 만든다
-  - successes[0].entity_id: 미리 만든 도메인의 id와 같다
-  - successes[0].created_at: 이 실행이 쓴 시각
-  - successes[0].modified_at: 이 실행이 쓴 시각
+  - successes[0].id: skipped: the database generates it
+  - successes[0].entity_id: same as the id of the domain seeded in advance
+  - successes[0].created_at: the time this run wrote
+  - successes[0].modified_at: the time this run wrote
   - successes[1].name = 'other-1'
-  - successes[1].description = '이미 있던 도메인'
+  - successes[1].description = 'a domain that already existed'
   - successes[1].integration_name = None
   - successes[1].allowed_docker_registries = []
   - successes[1].is_active = True
   - successes[1].is_default = False
-  - successes[1].id: 무시함: 데이터베이스가 만든다
-  - successes[1].entity_id: 미리 만든 도메인의 id와 같다
-  - successes[1].created_at: 이 실행이 쓴 시각
-  - successes[1].modified_at: 이 실행이 쓴 시각
+  - successes[1].id: skipped: the database generates it
+  - successes[1].entity_id: same as the id of the domain seeded in advance
+  - successes[1].created_at: the time this run wrote
+  - successes[1].modified_at: the time this run wrote
   - failed = []
 
 ### partial_bulk_update
@@ -855,131 +961,131 @@ Then
 
 #### [a-user-granted-nothing-edits-none-of-several-domains](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_editing.py): pass
 
-아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user granted nothing edits several domains at once, none is edited and every one comes back in the failed list for lack of permission
 
 Given
 
-- 도메인 3개와, 그중 하나에 속한 user 한 명
-  - 도메인 home-1
-  - 도메인 wanted-1
-  - 도메인 other-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 3 domains and one user in one of them
+  - Domain home-1
+  - Domain wanted-1
+  - Domain other-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.partial_bulk_update: user-1이 도메인 2개의 설명을 한 번에 고침
+- DomainAdapter.partial_bulk_update: user-1 edits the description of 2 domains at once
 
 Then
 
-- 처리된 도메인 없이 대상이 모두 실패 목록에 온다
+- no domain is processed and every target comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상 도메인의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 도메인의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the target domain
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target domain
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_editing-the-active-flag-soft-deletes-or-restores-each-of-several-domains"></a>
 
 #### [the-active-flag-soft-deletes-or-restores-each-of-several-domains](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_editing.py): pass
 
-활성 플래그와 설명을 섞어 도메인 여럿을 한 번에 고치면, 플래그를 내린 것은 soft delete 되고 올린 것은 restore 되며 둘 다 새 설명으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+when several domains are edited at once with a mix of active flags and descriptions, the one deactivated is soft-deleted and the one activated is restored, both come back with the new description, and the missing id comes back in the failed list because there is no such target
 
 Given
 
-- 도메인 3개와, 그중 하나에 속한 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 wanted-1
-  - 도메인 other-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 3 domains and one superadmin in one of them
+  - Domain home-1
+  - Domain wanted-1
+  - Domain other-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.partial_bulk_update: user-1이 둘째 도메인을 soft delete 한 뒤, 첫째는 활성 플래그를 내리고 둘째는 올리며 둘의 설명을 바꾸고, 없는 id 하나의 활성 플래그를 내림
+- DomainAdapter.partial_bulk_update: user-1 soft deletes the second domain, then deactivates the active flag of the first, activates the second, changes the description of both, and deactivates the active flag of one missing id
 
 Then
 
-- 둘 다 새 설명으로 오고 첫째는 비활성, 둘째는 활성이며, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+- both come back with the new description, the first is inactive and the second is active, and the missing id comes back in the failed list because there is no such target
   - successes count = 2
   - successes[0].name = 'wanted-1'
-  - successes[0].description = '한 번에 고친 설명'
+  - successes[0].description = 'a description edited at once'
   - successes[0].integration_name = None
   - successes[0].allowed_docker_registries = []
   - successes[0].is_active = False
   - successes[0].is_default = False
-  - successes[0].id: 무시함: 데이터베이스가 만든다
-  - successes[0].entity_id: 미리 만든 도메인의 id와 같다
-  - successes[0].created_at: 이 실행이 쓴 시각
-  - successes[0].modified_at: 이 실행이 쓴 시각
+  - successes[0].id: skipped: the database generates it
+  - successes[0].entity_id: same as the id of the domain seeded in advance
+  - successes[0].created_at: the time this run wrote
+  - successes[0].modified_at: the time this run wrote
   - successes[1].name = 'other-1'
-  - successes[1].description = '한 번에 고친 설명'
+  - successes[1].description = 'a description edited at once'
   - successes[1].integration_name = None
   - successes[1].allowed_docker_registries = []
   - successes[1].is_active = True
   - successes[1].is_default = False
-  - successes[1].id: 무시함: 데이터베이스가 만든다
-  - successes[1].entity_id: 미리 만든 도메인의 id와 같다
-  - successes[1].created_at: 이 실행이 쓴 시각
-  - successes[1].modified_at: 이 실행이 쓴 시각
+  - successes[1].id: skipped: the database generates it
+  - successes[1].entity_id: same as the id of the domain seeded in advance
+  - successes[1].created_at: the time this run wrote
+  - successes[1].modified_at: the time this run wrote
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 'not found'를 담은 이유
+  - failed[0].id: same as the missing id in the request
+  - failed[0].message: a reason containing 'not found'
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-domains-at-once"></a>
 
 #### [the-superadmin-edits-several-domains-at-once](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_editing.py): pass
 
-슈퍼관리자가 도메인 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다
+when the superadmin changes the description of several domains at once, all of them come back with the new description and none failed
 
 Given
 
-- 도메인 3개와, 그중 하나에 속한 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 wanted-1
-  - 도메인 other-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 3 domains and one superadmin in one of them
+  - Domain home-1
+  - Domain wanted-1
+  - Domain other-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.partial_bulk_update: user-1이 도메인 2개의 설명을 한 번에 고침
+- DomainAdapter.partial_bulk_update: user-1 edits the description of 2 domains at once
 
 Then
 
-- 대상 도메인이 모두 새 설명으로 오고, 실패한 것은 없다
+- every target domain comes back with the new description and none failed
   - successes count = 2
   - failed = []
   - successes[0].name = 'wanted-1'
-  - successes[0].description = '한 번에 고친 설명'
+  - successes[0].description = 'a description edited at once'
   - successes[0].integration_name = None
   - successes[0].allowed_docker_registries = []
   - successes[0].is_active = True
   - successes[0].is_default = False
-  - successes[0].id: 무시함: 데이터베이스가 만든다
-  - successes[0].entity_id: 미리 만든 도메인의 id와 같다
-  - successes[0].created_at: 이 실행이 쓴 시각
-  - successes[0].modified_at: 이 실행이 쓴 시각
+  - successes[0].id: skipped: the database generates it
+  - successes[0].entity_id: same as the id of the domain seeded in advance
+  - successes[0].created_at: the time this run wrote
+  - successes[0].modified_at: the time this run wrote
   - successes[1].name = 'other-1'
-  - successes[1].description = '한 번에 고친 설명'
+  - successes[1].description = 'a description edited at once'
   - successes[1].integration_name = None
   - successes[1].allowed_docker_registries = []
   - successes[1].is_active = True
   - successes[1].is_default = False
-  - successes[1].id: 무시함: 데이터베이스가 만든다
-  - successes[1].entity_id: 미리 만든 도메인의 id와 같다
-  - successes[1].created_at: 이 실행이 쓴 시각
-  - successes[1].modified_at: 이 실행이 쓴 시각
+  - successes[1].id: skipped: the database generates it
+  - successes[1].entity_id: same as the id of the domain seeded in advance
+  - successes[1].created_at: the time this run wrote
+  - successes[1].modified_at: the time this run wrote
 
 ### restore
 
@@ -987,79 +1093,99 @@ Then
 
 #### [restoring-a-domain-that-is-not-soft-deleted](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-soft delete 되지 않은 도메인을 슈퍼관리자가 restore 하면, restore 했다는 답이 온다
+when the superadmin restores a domain that is not soft-deleted, the answer says it was restored and the domain comes back active
 
 Given
 
-- 건드릴 도메인 하나와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 active-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain and one superadmin in another domain
+  - Domain home-1
+  - Domain active-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.restore: user-1이 active-1을 restore 함
+- DomainAdapter.restore: user-1 restores active-1
 
 Then
 
-- 했다는 답이 온다
+- the answer says it was done and the domain comes back active
   - restored = True
+  - domain.name = 'active-1'
+  - domain.description = 'a domain that already existed'
+  - domain.integration_name = None
+  - domain.allowed_docker_registries = []
+  - domain.is_active = True
+  - domain.is_default = False
+  - domain.id: skipped: the database generates it
+  - domain.entity_id: same as the id of the domain seeded in advance
+  - domain.created_at: the time this run wrote
+  - domain.modified_at: the time this run wrote
 
 <a id="deleting-restoring-answers-that-it-restored"></a>
 
 #### [restoring-answers-that-it-restored](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-soft delete 된 도메인을 restore 하면, restore 했다는 답이 온다
+when a soft-deleted domain is restored, the answer says it was restored and the domain comes back active
 
 Given
 
-- 건드릴 도메인 하나와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 to-restore-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain and one superadmin in another domain
+  - Domain home-1
+  - Domain to-restore-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.restore: user-1이 to-restore-1을 soft delete 했다가 restore 함
+- DomainAdapter.restore: user-1 soft deletes to-restore-1 and then restores it
 
 Then
 
-- 했다는 답이 온다
+- the answer says it was done and the domain comes back active
   - restored = True
+  - domain.name = 'to-restore-1'
+  - domain.description = 'a domain that already existed'
+  - domain.integration_name = None
+  - domain.allowed_docker_registries = []
+  - domain.is_active = True
+  - domain.is_default = False
+  - domain.id: skipped: the database generates it
+  - domain.entity_id: same as the id of the domain seeded in advance
+  - domain.created_at: the time this run wrote
+  - domain.modified_at: the time this run wrote
 
 <a id="deleting-a-user-granted-nothing-may-not-restore-a-domain"></a>
 
 #### [a-user-granted-nothing-may-not-restore-a-domain](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-아무 권한도 받지 않은 사용자는 도메인을 restore 할 수 없다
+a user granted nothing cannot restore a domain
 
 Given
 
-- 건드릴 도메인 하나와, 다른 도메인에 사는 user 한 명
-  - 도메인 home-1
-  - 도메인 untouchable-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain and one user in another domain
+  - Domain home-1
+  - Domain untouchable-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.restore: user-1이 untouchable-1을 restore 함
+- DomainAdapter.restore: user-1 restores untouchable-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### scoped_search
 
@@ -1067,34 +1193,34 @@ Then
 
 #### [a-user-granted-read-in-the-group-searches-its-domains](/tests/scenario/bai_scenario/manager/domain/test_scoped_searching.py): pass
 
-리소스 그룹 범위에서 도메인 읽기 역할을 받은 사용자가 그 범위에서 search 하면, 슈퍼관리자와 같은 도메인들이 온다
+when a user granted the domain read role in a resource group scope searches in that scope, the same domains as the superadmin sees come back
 
 Given
 
-- 리소스 그룹 하나, 그 그룹을 쓸 수 있는 도메인 둘과 쓸 수 없는 하나, 그리고 그 그룹 범위의 도메인 읽기 역할을 받은 user 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인 linked-1
-  - 도메인 linked-2
-  - 도메인 linked-1 의 세션이 쓸 수 있는 리소스 그룹 resource-group-1
-  - 도메인 linked-2 의 세션이 쓸 수 있는 리소스 그룹 resource-group-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 리소스 그룹 범위의 도메인 읽기 역할을 받은 사용자 준비
-    - 역할 domain-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 domain-reader-1: domain 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 domain-reader-1 보유
+- one resource group, two domains that can use it and one that cannot, and the user granted the domain read role in the resource group scope
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Domain linked-1
+  - Domain linked-2
+  - Domain linked-1 whose sessions can use Resource group resource-group-1
+  - Domain linked-2 whose sessions can use Resource group resource-group-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+  - Prepare a user granted the domain read role in the resource group scope
+    - Role domain-reader-1: applies only within the scope it is granted in
+    - Role domain-reader-1: READ allowed on every domain
+    - regular user user-1: holds Role domain-reader-1
 
 When
 
-- DomainAdapter.scoped_search: user-1이 리소스 그룹 resource-group-1 범위에서 조회
+- DomainAdapter.scoped_search: user-1 searches in the resource group resource-group-1
 
 Then
 
-- 그 그룹을 쓸 수 있는 도메인만 남는다
+- only the domains that can use the group are left
   - items = ['linked-1', 'linked-2']
   - total_count = 2
   - has_next_page = False
@@ -1104,30 +1230,30 @@ Then
 
 #### [the-superadmin-searches-the-domains-of-a-resource-group](/tests/scenario/bai_scenario/manager/domain/test_scoped_searching.py): pass
 
-슈퍼관리자가 리소스 그룹 범위에서 search 하면, 그 그룹을 쓸 수 있는 도메인만 온다
+when the superadmin searches in a resource group scope, only the domains that can use the group come back
 
 Given
 
-- 리소스 그룹 하나, 그 그룹을 쓸 수 있는 도메인 둘과 쓸 수 없는 하나, 그리고 superadmin 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인 linked-1
-  - 도메인 linked-2
-  - 도메인 linked-1 의 세션이 쓸 수 있는 리소스 그룹 resource-group-1
-  - 도메인 linked-2 의 세션이 쓸 수 있는 리소스 그룹 resource-group-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group, two domains that can use it and one that cannot, and one superadmin
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Domain linked-1
+  - Domain linked-2
+  - Domain linked-1 whose sessions can use Resource group resource-group-1
+  - Domain linked-2 whose sessions can use Resource group resource-group-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.scoped_search: user-1이 리소스 그룹 resource-group-1 범위에서 조회
+- DomainAdapter.scoped_search: user-1 searches in the resource group resource-group-1
 
 Then
 
-- 그 그룹을 쓸 수 있는 도메인만 남는다
+- only the domains that can use the group are left
   - items = ['linked-1', 'linked-2']
   - total_count = 2
   - has_next_page = False
@@ -1137,31 +1263,31 @@ Then
 
 #### [a-user-granted-nothing-may-not-search-the-domains-of-a-resource-group](/tests/scenario/bai_scenario/manager/domain/test_scoped_searching.py): pass
 
-아무 권한도 받지 않은 사용자가 리소스 그룹 범위에서 search 하면 권한 부족으로 거부된다
+when a user granted nothing searches in a resource group scope, the call is rejected for lack of permission
 
 Given
 
-- 리소스 그룹 하나, 그 그룹을 쓸 수 있는 도메인 둘과 쓸 수 없는 하나, 그리고 user 한 명
-  - 도메인 home-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인 linked-1
-  - 도메인 linked-2
-  - 도메인 linked-1 의 세션이 쓸 수 있는 리소스 그룹 resource-group-1
-  - 도메인 linked-2 의 세션이 쓸 수 있는 리소스 그룹 resource-group-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one resource group, two domains that can use it and one that cannot, and one user
+  - Domain home-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Domain linked-1
+  - Domain linked-2
+  - Domain linked-1 whose sessions can use Resource group resource-group-1
+  - Domain linked-2 whose sessions can use Resource group resource-group-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.scoped_search: user-1이 리소스 그룹 resource-group-1 범위에서 조회
+- DomainAdapter.scoped_search: user-1 searches in the resource group resource-group-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### update
 
@@ -1169,187 +1295,187 @@ Then
 
 #### [clearing-the-active-flag-soft-deletes-a-domain](/tests/scenario/bai_scenario/manager/domain/test_editing.py): pass
 
-활성 플래그를 내리는 수정은 도메인을 soft delete 하고, 답이 비활성 상태를 실어 온다
+an edit that turns the active flag off soft deletes the domain, and the response carries the inactive state
 
 Given
 
-- 도메인 하나와, 그 도메인에 속한 superadmin 한 명
-  - 도메인 to-deactivate-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain and one superadmin in it
+  - Domain to-deactivate-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.update: user-1이 to-deactivate-1의 활성 플래그을 고침
+- DomainAdapter.update: user-1 edits the active flag of to-deactivate-1
 
 Then
 
-- 미리 만든 도메인 전체가 온다
+- the whole domain seeded in advance comes back
   - name = 'to-deactivate-1'
-  - description = '이미 있던 도메인'
+  - description = 'a domain that already existed'
   - integration_name = None
   - allowed_docker_registries = []
   - is_active = False
   - is_default = False
-  - id: 무시함: 데이터베이스가 만든다
-  - entity_id: 미리 만든 도메인의 id와 같다
-  - created_at: 이 실행이 쓴 시각
-  - modified_at: 이 실행이 쓴 시각
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the domain seeded in advance
+  - created_at: the time this run wrote
+  - modified_at: the time this run wrote
 
 <a id="editing-editing-a-description-leaves-the-name-alone"></a>
 
 #### [editing-a-description-leaves-the-name-alone](/tests/scenario/bai_scenario/manager/domain/test_editing.py): pass
 
-슈퍼관리자가 도메인의 설명만 바꾸면, 설명은 새 값이 되고 이름은 그대로 남는다
+when the superadmin changes only the description of a domain, the description becomes the new value and the name stays
 
 Given
 
-- 도메인 하나와, 그 도메인에 속한 superadmin 한 명
-  - 도메인 editable-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain and one superadmin in it
+  - Domain editable-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.update: user-1이 editable-1의 설명을 고침
+- DomainAdapter.update: user-1 edits the description of editable-1
 
 Then
 
-- 미리 만든 도메인 전체가 온다
+- the whole domain seeded in advance comes back
   - name = 'editable-1'
-  - description = '고쳐 쓴 설명'
+  - description = 'an edited description'
   - integration_name = None
   - allowed_docker_registries = []
   - is_active = True
   - is_default = False
-  - id: 무시함: 데이터베이스가 만든다
-  - entity_id: 미리 만든 도메인의 id와 같다
-  - created_at: 이 실행이 쓴 시각
-  - modified_at: 이 실행이 쓴 시각
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the domain seeded in advance
+  - created_at: the time this run wrote
+  - modified_at: the time this run wrote
 
 <a id="editing-lowering-the-active-flag-of-a-soft-deleted-domain-edits-only-the-rest"></a>
 
 #### [lowering-the-active-flag-of-a-soft-deleted-domain-edits-only-the-rest](/tests/scenario/bai_scenario/manager/domain/test_editing.py): pass
 
-soft delete 된 도메인의 활성 플래그를 내리며 설명을 바꾸면, 설명은 새 값이 되고 비활성 상태는 그대로다
+when an edit turns the active flag off of a soft-deleted domain and changes the description, the description becomes the new value and the inactive state stays
 
 Given
 
-- 도메인 하나와, 그 도메인에 속한 superadmin 한 명
-  - 도메인 already-deleted-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain and one superadmin in it
+  - Domain already-deleted-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.update: user-1이 already-deleted-1을 soft delete 한 뒤 활성 플래그와 설명을 고침
+- DomainAdapter.update: user-1 soft deletes already-deleted-1 and then edits the active flag and the description
 
 Then
 
-- 미리 만든 도메인 전체가 온다
+- the whole domain seeded in advance comes back
   - name = 'already-deleted-1'
-  - description = '고쳐 쓴 설명'
+  - description = 'an edited description'
   - integration_name = None
   - allowed_docker_registries = []
   - is_active = False
   - is_default = False
-  - id: 무시함: 데이터베이스가 만든다
-  - entity_id: 미리 만든 도메인의 id와 같다
-  - created_at: 이 실행이 쓴 시각
-  - modified_at: 이 실행이 쓴 시각
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the domain seeded in advance
+  - created_at: the time this run wrote
+  - modified_at: the time this run wrote
 
 <a id="editing-raising-the-active-flag-restores-a-soft-deleted-domain"></a>
 
 #### [raising-the-active-flag-restores-a-soft-deleted-domain](/tests/scenario/bai_scenario/manager/domain/test_editing.py): pass
 
-soft delete 된 도메인의 활성 플래그를 올리는 수정은 그 도메인을 restore 하고, 답이 활성 상태를 실어 온다
+an edit that turns the active flag on of a soft-deleted domain restores it, and the response carries the active state
 
 Given
 
-- 도메인 하나와, 그 도메인에 속한 superadmin 한 명
-  - 도메인 to-restore-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain and one superadmin in it
+  - Domain to-restore-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.update: user-1이 to-restore-1을 soft delete 한 뒤 활성 플래그을 고침
+- DomainAdapter.update: user-1 soft deletes to-restore-1 and then edits the active flag
 
 Then
 
-- 미리 만든 도메인 전체가 온다
+- the whole domain seeded in advance comes back
   - name = 'to-restore-1'
-  - description = '이미 있던 도메인'
+  - description = 'a domain that already existed'
   - integration_name = None
   - allowed_docker_registries = []
   - is_active = True
   - is_default = False
-  - id: 무시함: 데이터베이스가 만든다
-  - entity_id: 미리 만든 도메인의 id와 같다
-  - created_at: 이 실행이 쓴 시각
-  - modified_at: 이 실행이 쓴 시각
+  - id: skipped: the database generates it
+  - entity_id: same as the id of the domain seeded in advance
+  - created_at: the time this run wrote
+  - modified_at: the time this run wrote
 
 <a id="editing-a-user-granted-nothing-may-not-edit-a-domain"></a>
 
 #### [a-user-granted-nothing-may-not-edit-a-domain](/tests/scenario/bai_scenario/manager/domain/test_editing.py): pass
 
-아무 권한도 받지 않은 사용자가 도메인을 수정하려 하면 권한 부족으로 거부된다
+when a user granted nothing tries to edit a domain, the call is rejected for lack of permission
 
 Given
 
-- 도메인 하나와, 그 도메인에 속한 user 한 명
-  - 도메인 host-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain and one user in it
+  - Domain host-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.update: user-1이 host-1의 설명을 고침
+- DomainAdapter.update: user-1 edits the description of host-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="editing-editing-a-name-nothing-answers-to-is-not-found"></a>
 
 #### [editing-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/domain/test_editing.py): pass
 
-아무 도메인도 갖지 않은 이름을 수정하려 하면 대상이 없다는 것으로 거부된다
+editing a name no domain answers to is rejected as not found
 
 Given
 
-- 도메인 하나와, 그 도메인에 속한 superadmin 한 명
-  - 도메인 host-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain and one superadmin in it
+  - Domain host-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.update: user-1이 no-such-domain의 설명을 고침
+- DomainAdapter.update: user-1 edits the description of no-such-domain
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 ### create
 
@@ -1357,167 +1483,167 @@ Then
 
 #### [creating-a-domain-also-creates-its-model-store-project](/tests/scenario/bai_scenario/manager/domain/test_creating.py): pass
 
-슈퍼관리자가 도메인을 만들면 model-store 프로젝트가 함께 생겨, 그 프로젝트를 가진 도메인으로 걸러 찾을 때 만든 도메인이 온다
+when the superadmin creates a domain, its model-store project is created too, and searching for the domain holding that project brings back the domain just created
 
 Given
 
-- 도메인 하나와, 그 도메인에 속한 superadmin 한 명
-  - 도메인 host-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain and one superadmin in it
+  - Domain host-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.create: user-1이 with-model-store으로 만든 뒤, model-store 프로젝트를 가진 도메인으로 걸러 찾음
+- DomainAdapter.create: user-1 creates it as with-model-store, then searches for the domain holding the model-store project
 
 Then
 
-- 만든 도메인 전체가 온다
+- the whole domain just created comes back
   - name = 'with-model-store'
-  - description = '새로 만든 도메인'
+  - description = 'a freshly created domain'
   - integration_name = None
   - allowed_docker_registries = []
   - is_active = True
   - is_default = False
-  - id: 무시함: 데이터베이스가 만든다
-  - created_at: 이 실행이 쓴 시각
-  - modified_at: 이 실행이 쓴 시각
+  - id: skipped: the database generates it
+  - created_at: the time this run wrote
+  - modified_at: the time this run wrote
 
 <a id="creating-creating-a-domain-answers-with-the-whole-node"></a>
 
 #### [creating-a-domain-answers-with-the-whole-node](/tests/scenario/bai_scenario/manager/domain/test_creating.py): pass
 
-슈퍼관리자가 이름과 설명만 주고 도메인을 만들면, 요청에 없던 값들은 기본값으로 채워진 노드 전체가 답으로 온다
+when the superadmin creates a domain with only a name and a description, the whole node comes back with the values the request omitted filled from defaults
 
 Given
 
-- 도메인 하나와, 그 도메인에 속한 superadmin 한 명
-  - 도메인 host-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain and one superadmin in it
+  - Domain host-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.create: user-1이 new-domain으로 만듦
+- DomainAdapter.create: user-1 creates it as new-domain
 
 Then
 
-- 만든 도메인 전체가 온다
+- the whole domain just created comes back
   - name = 'new-domain'
-  - description = '새로 만든 도메인'
+  - description = 'a freshly created domain'
   - integration_name = None
   - allowed_docker_registries = []
   - is_active = True
   - is_default = False
-  - id: 무시함: 데이터베이스가 만든다
-  - created_at: 이 실행이 쓴 시각
-  - modified_at: 이 실행이 쓴 시각
+  - id: skipped: the database generates it
+  - created_at: the time this run wrote
+  - modified_at: the time this run wrote
 
 <a id="creating-a-blank-name-is-refused"></a>
 
 #### [a-blank-name-is-refused](/tests/scenario/bai_scenario/manager/domain/test_creating.py): pass
 
-이름이 공백뿐이면 도메인을 만들 수 없다
+a domain cannot be created when the name is only whitespace
 
 Given
 
-- 도메인 하나와, 그 도메인에 속한 superadmin 한 명
-  - 도메인 host-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain and one superadmin in it
+  - Domain host-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.create: user-1이    으로 만듦
+- DomainAdapter.create: user-1 creates it as    
 
 Then
 
-- 거부된다
-  - 거부: InvalidAPIParameters
+- the call is rejected
+  - rejected: InvalidAPIParameters
 
 <a id="creating-a-name-another-domain-already-holds-is-refused"></a>
 
 #### [a-name-another-domain-already-holds-is-refused](/tests/scenario/bai_scenario/manager/domain/test_creating.py): pass
 
-이미 어떤 도메인이 쓰고 있는 이름으로 만들려 하면, 권한이 있어도 이름이 겹친다는 이유로 거부된다
+when a domain is created with a name another domain already holds, it is rejected because the name is taken even when the caller has the permission
 
 Given
 
-- 도메인 하나와, 그 도메인에 속한 superadmin 한 명
-  - 도메인 taken-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain and one superadmin in it
+  - Domain taken-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.create: user-1이 taken-1으로 만듦
+- DomainAdapter.create: user-1 creates it as taken-1
 
 Then
 
-- 거부된다
-  - 거부: InvalidAPIParameters
+- the call is rejected
+  - rejected: InvalidAPIParameters
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-create-a-domain"></a>
 
 #### [a-user-who-is-not-the-superadmin-may-not-create-a-domain](/tests/scenario/bai_scenario/manager/domain/test_creating.py): pass
 
-슈퍼관리자가 아닌 사용자가 도메인을 만들려 하면, 권한을 얼마나 받았는지와 무관하게 역할로 막힌다
+when a user who is not the superadmin tries to create a domain, the role rejects it regardless of how much permission the user holds
 
 Given
 
-- 도메인 하나와, 그 도메인에 속한 user 한 명
-  - 도메인 host-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain and one user in it
+  - Domain host-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.create: user-1이 by-a-user으로 만듦
+- DomainAdapter.create: user-1 creates it as by-a-user
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 <a id="creating-turning-enforcement-off-still-does-not-let-a-user-create-a-domain"></a>
 
 #### [turning-enforcement-off-still-does-not-let-a-user-create-a-domain](/tests/scenario/bai_scenario/manager/domain/test_creating.py): pass
 
-엔티티 권한 집행을 꺼도 도메인 생성은 여전히 막힌다. 이 문은 권한 그래프가 아니라 역할이 지키기 때문이다
+turning entity permission enforcement off still rejects creating a domain, because a role checks this operation, not the permission graph
 
 Given
 
-- 도메인 하나와, 그 도메인에 속한 user 한 명
-  - 도메인 host-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one domain and one user in it
+  - Domain host-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.create: user-1이 by-a-user-again으로 만듦
+- DomainAdapter.create: user-1 creates it as by-a-user-again
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### purge
 
@@ -1525,133 +1651,133 @@ Then
 
 #### [purging-a-domain-nothing-else-refers-to-succeeds](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-아무것도 딸려 있지 않은 도메인은 purge 할 수 있다
+a domain nothing else refers to can be purged
 
 Given
 
-- 건드릴 도메인 하나와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 to-purge-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain and one superadmin in another domain
+  - Domain home-1
+  - Domain to-purge-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.purge: user-1이 to-purge-1을 purge 함
+- DomainAdapter.purge: user-1 purges to-purge-1
 
 Then
 
-- 했다는 답이 온다
+- the answer says it was done
   - purged = True
 
 <a id="deleting-a-domain-holding-a-project-is-not-purged"></a>
 
 #### [a-domain-holding-a-project-is-not-purged](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-프로젝트가 딸린 도메인은 슈퍼관리자라도 purge 할 수 없다
+a domain holding a project cannot be purged even by the superadmin
 
 Given
 
-- 프로젝트이 딸린 건드릴 도메인 하나와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain holding a project and one superadmin in another domain
+  - Domain home-1
+  - Domain target-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.purge: user-1이 target-1을 purge 함
+- DomainAdapter.purge: user-1 purges target-1
 
 Then
 
-- 거부된다
-  - 거부: DomainHasGroups
+- the call is rejected
+  - rejected: DomainHasGroups
 
 <a id="deleting-a-domain-holding-a-user-is-not-purged"></a>
 
 #### [a-domain-holding-a-user-is-not-purged](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-사용자가 딸린 도메인은 슈퍼관리자라도 purge 할 수 없다
+a domain holding a user cannot be purged even by the superadmin
 
 Given
 
-- 사용자이 딸린 건드릴 도메인 하나와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+- one target domain holding a user and one superadmin in another domain
+  - Domain home-1
+  - Domain target-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - superadmin user-2: has their own keypair and personal project
 
 When
 
-- DomainAdapter.purge: user-2이 target-1을 purge 함
+- DomainAdapter.purge: user-2 purges target-1
 
 Then
 
-- 거부된다
-  - 거부: DomainHasUsers
+- the call is rejected
+  - rejected: DomainHasUsers
 
 <a id="deleting-a-user-granted-nothing-may-not-purge-a-domain"></a>
 
 #### [a-user-granted-nothing-may-not-purge-a-domain](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-아무 권한도 받지 않은 사용자는 아무것도 딸리지 않은 도메인이라도 purge 할 수 없다
+a user granted nothing cannot purge a domain even when nothing else refers to it
 
 Given
 
-- 건드릴 도메인 하나와, 다른 도메인에 사는 user 한 명
-  - 도메인 home-1
-  - 도메인 untouchable-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain and one user in another domain
+  - Domain home-1
+  - Domain untouchable-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.purge: user-1이 untouchable-1을 purge 함
+- DomainAdapter.purge: user-1 purges untouchable-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="deleting-purging-a-name-nothing-answers-to-is-not-found"></a>
 
 #### [purging-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
-아무 도메인도 갖지 않은 이름을 purge 하려 하면 대상이 없다는 것으로 거부된다
+purging a name no domain answers to is rejected as not found
 
 Given
 
-- 건드릴 도메인 하나와, 다른 도메인에 사는 superadmin 한 명
-  - 도메인 home-1
-  - 도메인 target-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one target domain and one superadmin in another domain
+  - Domain home-1
+  - Domain target-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- DomainAdapter.purge: user-1이 no-such-domain을 purge 함
+- DomainAdapter.purge: user-1 purges no-such-domain
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 

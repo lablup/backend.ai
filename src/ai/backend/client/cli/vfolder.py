@@ -71,10 +71,10 @@ def list_allowed_types() -> None:
 @click.option(
     "-g",
     "--group",
-    metavar="GROUP",
+    metavar="GROUP_ID",
     type=str,
     default=None,
-    help="Group ID or NAME. Specify this option if you want to create a group folder.",
+    help="Project ID (UUID). Specify this option if you want to create a project folder.",
 )
 @click.option(
     "--unmanaged",
@@ -117,7 +117,7 @@ def list_allowed_types() -> None:
     default="rw",
     help=(
         "Folder's innate permission. "
-        'Group folders can be shared as read-only by setting this option to "ro". '
+        'Project folders can be shared as read-only by setting this option to "ro". '
         "Invited folders override this setting by its own invitation permission. "
     ),
 )

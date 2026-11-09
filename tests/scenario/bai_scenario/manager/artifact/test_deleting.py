@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.v2.artifact.types import ArtifactAvailability
 from ai.backend.manager.api.adapters.artifact.adapter import ArtifactAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.artifact import (
     AnArtifactAndACaller,
     AnArtifactAndSomeone,
@@ -42,7 +42,10 @@ class SoftDeleting(When[AnArtifactAndACaller, ArtifactAdapter, ArtifactNode]):
 
     @override
     def describe(self, laid: AnArtifactAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.artifact.name}을 soft delete 함"
+        return Says(
+            f"{laid.caller.username}이 {laid.artifact.name}을 soft delete 합니다",
+            english=f"{laid.caller.username} soft deletes {laid.artifact.name}",
+        )
 
     @override
     async def call(self, adapter: ArtifactAdapter, laid: AnArtifactAndACaller) -> ArtifactNode:
@@ -61,7 +64,12 @@ class SoftDeletingThenRestoring(When[AnArtifactAndACaller, ArtifactAdapter, Arti
 
     @override
     def describe(self, laid: AnArtifactAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.artifact.name}을 soft delete 했다가 restore 함"
+        return Says(
+            f"{laid.caller.username}이 {laid.artifact.name}을 soft delete 했다가 restore 합니다",
+            english=(
+                f"{laid.caller.username} soft deletes {laid.artifact.name} and then restores it"
+            ),
+        )
 
     @override
     async def call(self, adapter: ArtifactAdapter, laid: AnArtifactAndACaller) -> ArtifactNode:
@@ -81,7 +89,10 @@ class Restoring(When[AnArtifactAndACaller, ArtifactAdapter, ArtifactNode]):
 
     @override
     def describe(self, laid: AnArtifactAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.artifact.name}을 restore 함"
+        return Says(
+            f"{laid.caller.username}이 {laid.artifact.name}을 restore 합니다",
+            english=f"{laid.caller.username} restores {laid.artifact.name}",
+        )
 
     @override
     async def call(self, adapter: ArtifactAdapter, laid: AnArtifactAndACaller) -> ArtifactNode:
@@ -102,7 +113,13 @@ class TheSuperadminSoftDeletesAnArtifact(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 아티팩트를 soft delete 하면, 삭제됨 상태의 아티팩트가 온다"
+        return Says(
+            "superadmin 이 아티팩트를 soft delete 하면, 삭제됨 상태의 아티팩트가 옵니다",
+            english=(
+                "when the superadmin soft deletes an artifact, the artifact comes back in the "
+                "deleted state"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnArtifactAndACaller]:
@@ -130,7 +147,10 @@ class AUserGrantedNothingMayNotSoftDelete(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자는 아티팩트를 soft delete 할 수 없다"
+        return Says(
+            "아무 권한도 받지 않은 사용자는 아티팩트를 soft delete 할 수 없습니다",
+            english="a user granted nothing cannot soft delete an artifact",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnArtifactAndACaller]:
@@ -157,7 +177,12 @@ class RestoringBringsItBack(
 
     @override
     def describe(self) -> str:
-        return "soft delete 된 아티팩트를 restore 하면, 살아 있는 상태의 아티팩트가 온다"
+        return Says(
+            "soft delete 된 아티팩트를 restore 하면, 살아 있는 상태의 아티팩트가 옵니다",
+            english=(
+                "when a soft-deleted artifact is restored, the artifact comes back in the live state"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnArtifactAndACaller]:
@@ -182,7 +207,10 @@ class AUserGrantedNothingMayNotRestore(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 받지 않은 사용자는 아티팩트를 restore 할 수 없다"
+        return Says(
+            "아무 권한도 받지 않은 사용자는 아티팩트를 restore 할 수 없습니다",
+            english="a user granted nothing cannot restore an artifact",
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnArtifactAndACaller]:

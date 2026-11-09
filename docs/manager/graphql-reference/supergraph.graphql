@@ -14830,7 +14830,7 @@ type Mutation
   deleteModelDeployment(input: DeleteDeploymentInput!): DeleteDeploymentPayload @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.4.4. Fully replace the ``options`` surface of a deployment. Replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
+  Added in 26.10.0. Fully replace the ``options`` surface of a deployment. Replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
   """
   replaceDeploymentOptions(input: ReplaceDeploymentOptionsInput!): ReplaceDeploymentOptionsPayload @join__field(graph: STRAWBERRY)
 
@@ -16678,6 +16678,10 @@ type ObjectStorage implements Node
   name: String!
   host: String!
   accessKey: String!
+
+  """
+  Secret key for authentication. Masked unless the caller is a superadmin.
+  """
   secretKey: String!
   endpoint: String!
   region: String!
@@ -22671,7 +22675,7 @@ input RejectRoleInvitationInput
 }
 
 """
-Added in 26.4.4. Input for the replaceDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
+Added in 26.10.0. Input for the replaceDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
 """
 input ReplaceDeploymentOptionsInput
   @join__type(graph: STRAWBERRY)
@@ -22681,7 +22685,7 @@ input ReplaceDeploymentOptionsInput
 }
 
 """
-Added in 26.4.4. Payload returned after replacing a deployment's options. Only the refreshed options surface is returned.
+Added in 26.10.0. Payload returned after replacing a deployment's options. Only the refreshed options surface is returned.
 """
 type ReplaceDeploymentOptionsPayload
   @join__type(graph: STRAWBERRY)
@@ -23983,6 +23987,7 @@ enum RetentionCategory
   SESSIONS @join__enumValue(graph: STRAWBERRY)
   USAGE_RECORDS @join__enumValue(graph: STRAWBERRY)
   USAGE_BUCKETS @join__enumValue(graph: STRAWBERRY)
+  PROJECTS @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -25924,7 +25929,6 @@ type ScalingGroupNode implements Node
   is_public: Boolean @join__field(graph: GRAPHENE)
   created_at: DateTime @join__field(graph: GRAPHENE)
   wsproxy_addr: String @join__field(graph: GRAPHENE)
-  wsproxy_api_token: String @join__field(graph: GRAPHENE)
   driver: String @join__field(graph: GRAPHENE)
   driver_opts: JSONString @join__field(graph: GRAPHENE)
   scheduler: String @join__field(graph: GRAPHENE)
@@ -31678,6 +31682,11 @@ type VFolder implements Node
   Added in 26.10.0. The level the current user mounts this vfolder at: NONE without read access, READ_WRITE on a personal folder they own, otherwise their own mount policy or the folder's default (`accessControl.permission`).
   """
   mountPermission: VFolderMountPermission
+
+  """
+  Added in 26.10.0. The auto-mounts set on this vfolder, in every project or user they are set on.
+  """
+  vfolderAutoMounts(filter: VFolderAutoMountFilter = null, orderBy: [VFolderAutoMountOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderAutoMountConnection
 }
 
 """
@@ -31858,7 +31867,7 @@ input VFolderAutoMountPermissionFilter
 }
 
 """
-Added in 26.10.0. Scope for the scoped vfolder auto-mount query. The items are OR'd, and every scope named is authorized before the read runs. At least one of `project` and `user` must be non-empty.
+Added in 26.10.0. Scope for the scoped vfolder auto-mount query. The items are OR'd, and every scope named is authorized before the read runs. At least one of `project`, `user` and `vfolder` must be non-empty.
 """
 input VFolderAutoMountScope
   @join__type(graph: STRAWBERRY)
@@ -31872,6 +31881,11 @@ input VFolderAutoMountScope
   Users whose own auto-mounts are being read; those of a personal project are not.
   """
   user: [UUIDScope!] = null
+
+  """
+  VFolders whose auto-mounts are being read, in every scope they are set on.
+  """
+  vfolder: [UUIDScope!] = null
 }
 
 """Added in 26.10.0. The one project or user an auto-mount is set on."""

@@ -215,13 +215,16 @@ class AuthRepository:
         )
 
     @auth_repository_resilience.apply()
-    async def delete_login_session_by_token(
+    async def delete_owned_login_session_by_token(
         self,
         session_token: str,
+        user_id: UserID,
         result: LoginAttemptResult,
         client_ip: str | None = None,
     ) -> None:
-        await self._db_source.delete_session_by_token(session_token, result, client_ip)
+        await self._db_source.delete_owned_session_by_token(
+            session_token, user_id, result, client_ip
+        )
 
     @auth_repository_resilience.apply()
     async def delete_user_login_sessions(
@@ -259,5 +262,6 @@ class AuthRepository:
         )
 
     @auth_repository_resilience.apply()
-    async def invalidate_active_login_sessions(self, user_id: UserID) -> None:
-        await self._db_source.invalidate_active_login_sessions(user_id)
+    async def invalidate_active_login_sessions(self, user_id: UserID) -> list[str]:
+        """Return only tokens of this user's sessions invalidated by this call."""
+        return await self._db_source.invalidate_active_login_sessions(user_id)

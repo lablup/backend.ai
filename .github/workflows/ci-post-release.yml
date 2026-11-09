@@ -30,15 +30,18 @@ jobs:
           gh api /repos/lablup/isla-sorna/dispatches \
               --method POST \
               -f 'event_type=build-images' \
-              -F "client_payload[version]=${{ inputs.tag }}"
+              -F "client_payload[version]=$TAG"
         env:
           GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT }}
+          TAG: ${{ inputs.tag }}
 
   build-conda-pack-for-windows:
     if: inputs.release-audience != 'internal'
     runs-on: windows-latest
     permissions:
       contents: write
+    env:
+      TAG: ${{ inputs.tag }}
 
     steps:
     - name: Check out the revision
@@ -80,9 +83,9 @@ jobs:
         conda create -n backend.ai-client python=${{ env.PROJECT_PYTHON_VERSION }}
         conda activate backend.ai-client
         pip install dist/backend_ai_client-${{ env.PKGVER }}-py3-none-any.whl dist/backend_ai_cli-${{ env.PKGVER }}-py3-none-any.whl dist/backend_ai_common-${{ env.PKGVER }}-py3-none-any.whl dist/backend_ai_plugin-${{ env.PKGVER }}-py3-none-any.whl
-        conda-pack -o backend.ai-client-${{ inputs.tag }}-windows-conda.zip
+        conda-pack -o "backend.ai-client-${env:TAG}-windows-conda.zip"
     - name: Upload conda-pack to GitHub release
       run: |
-        gh release upload ${{ inputs.tag }} backend.ai-client-${{ inputs.tag }}-windows-conda.zip
+        gh release upload "${env:TAG}" "backend.ai-client-${env:TAG}-windows-conda.zip"
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

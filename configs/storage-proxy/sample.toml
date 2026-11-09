@@ -127,6 +127,19 @@
   # Added in 24.12.1
   ## sample-rate = 100
 
+# Plugin wheels loaded when the storage-proxy starts. Wheels run without
+# verification, so keep the path writable only by trusted operators.
+# Added in 26.10.0
+[wheelhouse]
+  # Whether to load the plugin wheels in the path when the server starts.
+  # Added in 26.10.0
+  allow = false
+  # Directory holding the plugin wheels. A relative path starts from the current
+  # directory of the server. The storage-proxy runs from the directory of its
+  # config file.
+  # Added in 26.10.0
+  path = "wheelhouse"
+
 # Logging system configuration. Controls log levels, formats, outputs, and
 # rotation settings. Proper logging configuration is essential for monitoring
 # and debugging storage-proxy in production environments.
@@ -474,14 +487,14 @@
   # keys will be stored under this namespace.
   # Added in 22.03.0
   namespace = "backend"
-  # Username for authenticating with etcd. Optional if etcd doesn't require
-  # authentication. Should be set along with password for secure deployments.
+  # Username for authenticating with etcd. Set together with the password field.
+  # Required since 26.10.0.
   # Added in 22.03.0
-  ## user = "backend"
-  # Password for authenticating with etcd. Should be kept secret in production
-  # environments. Set together with the user field for authentication.
+  user = "backend"
+  # Password for authenticating with etcd. Set together with the user field.
+  # Required since 26.10.0.
   # Added in 22.03.0
-  ## password = "ETCD_PASSWORD"
+  password = "ETCD_PASSWORD"
   # Seconds without a frame from an etcd member before a keep-alive ping is sent
   # on a connection with requests in flight. Must not be below the server's
   # --grpc-keepalive-min-time (5 seconds by default).
@@ -491,6 +504,32 @@
   # etcd member is closed and its requests go to the other members.
   # Added in 26.10.0
   keep-alive-timeout = 3.0
+
+  # TLS settings for the connection to etcd.
+  # Added in 26.10.0
+  [etcd.tls]
+    # Connect to etcd over TLS.
+    # Added in 26.10.0
+    enabled = false
+
+    # PEM file of the CA certificate that signed the etcd server certificate.
+    # Required if TLS is enabled.
+    # Added in 26.10.0
+    ## ca-cert = "/etc/backend.ai/etcd/ca.pem"
+
+    # PEM file of the client certificate, for an etcd started with --client-
+    # cert-auth. Set together with client-key.
+    # Added in 26.10.0
+    ## client-cert = "/etc/backend.ai/etcd/client.pem"
+
+    # PEM file of the client private key. Set together with client-cert.
+    # Added in 26.10.0
+    ## client-key = "/etc/backend.ai/etcd/client-key.pem"
+
+    # Seconds to wait for the TLS handshake with an etcd member. When not set,
+    # the handshake has no limit: request timeouts do not end it.
+    # Added in 26.10.0
+    ## handshake-timeout = 10.0
 
   # Addresses of the etcd cluster members. List every member of an etcd cluster,
   # or a single address of a standalone server.

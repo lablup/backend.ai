@@ -4,14 +4,14 @@
 
 ## Overview
 
-SchedulingController is the component responsible for pre-validation and preparation of session creation requests, validating request validity and preparing necessary data before the Scheduler schedules sessions.
+SchedulingController handles pre-validation and preparation of session creation requests. It validates the request and prepares the data the Scheduler needs before the Scheduler schedules sessions.
 
 **Key Responsibilities:**
-- **Request Validation**: Proactively blocks invalid requests from reaching the scheduling stage
-- **Data Preparation**: Prepares various data needed for scheduling and transforms to appropriate format
-- **Resource Calculation**: Accurately calculates the amount of resources that sessions actually require
-- **Scaling Group Selection**: Determines the most suitable scaling group to execute the session
-- **Configuration Validation**: Verifies the validity of cluster session and volume mount configurations
+- **Request Validation**: Blocks invalid requests before they reach the scheduling stage
+- **Data Preparation**: Prepares the data needed for scheduling and transforms it into the appropriate format
+- **Resource Calculation**: Calculates the amount of resources that sessions actually require
+- **Resource Group Selection**: Determines the resource group most suitable to execute the session
+- **Configuration Validation**: Verifies the validity of multi-kernel session and volume mount configurations
 
 ## Architecture
 
@@ -35,9 +35,9 @@ SchedulingController is the component responsible for pre-validation and prepara
 
 SchedulingController depends on the following infrastructure components:
 
-**PostgreSQL**: Queries scaling group, domain, and user information
+**PostgreSQL**: Queries resource group, domain and user information
 
-**Redis (Valkey)**: Caches resource constraints
+**Valkey**: Caches resource constraints
 
 **etcd**: Shares global configuration
 
@@ -45,13 +45,13 @@ SchedulingController depends on the following infrastructure components:
 
 SchedulingController processes the following data through validation and preparation:
 
-**Input**: User's session creation request (image, resources, cluster size, mounts, etc.)
+**Input**: The user's session creation request (image, resources, cluster size, mounts and so on)
 
-**Validation Stage**: Verifies request validity, validates user permissions and resource constraints
+**Validation Stage**: Verifies request validity and validates user permissions and resource constraints
 
-**Preparation Stage**: Generates internal data, prepares cluster and mount configurations, calculates resource requirements
+**Preparation Stage**: Generates internal data, prepares cluster and mount configurations, and calculates resource requirements
 
-**Output**: Delivers validated and prepared session data to Scheduler
+**Output**: Delivers validated and prepared session data to the Scheduler
 
 ## Major Components
 
@@ -61,10 +61,10 @@ SchedulingController is the main controller that orchestrates the validation and
 
 **Key Tasks:**
 - **Execute Validation Pipeline**: Verifies request validity through multiple validation rules
-- **Execute Preparation Pipeline**: Generates scheduling-needed data with various preparation rules
-- **Resource Calculation**: Calculates actual resource requirements through resource calculator
-- **Scaling Group Determination**: Selects optimal group through scaling group resolver
-- **Data Return**: Delivers data with all validation and preparation completed to Scheduler
+- **Execute Preparation Pipeline**: Generates the data needed for scheduling with various preparation rules
+- **Resource Calculation**: Calculates actual resource requirements through the resource calculator
+- **Resource Group Determination**: Selects the optimal resource group through the resource group resolver
+- **Data Return**: Delivers data with all validation and preparation completed to the Scheduler
 
 **Key Methods:**
 
@@ -105,7 +105,7 @@ PreparedSessionData(
 ```
 
 #### `validate_session()`
-Validates session creation request.
+Validates the session creation request.
 
 **Processing Flow:**
 ```
@@ -122,24 +122,24 @@ Validates session creation request.
 
 ## Validators
 
-Validator is the component that verifies whether session creation requests satisfy system constraints and policies.
+Validator verifies whether session creation requests satisfy system constraints and policies.
 
 ### Basic Structure
 
-All validation rules inherit from the ValidationRule abstract class and must implement the `validate()` method that executes validation logic. If validation fails, they raise a ValidationError exception to immediately stop the scheduling process.
+All validation rules inherit from the ValidationRule abstract class and must implement the `validate()` method that executes the validation logic. If validation fails, they raise a ValidationError exception that stops the scheduling process immediately.
 
-SessionValidator is a container managing multiple ValidationRules, executing registered rules sequentially and stopping processing immediately if any rule fails.
+SessionValidator is a container that manages multiple ValidationRules, executes the registered rules sequentially, and stops processing immediately if any rule fails.
 
 ### Key Validation Rules
 
 #### ClusterValidationRule
 
-ClusterValidationRule validates the validity of cluster session configuration.
+ClusterValidationRule verifies the multi-kernel session configuration.
 
 **Validation Items:**
 - Verify cluster size is 1 or greater
-- Validate requested container image supports cluster mode
-- Confirm selected cluster mode is supported by system
+- Validate that the requested container image supports cluster mode
+- Confirm that the selected cluster mode is supported by the system
 
 **Examples:**
 ```python
@@ -157,13 +157,13 @@ ClusterValidationRule validates the validity of cluster session configuration.
 
 #### MountValidationRule
 
-MountValidationRule validates the validity of volume mount paths and configuration.
+MountValidationRule verifies the volume mount paths and configuration.
 
 **Validation Items:**
-- Validate mount path is in correct format
+- Validate that the mount path is in the correct format
 - Detect attempts to mount duplicate paths
-- Verify requested read/write permissions are allowable
-- Validate volume is actually mountable
+- Verify that the requested read/write permissions are allowed
+- Validate that the volume is actually mountable
 
 **Examples:**
 ```python
@@ -186,18 +186,18 @@ MountValidationRule validates the validity of volume mount paths and configurati
 
 #### ScalingGroupFilteringRule
 
-ScalingGroupFilteringRule filters suitable scaling groups that can execute the session.
+ScalingGroupFilteringRule filters the resource groups that can execute the session.
 
 **Validation Items:**
-- Verify group supports requested resource types (CPU, GPU, etc.)
-- Validate access permissions for user's domain and group
+- Verify that the resource group supports the requested resource types (CPU, GPU and so on)
+- Validate access permissions for the user's domain and resource group
 - Confirm resource slot compatibility
 
 **Filtering Criteria:**
-- Whether scaling group has sufficient available resources
-- Whether it supports requested container image
-- Whether user has permission to access group's network and storage
-- Whether resource slot types are compatible
+- Whether the resource group has sufficient available resources
+- Whether it supports the requested container image
+- Whether the user has permission to access the resource group's network and storage
+- Whether the resource slot types are compatible
 
 **Examples:**
 ```python
@@ -220,25 +220,25 @@ ScalingGroupFilteringRule filters suitable scaling groups that can execute the s
 
 ## Preparers
 
-Preparer is the component that prepares and transforms data needed for scheduling. It processes validated requests into format usable for actual scheduling.
+Preparer prepares and transforms the data needed for scheduling. It processes validated requests into a format usable for actual scheduling.
 
 ### Basic Structure
 
-All preparation rules inherit from the PreparationRule abstract class and implement the `prepare()` method that executes preparation logic. This method transforms input data or augments it by adding necessary information.
+All preparation rules inherit from the PreparationRule abstract class and implement the `prepare()` method that executes the preparation logic. This method transforms the input data or augments it with the necessary information.
 
-SessionPreparer is a container managing multiple PreparationRules, executing registered rules sequentially and passing the output of previous rules as input to next rules in a pipeline fashion.
+SessionPreparer is a container that manages multiple PreparationRules, executes the registered rules sequentially, and passes the output of each rule as the input of the next rule in a pipeline.
 
 ### Key Preparation Rules
 
 #### InternalDataPreparer
 
-InternalDataPreparer prepares data needed for internal system processing.
+InternalDataPreparer prepares the data needed for internal system processing.
 
 **Preparation Items:**
-- Generate unique session ID
-- Set timestamps such as session creation time
+- Generate a unique session ID
+- Set timestamps such as the session creation time
 - Apply default values for unspecified user settings
-- Add metadata needed for tracking or analysis
+- Add the metadata needed for tracking or analysis
 
 **Examples:**
 ```python
@@ -263,16 +263,16 @@ InternalDataPreparer prepares data needed for internal system processing.
 
 #### ClusterPreparer
 
-ClusterPreparer prepares cluster session configuration.
+ClusterPreparer prepares the multi-kernel session configuration.
 
 **Preparation Items:**
-- Configure appropriate cluster mode according to cluster size
+- Configure the appropriate cluster mode according to the cluster size
 - Configure network settings for inter-node communication
-- Generate SSH key pair if needed
-- Prepare cluster-dedicated network configuration
+- Generate an SSH key pair if needed
+- Prepare the dedicated network configuration of the multi-kernel session
 
 **Cluster Modes:**
-- `single-node`: Default mode running as single container
+- `single-node`: Default mode running as a single container
 - `multi-container`: Run multiple containers on one agent
 - `multi-node`: Distribute containers across multiple agents
 
@@ -297,12 +297,12 @@ ClusterPreparer prepares cluster session configuration.
 
 #### MountPreparer
 
-MountPreparer prepares volume mount configuration.
+MountPreparer prepares the volume mount configuration.
 
 **Preparation Items:**
 - Normalize user-specified mount paths to system standard paths
-- Create mappings between virtual folders and container paths
-- Explicitly set read/write permissions
+- Create mappings between vfolders and container paths
+- Set read/write permissions explicitly
 - Add mount options such as bind mount
 
 **Examples:**
@@ -330,17 +330,17 @@ MountPreparer prepares volume mount configuration.
 
 ## Calculators
 
-Calculator is the component that accurately calculates the resource requirements that sessions actually need.
+Calculator accurately calculates the resource requirements that sessions actually need.
 
 ### ResourceCalculator
 
 ResourceCalculator is the calculator that computes session resource requirements.
 
 **Calculation Items:**
-- Start from basic resource amount requested by user
-- Calculate actual requirement considering system overhead
-- Apply multiplier for node count according to cluster mode
-- Convert resource slots to system standard format
+- Start from the basic resource amount requested by the user
+- Calculate the actual requirement considering system overhead
+- Apply the multiplier for the node count according to the cluster mode
+- Convert resource slots to the system standard format
 
 **Calculation Logic:**
 ```python
@@ -395,11 +395,11 @@ total_gpu = gpu_with_overhead * 3 = 3
 
 ## Resolvers
 
-Resolver is the component that makes optimal choices among multiple options or solves complex decision problems.
+Resolver makes optimal choices among multiple options or solves complex decision problems.
 
 ### ScalingGroupResolver
 
-ScalingGroupResolver validates whether the selected scaling group is usable from the filtered scaling group list.
+ScalingGroupResolver validates whether the selected resource group is usable in the filtered resource group list.
 
 **Resolution Process:**
 ```
@@ -510,13 +510,13 @@ validation_pipeline.add_rule(ScalingGroupFilteringRule())
 validated_data = validation_pipeline.execute(request_data)
 ```
 
-The advantages of the pipeline pattern are: processing order is clear making the flow easy to understand, rules can be dynamically added or removed providing excellent extensibility, each stage operates independently with low coupling, and individual rules can be tested independently making testing easy.
+The advantages of the pipeline pattern are: the processing order is clear, so the flow is easy to understand; rules can be added or removed dynamically, so extensibility is high; each stage operates independently with low coupling; and individual rules can be tested independently, so testing is easy.
 
 ## Error Handling
 
 ### ValidationError
 
-ValidationError is the exception raised when a request is invalid during the validation stage. This exception includes which validation rule failed, the specific error message, the name and value of incorrect fields, and suggestions for resolving the problem when possible.
+ValidationError is the exception raised when a request is invalid during the validation stage. This exception includes which validation rule failed, the specific error message, the names and values of the incorrect fields, and suggestions for resolving the problem when possible.
 
 **Examples:**
 ```python
@@ -535,11 +535,11 @@ PreparationError is the exception raised when data transformation or generation 
 
 ### CalculationError
 
-CalculationError is the exception raised when an error occurs during resource calculation. It includes the cause of calculation failure, input data used for calculation, and expected value range information.
+CalculationError is the exception raised when an error occurs during resource calculation. It includes the cause of the calculation failure, the input data used for the calculation, and the expected value range.
 
 ### ResolutionError
 
-ResolutionError is the exception raised when failing to find a suitable option. For example, it's raised when there's no scaling group satisfying the session's requirements. This exception includes the session's requirements, a list of reviewed options, and why each option is unsuitable.
+ResolutionError is the exception raised when no suitable option is found. For example, it is raised when no resource group satisfies the requirements of the session. This exception includes the requirements of the session, a list of the reviewed options, and the reason each option is unsuitable.
 
 ## Configuration and Extension
 
@@ -573,7 +573,7 @@ controller.add_preparation_rule(CustomPreparationRule())
 
 ### Changing Rule Order
 
-When rule execution order is important, order can be explicitly specified:
+When the rule execution order is important, the order can be specified explicitly:
 
 ```python
 controller.set_validation_order([
@@ -587,66 +587,66 @@ controller.set_validation_order([
 
 ### Validation Optimization
 
-To optimize validation stage performance, use Fast Fail strategy to stop immediately at first validation failure, execute rules with no interdependencies in parallel, and cache and reuse repeated validation results for identical requests.
+To optimize the performance of the validation stage, use a Fast Fail strategy that stops immediately at the first validation failure, execute rules without interdependencies in parallel, and cache and reuse repeated validation results for identical requests.
 
 ### Data Preparation Optimization
 
-Data preparation process uses Lazy Evaluation to perform calculations only when actually needed, maximizes reuse of results generated in previous stages, and improves efficiency by batching multiple session creation requests for processing at once.
+The data preparation process uses Lazy Evaluation to perform calculations only when they are actually needed, maximizes the reuse of results generated in previous stages, and improves efficiency by batching multiple session creation requests for processing at once.
 
 ### Resource Calculation Optimization
 
-Resource calculation caches and reuses calculation results for identical inputs, and achieves appropriate balance between accuracy and speed by using approximate calculation instead of exact calculation depending on situation.
+Resource calculation caches and reuses calculation results for identical inputs, and achieves an appropriate balance between accuracy and speed by using approximate calculation instead of exact calculation depending on the situation.
 
 ## Monitoring and Debugging
 
 ### Metrics
 
-To monitor system state, track validation success and failure counts, failure frequency per validation rule, time spent in preparation stage, time taken for resource calculation, and scaling group selection success rate.
+To monitor system state, track the validation success and failure counts, the failure frequency per validation rule, the time spent in the preparation stage, the time taken for resource calculation, and the resource group selection success rate.
 
 ## Troubleshooting
 
 ### 1. Repeated Validation Failures
 
 **Symptoms**:
-- Session creation requests continuously fail at validation stage
+- Session creation requests continuously fail at the validation stage
 
 **Causes**:
 - Incorrect request data
 - System constraint violations
 
 **Diagnosis**:
-- **Check Error Message**: Review error message returned on session creation failure and failed rule
-- **Request Data**: Validate cluster size, resource requests, mount paths, etc.
-- **Constraints**: Check resource quotas, concurrent session count limits
+- **Check Error Message**: Review the error message returned on session creation failure and the failed rule
+- **Request Data**: Validate the cluster size, resource requests, mount paths and so on
+- **Constraints**: Check the resource quotas and concurrent session count limits
 
 **Resolution**:
-1. Fix request data format and values
-2. Check and adjust resource quotas
-3. Review system constraints
+1. Fix the request data format and values
+2. Check and adjust the resource quotas
+3. Review the system constraints
 
-### 2. Scaling Group Selection Failure
+### 2. Resource Group Selection Failure
 
 **Symptoms**:
-- "No suitable scaling group found" error
+- An error reporting that no suitable resource group was found
 
 **Causes**:
-- No scaling group providing requested resources
-- Insufficient scaling group permissions
+- No resource group provides the requested resources
+- Insufficient resource group permissions
 
 **Diagnosis**:
-- **Available Scaling Groups**: Check list of scaling groups accessible to user
-- **Resource Requirements**: Verify which scaling groups can provide requested GPU, memory, etc.
-- **Permission Settings**: Check scaling group access permissions per domain/group
+- **Available Resource Groups**: Check the list of resource groups accessible to the user
+- **Resource Requirements**: Verify which resource groups can provide the requested GPU, memory and so on
+- **Permission Settings**: Check the resource group access permissions per domain and project
 
 **Resolution**:
-1. Adjust resource requirements
-2. Check and adjust user permissions
-3. Validate scaling group configuration
+1. Adjust the resource requirements
+2. Check and adjust the user permissions
+3. Validate the resource group configuration
 
 ### 3. Error in Preparation Stage
 
 **Symptoms**:
-- Session creation fails in preparation stage
+- Session creation fails in the preparation stage
 
 **Causes**:
 - Volume mount validation failure
@@ -654,36 +654,36 @@ To monitor system state, track validation success and failure counts, failure fr
 
 **Diagnosis**:
 - **Error Message**: Identify which preparation stage failed
-- **Mount Configuration**: Check vfolder existence and permissions
-- **External Services**: Check Storage, Network service status
+- **Mount Configuration**: Check the vfolder existence and permissions
+- **External Services**: Check the status of the Storage and Network services
 
 **Resolution**:
-1. Verify mount paths and vfolder permissions
-2. Check external service status
-3. Review cluster network configuration
+1. Verify the mount paths and vfolder permissions
+2. Check the external service status
+3. Review the cluster network configuration
 
 ### 4. Resource Calculation Error
 
 **Symptoms**:
-- Calculated resources differ from expected
+- Calculated resources differ from the expected values
 
 **Causes**:
 - Unit conversion errors
-- Multiplier calculation errors according to cluster size
+- Multiplier calculation errors according to the cluster size
 
 **Diagnosis**:
-- **Requested Resources**: Check input resource values and units
-- **Cluster Size**: Verify cluster mode and node count
-- **Calculation Result**: Check final calculated total resources
+- **Requested Resources**: Check the input resource values and units
+- **Cluster Size**: Verify the cluster mode and node count
+- **Calculation Result**: Check the final calculated total resources
 
 **Resolution**:
-1. Verify resource units (GB vs GiB, etc.)
-2. Validate cluster size
-3. Adjust resource request values if needed
+1. Verify the resource units (GB vs GiB and so on)
+2. Validate the cluster size
+3. Adjust the resource request values if needed
 
 ## Parent Document
 - [Sokovan Overall Architecture](../README.md)
 
-## Related Documents
+## Related documents
 - [Scheduler Architecture](../scheduler/README.md)
 - [Deployment Architecture](../deployment/README.md)

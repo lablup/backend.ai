@@ -23,7 +23,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
+from ai.backend.testutils.scenario_steps import Configured, Given, Says, Scenario, Then, When
 from bai_scenario.components.agent_resource import (
     AgentsReportingSlots,
     AnAgentAndACaller,
@@ -60,7 +60,10 @@ class SearchingEveryAgentResource(
 
     @override
     def describe(self, laid: AnAgentAndACaller | ReportedSlotsAndACaller) -> str:
-        return f"{laid.caller.username}이 필터 없이 전체 조회"
+        return Says(
+            f"{laid.caller.username} 이 필터 없이 전체를 조회합니다",
+            english=f"{laid.caller.username} reads everything without a filter",
+        )
 
     @override
     async def call(
@@ -82,7 +85,11 @@ class SearchingBySlotName(When[ReportedSlotsAndACaller, ResourceSlotAdapter, Sea
 
     @override
     def describe(self, laid: ReportedSlotsAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.slots[self.slot].name} 슬롯 이름 필터로 조회"
+        name = laid.slots[self.slot].name
+        return Says(
+            f"{laid.caller.username} 이 {name} 슬롯 이름 필터로 조회합니다",
+            english=f"{laid.caller.username} reads with the slot name filter {name}",
+        )
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: ReportedSlotsAndACaller) -> Searched:
@@ -108,7 +115,11 @@ class SearchingByAgent(When[ReportedSlotsAndACaller, ResourceSlotAdapter, Search
 
     @override
     def describe(self, laid: ReportedSlotsAndACaller) -> str:
-        return f"{laid.caller.username}이 {laid.agents[self.agent].agent_id} 에이전트 필터로 조회"
+        agent = laid.agents[self.agent].agent_id
+        return Says(
+            f"{laid.caller.username} 이 {agent} 에이전트 필터로 조회합니다",
+            english=f"{laid.caller.username} reads with the agent filter {agent}",
+        )
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: ReportedSlotsAndACaller) -> Searched:
@@ -134,7 +145,10 @@ class SearchingTheFirst(When[ReportedSlotsAndACaller, ResourceSlotAdapter, Searc
 
     @override
     def describe(self, laid: ReportedSlotsAndACaller) -> str:
-        return f"{laid.caller.username}이 앞에서 {self.first}건만 요청해 조회"
+        return Says(
+            f"{laid.caller.username} 이 앞에서 {self.first}건만 요청해 조회합니다",
+            english=f"{laid.caller.username} reads asking for only the first {self.first}",
+        )
 
     @override
     async def call(self, adapter: ResourceSlotAdapter, laid: ReportedSlotsAndACaller) -> Searched:
@@ -154,9 +168,13 @@ class TheSuperadminFindsEveryReportedSlot(
 
     @override
     def describe(self) -> str:
-        return (
-            "슬롯을 보고한 에이전트 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 보고된 슬롯이 "
-            "모두 반환된다"
+        return Says(
+            "슬롯을 보고한 에이전트 둘이 있을 때 superadmin 이 필터 없이 조회하면 보고된 슬롯이 "
+            "모두 반환됩니다",
+            english=(
+                "when two agents report slots and the superadmin reads without a filter, every "
+                "reported slot comes back"
+            ),
         )
 
     @override
@@ -184,9 +202,13 @@ class ASlotNameFilterNarrows(
 
     @override
     def describe(self) -> str:
-        return (
-            "슬롯 둘을 보고한 에이전트 하나가 있을 때 한 슬롯의 이름을 필터로 조회하면, "
-            "응답에는 그 슬롯의 행만 남는다"
+        return Says(
+            "슬롯 둘을 보고한 에이전트 하나가 있을 때 한 슬롯의 이름을 필터로 조회하면, 응답에는 "
+            "그 슬롯의 row 만 남습니다",
+            english=(
+                "when one agent reports two slots and the call reads with the name of one slot "
+                "as a filter, only the row of that slot stays in the answer"
+            ),
         )
 
     @override
@@ -212,9 +234,13 @@ class AnAgentFilterNarrows(
 
     @override
     def describe(self) -> str:
-        return (
-            "슬롯을 보고한 에이전트 둘이 있을 때 한 에이전트를 필터로 조회하면, "
-            "응답에는 그 에이전트의 행만 남는다"
+        return Says(
+            "슬롯을 보고한 에이전트 둘이 있을 때 한 에이전트를 필터로 조회하면, 응답에는 그 "
+            "에이전트의 row 만 남습니다",
+            english=(
+                "when two agents report slots and the call reads with one agent as a filter, "
+                "only the rows of that agent stay in the answer"
+            ),
         )
 
     @override
@@ -240,9 +266,13 @@ class OmittingThePageSizeAnswersTheDefaultPage(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "보고된 슬롯 11개가 있을 때 크기 없이 조회하면 슬롯 이름 순서로 앞선 10건까지 "
-            "반환되고 다음 페이지가 있다고 응답한다"
+            "반환되고 다음 페이지가 있다고 응답합니다",
+            english=(
+                "when 11 slots are reported and the call reads without a size, the first 10 in "
+                "slot name order come back and the answer says a next page exists"
+            ),
         )
 
     @override
@@ -268,9 +298,13 @@ class AskingForTheFirstAnswersOne(
 
     @override
     def describe(self) -> str:
-        return (
+        return Says(
             "보고된 슬롯 둘이 있을 때 앞에서 1건만 요청해 조회하면 슬롯 이름 순서로 앞선 한 건이 "
-            "반환되고 다음 페이지가 있다고 응답한다"
+            "반환되고 다음 페이지가 있다고 응답합니다",
+            english=(
+                "when two slots are reported and the call asks for only the first one, the "
+                "first one in slot name order comes back and the answer says a next page exists"
+            ),
         )
 
     @override
@@ -296,7 +330,14 @@ class NoSlotReportedMeansNoneFound(
 
     @override
     def describe(self) -> str:
-        return "아직 슬롯을 보고하지 않은 에이전트만 있을 때 슈퍼관리자가 필터 없이 조회하면 응답이 비어 있다"
+        return Says(
+            "아직 슬롯을 보고하지 않은 에이전트만 있을 때 superadmin 이 필터 없이 조회하면 "
+            "응답이 비어 있습니다",
+            english=(
+                "when only an agent that does not report any slot exists and the superadmin "
+                "reads without a filter, the answer is empty"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnAgentAndACaller]:
@@ -321,7 +362,14 @@ class AMonitorMaySearch(
 
     @override
     def describe(self) -> str:
-        return "모니터가 필터 없이 조회하면 응답이 반환된다. 슈퍼관리자인지 검사하는 조회는 모니터도 통과한다"
+        return Says(
+            "모니터가 필터 없이 조회하면 응답이 반환됩니다. superadmin 인지 검사하는 조회는 "
+            "모니터도 통과합니다",
+            english=(
+                "when a monitor reads without a filter, the answer comes back. A read that "
+                "checks whether the caller is the superadmin also passes for a monitor"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnAgentAndACaller]:
@@ -346,7 +394,10 @@ class AUserGrantedNothingMayNotSearch(
 
     @override
     def describe(self) -> str:
-        return "아무 권한도 없는 사용자가 조회하면 역할 부족으로 거부된다"
+        return Says(
+            "아무 권한도 없는 사용자가 조회하면 역할 부족으로 거부됩니다",
+            english=("when a user granted nothing reads, the call is rejected for lack of role"),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AnAgentAndACaller]:
@@ -371,7 +422,14 @@ class EnforcementOffStillNeedsTheRole(
 
     @override
     def describe(self) -> str:
-        return "권한 검사를 꺼도 슈퍼관리자나 모니터가 아니면 조회할 수 없다. 슈퍼관리자 검사는 그 설정을 읽지 않는다"
+        return Says(
+            "권한 검사를 꺼도 superadmin 이나 모니터가 아니면 조회할 수 없습니다. superadmin "
+            "검사는 그 설정을 읽지 않습니다",
+            english=(
+                "turning permission checks off still does not let a user who is neither the "
+                "superadmin nor a monitor read. The superadmin check does not read that setting"
+            ),
+        )
 
     @override
     def config(self) -> Mapping[str, Any]:

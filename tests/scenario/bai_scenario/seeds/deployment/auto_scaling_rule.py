@@ -17,6 +17,7 @@ from ai.backend.manager.models.endpoint.row import EndpointAutoScalingRuleRow
 from ai.backend.manager.models.endpoint.searchable_fields import AutoScalingRuleSearchableFields
 from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.testutils.scenario_steps import Says
 from bai_scenario.seeds.seeder import TestSeedFieldCreator
 
 
@@ -70,7 +71,7 @@ class TestSeedAutoScalingRuleOf(
 
     @override
     def kind(self) -> str:
-        return "자동 스케일링 규칙 하나를 갖는다"
+        return Says("오토스케일링 규칙 하나를 갖는다", english="has one auto-scaling rule")
 
     @override
     def owner_id(self, owner: DeploymentInfo) -> DeploymentID:

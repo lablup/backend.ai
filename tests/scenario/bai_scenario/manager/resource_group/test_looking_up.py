@@ -18,6 +18,7 @@ from ai.backend.testutils.scenario_steps import (
     Given,
     Held,
     SameAs,
+    Says,
     Scenario,
     Then,
     Verdict,
@@ -49,7 +50,10 @@ class LookingUpTheName(When[AGroupAndACaller, ResourceGroupAdapter, ResourceGrou
     @override
     def describe(self, laid: AGroupAndACaller) -> str:
         name = UNKNOWN if self.unknown else laid.group.name
-        return f"{laid.caller.username}이 {name}의 id를 찾음"
+        return Says(
+            f"{laid.caller.username}이 {name}의 id 를 찾습니다",
+            english=f"{laid.caller.username} looks up the id of {name}",
+        )
 
     @override
     async def call(self, adapter: ResourceGroupAdapter, laid: AGroupAndACaller) -> ResourceGroupID:
@@ -63,14 +67,29 @@ class TheGroupsIdComesBack(Then[AGroupAndACaller, ResourceGroupID]):
 
     @override
     def says(self) -> str:
-        return "그 리소스 그룹의 id가 온다"
+        return Says(
+            "그 자원 그룹의 id 가 반환됩니다",
+            english="the id of that resource group comes back",
+        )
 
     @override
     def look(self, laid: AGroupAndACaller, answered: Answered[ResourceGroupID]) -> list[Verdict]:
         found = answered.response
         if found is None:
             return [MissingResponse(answered.raised)]
-        return [Held[UUID]("id", found, SameAs(laid.group.id, "미리 만든 리소스 그룹의 id"))]
+        return [
+            Held[UUID](
+                "id",
+                found,
+                SameAs(
+                    laid.group.id,
+                    Says(
+                        "미리 저장한 자원 그룹의 id",
+                        english="the id of the resource group seeded in advance",
+                    ),
+                ),
+            )
+        ]
 
 
 @dataclass(frozen=True)
@@ -83,7 +102,13 @@ class TheSuperadminLooksUpAName(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 리소스 그룹 이름으로 id를 찾으면, 그 리소스 그룹의 id가 온다"
+        return Says(
+            "superadmin 이 자원 그룹 이름으로 id 를 찾으면 그 자원 그룹의 id 가 반환됩니다",
+            english=(
+                "when the superadmin looks up a resource group by name, the id of that resource "
+                "group comes back"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
@@ -108,9 +133,14 @@ class AUserGrantedNothingStillLooksUpAName(
 
     @override
     def describe(self) -> str:
-        return (
-            "아무 권한도 받지 않은 사용자도 리소스 그룹 이름으로 id를 찾을 수 있다. "
-            "이 호출은 인증만 보고, 권한은 그 id를 받는 호출이 본다"
+        return Says(
+            "아무 권한도 받지 않은 사용자도 자원 그룹 이름으로 id 를 찾을 수 있습니다. 이 호출은 "
+            "인증만 보고, 권한은 그 id 를 받는 호출이 봅니다",
+            english=(
+                "a user granted nothing can still look up a resource group by name. this call "
+                "checks authentication alone, and the call receiving that id checks the "
+                "permission"
+            ),
         )
 
     @override
@@ -136,7 +166,12 @@ class ANameNothingAnswersToIsNotFound(
 
     @override
     def describe(self) -> str:
-        return "아무 리소스 그룹도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다"
+        return Says(
+            "아무 자원 그룹도 갖지 않은 이름으로 id 를 찾으면 대상이 없다는 것으로 거부됩니다",
+            english=(
+                "looking up the id of a name no resource group holds is rejected as no such target"
+            ),
+        )
 
     @override
     def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:

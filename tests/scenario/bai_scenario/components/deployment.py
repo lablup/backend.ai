@@ -47,6 +47,7 @@ from ai.backend.testutils.scenario_steps import (
     Refused,
     Same,
     SameAs,
+    Says,
     Skipped,
     Then,
     Verdict,
@@ -79,7 +80,7 @@ class APlaceAndACaller:
 class ADeploymentAndACaller:
     """이미 있는 배포 하나와, 그것을 부를 사람.
 
-    ``owner``는 그 배포를 만든 사람이다. 대지 않으면 부르는 사람이 만든 것이다.
+    ``owner``는 그 배포를 만든 사람이다. 대지 않으면 호출자가 만든 것이다.
     """
 
     place: APlaceAndACaller
@@ -142,8 +143,15 @@ class SomeoneOfTheProject(TestSeedNest[Laid[UserData]]):
     @override
     def kind(self) -> str:
         if not self.granted:
-            return "배포 권한을 하나도 받지 않은 사용자 준비"
-        return f"배포에 {_names(self.granted)} 권한을 받은 사용자 준비"
+            return Says(
+                "배포 권한을 하나도 받지 않은 사용자 준비",
+                english="Prepare a user with no deployment permission",
+            )
+        names = _names(self.granted)
+        return Says(
+            f"배포에 {names} 권한을 받은 사용자 준비",
+            english=f"Prepare a user granted {names} on deployments",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[UserData]:
@@ -173,7 +181,10 @@ class SomeoneReadingTheirOwn(TestSeedNest[Laid[UserData]]):
 
     @override
     def kind(self) -> str:
-        return "자기 스코프에서 배포를 읽을 수 있는 사용자 준비"
+        return Says(
+            "자기 스코프에서 배포를 읽을 수 있는 사용자 준비",
+            english="Prepare a user who can read deployments in their own scope",
+        )
 
     @override
     def lay(self, seed: TestSeeder) -> Laid[UserData]:
@@ -241,10 +252,18 @@ class APlaceForDeployments(Given[Any, APlaceAndACaller]):
     @override
     def describe(self) -> str:
         if not self.granted:
-            return "배포를 놓을 수 있는 프로젝트와, 아무 배포 권한도 받지 않은 사용자 한 명"
-        return (
-            f"배포를 놓을 수 있는 프로젝트와, 배포에 {_names(self.granted)} "
-            "권한을 받은 사용자 한 명"
+            return Says(
+                "배포를 놓을 수 있는 프로젝트와, 아무 배포 권한도 받지 않은 사용자 한 명",
+                english=(
+                    "a project that can hold deployments and one user with no deployment permission"
+                ),
+            )
+        names = _names(self.granted)
+        return Says(
+            f"배포를 놓을 수 있는 프로젝트와, 배포에 {names} 권한을 받은 사용자 한 명",
+            english=(
+                f"a project that can hold deployments and one user granted {names} on deployments"
+            ),
         )
 
     @override
@@ -265,9 +284,13 @@ class AProjectGrantedElsewhere(Given[Any, APlaceAndACaller]):
 
     @override
     def describe(self) -> str:
-        return (
-            f"배포를 놓을 프로젝트와, 다른 프로젝트에서 배포에 {_names(self.granted)} "
-            "권한을 받은 사용자 한 명"
+        names = _names(self.granted)
+        return Says(
+            f"배포를 놓을 프로젝트와, 다른 프로젝트에서 배포에 {names} 권한을 받은 사용자 한 명",
+            english=(
+                f"a project to hold the deployment and one user granted {names} on deployments "
+                "in another project"
+            ),
         )
 
     @override
@@ -302,8 +325,15 @@ class ADeploymentInThatPlace(Given[Any, ADeploymentAndACaller]):
     @override
     def describe(self) -> str:
         if not self.granted:
-            return "이미 있는 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명"
-        return f"이미 있는 배포 하나와, 배포에 {_names(self.granted)} 권한을 받은 사용자 한 명"
+            return Says(
+                "이미 있는 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명",
+                english="one existing deployment and one user with no deployment permission",
+            )
+        names = _names(self.granted)
+        return Says(
+            f"이미 있는 배포 하나와, 배포에 {names} 권한을 받은 사용자 한 명",
+            english=f"one existing deployment and one user granted {names} on deployments",
+        )
 
     @override
     async def lay(self, seeding: Any) -> ADeploymentAndACaller:
@@ -328,7 +358,13 @@ class AnothersDeploymentAndASuperadmin(Given[Any, ADeploymentAndACaller]):
 
     @override
     def describe(self) -> str:
-        return "다른 사람이 만든 배포 하나와, 아무 배포 권한도 받지 않은 슈퍼관리자 한 명"
+        return Says(
+            "다른 사람이 만든 배포 하나와, 아무 배포 권한도 받지 않은 superadmin 한 명",
+            english=(
+                "one deployment another user created and one superadmin with no deployment "
+                "permission"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ADeploymentAndACaller:
@@ -358,7 +394,12 @@ class ManyDeploymentsInThatPlace(Given[Any, ManyDeploymentsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return f"같은 프로젝트의 배포 {self.besides + 1}개와, 그 프로젝트의 사용자 한 명"
+        return Says(
+            f"같은 프로젝트의 배포 {self.besides + 1}개와, 그 프로젝트의 사용자 한 명",
+            english=(
+                f"{self.besides + 1} deployments in the same project and one user of that project"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyDeploymentsAndACaller:
@@ -386,9 +427,13 @@ class DeploymentsInTwoProjects(Given[Any, ManyDeploymentsAndACaller]):
 
     @override
     def describe(self) -> str:
-        return (
-            f"두 프로젝트에 나뉜 배포들과, 한쪽 프로젝트에서만 배포에 {_names(self.granted)} "
-            "권한을 받은 사용자 한 명"
+        names = _names(self.granted)
+        return Says(
+            f"두 프로젝트에 나뉜 배포들과, 한쪽 프로젝트에서만 배포에 {names} 권한을 받은 사용자 한 명",
+            english=(
+                f"deployments split between two projects and one user granted {names} on "
+                "deployments in one project only"
+            ),
         )
 
     @override
@@ -418,7 +463,7 @@ class DeploymentsInTwoProjects(Given[Any, ManyDeploymentsAndACaller]):
 class MineBesideAnothers(Given[Any, ManyDeploymentsAndACaller]):
     """같은 프로젝트에 두 사람이 각자 만든 배포와, 그중 한 사람.
 
-    답으로 오는 ``laid``는 부르는 사람의 것뿐이다. 다른 사람의 배포는 심기만 하고 답하지
+    답으로 오는 ``laid``는 호출자의 것뿐이다. 다른 사람의 배포는 심기만 하고 답하지
     않으므로, 훑은 결과에 섞여 나오면 그 자리에서 어긋난다.
     """
 
@@ -427,8 +472,19 @@ class MineBesideAnothers(Given[Any, ManyDeploymentsAndACaller]):
     @override
     def describe(self) -> str:
         if self.reads_own:
-            return "두 사람이 각자 만든 배포와, 자기 스코프에서 배포 읽기 권한을 받은 그중 한 명"
-        return "두 사람이 각자 만든 배포와, 아무 배포 권한도 받지 않은 그중 한 명"
+            return Says(
+                "두 사람이 각자 만든 배포와, 자기 스코프에서 배포 읽기 권한을 받은 그중 한 명",
+                english=(
+                    "deployments two users each created and one of them granted deployment "
+                    "read permission in their own scope"
+                ),
+            )
+        return Says(
+            "두 사람이 각자 만든 배포와, 아무 배포 권한도 받지 않은 그중 한 명",
+            english=(
+                "deployments two users each created and one of them with no deployment permission"
+            ),
+        )
 
     @override
     async def lay(self, seeding: Any) -> ManyDeploymentsAndACaller:
@@ -460,7 +516,10 @@ class NamedAfterTheMaker(Condition[str]):
 
     @override
     def says(self) -> str:
-        return "만든 사람에게서 지어진 이름"
+        return Says(
+            "만든 사람에게서 지어진 이름",
+            english="the name given after its maker",
+        )
 
     @override
     def holds(self, got: str) -> bool:
@@ -481,7 +540,10 @@ class TheNewDeploymentNode(Then[APlaceAndACaller, DeploymentNode]):
 
     @override
     def says(self) -> str:
-        return "만든 배포 전체가 온다"
+        return Says(
+            "만든 배포 전체가 옵니다",
+            english="the whole deployment just created comes back",
+        )
 
     def _name_seen(self, got: str, laid: APlaceAndACaller) -> Verdict:
         if self.named is None:
@@ -496,11 +558,14 @@ class TheNewDeploymentNode(Then[APlaceAndACaller, DeploymentNode]):
         written = WrittenByThisRun(self.started)
         inherited = deployment_options_to_info(laid.resource_group.default_deployment_options)
         return [
-            Skipped("id", "데이터베이스가 만든다"),
+            Skipped("id", Says("데이터베이스가 생성합니다", english="the database generates it")),
             Held(
                 "metadata.project_id",
                 node.metadata.project_id,
-                SameAs(str(laid.project.id), "심은 프로젝트"),
+                SameAs(
+                    str(laid.project.id),
+                    Says("미리 저장한 프로젝트", english="the project seeded in advance"),
+                ),
             ),
             Same("metadata.domain_name", node.metadata.domain_name, laid.domain.name),
             self._name_seen(node.metadata.name, laid),
@@ -535,8 +600,19 @@ class TheNewDeploymentNode(Then[APlaceAndACaller, DeploymentNode]):
                 node.default_deployment_strategy.type,
                 DeploymentStrategy.ROLLING,
             ),
-            Held("created_user_id", node.created_user_id, SameAs(laid.caller.id, "만든 사람")),
-            Held("options", node.options, SameAs(inherited, "리소스 그룹의 기본값")),
+            Held(
+                "created_user_id",
+                node.created_user_id,
+                SameAs(laid.caller.id, Says("만든 사람", english="the user who created it")),
+            ),
+            Held(
+                "options",
+                node.options,
+                SameAs(
+                    inherited,
+                    Says("리소스 그룹의 기본값", english="the resource group defaults"),
+                ),
+            ),
             Same("scaling_state", node.scaling_state, ScalingState.STABLE),
             Same("current_revision_id", node.current_revision_id, None),
             Same("deploying_revision_id", node.deploying_revision_id, None),
@@ -571,7 +647,10 @@ class TheDeploymentNode(Then[ADeploymentAndACaller, DeploymentNode]):
 
     @override
     def says(self) -> str:
-        return "심은 배포 전체가 온다"
+        return Says(
+            "미리 저장한 배포 전체가 옵니다",
+            english="the whole deployment seeded in advance comes back",
+        )
 
     @override
     def look(
@@ -592,11 +671,20 @@ class TheDeploymentNode(Then[ADeploymentAndACaller, DeploymentNode]):
             else seeded.network.open_to_public
         )
         return [
-            Held("id", node.id, SameAs(seeded.id, "심은 배포")),
+            Held(
+                "id",
+                node.id,
+                SameAs(
+                    seeded.id, Says("미리 저장한 배포", english="the deployment seeded in advance")
+                ),
+            ),
             Held(
                 "metadata.project_id",
                 node.metadata.project_id,
-                SameAs(str(place.project.id), "심은 프로젝트"),
+                SameAs(
+                    str(place.project.id),
+                    Says("미리 저장한 프로젝트", english="the project seeded in advance"),
+                ),
             ),
             Same("metadata.domain_name", node.metadata.domain_name, place.domain.name),
             Same(
@@ -636,12 +724,24 @@ class TheDeploymentNode(Then[ADeploymentAndACaller, DeploymentNode]):
             Held(
                 "created_user_id",
                 node.created_user_id,
-                SameAs(laid.made_by.id, "심은 배포를 가진 사람"),
+                SameAs(
+                    laid.made_by.id,
+                    Says(
+                        "미리 저장한 배포를 가진 사람",
+                        english="the user holding the seeded deployment",
+                    ),
+                ),
             ),
             Held(
                 "options",
                 node.options,
-                SameAs(deployment_options_to_info(seeded.options), "심은 배포의 옵션"),
+                SameAs(
+                    deployment_options_to_info(seeded.options),
+                    Says(
+                        "미리 저장한 배포의 옵션",
+                        english="the options of the deployment seeded in advance",
+                    ),
+                ),
             ),
             Same("scaling_state", node.scaling_state, ScalingState.STABLE),
             Same("current_revision_id", node.current_revision_id, None),

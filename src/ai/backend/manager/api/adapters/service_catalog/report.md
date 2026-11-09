@@ -7,21 +7,27 @@ Scenario: incomplete 1 / 2
 - built from ops (1)
   - admin_search: representative success ✓ · representative rejection ✓
 - direct implementation (1)
-  - batch_load_by_ids: success absent · rejection absent (partial_bulk): SCENARIO-GAP
+  - batch_load_by_ids: success present 1 · rejection absent (partial_bulk): SCENARIO-GAP
 
 **admin_search**
 
 | scenario | verdict |
 |---|---|
-| [그룹이 다른 서비스 둘 중 한 그룹으로 걸러 조회하면, 답에는 그 그룹의 서비스만 남는다](#searching-a-group-filter-narrows-the-answer-to-the-services-of-that-group) | answered |
-| [상태마다 하나씩 있는 서비스를 비정상과 같은 것으로 걸러 조회하면 비정상 서비스만 반환된다](#searching-a-status-equals-filter-keeps-the-services-of-that-status) | answered |
-| [상태마다 하나씩 있는 서비스를 비정상·등록 해제 목록에 든 것으로 걸러 조회하면 비정상과 등록 해제 서비스만 반환된다](#searching-a-status-in-filter-keeps-the-services-of-a-listed-status) | answered |
-| [상태마다 하나씩 있는 서비스를 비정상과 다른 것으로 걸러 조회하면 정상과 등록 해제 서비스만 반환된다](#searching-a-status-not-equals-filter-drops-the-services-of-that-status) | answered |
-| [상태마다 하나씩 있는 서비스를 비정상·등록 해제 목록에 들지 않은 것으로 걸러 조회하면 정상 서비스만 반환된다](#searching-a-status-not-in-filter-drops-the-services-of-a-listed-status) | answered |
-| [서비스 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching-omitting-the-page-size-answers-ten-services-and-a-next-page) | answered |
-| [모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 답을 받는다. 이 검색은 읽기 연산이라 모니터 역할이 전역 역할 검사를 통과한다](#searching-the-monitor-role-counts-every-service-as-the-superadmin-does) | answered |
-| [서비스 둘 중 하나가 엔드포인트를 가질 때 슈퍼관리자가 필터 없이 조회하면, 둘 다 한 번씩 집계된다](#searching-the-superadmin-counts-every-service-laid-once) | answered |
-| [슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-services) | rejected |
+| [when a read is filtered by one group among two services of different groups, only the services of that group remain in the answer](#searching-a-group-filter-narrows-the-answer-to-the-services-of-that-group) | answered |
+| [when services with one of each status are read filtered by unhealthy, only the unhealthy service comes back](#searching-a-status-equals-filter-keeps-the-services-of-that-status) | answered |
+| [when services with one of each status are read filtered by a status in the unhealthy and deregistered list, only the unhealthy and deregistered services come back](#searching-a-status-in-filter-keeps-the-services-of-a-listed-status) | answered |
+| [when services with one of each status are read filtered by a status other than unhealthy, only the healthy and deregistered services come back](#searching-a-status-not-equals-filter-drops-the-services-of-that-status) | answered |
+| [when services with one of each status are read filtered by a status not in the unhealthy and deregistered list, only the healthy service comes back](#searching-a-status-not-in-filter-drops-the-services-of-a-listed-status) | answered |
+| [when eleven services exist and the read names no size, ten services come back and the answer says there is a next page](#searching-omitting-the-page-size-answers-ten-services-and-a-next-page) | answered |
+| [when the monitor role reads without a filter, it gets the same answer as the superadmin. This search is a read operation, so the monitor role passes the global role check](#searching-the-monitor-role-counts-every-service-as-the-superadmin-does) | answered |
+| [when one of two services holds an endpoint and the superadmin reads without a filter, both are counted once](#searching-the-superadmin-counts-every-service-laid-once) | answered |
+| [when a user who is not the superadmin requests a global read, it is rejected for lack of role](#searching-a-user-who-is-not-the-superadmin-may-not-search-services) | rejected |
+
+**batch_load_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin batch-loads two services created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | answered |
 
 ### admin_search
 
@@ -29,28 +35,28 @@ Scenario: incomplete 1 / 2
 
 #### [a-group-filter-narrows-the-answer-to-the-services-of-that-group](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py): pass
 
-그룹이 다른 서비스 둘 중 한 그룹으로 걸러 조회하면, 답에는 그 그룹의 서비스만 남는다
+when a read is filtered by one group among two services of different groups, only the services of that group remain in the answer
 
 Given
 
-- 그룹이 다른 서비스 둘과, 슈퍼관리자 한 명
-  - 서비스 wanted-1: manager 그룹에 정상 상태로 등록됨
-  - 서비스 other-1: agent 그룹에 정상 상태로 등록됨
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two services in different groups and one superadmin
+  - Service wanted-1: registered as healthy in the manager group
+  - Service other-1: registered as healthy in the agent group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ServiceCatalogAdapter.admin_search: user-1이 manager 그룹으로 걸러 조회
+- ServiceCatalogAdapter.admin_search: user-1 reads filtered by the manager group
 
 Then
 
-- 골라낸 그룹의 서비스 하나만 남는다
-  - items.id: 골라낸 서비스와 같다
+- only the service of the picked group is left
+  - items.id: same as the picked service
   - items.service_group = ['manager']
   - total_count = 1
   - has_next_page = False
@@ -60,29 +66,29 @@ Then
 
 #### [a-status-equals-filter-keeps-the-services-of-that-status](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py): pass
 
-상태마다 하나씩 있는 서비스를 비정상과 같은 것으로 걸러 조회하면 비정상 서비스만 반환된다
+when services with one of each status are read filtered by unhealthy, only the unhealthy service comes back
 
 Given
 
-- 정상·비정상·등록 해제 상태의 서비스 하나씩과, 슈퍼관리자 한 명
-  - 서비스 healthy-1: manager 그룹에 정상 상태로 등록됨
-  - 서비스 unhealthy-1: manager 그룹에 비정상 상태로 등록됨
-  - 서비스 deregistered-1: manager 그룹에 등록 해제 상태로 등록됨
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one service for each status: healthy, unhealthy, deregistered, and one superadmin
+  - Service healthy-1: registered as healthy in the manager group
+  - Service unhealthy-1: registered as unhealthy in the manager group
+  - Service deregistered-1: registered as deregistered in the manager group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ServiceCatalogAdapter.admin_search: user-1이 상태가 unhealthy인 것으로 걸러 조회
+- ServiceCatalogAdapter.admin_search: user-1 reads filtered by the status unhealthy
 
 Then
 
-- 비정상 상태의 서비스만 반환된다
-  - items.id: 그 상태로 심은 서비스와 같다
+- only the services with status unhealthy come back
+  - items.id: same as the services seeded in advance with that status
   - items.instance_id = ['unhealthy-1']
   - items.status = [<ServiceCatalogStatus.UNHEALTHY: 'unhealthy'>]
   - total_count = 1
@@ -93,29 +99,29 @@ Then
 
 #### [a-status-in-filter-keeps-the-services-of-a-listed-status](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py): pass
 
-상태마다 하나씩 있는 서비스를 비정상·등록 해제 목록에 든 것으로 걸러 조회하면 비정상과 등록 해제 서비스만 반환된다
+when services with one of each status are read filtered by a status in the unhealthy and deregistered list, only the unhealthy and deregistered services come back
 
 Given
 
-- 정상·비정상·등록 해제 상태의 서비스 하나씩과, 슈퍼관리자 한 명
-  - 서비스 healthy-1: manager 그룹에 정상 상태로 등록됨
-  - 서비스 unhealthy-1: manager 그룹에 비정상 상태로 등록됨
-  - 서비스 deregistered-1: manager 그룹에 등록 해제 상태로 등록됨
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one service for each status: healthy, unhealthy, deregistered, and one superadmin
+  - Service healthy-1: registered as healthy in the manager group
+  - Service unhealthy-1: registered as unhealthy in the manager group
+  - Service deregistered-1: registered as deregistered in the manager group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ServiceCatalogAdapter.admin_search: user-1이 상태가 unhealthy, deregistered 중 하나인 것으로 걸러 조회
+- ServiceCatalogAdapter.admin_search: user-1 reads filtered by one of the statuses unhealthy, deregistered
 
 Then
 
-- 비정상·등록 해제 상태의 서비스만 반환된다
-  - items.id: 그 상태로 심은 서비스와 같다
+- only the services with status unhealthy, deregistered come back
+  - items.id: same as the services seeded in advance with that status
   - items.instance_id = ['deregistered-1', 'unhealthy-1']
   - items.status = [<ServiceCatalogStatus.DEREGISTERED: 'deregistered'>, <ServiceCatalogStatus.UNHEALTHY: 'unhealthy'>]
   - total_count = 2
@@ -126,29 +132,29 @@ Then
 
 #### [a-status-not-equals-filter-drops-the-services-of-that-status](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py): pass
 
-상태마다 하나씩 있는 서비스를 비정상과 다른 것으로 걸러 조회하면 정상과 등록 해제 서비스만 반환된다
+when services with one of each status are read filtered by a status other than unhealthy, only the healthy and deregistered services come back
 
 Given
 
-- 정상·비정상·등록 해제 상태의 서비스 하나씩과, 슈퍼관리자 한 명
-  - 서비스 healthy-1: manager 그룹에 정상 상태로 등록됨
-  - 서비스 unhealthy-1: manager 그룹에 비정상 상태로 등록됨
-  - 서비스 deregistered-1: manager 그룹에 등록 해제 상태로 등록됨
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one service for each status: healthy, unhealthy, deregistered, and one superadmin
+  - Service healthy-1: registered as healthy in the manager group
+  - Service unhealthy-1: registered as unhealthy in the manager group
+  - Service deregistered-1: registered as deregistered in the manager group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ServiceCatalogAdapter.admin_search: user-1이 상태가 unhealthy이 아닌 것으로 걸러 조회
+- ServiceCatalogAdapter.admin_search: user-1 reads filtered by a status other than unhealthy
 
 Then
 
-- 정상·등록 해제 상태의 서비스만 반환된다
-  - items.id: 그 상태로 심은 서비스와 같다
+- only the services with status healthy, deregistered come back
+  - items.id: same as the services seeded in advance with that status
   - items.instance_id = ['deregistered-1', 'healthy-1']
   - items.status = [<ServiceCatalogStatus.DEREGISTERED: 'deregistered'>, <ServiceCatalogStatus.HEALTHY: 'healthy'>]
   - total_count = 2
@@ -159,29 +165,29 @@ Then
 
 #### [a-status-not-in-filter-drops-the-services-of-a-listed-status](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py): pass
 
-상태마다 하나씩 있는 서비스를 비정상·등록 해제 목록에 들지 않은 것으로 걸러 조회하면 정상 서비스만 반환된다
+when services with one of each status are read filtered by a status not in the unhealthy and deregistered list, only the healthy service comes back
 
 Given
 
-- 정상·비정상·등록 해제 상태의 서비스 하나씩과, 슈퍼관리자 한 명
-  - 서비스 healthy-1: manager 그룹에 정상 상태로 등록됨
-  - 서비스 unhealthy-1: manager 그룹에 비정상 상태로 등록됨
-  - 서비스 deregistered-1: manager 그룹에 등록 해제 상태로 등록됨
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one service for each status: healthy, unhealthy, deregistered, and one superadmin
+  - Service healthy-1: registered as healthy in the manager group
+  - Service unhealthy-1: registered as unhealthy in the manager group
+  - Service deregistered-1: registered as deregistered in the manager group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ServiceCatalogAdapter.admin_search: user-1이 상태가 unhealthy, deregistered 중 어느 것도 아닌 것으로 걸러 조회
+- ServiceCatalogAdapter.admin_search: user-1 reads filtered by a status that is none of unhealthy, deregistered
 
 Then
 
-- 정상 상태의 서비스만 반환된다
-  - items.id: 그 상태로 심은 서비스와 같다
+- only the services with status healthy come back
+  - items.id: same as the services seeded in advance with that status
   - items.instance_id = ['healthy-1']
   - items.status = [<ServiceCatalogStatus.HEALTHY: 'healthy'>]
   - total_count = 1
@@ -192,37 +198,37 @@ Then
 
 #### [omitting-the-page-size-answers-ten-services-and-a-next-page](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py): pass
 
-서비스 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다
+when eleven services exist and the read names no size, ten services come back and the answer says there is a next page
 
 Given
 
-- 서비스 11개와, 슈퍼관리자 한 명
-  - 서비스 wanted-1: manager 그룹에 정상 상태로 등록됨
-  - 서비스 wanted-1: http://127.0.0.1:8080 엔드포인트 하나를 갖는다
-  - 서비스 other-1: manager 그룹에 정상 상태로 등록됨
-  - 서비스 other-2: manager 그룹에 정상 상태로 등록됨
-  - 서비스 other-3: manager 그룹에 정상 상태로 등록됨
-  - 서비스 other-4: manager 그룹에 정상 상태로 등록됨
-  - 서비스 other-5: manager 그룹에 정상 상태로 등록됨
-  - 서비스 other-6: manager 그룹에 정상 상태로 등록됨
-  - 서비스 other-7: manager 그룹에 정상 상태로 등록됨
-  - 서비스 other-8: manager 그룹에 정상 상태로 등록됨
-  - 서비스 other-9: manager 그룹에 정상 상태로 등록됨
-  - 서비스 other-10: manager 그룹에 정상 상태로 등록됨
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 11 services and one superadmin
+  - Service wanted-1: registered as healthy in the manager group
+  - Service wanted-1: has one endpoint at http://127.0.0.1:8080
+  - Service other-1: registered as healthy in the manager group
+  - Service other-2: registered as healthy in the manager group
+  - Service other-3: registered as healthy in the manager group
+  - Service other-4: registered as healthy in the manager group
+  - Service other-5: registered as healthy in the manager group
+  - Service other-6: registered as healthy in the manager group
+  - Service other-7: registered as healthy in the manager group
+  - Service other-8: registered as healthy in the manager group
+  - Service other-9: registered as healthy in the manager group
+  - Service other-10: registered as healthy in the manager group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ServiceCatalogAdapter.admin_search: user-1이 필터 없이 전체 조회
+- ServiceCatalogAdapter.admin_search: user-1 reads everything without a filter
 
 Then
 
-- 기본 크기의 첫 페이지가 반환된다
+- the first page of the default size comes back
   - len(items) = 10
   - total_count = 11
   - has_next_page = True
@@ -232,33 +238,33 @@ Then
 
 #### [the-monitor-role-counts-every-service-as-the-superadmin-does](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py): pass
 
-모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 답을 받는다. 이 검색은 읽기 연산이라 모니터 역할이 전역 역할 검사를 통과한다
+when the monitor role reads without a filter, it gets the same answer as the superadmin. This search is a read operation, so the monitor role passes the global role check
 
 Given
 
-- 서비스 2개와, 모니터 한 명
-  - 서비스 wanted-1: manager 그룹에 정상 상태로 등록됨
-  - 서비스 wanted-1: http://127.0.0.1:8080 엔드포인트 하나를 갖는다
-  - 서비스 other-1: manager 그룹에 정상 상태로 등록됨
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 모니터 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 services and one monitor
+  - Service wanted-1: registered as healthy in the manager group
+  - Service wanted-1: has one endpoint at http://127.0.0.1:8080
+  - Service other-1: registered as healthy in the manager group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - monitor user-1: has their own keypair and personal project
 
 When
 
-- ServiceCatalogAdapter.admin_search: user-1이 필터 없이 전체 조회
+- ServiceCatalogAdapter.admin_search: user-1 reads everything without a filter
 
 Then
 
-- 심은 서비스가 모두 한 번씩, 통째로 집계된다
+- every service seeded in advance is counted once, and each whole service comes back
   - items.instance_id = ['other-1', 'wanted-1']
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
-  - items[0].id: 심은 서비스와 같다
+  - items[0].id: same as the service seeded in advance
   - items[0].service_group = 'manager'
   - items[0].instance_id = 'other-1'
   - items[0].display_name = 'other-1'
@@ -266,10 +272,10 @@ Then
   - items[0].labels = {}
   - items[0].status = <ServiceCatalogStatus.HEALTHY: 'healthy'>
   - items[0].startup_time = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
-  - items[0].registered_at: 이 실행이 쓴 시각
-  - items[0].last_heartbeat: 이 실행이 쓴 시각
+  - items[0].registered_at: the time this run wrote
+  - items[0].last_heartbeat: the time this run wrote
   - items[0].config_hash = ''
-  - items[1].id: 심은 서비스와 같다
+  - items[1].id: same as the service seeded in advance
   - items[1].service_group = 'manager'
   - items[1].instance_id = 'wanted-1'
   - items[1].display_name = 'wanted-1'
@@ -277,41 +283,41 @@ Then
   - items[1].labels = {}
   - items[1].status = <ServiceCatalogStatus.HEALTHY: 'healthy'>
   - items[1].startup_time = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
-  - items[1].registered_at: 이 실행이 쓴 시각
-  - items[1].last_heartbeat: 이 실행이 쓴 시각
+  - items[1].registered_at: the time this run wrote
+  - items[1].last_heartbeat: the time this run wrote
   - items[1].config_hash = ''
 
 <a id="searching-the-superadmin-counts-every-service-laid-once"></a>
 
 #### [the-superadmin-counts-every-service-laid-once](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py): pass
 
-서비스 둘 중 하나가 엔드포인트를 가질 때 슈퍼관리자가 필터 없이 조회하면, 둘 다 한 번씩 집계된다
+when one of two services holds an endpoint and the superadmin reads without a filter, both are counted once
 
 Given
 
-- 서비스 2개와, 슈퍼관리자 한 명
-  - 서비스 wanted-1: manager 그룹에 정상 상태로 등록됨
-  - 서비스 wanted-1: http://127.0.0.1:8080 엔드포인트 하나를 갖는다
-  - 서비스 other-1: manager 그룹에 정상 상태로 등록됨
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 services and one superadmin
+  - Service wanted-1: registered as healthy in the manager group
+  - Service wanted-1: has one endpoint at http://127.0.0.1:8080
+  - Service other-1: registered as healthy in the manager group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- ServiceCatalogAdapter.admin_search: user-1이 필터 없이 전체 조회
+- ServiceCatalogAdapter.admin_search: user-1 reads everything without a filter
 
 Then
 
-- 심은 서비스가 모두 한 번씩, 통째로 집계된다
+- every service seeded in advance is counted once, and each whole service comes back
   - items.instance_id = ['other-1', 'wanted-1']
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
-  - items[0].id: 심은 서비스와 같다
+  - items[0].id: same as the service seeded in advance
   - items[0].service_group = 'manager'
   - items[0].instance_id = 'other-1'
   - items[0].display_name = 'other-1'
@@ -319,10 +325,10 @@ Then
   - items[0].labels = {}
   - items[0].status = <ServiceCatalogStatus.HEALTHY: 'healthy'>
   - items[0].startup_time = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
-  - items[0].registered_at: 이 실행이 쓴 시각
-  - items[0].last_heartbeat: 이 실행이 쓴 시각
+  - items[0].registered_at: the time this run wrote
+  - items[0].last_heartbeat: the time this run wrote
   - items[0].config_hash = ''
-  - items[1].id: 심은 서비스와 같다
+  - items[1].id: same as the service seeded in advance
   - items[1].service_group = 'manager'
   - items[1].instance_id = 'wanted-1'
   - items[1].display_name = 'wanted-1'
@@ -330,35 +336,90 @@ Then
   - items[1].labels = {}
   - items[1].status = <ServiceCatalogStatus.HEALTHY: 'healthy'>
   - items[1].startup_time = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
-  - items[1].registered_at: 이 실행이 쓴 시각
-  - items[1].last_heartbeat: 이 실행이 쓴 시각
+  - items[1].registered_at: the time this run wrote
+  - items[1].last_heartbeat: the time this run wrote
   - items[1].config_hash = ''
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-services"></a>
 
 #### [a-user-who-is-not-the-superadmin-may-not-search-services](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py): pass
 
-슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다
+when a user who is not the superadmin requests a global read, it is rejected for lack of role
 
 Given
 
-- 서비스 2개와, 일반 사용자 한 명
-  - 서비스 wanted-1: manager 그룹에 정상 상태로 등록됨
-  - 서비스 wanted-1: http://127.0.0.1:8080 엔드포인트 하나를 갖는다
-  - 서비스 other-1: manager 그룹에 정상 상태로 등록됨
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- 2 services and one regular user
+  - Service wanted-1: registered as healthy in the manager group
+  - Service wanted-1: has one endpoint at http://127.0.0.1:8080
+  - Service other-1: registered as healthy in the manager group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- ServiceCatalogAdapter.admin_search: user-1이 필터 없이 전체 조회
+- ServiceCatalogAdapter.admin_search: user-1 reads everything without a filter
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+### batch_load_by_ids
+
+<a id="reading-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
+
+#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/service_catalog/test_reading.py): pass
+
+when the superadmin batch-loads two services created in advance and one unknown id, they come back in the order asked and the item for the unknown id is empty
+
+Given
+
+- 2 services and one superadmin
+  - Service wanted-1: registered as healthy in the manager group
+  - Service wanted-1: has one endpoint at http://127.0.0.1:8080
+  - Service other-1: registered as healthy in the manager group
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- ServiceCatalogAdapter.batch_load_by_ids: user-1 batch-loads the 2 services created in advance and one unknown id
+
+Then
+
+- they come back in the order asked and the item for an unknown id is empty
+  - len(items) = 3
+  - items[0].entity_id: same as the service created in advance
+  - items[0].id: same as the service seeded in advance
+  - items[0].service_group = 'manager'
+  - items[0].instance_id = 'wanted-1'
+  - items[0].display_name = 'wanted-1'
+  - items[0].version = '26.9.0'
+  - items[0].labels = {}
+  - items[0].status = <ServiceCatalogStatus.HEALTHY: 'healthy'>
+  - items[0].startup_time = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
+  - items[0].registered_at: the time this run wrote
+  - items[0].last_heartbeat: the time this run wrote
+  - items[0].config_hash = ''
+  - items[1].entity_id: same as the service created in advance
+  - items[1].id: same as the service seeded in advance
+  - items[1].service_group = 'manager'
+  - items[1].instance_id = 'other-1'
+  - items[1].display_name = 'other-1'
+  - items[1].version = '26.9.0'
+  - items[1].labels = {}
+  - items[1].status = <ServiceCatalogStatus.HEALTHY: 'healthy'>
+  - items[1].startup_time = datetime.datetime(2026, 1, 1, 0, 0, tzinfo=datetime.timezone.utc)
+  - items[1].registered_at: the time this run wrote
+  - items[1].last_heartbeat: the time this run wrote
+  - items[1].config_hash = ''
+  - items[2] = None
 

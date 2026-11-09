@@ -5,7 +5,7 @@
 Scenario: incomplete 3 / 8
 
 - built from ops (8)
-  - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_by_ids: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - create: representative success ✓ · representative rejection ✓
   - get: representative success ✓ · representative rejection ✓
   - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
@@ -14,79 +14,134 @@ Scenario: incomplete 3 / 8
   - search: representative success ✓ · representative rejection ✓
   - update: representative success ✓ · representative rejection ✓
 
+**batch_load_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when one policy exists and the superadmin batch-loads it and one unknown id, they come back in the order asked and the item for the unknown id is empty](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | answered |
+
 **create**
 
 | scenario | verdict |
 |---|---|
-| [슈퍼관리자가 deployments 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-deployments-category-is-made) | answered |
-| [슈퍼관리자가 login 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-login-category-is-made) | answered |
-| [슈퍼관리자가 logs 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-logs-category-is-made) | answered |
-| [슈퍼관리자가 reconcile_history 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-reconcile-history-category-is-made) | answered |
-| [슈퍼관리자가 roles_invitations 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-roles-invitations-category-is-made) | answered |
-| [슈퍼관리자가 sessions 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-sessions-category-is-made) | answered |
-| [슈퍼관리자가 usage_buckets 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-usage-buckets-category-is-made) | answered |
-| [슈퍼관리자가 usage_records 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-usage-records-category-is-made) | answered |
-| [활성 여부를 거짓으로 지정해 생성하면 비활성 상태가 담긴 노드가 반환된다](#creating-a-policy-made-inactive-comes-back-inactive) | answered |
-| [슈퍼관리자가 카테고리와 보존 일수만 지정해 생성하면, 활성 여부는 참이고 마지막 정리 시각은 비어 있는 노드가 반환된다](#creating-the-superadmin-makes-a-policy-that-is-active-and-never-swept) | answered |
-| [어떤 카테고리의 정책이 이미 있을 때 같은 카테고리로 다시 생성하면, 카테고리 중복으로 거부된다](#creating-a-second-policy-for-the-same-category-is-refused) | rejected |
-| [슈퍼관리자가 아닌 사용자가 정책을 생성하면 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-policy) | rejected |
-| [모니터 역할이 정책을 생성하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다](#creating-the-monitor-may-not-create-a-policy) | rejected |
-| [권한 검사를 꺼도 슈퍼관리자가 아니면 정책을 생성하지 못한다](#creating-turning-enforcement-off-does-not-let-a-user-create-a-policy) | rejected |
+| [when the superadmin creates a policy of the deployments category, the node comes back with that category](#creating-a-policy-for-the-deployments-category-is-made) | answered |
+| [when the superadmin creates a policy of the login category, the node comes back with that category](#creating-a-policy-for-the-login-category-is-made) | answered |
+| [when the superadmin creates a policy of the logs category, the node comes back with that category](#creating-a-policy-for-the-logs-category-is-made) | answered |
+| [when the superadmin creates a policy of the projects category, the node comes back with that category](#creating-a-policy-for-the-projects-category-is-made) | answered |
+| [when the superadmin creates a policy of the reconcile_history category, the node comes back with that category](#creating-a-policy-for-the-reconcile-history-category-is-made) | answered |
+| [when the superadmin creates a policy of the roles_invitations category, the node comes back with that category](#creating-a-policy-for-the-roles-invitations-category-is-made) | answered |
+| [when the superadmin creates a policy of the sessions category, the node comes back with that category](#creating-a-policy-for-the-sessions-category-is-made) | answered |
+| [when the superadmin creates a policy of the usage_buckets category, the node comes back with that category](#creating-a-policy-for-the-usage-buckets-category-is-made) | answered |
+| [when the superadmin creates a policy of the usage_records category, the node comes back with that category](#creating-a-policy-for-the-usage-records-category-is-made) | answered |
+| [creating a policy with enabled false brings back a node that is not enabled](#creating-a-policy-made-inactive-comes-back-inactive) | answered |
+| [when the superadmin creates a policy with only a category and retention days, the node comes back with enabled true and an empty last sweep time](#creating-the-superadmin-makes-a-policy-that-is-active-and-never-swept) | answered |
+| [when a policy of a category already exists, creating it again for the same category is rejected as a duplicate](#creating-a-second-policy-for-the-same-category-is-refused) | rejected |
+| [a user who is not the superadmin creating a policy is rejected for lack of role](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-policy) | rejected |
+| [a monitor role creating a policy is rejected for lack of role. A monitor passes the superadmin check for reads only](#creating-the-monitor-may-not-create-a-policy) | rejected |
+| [turning permission checks off still does not let a user who is not the superadmin create a policy](#creating-turning-enforcement-off-does-not-let-a-user-create-a-policy) | rejected |
 
 **get**
 
 | scenario | verdict |
 |---|---|
-| [정책 하나가 있고 슈퍼관리자가 id로 조회하면, 그 정책 전체가 반환된다](#reading-the-superadmin-reads-a-policy-by-id) | answered |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 조회할 수 있다](#reading-turning-enforcement-off-lets-a-user-read-a-policy) | answered |
-| [아무 권한도 없는 사용자가 id로 조회하면 권한 부족으로 거부된다. 인증만으로 조회되는 다른 카탈로그와 달리 이 조회는 권한 검사를 거친다](#reading-a-user-granted-nothing-may-not-read-a-policy) | rejected |
-| [아무 권한도 없는 사용자가 존재하지 않는 id로 조회하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다](#reading-a-user-granted-nothing-reading-an-unknown-policy-id-is-refused-for-permission) | rejected |
-| [슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading-the-superadmin-reading-a-policy-id-nothing-answers-to-is-not-found) | rejected |
+| [when one policy exists and the superadmin reads it by id, the whole policy comes back](#reading-the-superadmin-reads-a-policy-by-id) | answered |
+| [turning permission checks off lets a user granted nothing read a policy](#reading-turning-enforcement-off-lets-a-user-read-a-policy) | answered |
+| [when a user granted nothing reads by id, the call is rejected for lack of permission. Unlike the other catalogs that a read reaches with authentication alone, this read goes through a permission check](#reading-a-user-granted-nothing-may-not-read-a-policy) | rejected |
+| [when a user granted nothing reads with an id nothing answers to, the call is rejected for lack of permission, not as not found, because the permission check runs first and no permission is granted on a row that does not exist](#reading-a-user-granted-nothing-reading-an-unknown-policy-id-is-refused-for-permission) | rejected |
+| [when the superadmin reads with an id nothing answers to, the call is rejected as not found](#reading-the-superadmin-reading-a-policy-id-nothing-answers-to-is-not-found) | rejected |
 
 **partial_bulk_purge**
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 정책 여럿을 한 번에 완전 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-policies) | answered |
-| [슈퍼관리자가 정책 둘과 없는 id 하나를 한 번에 완전 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-policies-answers-for-the-missing-one) | answered |
+| [when a user granted nothing tries to purge several policies at once, none is deleted and every one comes back in the failed list because the user has no permission](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-policies) | answered |
+| [when the superadmin purges two policies and one missing id at once, the two come back in the processed list and the missing id comes back in the failed list because nothing answers to it](#partial_bulk_purging-purging-several-policies-answers-for-the-missing-one) | answered |
 
 **partial_bulk_update**
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-policies) | answered |
-| [슈퍼관리자가 정책 여럿의 보존 일수를 한 번에 바꾸면, 모두 새 일수로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-policies-at-once) | answered |
+| [when a user granted nothing tries to edit several policies at once, none is edited and every one comes back in the failed list because the user has no permission](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-policies) | answered |
+| [when the superadmin changes the retention days of several policies at once, all of them come back with the new days and nothing failed](#partial_bulk_editing-the-superadmin-edits-several-policies-at-once) | answered |
 
 **purge**
 
 | scenario | verdict |
 |---|---|
-| [슈퍼관리자가 정책을 완전 삭제하면 삭제한 정책의 id를 담은 응답이 반환된다](#retiring-the-superadmin-purges-a-policy) | answered |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 완전 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-purge-a-policy) | answered |
-| [아무 권한도 없는 사용자가 정책을 완전 삭제하면 권한 부족으로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-policy) | rejected |
-| [슈퍼관리자가 존재하지 않는 id를 완전 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-purging-a-policy-id-nothing-answers-to-is-not-found) | rejected |
+| [when the superadmin purges a policy, the answer carries the id of the policy that was purged](#retiring-the-superadmin-purges-a-policy) | answered |
+| [turning permission checks off lets a user granted nothing purge a policy](#retiring-turning-enforcement-off-lets-a-user-purge-a-policy) | answered |
+| [when a user granted nothing purges a policy, the call is rejected for lack of permission](#retiring-a-user-granted-nothing-may-not-purge-a-policy) | rejected |
+| [when the superadmin purges an id nothing answers to, the call is rejected as not found](#retiring-purging-a-policy-id-nothing-answers-to-is-not-found) | rejected |
 
 **search**
 
 | scenario | verdict |
 |---|---|
-| [카테고리가 다른 정책 여럿 중 하나의 카테고리를 필터로 조회하면 그 카테고리의 정책 하나만 반환된다](#searching-a-category-filter-narrows-the-answer-to-that-category) | answered |
-| [활성과 비활성이 섞여 있을 때 활성 필터로 조회하면 활성인 정책만 반환된다](#searching-an-enabled-filter-keeps-only-the-active-policies) | answered |
-| [모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다](#searching-the-monitor-searches-policies-like-the-superadmin) | answered |
-| [카테고리가 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 집계된다](#searching-the-superadmin-counts-every-policy-laid) | answered |
-| [슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-policies) | rejected |
+| [when the call reads with the category of one of several policies of different categories as a filter, only the one policy of that category comes back](#searching-a-category-filter-narrows-the-answer-to-that-category) | answered |
+| [when active and inactive policies are mixed and the call reads with the enabled filter, only the active policies come back](#searching-an-enabled-filter-keeps-only-the-active-policies) | answered |
+| [when a monitor role reads without a filter, the same answer as for the superadmin comes back. The superadmin check allows reads for a monitor](#searching-the-monitor-searches-policies-like-the-superadmin) | answered |
+| [when two policies of different categories exist and the superadmin reads without a filter, both are counted](#searching-the-superadmin-counts-every-policy-laid) | answered |
+| [when a user who is not the superadmin asks to read everything, the call is rejected for lack of role](#searching-a-user-who-is-not-the-superadmin-may-not-search-policies) | rejected |
 
 **update**
 
 | scenario | verdict |
 |---|---|
-| [값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-a-policy-edit-giving-no-value-changes-nothing) | answered |
-| [활성 정책의 활성 여부를 끄면 비활성 상태가 담긴 노드가 반환된다](#editing-disabling-a-policy-answers-it-inactive) | answered |
-| [슈퍼관리자가 보존 일수만 수정하면, 일수는 새 값이 되고 카테고리와 활성 여부는 그대로 유지된다](#editing-editing-the-retention-days-leaves-the-rest-alone) | answered |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 수정할 수 있다](#editing-turning-enforcement-off-lets-a-user-edit-a-policy) | answered |
-| [아무 권한도 없는 사용자가 정책을 수정하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-policy) | rejected |
-| [정책 둘 중 한쪽의 카테고리를 다른 쪽 카테고리로 바꾸면, 카테고리 중복으로 거부된다. 생성할 때와 달리 저장소의 제약 위반이 그대로 전파된다](#editing-moving-a-policy-to-a-category-already-taken-is-refused) | rejected |
-| [슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-a-policy-id-nothing-answers-to-is-not-found) | rejected |
+| [editing without giving any value brings back a node that changed nothing](#editing-a-policy-edit-giving-no-value-changes-nothing) | answered |
+| [turning off the enabled flag of an active policy brings back a node that is not enabled](#editing-disabling-a-policy-answers-it-inactive) | answered |
+| [when the superadmin edits only the retention days, the days become the new value and the category and enabled flag stay](#editing-editing-the-retention-days-leaves-the-rest-alone) | answered |
+| [turning permission checks off lets a user granted nothing edit a policy](#editing-turning-enforcement-off-lets-a-user-edit-a-policy) | answered |
+| [when a user granted nothing edits a policy, the call is rejected for lack of permission](#editing-a-user-granted-nothing-may-not-edit-a-policy) | rejected |
+| [when the category of one of two policies is changed to the category of the other, the call is rejected as a duplicate. Unlike at creation, the constraint violation from the repository propagates as it is](#editing-moving-a-policy-to-a-category-already-taken-is-refused) | rejected |
+| [when the superadmin edits an id nothing answers to, the call is rejected as not found](#editing-the-superadmin-editing-a-policy-id-nothing-answers-to-is-not-found) | rejected |
+
+### batch_load_by_ids
+
+<a id="reading-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
+
+#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py): pass
+
+when one policy exists and the superadmin batch-loads it and one unknown id, they come back in the order asked and the item for the unknown id is empty
+
+Given
+
+- two retention policies of different categories and one superadmin
+  - Retention policy logs: kept for 30 days
+  - Retention policy login: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- RetentionPolicyAdapter.batch_load_by_ids: user-1 batch-loads the policy created in advance and one unknown id
+
+Then
+
+- they come back in the order asked and the item for an unknown id is empty
+  - len(items) = 3
+  - items[0].id: same as the id of the policy laid
+  - items[0].entity_id: same as the id of the policy laid
+  - id: skipped: the database generates it
+  - category = <RetentionCategory.LOGS: 'logs'>
+  - retention_period_days = 30
+  - enabled = True
+  - last_swept_at = None
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+  - items[1].id: same as the id of the policy laid
+  - items[1].entity_id: same as the id of the policy laid
+  - id: skipped: the database generates it
+  - category = <RetentionCategory.LOGIN: 'login'>
+  - retention_period_days = 30
+  - enabled = True
+  - last_swept_at = None
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+  - items[2] = None
 
 ### create
 
@@ -94,412 +149,443 @@ Scenario: incomplete 3 / 8
 
 #### [a-policy-for-the-deployments-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
-슈퍼관리자가 deployments 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다
+when the superadmin creates a policy of the deployments category, the node comes back with that category
 
 Given
 
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.create: user-1이 deployments 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1 creates a policy for the deployments category
 
 Then
 
-- 생성한 정책 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole policy just created comes back
+  - id: skipped: the database generates it
   - category = <RetentionCategory.DEPLOYMENTS: 'deployments'>
   - retention_period_days = 90
   - enabled = True
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="creating-a-policy-for-the-login-category-is-made"></a>
 
 #### [a-policy-for-the-login-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
-슈퍼관리자가 login 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다
+when the superadmin creates a policy of the login category, the node comes back with that category
 
 Given
 
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.create: user-1이 login 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1 creates a policy for the login category
 
 Then
 
-- 생성한 정책 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole policy just created comes back
+  - id: skipped: the database generates it
   - category = <RetentionCategory.LOGIN: 'login'>
   - retention_period_days = 90
   - enabled = True
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="creating-a-policy-for-the-logs-category-is-made"></a>
 
 #### [a-policy-for-the-logs-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
-슈퍼관리자가 logs 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다
+when the superadmin creates a policy of the logs category, the node comes back with that category
 
 Given
 
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.create: user-1이 logs 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1 creates a policy for the logs category
 
 Then
 
-- 생성한 정책 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole policy just created comes back
+  - id: skipped: the database generates it
   - category = <RetentionCategory.LOGS: 'logs'>
   - retention_period_days = 90
   - enabled = True
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+
+<a id="creating-a-policy-for-the-projects-category-is-made"></a>
+
+#### [a-policy-for-the-projects-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
+
+when the superadmin creates a policy of the projects category, the node comes back with that category
+
+Given
+
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
+
+When
+
+- RetentionPolicyAdapter.create: user-1 creates a policy for the projects category
+
+Then
+
+- the whole policy just created comes back
+  - id: skipped: the database generates it
+  - category = <RetentionCategory.PROJECTS: 'projects'>
+  - retention_period_days = 90
+  - enabled = True
+  - last_swept_at = None
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="creating-a-policy-for-the-reconcile-history-category-is-made"></a>
 
 #### [a-policy-for-the-reconcile-history-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
-슈퍼관리자가 reconcile_history 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다
+when the superadmin creates a policy of the reconcile_history category, the node comes back with that category
 
 Given
 
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.create: user-1이 reconcile_history 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1 creates a policy for the reconcile_history category
 
 Then
 
-- 생성한 정책 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole policy just created comes back
+  - id: skipped: the database generates it
   - category = <RetentionCategory.RECONCILE_HISTORY: 'reconcile_history'>
   - retention_period_days = 90
   - enabled = True
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="creating-a-policy-for-the-roles-invitations-category-is-made"></a>
 
 #### [a-policy-for-the-roles-invitations-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
-슈퍼관리자가 roles_invitations 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다
+when the superadmin creates a policy of the roles_invitations category, the node comes back with that category
 
 Given
 
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.create: user-1이 roles_invitations 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1 creates a policy for the roles_invitations category
 
 Then
 
-- 생성한 정책 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole policy just created comes back
+  - id: skipped: the database generates it
   - category = <RetentionCategory.ROLES_INVITATIONS: 'roles_invitations'>
   - retention_period_days = 90
   - enabled = True
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="creating-a-policy-for-the-sessions-category-is-made"></a>
 
 #### [a-policy-for-the-sessions-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
-슈퍼관리자가 sessions 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다
+when the superadmin creates a policy of the sessions category, the node comes back with that category
 
 Given
 
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.create: user-1이 sessions 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1 creates a policy for the sessions category
 
 Then
 
-- 생성한 정책 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole policy just created comes back
+  - id: skipped: the database generates it
   - category = <RetentionCategory.SESSIONS: 'sessions'>
   - retention_period_days = 90
   - enabled = True
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="creating-a-policy-for-the-usage-buckets-category-is-made"></a>
 
 #### [a-policy-for-the-usage-buckets-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
-슈퍼관리자가 usage_buckets 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다
+when the superadmin creates a policy of the usage_buckets category, the node comes back with that category
 
 Given
 
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.create: user-1이 usage_buckets 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1 creates a policy for the usage_buckets category
 
 Then
 
-- 생성한 정책 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole policy just created comes back
+  - id: skipped: the database generates it
   - category = <RetentionCategory.USAGE_BUCKETS: 'usage_buckets'>
   - retention_period_days = 90
   - enabled = True
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="creating-a-policy-for-the-usage-records-category-is-made"></a>
 
 #### [a-policy-for-the-usage-records-category-is-made](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
-슈퍼관리자가 usage_records 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다
+when the superadmin creates a policy of the usage_records category, the node comes back with that category
 
 Given
 
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.create: user-1이 usage_records 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1 creates a policy for the usage_records category
 
 Then
 
-- 생성한 정책 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole policy just created comes back
+  - id: skipped: the database generates it
   - category = <RetentionCategory.USAGE_RECORDS: 'usage_records'>
   - retention_period_days = 90
   - enabled = True
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="creating-a-policy-made-inactive-comes-back-inactive"></a>
 
 #### [a-policy-made-inactive-comes-back-inactive](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
-활성 여부를 거짓으로 지정해 생성하면 비활성 상태가 담긴 노드가 반환된다
+creating a policy with enabled false brings back a node that is not enabled
 
 Given
 
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.create: user-1이 sessions 카테고리 정책을 비활성으로 생성
+- RetentionPolicyAdapter.create: user-1 creates an inactive policy for the sessions category
 
 Then
 
-- 생성한 정책 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole policy just created comes back
+  - id: skipped: the database generates it
   - category = <RetentionCategory.SESSIONS: 'sessions'>
   - retention_period_days = 90
   - enabled = False
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="creating-the-superadmin-makes-a-policy-that-is-active-and-never-swept"></a>
 
 #### [the-superadmin-makes-a-policy-that-is-active-and-never-swept](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
-슈퍼관리자가 카테고리와 보존 일수만 지정해 생성하면, 활성 여부는 참이고 마지막 정리 시각은 비어 있는 노드가 반환된다
+when the superadmin creates a policy with only a category and retention days, the node comes back with enabled true and an empty last sweep time
 
 Given
 
-- 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one superadmin
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.create: user-1이 sessions 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1 creates a policy for the sessions category
 
 Then
 
-- 생성한 정책 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole policy just created comes back
+  - id: skipped: the database generates it
   - category = <RetentionCategory.SESSIONS: 'sessions'>
   - retention_period_days = 90
   - enabled = True
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="creating-a-second-policy-for-the-same-category-is-refused"></a>
 
 #### [a-second-policy-for-the-same-category-is-refused](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
-어떤 카테고리의 정책이 이미 있을 때 같은 카테고리로 다시 생성하면, 카테고리 중복으로 거부된다
+when a policy of a category already exists, creating it again for the same category is rejected as a duplicate
 
 Given
 
-- 보존 정책 하나와, 슈퍼관리자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one retention policy and one superadmin
+  - Retention policy logs: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.create: user-1이 이미 있는 logs 카테고리 정책을 다시 생성
+- RetentionPolicyAdapter.create: user-1 creates the policy of the logs category again
 
 Then
 
-- 거부된다
-  - 거부: RetentionPolicyConflict
+- the call is rejected
+  - rejected: RetentionPolicyConflict
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-create-a-policy"></a>
 
 #### [a-user-who-is-not-the-superadmin-may-not-create-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
-슈퍼관리자가 아닌 사용자가 정책을 생성하면 역할 부족으로 거부된다
+a user who is not the superadmin creating a policy is rejected for lack of role
 
 Given
 
-- 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.create: user-1이 sessions 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1 creates a policy for the sessions category
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 <a id="creating-the-monitor-may-not-create-a-policy"></a>
 
 #### [the-monitor-may-not-create-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
-모니터 역할이 정책을 생성하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다
+a monitor role creating a policy is rejected for lack of role. A monitor passes the superadmin check for reads only
 
 Given
 
-- 모니터 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 모니터 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one monitor
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - monitor user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.create: user-1이 sessions 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1 creates a policy for the sessions category
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 <a id="creating-turning-enforcement-off-does-not-let-a-user-create-a-policy"></a>
 
 #### [turning-enforcement-off-does-not-let-a-user-create-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_creating.py): pass
 
-권한 검사를 꺼도 슈퍼관리자가 아니면 정책을 생성하지 못한다
+turning permission checks off still does not let a user who is not the superadmin create a policy
 
 Given
 
-- 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one regular user
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.create: user-1이 sessions 카테고리 정책을 생성
+- RetentionPolicyAdapter.create: user-1 creates a policy for the sessions category
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### get
 
@@ -507,143 +593,143 @@ Then
 
 #### [the-superadmin-reads-a-policy-by-id](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py): pass
 
-정책 하나가 있고 슈퍼관리자가 id로 조회하면, 그 정책 전체가 반환된다
+when one policy exists and the superadmin reads it by id, the whole policy comes back
 
 Given
 
-- 보존 정책 하나와, 슈퍼관리자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one retention policy and one superadmin
+  - Retention policy logs: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.get: user-1이 logs 카테고리 정책 조회
+- RetentionPolicyAdapter.get: user-1 reads the policy of the logs category
 
 Then
 
-- 미리 만들어 둔 정책 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole policy seeded in advance comes back
+  - id: skipped: the database generates it
   - category = <RetentionCategory.LOGS: 'logs'>
   - retention_period_days = 30
   - enabled = True
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="reading-turning-enforcement-off-lets-a-user-read-a-policy"></a>
 
 #### [turning-enforcement-off-lets-a-user-read-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py): pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 조회할 수 있다
+turning permission checks off lets a user granted nothing read a policy
 
 Given
 
-- 보존 정책 하나와, 일반 사용자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one retention policy and one regular user
+  - Retention policy logs: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.get: user-1이 logs 카테고리 정책 조회
+- RetentionPolicyAdapter.get: user-1 reads the policy of the logs category
 
 Then
 
-- 미리 만들어 둔 정책 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole policy seeded in advance comes back
+  - id: skipped: the database generates it
   - category = <RetentionCategory.LOGS: 'logs'>
   - retention_period_days = 30
   - enabled = True
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="reading-a-user-granted-nothing-may-not-read-a-policy"></a>
 
 #### [a-user-granted-nothing-may-not-read-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py): pass
 
-아무 권한도 없는 사용자가 id로 조회하면 권한 부족으로 거부된다. 인증만으로 조회되는 다른 카탈로그와 달리 이 조회는 권한 검사를 거친다
+when a user granted nothing reads by id, the call is rejected for lack of permission. Unlike the other catalogs that a read reaches with authentication alone, this read goes through a permission check
 
 Given
 
-- 보존 정책 하나와, 일반 사용자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one retention policy and one regular user
+  - Retention policy logs: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.get: user-1이 logs 카테고리 정책 조회
+- RetentionPolicyAdapter.get: user-1 reads the policy of the logs category
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="reading-a-user-granted-nothing-reading-an-unknown-policy-id-is-refused-for-permission"></a>
 
 #### [a-user-granted-nothing-reading-an-unknown-policy-id-is-refused-for-permission](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py): pass
 
-아무 권한도 없는 사용자가 존재하지 않는 id로 조회하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다
+when a user granted nothing reads with an id nothing answers to, the call is rejected for lack of permission, not as not found, because the permission check runs first and no permission is granted on a row that does not exist
 
 Given
 
-- 보존 정책 하나와, 일반 사용자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one retention policy and one regular user
+  - Retention policy logs: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.get: user-1이 존재하지 않는 id 조회
+- RetentionPolicyAdapter.get: user-1 reads an id nothing answers to
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="reading-the-superadmin-reading-a-policy-id-nothing-answers-to-is-not-found"></a>
 
 #### [the-superadmin-reading-a-policy-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/retention_policy/test_reading.py): pass
 
-슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다
+when the superadmin reads with an id nothing answers to, the call is rejected as not found
 
 Given
 
-- 보존 정책 하나와, 슈퍼관리자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one retention policy and one superadmin
+  - Retention policy logs: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.get: user-1이 존재하지 않는 id 조회
+- RetentionPolicyAdapter.get: user-1 reads an id nothing answers to
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 ### partial_bulk_purge
 
@@ -651,77 +737,77 @@ Then
 
 #### [a-user-granted-nothing-purges-none-of-several-policies](/tests/scenario/bai_scenario/manager/retention_policy/test_partial_bulk_purging.py): pass
 
-아무 권한도 없는 사용자가 정책 여럿을 한 번에 완전 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user granted nothing tries to purge several policies at once, none is deleted and every one comes back in the failed list because the user has no permission
 
 Given
 
-- 카테고리가 다른 보존 정책 둘과, 일반 사용자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 보존 정책 login: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two retention policies of different categories and one regular user
+  - Retention policy logs: kept for 30 days
+  - Retention policy login: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.partial_bulk_purge: user-1이 정책 2개를 한 번에 완전 삭제
+- RetentionPolicyAdapter.partial_bulk_purge: user-1 purges 2 policies at once
 
 Then
 
-- 처리된 정책 없이 대상이 모두 실패 목록에 온다
+- no policy is processed and every target comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상 정책의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 정책의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the target policy
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target policy
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_purging-purging-several-policies-answers-for-the-missing-one"></a>
 
 #### [purging-several-policies-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/retention_policy/test_partial_bulk_purging.py): pass
 
-슈퍼관리자가 정책 둘과 없는 id 하나를 한 번에 완전 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+when the superadmin purges two policies and one missing id at once, the two come back in the processed list and the missing id comes back in the failed list because nothing answers to it
 
 Given
 
-- 카테고리가 다른 보존 정책 둘과, 슈퍼관리자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 보존 정책 login: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two retention policies of different categories and one superadmin
+  - Retention policy logs: kept for 30 days
+  - Retention policy login: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.partial_bulk_purge: user-1이 정책 2개 와 없는 id 하나를 한 번에 완전 삭제
+- RetentionPolicyAdapter.partial_bulk_purge: user-1 purges 2 policies and one missing id at once
 
 Then
 
-- 대상 정책이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+- every target policy comes back in the processed list, and the missing id comes back in the failed list because nothing answers to it
   - successes count = 2
-  - id: 무시함: 데이터베이스가 만든다
+  - id: skipped: the database generates it
   - category = <RetentionCategory.LOGS: 'logs'>
   - retention_period_days = 30
   - enabled = True
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
-  - id: 무시함: 데이터베이스가 만든다
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+  - id: skipped: the database generates it
   - category = <RetentionCategory.LOGIN: 'login'>
   - retention_period_days = 30
   - enabled = True
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 'not found'를 담은 이유
+  - failed[0].id: same as the missing id put in the request
+  - failed[0].message: a reason containing 'not found'
 
 ### partial_bulk_update
 
@@ -729,75 +815,75 @@ Then
 
 #### [a-user-granted-nothing-edits-none-of-several-policies](/tests/scenario/bai_scenario/manager/retention_policy/test_partial_bulk_editing.py): pass
 
-아무 권한도 없는 사용자가 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user granted nothing tries to edit several policies at once, none is edited and every one comes back in the failed list because the user has no permission
 
 Given
 
-- 카테고리가 다른 보존 정책 둘과, 일반 사용자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 보존 정책 login: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two retention policies of different categories and one regular user
+  - Retention policy logs: kept for 30 days
+  - Retention policy login: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.partial_bulk_update: user-1이 정책 2개의 보존 일수를 한 번에 수정
+- RetentionPolicyAdapter.partial_bulk_update: user-1 edits the retention days of 2 policies at once
 
 Then
 
-- 처리된 정책 없이 대상이 모두 실패 목록에 온다
+- no policy is processed and every target comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 대상 정책의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 대상 정책의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the target policy
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the target policy
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-policies-at-once"></a>
 
 #### [the-superadmin-edits-several-policies-at-once](/tests/scenario/bai_scenario/manager/retention_policy/test_partial_bulk_editing.py): pass
 
-슈퍼관리자가 정책 여럿의 보존 일수를 한 번에 바꾸면, 모두 새 일수로 오고 실패한 것은 없다
+when the superadmin changes the retention days of several policies at once, all of them come back with the new days and nothing failed
 
 Given
 
-- 카테고리가 다른 보존 정책 둘과, 슈퍼관리자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 보존 정책 login: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two retention policies of different categories and one superadmin
+  - Retention policy logs: kept for 30 days
+  - Retention policy login: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.partial_bulk_update: user-1이 정책 2개의 보존 일수를 한 번에 수정
+- RetentionPolicyAdapter.partial_bulk_update: user-1 edits the retention days of 2 policies at once
 
 Then
 
-- 대상 정책이 모두 새 보존 일수로 오고, 실패한 것은 없다
+- every target policy comes back with the new retention days and nothing failed
   - successes count = 2
   - failed = []
-  - id: 무시함: 데이터베이스가 만든다
+  - id: skipped: the database generates it
   - category = <RetentionCategory.LOGS: 'logs'>
   - retention_period_days = 180
   - enabled = True
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
-  - id: 무시함: 데이터베이스가 만든다
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+  - id: skipped: the database generates it
   - category = <RetentionCategory.LOGIN: 'login'>
   - retention_period_days = 180
   - enabled = True
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 ### purge
 
@@ -805,105 +891,105 @@ Then
 
 #### [the-superadmin-purges-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_retiring.py): pass
 
-슈퍼관리자가 정책을 완전 삭제하면 삭제한 정책의 id를 담은 응답이 반환된다
+when the superadmin purges a policy, the answer carries the id of the policy that was purged
 
 Given
 
-- 보존 정책 하나와, 슈퍼관리자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one retention policy and one superadmin
+  - Retention policy logs: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.purge: user-1이 logs 카테고리 정책 완전 삭제
+- RetentionPolicyAdapter.purge: user-1 purges the policy of the logs category
 
 Then
 
-- 삭제한 정책의 id가 반환된다
-  - id: 미리 만들어 둔 정책와 같다
+- the id of the deleted policy comes back
+  - id: same as the policy seeded in advance
 
 <a id="retiring-turning-enforcement-off-lets-a-user-purge-a-policy"></a>
 
 #### [turning-enforcement-off-lets-a-user-purge-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_retiring.py): pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 완전 삭제할 수 있다
+turning permission checks off lets a user granted nothing purge a policy
 
 Given
 
-- 보존 정책 하나와, 일반 사용자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one retention policy and one regular user
+  - Retention policy logs: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.purge: user-1이 logs 카테고리 정책 완전 삭제
+- RetentionPolicyAdapter.purge: user-1 purges the policy of the logs category
 
 Then
 
-- 삭제한 정책의 id가 반환된다
-  - id: 미리 만들어 둔 정책와 같다
+- the id of the deleted policy comes back
+  - id: same as the policy seeded in advance
 
 <a id="retiring-a-user-granted-nothing-may-not-purge-a-policy"></a>
 
 #### [a-user-granted-nothing-may-not-purge-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_retiring.py): pass
 
-아무 권한도 없는 사용자가 정책을 완전 삭제하면 권한 부족으로 거부된다
+when a user granted nothing purges a policy, the call is rejected for lack of permission
 
 Given
 
-- 보존 정책 하나와, 일반 사용자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one retention policy and one regular user
+  - Retention policy logs: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.purge: user-1이 logs 카테고리 정책 완전 삭제
+- RetentionPolicyAdapter.purge: user-1 purges the policy of the logs category
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="retiring-purging-a-policy-id-nothing-answers-to-is-not-found"></a>
 
 #### [purging-a-policy-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/retention_policy/test_retiring.py): pass
 
-슈퍼관리자가 존재하지 않는 id를 완전 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
+when the superadmin purges an id nothing answers to, the call is rejected as not found
 
 Given
 
-- 보존 정책 하나와, 슈퍼관리자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one retention policy and one superadmin
+  - Retention policy logs: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.purge: user-1이 존재하지 않는 id 완전 삭제
+- RetentionPolicyAdapter.purge: user-1 purges an id nothing answers to
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 
 ### search
 
@@ -911,27 +997,27 @@ Then
 
 #### [a-category-filter-narrows-the-answer-to-that-category](/tests/scenario/bai_scenario/manager/retention_policy/test_searching.py): pass
 
-카테고리가 다른 정책 여럿 중 하나의 카테고리를 필터로 조회하면 그 카테고리의 정책 하나만 반환된다
+when the call reads with the category of one of several policies of different categories as a filter, only the one policy of that category comes back
 
 Given
 
-- 카테고리가 다른 보존 정책 둘과, 슈퍼관리자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 보존 정책 login: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two retention policies of different categories and one superadmin
+  - Retention policy logs: kept for 30 days
+  - Retention policy login: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.search: user-1이 logs 카테고리 필터로 조회
+- RetentionPolicyAdapter.search: user-1 reads with the logs category filter
 
 Then
 
-- 필터에 맞는 정책 하나만 반환된다
+- only the one policy the filter names comes back
   - items = ['logs']
   - total_count = 1
   - has_next_page = False
@@ -941,27 +1027,27 @@ Then
 
 #### [an-enabled-filter-keeps-only-the-active-policies](/tests/scenario/bai_scenario/manager/retention_policy/test_searching.py): pass
 
-활성과 비활성이 섞여 있을 때 활성 필터로 조회하면 활성인 정책만 반환된다
+when active and inactive policies are mixed and the call reads with the enabled filter, only the active policies come back
 
 Given
 
-- 활성 보존 정책 하나와 비활성 하나, 그리고 슈퍼관리자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 보존 정책 login: 30일 보존, 비활성
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one active retention policy, one inactive and one superadmin
+  - Retention policy logs: kept for 30 days
+  - Retention policy login: kept for 30 days, inactive
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.search: user-1이 활성 필터로 조회
+- RetentionPolicyAdapter.search: user-1 reads with the enabled filter
 
 Then
 
-- 응답에 나와야 하는 정책만 반환된다
+- only the policies that must appear in the response come back
   - items = ['logs']
   - total_count = 1
   - has_next_page = False
@@ -971,27 +1057,27 @@ Then
 
 #### [the-monitor-searches-policies-like-the-superadmin](/tests/scenario/bai_scenario/manager/retention_policy/test_searching.py): pass
 
-모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다
+when a monitor role reads without a filter, the same answer as for the superadmin comes back. The superadmin check allows reads for a monitor
 
 Given
 
-- 카테고리가 다른 보존 정책 둘과, 모니터 한 명
-  - 보존 정책 logs: 30일 보존
-  - 보존 정책 login: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 모니터 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two retention policies of different categories and one monitor
+  - Retention policy logs: kept for 30 days
+  - Retention policy login: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - monitor user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.search: user-1이 필터 없이 전체 조회
+- RetentionPolicyAdapter.search: user-1 reads everything without a filter
 
 Then
 
-- 응답에 나와야 하는 정책만 반환된다
+- only the policies that must appear in the response come back
   - items = ['login', 'logs']
   - total_count = 2
   - has_next_page = False
@@ -1001,27 +1087,27 @@ Then
 
 #### [the-superadmin-counts-every-policy-laid](/tests/scenario/bai_scenario/manager/retention_policy/test_searching.py): pass
 
-카테고리가 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 집계된다
+when two policies of different categories exist and the superadmin reads without a filter, both are counted
 
 Given
 
-- 카테고리가 다른 보존 정책 둘과, 슈퍼관리자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 보존 정책 login: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two retention policies of different categories and one superadmin
+  - Retention policy logs: kept for 30 days
+  - Retention policy login: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.search: user-1이 필터 없이 전체 조회
+- RetentionPolicyAdapter.search: user-1 reads everything without a filter
 
 Then
 
-- 응답에 나와야 하는 정책만 반환된다
+- only the policies that must appear in the response come back
   - items = ['login', 'logs']
   - total_count = 2
   - has_next_page = False
@@ -1031,28 +1117,28 @@ Then
 
 #### [a-user-who-is-not-the-superadmin-may-not-search-policies](/tests/scenario/bai_scenario/manager/retention_policy/test_searching.py): pass
 
-슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다
+when a user who is not the superadmin asks to read everything, the call is rejected for lack of role
 
 Given
 
-- 카테고리가 다른 보존 정책 둘과, 일반 사용자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 보존 정책 login: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two retention policies of different categories and one regular user
+  - Retention policy logs: kept for 30 days
+  - Retention policy login: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.search: user-1이 필터 없이 전체 조회
+- RetentionPolicyAdapter.search: user-1 reads everything without a filter
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### update
 
@@ -1060,206 +1146,206 @@ Then
 
 #### [a-policy-edit-giving-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py): pass
 
-값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다
+editing without giving any value brings back a node that changed nothing
 
 Given
 
-- 보존 정책 하나와, 슈퍼관리자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one retention policy and one superadmin
+  - Retention policy logs: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.update: user-1이 logs 카테고리 정책의 아무것도 수정
+- RetentionPolicyAdapter.update: user-1 edits the policy of the logs category without giving a value
 
 Then
 
-- 미리 만들어 둔 정책 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole policy seeded in advance comes back
+  - id: skipped: the database generates it
   - category = <RetentionCategory.LOGS: 'logs'>
   - retention_period_days = 30
   - enabled = True
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="editing-disabling-a-policy-answers-it-inactive"></a>
 
 #### [disabling-a-policy-answers-it-inactive](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py): pass
 
-활성 정책의 활성 여부를 끄면 비활성 상태가 담긴 노드가 반환된다
+turning off the enabled flag of an active policy brings back a node that is not enabled
 
 Given
 
-- 보존 정책 하나와, 슈퍼관리자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one retention policy and one superadmin
+  - Retention policy logs: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.update: user-1이 logs 카테고리 정책의 활성 여부 수정
+- RetentionPolicyAdapter.update: user-1 edits the enabled flag of the policy of the logs category
 
 Then
 
-- 미리 만들어 둔 정책 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole policy seeded in advance comes back
+  - id: skipped: the database generates it
   - category = <RetentionCategory.LOGS: 'logs'>
   - retention_period_days = 30
   - enabled = False
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="editing-editing-the-retention-days-leaves-the-rest-alone"></a>
 
 #### [editing-the-retention-days-leaves-the-rest-alone](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py): pass
 
-슈퍼관리자가 보존 일수만 수정하면, 일수는 새 값이 되고 카테고리와 활성 여부는 그대로 유지된다
+when the superadmin edits only the retention days, the days become the new value and the category and enabled flag stay
 
 Given
 
-- 보존 정책 하나와, 슈퍼관리자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one retention policy and one superadmin
+  - Retention policy logs: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.update: user-1이 logs 카테고리 정책의 보존 일수 수정
+- RetentionPolicyAdapter.update: user-1 edits the retention days of the policy of the logs category
 
 Then
 
-- 미리 만들어 둔 정책 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole policy seeded in advance comes back
+  - id: skipped: the database generates it
   - category = <RetentionCategory.LOGS: 'logs'>
   - retention_period_days = 180
   - enabled = True
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="editing-turning-enforcement-off-lets-a-user-edit-a-policy"></a>
 
 #### [turning-enforcement-off-lets-a-user-edit-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py): pass
 
-권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 수정할 수 있다
+turning permission checks off lets a user granted nothing edit a policy
 
 Given
 
-- 보존 정책 하나와, 일반 사용자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one retention policy and one regular user
+  - Retention policy logs: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.update: user-1이 logs 카테고리 정책의 보존 일수 수정
+- RetentionPolicyAdapter.update: user-1 edits the retention days of the policy of the logs category
 
 Then
 
-- 미리 만들어 둔 정책 전체가 반환된다
-  - id: 무시함: 데이터베이스가 만든다
+- the whole policy seeded in advance comes back
+  - id: skipped: the database generates it
   - category = <RetentionCategory.LOGS: 'logs'>
   - retention_period_days = 180
   - enabled = True
   - last_swept_at = None
-  - created_at: 이 실행이 쓴 시각
-  - updated_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
 
 <a id="editing-a-user-granted-nothing-may-not-edit-a-policy"></a>
 
 #### [a-user-granted-nothing-may-not-edit-a-policy](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py): pass
 
-아무 권한도 없는 사용자가 정책을 수정하면 권한 부족으로 거부된다
+when a user granted nothing edits a policy, the call is rejected for lack of permission
 
 Given
 
-- 보존 정책 하나와, 일반 사용자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one retention policy and one regular user
+  - Retention policy logs: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.update: user-1이 logs 카테고리 정책의 보존 일수 수정
+- RetentionPolicyAdapter.update: user-1 edits the retention days of the policy of the logs category
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="editing-moving-a-policy-to-a-category-already-taken-is-refused"></a>
 
 #### [moving-a-policy-to-a-category-already-taken-is-refused](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py): pass
 
-정책 둘 중 한쪽의 카테고리를 다른 쪽 카테고리로 바꾸면, 카테고리 중복으로 거부된다. 생성할 때와 달리 저장소의 제약 위반이 그대로 전파된다
+when the category of one of two policies is changed to the category of the other, the call is rejected as a duplicate. Unlike at creation, the constraint violation from the repository propagates as it is
 
 Given
 
-- 카테고리가 다른 보존 정책 둘과, 슈퍼관리자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 보존 정책 login: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- two retention policies of different categories and one superadmin
+  - Retention policy logs: kept for 30 days
+  - Retention policy login: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.update: user-1이 logs 카테고리 정책의 카테고리를 login(으)로 수정
+- RetentionPolicyAdapter.update: user-1 changes the category of the logs policy to login
 
 Then
 
-- 거부된다
-  - 거부: UniqueConstraintViolationError
+- the call is rejected
+  - rejected: UniqueConstraintViolationError
 
 <a id="editing-the-superadmin-editing-a-policy-id-nothing-answers-to-is-not-found"></a>
 
 #### [the-superadmin-editing-a-policy-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/retention_policy/test_editing.py): pass
 
-슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다
+when the superadmin edits an id nothing answers to, the call is rejected as not found
 
 Given
 
-- 보존 정책 하나와, 슈퍼관리자 한 명
-  - 보존 정책 logs: 30일 보존
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- one retention policy and one superadmin
+  - Retention policy logs: kept for 30 days
+  - Domain home-1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - superadmin user-1: has their own keypair and personal project
 
 When
 
-- RetentionPolicyAdapter.update: user-1이 존재하지 않는 id의 보존 일수 수정
+- RetentionPolicyAdapter.update: user-1 edits the retention days of an id nothing answers to
 
 Then
 
-- 거부된다
-  - 거부: EntityNotFoundError
+- the call is rejected
+  - rejected: EntityNotFoundError
 

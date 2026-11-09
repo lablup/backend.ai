@@ -5,7 +5,7 @@ import logging
 import secrets
 import uuid
 from collections.abc import Mapping, MutableMapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from typing import Any, cast
 from urllib.parse import urlparse
@@ -37,6 +37,7 @@ from ai.backend.common.exception import (
     BackendAIError,
     InvalidAPIParameters,
     UnknownImageReference,
+    UnreachableError,
 )
 from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
@@ -78,9 +79,10 @@ from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
 )
-from ai.backend.manager.data.session.types import SessionTerminationStatus
+from ai.backend.manager.data.session.types import SessionStatus, SessionTerminationStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.agent import AgentNotAllocated
+from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.common import (
     InternalServerError,
     ServiceUnavailable,
@@ -106,7 +108,6 @@ from ai.backend.manager.errors.session_group import (
 from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.session.row import (
-    DEAD_SESSION_STATUSES,
     PRIVATE_SESSION_TYPES,
     KernelLoadingStrategy,
 )
@@ -253,6 +254,7 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
     SchedulingController,
 )
 from ai.backend.manager.types import UserScope
+from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -964,7 +966,7 @@ class SessionService:
                 code = action.params.code
                 opts = action.params.options
             else:
-                raise RuntimeError("should not reach here")
+                raise UnreachableError("should not reach here")
             # handle cases when some params are deliberately set to None
             if code is None:
                 code = ""
@@ -1051,7 +1053,7 @@ class SessionService:
             ),
         )
 
-        if compute_session.status in DEAD_SESSION_STATUSES:
+        if compute_session.status in SessionStatus.terminal_statuses():
             if kernel_id is None:
                 # Get logs from the main kernel
                 kernel_id = compute_session.main_kernel.id
@@ -1284,24 +1286,23 @@ class SessionService:
 
         arguments = action.arguments
         envs = action.envs
-        login_session_token = action.login_session_token
 
         info = await self._session_repository.get_session_with_routing_minimal(session_id)
         session_data = info.session
 
         if session_data.resource_group_name is None:
             raise ServiceUnavailable("Session has no scaling group assigned")
-        wsproxy_addr = await self._session_repository.get_resource_group_wsproxy_addr(
+        proxy_connection_info = await self._session_repository.resource_group_proxy_connection_info(
             session_data.resource_group_name
         )
-        if not wsproxy_addr:
+        if proxy_connection_info is None:
             raise ServiceUnavailable("No coordinator configured for this resource group")
-        client = self._appproxy_client_pool.load_client(wsproxy_addr, "")
+        client = self._appproxy_client_pool.load_client(proxy_connection_info.addr, "")
         wsproxy_status = await client.fetch_status()
         if wsproxy_status.advertise_address:
             wsproxy_advertise_addr = wsproxy_status.advertise_address
         else:
-            wsproxy_advertise_addr = wsproxy_addr
+            wsproxy_advertise_addr = proxy_connection_info.addr
 
         if info.kernel_host is None:
             kernel_host = urlparse(info.agent_addr).hostname
@@ -1357,7 +1358,9 @@ class SessionService:
             )
 
         body = {
-            "login_session_token": login_session_token,
+            # A coordinator of an older version requires the key, and the legacy
+            # backend.ai-proxy-coordinator saves it to a non-nullable column.
+            "login_session_token": "",
             "kernel_host": kernel_host,
             "kernel_port": host_port,
             "session": {
@@ -1369,11 +1372,16 @@ class SessionService:
             },
         }
 
+        conf_request_headers: dict[str, str] = {}
+        if proxy_connection_info.api_token:
+            conf_request_headers["X-BackendAI-Token"] = proxy_connection_info.api_token
+
         async with (
             aiohttp.ClientSession() as req,
             req.post(
-                f"{wsproxy_addr}/v2/conf",
+                f"{proxy_connection_info.addr}/v2/conf",
                 json=body,
+                headers=conf_request_headers,
             ) as resp,
         ):
             token_json = await resp.json()
@@ -1434,13 +1442,11 @@ class SessionService:
         session_id = action.session_id
         session_name = action.updater.name.optional_value()
 
-        session_row = await self._session_repository.update_session(action.updater, session_name)
-        if session_row is None:
-            raise ValueError(f"Session not found (id:{session_id})")
+        session_data = await self._session_repository.update_session(action.updater, session_name)
         session_owner_data = await self._session_repository.get_session_owner(str(session_id))
 
         return UpdateSessionActionResult(
-            session_data=session_row.to_dataclass(owner=session_owner_data)
+            session_data=replace(session_data, owner=session_owner_data)
         )
 
     async def bulk_get_session_designated_agent_ids(
@@ -1505,6 +1511,16 @@ class SessionService:
         domain_name = action.domain_name
         if action.owner_id is not None:
             owner = await self._user_repository.get_user_by_uuid(action.owner_id)
+            if action.owner_id != action.user_id:
+                try:
+                    check_if_requester_is_eligible_to_act_as_target_user(
+                        action.user_role,
+                        action.domain_name,
+                        owner.role,
+                        owner.domain_name,
+                    )
+                except RuntimeError as e:
+                    raise InsufficientPrivilege(str(e)) from e
             owner_access_key = await self._user_repository.default_access_key(
                 UserID(action.owner_id)
             )

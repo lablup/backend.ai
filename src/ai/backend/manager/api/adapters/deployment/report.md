@@ -2,221 +2,382 @@
 
 [background](/src/ai/backend/manager/api/adapters/deployment/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/deployment/adapter.py)
 
-Scenario: incomplete 33 / 47
+Scenario: incomplete 12 / 47
 
 - built from ops (22)
   - admin_search: representative success ✓ · representative rejection ✓
-  - admin_search_replicas: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - admin_search_replicas: representative success ✓ · representative rejection ✓
   - admin_search_revisions: representative success ✓ · representative rejection ✓
-  - batch_load_access_tokens_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - batch_load_auto_scaling_rules_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_access_tokens_by_ids: representative success ✓ · representative rejection ✓
+  - batch_load_auto_scaling_rules_by_ids: representative success ✓ · representative rejection ✓
   - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
   - batch_load_policies_by_endpoint_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - batch_load_policies_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - batch_load_replicas_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_policies_by_ids: representative success ✓ · representative rejection ✓
+  - batch_load_replicas_by_ids: representative success ✓ · representative rejection ✓
   - batch_load_revisions_by_ids: representative success ✓ · representative rejection ✗: SCENARIO-GAP
-  - batch_load_routes_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - get_access_token: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - get_replica: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_routes_by_ids: representative success ✓ · representative rejection ✓
+  - get_access_token: representative success ✓ · representative rejection ✓
+  - get_replica: representative success ✓ · representative rejection ✓
   - get_revision: representative success ✓ · representative rejection ✓
   - project_search: representative success ✓ · representative rejection ✓
   - scoped_search: representative success ✓ · representative rejection ✓
-  - search_access_tokens: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - search_policies: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - search_replicas: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - search_access_tokens: representative success ✓ · representative rejection ✓
+  - search_policies: representative success ✓ · representative rejection ✓
+  - search_replicas: representative success ✓ · representative rejection ✓
   - search_revisions: representative success ✓ · representative rejection ✓
-  - search_routes: representative success ✗ · representative rejection ✗: SCENARIO-GAP
-  - search_rules: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - search_routes: representative success ✓ · representative rejection ✓
+  - search_rules: representative success ✓ · representative rejection ✓
 - ops + direct implementation (1)
   - get_current_revision: success absent · rejection present 1 (get_ops, single_entity): SCENARIO-GAP
 - direct implementation (24)
   - activate_revision: success absent · rejection absent (single_entity): SCENARIO-GAP
   - add_revision: success present 4 · rejection present 7 (single_entity)
   - admin_refresh_deployment_revisions: success absent · rejection absent (global_scope): SCENARIO-GAP
-  - bulk_delete_access_tokens: success absent · rejection absent (partial_bulk_field): SCENARIO-GAP
+  - bulk_delete_access_tokens: success present 2 · rejection absent (partial_bulk_field): SCENARIO-GAP
   - bulk_delete_rules: success absent · rejection absent (partial_bulk): SCENARIO-GAP
   - create: success present 3 · rejection present 2 (scope)
-  - create_access_token: success absent · rejection absent (single_entity): SCENARIO-GAP
-  - create_rule: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - create_access_token: success absent · rejection present 1 (single_entity): SCENARIO-GAP
+  - create_rule: success present 1 · rejection present 1 (single_entity)
   - delete: success present 2 · rejection present 2 (single_entity)
   - get: success present 2 · rejection present 3 (single_entity)
-  - get_policy: success absent · rejection absent (single_entity): SCENARIO-GAP
-  - get_rule: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - get_policy: success present 1 · rejection present 1 (single_entity)
+  - get_rule: success present 1 · rejection present 1 (single_entity)
   - partial_bulk_purge_access_tokens: success present 2 · rejection absent (partial_bulk_field): SCENARIO-GAP
   - partial_bulk_purge_rules: success present 3 · rejection absent (partial_bulk_field): SCENARIO-GAP
   - partial_bulk_update_rules: success present 2 · rejection absent (partial_bulk_field): SCENARIO-GAP
-  - purge_access_token: success absent · rejection absent (single_field): SCENARIO-GAP
-  - purge_rule: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - purge_access_token: success present 1 · rejection present 1 (single_field)
+  - purge_rule: success present 1 · rejection present 1 (single_entity)
   - replace_options: success present 4 · rejection present 3 (single_entity)
   - search_revision_resource_slots: success present 1 · rejection present 1 (single_field)
   - sync_replicas: success present 1 · rejection present 1 (single_entity)
   - update: success present 5 · rejection present 2 (single_entity)
-  - update_route_traffic: success absent · rejection absent (single_field): SCENARIO-GAP
-  - update_rule: success absent · rejection absent (single_entity): SCENARIO-GAP
-  - upsert_policy: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - update_route_traffic: success present 1 · rejection present 1 (single_field)
+  - update_rule: success present 1 · rejection present 1 (single_entity)
+  - upsert_policy: success present 1 · rejection present 1 (single_entity)
 
 **admin_search**
 
 | scenario | verdict |
 |---|---|
-| [배포 셋이 있고 슈퍼관리자가 필터 없이 전체를 훑으면, 셋을 모두 센다](#searching-the-superadmin-counts-every-deployment) | answered |
-| [배포 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체를 훑으면, 역할로 거부된다. 이 문은 권한 그래프가 아니라 역할이 지킨다](#searching-a-user-granted-read-may-not-search-every-deployment) | rejected |
+| [when three deployments exist and a superadmin searches everything without a filter, all three are counted](#searching-the-superadmin-counts-every-deployment) | answered |
+| [when a user granted deployment read but not a superadmin searches everything, the role rejects it; the role checks this operation, not the permission graph](#searching-a-user-granted-read-may-not-search-every-deployment) | rejected |
+
+**admin_search_replicas**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin searches every replica with a filter, the replicas seeded in advance come back. The requesting user of this row is the superadmin because the search is gated by the global role](#searching_replicas_admin-the-superadmin-searches-the-replicas) | answered |
+| [when a user granted nothing tries to search every replica, the search is rejected because the user lacks the global role](#searching_replicas_admin-a-user-granted-nothing-searches-no-replica) | rejected |
 
 **admin_search_revisions**
 
 | scenario | verdict |
 |---|---|
-| [두 프로젝트의 배포에 리비전이 나뉘어 있고 슈퍼관리자가 필터 없이 전체를 훑으면, 둘의 것을 모두 센다. 이 문은 역할이 지킨다](#searching_revisions-the-superadmin-counts-every-revision) | answered |
-| [모든 배포에 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체 리비전을 훑으면, 역할로 거부된다](#searching_revisions-a-user-granted-read-may-not-search-every-revision) | rejected |
+| [when revisions are split across deployments in two projects and a superadmin searches everything without a filter, the revisions of both are counted; the role checks this operation](#searching_revisions-the-superadmin-counts-every-revision) | answered |
+| [when a user granted read on every deployment but not a superadmin searches every revision, the role rejects it](#searching_revisions-a-user-granted-read-may-not-search-every-revision) | rejected |
+
+**batch_load_access_tokens_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read batch loads the access tokens the deployment holds by id, those tokens come back](#batch_loading_access_tokens-a-user-granted-deployment-read-loads-the-tokens-by-id) | answered |
+| [when a user granted nothing tries to batch load the access tokens the deployment holds by id, every entry is rejected because the user lacks permission](#batch_loading_access_tokens-a-user-granted-nothing-gets-a-refusal-for-each-token) | rejected |
+
+**batch_load_auto_scaling_rules_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read batch loads the auto-scaling rules the deployment holds by id, those rules come back](#batch_loading_rules-a-user-granted-deployment-read-loads-the-rules-by-id) | answered |
+| [when a user granted nothing tries to batch load the auto-scaling rules the deployment holds by id, every entry is rejected because the user lacks permission](#batch_loading_rules-a-user-granted-nothing-gets-a-refusal-for-each-rule) | rejected |
+
+**batch_load_policies_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read batch loads the policy the deployment holds by id, that policy comes back](#batch_loading_policies-a-user-granted-deployment-read-loads-the-policy-by-id) | answered |
+| [when a user granted nothing tries to batch load the policy the deployment holds by id, every entry is rejected because the user lacks permission](#batch_loading_policies-a-user-granted-nothing-gets-a-refusal-for-the-policy) | rejected |
+
+**batch_load_replicas_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read batch loads the replicas the deployment holds by id, those replicas come back](#batch_loading_replicas-a-user-granted-deployment-read-loads-the-replicas-by-id) | answered |
+| [when a user granted nothing tries to batch load the replicas the deployment holds by id, every entry is rejected because the user lacks permission](#batch_loading_replicas-a-user-granted-nothing-gets-a-refusal-for-the-replicas) | rejected |
 
 **batch_load_revisions_by_ids**
 
 | scenario | verdict |
 |---|---|
-| [한 프로젝트에서만 배포 읽기 권한을 받은 사용자가 읽을 수 있는 리비전, 다른 프로젝트의 리비전, 아무것도 갖지 않은 id를 한 번에 집으면, 이름 댄 순서대로 리비전, 거부, 빈 자리가 온다](#reading_revisions-loading-revisions-by-id-answers-each-id-on-its-own) | answered |
+| [when a user granted deployment read in only one project loads a readable revision, a revision of another project, and an id nothing answers to at once, a revision, a rejection, and an empty entry come back in the order given](#reading_revisions-loading-revisions-by-id-answers-each-id-on-its-own) | answered |
+
+**batch_load_routes_by_ids**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read batch loads the routes the deployment holds by id, those routes come back](#batch_loading_routes-a-user-granted-deployment-read-loads-the-routes-by-id) | answered |
+| [when a user granted nothing tries to batch load the routes the deployment holds by id, every entry is rejected because the user lacks permission](#batch_loading_routes-a-user-granted-nothing-gets-a-refusal-for-the-routes) | rejected |
+
+**get_access_token**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read reads one of the access tokens the deployment holds, that token comes back](#reading_access_tokens-a-user-granted-deployment-read-reads-a-token) | answered |
+| [when a user granted nothing tries to read one of the access tokens the deployment holds, the lookup that finds the deployment holding the token is rejected](#reading_access_tokens-a-user-granted-nothing-reads-no-token) | rejected |
+
+**get_replica**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read reads a replica of the deployment, that replica comes back](#reading_replicas-a-user-granted-deployment-read-reads-the-replica) | answered |
+| [when a user granted nothing tries to read a replica of the deployment, the lookup that finds the deployment holding the replica is rejected](#reading_replicas-a-user-granted-nothing-reads-no-replica) | rejected |
 
 **get_revision**
 
 | scenario | verdict |
 |---|---|
-| [배포 읽기 권한을 받은 사용자가 그 배포의 리비전을 id로 조회하면, 그 리비전이 온다](#reading_revisions-a-user-granted-read-reads-a-revision-by-id) | answered |
-| [슈퍼관리자가 아무것도 갖지 않은 id로 리비전을 조회하면, 대상이 없다는 것으로 거부된다. 모든 검사를 지나가는 사람에게는 감출 것이 없다](#reading_revisions-a-revision-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
-| [배포 읽기 권한을 받은 사용자가 아무것도 갖지 않은 id로 리비전을 조회하면, 볼 수 없는 id와 같은 이유로 거부된다](#reading_revisions-a-revision-id-nothing-answers-to-is-refused-as-unresolvable) | rejected |
-| [아무 배포 권한도 받지 않은 사용자가 리비전을 id로 조회하면, 키를 풀 수 없다는 이유로 거부된다](#reading_revisions-a-user-granted-nothing-may-not-read-a-revision) | rejected |
+| [when a user granted deployment read reads a revision of that deployment by id, that revision comes back](#reading_revisions-a-user-granted-read-reads-a-revision-by-id) | answered |
+| [when a superadmin reads a revision by an id nothing answers to, the call is rejected as not found; nothing is hidden from someone who passes every check](#reading_revisions-a-revision-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
+| [when a user granted deployment read reads a revision by an id nothing answers to, the call is rejected for the same reason as an id the user cannot see](#reading_revisions-a-revision-id-nothing-answers-to-is-refused-as-unresolvable) | rejected |
+| [when a user with no deployment grant reads a revision by id, the call is rejected because the key cannot be decrypted](#reading_revisions-a-user-granted-nothing-may-not-read-a-revision) | rejected |
 
 **project_search**
 
 | scenario | verdict |
 |---|---|
-| [두 프로젝트에 배포가 나뉘어 있고 한쪽에만 읽기 권한을 받은 사용자가 그 프로젝트를 훑으면, 그 프로젝트의 것만 나온다](#searching-searching-a-project-finds-only-its-own-deployments) | answered |
-| [그 프로젝트에 읽기 권한이 없는 사용자가 프로젝트를 훑으면, 권한 부족으로 거부된다](#searching-a-user-granted-nothing-may-not-search-a-project) | rejected |
+| [when deployments are split across two projects and a user granted read on only one side searches that project, only that project's deployments come back](#searching-searching-a-project-finds-only-its-own-deployments) | answered |
+| [when a user without read permission on the project searches the project, the call is rejected for lack of permission](#searching-a-user-granted-nothing-may-not-search-a-project) | rejected |
 
 **scoped_search**
 
 | scenario | verdict |
 |---|---|
-| [같은 프로젝트에 두 사람이 각자 배포를 만들었고 자기 스코프에서 읽기 권한을 받은 사람이 자기 것을 훑으면, 자기가 만든 것만 나온다](#searching-searching-my-own-finds-only-what-i-made) | answered |
-| [자기 스코프에서 읽기 권한을 받지 않은 사람이 자기 것을 훑으면, 권한 부족으로 거부된다. 이 문도 범위를 좁히기만 하지 않고 권한이 지킨다](#searching-a-user-granted-nothing-may-not-search-even-their-own) | rejected |
+| [when two users each created a deployment in the same project and the one granted read in their own scope searches their own, only what they created comes back](#searching-searching-my-own-finds-only-what-i-made) | answered |
+| [when a user not granted read in their own scope searches their own, the call is rejected for lack of permission; here too the permission checks it rather than only narrowing the scope](#searching-a-user-granted-nothing-may-not-search-even-their-own) | rejected |
+
+**search_access_tokens**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read searches the access tokens the deployment holds with a filter, those tokens come back](#searching_access_tokens-a-user-granted-deployment-read-searches-the-tokens) | answered |
+| [when a user granted nothing tries to search the access tokens the deployment holds, the search is rejected because the user lacks permission](#searching_access_tokens-a-user-granted-nothing-searches-no-token) | rejected |
+
+**search_policies**
+
+| scenario | verdict |
+|---|---|
+| [when the superadmin searches the deployment policies with a filter, the policy seeded in advance comes back. The requesting user of this row is the superadmin because the search is gated by the global role](#searching_policies-the-superadmin-searches-the-policies) | answered |
+| [when a user granted nothing tries to search the deployment policies, the search is rejected because the user lacks the global role](#searching_policies-a-user-granted-nothing-searches-no-policy) | rejected |
+
+**search_replicas**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read searches the replica of a route with traffic enabled, the replicas seeded in advance come back](#searching_replicas-a-user-granted-deployment-read-searches-the-replica-with-traffic-enabled) | answered |
+| [when a user granted deployment read searches the replicas of the deployment with a filter, the replicas seeded in advance come back](#searching_replicas-a-user-granted-deployment-read-searches-the-replicas) | answered |
+| [when a user granted nothing tries to search the replicas of the deployment, the search is rejected because the user lacks permission](#searching_replicas-a-user-granted-nothing-searches-no-replica) | rejected |
 
 **search_revisions**
 
 | scenario | verdict |
 |---|---|
-| [리비전 셋이 딸린 배포에 읽기 권한을 받은 사용자가 그 배포의 리비전을 훑으면, 셋을 모두 센다](#searching_revisions-a-user-granted-read-counts-every-revision-of-a-deployment) | answered |
-| [두 프로젝트의 배포에 리비전이 나뉘어 있고 한쪽에만 읽기 권한을 받은 사용자가 그쪽 배포의 리비전을 훑으면, 그쪽 것만 나온다](#searching_revisions-another-deployments-revisions-stay-out-of-a-deployment-search) | answered |
-| [리비전 셋이 딸린 배포의 리비전을 번호로 걸러 훑으면, 그 번호의 것만 남는다](#searching_revisions-filtering-revisions-by-number-leaves-only-that-one) | answered |
-| [아무 배포 권한도 받지 않은 사용자가 배포의 리비전을 훑으면, 권한 부족으로 거부된다](#searching_revisions-a-user-granted-nothing-may-not-search-a-deployments-revisions) | rejected |
+| [when a user granted read on a deployment holding three revisions searches that deployment's revisions, all three are counted](#searching_revisions-a-user-granted-read-counts-every-revision-of-a-deployment) | answered |
+| [when revisions are split across deployments in two projects and a user granted read on only one side searches that side's deployment revisions, only that side comes back](#searching_revisions-another-deployments-revisions-stay-out-of-a-deployment-search) | answered |
+| [searching the revisions of a deployment holding three revisions filtered by number leaves only the one with that number](#searching_revisions-filtering-revisions-by-number-leaves-only-that-one) | answered |
+| [when a user with no deployment grant searches a deployment's revisions, the call is rejected for lack of permission](#searching_revisions-a-user-granted-nothing-may-not-search-a-deployments-revisions) | rejected |
+
+**search_routes**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read searches the routes of the deployment with a filter, the routes seeded in advance come back](#searching_routes-a-user-granted-deployment-read-searches-the-routes) | answered |
+| [when a user granted nothing tries to search the routes of the deployment, the search is rejected because the user lacks permission](#searching_routes-a-user-granted-nothing-searches-no-route) | rejected |
+
+**search_rules**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read searches the auto-scaling rules the deployment holds with a filter, those rules come back](#searching_rules-a-user-granted-deployment-read-searches-the-rules) | answered |
+| [when a user granted nothing tries to search the auto-scaling rules the deployment holds, the search is rejected because the user lacks permission](#searching_rules-a-user-granted-nothing-searches-no-rule) | rejected |
 
 **get_current_revision**
 
 | scenario | verdict |
 |---|---|
-| [리비전이 딸리지 않은 배포의 현재 리비전을 조회하면, 현재 리비전이 없다는 이유로 거부된다](#reading-a-deployment-holding-no-revision-answers-nothing-as-its-current-one) | rejected |
+| [reading the current revision of a deployment holding no revision is rejected because there is no current revision](#reading-a-deployment-holding-no-revision-answers-nothing-as-its-current-one) | rejected |
 
 **add_revision**
 
 | scenario | verdict |
 |---|---|
-| [프리셋도 필수 슬롯도 없이 자원과 클러스터를 빼고 리비전을 더하면, 노드 하나에 크기 1이고 자원 슬롯이 빈 리비전이 온다](#adding_revisions-a-revision-added-without-resources-runs-on-one-node-with-no-slot) | answered |
-| [리비전 없는 배포에 생성 권한을 받은 사용자가 모든 설정을 주고 리비전을 더하면, 번호 1을 단 리비전이 준 설정 그대로 온다](#adding_revisions-a-user-granted-create-adds-the-first-revision) | answered |
-| [리비전 하나가 딸린 배포에 리비전을 더하면, 번호 2를 단 리비전이 온다](#adding_revisions-the-next-revision-is-numbered-one-past-the-last) | answered |
-| [배포에도 자기 모델 폴더에도 권한을 받지 않은 슈퍼관리자가 남의 배포에 리비전을 더하면, 리비전이 더해진다. 역할이 배포 권한과 폴더 권한을 함께 지나간다](#adding_revisions-the-superadmin-adds-a-revision-to-anothers-deployment-without-a-grant) | answered |
-| [배포 생성 권한은 받았지만 모델 폴더를 읽을 권한이 없는 사용자가 그 폴더로 리비전을 더하면, 폴더를 찾을 수 없다는 이유로 거부된다](#adding_revisions-a-model-folder-the-caller-may-not-read-is-not-found) | rejected |
-| [남의 모델 폴더를 읽기 전용으로 빌린 사용자가 읽고 쓰기로 마운트하는 리비전을 더하면, 폴더 권한을 넘는다는 이유로 거부된다](#adding_revisions-a-mount-beyond-what-the-caller-holds-on-the-folder-is-refused) | rejected |
-| [모든 리비전이 채워야 하는 슬롯이 정해져 있고 그 슬롯을 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다](#adding_revisions-a-revision-missing-a-required-slot-is-refused) | rejected |
-| [프리셋 없이 이미지를 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다](#adding_revisions-a-revision-with-no-image-from-any-layer-is-refused) | rejected |
-| [폴더 파일을 읽지 않는 런타임 변형으로 프리셋 없이 모델 정의를 빼고 리비전을 더하면, 이름 없는 모델이 모델 정의 검증에서 거부된다](#adding_revisions-a-revision-with-no-model-definition-from-any-layer-is-refused) | rejected |
-| [프리셋 없이 런타임 변형을 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다](#adding_revisions-a-revision-with-no-runtime-variant-from-any-layer-is-refused) | rejected |
-| [배포 읽기 권한만 받은 사용자가 리비전을 더하면, 권한 부족으로 거부된다](#adding_revisions-a-user-granted-only-read-may-not-add-a-revision) | rejected |
+| [adding a revision without resources and cluster when there is neither a preset nor a required slot brings back a revision on one node with size 1 and no resource slot](#adding_revisions-a-revision-added-without-resources-runs-on-one-node-with-no-slot) | answered |
+| [when a user granted create adds a revision with every setting to a deployment that has no revision, the revision numbered 1 comes back with exactly the settings that were given](#adding_revisions-a-user-granted-create-adds-the-first-revision) | answered |
+| [adding a revision to a deployment that holds one revision brings back the revision numbered 2](#adding_revisions-the-next-revision-is-numbered-one-past-the-last) | answered |
+| [when a superadmin holding no grant on the deployment or on their own model vfolder adds a revision to another user's deployment, the revision is added; the role passes through both the deployment permission and the vfolder permission](#adding_revisions-the-superadmin-adds-a-revision-to-anothers-deployment-without-a-grant) | answered |
+| [when a user granted create on the deployment but not read on the model vfolder adds a revision with that vfolder, the call is rejected because the vfolder is not found](#adding_revisions-a-model-folder-the-caller-may-not-read-is-not-found) | rejected |
+| [when a user who borrowed another user's model vfolder as read-only adds a revision that mounts it read-write, the call is rejected because it exceeds the vfolder permission](#adding_revisions-a-mount-beyond-what-the-caller-holds-on-the-folder-is-refused) | rejected |
+| [when a slot every revision must fill is set and a revision is added without it, the call is rejected because the input is wrong](#adding_revisions-a-revision-missing-a-required-slot-is-refused) | rejected |
+| [adding a revision without an image and without a preset is rejected because the input is wrong](#adding_revisions-a-revision-with-no-image-from-any-layer-is-refused) | rejected |
+| [adding a revision with a runtime variant that does not read vfolder files, without a model definition and without a preset, is rejected in model definition validation because a model has no name](#adding_revisions-a-revision-with-no-model-definition-from-any-layer-is-refused) | rejected |
+| [adding a revision without a runtime variant and without a preset is rejected because the input is wrong](#adding_revisions-a-revision-with-no-runtime-variant-from-any-layer-is-refused) | rejected |
+| [when a user granted only read on the deployment adds a revision, the call is rejected for lack of permission](#adding_revisions-a-user-granted-only-read-may-not-add-a-revision) | rejected |
+
+**bulk_delete_access_tokens**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment purge purges several access tokens the deployment holds at once, the ids of those tokens come back](#retiring_access_tokens-a-user-granted-deployment-purge-purges-tokens-at-once) | answered |
+| [when a user granted nothing tries to purge several access tokens the deployment holds at once, nothing is purged and the id list comes back empty](#retiring_access_tokens-a-user-granted-nothing-purges-no-token-at-once) | answered |
 
 **create**
 
 | scenario | verdict |
 |---|---|
-| [이름을 대지 않고 배포를 만들면, 만든 사람에게서 이름이 지어진다](#creating-a-deployment-made-without-a-name-is-named-after-its-maker) | answered |
-| [프로젝트에서 배포 생성 권한을 받은 사용자가 배포를 만들면, 그 프로젝트에 속하고 부른 사람이 소유하는 배포가 리비전 없이 만들어진다](#creating-a-user-granted-create-in-a-project-makes-a-deployment-there) | answered |
-| [엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 배포를 만든다. 이 문은 역할이 아니라 권한 그래프가 지키기 때문이다](#creating-turning-enforcement-off-lets-a-user-create-a-deployment) | answered |
-| [생성 권한을 받은 프로젝트가 아닌 다른 프로젝트에 배포를 만들면, 권한 부족으로 거부된다](#creating-a-create-grant-in-another-project-does-not-reach-this-one) | rejected |
-| [아무 배포 권한도 받지 않은 사용자가 배포를 만들면, 권한 부족으로 거부된다](#creating-a-user-granted-nothing-may-not-create-a-deployment) | rejected |
+| [creating a deployment without a name names it after the user who created it](#creating-a-deployment-made-without-a-name-is-named-after-its-maker) | answered |
+| [when a user granted create in a project creates a deployment, a deployment that belongs to the project and is owned by the requesting user is created with no revision](#creating-a-user-granted-create-in-a-project-makes-a-deployment-there) | answered |
+| [turning entity permission enforcement off lets a user with no grant create a deployment, because the permission graph checks this operation, not the role](#creating-turning-enforcement-off-lets-a-user-create-a-deployment) | answered |
+| [creating a deployment in a project other than the one where the create grant was given is rejected for lack of permission](#creating-a-create-grant-in-another-project-does-not-reach-this-one) | rejected |
+| [when a user granted no deployment permission creates a deployment, the call is rejected for lack of permission](#creating-a-user-granted-nothing-may-not-create-a-deployment) | rejected |
+
+**create_access_token**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment create tries to make an access token of the deployment, the create is rejected because the deployment's scaling group has no proxy target configured](#creating_access_tokens-a-user-granted-deployment-create-makes-no-token) | rejected |
+
+**create_rule**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment create makes an auto-scaling rule of the deployment, the rule made comes back](#creating_rules-a-user-granted-deployment-create-makes-a-rule) | answered |
+| [when a user granted nothing tries to make an auto-scaling rule of the deployment, the create is rejected because the user lacks permission](#creating_rules-a-user-granted-nothing-makes-no-rule) | rejected |
 
 **delete**
 
 | scenario | verdict |
 |---|---|
-| [soft-delete 권한을 받은 사용자가 배포를 지우면, 그 배포를 지우기 시작했다고 답한다](#retiring-a-user-granted-soft-delete-retires-a-deployment) | answered |
-| [다른 사람이 만든 배포를 아무 권한도 받지 않은 슈퍼관리자가 지우면, 그 배포를 지우기 시작했다고 답한다. 역할이 권한 그래프를 지나간다](#retiring-the-superadmin-retires-anothers-deployment-without-a-grant) | answered |
-| [수정 권한만 받고 soft-delete 권한은 받지 않은 사용자가 배포를 지우면, 권한 부족으로 거부된다. 지우기는 수정과 다른 문이다](#retiring-a-user-granted-only-update-may-not-retire-a-deployment) | rejected |
-| [슈퍼관리자가 아무것도 갖지 않은 id를 지우면, 대상이 없다는 것으로 거부된다](#retiring-retiring-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
+| [when a user granted soft-delete deletes a deployment, the response says the deployment's deletion has started](#retiring-a-user-granted-soft-delete-retires-a-deployment) | answered |
+| [when a superadmin holding no grant deletes another user's deployment, the response says the deployment's deletion has started; the role passes through the permission graph](#retiring-the-superadmin-retires-anothers-deployment-without-a-grant) | answered |
+| [when a user granted only update and not soft-delete deletes a deployment, the call is rejected for lack of permission; deletion is a different operation from update](#retiring-a-user-granted-only-update-may-not-retire-a-deployment) | rejected |
+| [when a superadmin deletes an id nothing answers to, the call is rejected as not found](#retiring-retiring-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
 
 **get**
 
 | scenario | verdict |
 |---|---|
-| [배포 하나가 있고 읽기 권한을 받은 사용자가 id로 조회하면, 그 배포가 답으로 온다](#reading-a-user-granted-read-reads-a-deployment-by-id) | answered |
-| [다른 사람이 만든 배포를 아무 권한도 받지 않은 슈퍼관리자가 id로 조회하면, 그 배포가 답으로 온다. 역할이 권한 그래프를 지나간다](#reading-the-superadmin-reads-anothers-deployment-without-a-grant) | answered |
-| [같은 배포가 있고 아무 권한도 받지 않은 사용자가 조회하면, 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-a-deployment) | rejected |
-| [슈퍼관리자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것으로 거부된다. 권한 검사를 지나가는 사람만 이 답을 본다](#reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
-| [읽기 권한을 받은 사용자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것이 아니라 권한 부족으로 거부된다. 없는 행에는 걸린 권한도 없기 때문이다](#reading-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | rejected |
+| [when a deployment exists and a user granted read reads it by id, that deployment comes back in the response](#reading-a-user-granted-read-reads-a-deployment-by-id) | answered |
+| [when a superadmin holding no grant reads another user's deployment by id, that deployment comes back in the response; the role passes through the permission graph](#reading-the-superadmin-reads-anothers-deployment-without-a-grant) | answered |
+| [when the same deployment exists and a user with no grant reads it, the call is rejected for lack of permission](#reading-a-user-granted-nothing-may-not-read-a-deployment) | rejected |
+| [when a superadmin reads by an id nothing answers to, the call is rejected as not found; only someone who passes the permission check sees this response](#reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
+| [when a user granted read reads by an id nothing answers to, the call is rejected for lack of permission rather than as not found, because no permission is held on a row that does not exist](#reading-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | rejected |
+
+**get_policy**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read reads the policy the deployment holds, that policy comes back](#reading_policy-a-user-granted-deployment-read-reads-the-policy) | answered |
+| [when a user granted nothing tries to read the policy the deployment holds, the read is rejected because the user lacks permission](#reading_policy-a-user-granted-nothing-reads-no-policy) | rejected |
+
+**get_rule**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read reads one of the rules seeded in advance by id, that rule comes back](#reading_rules-a-user-granted-deployment-read-reads-a-rule) | answered |
+| [when a user granted nothing tries to read one of the rules seeded in advance by id, the lookup that finds the deployment holding the rule is rejected](#reading_rules-a-user-granted-nothing-reads-no-rule) | rejected |
 
 **partial_bulk_purge_access_tokens**
 
 | scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 토큰 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_access_tokens-a-user-granted-nothing-purges-none-of-several-tokens) | answered |
-| [배포 영구 삭제 권한을 받은 사용자가 토큰 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_access_tokens-purging-several-tokens-answers-for-the-missing-one) | answered |
+| [when a user with no grant tries to purge several deployment tokens at once, nothing is purged and every token comes back in the failed list because the user lacks permission](#partial_bulk_access_tokens-a-user-granted-nothing-purges-none-of-several-tokens) | answered |
+| [when a user granted deployment purge purges two deployment tokens and one unknown id at once, the two come back in the processed list and the unknown id comes back in the failed list because no target answers to it](#partial_bulk_access_tokens-purging-several-tokens-answers-for-the-missing-one) | answered |
 
 **partial_bulk_purge_rules**
 
 | scenario | verdict |
 |---|---|
-| [배포 수정 권한만 받은 사용자가 규칙 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_auto_scaling_rules-a-deployment-editor-purges-none-of-several-rules) | answered |
-| [아무 권한도 받지 않은 사용자가 규칙 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_auto_scaling_rules-a-user-granted-nothing-purges-none-of-several-rules) | answered |
-| [배포 영구 삭제 권한을 받은 사용자가 규칙 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_auto_scaling_rules-purging-several-rules-answers-for-the-missing-one) | answered |
+| [when a user granted only deployment update tries to purge several auto-scaling rules at once, nothing is purged and every rule comes back in the failed list because the user lacks permission](#partial_bulk_auto_scaling_rules-a-deployment-editor-purges-none-of-several-rules) | answered |
+| [when a user with no grant tries to purge several auto-scaling rules at once, nothing is purged and every rule comes back in the failed list because the user lacks permission](#partial_bulk_auto_scaling_rules-a-user-granted-nothing-purges-none-of-several-rules) | answered |
+| [when a user granted deployment purge purges two auto-scaling rules and one unknown id at once, the two come back as they were before the purge and the unknown id comes back in the failed list because no target answers to it](#partial_bulk_auto_scaling_rules-purging-several-rules-answers-for-the-missing-one) | answered |
 
 **partial_bulk_update_rules**
 
 | scenario | verdict |
 |---|---|
-| [배포 수정 권한을 받은 사용자가 규칙 여럿의 지표 이름을 한 번에 바꾸면, 모두 새 이름으로 오고 실패한 것은 없다](#partial_bulk_auto_scaling_rules-a-deployment-editor-edits-several-rules-at-once) | answered |
-| [아무 권한도 받지 않은 사용자가 규칙 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_auto_scaling_rules-a-user-granted-nothing-edits-none-of-several-rules) | answered |
+| [when a user granted deployment update changes the metric name of several auto-scaling rules at once, every rule comes back with the new name and nothing failed](#partial_bulk_auto_scaling_rules-a-deployment-editor-edits-several-rules-at-once) | answered |
+| [when a user with no grant tries to update several auto-scaling rules at once, nothing is updated and every rule comes back in the failed list because the user lacks permission](#partial_bulk_auto_scaling_rules-a-user-granted-nothing-edits-none-of-several-rules) | answered |
+
+**purge_access_token**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read and purge purges one of the access tokens the deployment holds, the id of that token comes back. The purge reads the deployment first, so read is also required](#retiring_access_tokens-a-user-granted-deployment-purge-purges-a-token) | answered |
+| [when a user granted nothing tries to purge one of the access tokens the deployment holds, the lookup that finds the deployment holding the token is rejected](#retiring_access_tokens-a-user-granted-nothing-purges-no-token) | rejected |
+
+**purge_rule**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read and purge purges one of the auto-scaling rules the deployment holds, the id of that rule comes back. The purge reads the deployment first, so read is also required](#retiring_rules-a-user-granted-deployment-purge-purges-a-rule) | answered |
+| [when a user granted nothing tries to purge one of the auto-scaling rules the deployment holds, the lookup that finds the deployment holding the rule is rejected](#retiring_rules-a-user-granted-nothing-purges-no-rule) | rejected |
 
 **replace_options**
 
 | scenario | verdict |
 |---|---|
-| [수정 권한을 받은 사용자가 기본값과 처리기별 설정을 담아 옵션을 갈아끼우면, 준 것이 통째로 새 옵션이 되고 답은 그 옵션만 싣는다](#options-a-user-granted-update-replaces-the-options-whole) | answered |
-| [선택 정책을 STRICT로 담아 옵션을 갈아끼우면, 새 옵션의 선택 정책이 STRICT다](#options-replacing-with-a-strict-policy-keeps-it-strict) | answered |
-| [물려받은 처리기별 설정이 있는 배포에 기본값만 담아 옵션을 갈아끼우면, 물려받은 설정이 하나도 남지 않는다](#options-replacing-with-no-handler-entry-drops-the-inherited-ones) | answered |
-| [선택 정책이 STRICT인 배포에 선택 정책을 빼고 옵션을 갈아끼우면, 선택 정책은 STRICT로 남는다](#options-replacing-without-a-policy-keeps-the-stored-one) | answered |
-| [읽기 권한만 받은 사용자가 옵션을 갈아끼우면, 권한 부족으로 거부된다](#options-a-user-granted-only-read-may-not-replace-the-options) | rejected |
-| [같은 처리기 이름을 두 번 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다](#options-naming-a-handler-twice-is-refused) | rejected |
-| [등록되지 않은 처리기 이름을 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다](#options-naming-an-unregistered-handler-is-refused) | rejected |
+| [when a user granted update replaces the options with the defaults and per-handler settings, what was given becomes the new options as a whole and the response carries only those options](#options-a-user-granted-update-replaces-the-options-whole) | answered |
+| [replacing the options with the selection policy STRICT keeps that policy on the new options](#options-replacing-with-a-strict-policy-keeps-it-strict) | answered |
+| [replacing the options of a deployment that holds inherited per-handler settings with only the defaults leaves none of the inherited settings](#options-replacing-with-no-handler-entry-drops-the-inherited-ones) | answered |
+| [replacing the options of a deployment whose selection policy is STRICT without a policy keeps it STRICT](#options-replacing-without-a-policy-keeps-the-stored-one) | answered |
+| [when a user granted only read replaces the options, the call is rejected for lack of permission](#options-a-user-granted-only-read-may-not-replace-the-options) | rejected |
+| [replacing the options with the same handler name twice is rejected because the input is wrong](#options-naming-a-handler-twice-is-refused) | rejected |
+| [replacing the options with an unregistered handler name is rejected because the input is wrong](#options-naming-an-unregistered-handler-is-refused) | rejected |
 
 **search_revision_resource_slots**
 
 | scenario | verdict |
 |---|---|
-| [슬롯 둘을 잡은 리비전이 딸린 배포에 읽기 권한을 받은 사용자가 그 리비전의 슬롯을 훑으면, 둘을 모두 센다](#searching_revisions-a-user-granted-read-counts-every-slot-a-revision-allocates) | answered |
-| [아무 배포 권한도 받지 않은 사용자가 배포의 리비전의 슬롯을 훑으면, 리비전을 찾을 수 없다는 답으로 거부된다](#searching_revisions-a-user-granted-nothing-may-not-search-a-revisions-slots) | rejected |
+| [when a user granted read on a deployment holding a revision that allocates two slots searches that revision's slots, both are counted](#searching_revisions-a-user-granted-read-counts-every-slot-a-revision-allocates) | answered |
+| [when a user with no deployment grant searches a deployment revision's slots, the call is rejected with a response that the revision is not found](#searching_revisions-a-user-granted-nothing-may-not-search-a-revisions-slots) | rejected |
 
 **sync_replicas**
 
 | scenario | verdict |
 |---|---|
-| [수정 권한을 받은 사용자가 복제 맞추기를 요청하면, 맞추기를 시작했다고 답한다](#syncing-a-user-granted-update-starts-syncing-the-replicas) | answered |
-| [읽기 권한만 받은 사용자가 복제 맞추기를 요청하면, 권한 부족으로 거부된다](#syncing-a-user-granted-only-read-may-not-sync-the-replicas) | rejected |
+| [when a user granted update asks to sync the replicas, the response says syncing has started](#syncing-a-user-granted-update-starts-syncing-the-replicas) | answered |
+| [when a user granted only read asks to sync the replicas, the call is rejected for lack of permission](#syncing-a-user-granted-only-read-may-not-sync-the-replicas) | rejected |
 
 **update**
 
 | scenario | verdict |
 |---|---|
-| [공개가 아닌 배포를 수정 권한을 받은 사용자가 공개로 바꾸면, 공개로 바뀐 상태가 온다](#editing-a-user-granted-update-opens-a-deployment-to-the-public) | answered |
-| [수정 권한을 받은 사용자가 복제 수를 올리면, 두려는 복제 수가 새 값이 된다](#editing-a-user-granted-update-raises-the-replica-count) | answered |
-| [수정 권한을 받은 사용자가 이름을 바꾸면, 이름만 새 값이 되고 나머지는 그대로다](#editing-a-user-granted-update-renames-a-deployment) | answered |
-| [태그가 붙은 배포의 태그를 비우면, 태그가 하나도 남지 않는다](#editing-clearing-the-tags-of-a-deployment-leaves-none) | answered |
-| [다른 사람이 만든 배포의 이름을 아무 권한도 받지 않은 슈퍼관리자가 바꾸면, 이름만 새 값이 된다. 역할이 권한 그래프를 지나간다](#editing-the-superadmin-renames-anothers-deployment-without-a-grant) | answered |
-| [읽기 권한만 받은 사용자가 배포를 수정하면, 권한 부족으로 거부된다](#editing-a-user-granted-only-read-may-not-update-a-deployment) | rejected |
-| [슈퍼관리자가 아무것도 갖지 않은 id를 수정하면, 대상이 없다는 것으로 거부된다](#editing-updating-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
+| [when a user granted update changes a deployment that is not public to public, the state comes back changed to public](#editing-a-user-granted-update-opens-a-deployment-to-the-public) | answered |
+| [when a user granted update raises the replica count, the intended replica count becomes the new value](#editing-a-user-granted-update-raises-the-replica-count) | answered |
+| [when a user granted update changes the name, only the name becomes the new value and everything else stays the same](#editing-a-user-granted-update-renames-a-deployment) | answered |
+| [clearing the tags of a deployment that holds tags leaves no tag](#editing-clearing-the-tags-of-a-deployment-leaves-none) | answered |
+| [when a superadmin holding no grant changes the name of a deployment another user created, only the name becomes the new value; the role passes through the permission graph](#editing-the-superadmin-renames-anothers-deployment-without-a-grant) | answered |
+| [when a user granted only read updates a deployment, the call is rejected for lack of permission](#editing-a-user-granted-only-read-may-not-update-a-deployment) | rejected |
+| [when a superadmin updates an id nothing answers to, the call is rejected as not found](#editing-updating-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
+
+**update_route_traffic**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read and update turns the traffic of a route on, the route with its traffic turned on comes back. The traffic change reads the deployment first, so read is also required](#editing_route_traffic-a-user-granted-deployment-update-opens-the-traffic) | answered |
+| [when a user granted nothing tries to turn the traffic of a route, the lookup that finds the deployment holding the route is rejected](#editing_route_traffic-a-user-granted-nothing-changes-no-traffic) | rejected |
+
+**update_rule**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment read and update edits one of the rules seeded in advance, the rule edited comes back. The edit reads the deployment first, so read is also required](#updating_rules-a-user-granted-deployment-update-edits-a-rule) | answered |
+| [when a user granted nothing tries to edit one of the rules seeded in advance, the lookup that finds the deployment holding the rule is rejected](#updating_rules-a-user-granted-nothing-edits-no-rule) | rejected |
+
+**upsert_policy**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted deployment update puts a policy on the deployment, the policy put comes back. The upsert replaces an existing policy, so the call is gated by update](#upserting_policy-a-user-granted-deployment-update-puts-the-policy) | answered |
+| [when a user granted nothing tries to put a policy on the deployment, the upsert is rejected because the user lacks permission](#upserting_policy-a-user-granted-nothing-puts-no-policy) | rejected |
 
 ### admin_search
 
@@ -224,31 +385,31 @@ Scenario: incomplete 33 / 47
 
 #### [the-superadmin-counts-every-deployment](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
 
-배포 셋이 있고 슈퍼관리자가 필터 없이 전체를 훑으면, 셋을 모두 센다
+when three deployments exist and a superadmin searches everything without a filter, all three are counted
 
 Given
 
-- 같은 프로젝트의 배포 3개와, 그 프로젝트의 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 wanted-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 other-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 other-2: 복제를 1개 두려 한다, 아직 리비전이 없다
+- 3 deployments in the same project and one user of that project
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+  - Deployment wanted-1: replica count 1, has no revision yet
+  - Deployment other-1: replica count 1, has no revision yet
+  - Deployment other-2: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.admin_search: user-1이 필터 없이 전체 조회
+- DeploymentAdapter.admin_search: user-1 searches everything without a filter
 
 Then
 
-- 심은 배포가 모두, 그리고 그것만 세어진다
+- every deployment seeded in advance is counted, and nothing else
   - items = ['other-1', 'other-2', 'wanted-1']
   - total_count = 3
   - has_next_page = False
@@ -258,35 +419,141 @@ Then
 
 #### [a-user-granted-read-may-not-search-every-deployment](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
 
-배포 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체를 훑으면, 역할로 거부된다. 이 문은 권한 그래프가 아니라 역할이 지킨다
+when a user granted deployment read but not a superadmin searches everything, the role rejects it; the role checks this operation, not the permission graph
 
 Given
 
-- 같은 프로젝트의 배포 3개와, 그 프로젝트의 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 wanted-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 other-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 other-2: 복제를 1개 두려 한다, 아직 리비전이 없다
+- 3 deployments in the same project and one user of that project
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment wanted-1: replica count 1, has no revision yet
+  - Deployment other-1: replica count 1, has no revision yet
+  - Deployment other-2: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.admin_search: user-1이 필터 없이 전체 조회
+- DeploymentAdapter.admin_search: user-1 searches everything without a filter
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+### admin_search_replicas
+
+<a id="searching_replicas_admin-the-superadmin-searches-the-replicas"></a>
+
+#### [the-superadmin-searches-the-replicas](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas_admin.py): pass
+
+when the superadmin searches every replica with a filter, the replicas seeded in advance come back. The requesting user of this row is the superadmin because the search is gated by the global role
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and the superadmin, one more replica route with traffic enabled
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - superadmin user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.admin_search_replicas: user-1 searches every replica with one filter, one order and pagination
+
+Then
+
+- the replica the filter excludes does not come back, and the replicas seeded in advance come back with their count
+  - total_count = 1
+  - items count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: same as the id of the route seeded in advance
+  - items[0].field_id: same as the id of the route seeded in advance
+  - items[0].deployment_id: same as the id of the deployment the replica serves
+  - items[0].revision_id: same as the id of the revision seeded in advance
+  - items[0].session_id = None
+  - items[0].readiness_status = 'NOT_CHECKED'
+  - items[0].liveness_status = 'NOT_CHECKED'
+  - items[0].activeness_status = 'INACTIVE'
+  - items[0].status = 'provisioning'
+  - items[0].traffic_status = 'inactive'
+  - items[0].health_status = 'not_checked'
+  - items[0].created_at: the time this run wrote
+
+<a id="searching_replicas_admin-a-user-granted-nothing-searches-no-replica"></a>
+
+#### [a-user-granted-nothing-searches-no-replica](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas_admin.py): pass
+
+when a user granted nothing tries to search every replica, the search is rejected because the user lacks the global role
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.admin_search_replicas: user-1 searches every replica with one filter, one order and pagination
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### admin_search_revisions
 
@@ -294,46 +561,46 @@ Then
 
 #### [the-superadmin-counts-every-revision](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py): pass
 
-두 프로젝트의 배포에 리비전이 나뉘어 있고 슈퍼관리자가 필터 없이 전체를 훑으면, 둘의 것을 모두 센다. 이 문은 역할이 지킨다
+when revisions are split across deployments in two projects and a superadmin searches everything without a filter, the revisions of both are counted; the role checks this operation
 
 Given
 
-- 두 프로젝트의 배포에 리비전 2개와 1개가 나뉘어 있고, 아무 배포 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 프로젝트 other-1
-  - 배포 wanted-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 elsewhere-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 슈퍼관리자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
-  - 배포 wanted-1: 리비전 하나를 갖는다
-  - 배포 wanted-1: 리비전 하나를 갖는다
-  - 배포 elsewhere-1: 리비전 하나를 갖는다
+- revisions are split between deployments in two projects, 2 and 1, and one user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+  - Project other-1
+  - Deployment wanted-1: replica count 1, has no revision yet
+  - Deployment elsewhere-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - superadmin user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment wanted-1: has one revision
+  - Deployment wanted-1: has one revision
+  - Deployment elsewhere-1: has one revision
 
 When
 
-- DeploymentAdapter.admin_search_revisions: user-1이 필터 없이 모든 리비전을 조회
+- DeploymentAdapter.admin_search_revisions: user-1 searches every revision without a filter
 
 Then
 
-- 심은 리비전이 모두, 그리고 그것만 세어진다
-  - items.id: 센 리비전들와 같다
+- every revision seeded in advance is counted, and nothing else
+  - items.id: same as the revisions counted
   - items.revision_number = [1, 1, 2]
   - total_count = 3
   - has_next_page = False
@@ -343,45 +610,397 @@ Then
 
 #### [a-user-granted-read-may-not-search-every-revision](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py): pass
 
-모든 배포에 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체 리비전을 훑으면, 역할로 거부된다
+when a user granted read on every deployment but not a superadmin searches every revision, the role rejects it
 
 Given
 
-- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 배포에 READ 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
-  - 배포 deployment-1: 리비전 하나를 갖는다
+- one deployment holding 1 revisions and a user granted READ on deployments who can read their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
 
 When
 
-- DeploymentAdapter.admin_search_revisions: user-1이 필터 없이 모든 리비전을 조회
+- DeploymentAdapter.admin_search_revisions: user-1 searches every revision without a filter
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+### batch_load_access_tokens_by_ids
+
+<a id="batch_loading_access_tokens-a-user-granted-deployment-read-loads-the-tokens-by-id"></a>
+
+#### [a-user-granted-deployment-read-loads-the-tokens-by-id](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_access_tokens.py): pass
+
+when a user granted deployment read batch loads the access tokens the deployment holds by id, those tokens come back
+
+Given
+
+- one deployment holding 2 access tokens, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.batch_load_access_tokens_by_ids: user-1 batch loads 2 tokens by id
+
+Then
+
+- the tokens come back in the order they were put in the request
+  - loaded count = 2
+  - [0].id: same as the id of the token seeded in advance
+  - [0].field_id: same as the id of the token seeded in advance
+  - [0].token = 'scenario-token'
+  - [0].expires_at = None
+  - [0].created_at: the time this run wrote
+  - [1].id: same as the id of the token seeded in advance
+  - [1].field_id: same as the id of the token seeded in advance
+  - [1].token = 'scenario-token'
+  - [1].expires_at = None
+  - [1].created_at: the time this run wrote
+
+<a id="batch_loading_access_tokens-a-user-granted-nothing-gets-a-refusal-for-each-token"></a>
+
+#### [a-user-granted-nothing-gets-a-refusal-for-each-token](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_access_tokens.py): pass
+
+when a user granted nothing tries to batch load the access tokens the deployment holds by id, every entry is rejected because the user lacks permission
+
+Given
+
+- one deployment holding 2 access tokens, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.batch_load_access_tokens_by_ids: user-1 batch loads 2 tokens by id
+
+Then
+
+- no token comes back and every entry is the exception the check raised
+  - loaded count = 2
+  - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
+
+### batch_load_auto_scaling_rules_by_ids
+
+<a id="batch_loading_rules-a-user-granted-deployment-read-loads-the-rules-by-id"></a>
+
+#### [a-user-granted-deployment-read-loads-the-rules-by-id](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_rules.py): pass
+
+when a user granted deployment read batch loads the auto-scaling rules the deployment holds by id, those rules come back
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.batch_load_auto_scaling_rules_by_ids: user-1 batch loads 2 rules by id
+
+Then
+
+- the rules come back in the order they were put in the request
+  - loaded count = 2
+  - [0].id: same as the id of the rule seeded in advance
+  - [0].field_id: same as the id of the rule seeded in advance
+  - [0].deployment_id: same as the id of the deployment the rule scales
+  - [0].metric_source = 'KERNEL'
+  - [0].metric_name = 'cpu_util'
+  - [0].min_threshold = None
+  - [0].max_threshold = None
+  - [0].step_size = 1
+  - [0].time_window = 60
+  - [0].min_replicas = None
+  - [0].max_replicas = None
+  - [0].prometheus_query_preset_id = None
+  - [0].created_at: the time this run wrote
+  - [0].last_triggered_at = None
+  - [1].id: same as the id of the rule seeded in advance
+  - [1].field_id: same as the id of the rule seeded in advance
+  - [1].deployment_id: same as the id of the deployment the rule scales
+  - [1].metric_source = 'KERNEL'
+  - [1].metric_name = 'cpu_util'
+  - [1].min_threshold = None
+  - [1].max_threshold = None
+  - [1].step_size = 1
+  - [1].time_window = 60
+  - [1].min_replicas = None
+  - [1].max_replicas = None
+  - [1].prometheus_query_preset_id = None
+  - [1].created_at: the time this run wrote
+  - [1].last_triggered_at = None
+
+<a id="batch_loading_rules-a-user-granted-nothing-gets-a-refusal-for-each-rule"></a>
+
+#### [a-user-granted-nothing-gets-a-refusal-for-each-rule](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_rules.py): pass
+
+when a user granted nothing tries to batch load the auto-scaling rules the deployment holds by id, every entry is rejected because the user lacks permission
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.batch_load_auto_scaling_rules_by_ids: user-1 batch loads 2 rules by id
+
+Then
+
+- no rule comes back and every entry is the exception the check raised
+  - loaded count = 2
+  - rejected: NotEnoughPermission
+  - rejected: NotEnoughPermission
+
+### batch_load_policies_by_ids
+
+<a id="batch_loading_policies-a-user-granted-deployment-read-loads-the-policy-by-id"></a>
+
+#### [a-user-granted-deployment-read-loads-the-policy-by-id](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_policies.py): pass
+
+when a user granted deployment read batch loads the policy the deployment holds by id, that policy comes back
+
+Given
+
+- one deployment holding one policy, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment policy
+
+When
+
+- DeploymentAdapter.batch_load_policies_by_ids: user-1 batch loads the policy seeded in advance by id
+
+Then
+
+- the policy comes back in the order it was put in the request
+  - [0].id: same as the id of the policy seeded in advance
+  - [0].field_id: same as the id of the policy seeded in advance
+  - [0].deployment_id: same as the id of the deployment the policy sets
+  - [0].strategy_spec.strategy: same as the strategy of the policy seeded in advance
+  - [0].strategy_spec.max_surge = IntOrPercent(count=1, percent=None)
+  - [0].strategy_spec.max_unavailable = IntOrPercent(count=0, percent=None)
+  - [0].created_at: the time this run wrote
+  - [0].updated_at: the time this run wrote
+
+<a id="batch_loading_policies-a-user-granted-nothing-gets-a-refusal-for-the-policy"></a>
+
+#### [a-user-granted-nothing-gets-a-refusal-for-the-policy](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_policies.py): pass
+
+when a user granted nothing tries to batch load the policy the deployment holds by id, every entry is rejected because the user lacks permission
+
+Given
+
+- one deployment holding one policy, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment policy
+
+When
+
+- DeploymentAdapter.batch_load_policies_by_ids: user-1 batch loads the policy seeded in advance by id
+
+Then
+
+- no policy comes back and every entry is the exception the check raised
+  - rejected: NotEnoughPermission
+
+### batch_load_replicas_by_ids
+
+<a id="batch_loading_replicas-a-user-granted-deployment-read-loads-the-replicas-by-id"></a>
+
+#### [a-user-granted-deployment-read-loads-the-replicas-by-id](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_replicas.py): pass
+
+when a user granted deployment read batch loads the replicas the deployment holds by id, those replicas come back
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.batch_load_replicas_by_ids: user-1 batch loads the replicas seeded in advance by id
+
+Then
+
+- the replicas come back in the order they were put in the request
+  - [0].id: same as the id of the route seeded in advance
+  - [0].field_id: same as the id of the route seeded in advance
+  - [0].deployment_id: same as the id of the deployment the replica serves
+  - [0].revision_id: same as the id of the revision seeded in advance
+  - [0].session_id = None
+  - [0].readiness_status = 'NOT_CHECKED'
+  - [0].liveness_status = 'NOT_CHECKED'
+  - [0].activeness_status = 'INACTIVE'
+  - [0].status = 'provisioning'
+  - [0].traffic_status = 'inactive'
+  - [0].health_status = 'not_checked'
+  - [0].created_at: the time this run wrote
+
+<a id="batch_loading_replicas-a-user-granted-nothing-gets-a-refusal-for-the-replicas"></a>
+
+#### [a-user-granted-nothing-gets-a-refusal-for-the-replicas](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_replicas.py): pass
+
+when a user granted nothing tries to batch load the replicas the deployment holds by id, every entry is rejected because the user lacks permission
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.batch_load_replicas_by_ids: user-1 batch loads the replicas seeded in advance by id
+
+Then
+
+- no replica comes back and every entry is the exception the check raised
+  - rejected: NotEnoughPermission
 
 ### batch_load_revisions_by_ids
 
@@ -389,70 +1008,348 @@ Then
 
 #### [loading-revisions-by-id-answers-each-id-on-its-own](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py): pass
 
-한 프로젝트에서만 배포 읽기 권한을 받은 사용자가 읽을 수 있는 리비전, 다른 프로젝트의 리비전, 아무것도 갖지 않은 id를 한 번에 집으면, 이름 댄 순서대로 리비전, 거부, 빈 자리가 온다
+when a user granted deployment read in only one project loads a readable revision, a revision of another project, and an id nothing answers to at once, a revision, a rejection, and an empty entry come back in the order given
 
 Given
 
-- 두 프로젝트의 배포에 리비전 1개와 1개가 나뉘어 있고, 한쪽 프로젝트에서만 배포에 READ 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 프로젝트 other-1
-  - 배포 wanted-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 elsewhere-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
-  - 배포 wanted-1: 리비전 하나를 갖는다
-  - 배포 elsewhere-1: 리비전 하나를 갖는다
+- revisions are split between deployments in two projects, 1 and 1, and one user granted READ on deployments in one project only
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Project other-1
+  - Deployment wanted-1: replica count 1, has no revision yet
+  - Deployment elsewhere-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment wanted-1: has one revision
+  - Deployment elsewhere-1: has one revision
 
 When
 
-- DeploymentAdapter.batch_load_revisions_by_ids: user-1이 wanted-1의 리비전, 다른 프로젝트 배포의 리비전, 아무것도 갖지 않은 id를 차례로 집음
+- DeploymentAdapter.batch_load_revisions_by_ids: user-1 loads the revision of wanted-1, the revision of a deployment in another project, and an id nothing answers to, in that order, in one call
 
 Then
 
-- 이름 댄 순서대로 리비전, 거부, 빈 자리가 온다
+- a revision, a rejection and an empty place come back in the order given
   - len = 3
-  - [0].id: 심은 리비전와 같다
-  - [0].deployment_id: 심은 배포와 같다
+  - [0].id: same as the revision seeded in advance
+  - [0].deployment_id: same as the deployment seeded in advance
   - [0].revision_number = 1
-  - [0].image_id: 심은 이미지와 같다
+  - [0].image_id: same as the image seeded in advance
   - [0].cluster_config = ClusterConfigInfoDTO(mode='SINGLE_NODE', size=1)
   - [0].resource_config.resource_group_name = 'resource-group-1'
   - [0].resource_config.resource_slots = [('cpu', Decimal('1')), ('mem', Decimal('1073741824'))]
   - [0].resource_config.resource_opts = None
-  - [0].model_runtime_config.runtime_variant_id: 심은 런타임 변형와 같다
+  - [0].model_runtime_config.runtime_variant_id: same as the runtime variant seeded in advance
   - [0].model_runtime_config.inference_runtime_config = None
   - [0].model_runtime_config.environ = None
   - [0].model_runtime_config.runtime_variant_preset_values = []
-  - [0].model_mount_config.vfolder_id: 심은 모델 폴더와 같다
+  - [0].model_mount_config.vfolder_id: same as the model vfolder seeded in advance
   - [0].model_mount_config.mount_destination = '/models'
   - [0].model_mount_config.definition_path = ''
   - [0].model_mount_config.subpath = None
   - [0].model_definition = ModelDefinitionInfoDTO(models=[ModelConfigInfoDTO(name='served', model_path='/models', service=None, metadata=None)])
-  - [0].created_at: 이 실행이 쓴 시각
+  - [0].created_at: the time this run wrote
   - [0].extra_mounts = []
   - [0].revision_preset_id = None
   - [1] = 'NotEnoughPermission'
   - [2] = None
+
+### batch_load_routes_by_ids
+
+<a id="batch_loading_routes-a-user-granted-deployment-read-loads-the-routes-by-id"></a>
+
+#### [a-user-granted-deployment-read-loads-the-routes-by-id](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_routes.py): pass
+
+when a user granted deployment read batch loads the routes the deployment holds by id, those routes come back
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.batch_load_routes_by_ids: user-1 batch loads the routes seeded in advance by id
+
+Then
+
+- the routes come back in the order they were put in the request
+  - [0].id: same as the id of the route seeded in advance
+  - [0].field_id: same as the id of the route seeded in advance
+  - [0].deployment_id: same as the id of the deployment the route serves
+  - [0].session_id = None
+  - [0].status = 'provisioning'
+  - [0].health_status = 'not_checked'
+  - [0].traffic_ratio = 1.0
+  - [0].created_at: the time this run wrote
+  - [0].revision_id: same as the id of the revision seeded in advance
+  - [0].traffic_status = 'inactive'
+  - [0].error_data = {}
+
+<a id="batch_loading_routes-a-user-granted-nothing-gets-a-refusal-for-the-routes"></a>
+
+#### [a-user-granted-nothing-gets-a-refusal-for-the-routes](/tests/scenario/bai_scenario/manager/deployment/test_batch_loading_routes.py): pass
+
+when a user granted nothing tries to batch load the routes the deployment holds by id, every entry is rejected because the user lacks permission
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.batch_load_routes_by_ids: user-1 batch loads the routes seeded in advance by id
+
+Then
+
+- no route comes back and every entry is the exception the check raised
+  - rejected: NotEnoughPermission
+
+### get_access_token
+
+<a id="reading_access_tokens-a-user-granted-deployment-read-reads-a-token"></a>
+
+#### [a-user-granted-deployment-read-reads-a-token](/tests/scenario/bai_scenario/manager/deployment/test_reading_access_tokens.py): pass
+
+when a user granted deployment read reads one of the access tokens the deployment holds, that token comes back
+
+Given
+
+- one deployment holding 2 access tokens, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.get_access_token: user-1 reads one of the tokens seeded in advance
+
+Then
+
+- the token read comes back
+  - id: same as the id of the token seeded in advance
+  - field_id: same as the id of the token seeded in advance
+  - token = 'scenario-token'
+  - expires_at = None
+  - created_at: the time this run wrote
+
+<a id="reading_access_tokens-a-user-granted-nothing-reads-no-token"></a>
+
+#### [a-user-granted-nothing-reads-no-token](/tests/scenario/bai_scenario/manager/deployment/test_reading_access_tokens.py): pass
+
+when a user granted nothing tries to read one of the access tokens the deployment holds, the lookup that finds the deployment holding the token is rejected
+
+Given
+
+- one deployment holding 2 access tokens, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.get_access_token: user-1 reads one of the tokens seeded in advance
+
+Then
+
+- the call is rejected
+  - rejected: GenericBadRequest
+
+### get_replica
+
+<a id="reading_replicas-a-user-granted-deployment-read-reads-the-replica"></a>
+
+#### [a-user-granted-deployment-read-reads-the-replica](/tests/scenario/bai_scenario/manager/deployment/test_reading_replicas.py): pass
+
+when a user granted deployment read reads a replica of the deployment, that replica comes back
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.get_replica: user-1 reads one replica seeded in advance
+
+Then
+
+- the replica seeded in advance comes back whole
+  - id: same as the id of the route seeded in advance
+  - field_id: same as the id of the route seeded in advance
+  - deployment_id: same as the id of the deployment the replica serves
+  - revision_id: same as the id of the revision seeded in advance
+  - session_id = None
+  - readiness_status = 'NOT_CHECKED'
+  - liveness_status = 'NOT_CHECKED'
+  - activeness_status = 'INACTIVE'
+  - status = 'provisioning'
+  - traffic_status = 'inactive'
+  - health_status = 'not_checked'
+  - created_at: the time this run wrote
+
+<a id="reading_replicas-a-user-granted-nothing-reads-no-replica"></a>
+
+#### [a-user-granted-nothing-reads-no-replica](/tests/scenario/bai_scenario/manager/deployment/test_reading_replicas.py): pass
+
+when a user granted nothing tries to read a replica of the deployment, the lookup that finds the deployment holding the replica is rejected
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.get_replica: user-1 reads one replica seeded in advance
+
+Then
+
+- the call is rejected
+  - rejected: GenericBadRequest
 
 ### get_revision
 
@@ -460,62 +1357,62 @@ Then
 
 #### [a-user-granted-read-reads-a-revision-by-id](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py): pass
 
-배포 읽기 권한을 받은 사용자가 그 배포의 리비전을 id로 조회하면, 그 리비전이 온다
+when a user granted deployment read reads a revision of that deployment by id, that revision comes back
 
 Given
 
-- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 배포에 READ 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
-  - 배포 deployment-1: 리비전 하나를 갖는다
+- one deployment holding 1 revisions and a user granted READ on deployments who can read their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
 
 When
 
-- DeploymentAdapter.get_revision: user-1이 deployment-1의 첫 리비전 id로 리비전을 조회
+- DeploymentAdapter.get_revision: user-1 reads a revision by the id of the first revision of deployment-1
 
 Then
 
-- 리비전 전체가 온다
-  - id: 심은 리비전와 같다
-  - deployment_id: 심은 배포와 같다
+- the whole revision comes back
+  - id: same as the revision seeded in advance
+  - deployment_id: same as the deployment seeded in advance
   - revision_number = 1
-  - image_id: 심은 이미지와 같다
+  - image_id: same as the image seeded in advance
   - cluster_config = ClusterConfigInfoDTO(mode='SINGLE_NODE', size=1)
   - resource_config.resource_group_name = 'resource-group-1'
   - resource_config.resource_slots = [('cpu', Decimal('1')), ('mem', Decimal('1073741824'))]
   - resource_config.resource_opts = None
-  - model_runtime_config.runtime_variant_id: 심은 런타임 변형와 같다
+  - model_runtime_config.runtime_variant_id: same as the runtime variant seeded in advance
   - model_runtime_config.inference_runtime_config = None
   - model_runtime_config.environ = None
   - model_runtime_config.runtime_variant_preset_values = []
-  - model_mount_config.vfolder_id: 심은 모델 폴더와 같다
+  - model_mount_config.vfolder_id: same as the model vfolder seeded in advance
   - model_mount_config.mount_destination = '/models'
   - model_mount_config.definition_path = ''
   - model_mount_config.subpath = None
   - model_definition = ModelDefinitionInfoDTO(models=[ModelConfigInfoDTO(name='served', model_path='/models', service=None, metadata=None)])
-  - created_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
   - extra_mounts = []
   - revision_preset_id = None
 
@@ -523,127 +1420,127 @@ Then
 
 #### [a-revision-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py): pass
 
-슈퍼관리자가 아무것도 갖지 않은 id로 리비전을 조회하면, 대상이 없다는 것으로 거부된다. 모든 검사를 지나가는 사람에게는 감출 것이 없다
+when a superadmin reads a revision by an id nothing answers to, the call is rejected as not found; nothing is hidden from someone who passes every check
 
 Given
 
-- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 아무 배포 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 슈퍼관리자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
-  - 배포 deployment-1: 리비전 하나를 갖는다
+- one deployment holding 1 revisions and a user with no deployment permission who can read their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - superadmin user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
 
 When
 
-- DeploymentAdapter.get_revision: user-1이 아무것도 갖지 않은 id로 리비전을 조회
+- DeploymentAdapter.get_revision: user-1 reads a revision by an id nothing answers to
 
 Then
 
-- 거부된다
-  - 거부: FieldNotFoundError
+- the call is rejected
+  - rejected: FieldNotFoundError
 
 <a id="reading_revisions-a-revision-id-nothing-answers-to-is-refused-as-unresolvable"></a>
 
 #### [a-revision-id-nothing-answers-to-is-refused-as-unresolvable](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py): pass
 
-배포 읽기 권한을 받은 사용자가 아무것도 갖지 않은 id로 리비전을 조회하면, 볼 수 없는 id와 같은 이유로 거부된다
+when a user granted deployment read reads a revision by an id nothing answers to, the call is rejected for the same reason as an id the user cannot see
 
 Given
 
-- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 배포에 READ 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
-  - 배포 deployment-1: 리비전 하나를 갖는다
+- one deployment holding 1 revisions and a user granted READ on deployments who can read their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
 
 When
 
-- DeploymentAdapter.get_revision: user-1이 아무것도 갖지 않은 id로 리비전을 조회
+- DeploymentAdapter.get_revision: user-1 reads a revision by an id nothing answers to
 
 Then
 
-- 거부된다
-  - 거부: GenericBadRequest
+- the call is rejected
+  - rejected: GenericBadRequest
 
 <a id="reading_revisions-a-user-granted-nothing-may-not-read-a-revision"></a>
 
 #### [a-user-granted-nothing-may-not-read-a-revision](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py): pass
 
-아무 배포 권한도 받지 않은 사용자가 리비전을 id로 조회하면, 키를 풀 수 없다는 이유로 거부된다
+when a user with no deployment grant reads a revision by id, the call is rejected because the key cannot be decrypted
 
 Given
 
-- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 아무 배포 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
-  - 배포 deployment-1: 리비전 하나를 갖는다
+- one deployment holding 1 revisions and a user with no deployment permission who can read their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
 
 When
 
-- DeploymentAdapter.get_revision: user-1이 deployment-1의 첫 리비전 id로 리비전을 조회
+- DeploymentAdapter.get_revision: user-1 reads a revision by the id of the first revision of deployment-1
 
 Then
 
-- 거부된다
-  - 거부: GenericBadRequest
+- the call is rejected
+  - rejected: GenericBadRequest
 
 ### project_search
 
@@ -651,35 +1548,35 @@ Then
 
 #### [searching-a-project-finds-only-its-own-deployments](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
 
-두 프로젝트에 배포가 나뉘어 있고 한쪽에만 읽기 권한을 받은 사용자가 그 프로젝트를 훑으면, 그 프로젝트의 것만 나온다
+when deployments are split across two projects and a user granted read on only one side searches that project, only that project's deployments come back
 
 Given
 
-- 두 프로젝트에 나뉜 배포들과, 한쪽 프로젝트에서만 배포에 READ 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 프로젝트 other-1
-  - 배포 wanted-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 beside-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 elsewhere-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- deployments split between two projects and one user granted READ on deployments in one project only
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Project other-1
+  - Deployment wanted-1: replica count 1, has no revision yet
+  - Deployment beside-1: replica count 1, has no revision yet
+  - Deployment elsewhere-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.project_search: user-1이 team-1 안을 조회
+- DeploymentAdapter.project_search: user-1 searches inside team-1
 
 Then
 
-- 심은 배포가 모두, 그리고 그것만 세어진다
+- every deployment seeded in advance is counted, and nothing else
   - items = ['beside-1', 'wanted-1']
   - total_count = 2
   - has_next_page = False
@@ -689,32 +1586,32 @@ Then
 
 #### [a-user-granted-nothing-may-not-search-a-project](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
 
-그 프로젝트에 읽기 권한이 없는 사용자가 프로젝트를 훑으면, 권한 부족으로 거부된다
+when a user without read permission on the project searches the project, the call is rejected for lack of permission
 
 Given
 
-- 같은 프로젝트의 배포 3개와, 그 프로젝트의 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 wanted-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 other-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 other-2: 복제를 1개 두려 한다, 아직 리비전이 없다
+- 3 deployments in the same project and one user of that project
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment wanted-1: replica count 1, has no revision yet
+  - Deployment other-1: replica count 1, has no revision yet
+  - Deployment other-2: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.project_search: user-1이 team-1 안을 조회
+- DeploymentAdapter.project_search: user-1 searches inside team-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### scoped_search
 
@@ -722,37 +1619,37 @@ Then
 
 #### [searching-my-own-finds-only-what-i-made](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
 
-같은 프로젝트에 두 사람이 각자 배포를 만들었고 자기 스코프에서 읽기 권한을 받은 사람이 자기 것을 훑으면, 자기가 만든 것만 나온다
+when two users each created a deployment in the same project and the one granted read in their own scope searches their own, only what they created comes back
 
 Given
 
-- 두 사람이 각자 만든 배포와, 자기 스코프에서 배포 읽기 권한을 받은 그중 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 자기 스코프에서 배포를 읽을 수 있는 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-owner-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-owner-1 보유
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 mine-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 theirs-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- deployments two users each created and one of them granted deployment read permission in their own scope
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user who can read deployments in their own scope
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-owner-1: applies only within the scope it is granted in
+    - Role deployment-owner-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-owner-1
+  - Prepare one user in the domain
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Deployment mine-1: replica count 1, has no revision yet
+  - Deployment theirs-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.scoped_search: user-1이 자기 것을 조회
+- DeploymentAdapter.scoped_search: user-1 searches their own
 
 Then
 
-- 심은 배포가 모두, 그리고 그것만 세어진다
+- every deployment seeded in advance is counted, and nothing else
   - items = ['mine-1']
   - total_count = 1
   - has_next_page = False
@@ -762,33 +1659,367 @@ Then
 
 #### [a-user-granted-nothing-may-not-search-even-their-own](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
 
-자기 스코프에서 읽기 권한을 받지 않은 사람이 자기 것을 훑으면, 권한 부족으로 거부된다. 이 문도 범위를 좁히기만 하지 않고 권한이 지킨다
+when a user not granted read in their own scope searches their own, the call is rejected for lack of permission; here too the permission checks it rather than only narrowing the scope
 
 Given
 
-- 두 사람이 각자 만든 배포와, 아무 배포 권한도 받지 않은 그중 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 mine-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 theirs-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- deployments two users each created and one of them with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare one user in the domain
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+    - regular user user-1: has their own keypair and personal project
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Deployment mine-1: replica count 1, has no revision yet
+  - Deployment theirs-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.scoped_search: user-1이 자기 것을 조회
+- DeploymentAdapter.scoped_search: user-1 searches their own
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### search_access_tokens
+
+<a id="searching_access_tokens-a-user-granted-deployment-read-searches-the-tokens"></a>
+
+#### [a-user-granted-deployment-read-searches-the-tokens](/tests/scenario/bai_scenario/manager/deployment/test_searching_access_tokens.py): pass
+
+when a user granted deployment read searches the access tokens the deployment holds with a filter, those tokens come back
+
+Given
+
+- one deployment holding 2 access tokens, and a user granted the READ permission on deployments, one more token on the same deployment, and one token on another deployment
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+  - Deployment other-1: replica count 1, has no revision yet
+  - Deployment other-1: has one deployment token
+
+When
+
+- DeploymentAdapter.search_access_tokens: user-1 searches the access tokens the deployment holds with one filter, one order and pagination
+
+Then
+
+- the token the filter excludes and the token on another deployment do not come back, and the tokens the deployment holds come back with their count
+  - total_count = 2
+  - items count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: same as the id of the token seeded in advance
+  - items[0].field_id: same as the id of the token seeded in advance
+  - items[0].token = 'scenario-token'
+  - items[0].expires_at = None
+  - items[0].created_at: the time this run wrote
+  - items[1].id: same as the id of the token seeded in advance
+  - items[1].field_id: same as the id of the token seeded in advance
+  - items[1].token = 'scenario-token'
+  - items[1].expires_at = None
+  - items[1].created_at: the time this run wrote
+
+<a id="searching_access_tokens-a-user-granted-nothing-searches-no-token"></a>
+
+#### [a-user-granted-nothing-searches-no-token](/tests/scenario/bai_scenario/manager/deployment/test_searching_access_tokens.py): pass
+
+when a user granted nothing tries to search the access tokens the deployment holds, the search is rejected because the user lacks permission
+
+Given
+
+- one deployment holding 2 access tokens, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.search_access_tokens: user-1 searches the access tokens the deployment holds with one filter, one order and pagination
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### search_policies
+
+<a id="searching_policies-the-superadmin-searches-the-policies"></a>
+
+#### [the-superadmin-searches-the-policies](/tests/scenario/bai_scenario/manager/deployment/test_searching_policies.py): pass
+
+when the superadmin searches the deployment policies with a filter, the policy seeded in advance comes back. The requesting user of this row is the superadmin because the search is gated by the global role
+
+Given
+
+- one deployment holding one policy, and the superadmin, and one policy on another deployment
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment policy
+  - Deployment other-1: replica count 1, has no revision yet
+  - Deployment other-1: has one deployment policy
+
+When
+
+- DeploymentAdapter.search_policies: user-1 searches the deployment policies with one filter and pagination
+
+Then
+
+- the policy on another deployment the filter excludes does not come back, and the policy seeded in advance comes back with its count
+  - total_count = 1
+  - items count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: same as the id of the policy seeded in advance
+  - items[0].field_id: same as the id of the policy seeded in advance
+  - items[0].deployment_id: same as the id of the deployment the policy sets
+  - items[0].strategy_spec.strategy: same as the strategy of the policy seeded in advance
+  - items[0].strategy_spec.max_surge = IntOrPercent(count=1, percent=None)
+  - items[0].strategy_spec.max_unavailable = IntOrPercent(count=0, percent=None)
+  - items[0].created_at: the time this run wrote
+  - items[0].updated_at: the time this run wrote
+
+<a id="searching_policies-a-user-granted-nothing-searches-no-policy"></a>
+
+#### [a-user-granted-nothing-searches-no-policy](/tests/scenario/bai_scenario/manager/deployment/test_searching_policies.py): pass
+
+when a user granted nothing tries to search the deployment policies, the search is rejected because the user lacks the global role
+
+Given
+
+- one deployment holding one policy, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment policy
+
+When
+
+- DeploymentAdapter.search_policies: user-1 searches the deployment policies with one filter and pagination
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
+
+### search_replicas
+
+<a id="searching_replicas-a-user-granted-deployment-read-searches-the-replica-with-traffic-enabled"></a>
+
+#### [a-user-granted-deployment-read-searches-the-replica-with-traffic-enabled](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas.py): pass
+
+when a user granted deployment read searches the replica of a route with traffic enabled, the replicas seeded in advance come back
+
+Given
+
+- one deployment holding one revision and 1 replica routes with traffic enabled, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.search_replicas: user-1 searches the replicas of deployment-1
+
+Then
+
+- the replica seeded in advance with traffic enabled comes back with its count
+  - total_count = 1
+  - items count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: same as the id of the route seeded in advance
+  - items[0].field_id: same as the id of the route seeded in advance
+  - items[0].deployment_id: same as the id of the deployment the replica serves
+  - items[0].revision_id: same as the id of the revision seeded in advance
+  - items[0].session_id = None
+  - items[0].readiness_status = 'NOT_CHECKED'
+  - items[0].liveness_status = 'NOT_CHECKED'
+  - items[0].activeness_status = 'INACTIVE'
+  - items[0].status = 'provisioning'
+  - items[0].traffic_status = 'active'
+  - items[0].health_status = 'not_checked'
+  - items[0].created_at: the time this run wrote
+
+<a id="searching_replicas-a-user-granted-deployment-read-searches-the-replicas"></a>
+
+#### [a-user-granted-deployment-read-searches-the-replicas](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas.py): pass
+
+when a user granted deployment read searches the replicas of the deployment with a filter, the replicas seeded in advance come back
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user granted the READ permission on deployments, one more replica route with traffic enabled, and one replica route on another deployment
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+  - Deployment deployment-1: has one replica route
+  - Deployment other-1: replica count 1, has no revision yet
+  - Deployment other-1: has one revision
+  - Session group of a deployment deployment-session-group-2: the session group a deployment creates with its replica group
+  - Deployment other-1: has one replica group holding the session group
+  - Deployment other-1: has one replica route
+
+When
+
+- DeploymentAdapter.search_replicas: user-1 searches the replicas of deployment-1 with one filter, one order and pagination
+
+Then
+
+- the replica the filter excludes and the replica on another deployment do not come back, and the replicas seeded in advance come back with their count
+  - total_count = 1
+  - items count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: same as the id of the route seeded in advance
+  - items[0].field_id: same as the id of the route seeded in advance
+  - items[0].deployment_id: same as the id of the deployment the replica serves
+  - items[0].revision_id: same as the id of the revision seeded in advance
+  - items[0].session_id = None
+  - items[0].readiness_status = 'NOT_CHECKED'
+  - items[0].liveness_status = 'NOT_CHECKED'
+  - items[0].activeness_status = 'INACTIVE'
+  - items[0].status = 'provisioning'
+  - items[0].traffic_status = 'inactive'
+  - items[0].health_status = 'not_checked'
+  - items[0].created_at: the time this run wrote
+
+<a id="searching_replicas-a-user-granted-nothing-searches-no-replica"></a>
+
+#### [a-user-granted-nothing-searches-no-replica](/tests/scenario/bai_scenario/manager/deployment/test_searching_replicas.py): pass
+
+when a user granted nothing tries to search the replicas of the deployment, the search is rejected because the user lacks permission
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.search_replicas: user-1 searches the replicas of deployment-1 with one filter, one order and pagination
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### search_revisions
 
@@ -796,47 +2027,47 @@ Then
 
 #### [a-user-granted-read-counts-every-revision-of-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py): pass
 
-리비전 셋이 딸린 배포에 읽기 권한을 받은 사용자가 그 배포의 리비전을 훑으면, 셋을 모두 센다
+when a user granted read on a deployment holding three revisions searches that deployment's revisions, all three are counted
 
 Given
 
-- 리비전 3개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 배포에 READ 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
-  - 배포 deployment-1: 리비전 하나를 갖는다
-  - 배포 deployment-1: 리비전 하나를 갖는다
-  - 배포 deployment-1: 리비전 하나를 갖는다
+- one deployment holding 3 revisions and a user granted READ on deployments who can read their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Deployment deployment-1: has one revision
+  - Deployment deployment-1: has one revision
 
 When
 
-- DeploymentAdapter.search_revisions: user-1이 deployment-1의 리비전을 조회
+- DeploymentAdapter.search_revisions: user-1 searches the revisions of deployment-1
 
 Then
 
-- 심은 리비전이 모두, 그리고 그것만 세어진다
-  - items.id: 센 리비전들와 같다
+- every revision seeded in advance is counted, and nothing else
+  - items.id: same as the revisions counted
   - items.revision_number = [1, 2, 3]
   - total_count = 3
   - has_next_page = False
@@ -846,49 +2077,49 @@ Then
 
 #### [another-deployments-revisions-stay-out-of-a-deployment-search](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py): pass
 
-두 프로젝트의 배포에 리비전이 나뉘어 있고 한쪽에만 읽기 권한을 받은 사용자가 그쪽 배포의 리비전을 훑으면, 그쪽 것만 나온다
+when revisions are split across deployments in two projects and a user granted read on only one side searches that side's deployment revisions, only that side comes back
 
 Given
 
-- 두 프로젝트의 배포에 리비전 2개와 1개가 나뉘어 있고, 한쪽 프로젝트에서만 배포에 READ 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 프로젝트 other-1
-  - 배포 wanted-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 elsewhere-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
-  - 배포 wanted-1: 리비전 하나를 갖는다
-  - 배포 wanted-1: 리비전 하나를 갖는다
-  - 배포 elsewhere-1: 리비전 하나를 갖는다
+- revisions are split between deployments in two projects, 2 and 1, and one user granted READ on deployments in one project only
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Project other-1
+  - Deployment wanted-1: replica count 1, has no revision yet
+  - Deployment elsewhere-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment wanted-1: has one revision
+  - Deployment wanted-1: has one revision
+  - Deployment elsewhere-1: has one revision
 
 When
 
-- DeploymentAdapter.search_revisions: user-1이 wanted-1의 리비전을 조회
+- DeploymentAdapter.search_revisions: user-1 searches the revisions of wanted-1
 
 Then
 
-- 심은 리비전이 모두, 그리고 그것만 세어진다
-  - items.id: 센 리비전들와 같다
+- every revision seeded in advance is counted, and nothing else
+  - items.id: same as the revisions counted
   - items.revision_number = [1, 2]
   - total_count = 2
   - has_next_page = False
@@ -898,47 +2129,47 @@ Then
 
 #### [filtering-revisions-by-number-leaves-only-that-one](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py): pass
 
-리비전 셋이 딸린 배포의 리비전을 번호로 걸러 훑으면, 그 번호의 것만 남는다
+searching the revisions of a deployment holding three revisions filtered by number leaves only the one with that number
 
 Given
 
-- 리비전 3개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 배포에 READ 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
-  - 배포 deployment-1: 리비전 하나를 갖는다
-  - 배포 deployment-1: 리비전 하나를 갖는다
-  - 배포 deployment-1: 리비전 하나를 갖는다
+- one deployment holding 3 revisions and a user granted READ on deployments who can read their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Deployment deployment-1: has one revision
+  - Deployment deployment-1: has one revision
 
 When
 
-- DeploymentAdapter.search_revisions: user-1이 deployment-1의 리비전을 번호 2로 걸러 조회
+- DeploymentAdapter.search_revisions: user-1 searches the revisions of deployment-1 filtered by number 2
 
 Then
 
-- 심은 리비전이 모두, 그리고 그것만 세어진다
-  - items.id: 센 리비전들와 같다
+- every revision seeded in advance is counted, and nothing else
+  - items.id: same as the revisions counted
   - items.revision_number = [2]
   - total_count = 1
   - has_next_page = False
@@ -948,42 +2179,256 @@ Then
 
 #### [a-user-granted-nothing-may-not-search-a-deployments-revisions](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py): pass
 
-아무 배포 권한도 받지 않은 사용자가 배포의 리비전을 훑으면, 권한 부족으로 거부된다
+when a user with no deployment grant searches a deployment's revisions, the call is rejected for lack of permission
 
 Given
 
-- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 아무 배포 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
-  - 배포 deployment-1: 리비전 하나를 갖는다
+- one deployment holding 1 revisions and a user with no deployment permission who can read their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
 
 When
 
-- DeploymentAdapter.search_revisions: user-1이 deployment-1의 리비전을 조회
+- DeploymentAdapter.search_revisions: user-1 searches the revisions of deployment-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### search_routes
+
+<a id="searching_routes-a-user-granted-deployment-read-searches-the-routes"></a>
+
+#### [a-user-granted-deployment-read-searches-the-routes](/tests/scenario/bai_scenario/manager/deployment/test_searching_routes.py): pass
+
+when a user granted deployment read searches the routes of the deployment with a filter, the routes seeded in advance come back
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user granted the READ permission on deployments, one more replica route with traffic enabled, and one replica route on another deployment
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+  - Deployment deployment-1: has one replica route
+  - Deployment other-1: replica count 1, has no revision yet
+  - Deployment other-1: has one revision
+  - Session group of a deployment deployment-session-group-2: the session group a deployment creates with its replica group
+  - Deployment other-1: has one replica group holding the session group
+  - Deployment other-1: has one replica route
+
+When
+
+- DeploymentAdapter.search_routes: user-1 searches the routes of deployment-1 with one filter, one order and pagination
+
+Then
+
+- the route the filter excludes and the route on another deployment do not come back, and the routes seeded in advance come back with their count
+  - total_count = 1
+  - items count = 1
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: same as the id of the route seeded in advance
+  - items[0].field_id: same as the id of the route seeded in advance
+  - items[0].deployment_id: same as the id of the deployment the route serves
+  - items[0].session_id = None
+  - items[0].status = 'provisioning'
+  - items[0].health_status = 'not_checked'
+  - items[0].traffic_ratio = 1.0
+  - items[0].created_at: the time this run wrote
+  - items[0].revision_id: same as the id of the revision seeded in advance
+  - items[0].traffic_status = 'inactive'
+  - items[0].error_data = {}
+
+<a id="searching_routes-a-user-granted-nothing-searches-no-route"></a>
+
+#### [a-user-granted-nothing-searches-no-route](/tests/scenario/bai_scenario/manager/deployment/test_searching_routes.py): pass
+
+when a user granted nothing tries to search the routes of the deployment, the search is rejected because the user lacks permission
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.search_routes: user-1 searches the routes of deployment-1 with one filter, one order and pagination
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### search_rules
+
+<a id="searching_rules-a-user-granted-deployment-read-searches-the-rules"></a>
+
+#### [a-user-granted-deployment-read-searches-the-rules](/tests/scenario/bai_scenario/manager/deployment/test_searching_rules.py): pass
+
+when a user granted deployment read searches the auto-scaling rules the deployment holds with a filter, those rules come back
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user granted the READ permission on deployments, one more rule with a different metric name on the same deployment, and one rule on another deployment
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment other-1: replica count 1, has no revision yet
+  - Deployment other-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.search_rules: user-1 searches the auto-scaling rules the deployment holds with one filter, one order and pagination
+
+Then
+
+- the rule the filter excludes and the rule on another deployment do not come back, and the rules the deployment holds come back with their count
+  - total_count = 2
+  - items count = 2
+  - has_next_page = False
+  - has_previous_page = False
+  - items[0].id: same as the id of the rule seeded in advance
+  - items[0].field_id: same as the id of the rule seeded in advance
+  - items[0].deployment_id: same as the id of the deployment the rule scales
+  - items[0].metric_source = 'KERNEL'
+  - items[0].metric_name = 'cpu_util'
+  - items[0].min_threshold = None
+  - items[0].max_threshold = None
+  - items[0].step_size = 1
+  - items[0].time_window = 60
+  - items[0].min_replicas = None
+  - items[0].max_replicas = None
+  - items[0].prometheus_query_preset_id = None
+  - items[0].created_at: the time this run wrote
+  - items[0].last_triggered_at = None
+  - items[1].id: same as the id of the rule seeded in advance
+  - items[1].field_id: same as the id of the rule seeded in advance
+  - items[1].deployment_id: same as the id of the deployment the rule scales
+  - items[1].metric_source = 'KERNEL'
+  - items[1].metric_name = 'cpu_util'
+  - items[1].min_threshold = None
+  - items[1].max_threshold = None
+  - items[1].step_size = 1
+  - items[1].time_window = 60
+  - items[1].min_replicas = None
+  - items[1].max_replicas = None
+  - items[1].prometheus_query_preset_id = None
+  - items[1].created_at: the time this run wrote
+  - items[1].last_triggered_at = None
+
+<a id="searching_rules-a-user-granted-nothing-searches-no-rule"></a>
+
+#### [a-user-granted-nothing-searches-no-rule](/tests/scenario/bai_scenario/manager/deployment/test_searching_rules.py): pass
+
+when a user granted nothing tries to search the auto-scaling rules the deployment holds, the search is rejected because the user lacks permission
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.search_rules: user-1 searches the auto-scaling rules the deployment holds with one filter, one order and pagination
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### get_current_revision
 
@@ -991,33 +2436,33 @@ Then
 
 #### [a-deployment-holding-no-revision-answers-nothing-as-its-current-one](/tests/scenario/bai_scenario/manager/deployment/test_reading.py): pass
 
-리비전이 딸리지 않은 배포의 현재 리비전을 조회하면, 현재 리비전이 없다는 이유로 거부된다
+reading the current revision of a deployment holding no revision is rejected because there is no current revision
 
 Given
 
-- 이미 있는 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user granted READ on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.get_current_revision: user-1이 deployment-1의 현재 리비전을 조회
+- DeploymentAdapter.get_current_revision: user-1 reads the current revision of deployment-1
 
 Then
 
-- 거부된다
-  - 거부: DeploymentRevisionNotFound
+- the call is rejected
+  - rejected: DeploymentRevisionNotFound
 
 ### add_revision
 
@@ -1025,61 +2470,61 @@ Then
 
 #### [a-revision-added-without-resources-runs-on-one-node-with-no-slot](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
-프리셋도 필수 슬롯도 없이 자원과 클러스터를 빼고 리비전을 더하면, 노드 하나에 크기 1이고 자원 슬롯이 빈 리비전이 온다
+adding a revision without resources and cluster when there is neither a preset nor a required slot brings back a revision on one node with size 1 and no resource slot
 
 Given
 
-- 리비전 0개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 배포에 CREATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 CREATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+- one deployment holding 0 revisions and a user granted CREATE on deployments who can read their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted CREATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: CREATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
 
 When
 
-- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함 (자원과 클러스터 없이)
+- DeploymentAdapter.add_revision: user-1 adds a revision to deployment-1 without resources and cluster
 
 Then
 
-- 리비전 전체가 온다
-  - id: 무시함: 데이터베이스가 만든다
-  - deployment_id: 심은 배포와 같다
+- the whole revision comes back
+  - id: skipped: the database generates it
+  - deployment_id: same as the deployment seeded in advance
   - revision_number = 1
-  - image_id: 심은 이미지와 같다
+  - image_id: same as the image seeded in advance
   - cluster_config = ClusterConfigInfoDTO(mode='SINGLE_NODE', size=1)
   - resource_config.resource_group_name = 'resource-group-1'
   - resource_config.resource_slots = []
   - resource_config.resource_opts = None
-  - model_runtime_config.runtime_variant_id: 심은 런타임 변형와 같다
+  - model_runtime_config.runtime_variant_id: same as the runtime variant seeded in advance
   - model_runtime_config.inference_runtime_config = None
   - model_runtime_config.environ = None
   - model_runtime_config.runtime_variant_preset_values = []
-  - model_mount_config.vfolder_id: 심은 모델 폴더와 같다
+  - model_mount_config.vfolder_id: same as the model vfolder seeded in advance
   - model_mount_config.mount_destination = '/models'
   - model_mount_config.definition_path = ''
   - model_mount_config.subpath = None
   - model_definition = ModelDefinitionInfoDTO(models=[ModelConfigInfoDTO(name='served', model_path='/models', service=None, metadata=None)])
-  - created_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
   - extra_mounts = []
   - revision_preset_id = None
 
@@ -1087,61 +2532,61 @@ Then
 
 #### [a-user-granted-create-adds-the-first-revision](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
-리비전 없는 배포에 생성 권한을 받은 사용자가 모든 설정을 주고 리비전을 더하면, 번호 1을 단 리비전이 준 설정 그대로 온다
+when a user granted create adds a revision with every setting to a deployment that has no revision, the revision numbered 1 comes back with exactly the settings that were given
 
 Given
 
-- 리비전 0개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 배포에 CREATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 CREATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+- one deployment holding 0 revisions and a user granted CREATE on deployments who can read their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted CREATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: CREATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
 
 When
 
-- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함
+- DeploymentAdapter.add_revision: user-1 adds a revision to deployment-1
 
 Then
 
-- 리비전 전체가 온다
-  - id: 무시함: 데이터베이스가 만든다
-  - deployment_id: 심은 배포와 같다
+- the whole revision comes back
+  - id: skipped: the database generates it
+  - deployment_id: same as the deployment seeded in advance
   - revision_number = 1
-  - image_id: 심은 이미지와 같다
+  - image_id: same as the image seeded in advance
   - cluster_config = ClusterConfigInfoDTO(mode='SINGLE_NODE', size=1)
   - resource_config.resource_group_name = 'resource-group-1'
   - resource_config.resource_slots = [('cpu', Decimal('1')), ('mem', Decimal('1073741824'))]
   - resource_config.resource_opts = None
-  - model_runtime_config.runtime_variant_id: 심은 런타임 변형와 같다
+  - model_runtime_config.runtime_variant_id: same as the runtime variant seeded in advance
   - model_runtime_config.inference_runtime_config = None
   - model_runtime_config.environ = None
   - model_runtime_config.runtime_variant_preset_values = []
-  - model_mount_config.vfolder_id: 심은 모델 폴더와 같다
+  - model_mount_config.vfolder_id: same as the model vfolder seeded in advance
   - model_mount_config.mount_destination = '/models'
   - model_mount_config.definition_path = ''
   - model_mount_config.subpath = None
   - model_definition = ModelDefinitionInfoDTO(models=[ModelConfigInfoDTO(name='served', model_path='/models', service=None, metadata=None)])
-  - created_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
   - extra_mounts = []
   - revision_preset_id = None
 
@@ -1149,62 +2594,62 @@ Then
 
 #### [the-next-revision-is-numbered-one-past-the-last](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
-리비전 하나가 딸린 배포에 리비전을 더하면, 번호 2를 단 리비전이 온다
+adding a revision to a deployment that holds one revision brings back the revision numbered 2
 
 Given
 
-- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 배포에 CREATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 CREATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
-  - 배포 deployment-1: 리비전 하나를 갖는다
+- one deployment holding 1 revisions and a user granted CREATE on deployments who can read their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted CREATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: CREATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
 
 When
 
-- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함
+- DeploymentAdapter.add_revision: user-1 adds a revision to deployment-1
 
 Then
 
-- 리비전 전체가 온다
-  - id: 무시함: 데이터베이스가 만든다
-  - deployment_id: 심은 배포와 같다
+- the whole revision comes back
+  - id: skipped: the database generates it
+  - deployment_id: same as the deployment seeded in advance
   - revision_number = 2
-  - image_id: 심은 이미지와 같다
+  - image_id: same as the image seeded in advance
   - cluster_config = ClusterConfigInfoDTO(mode='SINGLE_NODE', size=1)
   - resource_config.resource_group_name = 'resource-group-1'
   - resource_config.resource_slots = [('cpu', Decimal('1')), ('mem', Decimal('1073741824'))]
   - resource_config.resource_opts = None
-  - model_runtime_config.runtime_variant_id: 심은 런타임 변형와 같다
+  - model_runtime_config.runtime_variant_id: same as the runtime variant seeded in advance
   - model_runtime_config.inference_runtime_config = None
   - model_runtime_config.environ = None
   - model_runtime_config.runtime_variant_preset_values = []
-  - model_mount_config.vfolder_id: 심은 모델 폴더와 같다
+  - model_mount_config.vfolder_id: same as the model vfolder seeded in advance
   - model_mount_config.mount_destination = '/models'
   - model_mount_config.definition_path = ''
   - model_mount_config.subpath = None
   - model_definition = ModelDefinitionInfoDTO(models=[ModelConfigInfoDTO(name='served', model_path='/models', service=None, metadata=None)])
-  - created_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
   - extra_mounts = []
   - revision_preset_id = None
 
@@ -1212,58 +2657,58 @@ Then
 
 #### [the-superadmin-adds-a-revision-to-anothers-deployment-without-a-grant](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
-배포에도 자기 모델 폴더에도 권한을 받지 않은 슈퍼관리자가 남의 배포에 리비전을 더하면, 리비전이 더해진다. 역할이 배포 권한과 폴더 권한을 함께 지나간다
+when a superadmin holding no grant on the deployment or on their own model vfolder adds a revision to another user's deployment, the revision is added; the role passes through both the deployment permission and the vfolder permission
 
 Given
 
-- 다른 사람이 만든 배포 하나와, 배포에도 자기 모델 폴더에도 권한을 받지 않은 슈퍼관리자
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 theirs-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+- one deployment another user created and a superadmin with permission on neither the deployment nor their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+  - Prepare one user in the domain
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Deployment theirs-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
 
 When
 
-- DeploymentAdapter.add_revision: user-1이 theirs-1에 리비전을 더함
+- DeploymentAdapter.add_revision: user-1 adds a revision to theirs-1
 
 Then
 
-- 리비전 전체가 온다
-  - id: 무시함: 데이터베이스가 만든다
-  - deployment_id: 심은 배포와 같다
+- the whole revision comes back
+  - id: skipped: the database generates it
+  - deployment_id: same as the deployment seeded in advance
   - revision_number = 1
-  - image_id: 심은 이미지와 같다
+  - image_id: same as the image seeded in advance
   - cluster_config = ClusterConfigInfoDTO(mode='SINGLE_NODE', size=1)
   - resource_config.resource_group_name = 'resource-group-1'
   - resource_config.resource_slots = [('cpu', Decimal('1')), ('mem', Decimal('1073741824'))]
   - resource_config.resource_opts = None
-  - model_runtime_config.runtime_variant_id: 심은 런타임 변형와 같다
+  - model_runtime_config.runtime_variant_id: same as the runtime variant seeded in advance
   - model_runtime_config.inference_runtime_config = None
   - model_runtime_config.environ = None
   - model_runtime_config.runtime_variant_preset_values = []
-  - model_mount_config.vfolder_id: 심은 모델 폴더와 같다
+  - model_mount_config.vfolder_id: same as the model vfolder seeded in advance
   - model_mount_config.mount_destination = '/models'
   - model_mount_config.definition_path = ''
   - model_mount_config.subpath = None
   - model_definition = ModelDefinitionInfoDTO(models=[ModelConfigInfoDTO(name='served', model_path='/models', service=None, metadata=None)])
-  - created_at: 이 실행이 쓴 시각
+  - created_at: the time this run wrote
   - extra_mounts = []
   - revision_preset_id = None
 
@@ -1271,304 +2716,373 @@ Then
 
 #### [a-model-folder-the-caller-may-not-read-is-not-found](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
-배포 생성 권한은 받았지만 모델 폴더를 읽을 권한이 없는 사용자가 그 폴더로 리비전을 더하면, 폴더를 찾을 수 없다는 이유로 거부된다
+when a user granted create on the deployment but not read on the model vfolder adds a revision with that vfolder, the call is rejected because the vfolder is not found
 
 Given
 
-- 리비전 0개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 권한이 없는 배포에 CREATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 CREATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+- one deployment holding 0 revisions and a user granted CREATE on deployments who has no permission to read their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted CREATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: CREATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
 
 When
 
-- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함
+- DeploymentAdapter.add_revision: user-1 adds a revision to deployment-1
 
 Then
 
-- 거부된다
-  - 거부: VFolderNotFound
+- the call is rejected
+  - rejected: VFolderNotFound
 
 <a id="adding_revisions-a-mount-beyond-what-the-caller-holds-on-the-folder-is-refused"></a>
 
 #### [a-mount-beyond-what-the-caller-holds-on-the-folder-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
-남의 모델 폴더를 읽기 전용으로 빌린 사용자가 읽고 쓰기로 마운트하는 리비전을 더하면, 폴더 권한을 넘는다는 이유로 거부된다
+when a user who borrowed another user's model vfolder as read-only adds a revision that mounts it read-write, the call is rejected because it exceeds the vfolder permission
 
 Given
 
-- 리비전 0개가 딸린 배포 하나와, 남의 모델 폴더를 읽기 전용으로 빌린 배포에 CREATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 CREATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다, 남에게는 ro로 마운트된다
-    - 폴더 공유 제안 share-1: READ 권한으로 제안되고, 아직 답하지 않았다
-    - 폴더 공유 제안 share-1: 받는 사람이 받아들임
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+- one deployment holding 0 revisions and a user granted CREATE on deployments borrowing another user's model vfolder as read-only
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted CREATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: CREATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare one user in the domain
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-2: has their own keypair and personal project
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use, is mounted for others as ro
+    - vfolder share offer share-1: offered under the READ permission, not answered yet
+    - vfolder share offer share-1: the recipient accepts it
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
 
 When
 
-- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함
+- DeploymentAdapter.add_revision: user-1 adds a revision to deployment-1
 
 Then
 
-- 거부된다
-  - 거부: VFolderPermissionError
+- the call is rejected
+  - rejected: VFolderPermissionError
 
 <a id="adding_revisions-a-revision-missing-a-required-slot-is-refused"></a>
 
 #### [a-revision-missing-a-required-slot-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
-모든 리비전이 채워야 하는 슬롯이 정해져 있고 그 슬롯을 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다
+when a slot every revision must fill is set and a revision is added without it, the call is rejected because the input is wrong
 
 Given
 
-- 리비전 0개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 배포에 CREATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 CREATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 모든 리비전이 반드시 채워야 한다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+- one deployment holding 0 revisions and a user granted CREATE on deployments who can read their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted CREATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: CREATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: every revision must fill it
+    - Resource slot type mem: a revision may leave it unfilled
 
 When
 
-- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함
+- DeploymentAdapter.add_revision: user-1 adds a revision to deployment-1
 
 Then
 
-- 거부된다
-  - 거부: InvalidAPIParameters
+- the call is rejected
+  - rejected: InvalidAPIParameters
 
 <a id="adding_revisions-a-revision-with-no-image-from-any-layer-is-refused"></a>
 
 #### [a-revision-with-no-image-from-any-layer-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
-프리셋 없이 이미지를 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다
+adding a revision without an image and without a preset is rejected because the input is wrong
 
 Given
 
-- 리비전 0개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 배포에 CREATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 CREATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+- one deployment holding 0 revisions and a user granted CREATE on deployments who can read their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted CREATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: CREATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
 
 When
 
-- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함 (이미지 없이)
+- DeploymentAdapter.add_revision: user-1 adds a revision to deployment-1 without the image
 
 Then
 
-- 거부된다
-  - 거부: InvalidAPIParameters
+- the call is rejected
+  - rejected: InvalidAPIParameters
 
 <a id="adding_revisions-a-revision-with-no-model-definition-from-any-layer-is-refused"></a>
 
 #### [a-revision-with-no-model-definition-from-any-layer-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
-폴더 파일을 읽지 않는 런타임 변형으로 프리셋 없이 모델 정의를 빼고 리비전을 더하면, 이름 없는 모델이 모델 정의 검증에서 거부된다
+adding a revision with a runtime variant that does not read vfolder files, without a model definition and without a preset, is rejected in model definition validation because a model has no name
 
 Given
 
-- 리비전 0개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 배포에 CREATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 CREATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+- one deployment holding 0 revisions and a user granted CREATE on deployments who can read their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted CREATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: CREATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
 
 When
 
-- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함 (모델 정의 없이)
+- DeploymentAdapter.add_revision: user-1 adds a revision to deployment-1 without the model definition
 
 Then
 
-- 거부된다
-  - 거부: BackendAISchemaValidationFailed
+- the call is rejected
+  - rejected: BackendAISchemaValidationFailed
 
 <a id="adding_revisions-a-revision-with-no-runtime-variant-from-any-layer-is-refused"></a>
 
 #### [a-revision-with-no-runtime-variant-from-any-layer-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
-프리셋 없이 런타임 변형을 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다
+adding a revision without a runtime variant and without a preset is rejected because the input is wrong
 
 Given
 
-- 리비전 0개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 배포에 CREATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 CREATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+- one deployment holding 0 revisions and a user granted CREATE on deployments who can read their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted CREATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: CREATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
 
 When
 
-- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함 (런타임 변형 없이)
+- DeploymentAdapter.add_revision: user-1 adds a revision to deployment-1 without the runtime variant
 
 Then
 
-- 거부된다
-  - 거부: InvalidAPIParameters
+- the call is rejected
+  - rejected: InvalidAPIParameters
 
 <a id="adding_revisions-a-user-granted-only-read-may-not-add-a-revision"></a>
 
 #### [a-user-granted-only-read-may-not-add-a-revision](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
-배포 읽기 권한만 받은 사용자가 리비전을 더하면, 권한 부족으로 거부된다
+when a user granted only read on the deployment adds a revision, the call is rejected for lack of permission
 
 Given
 
-- 리비전 0개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 배포에 READ 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
+- one deployment holding 0 revisions and a user granted READ on deployments who can read their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
 
 When
 
-- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함
+- DeploymentAdapter.add_revision: user-1 adds a revision to deployment-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### bulk_delete_access_tokens
+
+<a id="retiring_access_tokens-a-user-granted-deployment-purge-purges-tokens-at-once"></a>
+
+#### [a-user-granted-deployment-purge-purges-tokens-at-once](/tests/scenario/bai_scenario/manager/deployment/test_retiring_access_tokens.py): pass
+
+when a user granted deployment purge purges several access tokens the deployment holds at once, the ids of those tokens come back
+
+Given
+
+- one deployment holding 2 access tokens, and a user granted the HARD_DELETE permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted HARD_DELETE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: HARD_DELETE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.bulk_delete_access_tokens: user-1 purges 2 tokens at once
+
+Then
+
+- the ids of the purged tokens come back
+  - ids count = 2
+  - ids[0]: same as the id of the token seeded in advance
+  - ids[1]: same as the id of the token seeded in advance
+
+<a id="retiring_access_tokens-a-user-granted-nothing-purges-no-token-at-once"></a>
+
+#### [a-user-granted-nothing-purges-no-token-at-once](/tests/scenario/bai_scenario/manager/deployment/test_retiring_access_tokens.py): pass
+
+when a user granted nothing tries to purge several access tokens the deployment holds at once, nothing is purged and the id list comes back empty
+
+Given
+
+- one deployment holding 2 access tokens, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.bulk_delete_access_tokens: user-1 purges 2 tokens at once
+
+Then
+
+- nothing is purged and the id list comes back empty
+  - ids = []
 
 ### create
 
@@ -1576,48 +3090,48 @@ Then
 
 #### [a-deployment-made-without-a-name-is-named-after-its-maker](/tests/scenario/bai_scenario/manager/deployment/test_creating.py): pass
 
-이름을 대지 않고 배포를 만들면, 만든 사람에게서 이름이 지어진다
+creating a deployment without a name names it after the user who created it
 
 Given
 
-- 배포를 놓을 수 있는 프로젝트와, 배포에 CREATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 CREATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+- a project that can hold deployments and one user granted CREATE on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted CREATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: CREATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
 
 When
 
-- DeploymentAdapter.create: user-1이 team-1에 이름 없이 배포를 만듦
+- DeploymentAdapter.create: user-1 creates a deployment without a name in team-1
 
 Then
 
-- 만든 배포 전체가 온다
-  - id: 무시함: 데이터베이스가 만든다
-  - metadata.project_id: 심은 프로젝트와 같다
+- the whole deployment just created comes back
+  - id: skipped: the database generates it
+  - metadata.project_id: same as the project seeded in advance
   - metadata.domain_name = 'home-1'
-  - metadata.name: 만든 사람에게서 지어진 이름
+  - metadata.name: the name given after its maker
   - metadata.status = <ModelDeploymentStatus.PENDING: 'PENDING'>
   - metadata.tags = []
   - metadata.resource_group_name = 'resource-group-1'
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.updated_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
+  - metadata.updated_at: the time this run wrote
   - network_access.endpoint_url = None
   - network_access.preferred_domain_name = None
   - network_access.open_to_public = False
   - replica_state.desired_replica_count = 1
   - replica_state.replica_ids = []
   - default_deployment_strategy.type = <DeploymentStrategy.ROLLING: 'ROLLING'>
-  - created_user_id: 만든 사람와 같다
-  - options: 리소스 그룹의 기본값와 같다
+  - created_user_id: same as the user who created it
+  - options: same as the resource group defaults
   - scaling_state = <ScalingState.STABLE: 'stable'>
   - current_revision_id = None
   - deploying_revision_id = None
@@ -1627,48 +3141,48 @@ Then
 
 #### [a-user-granted-create-in-a-project-makes-a-deployment-there](/tests/scenario/bai_scenario/manager/deployment/test_creating.py): pass
 
-프로젝트에서 배포 생성 권한을 받은 사용자가 배포를 만들면, 그 프로젝트에 속하고 부른 사람이 소유하는 배포가 리비전 없이 만들어진다
+when a user granted create in a project creates a deployment, a deployment that belongs to the project and is owned by the requesting user is created with no revision
 
 Given
 
-- 배포를 놓을 수 있는 프로젝트와, 배포에 CREATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 CREATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+- a project that can hold deployments and one user granted CREATE on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted CREATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: CREATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
 
 When
 
-- DeploymentAdapter.create: user-1이 team-1에 serving 배포를 만듦
+- DeploymentAdapter.create: user-1 creates a deployment named serving in team-1
 
 Then
 
-- 만든 배포 전체가 온다
-  - id: 무시함: 데이터베이스가 만든다
-  - metadata.project_id: 심은 프로젝트와 같다
+- the whole deployment just created comes back
+  - id: skipped: the database generates it
+  - metadata.project_id: same as the project seeded in advance
   - metadata.domain_name = 'home-1'
   - metadata.name = 'serving'
   - metadata.status = <ModelDeploymentStatus.PENDING: 'PENDING'>
   - metadata.tags = []
   - metadata.resource_group_name = 'resource-group-1'
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.updated_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
+  - metadata.updated_at: the time this run wrote
   - network_access.endpoint_url = None
   - network_access.preferred_domain_name = None
   - network_access.open_to_public = False
   - replica_state.desired_replica_count = 2
   - replica_state.replica_ids = []
   - default_deployment_strategy.type = <DeploymentStrategy.ROLLING: 'ROLLING'>
-  - created_user_id: 만든 사람와 같다
-  - options: 리소스 그룹의 기본값와 같다
+  - created_user_id: same as the user who created it
+  - options: same as the resource group defaults
   - scaling_state = <ScalingState.STABLE: 'stable'>
   - current_revision_id = None
   - deploying_revision_id = None
@@ -1678,45 +3192,45 @@ Then
 
 #### [turning-enforcement-off-lets-a-user-create-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_creating.py): pass
 
-엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 배포를 만든다. 이 문은 역할이 아니라 권한 그래프가 지키기 때문이다
+turning entity permission enforcement off lets a user with no grant create a deployment, because the permission graph checks this operation, not the role
 
 Given
 
-- 배포를 놓을 수 있는 프로젝트와, 아무 배포 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- a project that can hold deployments and one user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
 
 When
 
-- DeploymentAdapter.create: user-1이 team-1에 serving 배포를 만듦
+- DeploymentAdapter.create: user-1 creates a deployment named serving in team-1
 
 Then
 
-- 만든 배포 전체가 온다
-  - id: 무시함: 데이터베이스가 만든다
-  - metadata.project_id: 심은 프로젝트와 같다
+- the whole deployment just created comes back
+  - id: skipped: the database generates it
+  - metadata.project_id: same as the project seeded in advance
   - metadata.domain_name = 'home-1'
   - metadata.name = 'serving'
   - metadata.status = <ModelDeploymentStatus.PENDING: 'PENDING'>
   - metadata.tags = []
   - metadata.resource_group_name = 'resource-group-1'
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.updated_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
+  - metadata.updated_at: the time this run wrote
   - network_access.endpoint_url = None
   - network_access.preferred_domain_name = None
   - network_access.open_to_public = False
   - replica_state.desired_replica_count = 1
   - replica_state.replica_ids = []
   - default_deployment_strategy.type = <DeploymentStrategy.ROLLING: 'ROLLING'>
-  - created_user_id: 만든 사람와 같다
-  - options: 리소스 그룹의 기본값와 같다
+  - created_user_id: same as the user who created it
+  - options: same as the resource group defaults
   - scaling_state = <ScalingState.STABLE: 'stable'>
   - current_revision_id = None
   - deploying_revision_id = None
@@ -1726,61 +3240,177 @@ Then
 
 #### [a-create-grant-in-another-project-does-not-reach-this-one](/tests/scenario/bai_scenario/manager/deployment/test_creating.py): pass
 
-생성 권한을 받은 프로젝트가 아닌 다른 프로젝트에 배포를 만들면, 권한 부족으로 거부된다
+creating a deployment in a project other than the one where the create grant was given is rejected for lack of permission
 
 Given
 
-- 배포를 놓을 프로젝트와, 다른 프로젝트에서 배포에 CREATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 프로젝트 other-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 CREATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 CREATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+- a project to hold the deployment and one user granted CREATE on deployments in another project
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Project other-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted CREATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: CREATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
 
 When
 
-- DeploymentAdapter.create: user-1이 team-1에 serving 배포를 만듦
+- DeploymentAdapter.create: user-1 creates a deployment named serving in team-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="creating-a-user-granted-nothing-may-not-create-a-deployment"></a>
 
 #### [a-user-granted-nothing-may-not-create-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_creating.py): pass
 
-아무 배포 권한도 받지 않은 사용자가 배포를 만들면, 권한 부족으로 거부된다
+when a user granted no deployment permission creates a deployment, the call is rejected for lack of permission
 
 Given
 
-- 배포를 놓을 수 있는 프로젝트와, 아무 배포 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+- a project that can hold deployments and one user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
 
 When
 
-- DeploymentAdapter.create: user-1이 team-1에 serving 배포를 만듦
+- DeploymentAdapter.create: user-1 creates a deployment named serving in team-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### create_access_token
+
+<a id="creating_access_tokens-a-user-granted-deployment-create-makes-no-token"></a>
+
+#### [a-user-granted-deployment-create-makes-no-token](/tests/scenario/bai_scenario/manager/deployment/test_creating_access_tokens.py): pass
+
+when a user granted deployment create tries to make an access token of the deployment, the create is rejected because the deployment's scaling group has no proxy target configured
+
+Given
+
+- one deployment holding 2 access tokens, and a user granted the CREATE permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted CREATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: CREATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.create_access_token: user-1 makes one access token of the deployment
+
+Then
+
+- the call is rejected
+  - rejected: InvalidAPIParameters
+
+### create_rule
+
+<a id="creating_rules-a-user-granted-deployment-create-makes-a-rule"></a>
+
+#### [a-user-granted-deployment-create-makes-a-rule](/tests/scenario/bai_scenario/manager/deployment/test_creating_rules.py): pass
+
+when a user granted deployment create makes an auto-scaling rule of the deployment, the rule made comes back
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user granted the CREATE permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted CREATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: CREATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.create_rule: user-1 makes one auto-scaling rule of the deployment
+
+Then
+
+- the whole rule made comes back
+  - id: skipped: the database generates it
+  - field_id: skipped: the database generates it
+  - deployment_id: same as the id of the deployment the rule scales
+  - metric_source = 'KERNEL'
+  - metric_name = 'made-rule'
+  - min_threshold = None
+  - max_threshold = None
+  - step_size = 1
+  - time_window = 60
+  - min_replicas = None
+  - max_replicas = None
+  - prometheus_query_preset_id = None
+  - created_at: the time this run wrote
+  - last_triggered_at = None
+
+<a id="creating_rules-a-user-granted-nothing-makes-no-rule"></a>
+
+#### [a-user-granted-nothing-makes-no-rule](/tests/scenario/bai_scenario/manager/deployment/test_creating_rules.py): pass
+
+when a user granted nothing tries to make an auto-scaling rule of the deployment, the create is rejected because the user lacks permission
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.create_rule: user-1 makes one auto-scaling rule of the deployment
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### delete
 
@@ -1788,127 +3418,127 @@ Then
 
 #### [a-user-granted-soft-delete-retires-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_retiring.py): pass
 
-soft-delete 권한을 받은 사용자가 배포를 지우면, 그 배포를 지우기 시작했다고 답한다
+when a user granted soft-delete deletes a deployment, the response says the deployment's deletion has started
 
 Given
 
-- 이미 있는 배포 하나와, 배포에 SOFT_DELETE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 SOFT_DELETE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 SOFT_DELETE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user granted SOFT_DELETE on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted SOFT_DELETE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: SOFT_DELETE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.delete: user-1이 deployment-1를 지움
+- DeploymentAdapter.delete: user-1 deletes deployment-1
 
 Then
 
-- 지우기 시작한 배포를 답한다
-  - id: 심은 배포와 같다
+- the response carries the deployment whose deletion has started
+  - id: same as the deployment seeded in advance
 
 <a id="retiring-the-superadmin-retires-anothers-deployment-without-a-grant"></a>
 
 #### [the-superadmin-retires-anothers-deployment-without-a-grant](/tests/scenario/bai_scenario/manager/deployment/test_retiring.py): pass
 
-다른 사람이 만든 배포를 아무 권한도 받지 않은 슈퍼관리자가 지우면, 그 배포를 지우기 시작했다고 답한다. 역할이 권한 그래프를 지나간다
+when a superadmin holding no grant deletes another user's deployment, the response says the deployment's deletion has started; the role passes through the permission graph
 
 Given
 
-- 다른 사람이 만든 배포 하나와, 아무 배포 권한도 받지 않은 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 theirs-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one deployment another user created and one superadmin with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+  - Prepare one user in the domain
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Deployment theirs-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.delete: user-1이 theirs-1를 지움
+- DeploymentAdapter.delete: user-1 deletes theirs-1
 
 Then
 
-- 지우기 시작한 배포를 답한다
-  - id: 심은 배포와 같다
+- the response carries the deployment whose deletion has started
+  - id: same as the deployment seeded in advance
 
 <a id="retiring-a-user-granted-only-update-may-not-retire-a-deployment"></a>
 
 #### [a-user-granted-only-update-may-not-retire-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_retiring.py): pass
 
-수정 권한만 받고 soft-delete 권한은 받지 않은 사용자가 배포를 지우면, 권한 부족으로 거부된다. 지우기는 수정과 다른 문이다
+when a user granted only update and not soft-delete deletes a deployment, the call is rejected for lack of permission; deletion is a different operation from update
 
 Given
 
-- 이미 있는 배포 하나와, 배포에 UPDATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user granted UPDATE on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.delete: user-1이 deployment-1를 지움
+- DeploymentAdapter.delete: user-1 deletes deployment-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="retiring-retiring-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
 #### [retiring-an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/deployment/test_retiring.py): pass
 
-슈퍼관리자가 아무것도 갖지 않은 id를 지우면, 대상이 없다는 것으로 거부된다
+when a superadmin deletes an id nothing answers to, the call is rejected as not found
 
 Given
 
-- 이미 있는 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.delete: user-1이 아무것도 갖지 않은 id를 지움
+- DeploymentAdapter.delete: user-1 deletes an id nothing answers to
 
 Then
 
-- 거부된다
-  - 거부: EndpointNotFound
+- the call is rejected
+  - rejected: EndpointNotFound
 
 ### get
 
@@ -1916,49 +3546,49 @@ Then
 
 #### [a-user-granted-read-reads-a-deployment-by-id](/tests/scenario/bai_scenario/manager/deployment/test_reading.py): pass
 
-배포 하나가 있고 읽기 권한을 받은 사용자가 id로 조회하면, 그 배포가 답으로 온다
+when a deployment exists and a user granted read reads it by id, that deployment comes back in the response
 
 Given
 
-- 이미 있는 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user granted READ on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.get: user-1이 deployment-1로 조회
+- DeploymentAdapter.get: user-1 reads deployment-1
 
 Then
 
-- 심은 배포 전체가 온다
-  - id: 심은 배포와 같다
-  - metadata.project_id: 심은 프로젝트와 같다
+- the whole deployment seeded in advance comes back
+  - id: same as the deployment seeded in advance
+  - metadata.project_id: same as the project seeded in advance
   - metadata.domain_name = 'home-1'
   - metadata.name = 'deployment-1'
   - metadata.status = <ModelDeploymentStatus.PENDING: 'PENDING'>
   - metadata.tags = []
   - metadata.resource_group_name = 'resource-group-1'
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.updated_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
+  - metadata.updated_at: the time this run wrote
   - network_access.endpoint_url = None
   - network_access.preferred_domain_name = None
   - network_access.open_to_public = False
   - replica_state.desired_replica_count = 1
   - replica_state.replica_ids = []
   - default_deployment_strategy.type = <DeploymentStrategy.ROLLING: 'ROLLING'>
-  - created_user_id: 심은 배포를 가진 사람와 같다
-  - options: 심은 배포의 옵션와 같다
+  - created_user_id: same as the user holding the seeded deployment
+  - options: same as the options of the deployment seeded in advance
   - scaling_state = <ScalingState.STABLE: 'stable'>
   - current_revision_id = None
   - deploying_revision_id = None
@@ -1968,50 +3598,50 @@ Then
 
 #### [the-superadmin-reads-anothers-deployment-without-a-grant](/tests/scenario/bai_scenario/manager/deployment/test_reading.py): pass
 
-다른 사람이 만든 배포를 아무 권한도 받지 않은 슈퍼관리자가 id로 조회하면, 그 배포가 답으로 온다. 역할이 권한 그래프를 지나간다
+when a superadmin holding no grant reads another user's deployment by id, that deployment comes back in the response; the role passes through the permission graph
 
 Given
 
-- 다른 사람이 만든 배포 하나와, 아무 배포 권한도 받지 않은 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 theirs-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one deployment another user created and one superadmin with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+  - Prepare one user in the domain
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Deployment theirs-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.get: user-1이 theirs-1로 조회
+- DeploymentAdapter.get: user-1 reads theirs-1
 
 Then
 
-- 심은 배포 전체가 온다
-  - id: 심은 배포와 같다
-  - metadata.project_id: 심은 프로젝트와 같다
+- the whole deployment seeded in advance comes back
+  - id: same as the deployment seeded in advance
+  - metadata.project_id: same as the project seeded in advance
   - metadata.domain_name = 'home-1'
   - metadata.name = 'theirs-1'
   - metadata.status = <ModelDeploymentStatus.PENDING: 'PENDING'>
   - metadata.tags = []
   - metadata.resource_group_name = 'resource-group-1'
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.updated_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
+  - metadata.updated_at: the time this run wrote
   - network_access.endpoint_url = None
   - network_access.preferred_domain_name = None
   - network_access.open_to_public = False
   - replica_state.desired_replica_count = 1
   - replica_state.replica_ids = []
   - default_deployment_strategy.type = <DeploymentStrategy.ROLLING: 'ROLLING'>
-  - created_user_id: 심은 배포를 가진 사람와 같다
-  - options: 심은 배포의 옵션와 같다
+  - created_user_id: same as the user holding the seeded deployment
+  - options: same as the options of the deployment seeded in advance
   - scaling_state = <ScalingState.STABLE: 'stable'>
   - current_revision_id = None
   - deploying_revision_id = None
@@ -2021,91 +3651,243 @@ Then
 
 #### [a-user-granted-nothing-may-not-read-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_reading.py): pass
 
-같은 배포가 있고 아무 권한도 받지 않은 사용자가 조회하면, 권한 부족으로 거부된다
+when the same deployment exists and a user with no grant reads it, the call is rejected for lack of permission
 
 Given
 
-- 이미 있는 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.get: user-1이 deployment-1로 조회
+- DeploymentAdapter.get: user-1 reads deployment-1
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
 #### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/deployment/test_reading.py): pass
 
-슈퍼관리자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것으로 거부된다. 권한 검사를 지나가는 사람만 이 답을 본다
+when a superadmin reads by an id nothing answers to, the call is rejected as not found; only someone who passes the permission check sees this response
 
 Given
 
-- 이미 있는 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.get: user-1이 아무것도 갖지 않은 id로 조회
+- DeploymentAdapter.get: user-1 reads by an id nothing answers to
 
 Then
 
-- 거부된다
-  - 거부: EndpointNotFound
+- the call is rejected
+  - rejected: EndpointNotFound
 
 <a id="reading-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user"></a>
 
 #### [an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user](/tests/scenario/bai_scenario/manager/deployment/test_reading.py): pass
 
-읽기 권한을 받은 사용자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것이 아니라 권한 부족으로 거부된다. 없는 행에는 걸린 권한도 없기 때문이다
+when a user granted read reads by an id nothing answers to, the call is rejected for lack of permission rather than as not found, because no permission is held on a row that does not exist
 
 Given
 
-- 이미 있는 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user granted READ on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.get: user-1이 아무것도 갖지 않은 id로 조회
+- DeploymentAdapter.get: user-1 reads by an id nothing answers to
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### get_policy
+
+<a id="reading_policy-a-user-granted-deployment-read-reads-the-policy"></a>
+
+#### [a-user-granted-deployment-read-reads-the-policy](/tests/scenario/bai_scenario/manager/deployment/test_reading_policy.py): pass
+
+when a user granted deployment read reads the policy the deployment holds, that policy comes back
+
+Given
+
+- one deployment holding one policy, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment policy
+
+When
+
+- DeploymentAdapter.get_policy: user-1 reads the policy the deployment holds
+
+Then
+
+- the policy the deployment holds comes back whole
+  - id: same as the id of the policy seeded in advance
+  - field_id: same as the id of the policy seeded in advance
+  - deployment_id: same as the id of the deployment the policy sets
+  - strategy_spec.strategy: same as the strategy of the policy seeded in advance
+  - strategy_spec.max_surge = IntOrPercent(count=1, percent=None)
+  - strategy_spec.max_unavailable = IntOrPercent(count=0, percent=None)
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+
+<a id="reading_policy-a-user-granted-nothing-reads-no-policy"></a>
+
+#### [a-user-granted-nothing-reads-no-policy](/tests/scenario/bai_scenario/manager/deployment/test_reading_policy.py): pass
+
+when a user granted nothing tries to read the policy the deployment holds, the read is rejected because the user lacks permission
+
+Given
+
+- one deployment holding one policy, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment policy
+
+When
+
+- DeploymentAdapter.get_policy: user-1 reads the policy the deployment holds
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+### get_rule
+
+<a id="reading_rules-a-user-granted-deployment-read-reads-a-rule"></a>
+
+#### [a-user-granted-deployment-read-reads-a-rule](/tests/scenario/bai_scenario/manager/deployment/test_reading_rules.py): pass
+
+when a user granted deployment read reads one of the rules seeded in advance by id, that rule comes back
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user granted the READ permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.get_rule: user-1 reads one of the rules seeded in advance by id
+
+Then
+
+- the whole rule read comes back
+  - id: same as the id of the rule seeded in advance
+  - field_id: same as the id of the rule seeded in advance
+  - deployment_id: same as the id of the deployment the rule scales
+  - metric_source = 'KERNEL'
+  - metric_name = 'cpu_util'
+  - min_threshold = None
+  - max_threshold = None
+  - step_size = 1
+  - time_window = 60
+  - min_replicas = None
+  - max_replicas = None
+  - prometheus_query_preset_id = None
+  - created_at: the time this run wrote
+  - last_triggered_at = None
+
+<a id="reading_rules-a-user-granted-nothing-reads-no-rule"></a>
+
+#### [a-user-granted-nothing-reads-no-rule](/tests/scenario/bai_scenario/manager/deployment/test_reading_rules.py): pass
+
+when a user granted nothing tries to read one of the rules seeded in advance by id, the lookup that finds the deployment holding the rule is rejected
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.get_rule: user-1 reads one of the rules seeded in advance by id
+
+Then
+
+- the call is rejected
+  - rejected: GenericBadRequest
 
 ### partial_bulk_purge_access_tokens
 
@@ -2113,76 +3895,76 @@ Then
 
 #### [a-user-granted-nothing-purges-none-of-several-tokens](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_access_tokens.py): pass
 
-아무 권한도 받지 않은 사용자가 토큰 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user with no grant tries to purge several deployment tokens at once, nothing is purged and every token comes back in the failed list because the user lacks permission
 
 Given
 
-- 접근 토큰 2개가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 deployment-1: 접근 토큰 하나를 갖는다
-  - 배포 deployment-1: 접근 토큰 하나를 갖는다
+- one deployment holding 2 access tokens, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
 
 When
 
-- DeploymentAdapter.partial_bulk_purge_access_tokens: user-1이 토큰 2개를 한 번에 purge 함
+- DeploymentAdapter.partial_bulk_purge_access_tokens: user-1 purges 2 deployment tokens at once
 
 Then
 
-- 처리된 토큰 없이 토큰이 모두 실패 목록에 온다
+- no token is processed and every token comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 심은 토큰의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 심은 토큰의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the token seeded in advance
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the token seeded in advance
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_access_tokens-purging-several-tokens-answers-for-the-missing-one"></a>
 
 #### [purging-several-tokens-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_access_tokens.py): pass
 
-배포 영구 삭제 권한을 받은 사용자가 토큰 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+when a user granted deployment purge purges two deployment tokens and one unknown id at once, the two come back in the processed list and the unknown id comes back in the failed list because no target answers to it
 
 Given
 
-- 접근 토큰 2개가 걸린 배포 하나와, 배포에 HARD_DELETE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 HARD_DELETE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 HARD_DELETE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 deployment-1: 접근 토큰 하나를 갖는다
-  - 배포 deployment-1: 접근 토큰 하나를 갖는다
+- one deployment holding 2 access tokens, and a user granted the HARD_DELETE permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted HARD_DELETE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: HARD_DELETE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
 
 When
 
-- DeploymentAdapter.partial_bulk_purge_access_tokens: user-1이 토큰 2개 와 없는 id 하나를 한 번에 purge 함
+- DeploymentAdapter.partial_bulk_purge_access_tokens: user-1 purges 2 deployment tokens and one unknown id at once
 
 Then
 
-- 토큰이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+- every token comes back in the processed list, and the missing id comes back in the failed list with a reason that it does not exist
   - successes count = 2
-  - successes[0].id: 심은 토큰의 id와 같다
-  - successes[1].id: 심은 토큰의 id와 같다
+  - successes[0].id: same as the id of the token seeded in advance
+  - successes[1].id: same as the id of the token seeded in advance
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 'not found'를 담은 이유
+  - failed[0].id: same as the nonexistent id sent in the request
+  - failed[0].message: a reason containing 'not found'
 
 ### partial_bulk_purge_rules
 
@@ -2190,117 +3972,117 @@ Then
 
 #### [a-deployment-editor-purges-none-of-several-rules](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py): pass
 
-배포 수정 권한만 받은 사용자가 규칙 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user granted only deployment update tries to purge several auto-scaling rules at once, nothing is purged and every rule comes back in the failed list because the user lacks permission
 
 Given
 
-- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 배포에 UPDATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
-  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
+- one deployment holding 2 auto-scaling rules, and a user granted the UPDATE permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
 
 When
 
-- DeploymentAdapter.partial_bulk_purge_rules: user-1이 규칙 2개를 한 번에 purge 함
+- DeploymentAdapter.partial_bulk_purge_rules: user-1 purges 2 auto-scaling rules at once
 
 Then
 
-- 처리된 규칙 없이 규칙이 모두 실패 목록에 온다
+- no rule is processed and every rule comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 심은 규칙의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 심은 규칙의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the rule seeded in advance
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the rule seeded in advance
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_auto_scaling_rules-a-user-granted-nothing-purges-none-of-several-rules"></a>
 
 #### [a-user-granted-nothing-purges-none-of-several-rules](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py): pass
 
-아무 권한도 받지 않은 사용자가 규칙 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user with no grant tries to purge several auto-scaling rules at once, nothing is purged and every rule comes back in the failed list because the user lacks permission
 
 Given
 
-- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
-  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
+- one deployment holding 2 auto-scaling rules, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
 
 When
 
-- DeploymentAdapter.partial_bulk_purge_rules: user-1이 규칙 2개를 한 번에 purge 함
+- DeploymentAdapter.partial_bulk_purge_rules: user-1 purges 2 auto-scaling rules at once
 
 Then
 
-- 처리된 규칙 없이 규칙이 모두 실패 목록에 온다
+- no rule is processed and every rule comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 심은 규칙의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 심은 규칙의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the rule seeded in advance
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the rule seeded in advance
+  - failed[1].message: a reason containing 'Insufficient permission'
 
 <a id="partial_bulk_auto_scaling_rules-purging-several-rules-answers-for-the-missing-one"></a>
 
 #### [purging-several-rules-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py): pass
 
-배포 영구 삭제 권한을 받은 사용자가 규칙 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+when a user granted deployment purge purges two auto-scaling rules and one unknown id at once, the two come back as they were before the purge and the unknown id comes back in the failed list because no target answers to it
 
 Given
 
-- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 배포에 HARD_DELETE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 HARD_DELETE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 HARD_DELETE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
-  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
+- one deployment holding 2 auto-scaling rules, and a user granted the HARD_DELETE permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted HARD_DELETE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: HARD_DELETE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
 
 When
 
-- DeploymentAdapter.partial_bulk_purge_rules: user-1이 규칙 2개 와 없는 id 하나를 한 번에 purge 함
+- DeploymentAdapter.partial_bulk_purge_rules: user-1 purges 2 auto-scaling rules and one unknown id at once
 
 Then
 
-- 규칙이 모두 지표 이름 'cpu_util'으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+- every rule comes back with metric name 'cpu_util', and the missing id comes back in the failed list with a reason that it does not exist
   - successes count = 2
-  - successes[0].id: 심은 규칙의 id와 같다
+  - successes[0].id: same as the id of the rule seeded in advance
   - successes[0].metric_name = 'cpu_util'
-  - successes[1].id: 심은 규칙의 id와 같다
+  - successes[1].id: same as the id of the rule seeded in advance
   - successes[1].metric_name = 'cpu_util'
   - failed count = 1
-  - failed[0].id: 요청에 넣은 없는 id와 같다
-  - failed[0].message: 'not found'를 담은 이유
+  - failed[0].id: same as the nonexistent id sent in the request
+  - failed[0].message: a reason containing 'not found'
 
 ### partial_bulk_update_rules
 
@@ -2308,38 +4090,38 @@ Then
 
 #### [a-deployment-editor-edits-several-rules-at-once](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py): pass
 
-배포 수정 권한을 받은 사용자가 규칙 여럿의 지표 이름을 한 번에 바꾸면, 모두 새 이름으로 오고 실패한 것은 없다
+when a user granted deployment update changes the metric name of several auto-scaling rules at once, every rule comes back with the new name and nothing failed
 
 Given
 
-- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 배포에 UPDATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
-  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
+- one deployment holding 2 auto-scaling rules, and a user granted the UPDATE permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
 
 When
 
-- DeploymentAdapter.partial_bulk_update_rules: user-1이 규칙 2개의 지표 이름을 한 번에 고침
+- DeploymentAdapter.partial_bulk_update_rules: user-1 changes the metric name of 2 auto-scaling rules at once
 
 Then
 
-- 규칙이 모두 지표 이름 'memory_util'으로 오고, 실패한 것은 없다
+- every rule comes back with metric name 'memory_util', and none failed
   - successes count = 2
-  - successes[0].id: 심은 규칙의 id와 같다
+  - successes[0].id: same as the id of the rule seeded in advance
   - successes[0].metric_name = 'memory_util'
-  - successes[1].id: 심은 규칙의 id와 같다
+  - successes[1].id: same as the id of the rule seeded in advance
   - successes[1].metric_name = 'memory_util'
   - failed = []
 
@@ -2347,37 +4129,175 @@ Then
 
 #### [a-user-granted-nothing-edits-none-of-several-rules](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py): pass
 
-아무 권한도 받지 않은 사용자가 규칙 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
+when a user with no grant tries to update several auto-scaling rules at once, nothing is updated and every rule comes back in the failed list because the user lacks permission
 
 Given
 
-- 자동 스케일링 규칙 2개가 걸린 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
-  - 배포 deployment-1: 자동 스케일링 규칙 하나를 갖는다
+- one deployment holding 2 auto-scaling rules, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
 
 When
 
-- DeploymentAdapter.partial_bulk_update_rules: user-1이 규칙 2개의 지표 이름을 한 번에 고침
+- DeploymentAdapter.partial_bulk_update_rules: user-1 changes the metric name of 2 auto-scaling rules at once
 
 Then
 
-- 처리된 규칙 없이 규칙이 모두 실패 목록에 온다
+- no rule is processed and every rule comes back in the failed list
   - successes = []
   - failed count = 2
-  - failed[0].id: 심은 규칙의 id와 같다
-  - failed[0].message: 'Insufficient permission'를 담은 이유
-  - failed[1].id: 심은 규칙의 id와 같다
-  - failed[1].message: 'Insufficient permission'를 담은 이유
+  - failed[0].id: same as the id of the rule seeded in advance
+  - failed[0].message: a reason containing 'Insufficient permission'
+  - failed[1].id: same as the id of the rule seeded in advance
+  - failed[1].message: a reason containing 'Insufficient permission'
+
+### purge_access_token
+
+<a id="retiring_access_tokens-a-user-granted-deployment-purge-purges-a-token"></a>
+
+#### [a-user-granted-deployment-purge-purges-a-token](/tests/scenario/bai_scenario/manager/deployment/test_retiring_access_tokens.py): pass
+
+when a user granted deployment read and purge purges one of the access tokens the deployment holds, the id of that token comes back. The purge reads the deployment first, so read is also required
+
+Given
+
+- one deployment holding 2 access tokens, and a user granted the READ, HARD_DELETE permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ, HARD_DELETE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - Role deployment-user-1: HARD_DELETE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.purge_access_token: user-1 purges one of the tokens seeded in advance
+
+Then
+
+- the id of the purged token comes back
+  - id: same as the id of the token seeded in advance
+  - field_id: same as the id of the token seeded in advance
+
+<a id="retiring_access_tokens-a-user-granted-nothing-purges-no-token"></a>
+
+#### [a-user-granted-nothing-purges-no-token](/tests/scenario/bai_scenario/manager/deployment/test_retiring_access_tokens.py): pass
+
+when a user granted nothing tries to purge one of the access tokens the deployment holds, the lookup that finds the deployment holding the token is rejected
+
+Given
+
+- one deployment holding 2 access tokens, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one deployment token
+  - Deployment deployment-1: has one deployment token
+
+When
+
+- DeploymentAdapter.purge_access_token: user-1 purges one of the tokens seeded in advance
+
+Then
+
+- the call is rejected
+  - rejected: GenericBadRequest
+
+### purge_rule
+
+<a id="retiring_rules-a-user-granted-deployment-purge-purges-a-rule"></a>
+
+#### [a-user-granted-deployment-purge-purges-a-rule](/tests/scenario/bai_scenario/manager/deployment/test_retiring_rules.py): pass
+
+when a user granted deployment read and purge purges one of the auto-scaling rules the deployment holds, the id of that rule comes back. The purge reads the deployment first, so read is also required
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user granted the READ, HARD_DELETE permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ, HARD_DELETE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - Role deployment-user-1: HARD_DELETE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.purge_rule: user-1 purges one of the rules seeded in advance
+
+Then
+
+- the id of the purged rule comes back
+  - id: same as the id of the rule seeded in advance
+  - field_id: same as the id of the rule seeded in advance
+
+<a id="retiring_rules-a-user-granted-nothing-purges-no-rule"></a>
+
+#### [a-user-granted-nothing-purges-no-rule](/tests/scenario/bai_scenario/manager/deployment/test_retiring_rules.py): pass
+
+when a user granted nothing tries to purge one of the auto-scaling rules the deployment holds, the lookup that finds the deployment holding the rule is rejected
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.purge_rule: user-1 purges one of the rules seeded in advance
+
+Then
+
+- the call is rejected
+  - rejected: GenericBadRequest
 
 ### replace_options
 
@@ -2385,33 +4305,33 @@ Then
 
 #### [a-user-granted-update-replaces-the-options-whole](/tests/scenario/bai_scenario/manager/deployment/test_options.py): pass
 
-수정 권한을 받은 사용자가 기본값과 처리기별 설정을 담아 옵션을 갈아끼우면, 준 것이 통째로 새 옵션이 되고 답은 그 옵션만 싣는다
+when a user granted update replaces the options with the defaults and per-handler settings, what was given becomes the new options as a whole and the response carries only those options
 
 Given
 
-- 이미 있는 배포 하나와, 배포에 UPDATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user granted UPDATE on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.replace_options: user-1이 deployment-1의 옵션을 처리기별 설정 check-replica-deployments을 담아 갈아끼움
+- DeploymentAdapter.replace_options: user-1 replaces the options of deployment-1 with the per-handler settings check-replica-deployments
 
 Then
 
-- 갈아끼운 옵션만 온다
-  - deployment_id: 심은 배포와 같다
+- only the replaced options come back
+  - deployment_id: same as the deployment seeded in advance
   - options.handler_options.default.timeout_sec = 600
   - options.handler_options.default.max_retry_count = 3
   - options.handler_options.by_handler = [('check-replica-deployments', None, 1)]
@@ -2421,33 +4341,33 @@ Then
 
 #### [replacing-with-a-strict-policy-keeps-it-strict](/tests/scenario/bai_scenario/manager/deployment/test_options.py): pass
 
-선택 정책을 STRICT로 담아 옵션을 갈아끼우면, 새 옵션의 선택 정책이 STRICT다
+replacing the options with the selection policy STRICT keeps that policy on the new options
 
 Given
 
-- 이미 있는 배포 하나와, 배포에 UPDATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user granted UPDATE on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.replace_options: user-1이 deployment-1의 옵션을 선택 정책 strict와 기본값만 담아 갈아끼움
+- DeploymentAdapter.replace_options: user-1 replaces the options of deployment-1 with the selection policy strict and only the defaults
 
 Then
 
-- 갈아끼운 옵션만 온다
-  - deployment_id: 심은 배포와 같다
+- only the replaced options come back
+  - deployment_id: same as the deployment seeded in advance
   - options.handler_options.default.timeout_sec = 600
   - options.handler_options.default.max_retry_count = 3
   - options.handler_options.by_handler = []
@@ -2457,33 +4377,33 @@ Then
 
 #### [replacing-with-no-handler-entry-drops-the-inherited-ones](/tests/scenario/bai_scenario/manager/deployment/test_options.py): pass
 
-물려받은 처리기별 설정이 있는 배포에 기본값만 담아 옵션을 갈아끼우면, 물려받은 설정이 하나도 남지 않는다
+replacing the options of a deployment that holds inherited per-handler settings with only the defaults leaves none of the inherited settings
 
 Given
 
-- 이미 있는 배포 하나와, 배포에 UPDATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user granted UPDATE on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.replace_options: user-1이 deployment-1의 옵션을 기본값만 담아 갈아끼움
+- DeploymentAdapter.replace_options: user-1 replaces the options of deployment-1 with only the defaults
 
 Then
 
-- 갈아끼운 옵션만 온다
-  - deployment_id: 심은 배포와 같다
+- only the replaced options come back
+  - deployment_id: same as the deployment seeded in advance
   - options.handler_options.default.timeout_sec = 600
   - options.handler_options.default.max_retry_count = 3
   - options.handler_options.by_handler = []
@@ -2493,33 +4413,33 @@ Then
 
 #### [replacing-without-a-policy-keeps-the-stored-one](/tests/scenario/bai_scenario/manager/deployment/test_options.py): pass
 
-선택 정책이 STRICT인 배포에 선택 정책을 빼고 옵션을 갈아끼우면, 선택 정책은 STRICT로 남는다
+replacing the options of a deployment whose selection policy is STRICT without a policy keeps it STRICT
 
 Given
 
-- 이미 있는 배포 하나와, 배포에 UPDATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다, 선택 정책이 strict다
+- one existing deployment and one user granted UPDATE on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet, the selection policy is strict
 
 When
 
-- DeploymentAdapter.replace_options: user-1이 deployment-1의 옵션을 기본값만 담아 갈아끼움
+- DeploymentAdapter.replace_options: user-1 replaces the options of deployment-1 with only the defaults
 
 Then
 
-- 갈아끼운 옵션만 온다
-  - deployment_id: 심은 배포와 같다
+- only the replaced options come back
+  - deployment_id: same as the deployment seeded in advance
   - options.handler_options.default.timeout_sec = 600
   - options.handler_options.default.max_retry_count = 3
   - options.handler_options.by_handler = []
@@ -2529,97 +4449,97 @@ Then
 
 #### [a-user-granted-only-read-may-not-replace-the-options](/tests/scenario/bai_scenario/manager/deployment/test_options.py): pass
 
-읽기 권한만 받은 사용자가 옵션을 갈아끼우면, 권한 부족으로 거부된다
+when a user granted only read replaces the options, the call is rejected for lack of permission
 
 Given
 
-- 이미 있는 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user granted READ on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.replace_options: user-1이 deployment-1의 옵션을 처리기별 설정 check-replica-deployments을 담아 갈아끼움
+- DeploymentAdapter.replace_options: user-1 replaces the options of deployment-1 with the per-handler settings check-replica-deployments
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="options-naming-a-handler-twice-is-refused"></a>
 
 #### [naming-a-handler-twice-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_options.py): pass
 
-같은 처리기 이름을 두 번 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다
+replacing the options with the same handler name twice is rejected because the input is wrong
 
 Given
 
-- 이미 있는 배포 하나와, 배포에 UPDATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user granted UPDATE on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.replace_options: user-1이 deployment-1의 옵션을 처리기별 설정 check-replica-deployments, check-replica-deployments을 담아 갈아끼움
+- DeploymentAdapter.replace_options: user-1 replaces the options of deployment-1 with the per-handler settings check-replica-deployments, check-replica-deployments
 
 Then
 
-- 거부된다
-  - 거부: InvalidAPIParameters
+- the call is rejected
+  - rejected: InvalidAPIParameters
 
 <a id="options-naming-an-unregistered-handler-is-refused"></a>
 
 #### [naming-an-unregistered-handler-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_options.py): pass
 
-등록되지 않은 처리기 이름을 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다
+replacing the options with an unregistered handler name is rejected because the input is wrong
 
 Given
 
-- 이미 있는 배포 하나와, 배포에 UPDATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user granted UPDATE on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.replace_options: user-1이 deployment-1의 옵션을 처리기별 설정 no-such-handler을 담아 갈아끼움
+- DeploymentAdapter.replace_options: user-1 replaces the options of deployment-1 with the per-handler settings no-such-handler
 
 Then
 
-- 거부된다
-  - 거부: InvalidAPIParameters
+- the call is rejected
+  - rejected: InvalidAPIParameters
 
 ### search_revision_resource_slots
 
@@ -2627,44 +4547,44 @@ Then
 
 #### [a-user-granted-read-counts-every-slot-a-revision-allocates](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py): pass
 
-슬롯 둘을 잡은 리비전이 딸린 배포에 읽기 권한을 받은 사용자가 그 리비전의 슬롯을 훑으면, 둘을 모두 센다
+when a user granted read on a deployment holding a revision that allocates two slots searches that revision's slots, both are counted
 
 Given
 
-- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 배포에 READ 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
-  - 배포 deployment-1: 리비전 하나를 갖는다
+- one deployment holding 1 revisions and a user granted READ on deployments who can read their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
 
 When
 
-- DeploymentAdapter.search_revision_resource_slots: user-1이 deployment-1의 첫 리비전의 슬롯을 조회
+- DeploymentAdapter.search_revision_resource_slots: user-1 searches the slots allocated by the first revision of deployment-1
 
 Then
 
-- 리비전이 잡은 슬롯이 모두 세어진다
+- every slot a revision holds is counted
   - items = [('cpu', Decimal('1')), ('mem', Decimal('1073741824'))]
   - total_count = 2
   - has_next_page = False
@@ -2674,42 +4594,42 @@ Then
 
 #### [a-user-granted-nothing-may-not-search-a-revisions-slots](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py): pass
 
-아무 배포 권한도 받지 않은 사용자가 배포의 리비전의 슬롯을 훑으면, 리비전을 찾을 수 없다는 답으로 거부된다
+when a user with no deployment grant searches a deployment revision's slots, the call is rejected with a response that the revision is not found
 
 Given
 
-- 리비전 1개가 딸린 배포 하나와, 자기 모델 폴더를 읽을 수 있는 아무 배포 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 리비전이 딛는 이미지, 모델 폴더, 런타임 변형, 자원 슬롯 타입 준비
-    - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-    - 이미지 image-1: x86_64 이미지
-    - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
-    - 폴더 읽기 권한 부여
-      - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-      - 역할 folder-reader-1: vfolder 전체에 READ 허용
-      - 일반 사용자 user-1: 역할 folder-reader-1 보유
-    - 런타임 변형 runtime-1: 기본 모델 정의가 비어 있고, 모델 폴더의 설정 파일을 읽지 않는다
-    - 자원 슬롯 타입 cpu: 리비전이 채우지 않아도 된다
-    - 자원 슬롯 타입 mem: 리비전이 채우지 않아도 된다
-  - 배포 deployment-1: 리비전 하나를 갖는다
+- one deployment holding 1 revisions and a user with no deployment permission who can read their own model vfolder
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
 
 When
 
-- DeploymentAdapter.search_revision_resource_slots: user-1이 deployment-1의 첫 리비전의 슬롯을 조회
+- DeploymentAdapter.search_revision_resource_slots: user-1 searches the slots allocated by the first revision of deployment-1
 
 Then
 
-- 거부된다
-  - 거부: GenericBadRequest
+- the call is rejected
+  - rejected: GenericBadRequest
 
 ### sync_replicas
 
@@ -2717,65 +4637,65 @@ Then
 
 #### [a-user-granted-update-starts-syncing-the-replicas](/tests/scenario/bai_scenario/manager/deployment/test_syncing.py): pass
 
-수정 권한을 받은 사용자가 복제 맞추기를 요청하면, 맞추기를 시작했다고 답한다
+when a user granted update asks to sync the replicas, the response says syncing has started
 
 Given
 
-- 이미 있는 배포 하나와, 배포에 UPDATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 2개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user granted UPDATE on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 2, has no revision yet
 
 When
 
-- DeploymentAdapter.sync_replicas: user-1이 deployment-1의 복제 맞추기를 요청
+- DeploymentAdapter.sync_replicas: user-1 asks deployment-1 to sync its replicas
 
 Then
 
-- 맞추기를 시작했다고 답한다
+- the response says syncing the replicas has started
   - success = True
 
 <a id="syncing-a-user-granted-only-read-may-not-sync-the-replicas"></a>
 
 #### [a-user-granted-only-read-may-not-sync-the-replicas](/tests/scenario/bai_scenario/manager/deployment/test_syncing.py): pass
 
-읽기 권한만 받은 사용자가 복제 맞추기를 요청하면, 권한 부족으로 거부된다
+when a user granted only read asks to sync the replicas, the call is rejected for lack of permission
 
 Given
 
-- 이미 있는 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user granted READ on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.sync_replicas: user-1이 deployment-1의 복제 맞추기를 요청
+- DeploymentAdapter.sync_replicas: user-1 asks deployment-1 to sync its replicas
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 ### update
 
@@ -2783,49 +4703,49 @@ Then
 
 #### [a-user-granted-update-opens-a-deployment-to-the-public](/tests/scenario/bai_scenario/manager/deployment/test_editing.py): pass
 
-공개가 아닌 배포를 수정 권한을 받은 사용자가 공개로 바꾸면, 공개로 바뀐 상태가 온다
+when a user granted update changes a deployment that is not public to public, the state comes back changed to public
 
 Given
 
-- 이미 있는 배포 하나와, 배포에 UPDATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user granted UPDATE on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.update: user-1이 deployment-1를 바깥에 열도록 수정
+- DeploymentAdapter.update: user-1 updates deployment-1 with opening it to the public
 
 Then
 
-- 심은 배포 전체가 온다
-  - id: 심은 배포와 같다
-  - metadata.project_id: 심은 프로젝트와 같다
+- the whole deployment seeded in advance comes back
+  - id: same as the deployment seeded in advance
+  - metadata.project_id: same as the project seeded in advance
   - metadata.domain_name = 'home-1'
   - metadata.name = 'deployment-1'
   - metadata.status = <ModelDeploymentStatus.PENDING: 'PENDING'>
   - metadata.tags = []
   - metadata.resource_group_name = 'resource-group-1'
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.updated_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
+  - metadata.updated_at: the time this run wrote
   - network_access.endpoint_url = None
   - network_access.preferred_domain_name = None
   - network_access.open_to_public = True
   - replica_state.desired_replica_count = 1
   - replica_state.replica_ids = []
   - default_deployment_strategy.type = <DeploymentStrategy.ROLLING: 'ROLLING'>
-  - created_user_id: 심은 배포를 가진 사람와 같다
-  - options: 심은 배포의 옵션와 같다
+  - created_user_id: same as the user holding the seeded deployment
+  - options: same as the options of the deployment seeded in advance
   - scaling_state = <ScalingState.STABLE: 'stable'>
   - current_revision_id = None
   - deploying_revision_id = None
@@ -2835,49 +4755,49 @@ Then
 
 #### [a-user-granted-update-raises-the-replica-count](/tests/scenario/bai_scenario/manager/deployment/test_editing.py): pass
 
-수정 권한을 받은 사용자가 복제 수를 올리면, 두려는 복제 수가 새 값이 된다
+when a user granted update raises the replica count, the intended replica count becomes the new value
 
 Given
 
-- 이미 있는 배포 하나와, 배포에 UPDATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user granted UPDATE on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.update: user-1이 deployment-1를 복제 수를 3으로 수정
+- DeploymentAdapter.update: user-1 updates deployment-1 with replica count to 3
 
 Then
 
-- 심은 배포 전체가 온다
-  - id: 심은 배포와 같다
-  - metadata.project_id: 심은 프로젝트와 같다
+- the whole deployment seeded in advance comes back
+  - id: same as the deployment seeded in advance
+  - metadata.project_id: same as the project seeded in advance
   - metadata.domain_name = 'home-1'
   - metadata.name = 'deployment-1'
   - metadata.status = <ModelDeploymentStatus.PENDING: 'PENDING'>
   - metadata.tags = []
   - metadata.resource_group_name = 'resource-group-1'
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.updated_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
+  - metadata.updated_at: the time this run wrote
   - network_access.endpoint_url = None
   - network_access.preferred_domain_name = None
   - network_access.open_to_public = False
   - replica_state.desired_replica_count = 3
   - replica_state.replica_ids = []
   - default_deployment_strategy.type = <DeploymentStrategy.ROLLING: 'ROLLING'>
-  - created_user_id: 심은 배포를 가진 사람와 같다
-  - options: 심은 배포의 옵션와 같다
+  - created_user_id: same as the user holding the seeded deployment
+  - options: same as the options of the deployment seeded in advance
   - scaling_state = <ScalingState.STABLE: 'stable'>
   - current_revision_id = None
   - deploying_revision_id = None
@@ -2887,49 +4807,49 @@ Then
 
 #### [a-user-granted-update-renames-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_editing.py): pass
 
-수정 권한을 받은 사용자가 이름을 바꾸면, 이름만 새 값이 되고 나머지는 그대로다
+when a user granted update changes the name, only the name becomes the new value and everything else stays the same
 
 Given
 
-- 이미 있는 배포 하나와, 배포에 UPDATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user granted UPDATE on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.update: user-1이 deployment-1를 이름을 renamed으로 수정
+- DeploymentAdapter.update: user-1 updates deployment-1 with name to renamed
 
 Then
 
-- 심은 배포 전체가 온다
-  - id: 심은 배포와 같다
-  - metadata.project_id: 심은 프로젝트와 같다
+- the whole deployment seeded in advance comes back
+  - id: same as the deployment seeded in advance
+  - metadata.project_id: same as the project seeded in advance
   - metadata.domain_name = 'home-1'
   - metadata.name = 'renamed'
   - metadata.status = <ModelDeploymentStatus.PENDING: 'PENDING'>
   - metadata.tags = []
   - metadata.resource_group_name = 'resource-group-1'
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.updated_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
+  - metadata.updated_at: the time this run wrote
   - network_access.endpoint_url = None
   - network_access.preferred_domain_name = None
   - network_access.open_to_public = False
   - replica_state.desired_replica_count = 1
   - replica_state.replica_ids = []
   - default_deployment_strategy.type = <DeploymentStrategy.ROLLING: 'ROLLING'>
-  - created_user_id: 심은 배포를 가진 사람와 같다
-  - options: 심은 배포의 옵션와 같다
+  - created_user_id: same as the user holding the seeded deployment
+  - options: same as the options of the deployment seeded in advance
   - scaling_state = <ScalingState.STABLE: 'stable'>
   - current_revision_id = None
   - deploying_revision_id = None
@@ -2939,49 +4859,49 @@ Then
 
 #### [clearing-the-tags-of-a-deployment-leaves-none](/tests/scenario/bai_scenario/manager/deployment/test_editing.py): pass
 
-태그가 붙은 배포의 태그를 비우면, 태그가 하나도 남지 않는다
+clearing the tags of a deployment that holds tags leaves no tag
 
 Given
 
-- 이미 있는 배포 하나와, 배포에 UPDATE 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 UPDATE 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다, keep 태그가 붙어 있다
+- one existing deployment and one user granted UPDATE on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet, tagged keep
 
 When
 
-- DeploymentAdapter.update: user-1이 deployment-1를 태그를 비우도록 수정
+- DeploymentAdapter.update: user-1 updates deployment-1 with clearing the tags
 
 Then
 
-- 심은 배포 전체가 온다
-  - id: 심은 배포와 같다
-  - metadata.project_id: 심은 프로젝트와 같다
+- the whole deployment seeded in advance comes back
+  - id: same as the deployment seeded in advance
+  - metadata.project_id: same as the project seeded in advance
   - metadata.domain_name = 'home-1'
   - metadata.name = 'deployment-1'
   - metadata.status = <ModelDeploymentStatus.PENDING: 'PENDING'>
   - metadata.tags = []
   - metadata.resource_group_name = 'resource-group-1'
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.updated_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
+  - metadata.updated_at: the time this run wrote
   - network_access.endpoint_url = None
   - network_access.preferred_domain_name = None
   - network_access.open_to_public = False
   - replica_state.desired_replica_count = 1
   - replica_state.replica_ids = []
   - default_deployment_strategy.type = <DeploymentStrategy.ROLLING: 'ROLLING'>
-  - created_user_id: 심은 배포를 가진 사람와 같다
-  - options: 심은 배포의 옵션와 같다
+  - created_user_id: same as the user holding the seeded deployment
+  - options: same as the options of the deployment seeded in advance
   - scaling_state = <ScalingState.STABLE: 'stable'>
   - current_revision_id = None
   - deploying_revision_id = None
@@ -2991,50 +4911,50 @@ Then
 
 #### [the-superadmin-renames-anothers-deployment-without-a-grant](/tests/scenario/bai_scenario/manager/deployment/test_editing.py): pass
 
-다른 사람이 만든 배포의 이름을 아무 권한도 받지 않은 슈퍼관리자가 바꾸면, 이름만 새 값이 된다. 역할이 권한 그래프를 지나간다
+when a superadmin holding no grant changes the name of a deployment another user created, only the name becomes the new value; the role passes through the permission graph
 
 Given
 
-- 다른 사람이 만든 배포 하나와, 아무 배포 권한도 받지 않은 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 theirs-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one deployment another user created and one superadmin with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+  - Prepare one user in the domain
+    - User resource policy user-policy-2: up to 10 folders per user
+    - Keypair policy keypair-policy-2: up to 5 concurrent sessions
+    - regular user user-2: has their own keypair and personal project
+  - Deployment theirs-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.update: user-1이 theirs-1를 이름을 renamed으로 수정
+- DeploymentAdapter.update: user-1 updates theirs-1 with name to renamed
 
 Then
 
-- 심은 배포 전체가 온다
-  - id: 심은 배포와 같다
-  - metadata.project_id: 심은 프로젝트와 같다
+- the whole deployment seeded in advance comes back
+  - id: same as the deployment seeded in advance
+  - metadata.project_id: same as the project seeded in advance
   - metadata.domain_name = 'home-1'
   - metadata.name = 'renamed'
   - metadata.status = <ModelDeploymentStatus.PENDING: 'PENDING'>
   - metadata.tags = []
   - metadata.resource_group_name = 'resource-group-1'
-  - metadata.created_at: 이 실행이 쓴 시각
-  - metadata.updated_at: 이 실행이 쓴 시각
+  - metadata.created_at: the time this run wrote
+  - metadata.updated_at: the time this run wrote
   - network_access.endpoint_url = None
   - network_access.preferred_domain_name = None
   - network_access.open_to_public = False
   - replica_state.desired_replica_count = 1
   - replica_state.replica_ids = []
   - default_deployment_strategy.type = <DeploymentStrategy.ROLLING: 'ROLLING'>
-  - created_user_id: 심은 배포를 가진 사람와 같다
-  - options: 심은 배포의 옵션와 같다
+  - created_user_id: same as the user holding the seeded deployment
+  - options: same as the options of the deployment seeded in advance
   - scaling_state = <ScalingState.STABLE: 'stable'>
   - current_revision_id = None
   - deploying_revision_id = None
@@ -3044,60 +4964,315 @@ Then
 
 #### [a-user-granted-only-read-may-not-update-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_editing.py): pass
 
-읽기 권한만 받은 사용자가 배포를 수정하면, 권한 부족으로 거부된다
+when a user granted only read updates a deployment, the call is rejected for lack of permission
 
 Given
 
-- 이미 있는 배포 하나와, 배포에 READ 권한을 받은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포에 READ 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 deployment-user-1: deployment 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 deployment-user-1 보유
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user granted READ on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.update: user-1이 deployment-1를 이름을 renamed으로 수정
+- DeploymentAdapter.update: user-1 updates deployment-1 with name to renamed
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- the call is rejected
+  - rejected: NotEnoughPermission
 
 <a id="editing-updating-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
 #### [updating-an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/deployment/test_editing.py): pass
 
-슈퍼관리자가 아무것도 갖지 않은 id를 수정하면, 대상이 없다는 것으로 거부된다
+when a superadmin updates an id nothing answers to, the call is rejected as not found
 
 Given
 
-- 이미 있는 배포 하나와, 아무 배포 권한도 받지 않은 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 배포 권한을 하나도 받지 않은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+- one existing deployment and one user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - superadmin user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
 
 When
 
-- DeploymentAdapter.update: user-1이 아무것도 갖지 않은 id를 이름을 renamed으로 수정
+- DeploymentAdapter.update: user-1 updates an id nothing answers to with name to renamed
 
 Then
 
-- 거부된다
-  - 거부: EndpointNotFound
+- the call is rejected
+  - rejected: EndpointNotFound
+
+### update_route_traffic
+
+<a id="editing_route_traffic-a-user-granted-deployment-update-opens-the-traffic"></a>
+
+#### [a-user-granted-deployment-update-opens-the-traffic](/tests/scenario/bai_scenario/manager/deployment/test_editing_route_traffic.py): pass
+
+when a user granted deployment read and update turns the traffic of a route on, the route with its traffic turned on comes back. The traffic change reads the deployment first, so read is also required
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user granted the READ, UPDATE permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ, UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.update_route_traffic: user-1 turns the traffic of a route of deployment-1 to active
+
+Then
+
+- the route with its traffic turned on comes back whole
+  - id: same as the id of the route seeded in advance
+  - field_id: same as the id of the route seeded in advance
+  - deployment_id: same as the id of the deployment the route serves
+  - session_id = None
+  - status = 'provisioning'
+  - health_status = 'not_checked'
+  - traffic_ratio = 1.0
+  - created_at: the time this run wrote
+  - revision_id: same as the id of the revision seeded in advance
+  - traffic_status = 'active'
+  - error_data = {}
+
+<a id="editing_route_traffic-a-user-granted-nothing-changes-no-traffic"></a>
+
+#### [a-user-granted-nothing-changes-no-traffic](/tests/scenario/bai_scenario/manager/deployment/test_editing_route_traffic.py): pass
+
+when a user granted nothing tries to turn the traffic of a route, the lookup that finds the deployment holding the route is rejected
+
+Given
+
+- one deployment holding one revision and 1 replica routes, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Prepare the image, model vfolder, runtime variant and resource slot types a revision stands on
+    - Container registry registry-1: image source
+    - Image image-1: x86_64 image
+    - Personal vfolder folder-1: is placed in that person's personal project and is ready to use
+    - Grant permission to read vfolders
+      - Role folder-reader-1: applies only within the scope it is granted in
+      - Role folder-reader-1: READ allowed on every vfolder
+      - regular user user-1: holds Role folder-reader-1
+    - Runtime variant runtime-1: the baseline model definition is empty, and it reads no config file from the model vfolder
+    - Resource slot type cpu: a revision may leave it unfilled
+    - Resource slot type mem: a revision may leave it unfilled
+  - Deployment deployment-1: has one revision
+  - Session group of a deployment deployment-session-group-1: the session group a deployment creates with its replica group
+  - Deployment deployment-1: has one replica group holding the session group
+  - Deployment deployment-1: has one replica route
+
+When
+
+- DeploymentAdapter.update_route_traffic: user-1 turns the traffic of a route of deployment-1 to active
+
+Then
+
+- the call is rejected
+  - rejected: GenericBadRequest
+
+### update_rule
+
+<a id="updating_rules-a-user-granted-deployment-update-edits-a-rule"></a>
+
+#### [a-user-granted-deployment-update-edits-a-rule](/tests/scenario/bai_scenario/manager/deployment/test_updating_rules.py): pass
+
+when a user granted deployment read and update edits one of the rules seeded in advance, the rule edited comes back. The edit reads the deployment first, so read is also required
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user granted the READ, UPDATE permission on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted READ, UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: READ allowed on every deployment
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.update_rule: user-1 edits the step size and time window of one of the rules seeded in advance
+
+Then
+
+- the whole rule edited comes back
+  - id: same as the id of the rule seeded in advance
+  - field_id: same as the id of the rule seeded in advance
+  - deployment_id: same as the id of the deployment the rule scales
+  - metric_source = 'KERNEL'
+  - metric_name = 'cpu_util'
+  - min_threshold = None
+  - max_threshold = None
+  - step_size = 2
+  - time_window = 120
+  - min_replicas = None
+  - max_replicas = None
+  - prometheus_query_preset_id = None
+  - created_at: the time this run wrote
+  - last_triggered_at = None
+
+<a id="updating_rules-a-user-granted-nothing-edits-no-rule"></a>
+
+#### [a-user-granted-nothing-edits-no-rule](/tests/scenario/bai_scenario/manager/deployment/test_updating_rules.py): pass
+
+when a user granted nothing tries to edit one of the rules seeded in advance, the lookup that finds the deployment holding the rule is rejected
+
+Given
+
+- one deployment holding 2 auto-scaling rules, and a user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+  - Deployment deployment-1: has one auto-scaling rule
+  - Deployment deployment-1: has one auto-scaling rule
+
+When
+
+- DeploymentAdapter.update_rule: user-1 edits the step size and time window of one of the rules seeded in advance
+
+Then
+
+- the call is rejected
+  - rejected: GenericBadRequest
+
+### upsert_policy
+
+<a id="upserting_policy-a-user-granted-deployment-update-puts-the-policy"></a>
+
+#### [a-user-granted-deployment-update-puts-the-policy](/tests/scenario/bai_scenario/manager/deployment/test_upserting_policy.py): pass
+
+when a user granted deployment update puts a policy on the deployment, the policy put comes back. The upsert replaces an existing policy, so the call is gated by update
+
+Given
+
+- one existing deployment and one user granted UPDATE on deployments
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user granted UPDATE on deployments
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role deployment-user-1: applies only within the scope it is granted in
+    - Role deployment-user-1: UPDATE allowed on every deployment
+    - regular user user-1: holds Role deployment-user-1
+  - Deployment deployment-1: replica count 1, has no revision yet
+
+When
+
+- DeploymentAdapter.upsert_policy: user-1 puts a rolling-update policy on the deployment
+
+Then
+
+- the whole policy put comes back
+  - id: skipped: the database generates it
+  - field_id: skipped: the database generates it
+  - deployment_id: same as the id of the deployment the policy was put on
+  - strategy_spec.strategy = <DeploymentStrategy.ROLLING: 'ROLLING'>
+  - strategy_spec.max_surge = IntOrPercent(count=None, percent=0.5)
+  - strategy_spec.max_unavailable = IntOrPercent(count=None, percent=0.0)
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+
+<a id="upserting_policy-a-user-granted-nothing-puts-no-policy"></a>
+
+#### [a-user-granted-nothing-puts-no-policy](/tests/scenario/bai_scenario/manager/deployment/test_upserting_policy.py): pass
+
+when a user granted nothing tries to put a policy on the deployment, the upsert is rejected because the user lacks permission
+
+Given
+
+- one existing deployment and one user with no deployment permission
+  - Domain home-1
+  - Project resource policy default: the personal project created along with a user looks it up by this name
+  - Project team-1
+  - Resource group resource-group-1: uses the fifo scheduler
+  - Prepare a user with no deployment permission
+    - Prepare one user in the domain
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Deployment deployment-1: replica count 1, has no revision yet
+
+When
+
+- DeploymentAdapter.upsert_policy: user-1 puts a rolling-update policy on the deployment
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
 
