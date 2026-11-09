@@ -1,7 +1,8 @@
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -21,7 +22,9 @@ from ai.backend.web.errors import UnauthenticatedError
 from ai.backend.web.server import (
     build_cors_options,
     config_toml_handler,
+    console_handler,
     extend_login_session,
+    static_handler,
     update_password_no_auth,
 )
 from ai.backend.web.template import build_template_environment
@@ -377,3 +380,56 @@ class TestConfigTomlHandler:
         assert config["general"]["hideAgents"] is False
         assert {"resources", "environments", "menu", "plugin", "wsproxy", "pipeline"} <= set(config)
         assert config["menu"]["blocklist"] == "agent"
+
+
+_VERSION_JSON = '{ "package": "26.10.0", "buildNumber": "100" }'
+
+
+class TestVersionJson:
+    @pytest.fixture
+    def app_serving_version_json(
+        self,
+        request: pytest.FixtureRequest,
+        tmp_path: Path,
+    ) -> web.Application:
+        fallback_handler: Callable[[web.Request], Awaitable[web.StreamResponse]] = request.param
+        (tmp_path / "version.json").write_text(_VERSION_JSON)
+        (tmp_path / "index.html").write_text("<html></html>")
+        app = web.Application()
+        setup_session(app, SimpleCookieStorage())
+        app["config"] = WebServerUnifiedConfig.model_validate({
+            "service": {"static-path": str(tmp_path)},
+        })
+        app["webui_index_template"] = "<html></html>"
+        app.router.add_route("POST", "/login", _login)
+        app.router.add_route("GET", "/{path:.*$}", fallback_handler)
+        return app
+
+    @pytest.mark.parametrize(
+        "app_serving_version_json",
+        [console_handler, static_handler],
+        ids=lambda handler: handler.__name__,
+        indirect=True,
+    )
+    async def test_before_login_is_not_found(
+        self, aiohttp_client: Any, app_serving_version_json: web.Application
+    ) -> None:
+        client = await aiohttp_client(app_serving_version_json)
+        resp = await client.get("/version.json")
+        assert resp.status == 404
+        assert "26.10.0" not in await resp.text()
+
+    @pytest.mark.parametrize(
+        "app_serving_version_json",
+        [console_handler, static_handler],
+        ids=lambda handler: handler.__name__,
+        indirect=True,
+    )
+    async def test_after_login_is_served(
+        self, aiohttp_client: Any, app_serving_version_json: web.Application
+    ) -> None:
+        client = await aiohttp_client(app_serving_version_json)
+        await client.post("/login")
+        resp = await client.get("/version.json")
+        assert resp.status == 200
+        assert await resp.text() == _VERSION_JSON

@@ -160,6 +160,8 @@ cache_patterns = {
 }
 _cache_patterns = {re.compile(k): v for k, v in cache_patterns.items()}
 
+_FILES_SERVED_ONLY_AFTER_LOGIN = frozenset({"version.json"})
+
 
 def apply_cache_headers(response: web.StreamResponse, path: str) -> web.StreamResponse:
     for regex, headers in _cache_patterns.items():
@@ -168,6 +170,17 @@ def apply_cache_headers(response: web.StreamResponse, path: str) -> web.StreamRe
             response.headers.update(headers)
             break
     return response
+
+
+async def _file_response_only_after_login(
+    request: web.Request, file_path: Path, request_path: str
+) -> web.StreamResponse:
+    session = await get_session(request)
+    match bool(session.get("authenticated", False)):
+        case True:
+            return apply_cache_headers(web.FileResponse(file_path), request_path)
+        case False:
+            raise StaticFileNotFoundError()
 
 
 async def static_handler(request: web.Request) -> web.StreamResponse:
@@ -184,6 +197,8 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
         ".css.map",
     )):
         raise StaticFileNotFoundError()
+    if relative_path.as_posix() in _FILES_SERVED_ONLY_AFTER_LOGIN and file_path.is_file():
+        return await _file_response_only_after_login(request, file_path, request_path)
     if file_path.is_file():
         return apply_cache_headers(web.FileResponse(file_path), request_path)
     raise StaticFileNotFoundError()
@@ -233,6 +248,8 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
         ".css.map",
     )):
         raise StaticFileNotFoundError()
+    if relative_path.as_posix() in _FILES_SERVED_ONLY_AFTER_LOGIN and file_path.is_file():
+        return await _file_response_only_after_login(request, file_path, request_path)
     index_path = (static_path / "index.html").resolve()
     if file_path.is_file() and file_path != index_path:
         return apply_cache_headers(web.FileResponse(file_path), request_path)
