@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from ai.backend.common.data.artifact.types import VerificationStepResult
+from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
@@ -246,7 +247,7 @@ class ArtifactDBSource:
             return artifact_revision_id
 
     async def mark_artifact_revision_pulling_if_unchanged(
-        self, artifact_revision_id: uuid.UUID, status_read_before: ArtifactStatus
+        self, artifact_revision_id: ArtifactRevisionID, status_read_before: ArtifactStatus
     ) -> bool:
         async with self._db.begin_session() as db_sess:
             stmt = (
